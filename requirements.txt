@@ -1,0 +1,11 @@
+Flask==3.0.3
+peewee==3.17.6
+PyMySQL==1.1.1
+psycopg2-binary==2.9.9
+requests==2.32.3
+APScheduler==3.10.4
+python-dateutil==2.9.0.post0
+pydantic==2.8.2
+email-validator==2.2.0
+
+PyJWT==2.8.0

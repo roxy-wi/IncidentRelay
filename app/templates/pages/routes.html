@@ -1,0 +1,27 @@
+<div class="grid-two">
+    <div class="card">
+        <div class="card-header"><h2 id="route-form-title">Create route</h2></div>
+        <div class="form-body">
+            <input id="route-id" type="hidden">
+            <label>Team</label><select id="route-team" class="input"></select>
+            <label>Name</label><input id="route-name" class="input" placeholder="infra-alertmanager">
+            <label>Source</label><select id="route-source" class="input"><option value="alertmanager">alertmanager</option><option value="zabbix">zabbix</option><option value="webhook">webhook</option></select>
+            <label>Rotation</label><select id="route-rotation" class="input"></select>
+            <label>Channels</label><select id="route-channels" class="input" multiple></select>
+            <div class="help-text">Select all notification channels that should receive alerts for this route.</div>
+            <label>Matchers JSON</label><textarea id="route-matchers" class="input textarea">{"labels":{"team":"infra"}}</textarea>
+            <label>Group by JSON</label><input id="route-group-by" class="input" value='["alertname","instance"]'>
+            <label><input id="route-enabled" type="checkbox" checked> Enabled</label>
+            <div class="actions"><button id="save-route" class="btn btn-primary">Save route</button><button id="reset-route-form" class="btn">Reset</button></div>
+
+            <div id="route-token-box" class="token-box" style="display:none;">
+                <strong>Route alert intake token</strong>
+                <div class="help-text">Copy this token now. It is shown only once. External systems must use this token to send alerts to this route.</div>
+                <textarea id="route-intake-token" class="input textarea" readonly></textarea>
+            </div>
+
+            <div class="help-text">Routes receive alerts. Channels only receive notifications from routes.</div>
+        </div>
+    </div>
+    <div class="card"><div class="card-header"><h2>Routes</h2><button id="reload-routes" class="btn btn-primary">Reload</button></div><div class="table-wrapper"><table class="data-table"><thead><tr><th>ID</th><th>Team</th><th>Name</th><th>Source</th><th>Rotation</th><th>Channels</th><th>Token</th><th>Enabled</th><th>Actions</th></tr></thead><tbody id="routes-table"></tbody></table></div></div>
+</div>

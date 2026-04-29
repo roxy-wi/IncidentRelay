@@ -1,0 +1,15 @@
+<div class="cards-grid">
+    <div class="card metric-card"><div class="metric-title">Firing alerts</div><div class="metric-value" id="metric-firing">0</div></div>
+    <div class="card metric-card"><div class="metric-title">Acknowledged</div><div class="metric-value" id="metric-acknowledged">0</div></div>
+    <div class="card metric-card"><div class="metric-title">Resolved</div><div class="metric-value" id="metric-resolved">0</div></div>
+    <div class="card metric-card"><div class="metric-title">Reminders</div><div class="metric-value" id="metric-reminders">0</div></div>
+</div>
+<div class="card">
+    <div class="card-header"><h2>Latest alerts</h2><button class="btn btn-primary" id="reload-dashboard">Reload</button></div>
+    <div class="table-wrapper">
+        <table class="data-table">
+            <thead><tr><th>ID</th><th>Team</th><th>Severity</th><th>Title</th><th>Status</th><th>Assignee</th><th>Created</th><th>Actions</th></tr></thead>
+            <tbody id="dashboard-alerts"></tbody>
+        </table>
+    </div>
+</div>

@@ -1,0 +1,71 @@
+<div class="grid-two">
+    <div class="card form-card">
+        <div class="card-header"><h2>Group</h2></div>
+        <div class="form-body">
+            <input id="group-id" type="hidden">
+            <label>Slug</label><input id="group-slug" class="input" placeholder="production">
+            <label>Name</label><input id="group-name" class="input" placeholder="Production">
+            <label>Description</label><input id="group-description" class="input">
+            <div class="actions">
+                <button id="save-group" type="button" class="btn btn-primary">Save group</button>
+                <button id="clear-group-form" type="button" class="btn">Clear</button>
+            </div>
+            <div class="help-text">Only admins can create groups. Users with RW role can edit groups they belong to.</div>
+        </div>
+    </div>
+
+    <div class="card form-card">
+        <div class="card-header"><h2 id="group-member-form-title">Add user to group</h2></div>
+        <div class="form-body">
+            <input id="group-membership-id" type="hidden">
+            <label>Group</label><select id="group-user-group" class="input"></select>
+            <label>User</label><select id="group-user-user" class="input"></select>
+            <label>Role</label>
+            <select id="group-user-role" class="input">
+                <option value="read_only">Read only</option>
+                <option value="rw">Read/write</option>
+            </select>
+            <label><input id="group-user-active" type="checkbox" checked> Active</label>
+            <div class="actions">
+                <button id="save-group-user" type="button" class="btn btn-primary">Save membership</button>
+                <button id="reset-group-user-form" type="button" class="btn">Reset</button>
+            </div>
+        </div>
+    </div>
+</div>
+
+<div class="grid-two">
+    <div class="card">
+        <div class="card-header">
+            <h2>Groups</h2>
+            <button id="reload-groups" type="button" class="btn btn-primary">Reload</button>
+        </div>
+        <div class="table-wrapper">
+            <table class="data-table">
+                <thead>
+                <tr><th>ID</th><th>Slug</th><th>Name</th><th>Description</th><th>Active</th><th>Actions</th></tr>
+                </thead>
+                <tbody id="groups-table"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <div>
+                <h2 id="group-members-title">Group members</h2>
+                <div class="card-subtitle">Select a group and click Members</div>
+            </div>
+        </div>
+        <div class="table-wrapper">
+            <table class="data-table">
+                <thead>
+                <tr><th>ID</th><th>User</th><th>Name</th><th>Role</th><th>Active</th><th>Actions</th></tr>
+                </thead>
+                <tbody id="group-members-table">
+                <tr><td colspan="6">No group selected</td></tr>
+                </tbody>
+            </table>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,56 @@
+<div class="grid-two">
+    <div class="card form-card">
+        <div class="card-header"><h2>Profile</h2></div>
+        <div class="form-body">
+            <label>Username</label><input id="profile-username" class="input" disabled>
+            <label>Display name</label><input id="profile-display-name" class="input">
+            <label>Email</label><input id="profile-email" class="input">
+            <label>Phone</label><input id="profile-phone" class="input">
+            <label>Telegram chat ID</label><input id="profile-telegram" class="input">
+            <label>Slack user ID</label><input id="profile-slack" class="input">
+            <label>Mattermost user ID</label><input id="profile-mattermost" class="input">
+            <button id="save-profile" type="button" class="btn btn-primary">Save profile</button>
+        </div>
+    </div>
+
+    <div class="card form-card">
+        <div class="card-header"><h2>Personal API token</h2></div>
+        <div class="form-body">
+            <label>Token name</label><input id="profile-token-name" class="input" value="personal-api-token">
+            <label>Group</label><select id="profile-token-group" class="input"></select>
+            <label>Scopes</label>
+            <select id="profile-token-scopes" class="input" multiple>
+                <option value="alerts:read" selected>alerts:read</option>
+                <option value="alerts:write">alerts:write</option>
+                <option value="resources:read">resources:read</option>
+                <option value="resources:write">resources:write</option>
+                <option value="profile:read">profile:read</option>
+                <option value="profile:write">profile:write</option>
+                <option value="*">*</option>
+            </select>
+            <label>Expires in days</label><input id="profile-token-days" class="input" type="number" value="0">
+            <button id="create-profile-token" type="button" class="btn btn-primary">Generate token</button>
+            <div class="help-text">The token is shown only once. Store it in a password manager.</div>
+            <pre id="profile-token-result" class="code-box"></pre>
+        </div>
+    </div>
+</div>
+
+<div class="card form-card">
+    <div class="card-header"><h2>Current active group</h2></div>
+    <div class="form-body">
+        <label>Active group</label>
+        <select id="profile-active-group" class="input"></select>
+        <button id="save-active-group" type="button" class="btn btn-primary">Set active group</button>
+        <div class="help-text">The active group limits list views. Select "All my groups" to see everything you can access.</div>
+    </div>
+</div>
+
+<div class="card form-card">
+    <div class="card-header"><h2>Change password</h2></div>
+    <div class="form-body">
+        <label>Old password</label><input id="profile-old-password" class="input" type="password">
+        <label>New password</label><input id="profile-new-password" class="input" type="password">
+        <button id="change-profile-password" type="button" class="btn btn-primary">Change password</button>
+    </div>
+</div>

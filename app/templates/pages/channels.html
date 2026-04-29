@@ -1,0 +1,123 @@
+<div class="grid-two">
+    <div class="card">
+        <div class="card-header">
+            <h2 id="channel-form-title">Create channel</h2>
+        </div>
+
+        <div class="form-body">
+            <input id="channel-id" type="hidden">
+
+            <label>Group</label>
+            <select id="channel-group" class="input"></select>
+
+            <label>Team</label>
+            <select id="channel-team" class="input"></select>
+
+            <label>Name</label>
+            <input id="channel-name" class="input" placeholder="infra-mattermost">
+
+            <label>Type</label>
+            <select id="channel-type" class="input"></select>
+
+            <div class="channel-config" data-channel-config="telegram">
+                <label>Telegram bot token</label>
+                <input id="cfg-telegram-bot-token" class="input" placeholder="123456:ABCDEF">
+
+                <label>Telegram chat ID</label>
+                <input id="cfg-telegram-chat-id" class="input" placeholder="-1001234567890">
+            </div>
+
+            <div class="channel-config" data-channel-config="mattermost">
+                <label>Mattermost mode</label>
+                <select id="cfg-mm-mode" class="input">
+                    <option value="bot_api">Bot API with buttons and message updates</option>
+                    <option value="webhook">Incoming webhook only</option>
+                </select>
+
+                <div id="cfg-mm-bot-fields">
+                    <label>Mattermost URL</label>
+                    <input id="cfg-mm-api-url" class="input" placeholder="https://mattermost.example.com">
+
+                    <label>Bot token</label>
+                    <input id="cfg-mm-bot-token" class="input" placeholder="Mattermost bot access token">
+
+                    <label>Channel ID</label>
+                    <input id="cfg-mm-channel-id" class="input" placeholder="Mattermost channel id">
+
+                    <label>Callback secret</label>
+                    <input id="cfg-mm-callback-secret" class="input" placeholder="optional; defaults to MATTERMOST_ACTION_SECRET">
+
+                    <div class="help-text">
+                        Bot API mode sends messages with Acknowledge and Resolve buttons. PUBLIC_BASE_URL must be reachable from Mattermost.
+                    </div>
+                </div>
+
+                <div id="cfg-mm-webhook-fields">
+                    <label>Mattermost incoming webhook URL</label>
+                    <input id="cfg-mm-webhook-url" class="input" placeholder="https://mattermost.example.com/hooks/...">
+
+                    <div class="help-text">
+                        Incoming webhook mode sends plain messages only. It cannot show action buttons or update messages after resolve.
+                    </div>
+                </div>
+            </div>
+
+            <div class="channel-config" data-channel-config="webhook">
+                <label>Webhook URL</label>
+                <input id="cfg-webhook-url" class="input" placeholder="https://...">
+            </div>
+
+            <div class="channel-config" data-channel-config="email">
+                <label>Recipients</label>
+                <input id="cfg-email-recipients" class="input" placeholder="ops@example.com,admin@example.com">
+
+                <label>SMTP host</label>
+                <input id="cfg-email-smtp-host" class="input" placeholder="smtp.example.com">
+
+                <label>SMTP port</label>
+                <input id="cfg-email-smtp-port" class="input" type="number" value="587">
+            </div>
+
+            <details>
+                <summary>Advanced JSON config</summary>
+                <textarea id="channel-config-json" class="input textarea">{}</textarea>
+            </details>
+
+            <label><input id="channel-enabled" type="checkbox" checked> Enabled</label>
+
+            <div class="actions">
+                <button id="save-channel" class="btn btn-primary">Save channel</button>
+                <button id="reset-channel-form" class="btn">Reset</button>
+            </div>
+
+            <div class="help-text">
+                Channels are notification targets only. Route intake tokens are created on the Routes page.
+            </div>
+        </div>
+    </div>
+
+    <div class="card">
+        <div class="card-header">
+            <h2>Channels</h2>
+            <button id="reload-channels" class="btn btn-primary">Reload</button>
+        </div>
+
+        <div class="table-wrapper">
+            <table class="data-table">
+                <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>Group</th>
+                    <th>Team</th>
+                    <th>Name</th>
+                    <th>Type</th>
+                    <th>Mode</th>
+                    <th>Enabled</th>
+                    <th>Actions</th>
+                </tr>
+                </thead>
+                <tbody id="channels-table"></tbody>
+            </table>
+        </div>
+    </div>
+</div>

@@ -1,0 +1,16 @@
+<div class="grid-two">
+    <div class="card">
+        <div class="card-header"><h2 id="silence-form-title">Create silence</h2></div>
+        <div class="form-body">
+            <input id="silence-id" type="hidden">
+            <label>Team</label><select id="silence-team" class="input"></select>
+            <label>Name</label><input id="silence-name" class="input" placeholder="maintenance-window">
+            <label>Reason</label><input id="silence-reason" class="input" placeholder="Maintenance">
+            <label>Starts at</label><input id="silence-starts-at" class="input" type="datetime-local">
+            <label>Ends at</label><input id="silence-ends-at" class="input" type="datetime-local">
+            <label>Matchers JSON</label><textarea id="silence-matchers" class="input textarea">{"labels":{"host":"host1"}}</textarea>
+            <div class="actions"><button id="save-silence" class="btn btn-primary">Save silence</button><button id="reset-silence-form" class="btn">Reset</button></div>
+        </div>
+    </div>
+    <div class="card"><div class="card-header"><h2>Silences</h2><button id="reload-silences" class="btn btn-primary">Reload</button></div><div class="table-wrapper"><table class="data-table"><thead><tr><th>ID</th><th>Team</th><th>Name</th><th>Reason</th><th>Start</th><th>End</th><th>Enabled</th><th>Actions</th></tr></thead><tbody id="silences-table"></tbody></table></div></div>
+</div>

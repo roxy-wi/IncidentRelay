@@ -1,0 +1,20 @@
+<div class="grid-two">
+    <div class="card">
+        <div class="card-header"><h2 id="admin-user-form-title">Create user</h2></div>
+        <div class="form-body">
+            <input id="admin-user-id" type="hidden">
+            <label>Username</label><input id="admin-user-username" class="input">
+            <label>Display name</label><input id="admin-user-display" class="input">
+            <label>Email</label><input id="admin-user-email" class="input">
+            <label>Phone</label><input id="admin-user-phone" class="input">
+            <label>Telegram chat ID</label><input id="admin-user-telegram" class="input">
+            <label>Slack user ID</label><input id="admin-user-slack" class="input">
+            <label>Mattermost user ID</label><input id="admin-user-mattermost" class="input">
+            <label>Password</label><input id="admin-user-password" class="input" type="password" placeholder="leave empty to keep current password">
+            <label><input id="admin-user-is-admin" type="checkbox"> Admin</label>
+            <label><input id="admin-user-active" type="checkbox" checked> Active</label>
+            <div class="actions"><button id="admin-save-user" class="btn btn-primary">Save user</button><button id="admin-reset-user-form" class="btn">Reset</button></div>
+        </div>
+    </div>
+    <div class="card"><div class="card-header"><h2>Users</h2><button id="reload-admin-users" class="btn btn-primary">Reload</button></div><div class="table-wrapper"><table class="data-table"><thead><tr><th>ID</th><th>Username</th><th>Email</th><th>Admin</th><th>Active</th><th>Actions</th></tr></thead><tbody id="admin-users-table"></tbody></table></div></div>
+</div>

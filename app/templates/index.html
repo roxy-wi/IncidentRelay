@@ -1,0 +1,83 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <title>IncidentRelay</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <link rel="stylesheet" href="/static/css/oncall.css">
+    <script src="/static/js/vendor/jquery-lite.js"></script>
+</head>
+<body>
+<div class="layout">
+    <aside class="sidebar">
+        <div class="brand">
+            <div class="brand-logo">IR</div>
+            <div>
+                <div class="brand-title">IncidentRelay</div>
+                <div class="brand-subtitle">Routes & on-call</div>
+            </div>
+        </div>
+        <nav class="menu">
+            <a href="/" data-page="dashboard" class="menu-link">Overview</a>
+            <a href="/alerts" data-page="alerts" class="menu-link">Alerts</a>
+            <a href="/rotations" data-page="rotations" class="menu-link">Rotations</a>
+            <a href="/calendar" data-page="calendar" class="menu-link">Calendar</a>
+            <a href="/routes" data-page="routes" class="menu-link">Routes</a>
+            <a href="/channels" data-page="channels" class="menu-link">Channels</a>
+            <a href="/silences" data-page="silences" class="menu-link">Silences</a>
+            <a href="/teams" data-page="teams" class="menu-link">Teams</a>
+            <div class="menu-section menu-link-admin">
+                <div class="menu-section-title">Administration</div>
+                <a href="/groups" data-page="groups" class="menu-link menu-sub-link">Groups</a>
+                <a href="/admin/users" data-page="admin-users" class="menu-link menu-sub-link">Users</a>
+            </div>
+            <a href="/docs" class="menu-link">Swagger</a>
+        </nav>
+    </aside>
+
+    <main class="content">
+        <header class="topbar">
+            <div>
+                <h1 id="page-title">Overview</h1>
+                <div id="page-subtitle" class="page-subtitle">Current duty and alerts</div>
+            </div>
+            <div class="topbar-actions">
+                <select id="active-group-select" class="input"></select>
+                <select id="global-team-filter" class="input"></select>
+                <button id="topbar-profile" type="button" class="btn btn-small">Profile: <span id="topbar-username">user</span></button>
+                <button id="topbar-logout" type="button" class="btn btn-small btn-danger">Logout</button>
+                <span id="service-version" class="badge badge-info">version</span>
+            </div>
+        </header>
+
+        <section class="page">
+            <div id="view-dashboard" class="view">{% include "pages/dashboard.html" %}</div>
+            <div id="view-alerts" class="view">{% include "pages/alerts.html" %}</div>
+            <div id="view-rotations" class="view">{% include "pages/rotations.html" %}</div>
+            <div id="view-calendar" class="view">{% include "pages/calendar.html" %}</div>
+            <div id="view-routes" class="view">{% include "pages/routes.html" %}</div>
+            <div id="view-channels" class="view">{% include "pages/channels.html" %}</div>
+            <div id="view-silences" class="view">{% include "pages/silences.html" %}</div>
+            <div id="view-teams" class="view">{% include "pages/teams.html" %}</div>
+            <div id="view-admin-users" class="view">{% include "pages/admin_users.html" %}</div>
+            <div id="view-groups" class="view">{% include "pages/groups.html" %}</div>
+            <div id="view-profile" class="view">{% include "pages/profile.html" %}</div>
+            <div id="view-login" class="view">{% include "pages/login.html" %}</div>
+        </section>
+    </main>
+</div>
+<script src="/static/js/common.js"></script>
+<script src="/static/js/pages/dashboard.js"></script>
+<script src="/static/js/pages/alerts.js"></script>
+<script src="/static/js/pages/rotations.js"></script>
+<script src="/static/js/pages/calendar.js"></script>
+<script src="/static/js/pages/routes.js"></script>
+<script src="/static/js/pages/channels.js"></script>
+<script src="/static/js/pages/silences.js"></script>
+<script src="/static/js/pages/teams.js"></script>
+<script src="/static/js/pages/admin_users.js"></script>
+<script src="/static/js/pages/groups.js"></script>
+<script src="/static/js/pages/profile.js"></script>
+<script src="/static/js/pages/login.js"></script>
+</body>
+</html>
