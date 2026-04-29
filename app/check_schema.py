@@ -2,8 +2,8 @@ import inspect
 import sys
 
 from app.db import init_database
-from app.models import BaseModel
-import app.models as models
+from app.modules.db.models import BaseModel
+import app.modules.db.models as models
 
 
 def model_classes():

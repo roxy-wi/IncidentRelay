@@ -1,4 +1,4 @@
-from app.models import AuditLog
+from app.modules.db.models import AuditLog
 
 
 def create_audit_log(action, object_type=None, object_id=None, group_id=None, team_id=None, user_id=None, api_token_id=None, message=None, data=None):

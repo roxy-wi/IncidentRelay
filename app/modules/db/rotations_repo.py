@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from app.models import Rotation, RotationMember, RotationOverride
+from app.modules.db.models import Rotation, RotationMember, RotationOverride
 
 
 def list_rotations(team_id=None, team_ids=None, enabled_only=False, include_deleted=False):

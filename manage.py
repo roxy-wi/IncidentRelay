@@ -4,7 +4,7 @@ from datetime import datetime, timedelta
 
 from app.db import init_database
 from app.login import hash_password
-from app.models import UserGroup
+from app.modules.db.models import UserGroup
 from app.modules.db.migrations import create_migration, list_migrations, migrate, rollback
 from app.modules.db import channels_repo, groups_repo, rotations_repo, routes_repo, teams_repo, tokens_repo, users_repo
 from app.services.auth import create_raw_token, hash_token
@@ -79,7 +79,7 @@ def create_group_if_missing(slug, name, description=None):
     Create a group if it does not exist.
     """
 
-    from app.models import Group
+    from app.modules.db.models import Group
 
     group, created = Group.get_or_create(
         slug=slug,

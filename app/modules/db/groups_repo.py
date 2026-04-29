@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from app.models import AlertRoute, Group, NotificationChannel, Rotation, Silence, Team, UserGroup
+from app.modules.db.models import AlertRoute, Group, NotificationChannel, Rotation, Silence, Team, UserGroup
 
 
 def list_groups(active_only=False, include_deleted=False):

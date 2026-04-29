@@ -61,7 +61,7 @@ body { margin: 0; background: var(--bg); color: var(--text); font-family: Arial,
 .btn { border: 0; border-radius: 8px; padding: 8px 12px; cursor: pointer; font-weight: 600; }
 .btn-primary { background: var(--primary); color: #fff; }
 .btn-primary:hover { background: var(--primary-hover); }
-.btn-small { padding: 6px 9px; font-size: 12px; }
+.btn-small { padding: 6px 9px; font-size: 12px; margin-right: 5px;}
 .btn-warning { background: var(--warning); color: #fff; }
 .btn-success { background: var(--success); color: #fff; }
 .calendar-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 10px; }

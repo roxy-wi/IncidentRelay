@@ -1,6 +1,18 @@
 # IncidentRelay
 
-IncidentRelay is a web application for on-call rotations, alert routing, acknowledgements, reminders, escalations, and notifications.
+IncidentRelay is an on-call incident routing and escalation service designed to help teams deliver alerts to the right people at the right time.
+
+It provides team schedules, routing rules, notification channels, acknowledgements, resolve workflows, and escalation logic for incident management platforms, monitoring systems, and internal SRE tools.
+
+## Key Features
+
+- On-call schedules for teams and users
+- Alert routing based on teams, routes, and channels
+- Acknowledge and resolve workflows
+- Escalation support
+- Calendar view for team schedules
+- Notification delivery through multiple channels
+- API-first design for integrations with monitoring systems
 
 It supports:
 
@@ -957,19 +969,6 @@ Expected response:
   "allowed_loggers": ["incedentrelay.audit", "incedentrelay.alerts", "incedentrelay.error"]
 }
 ```
-
-
-## Local frontend runtime
-
-The web UI does not depend on an external jQuery CDN. A small local
-jQuery-compatible helper is served from:
-
-```text
-/static/js/vendor/jquery-lite.js
-```
-
-This prevents blank pages on servers or workstations without Internet access.
-
 ## Editing memberships
 
 The web UI supports editing and disabling memberships:
@@ -995,20 +994,6 @@ active flag
 ```
 
 Disabling a membership keeps historical records intact.
-
-
-## Callback guard fix
-
-Frontend API callbacks are optional. The local frontend runtime checks callback
-types before calling them, so pages do not fail with:
-
-```text
-TypeError: callback is not a function
-```
-
-Admin users bypass group membership checks in Web UI/API views. Personal API
-tokens may still be restricted by token group scope when the token is created
-for a specific group.
 
 
 ## Schema initialization check
@@ -1067,51 +1052,6 @@ Demo data check OK.
 `python manage.py create-admin` creates or updates an administrator without group
 memberships and without active_group. If the username already existed as a
 regular user, existing group memberships are disabled.
-
-
-## Blank center page fix
-
-The UI uses local `jquery-lite.js`. Its `.show()` method sets
-`display: block`, because page containers have CSS rule:
-
-```css
-.view { display: none; }
-```
-
-If the left menu and topbar are visible but the center page is empty, hard
-refresh the browser after updating static files.
-
-
-## Routes callback fix
-
-The route page now checks callback types before calling them. This fixes:
-
-```text
-API error: TypeError: callback is not a function
-```
-
-The local frontend runtime also forces page views to `display: block`, because
-all page containers are hidden by default with `.view { display: none; }`.
-
-
-## Layout visibility fix
-
-Page visibility is handled by `.view-visible`, not by the generic `.show()`
-method. This prevents global `display: block` from changing the layout of menu,
-topbar, form, and table elements.
-
-The `Groups` page is admin-only and is shown inside the Administration menu.
-
-
-## Template layout check
-
-Run this check after changing page templates:
-
-```bash
-python app/check_templates.py
-```
-
-It validates basic HTML tag balance in `app/templates/pages/*.html`.
 
 ## Route examples
 

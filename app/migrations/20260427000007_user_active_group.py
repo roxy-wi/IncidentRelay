@@ -2,7 +2,7 @@ from peewee import IntegerField
 from playhouse.migrate import migrate
 
 from app.db import init_database
-from app.models import Group, User, UserGroup
+from app.modules.db.models import Group, User, UserGroup
 from app.modules.db.migrator import get_migrator
 
 

@@ -2,7 +2,7 @@ from peewee import BooleanField, DateTimeField
 from playhouse.migrate import migrate
 
 from app.db import init_database
-from app.models import (
+from app.modules.db.models import (
     AlertRoute,
     ApiToken,
     Group,

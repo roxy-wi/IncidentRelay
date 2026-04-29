@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from app.models import AlertRoute, NotificationChannel, Rotation, Silence, Team, TeamUser
+from app.modules.db.models import AlertRoute, NotificationChannel, Rotation, Silence, Team, TeamUser
 
 
 def list_teams(active_only=False, group_ids=None, include_deleted=False):

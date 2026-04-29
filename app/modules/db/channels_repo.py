@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from app.models import AlertRouteChannel, NotificationChannel
+from app.modules.db.models import AlertRouteChannel, NotificationChannel
 
 
 def list_channels(team_id=None, team_ids=None, enabled_only=False, include_deleted=False):

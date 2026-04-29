@@ -1,0 +1,32 @@
+[Unit]
+Description=IncidentRelay Gunicorn service
+After=network.target
+
+[Service]
+Type=simple
+
+User=www-data
+Group=www-data
+
+WorkingDirectory=/var/www/incedentrelay
+
+Environment="PYTHONUNBUFFERED=1"
+
+ExecStart=/usr/local/bin/gunicorn \
+    --workers 4 \
+    --threads 2 \
+    --timeout 120 \
+    --bind 127.0.0.1:8080 \
+    --access-logfile /var/log/incidentrelay/gun-incidentrelay.log \
+    --error-logfile /var/log/incidentrelay/gun-incidentrelay_error.log \
+    --capture-output \
+    "app:create_app()"
+
+Restart=always
+RestartSec=5
+
+KillSignal=SIGTERM
+PrivateTmp=true
+
+[Install]
+WantedBy=multi-user.target

@@ -1,7 +1,7 @@
 from datetime import datetime
 
 from app.db import init_database
-from app.models import Version
+from app.modules.db.models import Version
 from app.version import get_service_version
 
 

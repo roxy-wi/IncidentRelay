@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 
 from peewee import IntegrityError
 
-from app.models import AppLock
+from app.modules.db.models import AppLock
 
 
 def acquire_lock(name, owner, ttl_seconds):

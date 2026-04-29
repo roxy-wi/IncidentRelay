@@ -4,7 +4,7 @@ from peewee import CharField
 from playhouse.migrate import migrate
 
 from app.db import init_database
-from app.models import Version
+from app.modules.db.models import Version
 from app.modules.db.migrator import get_migrator
 from app.version import get_service_version
 

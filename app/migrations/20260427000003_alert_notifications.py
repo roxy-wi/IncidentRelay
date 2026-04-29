@@ -1,5 +1,5 @@
 from app.db import init_database
-from app.models import AlertNotification
+from app.modules.db.models import AlertNotification
 
 
 db = init_database()

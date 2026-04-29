@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from app.models import AlertNotification
+from app.modules.db.models import AlertNotification
 
 
 def get_notification(alert_id, channel_id):

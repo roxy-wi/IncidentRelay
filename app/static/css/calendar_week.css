@@ -1,0 +1,243 @@
+.calendar-card {
+    overflow: hidden;
+}
+
+.calendar-header {
+    align-items: flex-start;
+}
+
+.calendar-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: flex-end;
+    gap: 8px;
+    flex-wrap: wrap;
+}
+
+.calendar-toolbar .input {
+    width: auto;
+    min-width: 150px;
+}
+
+.calendar-body {
+    padding: 14px;
+}
+
+.calendar-legend {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-bottom: 12px;
+}
+
+.calendar-legend-item {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    color: #52616f;
+    font-size: 12px;
+}
+
+.calendar-legend-color {
+    display: inline-block;
+    width: 14px;
+    height: 14px;
+    border-radius: 3px;
+}
+
+.calendar-week-grid {
+    border: 1px solid #d8dee6;
+    border-radius: 4px;
+    overflow-x: auto;
+    background: #ffffff;
+}
+
+.calendar-row {
+    display: grid;
+    grid-template-columns: minmax(220px, 260px) repeat(7, minmax(120px, 1fr));
+    min-width: 1100px;
+}
+
+.calendar-week-header {
+    background: #f5f7fa;
+    border-bottom: 1px solid #d8dee6;
+    font-weight: 700;
+    color: #52616f;
+}
+
+.calendar-team-header,
+.calendar-day-header {
+    padding: 10px 12px;
+    border-right: 1px solid #d8dee6;
+}
+
+.calendar-day-header:last-child {
+    border-right: 0;
+}
+
+.calendar-team-row {
+    border-bottom: 1px solid #e6ebf0;
+}
+
+.calendar-team-row:last-child {
+    border-bottom: 0;
+}
+
+.calendar-team-cell {
+    min-height: 58px;
+    padding: 10px 12px;
+    border-right: 1px solid #e6ebf0;
+    background: #fbfcfd;
+}
+
+.calendar-team-link {
+    color: #0069d9;
+    font-weight: 700;
+    text-decoration: none;
+}
+
+.calendar-team-link:hover {
+    text-decoration: underline;
+}
+
+.calendar-team-subtitle {
+    margin-top: 4px;
+    color: #7b8794;
+    font-size: 12px;
+}
+
+.calendar-day-cell {
+    min-height: 58px;
+    padding: 8px;
+    border-right: 1px solid #e6ebf0;
+}
+
+.calendar-day-cell:last-child {
+    border-right: 0;
+}
+
+.calendar-month-grid {
+    border: 1px solid #d8dee6;
+    border-radius: 4px;
+    background: #ffffff;
+    overflow: hidden;
+}
+
+.calendar-month-header,
+.calendar-month-body {
+    display: grid;
+    grid-template-columns: repeat(7, minmax(120px, 1fr));
+}
+
+.calendar-month-header {
+    background: #f5f7fa;
+    border-bottom: 1px solid #d8dee6;
+}
+
+.calendar-month-weekday {
+    padding: 10px 12px;
+    border-right: 1px solid #d8dee6;
+    color: #52616f;
+    font-weight: 700;
+}
+
+.calendar-month-weekday:last-child {
+    border-right: 0;
+}
+
+.calendar-month-day-cell {
+    min-height: 120px;
+    padding: 8px;
+    border-right: 1px solid #e6ebf0;
+    border-bottom: 1px solid #e6ebf0;
+    background: #ffffff;
+}
+
+.calendar-month-day-cell:nth-child(7n) {
+    border-right: 0;
+}
+
+.calendar-day-outside-month {
+    background: #f7f9fb;
+    color: #9aa4af;
+}
+
+.calendar-month-day-number {
+    margin-bottom: 6px;
+    color: #52616f;
+    font-size: 12px;
+    font-weight: 700;
+}
+
+.calendar-assignment {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 6px;
+    min-height: 26px;
+    margin-bottom: 4px;
+    padding: 5px 7px;
+    border-radius: 3px;
+    color: #ffffff;
+    font-size: 12px;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+}
+
+.calendar-assignment:last-child {
+    margin-bottom: 0;
+}
+
+.calendar-assignment-month {
+    white-space: normal;
+}
+
+.calendar-assignment-override {
+    outline: 2px solid rgba(0, 0, 0, 0.18);
+}
+
+.calendar-assignment-user {
+    overflow: hidden;
+    text-overflow: ellipsis;
+}
+
+.calendar-assignment-badge {
+    flex: 0 0 auto;
+    padding: 2px 5px;
+    border-radius: 3px;
+    background: rgba(255, 255, 255, 0.22);
+    font-size: 10px;
+}
+
+.calendar-no-duty {
+    color: #a0a8b0;
+    text-align: center;
+    padding: 8px 0;
+}
+
+.calendar-empty {
+    padding: 16px;
+    color: #7b8794;
+}
+
+@media (max-width: 900px) {
+    .calendar-header {
+        flex-direction: column;
+    }
+
+    .calendar-toolbar {
+        justify-content: flex-start;
+        width: 100%;
+    }
+
+    .calendar-month-header,
+    .calendar-month-body {
+        min-width: 900px;
+    }
+
+    .calendar-month-grid {
+        overflow-x: auto;
+    }
+}

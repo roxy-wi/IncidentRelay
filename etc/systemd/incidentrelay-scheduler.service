@@ -1,0 +1,25 @@
+[Unit]
+Description=IncidentRelay APScheduler service
+After=network.target
+
+[Service]
+Type=simple
+
+User=www-data
+Group=www-data
+
+WorkingDirectory=/var/www/incedentrelay
+
+Environment=INCEDENTRELAY_CONFIG_FILE=/etc/incidentrelay/incidentrelay.conf
+Environment=PYTHONUNBUFFERED=1
+
+ExecStart=/usr/bin/python3 -m app.scheduler_runner
+
+Restart=always
+RestartSec=5
+
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

@@ -1,5 +1,5 @@
 from app.db import init_database
-from app.models import (
+from app.modules.db.models import (
     ApiToken,
     Alert,
     AlertEvent,

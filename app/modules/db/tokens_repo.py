@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from app.models import ApiToken
+from app.modules.db.models import ApiToken
 
 
 def create_api_token(name, token_prefix, token_hash, scopes, team_id=None, group_id=None, user_id=None, expires_at=None):

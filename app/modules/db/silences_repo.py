@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from app.models import Silence
+from app.modules.db.models import Silence
 
 
 def list_silences(team_id=None, team_ids=None, include_deleted=False):

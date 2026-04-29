@@ -5,7 +5,7 @@ from datetime import datetime
 from typing import Callable, List, Optional, Tuple
 
 from app.db import init_database
-from app.models import Migration
+from app.modules.db.models import Migration
 
 
 class MigrationError(Exception):

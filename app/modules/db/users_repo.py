@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from app.models import User, UserGroup
+from app.modules.db.models import User, UserGroup
 
 
 def list_users(active_only=False, group_ids=None, include_deleted=False):

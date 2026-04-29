@@ -2,7 +2,7 @@ from flask import Blueprint, jsonify, request
 
 from app.api.schemas.groups import GroupCreateSchema, GroupUpdateSchema, UserGroupAddSchema, UserGroupUpdateSchema
 from app.modules.db import groups_repo
-from app.models import UserGroup
+from app.modules.db.models import UserGroup
 from app.services.audit import write_audit
 from app.services.rbac import get_allowed_group_ids, require_admin_user, require_group_write
 from app.services.serializers import serialize_group, serialize_user_group

@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from app.models import AlertRoute, AlertRouteChannel, Group, Team
+from app.modules.db.models import AlertRoute, AlertRouteChannel, Group, Team
 
 
 def list_routes(team_id=None, team_ids=None, enabled_only=False, source=None, active_only=True, include_deleted=False):

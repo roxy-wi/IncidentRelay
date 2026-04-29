@@ -1,6 +1,6 @@
 from datetime import datetime, timedelta
 
-from app.models import Alert, AlertEvent
+from app.modules.db.models import Alert, AlertEvent
 
 
 def list_alerts(team_id=None, team_ids=None, status=None, source=None, severity=None, limit=300):

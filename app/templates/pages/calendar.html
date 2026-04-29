@@ -1,7 +1,27 @@
-<div class="card">
-    <div class="card-header">
-        <h2>On-call calendar</h2>
-        <div class="toolbar"><input id="calendar-start" class="input" type="date"><input id="calendar-end" class="input" type="date"><button id="reload-calendar" class="btn btn-primary">Load</button></div>
+<link rel="stylesheet" href="/static/css/calendar_week.css">
+
+<div class="card calendar-card">
+    <div class="card-header calendar-header">
+        <div>
+            <h2>On-call calendar</h2>
+            <div id="calendar-range-title" class="card-subtitle">Current week</div>
+        </div>
+
+        <div class="toolbar calendar-toolbar">
+            <button id="calendar-today" type="button" class="btn">Today</button>
+            <button id="calendar-prev" type="button" class="btn">‹</button>
+            <button id="calendar-next" type="button" class="btn">›</button>
+            <input id="calendar-start" class="input" type="date">
+            <input id="calendar-end" class="input" type="date">
+            <select id="calendar-team-filter" class="input">
+                <option value="">All teams</option>
+            </select>
+            <button id="reload-calendar" type="button" class="btn btn-primary">Load</button>
+        </div>
     </div>
-    <div class="form-body"><div id="calendar-grid" class="calendar-grid"></div></div>
+
+    <div class="calendar-body">
+        <div id="calendar-legend" class="calendar-legend"></div>
+        <div id="calendar-grid" class="calendar-week-grid"></div>
+    </div>
 </div>
