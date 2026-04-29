@@ -18,4 +18,24 @@ function loadDashboard() {
     });
 }
 
+function renderAlertRow(alert, reloadCallback) {
+    /* Render one compact alert row. */
+    const row = $("<tr>");
+    row.append($("<td>").text(alert.id));
+    row.append($("<td>").text(alert.team_slug || "-"));
+    row.append($("<td>").text(alert.severity || "-"));
+    row.append($("<td>").text(alert.title));
+    row.append($("<td>").text(alert.status).addClass("status-" + alert.status));
+    row.append($("<td>").text(alert.assignee || "-"));
+    row.append($("<td>").text(alert.first_seen_at || "-"));
+    const actions = $("<td>").addClass("actions");
+    if (alert.status === "firing") {
+        actions.append($("<button>").attr("type", "button").addClass("btn btn-warning btn-small").css('margin-right', '5px').text("Acknowledge").on("click", function () { apiPost("/api/alerts/" + alert.id + "/ack", {}, reloadCallback); }));
+    }
+    if (alert.status !== "resolved") {
+        actions.append($("<button>").attr("type", "button").addClass("btn btn-resolve btn-small").text("Resolve").on("click", function () { apiPost("/api/alerts/" + alert.id + "/resolve", {}, reloadCallback); }));
+    }
+    row.append(actions);
+    return row;
+}
 $(document).on("click", "#reload-dashboard", loadDashboard);

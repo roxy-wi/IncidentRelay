@@ -1,0 +1,33 @@
+<div id="alert-details-modal" class="modal-backdrop" style="display: none;">
+    <div class="modal-window alert-modal-window">
+        <div class="modal-header">
+            <div>
+                <h2 id="alert-details-title">Alert details</h2>
+                <div id="alert-details-subtitle" class="card-subtitle"></div>
+            </div>
+            <button id="close-alert-details" type="button" class="btn btn-small">Close</button>
+        </div>
+
+        <div class="modal-body">
+            <div id="alert-details-summary" class="details-grid"></div>
+
+            <label>Labels</label>
+            <pre id="alert-details-labels" class="code-box"></pre>
+
+            <label>Events</label>
+            <div id="alert-details-events" class="event-list"></div>
+
+            <label>Notification delivery</label>
+            <div id="alert-details-notifications" class="event-list"></div>
+
+            <label>Payload</label>
+            <pre id="alert-details-payload" class="code-box"></pre>
+        </div>
+
+        <div class="modal-footer">
+            <button id="modal-alert-ack" type="button" class="btn btn-warning btn-small">Acknowledge</button>
+            <button id="modal-alert-resolve" type="button" class="btn btn-resolve btn-small">Resolve</button>
+            <button id="close-alert-details-footer" type="button" class="btn btn-small">Close</button>
+        </div>
+    </div>
+</div>

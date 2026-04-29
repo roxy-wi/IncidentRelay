@@ -8,8 +8,10 @@
     <div class="card-header"><h2>Latest alerts</h2><button class="btn btn-primary" id="reload-dashboard">Reload</button></div>
     <div class="table-wrapper">
         <table class="data-table">
-            <thead><tr><th>ID</th><th>Team</th><th>Severity</th><th>Title</th><th>Status</th><th>Assignee</th><th>Created</th><th>Actions</th></tr></thead>
+            <thead><tr><th>ID</th><th>Team</th><th>Severity</th><th>Title</th><th>Created</th><th>Status</th><th>Assignee</th><th>Actions</th></tr></thead>
             <tbody id="dashboard-alerts"></tbody>
         </table>
     </div>
 </div>
+
+{% include 'pages/include/alerts_modal.html' %}

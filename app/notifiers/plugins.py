@@ -305,12 +305,12 @@ class MattermostNotifier(IncomingWebhookNotifier):
 
         if alert.status == "acknowledged":
             return [
-                self._button("resolve", "Resolve", "danger", action_url, alert.id, channel.id, secret),
+                self._button("resolve", "Resolve", "success", action_url, alert.id, channel.id, secret),
             ]
 
         return [
             self._button("acknowledge", "Acknowledge", "primary", action_url, alert.id, channel.id, secret),
-            self._button("resolve", "Resolve", "danger", action_url, alert.id, channel.id, secret),
+            self._button("resolve", "Resolve", "success", action_url, alert.id, channel.id, secret),
         ]
 
     def _button(self, action, name, style, action_url, alert_id, channel_id, secret):
