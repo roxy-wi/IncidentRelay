@@ -257,6 +257,7 @@ function renderDashboardAlertRow(alert) {
         $("<td>").append(
             $("<button>")
                 .attr("type", "button")
+                .attr("title", "Show alert details")
                 .addClass("overview-id-link")
                 .text("#" + alert.id)
                 .on("click", function () {
@@ -295,18 +296,6 @@ function renderDashboardAlertRow(alert) {
 
     const actionsCell = $("<td>").addClass("actions-cell");
     const actions = $("<div>").addClass("table-actions");
-
-    actions.append(
-        $("<button>")
-            .attr("type", "button")
-            .addClass("btn btn-info btn-small")
-            .text("Details")
-            .on("click", function () {
-                if (typeof showAlertDetails === "function") {
-                    showAlertDetails(alert.id);
-                }
-            })
-    );
 
     if (alert.status === "firing") {
         actions.append(

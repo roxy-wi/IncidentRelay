@@ -1,138 +1,517 @@
-<div class="grid-two">
-    <div class="card">
-        <div class="card-header"><h2 id="rotation-form-title">Create rotation</h2></div>
-        <div class="form-body">
-            <input id="rotation-id" type="hidden">
-            <label>Team</label><select id="rotation-team" class="input"></select>
-            <label>Name</label><input id="rotation-name" class="input" placeholder="infra-primary">
-            <label>Description</label><input id="rotation-description" class="input" placeholder="Primary rotation">
-            <label>Schedule starts at</label><input id="rotation-start" class="input" type="datetime-local">
+<link rel="stylesheet" href="/static/css/rotations.css">
 
-            <label>Rotation cadence</label>
-            <select id="rotation-type" class="input">
-                <option value="daily">Daily handoff</option>
-                <option value="weekly">Weekly handoff</option>
-                <option value="custom">Custom interval</option>
-            </select>
+<div class="rotations-page">
+    <div class="rotations-summary-grid">
+        <div class="rotations-summary-card rotations-summary-primary">
+            <div class="rotations-summary-icon">↻</div>
+            <div>
+                <div class="rotations-summary-title">Rotations</div>
+                <div id="rotations-summary-total" class="rotations-summary-value">0</div>
+                <div class="rotations-summary-hint">Current scope</div>
+            </div>
+        </div>
 
-            <div id="weekly-options">
-                <label>Weekly handoff day</label>
-                <select id="rotation-weekday" class="input">
-                    <option value="0">Monday</option>
-                    <option value="1">Tuesday</option>
-                    <option value="2">Wednesday</option>
-                    <option value="3">Thursday</option>
-                    <option value="4">Friday</option>
-                    <option value="5">Saturday</option>
-                    <option value="6">Sunday</option>
+        <div class="rotations-summary-card rotations-summary-success">
+            <div class="rotations-summary-icon">✓</div>
+            <div>
+                <div class="rotations-summary-title">Active</div>
+                <div id="rotations-summary-active" class="rotations-summary-value">0</div>
+                <div class="rotations-summary-hint">Enabled rotations</div>
+            </div>
+        </div>
+
+        <div class="rotations-summary-card rotations-summary-info">
+            <div class="rotations-summary-icon">👤</div>
+            <div>
+                <div class="rotations-summary-title">On call now</div>
+                <div id="rotations-summary-oncall" class="rotations-summary-value">0</div>
+                <div class="rotations-summary-hint">Assigned users</div>
+            </div>
+        </div>
+
+        <div class="rotations-summary-card rotations-summary-warning">
+            <div class="rotations-summary-icon">⏱</div>
+            <div>
+                <div class="rotations-summary-title">With reminders</div>
+                <div id="rotations-summary-reminders" class="rotations-summary-value">0</div>
+                <div class="rotations-summary-hint">Reminder configured</div>
+            </div>
+        </div>
+    </div>
+
+    <div class="rotations-layout-grid">
+        <section class="card rotations-card">
+            <div class="card-header rotations-card-header">
+                <div>
+                    <h2>Rotation management</h2>
+                    <div class="card-subtitle">
+                        Showing <span id="rotations-filtered-count">0</span>
+                        of <span id="rotations-total-count">0</span> rotations
+                    </div>
+                </div>
+                <div class="card-header-actions">
+                    <button id="open-rotation-create-modal" type="button" class="btn btn-primary btn-small">
+                        New rotation
+                    </button>
+                </div>
+                <div class="card-header-actions">
+                    <button id="reload-rotations" type="button" class="btn btn-primary btn-small">Reload</button>
+                </div>
+            </div>
+
+            <div class="rotations-toolbar">
+                <div class="rotations-search">
+                    <span class="rotations-search-icon">⌕</span>
+                    <input
+                        id="rotations-search"
+                        class="input"
+                        type="search"
+                        placeholder="Search rotations, teams, current user..."
+                        autocomplete="off"
+                    >
+                </div>
+
+                <select id="rotations-team-filter" class="input rotations-filter">
+                    <option value="">All teams</option>
+                </select>
+
+                <select id="rotations-status-filter" class="input rotations-filter">
+                    <option value="">All statuses</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
                 </select>
             </div>
 
-            <label>Handoff time</label><input id="rotation-handoff-time" class="input" type="time" value="09:00">
+            <div class="table-wrapper">
+                <table class="data-table rotations-table">
+                    <thead>
+                    <tr>
+                        <th>Rotation</th>
+                        <th>Group</th>
+                        <th>Team</th>
+                        <th>Cadence</th>
+                        <th>Current on call</th>
+                        <th>Handoff</th>
+                        <th>Reminder</th>
+                        <th>Status</th>
+                        <th class="rotations-actions-th">Actions</th>
+                    </tr>
+                    </thead>
+                    <tbody id="rotations-table"></tbody>
+                </table>
+            </div>
+        </section>
 
-            <div id="custom-interval-options" class="inline-fields">
-                <div><label>Every</label><input id="rotation-interval-value" class="input" type="number" value="1" min="1"></div>
-                <div><label>Unit</label><select id="rotation-interval-unit" class="input"><option value="minutes">minutes</option><option value="hours">hours</option><option value="days">days</option><option value="weeks">weeks</option></select></div>
+        <aside class="card rotations-details-card">
+            <div class="card-header rotations-details-header">
+                <div>
+                    <h2>Rotation details</h2>
+                    <div id="rotation-details-subtitle" class="card-subtitle">Select a rotation</div>
+                </div>
             </div>
 
-            <label>Reminder interval</label>
-            <div class="inline-fields">
-                <div><input id="rotation-reminder-value" class="input" type="number" value="5" min="1"></div>
-                <div><select id="rotation-reminder-unit" class="input"><option value="minutes">minutes</option><option value="hours">hours</option><option value="days">days</option></select></div>
+            <div id="rotation-details-body" class="rotations-details-body">
+                <div class="rotations-details-empty">
+                    Click a rotation name to see current on-call user, cadence, reminder and quick actions.
+                </div>
+            </div>
+        </aside>
+    </div>
+
+{#    <div class="rotations-bottom-grid">#}
+{#        <section class="card rotations-card">#}
+{#            <div class="card-header">#}
+{#                <div>#}
+{#                    <h2 id="rotation-members-title">Rotation members</h2>#}
+{#                    <div class="card-subtitle">Select a rotation and click Members</div>#}
+{#                </div>#}
+{#            </div>#}
+{##}
+{#            <div class="form-body rotations-inline-form">#}
+{#                <input id="rotation-member-id" type="hidden">#}
+{##}
+{#                <div>#}
+{#                    <label>Rotation</label>#}
+{#                    <select id="member-rotation" class="input"></select>#}
+{#                </div>#}
+{##}
+{#                <div>#}
+{#                    <label>User</label>#}
+{#                    <select id="member-user" class="input"></select>#}
+{#                </div>#}
+{##}
+{#                <div>#}
+{#                    <label>Position</label>#}
+{#                    <input id="member-position" class="input" value="0" type="number">#}
+{#                </div>#}
+{##}
+{#                <label class="rotations-checkbox">#}
+{#                    <input id="member-active" type="checkbox" checked>#}
+{#                    <span>Active</span>#}
+{#                </label>#}
+{##}
+{#                <div class="actions">#}
+{#                    <button id="save-rotation-member" type="button" class="btn btn-primary btn-small">Save member</button>#}
+{#                    <button id="reset-rotation-member-form" type="button" class="btn btn-small">Reset</button>#}
+{#                </div>#}
+{#            </div>#}
+{##}
+{#            <div class="table-wrapper">#}
+{#                <table class="data-table">#}
+{#                    <thead>#}
+{#                    <tr>#}
+{#                        <th>ID</th>#}
+{#                        <th>User</th>#}
+{#                        <th>Name</th>#}
+{#                        <th>Position</th>#}
+{#                        <th>Active</th>#}
+{#                        <th>Actions</th>#}
+{#                    </tr>#}
+{#                    </thead>#}
+{#                    <tbody id="rotation-members-table">#}
+{#                    <tr><td colspan="6">No rotation selected</td></tr>#}
+{#                    </tbody>#}
+{#                </table>#}
+{#            </div>#}
+{#        </section>#}
+{##}
+{#        <section class="card rotations-card">#}
+{#            <div class="card-header">#}
+{#                <div>#}
+{#                    <h2 id="overrides-title">Overrides</h2>#}
+{#                    <div class="card-subtitle">Temporarily replace the normal on-call user</div>#}
+{#                </div>#}
+{##}
+{#                <button id="reload-overrides" type="button" class="btn btn-small">Reload overrides</button>#}
+{#            </div>#}
+{##}
+{#            <div class="form-body rotations-inline-form">#}
+{#                <div>#}
+{#                    <label>Rotation</label>#}
+{#                    <select id="override-rotation" class="input"></select>#}
+{#                </div>#}
+{##}
+{#                <div>#}
+{#                    <label>User</label>#}
+{#                    <select id="override-user" class="input"></select>#}
+{#                </div>#}
+{##}
+{#                <div>#}
+{#                    <label>Starts at</label>#}
+{#                    <input id="override-starts-at" class="input" type="datetime-local">#}
+{#                </div>#}
+{##}
+{#                <div>#}
+{#                    <label>Ends at</label>#}
+{#                    <input id="override-ends-at" class="input" type="datetime-local">#}
+{#                </div>#}
+{##}
+{#                <div class="rotations-inline-wide">#}
+{#                    <label>Reason</label>#}
+{#                    <input id="override-reason" class="input" placeholder="Vacation, sick leave, manual replacement">#}
+{#                </div>#}
+{##}
+{#                <div class="actions">#}
+{#                    <button id="create-override" type="button" class="btn btn-primary btn-small">Create override</button>#}
+{#                </div>#}
+{#            </div>#}
+{##}
+{#            <div class="table-wrapper">#}
+{#                <table class="data-table">#}
+{#                    <thead>#}
+{#                    <tr>#}
+{#                        <th>ID</th>#}
+{#                        <th>User</th>#}
+{#                        <th>Starts</th>#}
+{#                        <th>Ends</th>#}
+{#                        <th>Reason</th>#}
+{#                        <th>Actions</th>#}
+{#                    </tr>#}
+{#                    </thead>#}
+{#                    <tbody id="overrides-table">#}
+{#                    <tr><td colspan="6">No rotation selected</td></tr>#}
+{#                    </tbody>#}
+{#                </table>#}
+{#            </div>#}
+{#        </section>#}
+{#    </div>#}
+    <div id="rotation-form-modal" class="rotation-modal" style="display: none;">
+    <div class="rotation-modal-dialog">
+        <div class="rotation-modal-header">
+            <div>
+                <h2 id="rotation-form-title">Create rotation</h2>
+                <div class="card-subtitle">Create or edit on-call rotation schedule</div>
             </div>
 
-            <label>Timezone</label><input id="rotation-timezone" class="input" value="UTC">
-            <label>
-              <input id="rotation-add-team-members" type="checkbox" checked>
-              Add all active team members to this rotation
-            </label>
-            <div class="actions">
-                <button id="save-rotation" type="button" class="btn btn-primary">Save rotation</button>
-                <button id="reset-rotation-form" type="button" class="btn">Reset</button>
+            <button id="close-rotation-form-modal" type="button" class="rotation-modal-close">
+                ×
+            </button>
+        </div>
+
+        <div class="rotation-modal-body">
+            <div class="form-body rotations-form-grid">
+                <input id="rotation-id" type="hidden">
+
+                <div>
+                    <label>Team</label>
+                    <select id="rotation-team" class="input"></select>
+                </div>
+
+                <div>
+                    <label>Name</label>
+                    <input id="rotation-name" class="input" placeholder="infra-primary">
+                </div>
+
+                <div class="rotations-form-wide">
+                    <label>Description</label>
+                    <input id="rotation-description" class="input" placeholder="Primary rotation">
+                </div>
+
+                <div>
+                    <label>Schedule starts at</label>
+                    <input id="rotation-start" class="input" type="datetime-local">
+                </div>
+
+                <div>
+                    <label>Rotation cadence</label>
+                    <select id="rotation-type" class="input">
+                        <option value="daily">Daily handoff</option>
+                        <option value="weekly">Weekly handoff</option>
+                        <option value="custom">Custom interval</option>
+                    </select>
+                </div>
+
+                <div id="weekly-options">
+                    <label>Weekly handoff day</label>
+                    <select id="rotation-weekday" class="input">
+                        <option value="0">Monday</option>
+                        <option value="1">Tuesday</option>
+                        <option value="2">Wednesday</option>
+                        <option value="3">Thursday</option>
+                        <option value="4">Friday</option>
+                        <option value="5">Saturday</option>
+                        <option value="6">Sunday</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label>Handoff time</label>
+                    <input id="rotation-handoff-time" class="input" type="time" value="09:00">
+                </div>
+
+                <div id="custom-interval-options" class="inline-fields rotations-form-wide">
+                    <div>
+                        <label>Every</label>
+                        <input id="rotation-interval-value" class="input" type="number" value="1" min="1">
+                    </div>
+
+                    <div>
+                        <label>Unit</label>
+                        <select id="rotation-interval-unit" class="input">
+                            <option value="minutes">minutes</option>
+                            <option value="hours">hours</option>
+                            <option value="days">days</option>
+                            <option value="weeks">weeks</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div class="inline-fields rotations-form-wide">
+                    <div>
+                        <label>Reminder interval</label>
+                        <input id="rotation-reminder-value" class="input" type="number" value="5" min="1">
+                    </div>
+
+                    <div>
+                        <label>Unit</label>
+                        <select id="rotation-reminder-unit" class="input">
+                            <option value="minutes">minutes</option>
+                            <option value="hours">hours</option>
+                            <option value="days">days</option>
+                        </select>
+                    </div>
+                </div>
+
+                <div>
+                    <label>Timezone</label>
+                    <input id="rotation-timezone" class="input" value="UTC">
+                </div>
+
+                <label class="rotations-checkbox">
+                    <input id="rotation-add-team-members" type="checkbox" checked>
+                    <span>Add all active team members to this rotation</span>
+                </label>
             </div>
         </div>
-    </div>
 
-    <div class="card">
-        <div class="card-header"><h2 id="rotation-member-form-title">Add member</h2></div>
-        <div class="form-body">
-            <input id="rotation-member-id" type="hidden">
-            <label>Rotation</label><select id="member-rotation" class="input"></select>
-            <label>User</label><select id="member-user" class="input"></select>
-            <label>Position</label><input id="member-position" class="input" value="0" type="number">
-            <label><input id="member-active" type="checkbox" checked> Active</label>
-            <div class="actions">
-                <button id="save-rotation-member" type="button" class="btn btn-primary">Save member</button>
-                <button id="reset-rotation-member-form" type="button" class="btn">Reset</button>
-            </div>
+        <div class="rotation-modal-footer">
+            <button id="reset-rotation-form" type="button" class="btn">
+                Reset
+            </button>
+
+            <button id="save-rotation" type="button" class="btn btn-primary">
+                Save rotation
+            </button>
         </div>
     </div>
-</div>
-
-<div class="card">
-    <div class="card-header"><h2>Rotations</h2><button id="reload-rotations" type="button" class="btn btn-primary">Reload</button></div>
-    <div class="table-wrapper">
-        <table class="data-table">
-            <thead>
-            <tr><th>ID</th><th>Team</th><th>Name</th><th>Current</th><th>Cadence</th><th>Handoff</th><th>Reminder</th><th>Enabled</th><th>Actions</th></tr>
-            </thead>
-            <tbody id="rotations-table"></tbody>
-        </table>
     </div>
-</div>
-
-<div class="grid-two">
-    <div class="card">
-        <div class="card-header">
+    <div id="rotation-members-modal" class="rotation-modal" style="display: none;">
+    <div class="rotation-modal-dialog rotation-modal-dialog-wide">
+        <div class="rotation-modal-header">
             <div>
                 <h2 id="rotation-members-title">Rotation members</h2>
-                <div class="card-subtitle">Select a rotation and click Members</div>
+                <div class="card-subtitle">Manage users and order for selected rotation</div>
             </div>
-        </div>
-        <div class="table-wrapper">
-            <table class="data-table">
-                <thead>
-                <tr><th>ID</th><th>User</th><th>Name</th><th>Position</th><th>Active</th><th>Actions</th></tr>
-                </thead>
-                <tbody id="rotation-members-table">
-                <tr><td colspan="6">No rotation selected</td></tr>
-                </tbody>
-            </table>
-        </div>
-    </div>
 
-    <div class="card form-card">
-        <div class="card-header"><h2>Create override</h2></div>
-        <div class="form-body">
-            <label>Rotation</label><select id="override-rotation" class="input"></select>
-            <label>User</label><select id="override-user" class="input"></select>
-            <label>Starts at</label><input id="override-starts-at" class="input" type="datetime-local">
-            <label>Ends at</label><input id="override-ends-at" class="input" type="datetime-local">
-            <label>Reason</label><input id="override-reason" class="input" placeholder="Vacation, sick leave, manual replacement">
-            <div class="actions">
-                <button id="create-override" type="button" class="btn btn-primary">Create override</button>
-                <button id="reload-overrides" type="button" class="btn">Reload overrides</button>
+            <button id="close-rotation-members-modal" type="button" class="rotation-modal-close">
+                ×
+            </button>
+        </div>
+
+        <div class="rotation-modal-body">
+            <div class="form-body rotations-inline-form">
+                <input id="rotation-member-id" type="hidden">
+
+                <div>
+                    <label>Rotation</label>
+                    <select id="member-rotation" class="input"></select>
+                </div>
+
+                <div>
+                    <label>User</label>
+                    <select id="member-user" class="input"></select>
+                </div>
+
+                <div>
+                    <label>Position</label>
+                    <input id="member-position" class="input" value="0" type="number">
+                </div>
+
+                <label class="rotations-checkbox">
+                    <input id="member-active" type="checkbox" checked>
+                    <span>Active</span>
+                </label>
+
+                <div class="actions">
+                    <button id="save-rotation-member" type="button" class="btn btn-primary btn-small">
+                        Save member
+                    </button>
+
+                    <button id="reset-rotation-member-form" type="button" class="btn btn-small">
+                        Reset
+                    </button>
+                </div>
             </div>
-            <div class="help-text">Override temporarily replaces the normal on-call user for the selected rotation and time range.</div>
+
+            <div class="table-wrapper rotations-modal-table-wrapper">
+                <table class="data-table">
+                    <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>User</th>
+                        <th>Name</th>
+                        <th>Position</th>
+                        <th>Active</th>
+                        <th>Actions</th>
+                    </tr>
+                    </thead>
+                    <tbody id="rotation-members-table">
+                    <tr>
+                        <td colspan="6">No rotation selected</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="rotation-modal-footer">
+            <button id="close-rotation-members-modal-footer" type="button" class="btn">
+                Close
+            </button>
         </div>
     </div>
 </div>
+    <div id="rotation-overrides-modal" class="rotation-modal" style="display: none;">
+    <div class="rotation-modal-dialog rotation-modal-dialog-wide">
+        <div class="rotation-modal-header">
+            <div>
+                <h2 id="overrides-title">Overrides</h2>
+                <div class="card-subtitle">Temporarily replace the normal on-call user</div>
+            </div>
 
-<div class="card">
-    <div class="card-header">
-        <div>
-            <h2 id="overrides-title">Overrides</h2>
-            <div class="card-subtitle">Select a rotation to see overrides</div>
+            <button id="close-rotation-overrides-modal" type="button" class="rotation-modal-close">
+                ×
+            </button>
+        </div>
+
+        <div class="rotation-modal-body">
+            <div class="form-body rotations-inline-form">
+                <div>
+                    <label>Rotation</label>
+                    <select id="override-rotation" class="input"></select>
+                </div>
+
+                <div>
+                    <label>User</label>
+                    <select id="override-user" class="input"></select>
+                </div>
+
+                <div>
+                    <label>Starts at</label>
+                    <input id="override-starts-at" class="input" type="datetime-local">
+                </div>
+
+                <div>
+                    <label>Ends at</label>
+                    <input id="override-ends-at" class="input" type="datetime-local">
+                </div>
+
+                <div class="rotations-inline-wide">
+                    <label>Reason</label>
+                    <input id="override-reason" class="input" placeholder="Vacation, sick leave, manual replacement">
+                </div>
+
+                <div class="actions">
+                    <button id="create-override" type="button" class="btn btn-primary btn-small">
+                        Create override
+                    </button>
+
+                    <button id="reload-overrides" type="button" class="btn btn-small">
+                        Reload
+                    </button>
+                </div>
+            </div>
+
+            <div class="help-text rotations-modal-help">
+                Override temporarily replaces the normal on-call user for the selected rotation and time range.
+            </div>
+
+            <div class="table-wrapper rotations-modal-table-wrapper">
+                <table class="data-table">
+                    <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>User</th>
+                        <th>Starts</th>
+                        <th>Ends</th>
+                        <th>Reason</th>
+                        <th>Actions</th>
+                    </tr>
+                    </thead>
+                    <tbody id="overrides-table">
+                    <tr>
+                        <td colspan="6">No rotation selected</td>
+                    </tr>
+                    </tbody>
+                </table>
+            </div>
+        </div>
+
+        <div class="rotation-modal-footer">
+            <button id="close-rotation-overrides-modal-footer" type="button" class="btn">
+                Close
+            </button>
         </div>
     </div>
-    <div class="table-wrapper">
-        <table class="data-table">
-            <thead>
-            <tr><th>ID</th><th>User</th><th>Starts</th><th>Ends</th><th>Reason</th><th>Actions</th></tr>
-            </thead>
-            <tbody id="overrides-table">
-            <tr><td colspan="6">No rotation selected</td></tr>
-            </tbody>
-        </table>
-    </div>
+</div>
 </div>

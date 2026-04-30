@@ -2,6 +2,9 @@ let currentDetailsAlertId = null;
 let alertsCache = [];
 let alertsAutoRefreshTimer = null;
 
+let alertsCurrentPage = 1;
+let alertsPageSize = 25;
+
 function alertsAsArray(value) {
     /*
      * Return value as array.
@@ -286,11 +289,85 @@ function renderAlertsPage() {
      * Render all alert page widgets from cached API response.
      */
     const filteredAlerts = getFilteredAlerts();
+    const pagination = getAlertsPagination(filteredAlerts);
 
-    // renderAlertsSummary(alertsCache, filteredAlerts);
     renderAlertsSummaryGrid("#alerts-alerts-summary", alertsCache);
+    renderAlertsInboxCounter(alertsCache, filteredAlerts, pagination);
     renderActiveAlertFilters(filteredAlerts);
-    renderAlertsTable(filteredAlerts);
+    renderAlertsTable(pagination.items);
+    renderAlertsPagination(pagination);
+}
+
+function getAlertsPagination(alerts) {
+    /*
+     * Return pagination state and alerts for the current page.
+     */
+    alerts = Array.isArray(alerts) ? alerts : [];
+
+    const totalItems = alerts.length;
+    const totalPages = Math.max(1, Math.ceil(totalItems / alertsPageSize));
+
+    if (alertsCurrentPage > totalPages) {
+        alertsCurrentPage = totalPages;
+    }
+
+    if (alertsCurrentPage < 1) {
+        alertsCurrentPage = 1;
+    }
+
+    const startIndex = (alertsCurrentPage - 1) * alertsPageSize;
+    const endIndex = startIndex + alertsPageSize;
+
+    return {
+        totalItems: totalItems,
+        totalPages: totalPages,
+        startIndex: startIndex,
+        endIndex: Math.min(endIndex, totalItems),
+        items: alerts.slice(startIndex, endIndex)
+    };
+}
+
+
+function renderAlertsInboxCounter(allAlerts, filteredAlerts, pagination) {
+    /*
+     * Render "Showing X-Y of Z alerts / N total" counter.
+     */
+    allAlerts = Array.isArray(allAlerts) ? allAlerts : [];
+    filteredAlerts = Array.isArray(filteredAlerts) ? filteredAlerts : [];
+
+    const from = pagination.totalItems ? pagination.startIndex + 1 : 0;
+    const to = pagination.totalItems ? pagination.endIndex : 0;
+
+    $("#alerts-page-from").text(from);
+    $("#alerts-page-to").text(to);
+    $("#alerts-filtered-count").text(filteredAlerts.length);
+    $("#alerts-total-count").text(allAlerts.length);
+
+    $("#alerts-total-wrapper").toggle(allAlerts.length !== filteredAlerts.length);
+}
+
+
+function renderAlertsPagination(pagination) {
+    /*
+     * Render pagination controls state.
+     */
+    $("#alerts-current-page").text(alertsCurrentPage);
+    $("#alerts-total-pages").text(pagination.totalPages);
+
+    $("#alerts-prev-page").prop("disabled", alertsCurrentPage <= 1);
+    $("#alerts-next-page").prop("disabled", alertsCurrentPage >= pagination.totalPages);
+
+    $("#alerts-page-size").val(String(alertsPageSize));
+
+    $(".alerts-pagination").toggle(pagination.totalItems > 0);
+}
+
+
+function resetAlertsPagination() {
+    /*
+     * Reset pagination to the first page after filters/search/API reload.
+     */
+    alertsCurrentPage = 1;
 }
 
 function getFilteredAlerts() {
@@ -460,6 +537,7 @@ function renderAlertPageRow(alert) {
         $("<td>").append(
             $("<button>")
                 .attr("type", "button")
+                .attr("title", "View alert details")
                 .addClass("alerts-id-link")
                 .text("#" + alert.id)
                 .on("click", function () {
@@ -503,16 +581,6 @@ function renderAlertPageRow(alert) {
 
     const actionsCell = $("<td>").addClass("actions-cell");
     const actions = $("<div>").addClass("table-actions");
-
-    actions.append(
-        $("<button>")
-            .attr("type", "button")
-            .addClass("btn btn-info btn-small")
-            .text("Details")
-            .on("click", function () {
-                showAlertDetails(alert.id);
-            })
-    );
 
     if (alert.status === "firing") {
         actions.append(
@@ -577,21 +645,6 @@ function renderReminderCount(alert) {
         .text(count);
 }
 
-function openAlertDetailsModal() {
-    /*
-     * Open alert details modal.
-     */
-    $("#alert-details-modal").attr("style", "display: flex;");
-}
-
-function closeAlertDetailsModal() {
-    /*
-     * Close alert details modal.
-     */
-    $("#alert-details-modal").attr("style", "display: none;");
-    currentDetailsAlertId = null;
-}
-
 function showAlertDetails(alertId) {
     /*
      * Load and render full alert details in modal.
@@ -601,6 +654,11 @@ function showAlertDetails(alertId) {
     apiGet("/api/alerts/" + alertId, function (alert) {
         const modal = alertDetailsModal();
 
+        if (!modal.length) {
+            console.error("Alert details modal not found");
+            return;
+        }
+
         currentDetailsAlertId = alert.id;
 
         modal.find("#alert-details-title").text(
@@ -608,16 +666,16 @@ function showAlertDetails(alertId) {
         );
 
         modal.find("#alert-details-subtitle").text(
-            (alert.team_slug || "-") + " / " + statusLabel(alert.status) + " / " + severityLabel(alert.severity)
+            (alert.team_slug || "-") + " / " + (alert.status || "-") + " / " + (alert.severity || "-")
         );
 
-        renderAlertDetailsSummary(alert);
+        renderAlertDetailsSummary(alert, modal);
 
         modal.find("#alert-details-labels").text(JSON.stringify(alert.labels || {}, null, 2));
         modal.find("#alert-details-payload").text(JSON.stringify(alert.payload || {}, null, 2));
 
-        renderEvents(alert.events || []);
-        renderNotifications(alert.notifications || []);
+        renderEvents(alert.events || [], modal);
+        renderNotifications(alert.notifications || [], modal);
 
         if (alert.status === "resolved") {
             modal.find("#modal-alert-ack").hide();
@@ -636,11 +694,11 @@ function showAlertDetails(alertId) {
     });
 }
 
-function renderAlertDetailsSummary(alert) {
+function renderAlertDetailsSummary(alert, modal) {
     /*
      * Render alert summary block.
      */
-    const summary = $("#alert-details-summary");
+    const summary = modal.find("#alert-details-summary");
     summary.empty();
 
     summary.append(detailItem("Source", alert.source));
@@ -649,7 +707,7 @@ function renderAlertDetailsSummary(alert) {
     summary.append(detailItem("Rotation", alert.rotation_name));
     summary.append(detailItem("Assignee", alert.assignee));
     summary.append(detailItem("Acknowledged by", alert.acknowledged_by));
-    summary.append(detailItem("Created", formatAlertDateTime(alertCreatedValue(alert))));
+    summary.append(detailItem("Created", formatAlertDateTime(alert.first_seen_at || alert.created_at)));
     summary.append(detailItem("Last seen", formatAlertDateTime(alert.last_seen_at)));
     summary.append(detailItem("Last notification", formatAlertDateTime(alert.last_notification_at)));
     summary.append(detailItem("Group key", alert.group_key));
@@ -659,6 +717,65 @@ function renderAlertDetailsSummary(alert) {
         "Reminder interval",
         alert.rotation_reminder_interval_seconds ? alert.rotation_reminder_interval_seconds + "s" : "-"
     ));
+}
+
+
+function renderEvents(events, modal) {
+    /*
+     * Render alert events.
+     */
+    const target = modal.find("#alert-details-events");
+    target.empty();
+
+    if (!events.length) {
+        target.append($("<div>").addClass("help-text").text("No events."));
+        return;
+    }
+
+    events.forEach(function (event) {
+        target.append(
+            $("<div>")
+                .addClass("event-item")
+                .append($("<strong>").text("#" + event.id + " " + event.event_type))
+                .append(
+                    $("<div>").text(
+                        formatAlertDateTime(event.created_at) + " " + (event.message || "")
+                    )
+                )
+        );
+    });
+}
+
+
+function renderNotifications(notifications, modal) {
+    /*
+     * Render notification delivery records.
+     */
+    const target = modal.find("#alert-details-notifications");
+    target.empty();
+
+    if (!notifications.length) {
+        target.append($("<div>").addClass("help-text").text("No delivery records."));
+        return;
+    }
+
+    notifications.forEach(function (item) {
+        const channel = item.channel
+            ? item.channel.name + " (" + item.channel.channel_type + ")"
+            : "-";
+
+        const status = item.last_error
+            ? "failed: " + item.last_error
+            : (item.last_event_type || "sent");
+
+        target.append(
+            $("<div>")
+                .addClass("event-item")
+                .append($("<strong>").text("#" + item.id + " " + channel))
+                .append($("<div>").text((item.provider || "-") + " / " + status))
+                .append($("<div>").text("message_id: " + (item.external_message_id || "-")))
+        );
+    });
 }
 
 function detailItem(label, value) {
@@ -736,15 +853,43 @@ function setAlertsAutoRefresh(enabled) {
     }
 }
 
-$(document).on("click", "#reload-alerts", loadAlerts);
+$(document).on("click", "#reload-alerts", function () {
+    resetAlertsPagination();
+    loadAlerts();
+});
+$(document).on("click", "#reload-dashboard", function () {
+    resetAlertsPagination();
+    loadDashboard();
+});
 
-$(document).on("change", "#status-filter", loadAlerts);
+$(document).on("change", "#status-filter", function () {
+    resetAlertsPagination();
+    loadAlerts();
+});
 
 $(document).on("change", "#severity-filter, #alerts-sort", function () {
+    resetAlertsPagination();
     renderAlertsPage();
 });
 
 $(document).on("input", "#alerts-search", function () {
+    resetAlertsPagination();
+    renderAlertsPage();
+});
+
+$(document).on("change", "#alerts-page-size", function () {
+    alertsPageSize = Number($(this).val() || 25);
+    resetAlertsPagination();
+    renderAlertsPage();
+});
+
+$(document).on("click", "#alerts-prev-page", function () {
+    alertsCurrentPage -= 1;
+    renderAlertsPage();
+});
+
+$(document).on("click", "#alerts-next-page", function () {
+    alertsCurrentPage += 1;
     renderAlertsPage();
 });
 
@@ -756,13 +901,13 @@ $(document).on("click", "#close-alert-details", closeAlertDetailsModal);
 $(document).on("click", "#close-alert-details-footer", closeAlertDetailsModal);
 
 $(document).on("click", "#alert-details-modal", function (event) {
-    if (event.target && event.target.id === "alert-details-modal") {
+    if (event.target === this) {
         closeAlertDetailsModal();
     }
 });
 
 $(document).on("keydown", function (event) {
-    if (event.key === "Escape") {
+    if (event.key === "Escape" && alertDetailsModal().hasClass("is-open")) {
         closeAlertDetailsModal();
     }
 });
@@ -795,16 +940,27 @@ function alertDetailsModal() {
      */
     return $("#alert-details-modal").last();
 }
+function alertDetailsModal() {
+    /*
+     * Return the single global alert details modal.
+     * The modal must be included only once in index.html.
+     */
+    return $("#alert-details-modal");
+}
 
 
 function openAlertDetailsModal() {
     /*
      * Open alert details modal.
      */
-    alertDetailsModal()
-        .css("display", "flex")
-        .addClass("is-open");
+    const modal = alertDetailsModal();
 
+    if (!modal.length) {
+        console.error("Alert details modal not found");
+        return;
+    }
+
+    modal.css("display", "flex").addClass("is-open");
     $("body").addClass("modal-open");
 }
 

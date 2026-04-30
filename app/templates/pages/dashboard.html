@@ -1,20 +1,6 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/overview.css') }}">
 
 <div class="overview-page">
-    <div class="overview-hero">
-        <div>
-            <div class="overview-eyebrow">IncidentRelay</div>
-            <h2>Operations overview</h2>
-            <p>Real-time summary of active incidents, acknowledgements, reminders and affected teams.</p>
-        </div>
-
-        <div class="overview-hero-actions">
-            <button id="reload-dashboard" type="button" class="btn btn-primary">
-                Reload
-            </button>
-        </div>
-    </div>
-
     {% set summary_id = "overview-alerts-summary" %}
     {% include 'pages/include/alerts_summary_grid.html' %}
 
@@ -32,6 +18,11 @@
                 <button type="button" class="btn btn-small btn-light" onclick="navigate('/alerts', true)">
                     View all
                 </button>
+                <div class="card-header-actions">
+                    <button id="reload-dashboard" type="button" class="btn btn-primary">
+                        Reload
+                    </button>
+                </div>
             </div>
 
             <div class="table-wrapper">
@@ -114,5 +105,3 @@
         </section>
     </div>
 </div>
-
-{% include 'pages/include/alerts_modal.html' %}

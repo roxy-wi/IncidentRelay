@@ -1,20 +1,6 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/alerts.css') }}">
 
 <div class="alerts-page">
-    <div class="alerts-hero">
-        <div>
-            <div class="alerts-eyebrow">Incident workflow</div>
-            <h2>Alerts</h2>
-            <p>Search, inspect, acknowledge and resolve routed incidents from one workspace.</p>
-        </div>
-
-        <div class="alerts-hero-actions">
-            <button id="reload-alerts" type="button" class="btn btn-primary">
-                Reload
-            </button>
-        </div>
-    </div>
-
     {% set summary_id = "alerts-alerts-summary" %}
     {% include 'pages/include/alerts_summary_grid.html' %}
 
@@ -23,15 +9,25 @@
             <div>
                 <h2>Alert inbox</h2>
                 <div class="card-subtitle">
-                    Showing <span id="alerts-filtered-count">0</span> of <span id="alerts-total-count">0</span> alerts
+                    Showing
+                    <span id="alerts-page-from">0</span>-<span id="alerts-page-to">0</span>
+                    of <span id="alerts-filtered-count">0</span>
+                    alerts
+                    <span id="alerts-total-wrapper">
+                        / <span id="alerts-total-count">0</span> total
+                    </span>
                 </div>
             </div>
 
-            <div class="alerts-auto-refresh">
+            <div class="card-header-actions">
                 <label class="alerts-switch">
                     <input id="alerts-auto-refresh" type="checkbox">
                     <span>Auto refresh</span>
                 </label>
+
+                <button id="reload-alerts" type="button" class="btn btn-primary">
+                    Reload
+                </button>
             </div>
         </div>
 
@@ -93,7 +89,32 @@
                 <tbody id="alerts-table"></tbody>
             </table>
         </div>
+        <div class="alerts-pagination">
+            <div class="alerts-pagination-left">
+                <span>Rows per page</span>
+
+                <select id="alerts-page-size" class="input alerts-page-size">
+                    <option value="10">10</option>
+                    <option value="25" selected>25</option>
+                    <option value="50">50</option>
+                    <option value="100">100</option>
+                </select>
+            </div>
+
+            <div class="alerts-pagination-center">
+                Page <span id="alerts-current-page">1</span>
+                of <span id="alerts-total-pages">1</span>
+            </div>
+
+            <div class="alerts-pagination-actions">
+                <button id="alerts-prev-page" type="button" class="btn btn-small">
+                    Previous
+                </button>
+
+                <button id="alerts-next-page" type="button" class="btn btn-small">
+                    Next
+                </button>
+            </div>
+        </div>
     </section>
 </div>
-
-{% include 'pages/include/alerts_modal.html' %}

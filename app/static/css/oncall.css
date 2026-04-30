@@ -91,26 +91,6 @@ summary {
     color: var(--muted);
 }
 
-.inline-fields {
-    display: grid;
-    grid-template-columns: 1fr 1fr;
-    gap: 10px;
-}
-
-details {
-    border: 1px solid var(--border);
-    border-radius: 8px;
-    padding: 10px;
-    background: #fbfcfe;
-}
-
-summary {
-    cursor: pointer;
-    font-weight: 600;
-    color: var(--muted);
-}
-
-
 .btn-danger {
     background: var(--danger);
     color: #ffffff;
@@ -235,45 +215,12 @@ summary {
     margin-left: 8px;
 }
 
-.btn-danger {
-    background: var(--danger);
-    color: #ffffff;
-}
-
 .view-visible {
     display: block !important;
 }
 
 .is-hidden {
     display: none !important;
-}
-
-.alerts-table td {
-    vertical-align: middle;
-}
-
-.alerts-table .actions-cell {
-    display: table-cell;
-    white-space: nowrap;
-    min-width: 190px;
-}
-
-.alerts-table .table-actions {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    flex-wrap: nowrap;
-    min-width: max-content;
-}
-
-.alerts-table .alert-title-cell {
-    min-width: 360px;
-}
-
-.alerts-table .empty-table-cell {
-    text-align: center;
-    color: #7b8794;
-    padding: 16px;
 }
 
 .data-table td.actions {
