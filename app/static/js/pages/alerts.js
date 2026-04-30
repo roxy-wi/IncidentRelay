@@ -437,35 +437,6 @@ function getFilteredAlerts() {
     return result;
 }
 
-// function renderAlertsSummary(allAlerts, filteredAlerts) {
-//     /*
-//      * Render top counters.
-//      */
-//     const counts = {
-//         firing: 0,
-//         acknowledged: 0,
-//         resolved: 0,
-//         silenced: 0
-//     };
-//
-//     allAlerts.forEach(function (alert) {
-//         const status = normalizeAlertValue(alert.status);
-//
-//         if (Object.prototype.hasOwnProperty.call(counts, status)) {
-//             counts[status] += 1;
-//         }
-//     });
-//
-//     $("#alerts-count-firing").text(counts.firing);
-//     $("#alerts-count-acknowledged").text(counts.acknowledged);
-//     $("#alerts-count-resolved").text(counts.resolved);
-//     $("#alerts-count-silenced").text(counts.silenced);
-//     $("#alerts-count-total").text(allAlerts.length);
-//
-//     $("#alerts-filtered-count").text(filteredAlerts.length);
-//     $("#alerts-total-count").text(allAlerts.length);
-// }
-
 function renderActiveAlertFilters(filteredAlerts) {
     /*
      * Render active filter chips.
@@ -788,57 +759,6 @@ function detailItem(label, value) {
         .append($("<div>").addClass("detail-value").text(value || "-"));
 }
 
-function renderEvents(events) {
-    /*
-     * Render alert events.
-     */
-    const target = $("#alert-details-events");
-    target.empty();
-
-    if (!events.length) {
-        target.append($("<div>").addClass("help-text").text("No events."));
-        return;
-    }
-
-    events.forEach(function (event) {
-        target.append(
-            $("<div>")
-                .addClass("event-item")
-                .append($("<strong>").text("#" + event.id + " " + event.event_type))
-                .append(
-                    $("<div>")
-                        .text(formatAlertDateTime(event.created_at) + " " + (event.message || ""))
-                )
-        );
-    });
-}
-
-function renderNotifications(notifications) {
-    /*
-     * Render notification delivery records.
-     */
-    const target = $("#alert-details-notifications");
-    target.empty();
-
-    if (!notifications.length) {
-        target.append($("<div>").addClass("help-text").text("No delivery records."));
-        return;
-    }
-
-    notifications.forEach(function (item) {
-        const channel = item.channel ? item.channel.name + " (" + item.channel.channel_type + ")" : "-";
-        const status = item.last_error ? "failed: " + item.last_error : (item.last_event_type || "sent");
-
-        target.append(
-            $("<div>")
-                .addClass("event-item")
-                .append($("<strong>").text("#" + item.id + " " + channel))
-                .append($("<div>").text((item.provider || "-") + " / " + status))
-                .append($("<div>").text("message_id: " + (item.external_message_id || "-")))
-        );
-    });
-}
-
 function setAlertsAutoRefresh(enabled) {
     /*
      * Enable or disable alerts auto-refresh.
@@ -856,10 +776,6 @@ function setAlertsAutoRefresh(enabled) {
 $(document).on("click", "#reload-alerts", function () {
     resetAlertsPagination();
     loadAlerts();
-});
-$(document).on("click", "#reload-dashboard", function () {
-    resetAlertsPagination();
-    loadDashboard();
 });
 
 $(document).on("change", "#status-filter", function () {
@@ -933,13 +849,6 @@ $(document).on("click", "#modal-alert-resolve", function () {
         loadAlerts();
     });
 });
-function alertDetailsModal() {
-    /*
-     * Return the global alert details modal.
-     * It must exist only once in index.html.
-     */
-    return $("#alert-details-modal").last();
-}
 function alertDetailsModal() {
     /*
      * Return the single global alert details modal.

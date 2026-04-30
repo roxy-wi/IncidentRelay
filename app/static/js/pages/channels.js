@@ -1,5 +1,6 @@
 let channelsCache = [];
 let channelTeamsCache = [];
+let selectedChannelDetailsId = null;
 
 function loadChannels() {
     /*
@@ -67,16 +68,17 @@ function loadChannelTypes() {
     /*
      * Load supported channel types from the API.
      */
-
     apiGet("/api/channels/types", function (types) {
         const select = $("#channel-type");
-        select.empty();
 
+        select.empty();
         types = asArray(types);
+
         types.forEach(function (type) {
             select.append($("<option>").val(type).text(type));
         });
 
+        fillChannelTypeFilter(types);
         showChannelFields();
     });
 }
@@ -85,7 +87,6 @@ function showChannelFields() {
     /*
      * Show only fields needed for the selected channel type.
      */
-
     const type = $("#channel-type").val();
 
     $(".channel-config").hide();
@@ -108,6 +109,11 @@ function showChannelFields() {
 
     if (type === "email") {
         $('[data-channel-config="email"]').show();
+        return;
+    }
+
+    if (type === "voice_call") {
+        $('[data-channel-config="voice_call"]').show();
     }
 }
 
@@ -155,6 +161,12 @@ function buildChannelConfig() {
         config.recipients = splitCsv($("#cfg-email-recipients").val());
         config.smtp_host = $("#cfg-email-smtp-host").val();
         config.smtp_port = Number($("#cfg-email-smtp-port").val() || 587);
+        return config;
+    }
+
+    if (type === "voice_call") {
+        config.call_on_severities = getVoiceCallSeverities();
+        config.notification_rules = parseJsonInput("#cfg-voice-notification-rules", []);
         return config;
     }
 
@@ -222,21 +234,44 @@ function refreshChannels() {
     /*
      * Reload the channels table.
      */
-
     apiGet("/api/channels" + selectedTeamQuery(), function (channels) {
-        channels = asArray(channels);
-        channelsCache = channels;
-        renderChannels(channels);
+        channelsCache = asArray(channels);
+
+        renderChannelsSummary(channelsCache);
+        renderChannels();
+
+        if (selectedChannelDetailsId) {
+            restoreChannelDetails();
+        } else if (channelsCache.length) {
+            renderChannelDetails(channelsCache[0]);
+        } else {
+            renderChannelDetailsEmpty();
+        }
     });
 }
 
-function renderChannels(channels) {
-    /*
-     * Render all channels.
-     */
 
+function renderChannels() {
+    /*
+     * Render filtered channels.
+     */
     const tbody = $("#channels-table");
+    const channels = getFilteredChannels();
+
     tbody.empty();
+    renderChannelsCounter(channels, channelsCache);
+
+    if (!channels.length) {
+        tbody.append(
+            $("<tr>").append(
+                $("<td>")
+                    .attr("colspan", "7")
+                    .addClass("channels-empty-cell")
+                    .text("No channels")
+            )
+        );
+        return;
+    }
 
     channels.forEach(function (channel) {
         tbody.append(renderChannelRow(channel));
@@ -247,19 +282,56 @@ function renderChannelRow(channel) {
     /*
      * Render one channel row.
      */
-
     const row = $("<tr>");
-    const config = channel.config || {};
-    const mode = channel.channel_type === "mattermost" ? (config.mode || (config.api_url ? "bot_api" : "webhook")) : "-";
+    const mode = getChannelModeLabel(channel);
 
-    row.append($("<td>").text(channel.id));
+    row.append(
+        $("<td>")
+            .append(
+                $("<button>")
+                    .attr("type", "button")
+                    .addClass("channel-name-button")
+                    .text(channel.name || "-")
+                    .on("click", function () {
+                        renderChannelDetails(channel);
+                    })
+            )
+            .append(
+                $("<div>")
+                    .addClass("channel-row-subtitle")
+                    .text("Channel #" + channel.id)
+            )
+    );
+
     row.append($("<td>").text(channel.group_slug || "-"));
     row.append($("<td>").text(channel.team_slug || "-"));
-    row.append($("<td>").text(channel.name));
-    row.append($("<td>").text(channel.channel_type));
-    row.append($("<td>").text(mode));
-    row.append($("<td>").text(channel.enabled ? "yes" : "no"));
-    row.append(renderChannelActions(channel));
+
+    row.append(
+        $("<td>").append(
+            $("<span>")
+                .addClass("channel-type-pill")
+                .text(channel.channel_type || "-")
+        )
+    );
+
+    row.append(
+        $("<td>").append(
+            $("<span>")
+                .addClass("channel-mode-pill")
+                .text(mode)
+        )
+    );
+
+    row.append(
+        $("<td>").append(
+            $("<span>")
+                .addClass("channel-status-pill")
+                .addClass(channel.enabled ? "channel-status-enabled" : "channel-status-disabled")
+                .text(channel.enabled ? "Enabled" : "Disabled")
+        )
+    );
+
+    row.append($("<td>").addClass("actions-cell").append(renderChannelActions(channel)));
 
     return row;
 }
@@ -308,12 +380,12 @@ function saveChannel() {
     /*
      * Create or update a channel.
      */
-
     const id = $("#channel-id").val();
     const payload = collectChannelPayload();
 
     if (id) {
         apiPut("/api/channels/" + id, payload, function () {
+            closeChannelFormModal();
             resetChannelForm();
             refreshChannels();
         });
@@ -321,6 +393,7 @@ function saveChannel() {
     }
 
     apiPost("/api/channels", payload, function () {
+        closeChannelFormModal();
         resetChannelForm();
         refreshChannels();
     });
@@ -362,6 +435,7 @@ function editChannel(id) {
 
     fillChannelFields(channel.channel_type, channel.config || {});
     showChannelFields();
+    openChannelFormModal();
 }
 
 function fillChannelFields(type, config) {
@@ -395,6 +469,18 @@ function fillChannelFields(type, config) {
         $("#cfg-email-smtp-host").val(config.smtp_host || "");
         $("#cfg-email-smtp-port").val(config.smtp_port || 587);
     }
+
+    if (type === "voice_call") {
+        const severities = config.call_on_severities || ["critical", "high"];
+
+        $(".cfg-voice-severity").each(function () {
+            $(this).prop("checked", severities.includes($(this).val()));
+        });
+
+        $("#cfg-voice-notification-rules").val(
+            JSON.stringify(config.notification_rules || [], null, 2)
+        );
+    }
 }
 
 function clearChannelFields() {
@@ -415,6 +501,11 @@ function clearChannelFields() {
     $("#cfg-mm-channel-id").val("");
     $("#cfg-mm-callback-secret").val("");
     $("#cfg-mm-webhook-url").val("");
+
+    $(".cfg-voice-severity").prop("checked", false);
+    $('.cfg-voice-severity[value="critical"]').prop("checked", true);
+    $('.cfg-voice-severity[value="high"]').prop("checked", true);
+    $("#cfg-voice-notification-rules").val("[]");
 }
 
 function deleteChannel(id) {
@@ -464,4 +555,310 @@ $(document).on("click", "#save-channel", saveChannel);
 $(document).on("click", "#reset-channel-form", resetChannelForm);
 $(document).on("click", "#reload-channels", function () {
     loadChannelGroups(refreshChannels);
+});
+function getVoiceCallSeverities() {
+    /*
+     * Return selected severities for voice calls.
+     */
+    const severities = [];
+
+    $(".cfg-voice-severity:checked").each(function () {
+        severities.push($(this).val());
+    });
+
+    return severities;
+}
+function getChannelModeLabel(channel) {
+    /*
+     * Return safe display mode for channel.
+     */
+    const config = channel.config || {};
+
+    if (channel.channel_type === "mattermost") {
+        return config.mode || (config.api_url ? "bot_api" : "webhook");
+    }
+
+    if (channel.channel_type === "voice_call") {
+        const severities = config.call_on_severities || [];
+        return severities.length ? severities.join(", ") : "no severities";
+    }
+
+    if (["slack", "webhook", "discord", "teams"].includes(channel.channel_type)) {
+        return "webhook";
+    }
+
+    if (channel.channel_type === "email") {
+        return config.smtp_host ? "smtp" : "email";
+    }
+
+    return "-";
+}
+
+
+function getChannelSearchText(channel) {
+    /*
+     * Build searchable channel text.
+     */
+    return [
+        channel.id,
+        channel.group_slug,
+        channel.team_slug,
+        channel.name,
+        channel.channel_type,
+        getChannelModeLabel(channel),
+        channel.enabled ? "enabled" : "disabled"
+    ].join(" ").toLowerCase();
+}
+
+
+function getFilteredChannels() {
+    /*
+     * Apply client-side filters to channels cache.
+     */
+    const query = String($("#channels-search").val() || "").trim().toLowerCase();
+    const type = String($("#channels-type-filter").val() || "");
+    const status = String($("#channels-status-filter").val() || "");
+
+    return channelsCache.filter(function (channel) {
+        if (type && channel.channel_type !== type) {
+            return false;
+        }
+
+        if (status === "enabled" && !channel.enabled) {
+            return false;
+        }
+
+        if (status === "disabled" && channel.enabled) {
+            return false;
+        }
+
+        if (!query) {
+            return true;
+        }
+
+        return getChannelSearchText(channel).indexOf(query) !== -1;
+    });
+}
+
+
+function renderChannelsSummary(channels) {
+    /*
+     * Render top summary cards.
+     */
+    channels = Array.isArray(channels) ? channels : [];
+
+    const enabled = channels.filter(function (channel) {
+        return !!channel.enabled;
+    }).length;
+
+    const voice = channels.filter(function (channel) {
+        return channel.channel_type === "voice_call";
+    }).length;
+
+    $("#channels-summary-total").text(channels.length);
+    $("#channels-summary-enabled").text(enabled);
+    $("#channels-summary-disabled").text(channels.length - enabled);
+    $("#channels-summary-voice").text(voice);
+}
+
+
+function renderChannelsCounter(filteredChannels, allChannels) {
+    /*
+     * Render "Showing X of Y channels" counter.
+     */
+    filteredChannels = Array.isArray(filteredChannels) ? filteredChannels : [];
+    allChannels = Array.isArray(allChannels) ? allChannels : [];
+
+    $("#channels-filtered-count").text(filteredChannels.length);
+    $("#channels-total-count").text(allChannels.length);
+}
+
+
+function fillChannelTypeFilter(types) {
+    /*
+     * Fill channel type filter in table toolbar.
+     */
+    const filter = $("#channels-type-filter");
+    const selected = filter.val();
+
+    filter.empty();
+    filter.append($("<option>").val("").text("All types"));
+
+    types.forEach(function (type) {
+        filter.append($("<option>").val(type).text(type));
+    });
+
+    if (selected && types.includes(selected)) {
+        filter.val(selected);
+    }
+}
+function channelDetailsItem(label, value) {
+    /*
+     * Render one channel details item.
+     */
+    return $("<div>")
+        .addClass("details-item")
+        .append($("<div>").addClass("details-label").text(label))
+        .append($("<div>").addClass("details-value").text(value || "-"));
+}
+
+
+function getSafeChannelConfigSummary(channel) {
+    /*
+     * Return safe config summary without secrets.
+     */
+    const config = channel.config || {};
+
+    if (channel.channel_type === "mattermost") {
+        return getChannelModeLabel(channel);
+    }
+
+    if (channel.channel_type === "voice_call") {
+        return "Calls on: " + ((config.call_on_severities || []).join(", ") || "-");
+    }
+
+    if (channel.channel_type === "email") {
+        return "Recipients: " + ((config.recipients || []).length || 0);
+    }
+
+    if (["slack", "webhook", "discord", "teams"].includes(channel.channel_type)) {
+        return config.webhook_url ? "Webhook configured" : "Webhook missing";
+    }
+
+    if (channel.channel_type === "telegram") {
+        return config.chat_id ? "Chat configured" : "Chat missing";
+    }
+
+    return "-";
+}
+
+
+function renderChannelDetails(channel) {
+    /*
+     * Render selected channel details.
+     */
+    selectedChannelDetailsId = channel.id;
+
+    $("#channel-details-subtitle").text(
+        (channel.team_slug || "-") + " / " + (channel.enabled ? "Enabled" : "Disabled")
+    );
+
+    const body = $("#channel-details-body");
+    body.empty();
+
+    body.append(
+        $("<div>")
+            .addClass("details-list")
+            .append(channelDetailsItem("Name", channel.name))
+            .append(channelDetailsItem("Group", channel.group_slug))
+            .append(channelDetailsItem("Team", channel.team_slug))
+            .append(channelDetailsItem("Type", channel.channel_type))
+            .append(channelDetailsItem("Mode", getChannelModeLabel(channel)))
+            .append(channelDetailsItem("Status", channel.enabled ? "Enabled" : "Disabled"))
+            .append(channelDetailsItem("Config", getSafeChannelConfigSummary(channel)))
+    );
+
+    body.append(
+        $("<div>")
+            .addClass("details-actions")
+            .append(
+                $("<button>")
+                    .attr("type", "button")
+                    .addClass("btn btn-small")
+                    .text("Edit channel")
+                    .on("click", function () {
+                        editChannel(channel.id);
+                    })
+            )
+            .append(
+                $("<button>")
+                    .attr("type", "button")
+                    .addClass("btn btn-small")
+                    .text("Test")
+                    .on("click", function () {
+                        testChannel(channel.id);
+                    })
+            )
+    );
+}
+
+
+function restoreChannelDetails() {
+    /*
+     * Restore selected channel details after reload.
+     */
+    const selected = channelsCache.find(function (channel) {
+        return Number(channel.id) === Number(selectedChannelDetailsId);
+    });
+
+    if (selected) {
+        renderChannelDetails(selected);
+        return;
+    }
+
+    renderChannelDetailsEmpty();
+}
+
+
+function renderChannelDetailsEmpty() {
+    /*
+     * Render empty details state.
+     */
+    selectedChannelDetailsId = null;
+
+    $("#channel-details-subtitle").text("Select a channel");
+    $("#channel-details-body").html(
+        '<div class="details-empty">' +
+        'Click a channel name to inspect delivery type, team binding and safe configuration summary.' +
+        '</div>'
+    );
+}
+function openChannelFormModal() {
+    /*
+     * Open channel create/edit modal.
+     */
+    $("#channel-form-modal")
+        .css("display", "flex")
+        .addClass("is-open");
+
+    $("body").addClass("modal-open");
+}
+
+
+function closeChannelFormModal() {
+    /*
+     * Close channel create/edit modal.
+     */
+    $("#channel-form-modal")
+        .css("display", "none")
+        .removeClass("is-open");
+
+    $("body").removeClass("modal-open");
+}
+
+
+function openCreateChannelModal() {
+    /*
+     * Reset form and open create modal.
+     */
+    resetChannelForm();
+    $("#channel-form-title").text("Create channel");
+    openChannelFormModal();
+}
+$(document).on("input", "#channels-search", renderChannels);
+$(document).on("change", "#channels-type-filter, #channels-status-filter", renderChannels);
+
+$(document).on("click", "#open-channel-create-modal", openCreateChannelModal);
+$(document).on("click", "#close-channel-form-modal", closeChannelFormModal);
+
+$(document).on("click", "#channel-form-modal", function (event) {
+    if (event.target === this) {
+        closeChannelFormModal();
+    }
+});
+
+$(document).on("keydown", function (event) {
+    if (event.key === "Escape" && $("#channel-form-modal").hasClass("is-open")) {
+        closeChannelFormModal();
+    }
 });

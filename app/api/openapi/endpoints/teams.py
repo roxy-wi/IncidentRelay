@@ -61,7 +61,7 @@ def response(description, schema=None):
 
 TEAM_SCHEMA = {
     "type": "object",
-    "required": ["slug", "name"],
+    "required": ["group_id", "slug", "name"],
     "properties": {
         "slug": {
             "type": "string",

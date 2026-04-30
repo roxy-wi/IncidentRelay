@@ -1,27 +1,230 @@
-<div class="grid-two">
-    <div class="card">
-        <div class="card-header"><h2 id="route-form-title">Create route</h2></div>
-        <div class="form-body">
-            <input id="route-id" type="hidden">
-            <label>Team</label><select id="route-team" class="input"></select>
-            <label>Name</label><input id="route-name" class="input" placeholder="infra-alertmanager">
-            <label>Source</label><select id="route-source" class="input"><option value="alertmanager">alertmanager</option><option value="zabbix">zabbix</option><option value="webhook">webhook</option></select>
-            <label>Rotation</label><select id="route-rotation" class="input"></select>
-            <label>Channels</label><select id="route-channels" class="input" multiple></select>
-            <div class="help-text">Select all notification channels that should receive alerts for this route.</div>
-            <label>Matchers JSON</label><textarea id="route-matchers" class="input textarea">{"labels":{"team":"infra"}}</textarea>
-            <label>Group by JSON</label><input id="route-group-by" class="input" value='["alertname","instance"]'>
-            <label><input id="route-enabled" type="checkbox" checked> Enabled</label>
-            <div class="actions"><button id="save-route" class="btn btn-primary">Save route</button><button id="reset-route-form" class="btn">Reset</button></div>
+<link rel="stylesheet" href="/static/css/routes.css">
 
-            <div id="route-token-box" class="token-box" style="display:none;">
-                <strong>Route alert intake token</strong>
-                <div class="help-text">Copy this token now. It is shown only once. External systems must use this token to send alerts to this route.</div>
-                <textarea id="route-intake-token" class="input textarea" readonly></textarea>
+<div class="routes-page">
+    <div class="summary-grid">
+        <div class="summary-card summary-primary">
+            <div class="summary-icon">↱</div>
+            <div>
+                <div class="summary-title">Routes</div>
+                <div id="routes-summary-total" class="summary-value">0</div>
+                <div class="summary-hint">Alert intake rules</div>
             </div>
+        </div>
 
-            <div class="help-text">Routes receive alerts. Channels only receive notifications from routes.</div>
+        <div class="summary-card summary-success">
+            <div class="summary-icon">✓</div>
+            <div>
+                <div class="summary-title">Enabled</div>
+                <div id="routes-summary-enabled" class="summary-value">0</div>
+                <div class="summary-hint">Accepting alerts</div>
+            </div>
+        </div>
+
+        <div class="summary-card summary-warning">
+            <div class="summary-icon">×</div>
+            <div>
+                <div class="summary-title">Disabled</div>
+                <div id="routes-summary-disabled" class="summary-value">0</div>
+                <div class="summary-hint">Not accepting alerts</div>
+            </div>
+        </div>
+
+        <div class="summary-card summary-info">
+            <div class="summary-icon">↻</div>
+            <div>
+                <div class="summary-title">With rotation</div>
+                <div id="routes-summary-rotation" class="summary-value">0</div>
+                <div class="summary-hint">Assigned to on-call</div>
+            </div>
         </div>
     </div>
-    <div class="card"><div class="card-header"><h2>Routes</h2><button id="reload-routes" class="btn btn-primary">Reload</button></div><div class="table-wrapper"><table class="data-table"><thead><tr><th>ID</th><th>Team</th><th>Name</th><th>Source</th><th>Rotation</th><th>Channels</th><th>Token</th><th>Enabled</th><th>Actions</th></tr></thead><tbody id="routes-table"></tbody></table></div></div>
+
+    <div class="page-layout-grid">
+        <section class="card routes-card">
+            <div class="card-header routes-card-header">
+                <div>
+                    <h2>Alert routes</h2>
+                    <div class="card-subtitle">
+                        Showing <span id="routes-filtered-count">0</span>
+                        of <span id="routes-total-count">0</span> routes
+                    </div>
+                </div>
+
+                <div class="card-header-actions">
+                    <button id="open-route-create-modal" type="button" class="btn btn-primary btn-small">
+                        New route
+                    </button>
+
+                    <button id="reload-routes" type="button" class="btn btn-small btn-primary">
+                        Reload
+                    </button>
+                </div>
+            </div>
+
+            <div class="page-toolbar">
+                <div class="page-toolbar-search">
+                    <span class="page-toolbar-search-icon">⌕</span>
+                    <input
+                        id="routes-search"
+                        class="input"
+                        type="search"
+                        placeholder="Search routes, teams, source, rotation..."
+                        autocomplete="off"
+                    >
+                </div>
+
+                <select id="routes-source-filter" class="input page-toolbar-filter">
+                    <option value="">All sources</option>
+                </select>
+
+                <select id="routes-status-filter" class="input page-toolbar-filter">
+                    <option value="">All statuses</option>
+                    <option value="enabled">Enabled</option>
+                    <option value="disabled">Disabled</option>
+                </select>
+            </div>
+
+            <div class="table-wrapper">
+                <table class="data-table routes-table">
+                    <thead>
+                    <tr>
+                        <th>Route</th>
+                        <th>Team</th>
+                        <th>Source</th>
+                        <th>Rotation</th>
+                        <th>Channels</th>
+                        <th>Token</th>
+                        <th>Status</th>
+                        <th class="routes-actions-th">Actions</th>
+                    </tr>
+                    </thead>
+                    <tbody id="routes-table"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <aside class="card page-details-card">
+            <div class="card-header details-header">
+                <div>
+                    <h2>Route details</h2>
+                    <div id="route-details-subtitle" class="card-subtitle">Select a route</div>
+                </div>
+            </div>
+
+            <div id="route-details-body" class="details-body">
+                <div class="details-empty">
+                    Click a route name to inspect matchers, group by, channels and intake token prefix.
+                </div>
+            </div>
+        </aside>
+    </div>
+</div>
+
+<div id="route-form-modal" class="route-modal" style="display: none;">
+    <div class="app-modal-dialog">
+        <div class="app-modal-header">
+            <div>
+                <h2 id="route-form-title">Create route</h2>
+                <div class="card-subtitle">
+                    Routes receive alerts. Channels only receive notifications from routes.
+                </div>
+            </div>
+
+            <button id="close-route-form-modal" type="button" class="app-modal-close">×</button>
+        </div>
+
+        <div class="app-modal-body">
+            <div class="form-body routes-form-grid">
+                <input id="route-id" type="hidden">
+
+                <div>
+                    <label>Team</label>
+                    <select id="route-team" class="input"></select>
+                </div>
+
+                <div>
+                    <label>Name</label>
+                    <input id="route-name" class="input" placeholder="cloud-alertmanager">
+                </div>
+
+                <div>
+                    <label>Source</label>
+                    <select id="route-source" class="input">
+                        <option value="alertmanager">alertmanager</option>
+                        <option value="zabbix">zabbix</option>
+                        <option value="webhook">webhook</option>
+                    </select>
+                </div>
+
+                <div>
+                    <label>Rotation</label>
+                    <select id="route-rotation" class="input">
+                        <option value="">No rotation</option>
+                    </select>
+                </div>
+
+                <div class="routes-form-wide">
+                    <label>Channels</label>
+                    <select id="route-channels" class="input" multiple></select>
+                    <div class="help-text">
+                        Select all notification channels that should receive alerts for this route.
+                    </div>
+                </div>
+
+                <div class="routes-form-wide">
+                    <label>Matchers JSON</label>
+                    <textarea id="route-matchers" class="input" rows="5">{"labels":{"team":"infra"}}</textarea>
+                </div>
+
+                <div class="routes-form-wide">
+                    <label>Group by JSON</label>
+                    <textarea id="route-group-by" class="input" rows="3">["alertname","instance"]</textarea>
+                </div>
+
+                <label class="routes-checkbox">
+                    <input id="route-enabled" type="checkbox" checked>
+                    <span>Enabled</span>
+                </label>
+            </div>
+        </div>
+
+        <div class="app-modal-footer">
+            <button id="reset-route-form" type="button" class="btn">Reset</button>
+            <button id="save-route" type="button" class="btn btn-primary">Save route</button>
+        </div>
+    </div>
+</div>
+
+<div id="route-token-box" class="route-modal" style="display: none;">
+    <div class="app-modal-dialog route-token-dialog">
+        <div class="app-modal-header">
+            <div>
+                <h2>Route alert intake token</h2>
+                <div class="card-subtitle">
+                    Copy this token now. It is shown only once.
+                </div>
+            </div>
+
+            <button id="close-route-token-modal" type="button" class="app-modal-close">×</button>
+        </div>
+
+        <div class="app-modal-body">
+            <label>Intake token</label>
+            <textarea id="route-intake-token" class="input route-token-value" rows="4" readonly></textarea>
+
+            <div class="help-text">
+                External systems must use this token to send alerts to this route.
+            </div>
+        </div>
+
+        <div class="app-modal-footer">
+            <button id="copy-route-intake-token" type="button" class="btn btn-primary">
+                Copy token
+            </button>
+
+            <button id="close-route-token-modal-footer" type="button" class="btn">
+                Close
+            </button>
+        </div>
+    </div>
 </div>

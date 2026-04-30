@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from app.modules.db.models import AlertRoute, NotificationChannel, Rotation, Silence, Team, TeamUser
+from app.modules.db.models import AlertRoute, NotificationChannel, Rotation, Silence, Team, TeamUser, RotationMember, RotationOverride
 
 
 def list_teams(active_only=False, group_ids=None, include_deleted=False):
@@ -223,3 +223,58 @@ def disable_team_membership(membership_id):
     membership.active = False
     membership.save()
     return membership
+
+
+def delete_team_membership(membership_id: int):
+    """
+    Permanently remove a user membership from a team.
+    """
+    membership = get_team_membership(membership_id)
+
+    data = {
+        "id": membership.id,
+        "team_id": membership.team.id,
+        "group_id": membership.team.group_id,
+        "user_id": membership.user.id,
+    }
+
+    membership.delete_instance()
+
+    return data
+
+
+def delete_team_membership(membership_id: int) -> dict:
+    """
+    Permanently remove user from team and from all rotations of this team.
+    """
+    membership = get_team_membership(membership_id)
+
+    team_id = membership.team.id
+    group_id = membership.team.group_id
+    user_id = membership.user.id
+
+    with db.atomic():
+        rotation_ids_query = (
+            Rotation
+            .select(Rotation.id)
+            .where(Rotation.team == team_id)
+        )
+
+        RotationMember.delete().where(
+            (RotationMember.user == user_id) &
+            (RotationMember.rotation.in_(rotation_ids_query))
+        ).execute()
+
+        RotationOverride.delete().where(
+            (RotationOverride.user == user_id) &
+            (RotationOverride.rotation.in_(rotation_ids_query))
+        ).execute()
+
+        membership.delete_instance()
+
+    return {
+        "id": membership_id,
+        "team_id": team_id,
+        "group_id": group_id,
+        "user_id": user_id,
+    }

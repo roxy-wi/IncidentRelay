@@ -1,45 +1,45 @@
 <link rel="stylesheet" href="/static/css/calendar_week.css">
 
 <div class="calendar-page">
-    <div class="calendar-summary-grid">
-        <div class="calendar-summary-card calendar-summary-primary">
-            <div class="calendar-summary-icon">👥</div>
+    <div class="summary-grid">
+        <div class="summary-card summary-primary">
+            <div class="summary-icon">👥</div>
             <div>
-                <div class="calendar-summary-title">Visible teams</div>
-                <div id="calendar-summary-teams" class="calendar-summary-value">0</div>
-                <div class="calendar-summary-hint">Current calendar scope</div>
+                <div class="summary-title">Visible teams</div>
+                <div id="calendar-summary-teams" class="summary-value">0</div>
+                <div class="summary-hint">Current calendar scope</div>
             </div>
         </div>
 
-        <div class="calendar-summary-card calendar-summary-success">
-            <div class="calendar-summary-icon">✓</div>
+        <div class="summary-card summary-success">
+            <div class="summary-icon">✓</div>
             <div>
-                <div class="calendar-summary-title">People on call</div>
-                <div id="calendar-summary-users" class="calendar-summary-value">0</div>
-                <div class="calendar-summary-hint">Unique users in range</div>
+                <div class="summary-title">People on call</div>
+                <div id="calendar-summary-users" class="summary-value">0</div>
+                <div class="summary-hint">Unique users in range</div>
             </div>
         </div>
 
-        <div class="calendar-summary-card calendar-summary-warning">
-            <div class="calendar-summary-icon">↻</div>
+        <div class="summary-card summary-warning">
+            <div class="summary-icon">↻</div>
             <div>
-                <div class="calendar-summary-title">Assignments</div>
-                <div id="calendar-summary-assignments" class="calendar-summary-value">0</div>
-                <div class="calendar-summary-hint">Scheduled shifts</div>
+                <div class="summary-title">Assignments</div>
+                <div id="calendar-summary-assignments" class="summary-value">0</div>
+                <div class="summary-hint">Scheduled shifts</div>
             </div>
         </div>
 
-        <div class="calendar-summary-card calendar-summary-info">
-            <div class="calendar-summary-icon">⌁</div>
+        <div class="summary-card summary-info">
+            <div class="summary-icon">⌁</div>
             <div>
-                <div class="calendar-summary-title">Overrides</div>
-                <div id="calendar-summary-overrides" class="calendar-summary-value">0</div>
-                <div class="calendar-summary-hint">Manual changes</div>
+                <div class="summary-title">Overrides</div>
+                <div id="calendar-summary-overrides" class="summary-value">0</div>
+                <div class="summary-hint">Manual changes</div>
             </div>
         </div>
     </div>
 
-    <div class="calendar-layout-grid">
+    <div class="page-layout-grid">
         <section class="card calendar-card">
             <div class="card-header calendar-header">
                 <div>
@@ -79,21 +79,21 @@
             </div>
 
             <div class="calendar-body">
-                <div id="calendar-legend" class="calendar-legend"></div>
+                <div id="calendar-legend" class="legend"></div>
                 <div id="calendar-grid" class="calendar-week-grid"></div>
             </div>
         </section>
 
-        <aside class="card calendar-details-card">
-            <div class="card-header calendar-details-header">
+        <aside class="card page-details-card">
+            <div class="card-header details-header">
                 <div>
                     <h2>Shift details</h2>
                     <div id="calendar-details-subtitle" class="card-subtitle">Select an assignment</div>
                 </div>
             </div>
 
-            <div id="calendar-details-body" class="calendar-details-body">
-                <div class="calendar-details-empty">
+            <div id="calendar-details-body" class="details-body">
+                <div class="details-empty">
                     Click any shift in the calendar to see user, team, rotation and time range.
                 </div>
             </div>

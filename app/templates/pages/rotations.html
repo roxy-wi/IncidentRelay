@@ -1,45 +1,45 @@
 <link rel="stylesheet" href="/static/css/rotations.css">
 
 <div class="rotations-page">
-    <div class="rotations-summary-grid">
-        <div class="rotations-summary-card rotations-summary-primary">
-            <div class="rotations-summary-icon">↻</div>
+    <div class="summary-grid">
+        <div class="summary-card summary-primary">
+            <div class="summary-icon">↻</div>
             <div>
-                <div class="rotations-summary-title">Rotations</div>
-                <div id="rotations-summary-total" class="rotations-summary-value">0</div>
-                <div class="rotations-summary-hint">Current scope</div>
+                <div class="summary-title">Rotations</div>
+                <div id="rotations-summary-total" class="summary-value">0</div>
+                <div class="summary-hint">Current scope</div>
             </div>
         </div>
 
-        <div class="rotations-summary-card rotations-summary-success">
-            <div class="rotations-summary-icon">✓</div>
+        <div class="summary-card summary-success">
+            <div class="summary-icon">✓</div>
             <div>
-                <div class="rotations-summary-title">Active</div>
-                <div id="rotations-summary-active" class="rotations-summary-value">0</div>
-                <div class="rotations-summary-hint">Enabled rotations</div>
+                <div class="summary-title">Active</div>
+                <div id="rotations-summary-active" class="summary-value">0</div>
+                <div class="summary-hint">Enabled rotations</div>
             </div>
         </div>
 
-        <div class="rotations-summary-card rotations-summary-info">
-            <div class="rotations-summary-icon">👤</div>
+        <div class="summary-card summary-info">
+            <div class="summary-icon">👤</div>
             <div>
-                <div class="rotations-summary-title">On call now</div>
-                <div id="rotations-summary-oncall" class="rotations-summary-value">0</div>
-                <div class="rotations-summary-hint">Assigned users</div>
+                <div class="summary-title">On call now</div>
+                <div id="rotations-summary-oncall" class="summary-value">0</div>
+                <div class="summary-hint">Assigned users</div>
             </div>
         </div>
 
-        <div class="rotations-summary-card rotations-summary-warning">
-            <div class="rotations-summary-icon">⏱</div>
+        <div class="summary-card summary-warning">
+            <div class="summary-icon">⏱</div>
             <div>
-                <div class="rotations-summary-title">With reminders</div>
-                <div id="rotations-summary-reminders" class="rotations-summary-value">0</div>
-                <div class="rotations-summary-hint">Reminder configured</div>
+                <div class="summary-title">With reminders</div>
+                <div id="rotations-summary-reminders" class="summary-value">0</div>
+                <div class="summary-hint">Reminder configured</div>
             </div>
         </div>
     </div>
 
-    <div class="rotations-layout-grid">
+    <div class="page-layout-grid">
         <section class="card rotations-card">
             <div class="card-header rotations-card-header">
                 <div>
@@ -59,9 +59,9 @@
                 </div>
             </div>
 
-            <div class="rotations-toolbar">
-                <div class="rotations-search">
-                    <span class="rotations-search-icon">⌕</span>
+            <div class="page-toolbar">
+                <div class="page-toolbar-search">
+                    <span class="page-toolbar-search-icon">⌕</span>
                     <input
                         id="rotations-search"
                         class="input"
@@ -71,11 +71,11 @@
                     >
                 </div>
 
-                <select id="rotations-team-filter" class="input rotations-filter">
+                <select id="rotations-team-filter" class="input page-toolbar-filter">
                     <option value="">All teams</option>
                 </select>
 
-                <select id="rotations-status-filter" class="input rotations-filter">
+                <select id="rotations-status-filter" class="input page-toolbar-filter">
                     <option value="">All statuses</option>
                     <option value="active">Active</option>
                     <option value="inactive">Inactive</option>
@@ -102,153 +102,36 @@
             </div>
         </section>
 
-        <aside class="card rotations-details-card">
-            <div class="card-header rotations-details-header">
+        <aside class="card page-details-card">
+            <div class="card-header details-header">
                 <div>
                     <h2>Rotation details</h2>
                     <div id="rotation-details-subtitle" class="card-subtitle">Select a rotation</div>
                 </div>
             </div>
 
-            <div id="rotation-details-body" class="rotations-details-body">
-                <div class="rotations-details-empty">
+            <div id="rotation-details-body" class="details-body">
+                <div class="details-empty">
                     Click a rotation name to see current on-call user, cadence, reminder and quick actions.
                 </div>
             </div>
         </aside>
     </div>
 
-{#    <div class="rotations-bottom-grid">#}
-{#        <section class="card rotations-card">#}
-{#            <div class="card-header">#}
-{#                <div>#}
-{#                    <h2 id="rotation-members-title">Rotation members</h2>#}
-{#                    <div class="card-subtitle">Select a rotation and click Members</div>#}
-{#                </div>#}
-{#            </div>#}
-{##}
-{#            <div class="form-body rotations-inline-form">#}
-{#                <input id="rotation-member-id" type="hidden">#}
-{##}
-{#                <div>#}
-{#                    <label>Rotation</label>#}
-{#                    <select id="member-rotation" class="input"></select>#}
-{#                </div>#}
-{##}
-{#                <div>#}
-{#                    <label>User</label>#}
-{#                    <select id="member-user" class="input"></select>#}
-{#                </div>#}
-{##}
-{#                <div>#}
-{#                    <label>Position</label>#}
-{#                    <input id="member-position" class="input" value="0" type="number">#}
-{#                </div>#}
-{##}
-{#                <label class="rotations-checkbox">#}
-{#                    <input id="member-active" type="checkbox" checked>#}
-{#                    <span>Active</span>#}
-{#                </label>#}
-{##}
-{#                <div class="actions">#}
-{#                    <button id="save-rotation-member" type="button" class="btn btn-primary btn-small">Save member</button>#}
-{#                    <button id="reset-rotation-member-form" type="button" class="btn btn-small">Reset</button>#}
-{#                </div>#}
-{#            </div>#}
-{##}
-{#            <div class="table-wrapper">#}
-{#                <table class="data-table">#}
-{#                    <thead>#}
-{#                    <tr>#}
-{#                        <th>ID</th>#}
-{#                        <th>User</th>#}
-{#                        <th>Name</th>#}
-{#                        <th>Position</th>#}
-{#                        <th>Active</th>#}
-{#                        <th>Actions</th>#}
-{#                    </tr>#}
-{#                    </thead>#}
-{#                    <tbody id="rotation-members-table">#}
-{#                    <tr><td colspan="6">No rotation selected</td></tr>#}
-{#                    </tbody>#}
-{#                </table>#}
-{#            </div>#}
-{#        </section>#}
-{##}
-{#        <section class="card rotations-card">#}
-{#            <div class="card-header">#}
-{#                <div>#}
-{#                    <h2 id="overrides-title">Overrides</h2>#}
-{#                    <div class="card-subtitle">Temporarily replace the normal on-call user</div>#}
-{#                </div>#}
-{##}
-{#                <button id="reload-overrides" type="button" class="btn btn-small">Reload overrides</button>#}
-{#            </div>#}
-{##}
-{#            <div class="form-body rotations-inline-form">#}
-{#                <div>#}
-{#                    <label>Rotation</label>#}
-{#                    <select id="override-rotation" class="input"></select>#}
-{#                </div>#}
-{##}
-{#                <div>#}
-{#                    <label>User</label>#}
-{#                    <select id="override-user" class="input"></select>#}
-{#                </div>#}
-{##}
-{#                <div>#}
-{#                    <label>Starts at</label>#}
-{#                    <input id="override-starts-at" class="input" type="datetime-local">#}
-{#                </div>#}
-{##}
-{#                <div>#}
-{#                    <label>Ends at</label>#}
-{#                    <input id="override-ends-at" class="input" type="datetime-local">#}
-{#                </div>#}
-{##}
-{#                <div class="rotations-inline-wide">#}
-{#                    <label>Reason</label>#}
-{#                    <input id="override-reason" class="input" placeholder="Vacation, sick leave, manual replacement">#}
-{#                </div>#}
-{##}
-{#                <div class="actions">#}
-{#                    <button id="create-override" type="button" class="btn btn-primary btn-small">Create override</button>#}
-{#                </div>#}
-{#            </div>#}
-{##}
-{#            <div class="table-wrapper">#}
-{#                <table class="data-table">#}
-{#                    <thead>#}
-{#                    <tr>#}
-{#                        <th>ID</th>#}
-{#                        <th>User</th>#}
-{#                        <th>Starts</th>#}
-{#                        <th>Ends</th>#}
-{#                        <th>Reason</th>#}
-{#                        <th>Actions</th>#}
-{#                    </tr>#}
-{#                    </thead>#}
-{#                    <tbody id="overrides-table">#}
-{#                    <tr><td colspan="6">No rotation selected</td></tr>#}
-{#                    </tbody>#}
-{#                </table>#}
-{#            </div>#}
-{#        </section>#}
-{#    </div>#}
-    <div id="rotation-form-modal" class="rotation-modal" style="display: none;">
-    <div class="rotation-modal-dialog">
-        <div class="rotation-modal-header">
+    <div id="rotation-form-modal" class="app-modal" style="display: none;">
+    <div class="app-modal-dialog">
+        <div class="app-modal-header">
             <div>
                 <h2 id="rotation-form-title">Create rotation</h2>
                 <div class="card-subtitle">Create or edit on-call rotation schedule</div>
             </div>
 
-            <button id="close-rotation-form-modal" type="button" class="rotation-modal-close">
+            <button id="close-rotation-form-modal" type="button" class="app-modal-close">
                 ×
             </button>
         </div>
 
-        <div class="rotation-modal-body">
+        <div class="app-modal-body">
             <div class="form-body rotations-form-grid">
                 <input id="rotation-id" type="hidden">
 
@@ -344,7 +227,7 @@
             </div>
         </div>
 
-        <div class="rotation-modal-footer">
+        <div class="app-modal-footer">
             <button id="reset-rotation-form" type="button" class="btn">
                 Reset
             </button>
@@ -355,20 +238,20 @@
         </div>
     </div>
     </div>
-    <div id="rotation-members-modal" class="rotation-modal" style="display: none;">
-    <div class="rotation-modal-dialog rotation-modal-dialog-wide">
-        <div class="rotation-modal-header">
+    <div id="rotation-members-modal" class="app-modal" style="display: none;">
+    <div class="app-modal-dialog app-modal-dialog-wide">
+        <div class="app-modal-header">
             <div>
                 <h2 id="rotation-members-title">Rotation members</h2>
                 <div class="card-subtitle">Manage users and order for selected rotation</div>
             </div>
 
-            <button id="close-rotation-members-modal" type="button" class="rotation-modal-close">
+            <button id="close-rotation-members-modal" type="button" class="app-modal-close">
                 ×
             </button>
         </div>
 
-        <div class="rotation-modal-body">
+        <div class="app-modal-body">
             <div class="form-body rotations-inline-form">
                 <input id="rotation-member-id" type="hidden">
 
@@ -424,27 +307,27 @@
             </div>
         </div>
 
-        <div class="rotation-modal-footer">
+        <div class="app-modal-footer">
             <button id="close-rotation-members-modal-footer" type="button" class="btn">
                 Close
             </button>
         </div>
     </div>
 </div>
-    <div id="rotation-overrides-modal" class="rotation-modal" style="display: none;">
-    <div class="rotation-modal-dialog rotation-modal-dialog-wide">
-        <div class="rotation-modal-header">
+    <div id="rotation-overrides-modal" class="app-modal" style="display: none;">
+    <div class="app-modal-dialog app-modal-dialog-wide">
+        <div class="app-modal-header">
             <div>
                 <h2 id="overrides-title">Overrides</h2>
                 <div class="card-subtitle">Temporarily replace the normal on-call user</div>
             </div>
 
-            <button id="close-rotation-overrides-modal" type="button" class="rotation-modal-close">
+            <button id="close-rotation-overrides-modal" type="button" class="app-modal-close">
                 ×
             </button>
         </div>
 
-        <div class="rotation-modal-body">
+        <div class="app-modal-body">
             <div class="form-body rotations-inline-form">
                 <div>
                     <label>Rotation</label>
@@ -507,7 +390,7 @@
             </div>
         </div>
 
-        <div class="rotation-modal-footer">
+        <div class="app-modal-footer">
             <button id="close-rotation-overrides-modal-footer" type="button" class="btn">
                 Close
             </button>

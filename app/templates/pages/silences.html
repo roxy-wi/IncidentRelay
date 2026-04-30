@@ -1,16 +1,186 @@
-<div class="grid-two">
-    <div class="card">
-        <div class="card-header"><h2 id="silence-form-title">Create silence</h2></div>
-        <div class="form-body">
-            <input id="silence-id" type="hidden">
-            <label>Team</label><select id="silence-team" class="input"></select>
-            <label>Name</label><input id="silence-name" class="input" placeholder="maintenance-window">
-            <label>Reason</label><input id="silence-reason" class="input" placeholder="Maintenance">
-            <label>Starts at</label><input id="silence-starts-at" class="input" type="datetime-local">
-            <label>Ends at</label><input id="silence-ends-at" class="input" type="datetime-local">
-            <label>Matchers JSON</label><textarea id="silence-matchers" class="input textarea">{"labels":{"host":"host1"}}</textarea>
-            <div class="actions"><button id="save-silence" class="btn btn-primary">Save silence</button><button id="reset-silence-form" class="btn">Reset</button></div>
+<link rel="stylesheet" href="/static/css/silences.css">
+
+<div class="silences-page">
+    <div class="summary-grid summary-grid-5">
+        <div class="summary-card summary-primary">
+            <div class="summary-icon">#</div>
+            <div>
+                <div class="summary-title">Silences</div>
+                <div id="silences-summary-total" class="summary-value">0</div>
+                <div class="summary-hint">Current scope</div>
+            </div>
+        </div>
+
+        <div class="summary-card summary-success">
+            <div class="summary-icon">✓</div>
+            <div>
+                <div class="summary-title">Active now</div>
+                <div id="silences-summary-active" class="summary-value">0</div>
+                <div class="summary-hint">Suppressing alerts</div>
+            </div>
+        </div>
+
+        <div class="summary-card summary-info">
+            <div class="summary-icon">⏱</div>
+            <div>
+                <div class="summary-title">Scheduled</div>
+                <div id="silences-summary-scheduled" class="summary-value">0</div>
+                <div class="summary-hint">Starts later</div>
+            </div>
+        </div>
+
+        <div class="summary-card summary-warning">
+            <div class="summary-icon">⌛</div>
+            <div>
+                <div class="summary-title">Expired</div>
+                <div id="silences-summary-expired" class="summary-value">0</div>
+                <div class="summary-hint">Window ended</div>
+            </div>
+        </div>
+
+        <div class="summary-card summary-muted">
+            <div class="summary-icon">×</div>
+            <div>
+                <div class="summary-title">Disabled</div>
+                <div id="silences-summary-disabled" class="summary-value">0</div>
+                <div class="summary-hint">Not applied</div>
+            </div>
         </div>
     </div>
-    <div class="card"><div class="card-header"><h2>Silences</h2><button id="reload-silences" class="btn btn-primary">Reload</button></div><div class="table-wrapper"><table class="data-table"><thead><tr><th>ID</th><th>Team</th><th>Name</th><th>Reason</th><th>Start</th><th>End</th><th>Enabled</th><th>Actions</th></tr></thead><tbody id="silences-table"></tbody></table></div></div>
+
+    <div class="page-layout-grid">
+        <section class="card page-main-card silences-card">
+            <div class="card-header">
+                <div>
+                    <h2>Silence rules</h2>
+                    <div class="card-subtitle">
+                        Showing <span id="silences-filtered-count">0</span>
+                        of <span id="silences-total-count">0</span> silences
+                    </div>
+                </div>
+
+                <div class="card-header-actions">
+                    <button id="open-silence-create-modal" type="button" class="btn btn-primary btn-small">
+                        New silence
+                    </button>
+
+                    <button id="reload-silences" type="button" class="btn btn-small">
+                        Reload
+                    </button>
+                </div>
+            </div>
+
+            <div class="page-toolbar">
+                <div class="page-toolbar-search">
+                    <span class="page-toolbar-search-icon">⌕</span>
+                    <input
+                        id="silences-search"
+                        class="input"
+                        type="search"
+                        placeholder="Search silences, teams, reason, matchers..."
+                        autocomplete="off"
+                    >
+                </div>
+
+                <select id="silences-status-filter" class="input page-toolbar-filter">
+                    <option value="">All statuses</option>
+                    <option value="active">Active now</option>
+                    <option value="scheduled">Scheduled</option>
+                    <option value="expired">Expired</option>
+                    <option value="disabled">Disabled</option>
+                </select>
+            </div>
+
+            <div class="table-wrapper">
+                <table class="data-table silences-table">
+                    <thead>
+                    <tr>
+                        <th>Silence</th>
+                        <th>Team</th>
+                        <th>Reason</th>
+                        <th>Window</th>
+                        <th>Matchers</th>
+                        <th>Status</th>
+                        <th class="silences-actions-th">Actions</th>
+                    </tr>
+                    </thead>
+                    <tbody id="silences-table"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <aside class="card page-details-card silences-details-card">
+            <div class="card-header details-header">
+                <div>
+                    <h2>Silence details</h2>
+                    <div id="silence-details-subtitle" class="card-subtitle">Select a silence</div>
+                </div>
+            </div>
+
+            <div id="silence-details-body" class="silences-details-body">
+                <div class="details-empty">
+                    Click a silence name to inspect time window, reason and matchers.
+                </div>
+            </div>
+        </aside>
+    </div>
+</div>
+
+<div id="silence-form-modal" class="app-modal" style="display: none;">
+    <div class="app-modal-dialog">
+        <div class="app-modal-header">
+            <div>
+                <h2 id="silence-form-title">Create silence</h2>
+                <div class="card-subtitle">
+                    Silence matching alerts for a selected team and time window.
+                </div>
+            </div>
+
+            <button id="close-silence-form-modal" type="button" class="app-modal-close">×</button>
+        </div>
+
+        <div class="app-modal-body">
+            <div class="form-body silences-form-grid">
+                <input id="silence-id" type="hidden">
+
+                <div>
+                    <label>Team</label>
+                    <select id="silence-team" class="input"></select>
+                </div>
+
+                <div>
+                    <label>Name</label>
+                    <input id="silence-name" class="input" placeholder="mute noisy host">
+                </div>
+
+                <div class="silences-form-wide">
+                    <label>Reason</label>
+                    <input id="silence-reason" class="input" placeholder="Maintenance window">
+                </div>
+
+                <div>
+                    <label>Starts at</label>
+                    <input id="silence-starts-at" class="input" type="datetime-local">
+                </div>
+
+                <div>
+                    <label>Ends at</label>
+                    <input id="silence-ends-at" class="input" type="datetime-local">
+                </div>
+
+                <div class="silences-form-wide">
+                    <label>Matchers JSON</label>
+                    <textarea id="silence-matchers" class="input" rows="7">{"labels":{"host":"host1"}}</textarea>
+                    <div class="help-text">
+                        Example: {"labels":{"host":"host1"}}. Matching alerts will be suppressed during the silence window.
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="app-modal-footer">
+            <button id="reset-silence-form" type="button" class="btn">Reset</button>
+            <button id="save-silence" type="button" class="btn btn-primary">Save silence</button>
+        </div>
+    </div>
 </div>

@@ -1,3 +1,5 @@
+import os
+import logging
 import smtplib
 from email.message import EmailMessage
 from urllib.parse import urljoin
@@ -6,6 +8,8 @@ import requests
 
 from app.settings import Config
 from app.notifiers.base import BaseNotifier
+
+logger = logging.getLogger("oncall.alerts")
 
 
 class TelegramNotifier(BaseNotifier):
@@ -449,3 +453,141 @@ class EmailNotifier(BaseNotifier):
             smtp.send_message(message)
 
         return {"provider": self.name}
+
+
+class VoiceCallNotifier(BaseNotifier):
+    """
+    Voice call notification stub.
+
+    This notifier does not call any provider yet.
+    It only logs that a phone call should be placed.
+    """
+
+    name = "voice_call"
+    supports_update = False
+
+    allowed_events = {"notification", "reminder", "escalation", "test"}
+
+    severity_aliases = {
+        "crit": "critical",
+        "critical": "critical",
+        "error": "critical",
+        "high": "high",
+        "medium": "medium",
+        "warning": "warning",
+        "warn": "warning",
+        "low": "low",
+        "info": "info",
+        "information": "info",
+    }
+
+    @staticmethod
+    def _get_voice_call_provider() -> str:
+        """
+        Return an admin-configured voice call provider.
+        """
+        return os.getenv("INCIDENTRELAY_VOICE_PROVIDER", "stub")
+
+    def send(self, channel, alert, text, event_type="notification"):
+        """
+        Log that a voice call should be made.
+
+        Future implementation:
+        - apply notification_rules before severity fallback;
+        - call provider adapter;
+        - store provider call id in external_message_id.
+        """
+        config = channel.config or {}
+
+        if event_type not in self.allowed_events:
+            return self._skip("unsupported_event", channel, alert, event_type)
+
+        if event_type != "test" and alert.status != "firing":
+            return self._skip("alert_not_firing", channel, alert, event_type)
+
+        if event_type != "test" and not self._matches_severity(config, alert):
+            return self._skip("severity_not_matched", channel, alert, event_type)
+
+        rules = config.get("notification_rules") or []
+        if rules:
+            logger.info(
+                "voice notification_rules are configured but not implemented yet; "
+                "falling back to call_on_severities",
+                extra={
+                    "extra": {
+                        "channel_id": channel.id,
+                        "alert_id": getattr(alert, "id", None),
+                        "rules_count": len(rules),
+                    }
+                },
+            )
+
+        assignee = getattr(alert, "assignee", None)
+        phone = getattr(assignee, "phone", None) if assignee else None
+        username = getattr(assignee, "username", None) if assignee else None
+        provider = self._get_voice_call_provider()
+
+        logger.warning(
+            "VOICE CALL STUB: should call on-call user",
+            extra={
+                "extra": {
+                    "channel_id": channel.id,
+                    "channel_name": channel.name,
+                    "alert_id": getattr(alert, "id", None),
+                    "event_type": event_type,
+                    "severity": getattr(alert, "severity", None),
+                    "status": getattr(alert, "status", None),
+                    "assignee": username,
+                    "phone": phone,
+                    "provider": provider,
+                    "call_on_severities": config.get("call_on_severities") or [],
+                    "future_notification_rules": rules,
+                }
+            },
+        )
+
+        return {
+            "provider": self.name,
+            "external_message_id": f"voice-stub-alert-{getattr(alert, 'id', 0)}-{event_type}",
+            "external_channel_id": str(channel.id),
+        }
+
+    def _matches_severity(self, config, alert):
+        """
+        Return True if alert severity should trigger voice call.
+        """
+        call_on_severities = config.get("call_on_severities") or []
+        severity = self._normalize_severity(getattr(alert, "severity", None))
+
+        return severity in call_on_severities
+
+    def _normalize_severity(self, severity):
+        """
+        Normalize severity aliases.
+        """
+        value = str(severity or "").lower().strip()
+        return self.severity_aliases.get(value, value)
+
+    def _skip(self, reason, channel, alert, event_type):
+        """
+        Return a generic skipped result for notifier pipeline.
+        """
+        logger.debug(
+            "voice call skipped",
+            extra={
+                "extra": {
+                    "reason": reason,
+                    "channel_id": channel.id,
+                    "alert_id": getattr(alert, "id", None),
+                    "event_type": event_type,
+                    "severity": getattr(alert, "severity", None),
+                    "status": getattr(alert, "status", None),
+                }
+            },
+        )
+
+        return {
+            "provider": self.name,
+            "skipped": True,
+            "skip_reason": reason,
+        }

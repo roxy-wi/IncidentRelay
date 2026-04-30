@@ -2,30 +2,6 @@
     vertical-align: middle;
 }
 
-.alerts-table .actions-cell {
-    display: table-cell;
-    white-space: nowrap;
-    min-width: 260px;
-}
-
-.alerts-table .table-actions {
-    display: flex;
-    align-items: center;
-    gap: 7px;
-    flex-wrap: nowrap;
-    min-width: max-content;
-}
-
-.alerts-table .alert-title-cell {
-    min-width: 360px;
-}
-
-.alerts-table .empty-table-cell {
-    text-align: center;
-    color: #7b8794;
-    padding: 16px;
-}
-
 .data-table td.actions {
     display: table-cell;
 }

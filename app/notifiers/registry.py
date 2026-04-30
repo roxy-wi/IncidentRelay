@@ -6,6 +6,7 @@ from app.notifiers.plugins import (
     SlackNotifier,
     TeamsNotifier,
     TelegramNotifier,
+    VoiceCallNotifier
 )
 
 
@@ -17,6 +18,7 @@ NOTIFIERS = {
     "discord": DiscordNotifier(),
     "teams": TeamsNotifier(),
     "email": EmailNotifier(),
+    "voice_call": VoiceCallNotifier(),
 }
 
 

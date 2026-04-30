@@ -32,11 +32,11 @@ def build_openapi_spec():
     return {
         "openapi": "3.0.3",
         "info": {
-            "title": "On-call Service API",
+            "title": "IncidentRelay API",
             "version": get_service_version(),
             "description": (
                 "API-first on-call management service. The API manages teams, users, "
-                "PagerDuty-like rotations, alert routes, notification channels, silences, "
+                "rotations, alert routes, notification channels, silences, "
                 "incoming webhooks and alert acknowledgement workflow."
             ),
         },

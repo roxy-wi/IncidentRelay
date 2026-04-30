@@ -45,7 +45,21 @@ def notify_alert(alert, event_type="notification"):
         if not channel.enabled:
             continue
 
-        notifier = get_notifier(channel.channel_type)
+        try:
+            notifier = get_notifier(channel.channel_type)
+        except RuntimeError:
+            logger.exception(
+                "unsupported notification channel type",
+                extra={
+                    "extra": {
+                        "alert_id": alert.id,
+                        "channel_id": channel.id,
+                        "channel_type": channel.channel_type,
+                        "event_type": event_type,
+                    }
+                },
+            )
+            continue
         delivery = notifications_repo.get_notification(alert.id, channel.id)
 
         try:
@@ -65,6 +79,20 @@ def notify_alert(alert, event_type="notification"):
                 continue
 
             result = notifier.send(channel, alert, text, event_type=event_type) or {}
+            if result.get("skipped"):
+                logger.info(
+                    "notification skipped",
+                    extra={
+                        "extra": {
+                            "alert_id": alert.id,
+                            "channel_id": channel.id,
+                            "event_type": event_type,
+                            "provider": result.get("provider") or channel.channel_type,
+                            "reason": result.get("skip_reason"),
+                        }
+                    },
+                )
+                continue
             notifications_repo.save_notification(
                 alert_id=alert.id,
                 channel_id=channel.id,
@@ -101,7 +129,21 @@ def update_alert_messages(alert, event_type):
         if not channel.enabled:
             continue
 
-        notifier = get_notifier(channel.channel_type)
+        try:
+            notifier = get_notifier(channel.channel_type)
+        except RuntimeError:
+            logger.exception(
+                "unsupported notification channel type",
+                extra={
+                    "extra": {
+                        "alert_id": alert.id,
+                        "channel_id": channel.id,
+                        "channel_type": channel.channel_type,
+                        "event_type": event_type,
+                    }
+                },
+            )
+            continue
         if not notifier.supports_update:
             continue
 

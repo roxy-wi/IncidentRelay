@@ -1,0 +1,146 @@
+.routes-page {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.routes-table td {
+    vertical-align: middle;
+}
+
+.routes-actions-th {
+    min-width: 260px;
+}
+
+.route-name-button {
+    border: 0;
+    padding: 0;
+    background: transparent;
+    color: #101828;
+    cursor: pointer;
+    font: inherit;
+    font-weight: 800;
+    text-align: left;
+}
+
+.route-name-button:hover {
+    color: var(--primary);
+    text-decoration: underline;
+}
+
+.route-row-subtitle {
+    margin-top: 4px;
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.route-pill,
+.route-status-pill,
+.route-token-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 24px;
+    padding: 4px 9px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.route-pill {
+    color: #175cd3;
+    background: #d1e9ff;
+}
+
+.route-token-pill {
+    color: #344054;
+    background: #f2f4f7;
+}
+
+.route-status-enabled {
+    color: #027a48;
+    background: #d1fadf;
+}
+
+.route-status-disabled {
+    color: #475467;
+    background: #f2f4f7;
+}
+
+.route-channels-list {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 5px;
+}
+
+.route-channel-chip {
+    display: inline-flex;
+    align-items: center;
+    min-height: 22px;
+    padding: 3px 7px;
+    border-radius: 999px;
+    color: #344054;
+    background: #f2f4f7;
+    font-size: 11px;
+    font-weight: 700;
+}
+
+.route-token-dialog {
+    width: min(720px, 100%);
+}
+
+.routes-form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.routes-form-wide {
+    grid-column: 1 / -1;
+}
+
+.routes-checkbox {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    color: #344054;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.routes-checkbox input {
+    width: 16px;
+    height: 16px;
+    margin: 0;
+}
+
+.route-token-value {
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+}
+
+.routes-empty-cell {
+    padding: 18px;
+    color: var(--muted);
+    text-align: center;
+}
+
+body.modal-open {
+    overflow: hidden;
+}
+
+@media (max-width: 1300px) {
+    .routes-layout-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .routes-details-card {
+        position: static;
+    }
+}
+
+@media (max-width: 900px) {
+    .routes-form-grid {
+        grid-template-columns: 1fr;
+    }
+}

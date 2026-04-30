@@ -6,50 +6,6 @@
     gap: 18px;
 }
 
-.overview-hero {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    gap: 18px;
-    padding: 24px;
-    border: 1px solid rgba(74, 144, 226, 0.18);
-    border-radius: 18px;
-    background:
-        radial-gradient(circle at 8% 20%, rgba(74, 144, 226, 0.18), transparent 28%),
-        radial-gradient(circle at 95% 10%, rgba(255, 91, 0, 0.12), transparent 26%),
-        linear-gradient(135deg, #ffffff 0%, #f7fbff 100%);
-    box-shadow: var(--shadow);
-}
-
-.overview-eyebrow {
-    color: var(--primary);
-    font-size: 12px;
-    font-weight: 800;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    margin-bottom: 6px;
-}
-
-.overview-hero h2 {
-    margin: 0;
-    color: #101828;
-    font-size: 30px;
-    line-height: 1.15;
-    letter-spacing: -0.03em;
-}
-
-.overview-hero p {
-    margin: 8px 0 0 0;
-    color: var(--muted);
-    font-size: 14px;
-}
-
-.overview-hero-actions {
-    display: flex;
-    align-items: center;
-    gap: 8px;
-}
-
 .overview-layout-grid {
     display: grid;
     grid-template-columns: minmax(0, 2.1fr) minmax(320px, 0.9fr);

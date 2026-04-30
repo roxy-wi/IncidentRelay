@@ -3,6 +3,39 @@ from datetime import datetime
 from app.modules.db.models import User, UserGroup
 
 
+def list_users_by_group_ids(group_ids, active_only=True):
+    """
+    Return unique users that belong to one of the provided groups.
+
+    Args:
+        group_ids: List of group ids available to the current user.
+        active_only: If True, return only active users.
+
+    Returns:
+        list[User]: Users ordered by id.
+    """
+    if not group_ids:
+        return []
+
+    query = (
+        User
+        .select()
+        .join(UserGroup)
+        .where(
+            (UserGroup.group.in_(group_ids)) &
+            (UserGroup.active == True) &
+            (User.deleted == False)
+        )
+        .distinct()
+        .order_by(User.id.asc())
+    )
+
+    if active_only:
+        query = query.where(User.active == True)
+
+    return list(query)
+
+
 def list_users(active_only=False, group_ids=None, include_deleted=False):
     """
     Return users ordered by id.

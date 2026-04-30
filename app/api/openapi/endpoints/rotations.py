@@ -215,4 +215,40 @@ def paths():
                 "responses": {"201": response("Override created.")},
             },
         },
+        "/api/rotations/overrides/{override_id}": {
+            "delete": {
+                "tags": ["rotations"],
+                "summary": "Delete rotation override",
+                "operationId": "deleteRotationOverride",
+                "parameters": [path_param("override_id", "Rotation override id.")],
+                "responses": {"200": response("Override deleted.")},
+            },
+        },
+        "/api/rotations/members/{member_id}": {
+            "put": {
+                "tags": ["rotations"],
+                "summary": "Update rotation member",
+                "operationId": "updateRotationMember",
+                "parameters": [path_param("member_id", "Rotation member id.")],
+                "requestBody": json_body(
+                    "Updated rotation member.",
+                    {
+                        "type": "object",
+                        "required": ["position"],
+                        "properties": {
+                            "position": {"type": "integer", "minimum": 0},
+                            "active": {"type": "boolean", "default": True},
+                        },
+                    },
+                ),
+                "responses": {"200": response("Rotation member updated.")},
+            },
+            "delete": {
+                "tags": ["rotations"],
+                "summary": "Disable rotation member",
+                "operationId": "deleteRotationMember",
+                "parameters": [path_param("member_id", "Rotation member id.")],
+                "responses": {"200": response("Rotation member disabled.")},
+            },
+        },
     }

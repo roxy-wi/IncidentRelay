@@ -14,7 +14,7 @@ from app.services.validation import validate_body
 channels_bp = Blueprint("channels_api", __name__)
 
 
-CHANNEL_TYPES = ["telegram", "slack", "mattermost", "webhook", "discord", "teams", "email"]
+CHANNEL_TYPES = ["telegram", "slack", "mattermost", "webhook", "discord", "teams", "email", "voice_call"]
 
 
 @channels_bp.route("/types", methods=["GET"])
@@ -187,13 +187,13 @@ def test_channel(channel_id):
         assignee=None,
         status="test",
         source="manual-test",
-        title="On-call test notification",
+        title="IncidentRelay test notification",
         message="This is a test notification from the IncidentRelay.",
         severity="info",
     )
 
     try:
-        notifier.send(channel, fake_alert, "On-call test notification")
+        notifier.send(channel, fake_alert, "IncidentRelay test notification", event_type="test")
     except Exception as exc:
         write_audit(
             "channel.test.failed",

@@ -45,7 +45,7 @@ def get_rotation(rotation_id):
 @rotations_bp.route("", methods=["POST"])
 def create_rotation():
     """
-    Create a PagerDuty-like rotation.
+    Create a rotation.
     """
 
     payload, error = validate_body(RotationCreateSchema)
@@ -94,7 +94,7 @@ def create_rotation():
 @rotations_bp.route("/<int:rotation_id>", methods=["PUT"])
 def update_rotation(rotation_id):
     """
-    Update a PagerDuty-like rotation.
+    Update a rotation.
     """
 
     payload, error = validate_body(RotationUpdateSchema)
@@ -184,9 +184,43 @@ def add_rotation_member(rotation_id):
     error = require_team_write(rotation.team_id)
     if error:
         return error
+
+    try:
+        rotations_repo.ensure_user_in_rotation_team(rotation_id, payload.user_id)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
+
     member = rotations_repo.add_rotation_member(rotation_id, payload.user_id, payload.position)
     write_audit("rotation.member.add", object_type="rotation", object_id=rotation_id, team_id=member.rotation.team.id, data=payload.model_dump())
     return jsonify({"id": member.id}), 201
+
+
+@rotations_bp.route("/<int:rotation_id>/eligible-users", methods=["GET"])
+def list_rotation_eligible_users(rotation_id):
+    """
+    Return active users from the team of this rotation.
+
+    These users can be added as rotation members or selected for overrides.
+    """
+    rotation = rotations_repo.get_rotation(rotation_id)
+
+    error = require_team_read(rotation.team_id)
+    if error:
+        return error
+
+    memberships = rotations_repo.list_rotation_team_users(rotation_id, active_only=True)
+
+    return jsonify([
+        {
+            "user_id": membership.user.id,
+            "username": membership.user.username,
+            "display_name": membership.user.display_name,
+            "team_member_id": membership.id,
+            "role": membership.role,
+            "active": membership.active,
+        }
+        for membership in memberships
+    ])
 
 
 @rotations_bp.route("/members/<int:member_id>", methods=["PUT"])
@@ -231,10 +265,34 @@ def update_rotation_member(member_id):
 @rotations_bp.route("/members/<int:member_id>", methods=["DELETE"])
 def delete_rotation_member(member_id):
     """
-    Disable a rotation member.
+    Remove a user from a rotation.
     """
-
     member = rotations_repo.get_rotation_member(member_id)
+
+    error = require_team_write(member.rotation.team.id)
+    if error:
+        return error
+
+    data = rotations_repo.delete_rotation_member(member_id)
+
+    write_audit(
+        "rotation.member.remove",
+        object_type="rotation",
+        object_id=data["rotation_id"],
+        team_id=data["team_id"],
+        data=data,
+    )
+
+    return jsonify({"deleted": True, "id": member_id})
+
+
+@rotations_bp.route("/members/<int:member_id>/disable", methods=["POST"])
+def disable_rotation_member(member_id):
+    """
+    Disable a rotation member without deleting it.
+    """
+    member = rotations_repo.get_rotation_member(member_id)
+
     error = require_team_write(member.rotation.team.id)
     if error:
         return error
@@ -249,7 +307,7 @@ def delete_rotation_member(member_id):
         data={"member_id": member.id, "user_id": member.user.id},
     )
 
-    return jsonify({"deleted": True, "id": member.id})
+    return jsonify({"disabled": True, "id": member.id})
 
 
 @rotations_bp.route("/<int:rotation_id>/overrides", methods=["GET"])
@@ -292,6 +350,11 @@ def create_rotation_override(rotation_id):
     error = require_team_write(rotation.team_id)
     if error:
         return error
+
+    try:
+        rotations_repo.ensure_user_in_rotation_team(rotation_id, payload.user_id)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
 
     override = rotations_repo.create_rotation_override(
         rotation_id=rotation_id,

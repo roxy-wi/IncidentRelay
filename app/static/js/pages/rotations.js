@@ -20,25 +20,6 @@ function formatSeconds(seconds) {
     if (seconds % 60 === 0) { return (seconds / 60) + "m"; }
     return seconds + "s";
 }
-function getRotationCadence(rotation) {
-    /*
-     * Return human-readable rotation cadence.
-     */
-    if (rotation.rotation_type === "custom") {
-        return "every " + rotation.interval_value + " " + rotation.interval_unit;
-    }
-
-    if (rotation.rotation_type === "weekly") {
-        return "weekly";
-    }
-
-    if (rotation.rotation_type === "daily") {
-        return "daily";
-    }
-
-    return rotation.rotation_type || "-";
-}
-
 
 function rotationInitials(value) {
     /*
@@ -208,7 +189,6 @@ function refreshRotations(doneCallback) {
         const tbody = $("#rotations-table");
         const memberSelect = $("#member-rotation");
         const overrideSelect = $("#override-rotation");
-
         const savedMemberRotationId = selectedRotationForMembers || memberSelect.val();
         const savedOverrideRotationId = overrideSelect.val();
 
@@ -262,7 +242,18 @@ function refreshRotations(doneCallback) {
 
             const row = $("<tr>");
 
-            row.append($("<td>").text(rotation.id));
+            // row.append($("<td>").text('#' + rotation.id));
+             row.append(
+                $("<td>").append(
+                    $("<button>")
+                        .attr("type", "button")
+                        .addClass("rotation-name-button")
+                        .text('#' + rotation.id)
+                        .on("click", function () {
+                            renderRotationDetails(rotation);
+                        })
+                )
+            );
             row.append($("<td>").text(rotation.team_slug));
             row.append(
                 $("<td>").append(
@@ -275,8 +266,8 @@ function refreshRotations(doneCallback) {
                         })
                 )
             );
-            row.append($("<td>").text(rotation.current_oncall || "-"));
             row.append($("<td>").text(cadence));
+            row.append($("<td>").text(rotation.current_oncall || "-"));
             row.append($("<td>").text(rotation.handoff_time || "-"));
             row.append($("<td>").text(formatSeconds(rotation.reminder_interval_seconds)));
             row.append($("<td>").text(rotation.enabled ? "yes" : "no"));
@@ -317,7 +308,7 @@ function refreshRotations(doneCallback) {
                 $("<button>")
                     .attr("type", "button")
                     .addClass("btn btn-danger btn-small")
-                    .text("Delete")
+                    .text("Remove")
                     .on("click", function () {
                         deleteRotation(rotation.id);
                     })
@@ -463,7 +454,7 @@ function resetRotationForm() {
 
 function selectMemberRotation(rotationId) {
     /*
-     * Select a rotation, load members and open members modal.
+     * Select a rotation, load eligible users, load members and open modal.
      */
     $("#member-rotation").val(String(rotationId));
 
@@ -471,8 +462,14 @@ function selectMemberRotation(rotationId) {
         return Number(item.id) === Number(rotationId);
     });
 
-    loadRotationMembers(rotationId, rotation ? rotation.name : "rotation #" + rotationId);
-    openRotationMembersModal();
+    if (!rotation) {
+        return;
+    }
+
+    fillRotationEligibleUserSelect("#member-user", rotationId, function () {
+        loadRotationMembers(rotationId, rotation.name || "rotation #" + rotationId);
+        openRotationMembersModal();
+    });
 }
 
 function loadRotationMembers(rotationId, rotationName) {
@@ -504,9 +501,18 @@ function loadRotationMembers(rotationId, rotationName) {
             actions.append($("<button>").attr("type", "button").addClass("btn btn-small").text("Edit").on("click", function () {
                 editRotationMember(member);
             }));
-            actions.append($("<button>").attr("type", "button").addClass("btn btn-danger btn-small").text("Disable").on("click", function () {
+            actions.append($("<button>").attr("type", "button").addClass("btn btn-warning btn-small").text("Disable").on("click", function () {
                 disableRotationMember(member.id);
             }));
+            actions.append(
+                $("<button>")
+                    .attr("type", "button")
+                    .addClass("btn btn-danger btn-small")
+                    .text("Remove")
+                    .on("click", function () {
+                        removeRotationMember(member.id);
+                    })
+            );
             row.append(actions);
             tbody.append(row);
         });
@@ -587,7 +593,7 @@ function disableRotationMember(memberId) {
         return;
     }
 
-    apiDelete("/api/rotations/members/" + memberId, function () {
+    apiPost("/api/rotations/members/" + memberId + "/disable", function () {
         loadRotationMembers(selectedRotationForMembers, selectedRotationNameForMembers);
         refreshRotations();
     });
@@ -595,11 +601,22 @@ function disableRotationMember(memberId) {
 
 function selectOverrideRotation(rotationId) {
     /*
-     * Select a rotation, load overrides and open overrides modal.
+     * Select a rotation, load eligible users, load overrides and open modal.
      */
     $("#override-rotation").val(String(rotationId));
-    loadOverrides();
-    openRotationOverridesModal();
+
+    const rotation = rotationsCache.find(function (item) {
+        return Number(item.id) === Number(rotationId);
+    });
+
+    if (!rotation) {
+        return;
+    }
+
+    fillRotationEligibleUserSelect("#override-user", rotationId, function () {
+        loadOverrides();
+        openRotationOverridesModal();
+    });
 }
 
 function loadOverrides() {
@@ -672,13 +689,22 @@ function deleteOverride(overrideId) {
 }
 
 $(document).on("change", "#rotation-type", updateRotationCadenceFields);
-$(document).on("change", "#override-rotation", loadOverrides);
 $(document).on("change", "#member-rotation", function () {
-    const rotationId = $("#member-rotation").val();
-    const rotation = rotationsCache.find(function (item) { return item.id === Number(rotationId); });
-    if (rotationId) {
+    const rotationId = $(this).val();
+
+    const rotation = rotationsCache.find(function (item) {
+        return Number(item.id) === Number(rotationId);
+    });
+
+    fillRotationEligibleUserSelect("#member-user", rotationId, function () {
         loadRotationMembers(rotationId, rotation ? rotation.name : "rotation #" + rotationId);
-    }
+    });
+});
+
+$(document).on("change", "#override-rotation", function () {
+    const rotationId = $(this).val();
+
+    fillRotationEligibleUserSelect("#override-user", rotationId, loadOverrides);
 });
 $(document).on("click", "#save-rotation", saveRotation);
 $(document).on("click", "#reset-rotation-form", resetRotationForm);
@@ -792,7 +818,6 @@ function renderRotationRow(rotation) {
             .text("Edit")
             .on("click", function () {
                 editRotation(rotation.id);
-                $("html, body").animate({ scrollTop: $(".rotations-form-card").offset().top - 20 }, 200);
             })
     );
 
@@ -831,102 +856,6 @@ function renderRotationRow(rotation) {
     return row;
 }
 
-
-function rotationDetailsItem(label, value) {
-    /*
-     * Render one details item.
-     */
-    return $("<div>")
-        .addClass("rotations-details-item")
-        .append($("<div>").addClass("rotations-details-label").text(label))
-        .append($("<div>").addClass("rotations-details-value").text(value || "-"));
-}
-
-
-function renderRotationDetails(rotation) {
-    /*
-     * Render right-side details panel.
-     */
-    selectedRotationDetailsId = rotation.id;
-
-    const body = $("#rotation-details-body");
-    const currentUser = getRotationCurrentUser(rotation) || "No current user";
-
-    $("#rotation-details-subtitle").text((rotation.team_slug || rotation.team_name || "-") + " / " + (rotation.enabled ? "Active" : "Inactive"));
-
-    body.empty();
-
-    body.append(
-        $("<div>")
-            .addClass("rotations-details-user")
-            .append($("<div>").addClass("rotations-details-avatar").text(rotationInitials(currentUser)))
-            .append(
-                $("<div>")
-                    .append($("<div>").addClass("rotations-details-name").text(rotation.name || "Rotation #" + rotation.id))
-                    .append($("<div>").addClass("rotations-details-meta").text(currentUser))
-            )
-    );
-
-    body.append(
-        $("<div>")
-            .addClass("rotations-details-list")
-            .append(rotationDetailsItem("Team", rotation.team_name || rotation.team_slug))
-            .append(rotationDetailsItem("Description", rotation.description))
-            .append(rotationDetailsItem("Cadence", getRotationCadence(rotation)))
-            .append(rotationDetailsItem("Handoff time", rotation.handoff_time))
-            .append(rotationDetailsItem("Reminder", formatSeconds(rotation.reminder_interval_seconds)))
-            .append(rotationDetailsItem("Timezone", rotation.timezone))
-            .append(rotationDetailsItem("Status", rotation.enabled ? "Active" : "Inactive"))
-    );
-
-    body.append(
-        $("<div>")
-            .addClass("rotations-details-actions")
-            .append(
-                $("<button>")
-                    .attr("type", "button")
-                    .addClass("btn btn-small")
-                    .text("Edit rotation")
-                    .on("click", function () {
-                        editRotation(rotation.id);
-                        $("html, body").animate({ scrollTop: $(".rotations-form-card").offset().top - 20 }, 200);
-                    })
-            )
-            .append(
-                $("<button>")
-                    .attr("type", "button")
-                    .addClass("btn btn-small")
-                    .text("Members")
-                    .on("click", function () {
-                        selectMemberRotation(rotation.id);
-                    })
-            )
-            .append(
-                $("<button>")
-                    .attr("type", "button")
-                    .addClass("btn btn-small")
-                    .text("Overrides")
-                    .on("click", function () {
-                        selectOverrideRotation(rotation.id);
-                    })
-            )
-    );
-}
-
-
-function renderRotationDetailsEmpty() {
-    /*
-     * Render empty details state.
-     */
-    selectedRotationDetailsId = null;
-    $("#rotation-details-subtitle").text("Select a rotation");
-
-    $("#rotation-details-body").html(
-        '<div class="rotations-details-empty">' +
-        'Click a rotation name to see current on-call user, cadence, reminder and quick actions.' +
-        '</div>'
-    );
-}
 $(document).on("input", "#rotations-search", renderRotationsTable);
 $(document).on("change", "#rotations-team-filter, #rotations-status-filter", renderRotationsTable);
 function openRotationFormModal() {
@@ -1063,30 +992,14 @@ function getRotationCadence(rotation) {
     return rotation.rotation_type || "-";
 }
 
-
-function getRotationCurrentUser(rotation) {
-    /*
-     * Return current on-call user label from different possible API fields.
-     */
-    return (
-        rotation.current_oncall ||
-        rotation.current_on_call ||
-        rotation.current_user ||
-        rotation.current_username ||
-        rotation.current_display_name ||
-        ""
-    );
-}
-
-
 function rotationDetailsItem(label, value) {
     /*
      * Render one details item.
      */
     return $("<div>")
-        .addClass("rotations-details-item")
-        .append($("<div>").addClass("rotations-details-label").text(label))
-        .append($("<div>").addClass("rotations-details-value").text(value || "-"));
+        .addClass("details-item")
+        .append($("<div>").addClass("details-label").text(label))
+        .append($("<div>").addClass("details-value").text(value || "-"));
 }
 
 
@@ -1107,7 +1020,7 @@ function renderRotationDetails(rotation) {
 
     body.append(
         $("<div>")
-            .addClass("rotations-details-list")
+            .addClass("details-list")
             .append(rotationDetailsItem("Name", rotation.name))
             .append(rotationDetailsItem("Team", rotation.team_name || rotation.team_slug))
             .append(rotationDetailsItem("Current on call", getRotationCurrentUser(rotation) || "-"))
@@ -1120,7 +1033,7 @@ function renderRotationDetails(rotation) {
 
     body.append(
         $("<div>")
-            .addClass("rotations-details-actions")
+            .addClass("details-actions")
             .append(
                 $("<button>")
                     .attr("type", "button")
@@ -1161,7 +1074,7 @@ function renderRotationDetailsEmpty() {
     $("#rotation-details-subtitle").text("Select a rotation");
 
     $("#rotation-details-body").html(
-        '<div class="rotations-details-empty">' +
+        '<div class="details-empty">' +
         'Click a rotation name to see current on-call user, cadence, reminder and quick actions.' +
         '</div>'
     );
@@ -1175,4 +1088,65 @@ function renderRotationsInboxCounter(filteredRotations, allRotations) {
 
     $("#rotations-filtered-count").text(filteredRotations.length);
     $("#rotations-total-count").text(allRotations.length);
+}
+function removeRotationMember(memberId) {
+    /*
+     * Permanently remove a user from rotation.
+     */
+    if (!confirm("Remove this user from the rotation?")) {
+        return;
+    }
+
+    apiDelete("/api/rotations/members/" + memberId, function () {
+        resetRotationMemberForm();
+        loadRotationMembers(selectedRotationForMembers, selectedRotationNameForMembers);
+        refreshRotations();
+    });
+}
+function fillRotationEligibleUserSelect(selector, rotationId, callback) {
+    /*
+     * Fill user select with users eligible for this rotation.
+     */
+    const select = $(selector);
+    select.empty();
+
+    if (!rotationId) {
+        select.append(
+            $("<option>")
+                .val("")
+                .text("Select rotation first")
+        );
+
+        if (typeof callback === "function") {
+            callback([]);
+        }
+
+        return;
+    }
+
+    apiGet("/api/rotations/" + rotationId + "/eligible-users", function (users) {
+        users = asArray(users);
+
+        select.empty();
+
+        if (!users.length) {
+            select.append(
+                $("<option>")
+                    .val("")
+                    .text("No active team members")
+            );
+        }
+
+        users.forEach(function (user) {
+            select.append(
+                $("<option>")
+                    .val(user.user_id)
+                    .text("#" + user.user_id + " " + (user.display_name || user.username || "user"))
+            );
+        });
+
+        if (typeof callback === "function") {
+            callback(users);
+        }
+    });
 }

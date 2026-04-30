@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from app.modules.db.models import Rotation, RotationMember, RotationOverride
+from app.modules.db.models import Rotation, RotationMember, RotationOverride, TeamUser
 
 
 def list_rotations(team_id=None, team_ids=None, enabled_only=False, include_deleted=False):
@@ -91,16 +91,19 @@ def create_rotation_if_missing(team_id, name, description, start_at, duration_se
     return rotation
 
 
-def list_rotation_members(rotation_id):
+def list_rotation_members(rotation_id: int, active_only: bool = False):
     """
-    Return active rotation members ordered by position.
-    """
+    Return rotation members ordered by position.
 
-    return list(
-        RotationMember.select()
-        .where((RotationMember.rotation == rotation_id) & (RotationMember.active == True))
-        .order_by(RotationMember.position.asc(), RotationMember.id.asc())
-    )
+    Management UI should use active_only=False.
+    On-call calculation should use active_only=True.
+    """
+    query = RotationMember.select().where(RotationMember.rotation == rotation_id)
+
+    if active_only:
+        query = query.where(RotationMember.active == True)
+
+    return list(query.order_by(RotationMember.position.asc(), RotationMember.id.asc()))
 
 
 def add_rotation_member(rotation_id, user_id, position):
@@ -258,3 +261,67 @@ def disable_rotation_member(member_id):
     member.active = False
     member.save()
     return member
+
+
+def delete_rotation_member(member_id: int) -> dict:
+    """
+    Permanently remove user from rotation.
+    """
+    member = get_rotation_member(member_id)
+
+    data = {
+        "id": member.id,
+        "rotation_id": member.rotation.id,
+        "team_id": member.rotation.team.id,
+        "user_id": member.user.id,
+    }
+
+    member.delete_instance()
+
+    return data
+
+
+def list_rotation_team_users(rotation_id: int, active_only: bool = True):
+    """
+    Return users that belong to the team of the given rotation.
+
+    Used by UI selects for adding rotation members and overrides.
+    """
+    rotation = get_rotation(rotation_id)
+
+    query = (
+        TeamUser
+        .select()
+        .where(TeamUser.team == rotation.team_id)
+        .order_by(TeamUser.id.asc())
+    )
+
+    if active_only:
+        query = query.where(TeamUser.active == True)
+
+    return list(query)
+
+
+def ensure_user_in_rotation_team(rotation_id: int, user_id: int):
+    """
+    Ensure that user is an active member of the rotation team.
+
+    This protects API calls from manually adding users from another team.
+    """
+    rotation = get_rotation(rotation_id)
+
+    membership = (
+        TeamUser
+        .select()
+        .where(
+            (TeamUser.team == rotation.team_id) &
+            (TeamUser.user == user_id) &
+            (TeamUser.active == True)
+        )
+        .first()
+    )
+
+    if not membership:
+        raise ValueError("User is not an active member of the rotation team")
+
+    return membership

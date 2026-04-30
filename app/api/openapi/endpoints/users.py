@@ -85,8 +85,9 @@ def tags():
         {
             "name": "users",
             "description": (
-                "User management endpoints. Regular endpoints manage on-call users; "
-                "admin endpoints are reserved for the future RBAC/admin area."
+                "Returns users visible to the current principal. "
+                "Without all=1, regular users receive users from accessible groups. "
+                "Admin users receive all active users."
             ),
         }
     ]

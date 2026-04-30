@@ -1,123 +1,265 @@
-<div class="grid-two">
-    <div class="card">
-        <div class="card-header">
-            <h2 id="channel-form-title">Create channel</h2>
+<link rel="stylesheet" href="/static/css/channels.css">
+
+<div class="channels-page">
+    <div class="summary-grid">
+        <div class="summary-card summary-primary">
+            <div class="summary-icon">#</div>
+            <div>
+                <div class="summary-title">Channels</div>
+                <div id="channels-summary-total" class="summary-value">0</div>
+                <div class="summary-hint">Notification targets</div>
+            </div>
         </div>
 
-        <div class="form-body">
-            <input id="channel-id" type="hidden">
-
-            <label>Group</label>
-            <select id="channel-group" class="input"></select>
-
-            <label>Team</label>
-            <select id="channel-team" class="input"></select>
-
-            <label>Name</label>
-            <input id="channel-name" class="input" placeholder="infra-mattermost">
-
-            <label>Type</label>
-            <select id="channel-type" class="input"></select>
-
-            <div class="channel-config" data-channel-config="telegram">
-                <label>Telegram bot token</label>
-                <input id="cfg-telegram-bot-token" class="input" placeholder="123456:ABCDEF">
-
-                <label>Telegram chat ID</label>
-                <input id="cfg-telegram-chat-id" class="input" placeholder="-1001234567890">
+        <div class="summary-card summary-success">
+            <div class="summary-icon">✓</div>
+            <div>
+                <div class="summary-title">Enabled</div>
+                <div id="channels-summary-enabled" class="summary-value">0</div>
+                <div class="summary-hint">Ready to deliver</div>
             </div>
+        </div>
 
-            <div class="channel-config" data-channel-config="mattermost">
-                <label>Mattermost mode</label>
-                <select id="cfg-mm-mode" class="input">
-                    <option value="bot_api">Bot API with buttons and message updates</option>
-                    <option value="webhook">Incoming webhook only</option>
-                </select>
-
-                <div id="cfg-mm-bot-fields">
-                    <label>Mattermost URL</label>
-                    <input id="cfg-mm-api-url" class="input" placeholder="https://mattermost.example.com">
-
-                    <label>Bot token</label>
-                    <input id="cfg-mm-bot-token" class="input" placeholder="Mattermost bot access token">
-
-                    <label>Channel ID</label>
-                    <input id="cfg-mm-channel-id" class="input" placeholder="Mattermost channel id">
-
-                    <label>Callback secret</label>
-                    <input id="cfg-mm-callback-secret" class="input" placeholder="optional; defaults to MATTERMOST_ACTION_SECRET">
-
-                    <div class="help-text">
-                        Bot API mode sends messages with Acknowledge and Resolve buttons. PUBLIC_BASE_URL must be reachable from Mattermost.
-                    </div>
-                </div>
-
-                <div id="cfg-mm-webhook-fields">
-                    <label>Mattermost incoming webhook URL</label>
-                    <input id="cfg-mm-webhook-url" class="input" placeholder="https://mattermost.example.com/hooks/...">
-
-                    <div class="help-text">
-                        Incoming webhook mode sends plain messages only. It cannot show action buttons or update messages after resolve.
-                    </div>
-                </div>
+        <div class="summary-card summary-warning">
+            <div class="summary-icon">×</div>
+            <div>
+                <div class="summary-title">Disabled</div>
+                <div id="channels-summary-disabled" class="summary-value">0</div>
+                <div class="summary-hint">Muted targets</div>
             </div>
+        </div>
 
-            <div class="channel-config" data-channel-config="webhook">
-                <label>Webhook URL</label>
-                <input id="cfg-webhook-url" class="input" placeholder="https://...">
-            </div>
-
-            <div class="channel-config" data-channel-config="email">
-                <label>Recipients</label>
-                <input id="cfg-email-recipients" class="input" placeholder="ops@example.com,admin@example.com">
-
-                <label>SMTP host</label>
-                <input id="cfg-email-smtp-host" class="input" placeholder="smtp.example.com">
-
-                <label>SMTP port</label>
-                <input id="cfg-email-smtp-port" class="input" type="number" value="587">
-            </div>
-
-            <details>
-                <summary>Advanced JSON config</summary>
-                <textarea id="channel-config-json" class="input textarea">{}</textarea>
-            </details>
-
-            <label><input id="channel-enabled" type="checkbox" checked> Enabled</label>
-
-            <div class="actions">
-                <button id="save-channel" class="btn btn-primary">Save channel</button>
-                <button id="reset-channel-form" class="btn">Reset</button>
-            </div>
-
-            <div class="help-text">
-                Channels are notification targets only. Route intake tokens are created on the Routes page.
+        <div class="summary-card summary-info">
+            <div class="summary-icon">☎</div>
+            <div>
+                <div class="summary-title">Voice channels</div>
+                <div id="channels-summary-voice" class="summary-value">0</div>
+                <div class="summary-hint">Call delivery rules</div>
             </div>
         </div>
     </div>
 
-    <div class="card">
-        <div class="card-header">
-            <h2>Channels</h2>
-            <button id="reload-channels" class="btn btn-primary">Reload</button>
+    <div class="page-layout-grid">
+        <section class="card channels-card">
+            <div class="card-header channels-card-header">
+                <div>
+                    <h2>Notification channels</h2>
+                    <div class="card-subtitle">
+                        Showing <span id="channels-filtered-count">0</span>
+                        of <span id="channels-total-count">0</span> channels
+                    </div>
+                </div>
+
+                <div class="card-header-actions">
+                    <button id="open-channel-create-modal" type="button" class="btn btn-primary btn-small">
+                        New channel
+                    </button>
+
+                    <button id="reload-channels" type="button" class="btn btn-small btn-primary">
+                        Reload
+                    </button>
+                </div>
+            </div>
+
+            <div class="page-toolbar">
+                <div class="page-toolbar-search">
+                    <span class="page-toolbar-search-icon">⌕</span>
+                    <input
+                        id="channels-search"
+                        class="input"
+                        type="search"
+                        placeholder="Search channels, teams, groups..."
+                        autocomplete="off"
+                    >
+                </div>
+
+                <select id="channels-type-filter" class="input page-toolbar-filter">
+                    <option value="">All types</option>
+                </select>
+
+                <select id="channels-status-filter" class="input page-toolbar-filter">
+                    <option value="">All statuses</option>
+                    <option value="enabled">Enabled</option>
+                    <option value="disabled">Disabled</option>
+                </select>
+            </div>
+
+            <div class="table-wrapper">
+                <table class="data-table channels-table">
+                    <thead>
+                    <tr>
+                        <th>Channel</th>
+                        <th>Group</th>
+                        <th>Team</th>
+                        <th>Type</th>
+                        <th>Mode</th>
+                        <th>Status</th>
+                        <th class="channels-actions-th">Actions</th>
+                    </tr>
+                    </thead>
+                    <tbody id="channels-table"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <aside class="card page-details-card">
+            <div class="card-header channel-details-header">
+                <div>
+                    <h2>Channel details</h2>
+                    <div id="channel-details-subtitle" class="card-subtitle">Select a channel</div>
+                </div>
+            </div>
+
+            <div id="channel-details-body" class="channels-details-body">
+                <div class="channels-details-empty">
+                    Click a channel name to inspect delivery type, team binding and safe configuration summary.
+                </div>
+            </div>
+        </aside>
+    </div>
+</div>
+
+<div id="channel-form-modal" class="app-modal" style="display: none;">
+    <div class="app-modal-dialog">
+        <div class="app-modal-header">
+            <div>
+                <h2 id="channel-form-title">Create a channel</h2>
+                <div class="card-subtitle">Configure where IncidentRelay sends notifications</div>
+            </div>
+
+            <button id="close-channel-form-modal" type="button" class="app-modal-close">×</button>
         </div>
 
-        <div class="table-wrapper">
-            <table class="data-table">
-                <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>Group</th>
-                    <th>Team</th>
-                    <th>Name</th>
-                    <th>Type</th>
-                    <th>Mode</th>
-                    <th>Enabled</th>
-                    <th>Actions</th>
-                </tr>
-                </thead>
-                <tbody id="channels-table"></tbody>
-            </table>
+        <div class="app-modal-body">
+            <div class="form-body channels-form-grid">
+                <input id="channel-id" type="hidden">
+
+                <div>
+                    <label>Group</label>
+                    <select id="channel-group" class="input"></select>
+                </div>
+
+                <div>
+                    <label>Team</label>
+                    <select id="channel-team" class="input"></select>
+                </div>
+
+                <div>
+                    <label>Name</label>
+                    <input id="channel-name" class="input" placeholder="cloud-mattermost">
+                </div>
+
+                <div>
+                    <label>Type</label>
+                    <select id="channel-type" class="input"></select>
+                </div>
+
+                <div class="channel-config channels-form-wide" data-channel-config="telegram" style="display: none;">
+                    <label>Telegram bot token</label>
+                    <input id="cfg-telegram-bot-token" class="input" placeholder="123456:token">
+
+                    <label>Telegram chat ID</label>
+                    <input id="cfg-telegram-chat-id" class="input" placeholder="-1001234567890">
+                </div>
+
+                <div class="channel-config channels-form-wide" data-channel-config="mattermost" style="display: none;">
+                    <label>Mattermost mode</label>
+                    <select id="cfg-mm-mode" class="input">
+                        <option value="bot_api">Bot API with buttons and message updates</option>
+                        <option value="webhook">Incoming webhook only</option>
+                    </select>
+
+                    <div id="cfg-mm-bot-fields" class="channels-nested-grid">
+                        <div>
+                            <label>Mattermost URL</label>
+                            <input id="cfg-mm-api-url" class="input" placeholder="https://mattermost.example.com">
+                        </div>
+
+                        <div>
+                            <label>Bot token</label>
+                            <input id="cfg-mm-bot-token" class="input" placeholder="token">
+                        </div>
+
+                        <div>
+                            <label>Channel ID</label>
+                            <input id="cfg-mm-channel-id" class="input" placeholder="channel id">
+                        </div>
+
+                        <div>
+                            <label>Callback secret</label>
+                            <input id="cfg-mm-callback-secret" class="input" placeholder="optional secret">
+                        </div>
+                    </div>
+
+                    <div id="cfg-mm-webhook-fields">
+                        <label>Mattermost incoming webhook URL</label>
+                        <input id="cfg-mm-webhook-url" class="input" placeholder="https://mattermost/hooks/...">
+                    </div>
+
+                    <div class="help-text">
+                        Bot API mode supports Acknowledge and Resolve buttons. Incoming webhook mode sends plain messages only.
+                    </div>
+                </div>
+
+                <div class="channel-config channels-form-wide" data-channel-config="webhook" style="display: none;">
+                    <label>Webhook URL</label>
+                    <input id="cfg-webhook-url" class="input" placeholder="https://example.com/webhook">
+                </div>
+
+                <div class="channel-config channels-form-wide" data-channel-config="email" style="display: none;">
+                    <div class="channels-nested-grid">
+                        <div>
+                            <label>Recipients</label>
+                            <input id="cfg-email-recipients" class="input" placeholder="a@example.com,b@example.com">
+                        </div>
+
+                        <div>
+                            <label>SMTP host</label>
+                            <input id="cfg-email-smtp-host" class="input" placeholder="smtp.example.com">
+                        </div>
+
+                        <div>
+                            <label>SMTP port</label>
+                            <input id="cfg-email-smtp-port" class="input" type="number" value="587">
+                        </div>
+                    </div>
+                </div>
+
+                <div class="channel-config channels-form-wide" data-channel-config="voice_call" style="display: none;">
+                    <label>Call on severities</label>
+
+                    <div class="channels-severity-grid">
+                        <label><input class="cfg-voice-severity" type="checkbox" value="critical" checked> Critical</label>
+                        <label><input class="cfg-voice-severity" type="checkbox" value="high" checked> High</label>
+                        <label><input class="cfg-voice-severity" type="checkbox" value="medium"> Medium</label>
+                        <label><input class="cfg-voice-severity" type="checkbox" value="warning"> Warning</label>
+                        <label><input class="cfg-voice-severity" type="checkbox" value="low"> Low</label>
+                        <label><input class="cfg-voice-severity" type="checkbox" value="info"> Info</label>
+                    </div>
+
+                    <label>Future notification rules JSON</label>
+                    <textarea id="cfg-voice-notification-rules" class="input" rows="4" placeholder="[]">[]</textarea>
+
+                    <div class="help-text">
+                        Voice provider is configured by the system administrator. This channel only controls when voice calls should be triggered.
+                    </div>
+                </div>
+
+                <div class="channels-form-wide">
+                    <label>Advanced JSON config</label>
+                    <textarea id="channel-config-json" class="input" rows="5">{}</textarea>
+                </div>
+
+                <label class="channels-checkbox">
+                    <input id="channel-enabled" type="checkbox" checked>
+                    <span>Enabled</span>
+                </label>
+            </div>
+        </div>
+
+        <div class="app-modal-footer">
+            <button id="reset-channel-form" type="button" class="btn">Reset</button>
+            <button id="save-channel" type="button" class="btn btn-primary">Save channel</button>
         </div>
     </div>
 </div>

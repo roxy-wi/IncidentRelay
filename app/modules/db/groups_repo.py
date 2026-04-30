@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from app.modules.db.models import AlertRoute, Group, NotificationChannel, Rotation, Silence, Team, UserGroup
+from app.modules.db.models import AlertRoute, Group, NotificationChannel, Silence, Rotation, RotationMember, RotationOverride, Team, TeamUser, UserGroup
 
 
 def list_groups(active_only=False, include_deleted=False):
@@ -236,3 +236,49 @@ def soft_delete_group(group_id):
         ).execute()
 
     return group
+
+
+def delete_group_membership(membership_id: int) -> dict:
+    """
+    Permanently remove user from group, all group teams and all group rotations.
+    """
+    membership = get_group_membership(membership_id)
+
+    group_id = membership.group.id
+    user_id = membership.user.id
+
+    with db.atomic():
+        team_ids_query = (
+            Team
+            .select(Team.id)
+            .where(Team.group == group_id)
+        )
+
+        rotation_ids_query = (
+            Rotation
+            .select(Rotation.id)
+            .where(Rotation.team.in_(team_ids_query))
+        )
+
+        RotationMember.delete().where(
+            (RotationMember.user == user_id) &
+            (RotationMember.rotation.in_(rotation_ids_query))
+        ).execute()
+
+        RotationOverride.delete().where(
+            (RotationOverride.user == user_id) &
+            (RotationOverride.rotation.in_(rotation_ids_query))
+        ).execute()
+
+        TeamUser.delete().where(
+            (TeamUser.user == user_id) &
+            (TeamUser.team.in_(team_ids_query))
+        ).execute()
+
+        membership.delete_instance()
+
+    return {
+        "id": membership_id,
+        "group_id": group_id,
+        "user_id": user_id,
+    }

@@ -86,4 +86,15 @@ def paths():
                 },
             }
         },
+        "/api/auth/logout": {
+            "post": {
+                "tags": ["Authentication"],
+                "summary": "Logout",
+                "description": "Clears the JWT cookie. Frontend should also remove localStorage token.",
+                "operationId": "logout",
+                "responses": {
+                    "200": {"description": "Logged out"}
+                },
+            }
+        },
     }

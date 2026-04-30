@@ -469,22 +469,11 @@ function renderCalendarWeek() {
     header.append($("<div>").addClass("calendar-team-header").text("Team"));
 
     days.forEach(function (day) {
-        const inMonth = day >= start && day < end;
-        const cell = $("<div>").addClass("calendar-month-day-cell");
-
-        if (!inMonth) {
-            cell.addClass("calendar-day-outside-month");
-        }
-
-        cell.append(
+        header.append(
             $("<div>")
-                .addClass("calendar-month-day-number")
-                .text(formatEuropeanDate(day))
+                .addClass("calendar-day-header")
+                .text(calendarWeekdayLabel(day))
         );
-
-            renderCalendarDayEvents(selectedTeam, day, cell, true);
-
-            monthBody.append(cell);
     });
 
     grid.append(header);
@@ -885,9 +874,9 @@ function calendarDetailsItem(label, value) {
      * Render one details item.
      */
     return $("<div>")
-        .addClass("calendar-details-item")
-        .append($("<div>").addClass("calendar-details-label").text(label))
-        .append($("<div>").addClass("calendar-details-value").text(value || "-"));
+        .addClass("details-item")
+        .append($("<div>").addClass("details-label").text(label))
+        .append($("<div>").addClass("details-value").text(value || "-"));
 }
 
 
@@ -904,18 +893,18 @@ function renderCalendarDetails(event, clippedStart, clippedEnd) {
 
     body.append(
         $("<div>")
-            .addClass("calendar-details-user")
-            .append($("<div>").addClass("calendar-details-avatar").text(calendarInitials(userLabel)))
+            .addClass("details-user")
+            .append($("<div>").addClass("details-avatar").text(calendarInitials(userLabel)))
             .append(
                 $("<div>")
-                    .append($("<div>").addClass("calendar-details-name").text(userLabel))
-                    .append($("<div>").addClass("calendar-details-meta").text(event.username || "On-call user"))
+                    .append($("<div>").addClass("details-name").text(userLabel))
+                    .append($("<div>").addClass("details-meta").text(event.username || "On-call user"))
             )
     );
 
     body.append(
         $("<div>")
-            .addClass("calendar-details-list")
+            .addClass("details-list")
             .append(calendarDetailsItem("Team", event.team_name || event.team_slug))
             .append(calendarDetailsItem("Rotation", event.rotation_name))
             .append(calendarDetailsItem("Type", event.type || "regular"))
@@ -932,7 +921,7 @@ function renderCalendarDetailsEmpty() {
     $("#calendar-details-subtitle").text("Select an assignment");
 
     $("#calendar-details-body").html(
-        '<div class="calendar-details-empty">' +
+        '<div class="details-empty">' +
         'Click any shift in the calendar to see user, team, rotation and time range.' +
         '</div>'
     );

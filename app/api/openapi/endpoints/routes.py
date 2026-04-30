@@ -80,6 +80,18 @@ ROUTE_SCHEMA = {
             "example": ["alertname", "instance"],
         },
         "enabled": {"type": "boolean", "default": True},
+        "intake_token_prefix": {"type": "string", "nullable": True, "readOnly": True},
+        "has_intake_token": {"type": "boolean", "readOnly": True},
+        "channels": {
+            "type": "array",
+            "readOnly": True,
+            "items": {"type": "object"},
+        },
+        "intake_token": {
+            "type": "string",
+            "readOnly": True,
+            "description": "Returned only on route creation and token regeneration.",
+        },
     },
 }
 
@@ -197,5 +209,31 @@ def paths():
                 ],
                 "responses": {"200": response("Channel detached.")},
             },
+        },
+        "/api/routes/{route_id}/intake-token": {
+            "post": {
+                "tags": ["routes"],
+                "summary": "Regenerate route intake token",
+                "description": (
+                    "Generates a new route intake token. "
+                    "The full token is returned only in this response."
+                ),
+                "operationId": "regenerateRouteIntakeToken",
+                "parameters": [path_param("route_id", "Route id.")],
+                "responses": {
+                    "200": response(
+                        "New route intake token returned.",
+                        {
+                            "type": "object",
+                            "properties": {
+                                "id": {"type": "integer"},
+                                "intake_token": {"type": "string"},
+                                "intake_token_prefix": {"type": "string"},
+                                "has_intake_token": {"type": "boolean"},
+                            },
+                        },
+                    )
+                },
+            }
         },
     }

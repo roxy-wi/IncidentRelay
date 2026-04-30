@@ -1,104 +1,258 @@
-<div class="grid-two">
-    <div class="card">
-        <div class="card-header"><h2 id="team-form-title">Create team</h2></div>
-        <div class="form-body">
-            <input id="team-id" type="hidden">
+<link rel="stylesheet" href="/static/css/teams.css">
 
-            <label>Group</label>
-            <select id="team-group" class="input"></select>
+<div class="teams-page">
+    <div class="summary-grid">
+        <div class="summary-card summary-primary">
+            <div class="summary-icon">👥</div>
+            <div>
+                <div class="summary-title">Teams</div>
+                <div id="teams-summary-total" class="summary-value">0</div>
+                <div class="summary-hint">Current scope</div>
+            </div>
+        </div>
 
-            <label>Slug</label>
-            <input id="team-slug" class="input" placeholder="infra">
+        <div class="summary-card summary-success">
+            <div class="summary-icon">✓</div>
+            <div>
+                <div class="summary-title">Active</div>
+                <div id="teams-summary-active" class="summary-value">0</div>
+                <div class="summary-hint">Enabled teams</div>
+            </div>
+        </div>
 
-            <label>Name</label>
-            <input id="team-name" class="input" placeholder="Infrastructure">
+        <div class="summary-card summary-warning">
+            <div class="summary-icon">↗</div>
+            <div>
+                <div class="summary-title">Escalation</div>
+                <div id="teams-summary-escalation" class="summary-value">0</div>
+                <div class="summary-hint">Escalation enabled</div>
+            </div>
+        </div>
 
-            <label>Description</label>
-            <input id="team-description" class="input">
-
-            <label>Escalate after reminders</label>
-            <input id="team-escalation-after" class="input" type="number" value="2">
-
-            <label><input id="team-escalation-enabled" type="checkbox" checked> Escalation enabled</label>
-            <label><input id="team-active" type="checkbox" checked> Active</label>
-
-            <div class="actions">
-                <button id="save-team" type="button" class="btn btn-primary">Save team</button>
-                <button id="reset-team-form" type="button" class="btn">Reset</button>
+        <div class="summary-card summary-info">
+            <div class="summary-icon">#</div>
+            <div>
+                <div class="summary-title">Groups</div>
+                <div id="teams-summary-groups" class="summary-value">0</div>
+                <div class="summary-hint">Used groups</div>
             </div>
         </div>
     </div>
 
-    <div class="card">
-        <div class="card-header">
-            <h2>Teams</h2>
-            <button id="reload-teams" type="button" class="btn btn-primary">Reload</button>
+    <div class="page-layout-grid">
+        <section class="card page-main-card teams-card">
+            <div class="card-header">
+                <div>
+                    <h2>Teams</h2>
+                    <div class="card-subtitle">
+                        Showing <span id="teams-filtered-count">0</span>
+                        of <span id="teams-total-count">0</span> teams
+                    </div>
+                </div>
+
+                <div class="card-header-actions">
+                    <button id="open-team-create-modal" type="button" class="btn btn-primary btn-small">
+                        New team
+                    </button>
+
+                    <button id="reload-teams" type="button" class="btn btn-small">
+                        Reload
+                    </button>
+                </div>
+            </div>
+
+            <div class="page-toolbar">
+                <div class="page-toolbar-search">
+                    <span class="page-toolbar-search-icon">⌕</span>
+                    <input
+                        id="teams-search"
+                        class="input"
+                        type="search"
+                        placeholder="Search teams, groups, slug, description..."
+                        autocomplete="off"
+                    >
+                </div>
+
+                <select id="teams-group-filter" class="input page-toolbar-filter">
+                    <option value="">All groups</option>
+                </select>
+
+                <select id="teams-status-filter" class="input page-toolbar-filter">
+                    <option value="">All statuses</option>
+                    <option value="active">Active</option>
+                    <option value="inactive">Inactive</option>
+                </select>
+            </div>
+
+            <div class="table-wrapper">
+                <table class="data-table teams-table">
+                    <thead>
+                    <tr>
+                        <th>Team</th>
+                        <th>Group</th>
+                        <th>Slug</th>
+                        <th>Escalation</th>
+                        <th>Status</th>
+                        <th class="teams-actions-th">Actions</th>
+                    </tr>
+                    </thead>
+                    <tbody id="teams-table"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <aside class="card page-details-card teams-details-card">
+            <div class="card-header details-header">
+                <div>
+                    <h2>Team details</h2>
+                    <div id="team-details-subtitle" class="card-subtitle">Select a team</div>
+                </div>
+            </div>
+
+            <div id="team-details-body" class="teams-details-body">
+                <div class="details-empty">
+                    Click a team name to inspect group, escalation settings and quick actions.
+                </div>
+            </div>
+        </aside>
+    </div>
+</div>
+
+<div id="team-form-modal" class="app-modal" style="display: none;">
+    <div class="app-modal-dialog">
+        <div class="app-modal-header">
+            <div>
+                <h2 id="team-form-title">Create team</h2>
+                <div class="card-subtitle">Create or edit an IncidentRelay team.</div>
+            </div>
+
+            <button id="close-team-form-modal" type="button" class="app-modal-close">×</button>
         </div>
 
-        <div class="table-wrapper">
-            <table class="data-table">
-                <thead>
-                <tr>
-                    <th>ID</th>
-                    <th>Group</th>
-                    <th>Slug</th>
-                    <th>Name</th>
-                    <th>Escalation</th>
-                    <th>Active</th>
-                    <th>Actions</th>
-                </tr>
-                </thead>
-                <tbody id="teams-table"></tbody>
-            </table>
+        <div class="app-modal-body">
+            <div class="form-body teams-form-grid">
+                <input id="team-id" type="hidden">
+
+                <div>
+                    <label>Group</label>
+                    <select id="team-group" class="input"></select>
+                </div>
+
+                <div>
+                    <label>Slug</label>
+                    <input id="team-slug" class="input" placeholder="cloud">
+                </div>
+
+                <div>
+                    <label>Name</label>
+                    <input id="team-name" class="input" placeholder="Cloud OPS">
+                </div>
+
+                <div>
+                    <label>Escalate after reminders</label>
+                    <input id="team-escalation-after" class="input" type="number" min="0" value="2">
+                </div>
+
+                <div class="teams-form-wide">
+                    <label>Description</label>
+                    <input id="team-description" class="input" placeholder="Team responsible for cloud alerts">
+                </div>
+
+                <label class="teams-checkbox">
+                    <input id="team-escalation-enabled" type="checkbox" checked>
+                    <span>Escalation enabled</span>
+                </label>
+
+                <label class="teams-checkbox">
+                    <input id="team-active" type="checkbox" checked>
+                    <span>Active</span>
+                </label>
+            </div>
+        </div>
+
+        <div class="app-modal-footer">
+            <button id="reset-team-form" type="button" class="btn">Reset</button>
+            <button id="save-team" type="button" class="btn btn-primary">Save team</button>
         </div>
     </div>
 </div>
 
-<div class="grid-two">
-    <div class="card">
-        <div class="card-header">
+<div id="team-members-modal" class="app-modal" style="display: none;">
+    <div class="app-modal-dialog app-modal-dialog-wide">
+        <div class="app-modal-header">
             <div>
                 <h2 id="team-members-title">Team members</h2>
-                <div class="card-subtitle">Select a team and click Members</div>
+                <div class="card-subtitle">Manage users, role and membership status.</div>
+            </div>
+
+            <button id="close-team-members-modal" type="button" class="app-modal-close">×</button>
+        </div>
+
+        <div class="app-modal-body">
+            <div class="form-body teams-member-form-grid">
+                <input id="team-member-id" type="hidden">
+                <input id="team-member-team-id" type="hidden">
+                <input id="team-member-team-name" type="hidden">
+
+                <div>
+                    <label>Selected team</label>
+                    <input id="team-member-team-label" class="input" readonly>
+                </div>
+
+                <div>
+                    <label>User</label>
+                    <select id="team-member-user" class="input"></select>
+                </div>
+
+                <div>
+                    <label>Role</label>
+                    <select id="team-member-role" class="input">
+                        <option value="read_only">Read only</option>
+                        <option value="rw">Read/write</option>
+                    </select>
+                </div>
+
+                <label class="teams-checkbox">
+                    <input id="team-member-active" type="checkbox" checked>
+                    <span>Active</span>
+                </label>
+
+                <div class="actions">
+                    <button id="save-team-user" type="button" class="btn btn-primary btn-small">
+                        Save membership
+                    </button>
+
+                    <button id="reset-team-member-form" type="button" class="btn btn-small">
+                        Reset
+                    </button>
+                </div>
+            </div>
+
+            <div class="table-wrapper teams-modal-table-wrapper">
+                <table class="data-table">
+                    <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>User</th>
+                        <th>Name</th>
+                        <th>Role</th>
+                        <th>Active</th>
+                        <th>Actions</th>
+                    </tr>
+                    </thead>
+                    <tbody id="team-members-table">
+                    <tr>
+                        <td colspan="6">No team selected</td>
+                    </tr>
+                    </tbody>
+                </table>
             </div>
         </div>
 
-        <div class="table-wrapper">
-            <table class="data-table">
-                <thead>
-                <tr><th>ID</th><th>User</th><th>Name</th><th>Role</th><th>Active</th><th>Actions</th></tr>
-                </thead>
-                <tbody id="team-members-table">
-                <tr><td colspan="6">No team selected</td></tr>
-                </tbody>
-            </table>
-        </div>
-    </div>
-
-    <div class="card form-card">
-        <div class="card-header"><h2 id="team-member-form-title">Add user to selected team</h2></div>
-        <div class="form-body">
-            <input id="team-member-id" type="hidden">
-            <input id="team-member-team-id" type="hidden">
-
-            <label>Selected team</label>
-            <input id="team-member-team-name" class="input" disabled placeholder="Click Members on a team first">
-
-            <label>User</label>
-            <select id="team-member-user" class="input"></select>
-
-            <label>Role</label>
-            <select id="team-member-role" class="input">
-                <option value="read_only">Read only</option>
-                <option value="rw">Read/write</option>
-            </select>
-
-            <label><input id="team-member-active" type="checkbox" checked> Active</label>
-
-            <div class="actions">
-                <button id="save-team-user" type="button" class="btn btn-primary">Save membership</button>
-                <button id="reset-team-member-form" type="button" class="btn">Reset</button>
-            </div>
+        <div class="app-modal-footer">
+            <button id="close-team-members-modal-footer" type="button" class="btn">
+                Close
+            </button>
         </div>
     </div>
 </div>

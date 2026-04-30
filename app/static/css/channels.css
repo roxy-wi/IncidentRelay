@@ -1,0 +1,129 @@
+.channels-page {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
+
+.channels-table td {
+    vertical-align: middle;
+}
+
+.channels-actions-th {
+    min-width: 210px;
+}
+
+.channel-name-button {
+    border: 0;
+    padding: 0;
+    background: transparent;
+    color: #101828;
+    cursor: pointer;
+    font: inherit;
+    font-weight: 800;
+    text-align: left;
+}
+
+.channel-name-button:hover {
+    color: var(--primary);
+    text-decoration: underline;
+}
+
+.channel-row-subtitle {
+    margin-top: 4px;
+    color: var(--muted);
+    font-size: 12px;
+}
+
+.channel-type-pill,
+.channel-mode-pill,
+.channel-status-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 24px;
+    padding: 4px 9px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.channel-type-pill {
+    color: #175cd3;
+    background: #d1e9ff;
+}
+
+.channel-mode-pill {
+    color: #344054;
+    background: #f2f4f7;
+}
+
+.channel-status-enabled {
+    color: #027a48;
+    background: #d1fadf;
+}
+
+.channel-status-disabled {
+    color: #475467;
+    background: #f2f4f7;
+}
+
+.channels-form-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 14px;
+}
+
+.channels-form-wide {
+    grid-column: 1 / -1;
+}
+
+.channels-nested-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+    margin-top: 8px;
+}
+
+.channels-severity-grid {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin: 8px 0 12px;
+}
+
+.channels-severity-grid label,
+.channels-checkbox {
+    display: inline-flex;
+    align-items: center;
+    gap: 7px;
+    color: #344054;
+    font-size: 13px;
+    font-weight: 700;
+}
+
+.channels-severity-grid input,
+.channels-checkbox input {
+    width: 16px;
+    height: 16px;
+    margin: 0;
+}
+
+.channels-empty-cell {
+    padding: 18px;
+    color: var(--muted);
+    text-align: center;
+}
+
+@media (max-width: 900px) {
+    .channels-form-grid,
+    .channels-nested-grid {
+        grid-template-columns: 1fr;
+    }
+}
+
+@media (max-width: 760px) {
+    .channels-summary-grid {
+        grid-template-columns: 1fr;
+    }
+}

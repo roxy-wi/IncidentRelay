@@ -15,7 +15,7 @@ INTERVAL_SECONDS = {
 
 class RotationCreateSchema(ApiModel):
     """
-    Validate PagerDuty-like rotation creation input.
+    Validate rotation creation input.
     """
 
     team_id: int = Field(ge=1)
@@ -35,7 +35,7 @@ class RotationCreateSchema(ApiModel):
     @model_validator(mode="after")
     def set_duration(self):
         """
-        Calculate duration from PagerDuty-like interval fields.
+        Calculate duration from interval fields.
         """
 
         if self.rotation_type == "daily":
@@ -86,7 +86,7 @@ class RotationOverrideCreateSchema(ApiModel):
 
 class RotationUpdateSchema(RotationCreateSchema):
     """
-    Validate PagerDuty-like rotation update input.
+    Validate rotation update input.
     """
 
 

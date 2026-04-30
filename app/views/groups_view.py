@@ -154,10 +154,39 @@ def update_group_user(membership_id):
 @groups_bp.route("/users/<int:membership_id>", methods=["DELETE"])
 def delete_group_user(membership_id):
     """
-    Disable a group membership.
+    Remove user from group, group teams and group rotations.
     """
-
     membership = groups_repo.get_group_membership(membership_id)
+
+    error = require_group_write(membership.group.id)
+    if error:
+        return error
+
+    data = groups_repo.delete_group_membership(membership_id)
+
+    write_audit(
+        "group.user.remove",
+        object_type="group",
+        object_id=data["group_id"],
+        group_id=data["group_id"],
+        data={
+            "membership_id": data["id"],
+            "user_id": data["user_id"],
+            "removed_from_group_teams": True,
+            "removed_from_group_rotations": True,
+        },
+    )
+
+    return jsonify({"deleted": True, "id": membership_id})
+
+
+@groups_bp.route("/users/<int:membership_id>/disable", methods=["POST"])
+def disable_group_user(membership_id):
+    """
+    Disable group membership without deleting team/rotation memberships.
+    """
+    membership = groups_repo.get_group_membership(membership_id)
+
     error = require_group_write(membership.group.id)
     if error:
         return error
@@ -172,7 +201,7 @@ def delete_group_user(membership_id):
         data={"membership_id": membership.id, "user_id": membership.user.id},
     )
 
-    return jsonify({"deleted": True, "id": membership.id})
+    return jsonify({"disabled": True, "id": membership.id})
 
 
 @groups_bp.route("/<int:group_id>", methods=["DELETE"])
