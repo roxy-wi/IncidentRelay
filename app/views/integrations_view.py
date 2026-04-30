@@ -100,6 +100,7 @@ def process_incoming_alerts(normalized_alerts):
 
     return jsonify(result)
 
+
 @integrations_bp.route("/mattermost/actions", methods=["POST"])
 def mattermost_action():
     """

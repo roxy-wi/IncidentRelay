@@ -202,15 +202,6 @@ def soft_delete_route(route_id):
     return route
 
 
-def delete_route(route_id):
-    """
-    Soft-delete a route and unlink its channels.
-    """
-
-    AlertRouteChannel.delete().where(AlertRouteChannel.route == route_id).execute()
-    return soft_delete_route(route_id)
-
-
 def list_route_channels(route_id):
     """
     Return route-channel links.

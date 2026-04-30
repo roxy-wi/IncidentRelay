@@ -1,0 +1,81 @@
+<svg width="128" height="128" viewBox="0 0 128 128" xmlns="http://www.w3.org/2000/svg" fill="none">
+  <!-- Dark navy C arc -->
+  <path
+    d="M78 22C61 16 41 20 28 34"
+    stroke="#001f4d"
+    stroke-width="8"
+    stroke-linecap="round"
+  />
+  <path
+    d="M28 94C41 108 61 112 78 106"
+    stroke="#001f4d"
+    stroke-width="8"
+    stroke-linecap="round"
+  />
+
+  <!-- Orange heartbeat -->
+  <path
+    d="M7 65H20L25 57L32 80L42 38L51 65H61"
+    stroke="#ff5b00"
+    stroke-width="7"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+
+  <!-- Center routing node -->
+  <circle
+    cx="65"
+    cy="65"
+    r="10"
+    fill="#ffffff"
+    stroke="#0b6cff"
+    stroke-width="7"
+  />
+
+  <!-- Main route arrow -->
+  <path
+    d="M76 65H110"
+    stroke="#0b6cff"
+    stroke-width="7"
+    stroke-linecap="round"
+  />
+  <path
+    d="M101 53L114 65L101 77"
+    stroke="#0b6cff"
+    stroke-width="7"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+
+  <!-- Upper branch -->
+  <path
+    d="M72 58L91 39"
+    stroke="#0b6cff"
+    stroke-width="7"
+    stroke-linecap="round"
+  />
+  <circle
+    cx="96"
+    cy="34"
+    r="8"
+    fill="#ffffff"
+    stroke="#0b6cff"
+    stroke-width="7"
+  />
+
+  <!-- Lower branch -->
+  <path
+    d="M72 72L91 91"
+    stroke="#0b6cff"
+    stroke-width="7"
+    stroke-linecap="round"
+  />
+  <circle
+    cx="96"
+    cy="96"
+    r="8"
+    fill="#ffffff"
+    stroke="#0b6cff"
+    stroke-width="7"
+  />
+</svg>

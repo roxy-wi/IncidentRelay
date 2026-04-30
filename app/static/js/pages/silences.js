@@ -19,8 +19,8 @@ function refreshSilences() {
             row.append($("<td>").text(s.team_slug));
             row.append($("<td>").text(s.name));
             row.append($("<td>").text(s.reason || "-"));
-            row.append($("<td>").text(s.starts_at));
-            row.append($("<td>").text(s.ends_at));
+            row.append($("<td>").text(formatDateTime24(s.starts_at)));
+            row.append($("<td>").text(formatDateTime24(s.ends_at)));
             row.append($("<td>").text(s.enabled ? "yes" : "no"));
             const actions = $("<td>").addClass("actions");
             actions.append($("<button>").addClass("btn btn-small").text("Edit").on("click", function () { editSilence(s.id); }));

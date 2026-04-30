@@ -336,8 +336,8 @@ function loadOverrides() {
             const row = $("<tr>");
             row.append($("<td>").text(override.id));
             row.append($("<td>").text(override.display_name || override.username));
-            row.append($("<td>").text(override.starts_at));
-            row.append($("<td>").text(override.ends_at));
+            row.append($("<td>").text(formatDateTime24(override.starts_at)));
+            row.append($("<td>").text(formatDateTime24(override.ends_at)));
             row.append($("<td>").text(override.reason || "-"));
 
             const actions = $("<td>").addClass("actions");

@@ -1,16 +1,117 @@
-<div class="cards-grid">
-    <div class="card metric-card"><div class="metric-title">Firing alerts</div><div class="metric-value" id="metric-firing">0</div></div>
-    <div class="card metric-card"><div class="metric-title">Acknowledged</div><div class="metric-value" id="metric-acknowledged">0</div></div>
-    <div class="card metric-card"><div class="metric-title">Resolved</div><div class="metric-value" id="metric-resolved">0</div></div>
-    <div class="card metric-card"><div class="metric-title">Reminders</div><div class="metric-value" id="metric-reminders">0</div></div>
-</div>
-<div class="card">
-    <div class="card-header"><h2>Latest alerts</h2><button class="btn btn-primary" id="reload-dashboard">Reload</button></div>
-    <div class="table-wrapper">
-        <table class="data-table">
-            <thead><tr><th>ID</th><th>Team</th><th>Severity</th><th>Title</th><th>Created</th><th>Status</th><th>Assignee</th><th>Actions</th></tr></thead>
-            <tbody id="dashboard-alerts"></tbody>
-        </table>
+<link rel="stylesheet" href="{{ url_for('static', filename='css/overview.css') }}">
+
+<div class="overview-page">
+    <div class="overview-hero">
+        <div>
+            <div class="overview-eyebrow">IncidentRelay</div>
+            <h2>Operations overview</h2>
+            <p>Real-time summary of active incidents, acknowledgements, reminders and affected teams.</p>
+        </div>
+
+        <div class="overview-hero-actions">
+            <button id="reload-dashboard" type="button" class="btn btn-primary">
+                Reload
+            </button>
+        </div>
+    </div>
+
+    {% set summary_id = "overview-alerts-summary" %}
+    {% include 'pages/include/alerts_summary_grid.html' %}
+
+    <div class="overview-layout-grid">
+        <section class="card overview-card overview-active-card">
+            <div class="card-header overview-card-header">
+                <div>
+                    <h2>Active incidents</h2>
+                    <div class="card-subtitle">
+                        Latest firing and acknowledged alerts
+                        <span id="dashboard-active-count" class="overview-count-badge">0</span>
+                    </div>
+                </div>
+
+                <button type="button" class="btn btn-small btn-light" onclick="navigate('/alerts', true)">
+                    View all
+                </button>
+            </div>
+
+            <div class="table-wrapper">
+                <table class="data-table overview-alerts-table">
+                    <thead>
+                    <tr>
+                        <th>ID</th>
+                        <th>Title</th>
+                        <th>Severity</th>
+                        <th>Status</th>
+                        <th>Team</th>
+                        <th>Duration</th>
+                        <th>Updated</th>
+                        <th class="overview-actions-th">Actions</th>
+                    </tr>
+                    </thead>
+                    <tbody id="dashboard-alerts"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <aside class="overview-side-column">
+            <section class="card overview-card">
+                <div class="card-header overview-card-header compact">
+                    <div>
+                        <h2>Recent alerts</h2>
+                        <div class="card-subtitle">Last activity</div>
+                    </div>
+
+                    <button type="button" class="btn btn-small btn-link" onclick="navigate('/alerts', true)">
+                        View all
+                    </button>
+                </div>
+
+                <div id="dashboard-recent-alerts" class="overview-list"></div>
+            </section>
+
+            <section class="card overview-card">
+                <div class="card-header overview-card-header compact">
+                    <div>
+                        <h2>Teams involved now</h2>
+                        <div class="card-subtitle">Based on active alerts</div>
+                    </div>
+                </div>
+
+                <div id="dashboard-teams-now" class="overview-list"></div>
+            </section>
+        </aside>
+    </div>
+
+    <div class="overview-bottom-grid">
+        <section class="card overview-card">
+            <div class="card-header overview-card-header compact">
+                <div>
+                    <h2>Severity split</h2>
+                    <div class="card-subtitle">Current alert distribution</div>
+                </div>
+            </div>
+
+            <div id="dashboard-severity-split" class="overview-bars"></div>
+        </section>
+
+        <section class="card overview-card">
+            <div class="card-header overview-card-header compact">
+                <div>
+                    <h2>Team summary</h2>
+                    <div class="card-subtitle">Alerts by team</div>
+                </div>
+            </div>
+
+            <div id="dashboard-team-summary" class="overview-bars"></div>
+        </section>
+
+        <section class="card overview-card overview-status-card">
+            <div class="overview-status-dot"></div>
+            <div>
+                <h2>System status</h2>
+                <p id="dashboard-system-status">Waiting for data...</p>
+            </div>
+        </section>
     </div>
 </div>
 

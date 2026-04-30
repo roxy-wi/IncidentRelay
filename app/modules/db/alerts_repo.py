@@ -58,15 +58,6 @@ def create_alert(**kwargs):
     return Alert.create(**kwargs)
 
 
-def save_alert(alert):
-    """
-    Save an alert instance.
-    """
-
-    alert.save()
-    return alert
-
-
 def update_alert_from_payload(alert, alert_data, status, group_key):
     """
     Update an alert from normalized payload data.
@@ -79,8 +70,11 @@ def update_alert_from_payload(alert, alert_data, status, group_key):
     alert.labels = alert_data.get("labels")
     alert.message = alert_data.get("message")
     alert.severity = alert_data.get("severity")
-    alert.status = status
     alert.group_key = group_key
+    if previous_status in ("acknowledged", "silenced") and status == "firing":
+        alert.status = previous_status
+    else:
+        alert.status = status
     alert.save()
     return alert, previous_status
 
@@ -115,23 +109,6 @@ def list_firing_alerts():
     """
 
     return list(Alert.select().where(Alert.status == "firing"))
-
-
-def list_unacked_alerts(threshold):
-    """
-    Return firing alerts using a shared reminder threshold.
-
-    This function is kept for older code paths. New reminder logic should
-    evaluate the reminder interval per rotation.
-    """
-
-    return list(
-        Alert.select()
-        .where(
-            (Alert.status == "firing")
-            & ((Alert.last_notification_at.is_null(True)) | (Alert.last_notification_at <= threshold))
-        )
-    )
 
 
 def record_notification_time(alert, now):

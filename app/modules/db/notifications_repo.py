@@ -58,7 +58,6 @@ def mark_notification_error(alert_id, channel_id, provider, event_type, error):
     )
 
 
-
 def list_notifications_for_alert(alert_id):
     """
     Return delivery records for an alert ordered by id.

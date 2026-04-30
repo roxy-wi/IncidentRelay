@@ -1,37 +1,99 @@
-<link rel="stylesheet" href="/static/css/alerts_modal.css">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/alerts.css') }}">
 
-<div class="card">
-    <div class="card-header">
-        <h2>Alerts</h2>
-        <div class="toolbar">
-            <select id="status-filter" class="input">
-                <option value="">All</option>
+<div class="alerts-page">
+    <div class="alerts-hero">
+        <div>
+            <div class="alerts-eyebrow">Incident workflow</div>
+            <h2>Alerts</h2>
+            <p>Search, inspect, acknowledge and resolve routed incidents from one workspace.</p>
+        </div>
+
+        <div class="alerts-hero-actions">
+            <button id="reload-alerts" type="button" class="btn btn-primary">
+                Reload
+            </button>
+        </div>
+    </div>
+
+    {% set summary_id = "alerts-alerts-summary" %}
+    {% include 'pages/include/alerts_summary_grid.html' %}
+
+    <section class="card alerts-card">
+        <div class="card-header alerts-card-header">
+            <div>
+                <h2>Alert inbox</h2>
+                <div class="card-subtitle">
+                    Showing <span id="alerts-filtered-count">0</span> of <span id="alerts-total-count">0</span> alerts
+                </div>
+            </div>
+
+            <div class="alerts-auto-refresh">
+                <label class="alerts-switch">
+                    <input id="alerts-auto-refresh" type="checkbox">
+                    <span>Auto refresh</span>
+                </label>
+            </div>
+        </div>
+
+        <div class="alerts-toolbar">
+            <div class="alerts-search">
+                <span class="alerts-search-icon">⌕</span>
+                <input
+                    id="alerts-search"
+                    class="input"
+                    type="search"
+                    placeholder="Search by id, title, team, assignee, source..."
+                    autocomplete="off"
+                >
+            </div>
+
+            <select id="status-filter" class="input alerts-filter-select">
+                <option value="">All statuses</option>
                 <option value="firing">Firing</option>
                 <option value="acknowledged">Acknowledged</option>
                 <option value="resolved">Resolved</option>
                 <option value="silenced">Silenced</option>
             </select>
-            <button class="btn btn-primary" id="reload-alerts">Reload</button>
-        </div>
-    </div>
 
-    <div class="table-wrapper">
-        <table class="data-table alerts-table">
-            <thead>
-            <tr>
-                <th>ID</th>
-                <th>Team</th>
-                <th>Severity</th>
-                <th>Title</th>
-                <th>Created</th>
-                <th>Status</th>
-                <th>Assignee</th>
-                <th>Actions</th>
-            </tr>
-            </thead>
-            <tbody id="alerts-table"></tbody>
-        </table>
-    </div>
+            <select id="severity-filter" class="input alerts-filter-select">
+                <option value="">All severities</option>
+                <option value="critical">Critical</option>
+                <option value="high">High</option>
+                <option value="medium">Medium</option>
+                <option value="low">Low</option>
+            </select>
+
+            <select id="alerts-sort" class="input alerts-filter-select">
+                <option value="activity_desc">Newest activity</option>
+                <option value="created_desc">Newest created</option>
+                <option value="created_asc">Oldest created</option>
+                <option value="severity_desc">Severity first</option>
+                <option value="status_asc">Status</option>
+            </select>
+        </div>
+
+        <div id="alerts-active-filters" class="alerts-active-filters"></div>
+
+        <div class="table-wrapper">
+            <table class="data-table alerts-table alerts-inbox-table">
+                <thead>
+                <tr>
+                    <th>Status</th>
+                    <th>ID</th>
+                    <th>Alert</th>
+                    <th>Severity</th>
+                    <th>Team</th>
+                    <th>Assignee</th>
+                    <th>Created</th>
+                    <th>Last seen</th>
+                    <th>Reminders</th>
+                    <th class="alerts-actions-th">Actions</th>
+                </tr>
+                </thead>
+                <tbody id="alerts-table"></tbody>
+            </table>
+        </div>
+    </section>
 </div>
 
 {% include 'pages/include/alerts_modal.html' %}
