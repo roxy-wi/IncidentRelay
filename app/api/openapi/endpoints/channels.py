@@ -80,8 +80,6 @@ CHANNEL_SCHEMA = {
             "example": {"mode": "bot_api", "api_url": "https://mattermost.example.com", "bot_token": "...", "channel_id": "..."},
         },
         "enabled": {"type": "boolean", "default": True},
-        "intake_token_prefix": {"type": "string", "nullable": True, "description": "Prefix of the alert intake token. The full token is shown only once."},
-        "has_intake_token": {"type": "boolean", "description": "True when this channel has an alert intake token."},
     },
 }
 
@@ -164,16 +162,6 @@ def paths():
                 "parameters": [path_param("channel_id", "Channel id.")],
                 "responses": {"200": response("Channel disabled.")},
             },
-        },
-        "/api/channels/{channel_id}/intake-token": {
-            "post": {
-                "tags": ["channels"],
-                "summary": "Regenerate alert intake token",
-                "description": "Creates a new per-channel token for incoming alerts. The old token stops working. The full token is returned only once.",
-                "operationId": "regenerateChannelIntakeToken",
-                "parameters": [path_param("channel_id", "Channel id.")],
-                "responses": {"200": response("New channel intake token returned.")},
-            }
         },
         "/api/channels/{channel_id}/test": {
             "post": {

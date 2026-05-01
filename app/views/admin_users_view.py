@@ -21,7 +21,7 @@ def admin_list_users():
     Return users for the admin workspace.
     """
 
-    return jsonify([serialize_user(user) for user in users_repo.list_users(active_only=False)])
+    return jsonify([serialize_user(user) for user in users_repo.list_users()])
 
 
 @admin_users_bp.route("/<int:user_id>", methods=["GET"])

@@ -269,17 +269,15 @@ function renderRouteRow(route) {
     row.append(
         $("<td>").append(
             $("<span>")
-                .addClass("route-token-pill")
+                .addClass("token-pill")
                 .text(route.intake_token_prefix || "-")
         )
     );
 
     row.append(
         $("<td>").append(
-            $("<span>")
-                .addClass("route-status-pill")
-                .addClass(route.enabled ? "route-status-enabled" : "route-status-disabled")
-                .text(route.enabled ? "Enabled" : "Disabled")
+            renderStatusBadge(route.enabled ? "Enabled" : "Disabled")
+
         )
     );
 

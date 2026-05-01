@@ -9,7 +9,7 @@ from app.modules.db import groups_repo, tokens_repo, users_repo
 from app.services.auth import create_raw_token, hash_token
 from app.services.audit import write_audit
 from app.services.rbac import can_read_group
-from app.services.serializers import serialize_user
+from app.services.serializers import serialize_user, serialize_api_token
 from app.services.validation import validate_body
 
 
@@ -64,6 +64,16 @@ def change_profile_password():
     return jsonify({"status": "password_changed"})
 
 
+@profile_bp.route("/tokens", methods=["GET"])
+def list_profile_tokens():
+    """
+    Return personal API token metadata for the current user.
+    """
+    tokens = tokens_repo.list_user_tokens(request.current_user.id)
+
+    return jsonify([serialize_api_token(token) for token in tokens])
+
+
 @profile_bp.route("/tokens", methods=["POST"])
 def create_profile_token():
     """
@@ -94,15 +104,40 @@ def create_profile_token():
         expires_at=expires_at,
     )
 
-    write_audit("profile.token.create", object_type="api_token", object_id=token.id, user_id=request.current_user.id)
+    write_audit(
+        "profile.token.create",
+        object_type="api_token",
+        object_id=token.id,
+        user_id=request.current_user.id,
+    )
+
+    data = serialize_api_token(token)
+    data["token"] = raw_token
+
+    return jsonify(data), 201
+
+
+@profile_bp.route("/tokens/<int:token_id>", methods=["DELETE"])
+def revoke_profile_token(token_id):
+    """
+    Revoke a personal API token owned by the current user.
+    """
+    token = tokens_repo.revoke_user_token(token_id, request.current_user.id)
+
+    if not token:
+        return jsonify({"error": "Token not found"}), 404
+
+    write_audit(
+        "profile.token.revoke",
+        object_type="api_token",
+        object_id=token.id,
+        user_id=request.current_user.id,
+    )
 
     return jsonify({
+        "revoked": True,
         "id": token.id,
-        "name": token.name,
-        "token": raw_token,
-        "token_prefix": token.token_prefix,
-        "expires_at": token.expires_at.isoformat() if token.expires_at else None,
-    }), 201
+    })
 
 
 @profile_bp.route("/active-group", methods=["POST"])

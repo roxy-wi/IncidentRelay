@@ -16,13 +16,15 @@ def list_teams():
     """
     Return teams visible to the current user.
     """
-
     user = request.current_user
 
     if user and user.is_admin:
-        teams = teams_repo.list_teams(active_only=True)
+        teams = teams_repo.list_teams(active_only=False)
     else:
-        teams = teams_repo.list_teams(active_only=True, group_ids=get_allowed_group_ids())
+        teams = teams_repo.list_teams(
+            active_only=False,
+            group_ids=get_allowed_group_ids(),
+        )
 
     return jsonify([serialize_team(team) for team in teams])
 
@@ -103,16 +105,33 @@ def update_team(team_id):
 @teams_bp.route("/<int:team_id>", methods=["DELETE"])
 def delete_team(team_id):
     """
-    Disable a team.
+    Remove a team and all non-historical resources under it.
     """
-
     error = require_team_write(team_id)
     if error:
         return error
 
-    team = teams_repo.disable_team(team_id)
-    write_audit("team.disable", object_type="team", object_id=team.id, group_id=team.group_id, team_id=team.id)
-    return jsonify(serialize_team(team))
+    team = teams_repo.remove_team(team_id)
+
+    write_audit(
+        "team.remove",
+        object_type="team",
+        object_id=team.id,
+        group_id=team.group_id,
+        team_id=team.id,
+        data={
+            "removed_rotations": True,
+            "removed_routes": True,
+            "removed_channels": True,
+            "removed_silences": True,
+            "historical_alerts_preserved": True,
+        },
+    )
+
+    return jsonify({
+        "deleted": True,
+        "id": team.id,
+    })
 
 
 @teams_bp.route("/<int:team_id>/users", methods=["GET"])
@@ -229,31 +248,3 @@ def delete_team_user(membership_id):
     )
 
     return jsonify({"deleted": True, "id": membership_id})
-
-
-@teams_bp.route("/users/<int:membership_id>/disable", methods=["POST"])
-def disable_team_user(membership_id):
-    """
-    Disable a team membership without deleting it.
-    """
-    membership = teams_repo.get_team_membership(membership_id)
-
-    error = require_team_write(membership.team.id)
-    if error:
-        return error
-
-    membership = teams_repo.disable_team_membership(membership_id)
-
-    write_audit(
-        "team.user.disable",
-        object_type="team",
-        object_id=membership.team.id,
-        group_id=membership.team.group_id,
-        team_id=membership.team.id,
-        data={
-            "membership_id": membership.id,
-            "user_id": membership.user.id,
-        },
-    )
-
-    return jsonify({"disabled": True, "id": membership.id})

@@ -36,7 +36,7 @@ def list_users_by_group_ids(group_ids, active_only=True):
     return list(query)
 
 
-def list_users(active_only=False, group_ids=None, include_deleted=False):
+def list_users(group_ids=None, include_deleted=False):
     """
     Return users ordered by id.
     """
@@ -61,9 +61,6 @@ def list_users(active_only=False, group_ids=None, include_deleted=False):
             .distinct()
             .order_by(User.id.asc())
         )
-
-    if active_only:
-        query = query.where(User.active == True)
 
     return list(query)
 

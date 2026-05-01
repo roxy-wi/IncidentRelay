@@ -63,6 +63,23 @@ TEAM_SCHEMA = {
     "type": "object",
     "required": ["group_id", "slug", "name"],
     "properties": {
+        "id": {"type": "integer", "readOnly": True},
+        "group_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Owner group id.",
+            "example": 1,
+        },
+        "group_slug": {
+            "type": "string",
+            "readOnly": True,
+            "example": "production",
+        },
+        "group_name": {
+            "type": "string",
+            "readOnly": True,
+            "example": "Production",
+        },
         "slug": {
             "type": "string",
             "description": "Stable URL/API friendly team identifier.",
@@ -91,9 +108,38 @@ TEAM_SCHEMA = {
         },
         "active": {
             "type": "boolean",
-            "description": "Whether the team is active.",
+            "description": "Whether the team is active. Use false to disable the team without deleting it.",
             "default": True,
         },
+    },
+}
+
+TEAM_MEMBER_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "id": {"type": "integer", "readOnly": True},
+        "user_id": {"type": "integer", "minimum": 1},
+        "username": {"type": "string", "readOnly": True},
+        "display_name": {"type": "string", "nullable": True, "readOnly": True},
+        "role": {
+            "type": "string",
+            "enum": ["read_only", "rw"],
+            "default": "read_only",
+        },
+        "active": {"type": "boolean", "default": True},
+    },
+}
+
+TEAM_MEMBER_UPDATE_SCHEMA = {
+    "type": "object",
+    "required": ["role", "active"],
+    "properties": {
+        "role": {
+            "type": "string",
+            "enum": ["read_only", "rw"],
+            "default": "read_only",
+        },
+        "active": {"type": "boolean", "default": True},
     },
 }
 
@@ -165,11 +211,28 @@ def paths():
             },
             "delete": {
                 "tags": ["teams"],
-                "summary": "Disable team",
-                "description": "Soft-deletes a team by marking it inactive. Historical alerts are preserved.",
-                "operationId": "disableTeam",
-                "parameters": [path_param("team_id", "Team id.")],
-                "responses": {"200": response("Team disabled.")},
+                "summary": "Remove team",
+                "description": (
+                    "Removes a team from management UI by soft-deleting the team and all "
+                    "non-historical resources under it: rotations, alert routes, notification "
+                    "channels and silences. Rotation members, overrides, team memberships and "
+                    "route-channel links are deleted. Historical alerts are preserved."
+                ),
+                "operationId": "removeTeam",
+                "responses": {
+                    "200": response(
+                        "Team removed.",
+                        {
+                            "type": "object",
+                            "properties": {
+                                "deleted": {"type": "boolean"},
+                                "id": {"type": "integer"},
+                            },
+                        },
+                    ),
+                    "403": response("Access denied."),
+                    "404": response("Team not found."),
+                },
             },
         },
         "/api/teams/{team_id}/users": {
@@ -194,11 +257,61 @@ def paths():
                         "required": ["user_id"],
                         "properties": {
                             "user_id": {"type": "integer", "minimum": 1, "example": 1},
-                            "role": {"type": "string", "example": "admin"},
+                            "role": {
+                                "type": "string",
+                                "enum": ["read_only", "rw"],
+                                "default": "read_only",
+                            },
                         },
                     },
                 ),
                 "responses": {"201": response("User added to team."), "400": response("Validation error.")},
+            },
+        },
+        "/api/teams/users/{membership_id}": {
+            "put": {
+                "tags": ["teams"],
+                "summary": "Update team membership",
+                "description": (
+                    "Updates team membership role and active flag. "
+                    "Use active=true to enable a disabled team member."
+                ),
+                "operationId": "updateTeamUser",
+                "parameters": [path_param("membership_id", "Team membership id.")],
+                "requestBody": json_body(
+                    "Updated team membership.",
+                    TEAM_MEMBER_UPDATE_SCHEMA,
+                ),
+                "responses": {
+                    "200": response("Team membership updated.", TEAM_MEMBER_SCHEMA),
+                    "400": response("Validation error."),
+                    "403": response("Access denied."),
+                    "404": response("Membership not found."),
+                },
+            },
+            "delete": {
+                "tags": ["teams"],
+                "summary": "Remove team member",
+                "description": (
+                    "Removes user from the team. "
+                    "Backend also removes this user from rotations of the same team."
+                ),
+                "operationId": "removeTeamUser",
+                "parameters": [path_param("membership_id", "Team membership id.")],
+                "responses": {
+                    "200": response(
+                        "Team membership removed.",
+                        {
+                            "type": "object",
+                            "properties": {
+                                "deleted": {"type": "boolean"},
+                                "id": {"type": "integer"},
+                            },
+                        },
+                    ),
+                    "403": response("Access denied."),
+                    "404": response("Membership not found."),
+                },
             },
         },
     }

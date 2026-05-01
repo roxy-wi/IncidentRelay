@@ -20,17 +20,58 @@ def create_api_token(name, token_prefix, token_hash, scopes, team_id=None, group
     )
 
 
-def list_api_tokens(include_deleted=False):
+def list_user_tokens(user_id, include_deleted=False):
     """
-    Return API token metadata.
-    """
+    Return API tokens owned by one user.
 
-    query = ApiToken.select().order_by(ApiToken.id.desc())
+    Token hashes are not exposed here. The caller must serialize only metadata.
+    """
+    query = (
+        ApiToken
+        .select()
+        .where(ApiToken.user == user_id)
+        .order_by(ApiToken.id.desc())
+    )
 
     if not include_deleted:
         query = query.where(ApiToken.deleted == False)
 
     return list(query)
+
+
+def get_user_token(token_id, user_id, include_deleted=False):
+    """
+    Return one API token owned by the given user.
+    """
+    query = ApiToken.select().where(
+        (ApiToken.id == token_id) &
+        (ApiToken.user == user_id)
+    )
+
+    if not include_deleted:
+        query = query.where(ApiToken.deleted == False)
+
+    return query.get_or_none()
+
+
+def revoke_user_token(token_id, user_id):
+    """
+    Revoke one API token owned by the given user.
+
+    This is a soft delete: the token becomes inactive and hidden from default
+    token lists, but audit/history remains possible.
+    """
+    token = get_user_token(token_id, user_id)
+
+    if not token:
+        return None
+
+    token.active = False
+    token.deleted = True
+    token.deleted_at = datetime.utcnow()
+    token.save()
+
+    return token
 
 
 def get_active_token_by_hash(token_hash):

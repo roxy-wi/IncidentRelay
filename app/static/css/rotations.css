@@ -46,34 +46,6 @@
     font-size: 12px;
 }
 
-.rotation-team-pill,
-.rotation-status-pill {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 24px;
-    padding: 4px 9px;
-    border-radius: 999px;
-    font-size: 12px;
-    font-weight: 800;
-    white-space: nowrap;
-}
-
-.rotation-team-pill {
-    color: #175cd3;
-    background: #d1e9ff;
-}
-
-.rotation-status-active {
-    color: #027a48;
-    background: #d1fadf;
-}
-
-.rotation-status-inactive {
-    color: #475467;
-    background: #f2f4f7;
-}
-
 .rotation-current-user {
     display: flex;
     align-items: center;
@@ -165,7 +137,6 @@
 }
 
 @media (max-width: 1300px) {
-    .rotations-layout-grid,
     .rotations-bottom-grid {
         grid-template-columns: 1fr;
     }

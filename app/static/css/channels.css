@@ -34,20 +34,6 @@
     font-size: 12px;
 }
 
-.channel-type-pill,
-.channel-mode-pill,
-.channel-status-pill {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 24px;
-    padding: 4px 9px;
-    border-radius: 999px;
-    font-size: 12px;
-    font-weight: 800;
-    white-space: nowrap;
-}
-
 .channel-type-pill {
     color: #175cd3;
     background: #d1e9ff;
@@ -55,16 +41,6 @@
 
 .channel-mode-pill {
     color: #344054;
-    background: #f2f4f7;
-}
-
-.channel-status-enabled {
-    color: #027a48;
-    background: #d1fadf;
-}
-
-.channel-status-disabled {
-    color: #475467;
     background: #f2f4f7;
 }
 

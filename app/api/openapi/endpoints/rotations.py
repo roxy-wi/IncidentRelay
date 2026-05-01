@@ -89,6 +89,27 @@ ROTATION_SCHEMA = {
     },
 }
 
+ROTATION_MEMBER_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "id": {"type": "integer", "readOnly": True},
+        "user_id": {"type": "integer", "minimum": 1},
+        "username": {"type": "string", "readOnly": True},
+        "display_name": {"type": "string", "nullable": True, "readOnly": True},
+        "position": {"type": "integer", "minimum": 0},
+        "active": {"type": "boolean", "default": True},
+    },
+}
+
+ROTATION_MEMBER_UPDATE_SCHEMA = {
+    "type": "object",
+    "required": ["position", "active"],
+    "properties": {
+        "position": {"type": "integer", "minimum": 0},
+        "active": {"type": "boolean", "default": True},
+    },
+}
+
 
 def tags():
     """
@@ -172,7 +193,10 @@ def paths():
             "post": {
                 "tags": ["rotations"],
                 "summary": "Add rotation member",
-                "description": "Adds or reactivates a user in a rotation at a specific position.",
+                "description": (
+                    "Adds or reactivates a user in a rotation at a specific position. "
+                    "The user must be an active member of the rotation's team."
+                ),
                 "operationId": "addRotationMember",
                 "parameters": [path_param("rotation_id", "Rotation id.")],
                 "requestBody": json_body(
@@ -228,27 +252,43 @@ def paths():
             "put": {
                 "tags": ["rotations"],
                 "summary": "Update rotation member",
+                "description": (
+                    "Updates rotation member position and active flag. "
+                    "Use active=true to enable a disabled rotation member."
+                ),
                 "operationId": "updateRotationMember",
                 "parameters": [path_param("member_id", "Rotation member id.")],
                 "requestBody": json_body(
                     "Updated rotation member.",
-                    {
-                        "type": "object",
-                        "required": ["position"],
-                        "properties": {
-                            "position": {"type": "integer", "minimum": 0},
-                            "active": {"type": "boolean", "default": True},
-                        },
-                    },
+                    ROTATION_MEMBER_UPDATE_SCHEMA,
                 ),
-                "responses": {"200": response("Rotation member updated.")},
+                "responses": {
+                    "200": response("Rotation member updated.", ROTATION_MEMBER_SCHEMA),
+                    "400": response("Validation error."),
+                    "403": response("Access denied."),
+                    "404": response("Rotation member not found."),
+                },
             },
             "delete": {
                 "tags": ["rotations"],
-                "summary": "Disable rotation member",
-                "operationId": "deleteRotationMember",
+                "summary": "Remove rotation member",
+                "description": "Permanently removes user from this rotation.",
+                "operationId": "removeRotationMember",
                 "parameters": [path_param("member_id", "Rotation member id.")],
-                "responses": {"200": response("Rotation member disabled.")},
+                "responses": {
+                    "200": response(
+                        "Rotation member removed.",
+                        {
+                            "type": "object",
+                            "properties": {
+                                "deleted": {"type": "boolean"},
+                                "id": {"type": "integer"},
+                            },
+                        },
+                    ),
+                    "403": response("Access denied."),
+                    "404": response("Rotation member not found."),
+                },
             },
         },
     }

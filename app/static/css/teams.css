@@ -40,53 +40,6 @@
     color: var(--muted);
     font-size: 12px;
 }
-
-.team-pill,
-.team-status-pill,
-.team-escalation-pill,
-.team-role-pill {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 24px;
-    padding: 4px 9px;
-    border-radius: 999px;
-    font-size: 12px;
-    font-weight: 800;
-    white-space: nowrap;
-}
-
-.team-pill {
-    color: #175cd3;
-    background: #d1e9ff;
-}
-
-.team-status-active,
-.team-escalation-enabled {
-    color: #027a48;
-    background: #d1fadf;
-}
-
-.team-status-inactive,
-.team-escalation-disabled {
-    color: #475467;
-    background: #f2f4f7;
-}
-
-.team-role-rw {
-    color: #175cd3;
-    background: #d1e9ff;
-}
-
-.team-role-read-only {
-    color: #475467;
-    background: #f2f4f7;
-}
-
-.teams-details-body {
-    padding: 16px 18px 18px;
-}
-
 .teams-form-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));

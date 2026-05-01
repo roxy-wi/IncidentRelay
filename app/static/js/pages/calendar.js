@@ -656,7 +656,7 @@ function renderCalendarLegend() {
         legend.append(
             $("<div>").addClass("calendar-legend-item")
                 .append($("<span>").addClass("calendar-legend-color").attr("style", "background-color: " + user.color))
-                .append($("<span>").text(user.label))
+                .append($("<span>").addClass("calendar-legend-name").text(user.label))
         );
     });
 }

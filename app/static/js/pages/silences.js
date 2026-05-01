@@ -260,8 +260,8 @@ function renderSilenceRow(silence) {
     row.append(
         $("<td>").append(
             $("<span>")
-                .addClass("silence-status-pill")
-                .addClass("silence-status-" + status)
+                .addClass("status-pill")
+                .addClass("status-" + status)
                 .text(getSilenceStatusLabel(status))
         )
     );

@@ -1,6 +1,17 @@
 from datetime import datetime
 
-from app.modules.db.models import AlertRoute, NotificationChannel, Rotation, Silence, Team, TeamUser, RotationMember, RotationOverride
+from app.db import database_proxy
+from app.modules.db.models import (
+    AlertRoute,
+    AlertRouteChannel,
+    NotificationChannel,
+    Rotation,
+    RotationMember,
+    RotationOverride,
+    Silence,
+    Team,
+    TeamUser,
+)
 
 
 def list_teams(active_only=False, group_ids=None, include_deleted=False):
@@ -142,54 +153,134 @@ def disable_team(team_id):
     return soft_delete_team(team_id)
 
 
-def soft_delete_team(team_id):
+def set_team_active(team_id: int, active: bool):
     """
-    Soft-delete a team and disable all resources under it.
+    Enable or disable a team without deleting team resources.
+
+    Disabled teams remain visible in management UI, but alert intake and
+    active route lookups are blocked by Team.active checks.
     """
-
-    now = datetime.utcnow()
-
     team = get_team(team_id)
-    team.active = False
-    team.deleted = True
-    team.deleted_at = now
+    team.active = active
     team.save()
 
-    Rotation.update(
-        deleted=True,
-        deleted_at=now,
-        enabled=False,
-    ).where(
-        (Rotation.team == team.id)
-        & (Rotation.deleted == False)
-    ).execute()
+    return team
 
-    AlertRoute.update(
-        deleted=True,
-        deleted_at=now,
-        enabled=False,
-    ).where(
-        (AlertRoute.team == team.id)
-        & (AlertRoute.deleted == False)
-    ).execute()
 
-    NotificationChannel.update(
-        deleted=True,
-        deleted_at=now,
-        enabled=False,
-    ).where(
-        (NotificationChannel.team == team.id)
-        & (NotificationChannel.deleted == False)
-    ).execute()
+def disable_team(team_id: int):
+    """
+    Disable a team without deleting related resources.
+    """
+    return set_team_active(team_id, False)
 
-    Silence.update(
-        deleted=True,
-        deleted_at=now,
-        enabled=False,
-    ).where(
-        (Silence.team == team.id)
-        & (Silence.deleted == False)
-    ).execute()
+
+def enable_team(team_id: int):
+    """
+    Enable a disabled team.
+    """
+    return set_team_active(team_id, True)
+
+
+def remove_team(team_id: int):
+    """
+    Remove a team from management UI and disable all resources under it.
+
+    This is intentionally soft-delete for Team, Rotation, AlertRoute,
+    NotificationChannel and Silence, so historical alerts can still keep
+    references to old objects.
+
+    Non-historical config links are deleted:
+    - rotation members
+    - rotation overrides
+    - route-channel links
+    - team memberships
+    """
+    return soft_delete_team(team_id)
+
+
+def soft_delete_team(team_id: int):
+    """
+    Soft-delete a team and all resources under it.
+    """
+    now = datetime.utcnow()
+    team = get_team(team_id)
+
+    with Team._meta.database.atomic():
+        rotation_ids_query = (
+            Rotation
+            .select(Rotation.id)
+            .where(Rotation.team == team.id)
+        )
+
+        route_ids_query = (
+            AlertRoute
+            .select(AlertRoute.id)
+            .where(AlertRoute.team == team.id)
+        )
+
+        channel_ids_query = (
+            NotificationChannel
+            .select(NotificationChannel.id)
+            .where(NotificationChannel.team == team.id)
+        )
+
+        RotationMember.delete().where(
+            RotationMember.rotation.in_(rotation_ids_query)
+        ).execute()
+
+        RotationOverride.delete().where(
+            RotationOverride.rotation.in_(rotation_ids_query)
+        ).execute()
+
+        AlertRouteChannel.delete().where(
+            (AlertRouteChannel.route.in_(route_ids_query)) |
+            (AlertRouteChannel.channel.in_(channel_ids_query))
+        ).execute()
+
+        TeamUser.delete().where(
+            TeamUser.team == team.id
+        ).execute()
+
+        Rotation.update(
+            deleted=True,
+            deleted_at=now,
+            enabled=False,
+        ).where(
+            (Rotation.team == team.id) &
+            (Rotation.deleted == False)
+        ).execute()
+
+        AlertRoute.update(
+            deleted=True,
+            deleted_at=now,
+            enabled=False,
+        ).where(
+            (AlertRoute.team == team.id) &
+            (AlertRoute.deleted == False)
+        ).execute()
+
+        NotificationChannel.update(
+            deleted=True,
+            deleted_at=now,
+            enabled=False,
+        ).where(
+            (NotificationChannel.team == team.id) &
+            (NotificationChannel.deleted == False)
+        ).execute()
+
+        Silence.update(
+            deleted=True,
+            deleted_at=now,
+            enabled=False,
+        ).where(
+            (Silence.team == team.id) &
+            (Silence.deleted == False)
+        ).execute()
+
+        team.active = False
+        team.deleted = True
+        team.deleted_at = now
+        team.save()
 
     return team
 
@@ -225,24 +316,6 @@ def disable_team_membership(membership_id):
     return membership
 
 
-def delete_team_membership(membership_id: int):
-    """
-    Permanently remove a user membership from a team.
-    """
-    membership = get_team_membership(membership_id)
-
-    data = {
-        "id": membership.id,
-        "team_id": membership.team.id,
-        "group_id": membership.team.group_id,
-        "user_id": membership.user.id,
-    }
-
-    membership.delete_instance()
-
-    return data
-
-
 def delete_team_membership(membership_id: int) -> dict:
     """
     Permanently remove user from team and from all rotations of this team.
@@ -253,7 +326,7 @@ def delete_team_membership(membership_id: int) -> dict:
     group_id = membership.team.group_id
     user_id = membership.user.id
 
-    with db.atomic():
+    with database_proxy.atomic():
         rotation_ids_query = (
             Rotation
             .select(Rotation.id)

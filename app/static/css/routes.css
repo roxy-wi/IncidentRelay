@@ -34,40 +34,6 @@
     font-size: 12px;
 }
 
-.route-pill,
-.route-status-pill,
-.route-token-pill {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 24px;
-    padding: 4px 9px;
-    border-radius: 999px;
-    font-size: 12px;
-    font-weight: 800;
-    white-space: nowrap;
-}
-
-.route-pill {
-    color: #175cd3;
-    background: #d1e9ff;
-}
-
-.route-token-pill {
-    color: #344054;
-    background: #f2f4f7;
-}
-
-.route-status-enabled {
-    color: #027a48;
-    background: #d1fadf;
-}
-
-.route-status-disabled {
-    color: #475467;
-    background: #f2f4f7;
-}
-
 .route-channels-list {
     display: flex;
     flex-wrap: wrap;

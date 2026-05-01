@@ -286,30 +286,6 @@ def delete_rotation_member(member_id):
     return jsonify({"deleted": True, "id": member_id})
 
 
-@rotations_bp.route("/members/<int:member_id>/disable", methods=["POST"])
-def disable_rotation_member(member_id):
-    """
-    Disable a rotation member without deleting it.
-    """
-    member = rotations_repo.get_rotation_member(member_id)
-
-    error = require_team_write(member.rotation.team.id)
-    if error:
-        return error
-
-    member = rotations_repo.disable_rotation_member(member_id)
-
-    write_audit(
-        "rotation.member.disable",
-        object_type="rotation",
-        object_id=member.rotation.id,
-        team_id=member.rotation.team.id,
-        data={"member_id": member.id, "user_id": member.user.id},
-    )
-
-    return jsonify({"disabled": True, "id": member.id})
-
-
 @rotations_bp.route("/<int:rotation_id>/overrides", methods=["GET"])
 def list_rotation_overrides(rotation_id):
     """

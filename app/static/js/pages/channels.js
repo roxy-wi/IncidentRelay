@@ -324,10 +324,7 @@ function renderChannelRow(channel) {
 
     row.append(
         $("<td>").append(
-            $("<span>")
-                .addClass("channel-status-pill")
-                .addClass(channel.enabled ? "channel-status-enabled" : "channel-status-disabled")
-                .text(channel.enabled ? "Enabled" : "Disabled")
+            renderStatusBadge(channel.enabled ? "Enabled" : "Disabled")
         )
     );
 

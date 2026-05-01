@@ -41,44 +41,6 @@
     font-size: 12px;
 }
 
-.silence-team-pill,
-.silence-status-pill {
-    display: inline-flex;
-    align-items: center;
-    justify-content: center;
-    min-height: 24px;
-    padding: 4px 9px;
-    border-radius: 999px;
-    font-size: 12px;
-    font-weight: 800;
-    white-space: nowrap;
-}
-
-.silence-team-pill {
-    color: #175cd3;
-    background: #d1e9ff;
-}
-
-.silence-status-active {
-    color: #027a48;
-    background: #d1fadf;
-}
-
-.silence-status-scheduled {
-    color: #088ab2;
-    background: #cff9fe;
-}
-
-.silence-status-expired {
-    color: #b54708;
-    background: #fef0c7;
-}
-
-.silence-status-disabled {
-    color: #475467;
-    background: #f2f4f7;
-}
-
 .silence-window {
     display: flex;
     flex-direction: column;

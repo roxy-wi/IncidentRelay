@@ -198,7 +198,6 @@ function navigate(path, pushState) {
     $(".menu-link").removeClass("active");
     $('.menu-link[href="' + path + '"]').addClass("active");
 
-    // renderTopbarExtraActions(selectedRoute);
     if (pushState) {
         history.pushState({ path: path }, "", path);
     }
@@ -253,10 +252,7 @@ $(document).ready(function () {
     $("#topbar-profile").on("click", function () { navigate("/profile", true); });
 
     $("#topbar-logout").on("click", function () {
-        apiPost("/api/auth/logout", {}, function () {
-            localStorage.removeItem("oncall_jwt");
-            window.location.href = "/login";
-        });
+        logout();
     });
 
     window.onpopstate = function () { navigate(window.location.pathname, false); };
@@ -310,84 +306,12 @@ function formatDateTime24(value, options) {
 
     return datePart + ", " + timeParts.join(":");
 }
-// function clearTopbarExtraActions() {
-//     /*
-//      * Clear page-specific controls from topbar.
-//      */
-//     $("#topbar-extra-actions").empty();
-//     $(".topbar").removeClass("topbar-alerts");
-//
-//     if (typeof setAlertsAutoRefresh === "function") {
-//         setAlertsAutoRefresh(false);
-//     }
-// }
-
-//
-// function renderAlertsTopbarActions() {
-//     /*
-//      * Render Alerts page controls in the shared topbar.
-//      * These controls are recreated on every navigation to /alerts.
-//      */
-//     $(".topbar").addClass("topbar-alerts");
-//
-//     $("#topbar-extra-actions").html(`
-//         <div class="alerts-topbar-controls">
-//             <div class="alerts-topbar-search">
-//                 <span class="alerts-search-icon">⌕</span>
-//                 <input
-//                     id="alerts-search"
-//                     class="input"
-//                     type="search"
-//                     placeholder="Search alerts..."
-//                     autocomplete="off"
-//                 >
-//             </div>
-//
-//             <select id="status-filter" class="input alerts-topbar-select">
-//                 <option value="">All statuses</option>
-//                 <option value="firing">Firing</option>
-//                 <option value="acknowledged">Acknowledged</option>
-//                 <option value="resolved">Resolved</option>
-//                 <option value="silenced">Silenced</option>
-//             </select>
-//
-//             <select id="severity-filter" class="input alerts-topbar-select">
-//                 <option value="">All severities</option>
-//                 <option value="critical">Critical</option>
-//                 <option value="high">High</option>
-//                 <option value="medium">Medium</option>
-//                 <option value="low">Low</option>
-//             </select>
-//
-//             <select id="alerts-sort" class="input alerts-topbar-select">
-//                 <option value="activity_desc">Newest activity</option>
-//                 <option value="created_desc">Newest created</option>
-//                 <option value="created_asc">Oldest created</option>
-//                 <option value="severity_desc">Severity first</option>
-//                 <option value="status_asc">Status</option>
-//             </select>
-//
-//             <label class="alerts-topbar-switch">
-//                 <input id="alerts-auto-refresh" type="checkbox">
-//                 <span>Auto</span>
-//             </label>
-//
-//             <button id="reload-alerts" type="button" class="btn btn-primary btn-small">
-//                 Reload
-//             </button>
-//         </div>
-//     `);
-// }
-//
-//
-// function renderTopbarExtraActions(route) {
-//     /*
-//      * Render page-specific actions in topbar.
-//      */
-//     clearTopbarExtraActions();
-//
-//     if (route && route.page === "alerts") {
-//         renderAlertsTopbarActions();
-//     }
-// }
-
+function renderStatusBadge(isActive, activeText, inactiveText) {
+    /*
+     * Render a reusable status badge.
+     */
+    return $("<span>")
+        .addClass("status-pill")
+        .addClass(isActive ? "status-enabled" : "status-disabled")
+        .text(isActive ? activeText : inactiveText);
+}

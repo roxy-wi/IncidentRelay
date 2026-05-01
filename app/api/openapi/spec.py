@@ -1,4 +1,17 @@
-from app.api.openapi.endpoints import alerts, auth, calendar, channels, integrations, rotations, routes, silences, teams, users, version
+from app.api.openapi.endpoints import (
+    alerts,
+    auth,
+    calendar,
+    channels,
+    integrations,
+    profile,
+    rotations,
+    routes,
+    silences,
+    teams,
+    users,
+    version,
+)
 from app.version import get_service_version
 
 
@@ -14,6 +27,7 @@ ENDPOINT_MODULES = [
     alerts,
     silences,
     integrations,
+    profile
 ]
 
 

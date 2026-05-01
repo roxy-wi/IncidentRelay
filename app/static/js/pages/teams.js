@@ -202,7 +202,7 @@ function renderTeamRow(team) {
     /*
      * Render one team row.
      */
-    const row = $("<tr>");
+    const row = $("<tr>").toggleClass("row-disabled", !team.active);
 
     row.append(
         $("<td>")
@@ -217,7 +217,7 @@ function renderTeamRow(team) {
             )
             .append(
                 $("<div>")
-                    .addClass("team-row-subtitle")
+                    .addClass("row-subtitle")
                     .text("Team #" + team.id)
             )
     );
@@ -225,7 +225,7 @@ function renderTeamRow(team) {
     row.append(
         $("<td>").append(
             $("<span>")
-                .addClass("team-pill")
+                .addClass("pill")
                 .text(team.group_slug || "-")
         )
     );
@@ -235,18 +235,15 @@ function renderTeamRow(team) {
     row.append(
         $("<td>").append(
             $("<span>")
-                .addClass("team-escalation-pill")
-                .addClass(team.escalation_enabled ? "team-escalation-enabled" : "team-escalation-disabled")
+                .addClass("status-pill")
+                .addClass(team.escalation_enabled ? "status-enabled" : "status-disabled")
                 .text(team.escalation_enabled ? "after " + (team.escalation_after_reminders || 0) : "Disabled")
         )
     );
 
     row.append(
         $("<td>").append(
-            $("<span>")
-                .addClass("team-status-pill")
-                .addClass(team.active ? "team-status-active" : "team-status-inactive")
-                .text(team.active ? "Active" : "Inactive")
+            renderStatusBadge(team.active, "Active", `Inactive`)
         )
     );
 
@@ -286,13 +283,35 @@ function renderTeamActions(team) {
             })
     );
 
+    if (team.active) {
+        actions.append(
+            $("<button>")
+                .attr("type", "button")
+                .addClass("btn btn-warning btn-small")
+                .text("Disable")
+                .on("click", function () {
+                    setTeamActive(team, false);
+                })
+        );
+    } else {
+        actions.append(
+            $("<button>")
+                .attr("type", "button")
+                .addClass("btn btn-success btn-small")
+                .text("Enable")
+                .on("click", function () {
+                    setTeamActive(team, true);
+                })
+        );
+    }
+
     actions.append(
         $("<button>")
             .attr("type", "button")
             .addClass("btn btn-danger btn-small")
-            .text("Disable")
+            .text("Remove")
             .on("click", function () {
-                deleteTeam(team.id);
+                removeTeam(team);
             })
     );
 
@@ -449,7 +468,7 @@ function renderTeamMemberRow(member) {
      * Render one team member row.
      */
     const row = $("<tr>");
-    console.log(member);
+
     row.append($("<td>").text(member.user_id));
     row.append($("<td>").text(member.username));
     row.append($("<td>").text(member.display_name || "-"));
@@ -457,18 +476,14 @@ function renderTeamMemberRow(member) {
     row.append(
         $("<td>").append(
             $("<span>")
-                .addClass("team-role-pill")
-                .addClass(member.role === "rw" ? "team-role-rw" : "team-role-read-only")
+                .addClass("role-pill")
+                .addClass(member.role === "rw" ? "role-rw" : "role-read-only")
                 .text(member.role === "rw" ? "Read/write" : "Read only")
         )
     );
 
     row.append(
-        $("<td>").append(
-            $("<span>")
-                .addClass("team-status-pill")
-                .addClass(member.active ? "team-status-active" : "team-status-inactive")
-                .text(member.active ? "Active" : "Inactive")
+        $("<td>").append(renderStatusBadge(member.active, "Enabled", "Disabled")
         )
     );
 
@@ -484,15 +499,27 @@ function renderTeamMemberRow(member) {
             })
     );
 
-    actions.append(
-        $("<button>")
-            .attr("type", "button")
-            .addClass("btn btn-warning btn-small")
-            .text("Disable")
-            .on("click", function () {
-                disableTeamMember(member.id);
-            })
-    );
+    if (member.active) {
+        actions.append(
+            $("<button>")
+                .attr("type", "button")
+                .addClass("btn btn-warning btn-small")
+                .text("Disable")
+                .on("click", function () {
+                    setTeamMemberActive(member, false);
+                })
+        );
+    } else {
+        actions.append(
+            $("<button>")
+                .attr("type", "button")
+                .addClass("btn btn-small")
+                .text("Enable")
+                .on("click", function () {
+                    setTeamMemberActive(member, true);
+                })
+        );
+    }
 
     actions.append(
         $("<button>")
@@ -567,23 +594,35 @@ function saveTeamUser() {
         refreshTeams();
     });
 }
-
-
-function disableTeamMember(membershipId) {
+function setTeamMemberActive(member, active) {
     /*
-     * Disable team membership without deleting it.
+     * Enable or disable a team membership using the existing update endpoint.
+     *
+     * PUT requires role and active, so we preserve the current role.
      */
-    if (!confirm("Disable this team membership?")) {
+    const action = active ? "enable" : "disable";
+
+    if (!confirm("Are you sure you want to " + action + " this team member?")) {
         return;
     }
 
-    apiPost("/api/teams/users/" + membershipId + "/disable", {}, function () {
-        resetTeamMemberForm();
-        loadTeamMembers(selectedTeamForMembers, selectedTeamNameForMembers);
-        refreshTeams();
-    });
-}
+    apiPut(
+        "/api/teams/users/" + member.id,
+        {
+            role: member.role || "read_only",
+            active: active
+        },
+        function () {
+            resetTeamMemberForm();
 
+            if (selectedTeamForMembers) {
+                loadTeamMembers(selectedTeamForMembers, selectedTeamNameForMembers);
+            }
+
+            refreshTeams();
+        }
+    );
+}
 
 function collectTeamPayload() {
     /*
@@ -808,6 +847,104 @@ function removeTeamMember(membershipId) {
 
         if (typeof refreshRotations === "function") {
             refreshRotations();
+        }
+    });
+}
+function buildTeamUpdatePayload(team, active) {
+    /*
+     * Build a full team update payload.
+     *
+     * Backend TeamUpdateSchema expects the full team object, so we preserve all
+     * current values and only change active.
+     */
+    return {
+        group_id: Number(team.group_id),
+        slug: team.slug,
+        name: team.name,
+        description: team.description || "",
+        escalation_enabled: !!team.escalation_enabled,
+        escalation_after_reminders: Number(team.escalation_after_reminders || 0),
+        active: active
+    };
+}
+
+
+function setTeamActive(team, active) {
+    /*
+     * Enable or disable a team without deleting rotations, routes, channels or silences.
+     */
+    const action = active ? "enable" : "disable";
+
+    if (!confirm("Are you sure you want to " + action + " this team?")) {
+        return;
+    }
+
+    apiPut(
+        "/api/teams/" + team.id,
+        buildTeamUpdatePayload(team, active),
+        function () {
+            refreshTeams();
+
+            if (typeof refreshRotations === "function") {
+                refreshRotations();
+            }
+
+            if (typeof refreshRoutes === "function") {
+                refreshRoutes();
+            }
+
+            if (typeof refreshChannels === "function") {
+                refreshChannels();
+            }
+
+            if (typeof refreshSilences === "function") {
+                refreshSilences();
+            }
+        }
+    );
+}
+
+
+function removeTeam(team) {
+    /*
+     * Remove a team and all non-historical resources under it.
+     */
+    const message = [
+        "Remove team \"" + (team.name || team.slug || team.id) + "\"?",
+        "",
+        "This will remove rotations, routes, notification channels, silences,",
+        "team memberships and route-channel links for this team.",
+        "",
+        "Historical alerts will be preserved.",
+        "",
+        "Continue?"
+    ].join("\n");
+
+    if (!confirm(message)) {
+        return;
+    }
+
+    apiDelete("/api/teams/" + team.id, function () {
+        if (Number(selectedTeamDetailsId) === Number(team.id)) {
+            selectedTeamDetailsId = null;
+        }
+
+        refreshTeams();
+
+        if (typeof refreshRotations === "function") {
+            refreshRotations();
+        }
+
+        if (typeof refreshRoutes === "function") {
+            refreshRoutes();
+        }
+
+        if (typeof refreshChannels === "function") {
+            refreshChannels();
+        }
+
+        if (typeof refreshSilences === "function") {
+            refreshSilences();
         }
     });
 }

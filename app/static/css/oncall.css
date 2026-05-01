@@ -54,6 +54,19 @@ body { margin: 0; background: var(--bg); color: var(--text); font-family: Arial,
 .data-table tr:hover { background: #fbfcfe; }
 .badge { display: inline-flex; align-items: center; border-radius: 999px; padding: 5px 10px; font-size: 12px; font-weight: 600; }
 .badge-info { background: #e8f2ff; color: #1d65a6; }
+.badge-success {
+    background: #edf8ed;
+    color: #2f7d32;
+}
+
+.badge-muted {
+    background: #f2f4f7;
+    color: var(--muted);
+}
+
+.row-disabled {
+    opacity: 0.65;
+}
 .status-firing { color: var(--danger); font-weight: 700; }
 .status-acknowledged { color: var(--warning); font-weight: 700; }
 .status-resolved { color: var(--success); font-weight: 700; }
@@ -734,4 +747,65 @@ summary {
     .details-card {
         position: static;
     }
+}
+.row-disabled {
+    opacity: 0.65;
+}
+.pill,
+.team-pill,
+.status-pill,
+.token-pill {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    min-height: 24px;
+    padding: 4px 9px;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 800;
+    white-space: nowrap;
+}
+
+.pill {
+    color: #175cd3;
+    background: #d1e9ff;
+}
+
+.token-pill {
+    color: #344054;
+    background: #f2f4f7;
+}
+
+.status-enabled {
+    color: #027a48;
+    background: #d1fadf;
+}
+
+.status-disabled {
+    color: #475467;
+    background: #f2f4f7;
+}
+.status-active,
+.escalation-enabled {
+    color: #027a48;
+    background: #d1fadf;
+}
+.status-expired {
+    color: #b54708;
+    background: #fef0c7;
+}
+.status-inactive,
+.escalation-disabled {
+    color: #475467;
+    background: #f2f4f7;
+}
+
+.role-rw {
+    color: #175cd3;
+    background: #d1e9ff;
+}
+
+.role-read-only {
+    color: #475467;
+    background: #f2f4f7;
 }

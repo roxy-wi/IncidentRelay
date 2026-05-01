@@ -91,35 +91,6 @@ function getFilteredRotations() {
     });
 }
 
-
-function fillRotationsTeamFilter(rotations) {
-    /*
-     * Fill table team filter from loaded rotations.
-     */
-    const select = $("#rotations-team-filter");
-    const selected = select.val();
-
-    const teams = {};
-
-    rotations.forEach(function (rotation) {
-        if (rotation.team_slug) {
-            teams[rotation.team_slug] = rotation.team_name || rotation.team_slug;
-        }
-    });
-
-    select.empty();
-    select.append($("<option>").val("").text("All teams"));
-
-    Object.keys(teams).sort().forEach(function (slug) {
-        select.append($("<option>").val(slug).text(teams[slug]));
-    });
-
-    if (selected && teams[selected]) {
-        select.val(selected);
-    }
-}
-
-
 function renderRotationsSummary(rotations) {
     /*
      * Render rotations summary cards.
@@ -242,7 +213,6 @@ function refreshRotations(doneCallback) {
 
             const row = $("<tr>");
 
-            // row.append($("<td>").text('#' + rotation.id));
              row.append(
                 $("<td>").append(
                     $("<button>")
@@ -498,12 +468,39 @@ function loadRotationMembers(rotationId, rotationName) {
             row.append($("<td>").text(member.active ? "yes" : "no"));
 
             const actions = $("<td>").addClass("actions");
-            actions.append($("<button>").attr("type", "button").addClass("btn btn-small").text("Edit").on("click", function () {
-                editRotationMember(member);
-            }));
-            actions.append($("<button>").attr("type", "button").addClass("btn btn-warning btn-small").text("Disable").on("click", function () {
-                disableRotationMember(member.id);
-            }));
+
+            actions.append(
+                $("<button>")
+                    .attr("type", "button")
+                    .addClass("btn btn-small")
+                    .text("Edit")
+                    .on("click", function () {
+                        editRotationMember(member);
+                    })
+            );
+
+            if (member.active) {
+                actions.append(
+                    $("<button>")
+                        .attr("type", "button")
+                        .addClass("btn btn-warning btn-small")
+                        .text("Disable")
+                        .on("click", function () {
+                            setRotationMemberActive(member, false);
+                        })
+                );
+            } else {
+                actions.append(
+                    $("<button>")
+                        .attr("type", "button")
+                        .addClass("btn btn-success btn-small")
+                        .text("Enable")
+                        .on("click", function () {
+                            setRotationMemberActive(member, true);
+                        })
+                );
+            }
+
             actions.append(
                 $("<button>")
                     .attr("type", "button")
@@ -513,6 +510,7 @@ function loadRotationMembers(rotationId, rotationName) {
                         removeRotationMember(member.id);
                     })
             );
+
             row.append(actions);
             tbody.append(row);
         });
@@ -586,17 +584,37 @@ function saveRotationMember() {
         });
     });
 }
+function setRotationMemberActive(member, active) {
+    /*
+     * Enable or disable a rotation member using the existing update endpoint.
+     *
+     * PUT requires position and active, so we preserve the current position.
+     */
+    const action = active ? "enable" : "disable";
 
-function disableRotationMember(memberId) {
-    /* Disable a rotation member. */
-    if (!confirm("Disable this rotation member?")) {
+    if (!confirm("Are you sure you want to " + action + " this rotation member?")) {
         return;
     }
 
-    apiPost("/api/rotations/members/" + memberId + "/disable", function () {
-        loadRotationMembers(selectedRotationForMembers, selectedRotationNameForMembers);
-        refreshRotations();
-    });
+    apiPut(
+        "/api/rotations/members/" + member.id,
+        {
+            position: Number(member.position || 0),
+            active: active
+        },
+        function () {
+            resetRotationMemberForm();
+
+            if (selectedRotationForMembers) {
+                loadRotationMembers(
+                    selectedRotationForMembers,
+                    selectedRotationNameForMembers
+                );
+            }
+
+            refreshRotations();
+        }
+    );
 }
 
 function selectOverrideRotation(rotationId) {
@@ -802,10 +820,7 @@ function renderRotationRow(rotation) {
 
     row.append(
         $("<td>").append(
-            $("<span>")
-                .addClass("rotation-status-pill")
-                .addClass(rotation.enabled ? "rotation-status-active" : "rotation-status-inactive")
-                .text(rotation.enabled ? "Active" : "Inactive")
+            renderStatusBadge(rotation.enabled ? "Active" : "Inactive")
         )
     );
 
@@ -986,7 +1001,15 @@ function getRotationCadence(rotation) {
      * Return human-readable rotation cadence.
      */
     if (rotation.rotation_type === "custom") {
-        return "every " + rotation.interval_value + " " + rotation.interval_unit;
+        return (rotation.custom_days || 1) + "d";
+    }
+
+    if (rotation.rotation_type === "weekly") {
+        return "weekly";
+    }
+
+    if (rotation.rotation_type === "daily") {
+        return "daily";
     }
 
     return rotation.rotation_type || "-";

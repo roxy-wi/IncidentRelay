@@ -77,10 +77,14 @@
 .calendar-legend-item {
     display: inline-flex;
     align-items: center;
-    gap: 7px;
+    gap: 4px;
     color: #52616f;
     font-size: 12px;
     font-weight: 700;
+}
+
+.calendar-legend-item {
+    margin-right: 10px;
 }
 
 .calendar-legend-color {
