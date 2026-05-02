@@ -1,9 +1,3 @@
-.teams-page {
-    display: flex;
-    flex-direction: column;
-    gap: 18px;
-}
-
 .teams-card,
 .teams-details-card {
     margin-bottom: 0;

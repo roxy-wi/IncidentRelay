@@ -94,7 +94,6 @@ name = incedentrelay.db
 
 [auth]
 api_auth_required = true
-webhook_auth_required = true
 rbac_enforced = true
 jwt_secret = change-me-too
 jwt_expire_minutes = 1440

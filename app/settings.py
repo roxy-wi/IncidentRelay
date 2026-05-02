@@ -79,7 +79,6 @@ class Config:
     PUBLIC_BASE_URL = settings.get("main", "public_base_url", "http://127.0.0.1:8080")
 
     API_AUTH_REQUIRED = settings.get_bool("auth", "api_auth_required", False)
-    WEBHOOK_AUTH_REQUIRED = settings.get_bool("auth", "webhook_auth_required", False)
     RBAC_ENFORCED = settings.get_bool("auth", "rbac_enforced", False)
     JWT_SECRET_KEY = settings.get("auth", "jwt_secret", SECRET_KEY)
     JWT_EXPIRE_MINUTES = settings.get_int("auth", "jwt_expire_minutes", 1440)

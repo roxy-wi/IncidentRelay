@@ -217,7 +217,7 @@ function collectChannelPayload() {
     const teamId = Number($("#channel-team").val());
 
     if (!teamId) {
-        alert("Select a team first.");
+        showAppError("Select a team first.");
         throw new Error("team_id is required");
     }
 
@@ -324,7 +324,7 @@ function renderChannelRow(channel) {
 
     row.append(
         $("<td>").append(
-            renderStatusBadge(channel.enabled ? "Enabled" : "Disabled")
+            renderStatusBadge(channel.enabled, "Enabled", "Disabled")
         )
     );
 
@@ -523,7 +523,7 @@ function testChannel(id) {
      */
 
     apiPost("/api/channels/" + id + "/test", {}, function (response) {
-        alert(JSON.stringify(response, null, 2));
+        showAppSuccess(JSON.stringify(response, null, 2));
     });
 }
 

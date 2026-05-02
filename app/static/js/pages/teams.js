@@ -568,7 +568,7 @@ function saveTeamUser() {
     const membershipId = $("#team-member-id").val();
 
     if (!teamId) {
-        alert("Select a team first.");
+        showAppError("Select a team first.");
         return;
     }
 
@@ -601,27 +601,29 @@ function setTeamMemberActive(member, active) {
      * PUT requires role and active, so we preserve the current role.
      */
     const action = active ? "enable" : "disable";
+    showAppConfirm({
+        title: "Are you sure?",
+        message: ("Are you sure you want to " + action + " this team member?"),
+        confirmText: "Disable",
+        confirmClass: "btn-warning"
+    }).done(function () {
+        apiPut(
+            "/api/teams/users/" + member.id,
+            {
+                role: member.role || "read_only",
+                active: active
+            },
+            function () {
+                resetTeamMemberForm();
 
-    if (!confirm("Are you sure you want to " + action + " this team member?")) {
-        return;
-    }
+                if (selectedTeamForMembers) {
+                    loadTeamMembers(selectedTeamForMembers, selectedTeamNameForMembers);
+                }
 
-    apiPut(
-        "/api/teams/users/" + member.id,
-        {
-            role: member.role || "read_only",
-            active: active
-        },
-        function () {
-            resetTeamMemberForm();
-
-            if (selectedTeamForMembers) {
-                loadTeamMembers(selectedTeamForMembers, selectedTeamNameForMembers);
+                refreshTeams();
             }
-
-            refreshTeams();
-        }
-    );
+        );
+    });
 }
 
 function collectTeamPayload() {
@@ -631,7 +633,7 @@ function collectTeamPayload() {
     const groupId = Number($("#team-group").val());
 
     if (!groupId) {
-        alert("Select a group first.");
+        showAppError("Select a group first.");
         throw new Error("group_id is required");
     }
 
@@ -695,19 +697,6 @@ function editTeam(id) {
 
     openTeamFormModal();
 }
-
-
-function deleteTeam(id) {
-    /*
-     * Disable a team.
-     */
-    if (!confirm("Disable this team?")) {
-        return;
-    }
-
-    apiDelete("/api/teams/" + id, refreshTeams);
-}
-
 
 function resetTeamForm() {
     /*
@@ -836,18 +825,21 @@ function removeTeamMember(membershipId) {
      * Permanently remove a user from the selected team.
      * Backend also removes user from this team's rotations.
      */
-    if (!confirm("Remove this user from the team and from all team rotations?")) {
-        return;
-    }
+    showAppConfirm({
+        title: "Removing team member",
+        message: "Remove this user from the team and from all team rotations?",
+        confirmText: "Remove",
+        confirmClass: "btn-danger"
+    }).done(function () {
+        apiDelete("/api/teams/users/" + membershipId, function () {
+            resetTeamMemberForm();
+            loadTeamMembers(selectedTeamForMembers, selectedTeamNameForMembers);
+            refreshTeams();
 
-    apiDelete("/api/teams/users/" + membershipId, function () {
-        resetTeamMemberForm();
-        loadTeamMembers(selectedTeamForMembers, selectedTeamNameForMembers);
-        refreshTeams();
-
-        if (typeof refreshRotations === "function") {
-            refreshRotations();
-        }
+            if (typeof refreshRotations === "function") {
+                refreshRotations();
+            }
+        });
     });
 }
 function buildTeamUpdatePayload(team, active) {
@@ -874,34 +866,38 @@ function setTeamActive(team, active) {
      * Enable or disable a team without deleting rotations, routes, channels or silences.
      */
     const action = active ? "enable" : "disable";
+    const btn_class = active ? "btn-success" : "btn-warning";
 
-    if (!confirm("Are you sure you want to " + action + " this team?")) {
-        return;
-    }
+    showAppConfirm({
+        title: "Are you sure?",
+        message: "Are you sure you want to " + action + " this team?",
+        confirmText: upperCaseFirst(action),
+        confirmClass: btn_class
+    }).done(function () {
+        apiPut(
+            "/api/teams/" + team.id,
+            buildTeamUpdatePayload(team, active),
+            function () {
+                refreshTeams();
 
-    apiPut(
-        "/api/teams/" + team.id,
-        buildTeamUpdatePayload(team, active),
-        function () {
-            refreshTeams();
+                if (typeof refreshRotations === "function") {
+                    refreshRotations();
+                }
 
-            if (typeof refreshRotations === "function") {
-                refreshRotations();
+                if (typeof refreshRoutes === "function") {
+                    refreshRoutes();
+                }
+
+                if (typeof refreshChannels === "function") {
+                    refreshChannels();
+                }
+
+                if (typeof refreshSilences === "function") {
+                    refreshSilences();
+                }
             }
-
-            if (typeof refreshRoutes === "function") {
-                refreshRoutes();
-            }
-
-            if (typeof refreshChannels === "function") {
-                refreshChannels();
-            }
-
-            if (typeof refreshSilences === "function") {
-                refreshSilences();
-            }
-        }
-    );
+        );
+    });
 }
 
 
@@ -920,31 +916,34 @@ function removeTeam(team) {
         "Continue?"
     ].join("\n");
 
-    if (!confirm(message)) {
-        return;
-    }
+    showAppConfirm({
+        title: "Remove team",
+        message: message,
+        confirmText: "Remove",
+        confirmClass: "btn-danger"
+    }).done(function () {
+        apiDelete("/api/teams/" + team.id, function () {
+            if (Number(selectedTeamDetailsId) === Number(team.id)) {
+                selectedTeamDetailsId = null;
+            }
 
-    apiDelete("/api/teams/" + team.id, function () {
-        if (Number(selectedTeamDetailsId) === Number(team.id)) {
-            selectedTeamDetailsId = null;
-        }
+            refreshTeams();
 
-        refreshTeams();
+            if (typeof refreshRotations === "function") {
+                refreshRotations();
+            }
 
-        if (typeof refreshRotations === "function") {
-            refreshRotations();
-        }
+            if (typeof refreshRoutes === "function") {
+                refreshRoutes();
+            }
 
-        if (typeof refreshRoutes === "function") {
-            refreshRoutes();
-        }
+            if (typeof refreshChannels === "function") {
+                refreshChannels();
+            }
 
-        if (typeof refreshChannels === "function") {
-            refreshChannels();
-        }
-
-        if (typeof refreshSilences === "function") {
-            refreshSilences();
-        }
+            if (typeof refreshSilences === "function") {
+                refreshSilences();
+            }
+        });
     });
 }

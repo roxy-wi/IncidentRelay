@@ -82,11 +82,91 @@ function apiRequest(method, url, data, callback) {
     });
 }
 
-function apiGet(url, callback) { apiRequest("GET", url, null, callback); }
-function apiPost(url, data, callback) { apiRequest("POST", url, data, callback); }
-function apiPut(url, data, callback) { apiRequest("PUT", url, data, callback); }
-function apiDelete(url, callback) { apiRequest("DELETE", url, null, callback); }
+// function apiGet(url, callback) { apiRequest("GET", url, null, callback); }
+// function apiPost(url, data, callback) { apiRequest("POST", url, data, callback); }
+// function apiPut(url, data, callback) { apiRequest("PUT", url, data, callback); }
+// function apiDelete(url, callback) { apiRequest("DELETE", url, null, callback); }
+function getAuthHeaders() {
+    /*
+     * Return Authorization header from local storage token.
+     */
+    const token = localStorage.getItem("oncall_jwt");
 
+    if (!token) {
+        return {};
+    }
+
+    return {
+        "Authorization": "Bearer " + token
+    };
+}
+
+
+function apiRequest(method, url, data, onSuccess, onError) {
+    /*
+     * Common API request wrapper.
+     *
+     * All API helpers must go through this function so errors are handled
+     * consistently across pages.
+     */
+    const ajaxOptions = {
+        url: url,
+        method: method,
+        headers: getAuthHeaders(),
+        success: function (response) {
+            if (typeof onSuccess === "function") {
+                onSuccess(response);
+            }
+        },
+        error: function (xhr) {
+            if (typeof onError === "function") {
+                onError(xhr);
+                return;
+            }
+
+            showApiError(xhr);
+        }
+    };
+
+    if (data !== undefined && data !== null) {
+        ajaxOptions.contentType = "application/json";
+        ajaxOptions.data = JSON.stringify(data);
+    }
+
+    $.ajax(ajaxOptions);
+}
+
+
+function apiGet(url, onSuccess, onError) {
+    /*
+     * Send GET request.
+     */
+    apiRequest("GET", url, null, onSuccess, onError);
+}
+
+
+function apiPost(url, data, onSuccess, onError) {
+    /*
+     * Send POST request.
+     */
+    apiRequest("POST", url, data || {}, onSuccess, onError);
+}
+
+
+function apiPut(url, data, onSuccess, onError) {
+    /*
+     * Send PUT request.
+     */
+    apiRequest("PUT", url, data || {}, onSuccess, onError);
+}
+
+
+function apiDelete(url, onSuccess, onError) {
+    /*
+     * Send DELETE request.
+     */
+    apiRequest("DELETE", url, null, onSuccess, onError);
+}
 function asArray(value) {
     /* Return value when it is an array, otherwise return an empty array. */
     return Array.isArray(value) ? value : [];
@@ -306,12 +386,294 @@ function formatDateTime24(value, options) {
 
     return datePart + ", " + timeParts.join(":");
 }
-function renderStatusBadge(isActive, activeText, inactiveText) {
+function renderStatusBadge(isActive, activeText = "Enabled", inactiveText = "Disabled") {
     /*
      * Render a reusable status badge.
      */
+    console.log("renderStatusBadge", isActive, activeText, inactiveText);
     return $("<span>")
         .addClass("status-pill")
         .addClass(isActive ? "status-enabled" : "status-disabled")
         .text(isActive ? activeText : inactiveText);
 }
+function resetAppDialog() {
+    /*
+     * Reset global dialog state before showing a new message.
+     */
+    $("#app-dialog-modal")
+        .removeClass("app-dialog-error app-dialog-warning app-dialog-success app-dialog-info");
+
+    $("#app-dialog-title").text("Message");
+    $("#app-dialog-subtitle").text("");
+    $("#app-dialog-message").text("");
+    $("#app-dialog-icon").text("!");
+
+    $("#app-dialog-cancel").show().text("Cancel");
+    $("#app-dialog-confirm")
+        .removeClass("btn-danger btn-warning btn-success btn-primary")
+        .addClass("btn-primary")
+        .text("OK");
+}
+
+
+function closeAppDialog() {
+    /*
+     * Close global dialog.
+     */
+    $("#app-dialog-modal").addClass("is-hidden");
+}
+
+
+function showAppDialog(options) {
+    /*
+     * Show global application dialog.
+     *
+     * Returns:
+     *   jQuery Promise resolved on confirm, rejected on cancel/close.
+     */
+    const deferred = $.Deferred();
+    const opts = options || {};
+    const type = opts.type || "info";
+
+    resetAppDialog();
+
+    $("#app-dialog-modal")
+        .addClass("app-dialog-" + type)
+        .removeClass("is-hidden");
+
+    $("#app-dialog-title").text(opts.title || "Message");
+    $("#app-dialog-subtitle").text(opts.subtitle || "");
+    $("#app-dialog-message").text(opts.message || "");
+
+    $("#app-dialog-icon").text(opts.icon || getAppDialogIcon(type));
+
+    $("#app-dialog-confirm")
+        .text(opts.confirmText || "OK")
+        .removeClass("btn-primary btn-danger btn-warning btn-success")
+        .addClass(opts.confirmClass || getAppDialogButtonClass(type));
+
+    if (opts.cancelText === null || opts.hideCancel) {
+        $("#app-dialog-cancel").hide();
+    } else {
+        $("#app-dialog-cancel").show().text(opts.cancelText || "Cancel");
+    }
+
+    $("#app-dialog-confirm").off("click.appDialog").on("click.appDialog", function () {
+        closeAppDialog();
+        deferred.resolve();
+    });
+
+    $("#app-dialog-cancel, #app-dialog-close")
+        .off("click.appDialog")
+        .on("click.appDialog", function () {
+            closeAppDialog();
+            deferred.reject();
+        });
+
+    return deferred.promise();
+}
+
+
+function getAppDialogIcon(type) {
+    /*
+     * Return icon text for dialog type.
+     */
+    if (type === "error") {
+        return "!";
+    }
+
+    if (type === "warning") {
+        return "!";
+    }
+
+    if (type === "success") {
+        return "✓";
+    }
+
+    return "i";
+}
+
+
+function getAppDialogButtonClass(type) {
+    /*
+     * Return default button class for dialog type.
+     */
+    if (type === "error") {
+        return "btn-danger";
+    }
+
+    if (type === "warning") {
+        return "btn-warning";
+    }
+
+    if (type === "success") {
+        return "btn-success";
+    }
+
+    return "btn-primary";
+}
+
+
+function showAppError(message, title) {
+    /*
+     * Show error dialog.
+     */
+    return showAppDialog({
+        type: "error",
+        title: title || "Error",
+        message: message || "Unexpected error",
+        confirmText: "Close",
+        hideCancel: true
+    });
+}
+
+
+function showAppSuccess(message, title) {
+    /*
+     * Show success dialog.
+     */
+    return showAppDialog({
+        type: "success",
+        title: title || "Success",
+        message: message || "Done",
+        confirmText: "OK",
+        hideCancel: true
+    });
+}
+
+
+function showAppConfirm(options) {
+    /*
+     * Show confirmation dialog.
+     */
+    return showAppDialog({
+        type: options.type || "warning",
+        title: options.title || "Confirm action",
+        subtitle: options.subtitle || "",
+        message: options.message || "Are you sure?",
+        confirmText: options.confirmText || "Confirm",
+        cancelText: options.cancelText || "Cancel",
+        confirmClass: options.confirmClass || "btn-warning"
+    });
+}
+
+
+$(document).on("click", "#app-dialog-modal", function (event) {
+    /*
+     * Close dialog when clicking outside the modal dialog.
+     */
+    if (event.target === this) {
+        $("#app-dialog-cancel").trigger("click");
+    }
+});
+
+
+$(document).on("keydown", function (event) {
+    /*
+     * Close global dialog by Escape.
+     */
+    if (event.key !== "Escape") {
+        return;
+    }
+
+    if (!$("#app-dialog-modal").hasClass("is-hidden")) {
+        $("#app-dialog-cancel").trigger("click");
+    }
+});
+function getApiErrorMessage(xhr, fallbackMessage) {
+    /*
+     * Extract a readable error message from an API response.
+     */
+    if (!xhr) {
+        return fallbackMessage || "Request failed";
+    }
+
+    if (xhr.responseJSON) {
+        const data = xhr.responseJSON;
+
+        if (Array.isArray(data.details) && data.details.length) {
+            const title = data.message || data.error || fallbackMessage || "Validation failed";
+
+            const details = data.details.map(function (item) {
+                const field = item.field ||
+                    (Array.isArray(item.loc) ? item.loc.join(".") : "") ||
+                    "field";
+
+                const message = item.message || item.type || "Invalid value";
+
+                return "- " + field + ": " + message;
+            });
+
+            return title + "\n\n" + details.join("\n");
+        }
+
+        if (data.message && data.error && data.message !== data.error) {
+            return data.message + "\n\n" + data.error;
+        }
+
+        if (data.message) {
+            return data.message;
+        }
+
+        if (data.error) {
+            return data.error;
+        }
+
+        if (data.detail) {
+            return data.detail;
+        }
+
+        return JSON.stringify(data, null, 2);
+    }
+
+    if (xhr.responseText) {
+        return xhr.responseText;
+    }
+
+    return fallbackMessage || "Request failed";
+}
+
+
+function showApiError(xhr, fallbackMessage) {
+    /*
+     * Show API error using the global application dialog.
+     */
+    const status = xhr ? xhr.status : 0;
+    const data = xhr && xhr.responseJSON ? xhr.responseJSON : null;
+    const message = getApiErrorMessage(xhr, fallbackMessage);
+
+    if (status === 401) {
+        showAppError(
+            "Your session has expired. Please sign in again.",
+            "Unauthorized"
+        ).always(function () {
+            localStorage.removeItem("oncall_jwt");
+            window.location.href = "/login";
+        });
+
+        return;
+    }
+
+    if (data && data.error === "validation_error") {
+        showAppError(message, "Validation error");
+        return;
+    }
+
+    if (status === 403) {
+        showAppError(message || "Access denied", "Access denied");
+        return;
+    }
+
+    if (status === 404) {
+        showAppError(message || "Resource not found", "Not found");
+        return;
+    }
+
+    if (status >= 500) {
+        showAppError(message || "Server error", "Server error");
+        return;
+    }
+
+    showAppError(message, "API error");
+}
+function upperCaseFirst(value) { return value.charAt(0).toUpperCase() + value.slice(1); }

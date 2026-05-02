@@ -15,6 +15,54 @@ from app.services.validation import validate_body
 
 profile_bp = Blueprint("profile_api", __name__)
 
+ALLOWED_PROFILE_TOKEN_SCOPES = {
+    "alerts:read",
+    "alerts:write",
+    "resources:read",
+    "resources:write",
+    "profile:read",
+    "profile:write",
+    "*",
+}
+
+
+def validate_profile_token_scopes(requested_scopes):
+    """
+    Validate scopes for a newly created personal API token.
+
+    Security rules:
+    - unknown scopes are rejected;
+    - wildcard "*" is admin-only;
+    - API token cannot create another token with broader scopes than itself.
+    """
+    requested = set(requested_scopes or ["alerts:read"])
+    unknown = requested - ALLOWED_PROFILE_TOKEN_SCOPES
+
+    if unknown:
+        return None, jsonify({
+            "error": "Unknown token scopes",
+            "unknown_scopes": sorted(unknown),
+        }), 400
+
+    if "*" in requested and not request.current_user.is_admin:
+        return None, jsonify({
+            "error": "Wildcard scope is allowed for admin users only",
+        }), 403
+
+    current_api_token = getattr(request, "current_api_token", None)
+
+    if current_api_token:
+        current_scopes = set(current_api_token.scopes or [])
+
+        if "*" not in current_scopes and not requested.issubset(current_scopes):
+            return None, jsonify({
+                "error": "Cannot create a token with broader scopes than the current token",
+                "allowed_scopes": sorted(current_scopes),
+                "requested_scopes": sorted(requested),
+            }), 403
+
+    return sorted(requested), None, None
+
 
 @profile_bp.route("", methods=["GET"])
 def get_profile():
@@ -84,6 +132,10 @@ def create_profile_token():
     if error:
         return error
 
+    scopes, error_response, status_code = validate_profile_token_scopes(payload.scopes)
+    if error_response:
+        return error_response, status_code
+
     group = None
 
     if payload.group_id:
@@ -98,7 +150,7 @@ def create_profile_token():
         name=payload.name,
         token_prefix=raw_token[:12],
         token_hash=hash_token(raw_token),
-        scopes=payload.scopes,
+        scopes=scopes,
         user=request.current_user.id,
         group=group,
         expires_at=expires_at,

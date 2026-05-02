@@ -1,9 +1,3 @@
-.routes-page {
-    display: flex;
-    flex-direction: column;
-    gap: 18px;
-}
-
 .routes-table td {
     vertical-align: middle;
 }

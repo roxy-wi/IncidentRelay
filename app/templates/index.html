@@ -177,6 +177,41 @@
             <div id="view-profile" class="view">{% include "pages/profile.html" %}</div>
         </section>
         {% include 'pages/include/alerts_modal.html' %}
+        <div id="app-dialog-modal" class="app-modal is-hidden" role="dialog" aria-modal="true">
+            <div class="app-modal-dialog app-modal-dialog-small">
+            <div class="app-modal-header">
+                <div>
+                    <h2 id="app-dialog-title">Message</h2>
+                    <div id="app-dialog-subtitle" class="card-subtitle"></div>
+                </div>
+
+                <button
+                    id="app-dialog-close"
+                    type="button"
+                    class="app-modal-close"
+                    aria-label="Close"
+                >
+                    ×
+                </button>
+            </div>
+
+            <div class="app-modal-body">
+                <div id="app-dialog-box" class="app-dialog-box">
+                    <div id="app-dialog-icon" class="app-dialog-icon">!</div>
+                    <div id="app-dialog-message" class="app-dialog-message"></div>
+                </div>
+            </div>
+
+            <div class="app-modal-footer">
+                <button id="app-dialog-cancel" type="button" class="btn">
+                    Cancel
+                </button>
+                <button id="app-dialog-confirm" type="button" class="btn btn-primary">
+                    OK
+                </button>
+            </div>
+        </div>
+        </div>
     </main>
 </div>
 <script src="/static/js/common.js"></script>

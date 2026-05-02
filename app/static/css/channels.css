@@ -1,9 +1,3 @@
-.channels-page {
-    display: flex;
-    flex-direction: column;
-    gap: 18px;
-}
-
 .channels-table td {
     vertical-align: middle;
 }

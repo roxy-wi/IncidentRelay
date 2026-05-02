@@ -15,7 +15,7 @@ integrations_bp = Blueprint("integrations_api", __name__)
 
 
 @integrations_bp.route("/alertmanager", methods=["POST"])
-@require_alert_token(required=Config.WEBHOOK_AUTH_REQUIRED)
+@require_alert_token()
 def alertmanager_webhook():
     """
     Receive alerts from Prometheus Alertmanager.
@@ -28,7 +28,7 @@ def alertmanager_webhook():
 
 
 @integrations_bp.route("/zabbix", methods=["POST"])
-@require_alert_token(required=Config.WEBHOOK_AUTH_REQUIRED)
+@require_alert_token()
 def zabbix_webhook():
     """
     Receive alerts from Zabbix.
@@ -41,7 +41,7 @@ def zabbix_webhook():
 
 
 @integrations_bp.route("/webhook", methods=["POST"])
-@require_alert_token(required=Config.WEBHOOK_AUTH_REQUIRED)
+@require_alert_token()
 def generic_webhook():
     """
     Receive alerts from a generic webhook.

@@ -1,9 +1,3 @@
-.profile-page {
-    display: flex;
-    flex-direction: column;
-    gap: 18px;
-}
-
 .profile-hero {
     display: flex;
     align-items: center;

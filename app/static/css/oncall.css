@@ -534,6 +534,11 @@ summary {
 .page-toolbar-filter {
     min-width: 170px;
 }
+.first-div-page-layout {
+    display: flex;
+    flex-direction: column;
+    gap: 18px;
+}
 
 @media (max-width: 900px) {
     .page-toolbar {
@@ -553,7 +558,6 @@ summary {
     gap: 18px;
     align-items: start;
 }
-
 .page-details-card {
     position: sticky;
     top: 18px;
@@ -808,4 +812,50 @@ summary {
 .role-read-only {
     color: #475467;
     background: #f2f4f7;
+}
+.app-modal-dialog-small {
+    width: min(460px, calc(100vw - 32px));
+}
+
+.app-dialog-box {
+    display: flex;
+    align-items: flex-start;
+    gap: 14px;
+}
+
+.app-dialog-icon {
+    width: 40px;
+    height: 40px;
+    min-width: 40px;
+    border-radius: 12px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 800;
+}
+
+.app-dialog-message {
+    color: var(--text);
+    line-height: 1.5;
+    white-space: pre-line;
+}
+
+.app-dialog-error .app-dialog-icon {
+    background: #fff0f0;
+    color: var(--danger);
+}
+
+.app-dialog-warning .app-dialog-icon {
+    background: #fff8ec;
+    color: #b46a00;
+}
+
+.app-dialog-success .app-dialog-icon {
+    background: #edf8ed;
+    color: #2f7d32;
+}
+
+.app-dialog-info .app-dialog-icon {
+    background: #eef5ff;
+    color: var(--primary);
 }

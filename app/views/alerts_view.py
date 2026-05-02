@@ -117,5 +117,14 @@ def list_alert_events(alert_id):
     """
     Return alert events.
     """
+    alert = alerts_repo.get_alert(alert_id)
 
-    return jsonify([serialize_alert_event(event) for event in alerts_repo.list_alert_events(alert_id)])
+    if alert.team_id:
+        error = require_team_read(alert.team_id)
+        if error:
+            return error
+
+    return jsonify([
+        serialize_alert_event(event)
+        for event in alerts_repo.list_alert_events(alert_id)
+    ])

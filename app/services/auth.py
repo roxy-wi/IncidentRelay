@@ -162,7 +162,7 @@ def require_api_token(scopes=None, required=None):
     return decorator
 
 
-def require_alert_token(required=None):
+def require_alert_token():
     """
     Require a token that can submit incoming alerts.
 
@@ -170,8 +170,6 @@ def require_alert_token(required=None):
     - personal/API token with alerts:write scope;
     - route intake token created on the Routes page.
     """
-
-    required = Config.WEBHOOK_AUTH_REQUIRED if required is None else required
 
     def decorator(func):
         @wraps(func)
@@ -190,9 +188,6 @@ def require_alert_token(required=None):
             route = authenticate_route_token(raw_token)
 
             if route:
-                return func(*args, **kwargs)
-
-            if not required:
                 return func(*args, **kwargs)
 
             return jsonify({"error": "Route intake token is required"}), 401

@@ -482,11 +482,15 @@ function deleteSilence(id) {
     /*
      * Disable silence.
      */
-    if (!confirm("Disable this silence?")) {
-        return;
-    }
 
-    apiDelete("/api/silences/" + id, refreshSilences);
+    showAppConfirm({
+        title: "Disable this silence?",
+        message: "Disable this silence?",
+        confirmText: "Disable",
+        confirmClass: "btn-warning",
+    }).done(function () {
+        apiDelete("/api/silences/" + id, refreshSilences)
+    });
 }
 
 

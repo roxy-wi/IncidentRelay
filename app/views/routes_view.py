@@ -1,7 +1,7 @@
 from flask import Blueprint, jsonify, request
 
 from app.api.schemas.routes import RouteChannelsReplaceSchema, RouteCreateSchema, RouteUpdateSchema
-from app.modules.db import routes_repo
+from app.modules.db import routes_repo, channels_repo
 from app.services.auth import create_raw_token, hash_token
 from app.services.audit import write_audit
 from app.services.rbac import get_allowed_team_ids, require_team_read, require_team_write
@@ -10,6 +10,27 @@ from app.services.validation import validate_body
 
 
 routes_bp = Blueprint("routes_api", __name__)
+
+
+def validate_route_channels(team_id, channel_ids):
+    """
+    Ensure all route channels belong to the same team as the route.
+    """
+    for channel_id in channel_ids:
+        channel = channels_repo.get_channel(channel_id)
+
+        if channel.team_id != team_id:
+            return jsonify({
+                "error": "Channel does not belong to route team",
+                "channel_id": channel_id,
+                "team_id": team_id,
+            }), 400
+
+        error = require_team_write(channel.team_id)
+        if error:
+            return error
+
+    return None
 
 
 @routes_bp.route("", methods=["GET"])
@@ -59,6 +80,10 @@ def create_route():
     error = require_team_write(payload.team_id)
     if error:
         return error
+
+    channel_error = validate_route_channels(payload.team_id, payload.channel_ids)
+    if channel_error:
+        return channel_error
 
     raw_token = create_raw_token()
 
@@ -111,6 +136,10 @@ def update_route(route_id):
         error = require_team_write(payload.team_id)
         if error:
             return error
+
+    channel_error = validate_route_channels(payload.team_id, payload.channel_ids)
+    if channel_error:
+        return channel_error
 
     route = routes_repo.update_route(
         route_id,
@@ -201,6 +230,10 @@ def replace_route_channels(route_id):
     if error:
         return error
 
+    channel_error = validate_route_channels(route_before.team_id, payload.channel_ids)
+    if channel_error:
+        return channel_error
+
     routes_repo.replace_route_channels(route_id, payload.channel_ids)
     route = routes_repo.get_route(route_id)
 
@@ -226,6 +259,10 @@ def add_route_channel(route_id, channel_id):
 
     if error:
         return error
+
+    channel_error = validate_route_channels(route_before.team_id, [channel_id])
+    if channel_error:
+        return channel_error
 
     link = routes_repo.link_route_channel(route_id, channel_id)
 

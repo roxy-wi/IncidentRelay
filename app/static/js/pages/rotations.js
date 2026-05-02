@@ -240,7 +240,7 @@ function refreshRotations(doneCallback) {
             row.append($("<td>").text(rotation.current_oncall || "-"));
             row.append($("<td>").text(rotation.handoff_time || "-"));
             row.append($("<td>").text(formatSeconds(rotation.reminder_interval_seconds)));
-            row.append($("<td>").text(rotation.enabled ? "yes" : "no"));
+            row.append($("<td>").append(renderStatusBadge(rotation.enabled)));
 
             const actions = $("<td>").addClass("actions");
 
@@ -543,7 +543,7 @@ function saveRotationMember() {
     const memberId = $("#rotation-member-id").val();
 
     if (!rotationId) {
-        alert("Select a rotation first.");
+        showAppError("Select a rotation first.");
         return;
     }
 
@@ -682,7 +682,7 @@ function createOverride() {
     const rotationId = $("#override-rotation").val();
 
     if (!rotationId) {
-        alert("Select a rotation first.");
+        showAppError("Select a rotation first.");
         return;
     }
 
@@ -820,7 +820,7 @@ function renderRotationRow(rotation) {
 
     row.append(
         $("<td>").append(
-            renderStatusBadge(rotation.enabled ? "Active" : "Inactive")
+            renderStatusBadge(rotation.enabled, "Active", "Inactive")
         )
     );
 

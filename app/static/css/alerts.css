@@ -1,11 +1,3 @@
-/* Alerts page */
-
-.alerts-page {
-    display: flex;
-    flex-direction: column;
-    gap: 18px;
-}
-
 .alerts-table .alert-title-cell {
     min-width: 360px;
 }

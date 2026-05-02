@@ -1,6 +1,14 @@
 from datetime import datetime
 
-from app.modules.db.models import User, UserGroup
+from app.modules.db.models import (
+    ApiToken,
+    RotationMember,
+    RotationOverride,
+    TeamUser,
+    User,
+    UserGroup,
+    UserRole,
+)
 
 
 def list_users_by_group_ids(group_ids, active_only=True):
@@ -130,16 +138,62 @@ def disable_user(user_id):
     return user
 
 
+def get_user_or_none(user_id, include_deleted=False):
+    """
+    Return one user or None.
+    """
+    query = User.select().where(User.id == user_id)
+
+    if not include_deleted:
+        query = query.where(User.deleted == False)
+
+    return query.get_or_none()
+
+
 def soft_delete_user(user_id):
     """
-    Soft-delete a user.
-    """
+    Soft-delete a user and revoke access-related records.
 
-    user = get_user(user_id)
-    user.active = False
-    user.deleted = True
-    user.deleted_at = datetime.utcnow()
-    user.save()
+    This does not physically delete the user row, so historical alert references
+    remain safe. The user is removed from active memberships and rotations, and
+    personal API tokens are revoked.
+
+    Returns:
+        User | None: Removed user or None if user was not found.
+    """
+    user = get_user_or_none(user_id)
+
+    if not user:
+        return None
+
+    now = datetime.utcnow()
+    database = User._meta.database
+
+    if user.is_admin and user.active and count_active_admins(exclude_user_id=user.id) == 0:
+        raise ValueError("Cannot remove the last active admin user")
+
+    with database.atomic():
+        UserGroup.delete().where(UserGroup.user == user.id).execute()
+        TeamUser.delete().where(TeamUser.user == user.id).execute()
+        RotationMember.delete().where(RotationMember.user == user.id).execute()
+        RotationOverride.delete().where(RotationOverride.user == user.id).execute()
+        UserRole.delete().where(UserRole.user == user.id).execute()
+
+        ApiToken.update(
+            active=False,
+            deleted=True,
+            deleted_at=now,
+        ).where(
+            (ApiToken.user == user.id) &
+            (ApiToken.deleted == False)
+        ).execute()
+
+        user.active = False
+        user.deleted = True
+        user.deleted_at = now
+        user.active_group = None
+        user.save()
+
     return user
 
 
@@ -207,3 +261,25 @@ def set_active_group(user_id, group_id):
     user.active_group = group_id
     user.save()
     return user
+
+
+def count_active_admins(exclude_user_id=None):
+    """
+    Return count of active non-deleted admin users.
+
+    Args:
+        exclude_user_id: Optional user id to exclude from count.
+
+    Returns:
+        int: Number of active admin users.
+    """
+    query = User.select().where(
+        (User.is_admin == True) &
+        (User.active == True) &
+        (User.deleted == False)
+    )
+
+    if exclude_user_id:
+        query = query.where(User.id != exclude_user_id)
+
+    return query.count()

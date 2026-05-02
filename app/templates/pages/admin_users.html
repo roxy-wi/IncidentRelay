@@ -1,20 +1,252 @@
-<div class="grid-two">
-    <div class="card">
-        <div class="card-header"><h2 id="admin-user-form-title">Create user</h2></div>
-        <div class="form-body">
-            <input id="admin-user-id" type="hidden">
-            <label>Username</label><input id="admin-user-username" class="input">
-            <label>Display name</label><input id="admin-user-display" class="input">
-            <label>Email</label><input id="admin-user-email" class="input">
-            <label>Phone</label><input id="admin-user-phone" class="input">
-            <label>Telegram chat ID</label><input id="admin-user-telegram" class="input">
-            <label>Slack user ID</label><input id="admin-user-slack" class="input">
-            <label>Mattermost user ID</label><input id="admin-user-mattermost" class="input">
-            <label>Password</label><input id="admin-user-password" class="input" type="password" placeholder="leave empty to keep current password">
-            <label><input id="admin-user-is-admin" type="checkbox"> Admin</label>
-            <label><input id="admin-user-active" type="checkbox" checked> Active</label>
-            <div class="actions"><button id="admin-save-user" class="btn btn-primary">Save user</button><button id="admin-reset-user-form" class="btn">Reset</button></div>
+<div class="first-div-page-layout">
+    <div class="summary-grid">
+        <div class="summary-card summary-primary">
+            <div class="summary-icon">U</div>
+            <div>
+                <div class="summary-title">Users</div>
+                <div id="admin-users-total-count" class="summary-value">0</div>
+                <div class="summary-hint">Registered users</div>
+            </div>
+        </div>
+
+        <div class="summary-card summary-success">
+            <div class="summary-icon">✓</div>
+            <div>
+                <div class="summary-title">Active</div>
+                <div id="admin-users-active-count" class="summary-value">0</div>
+                <div class="summary-hint">Enabled users</div>
+            </div>
+        </div>
+
+        <div class="summary-card summary-muted">
+            <div class="summary-icon">−</div>
+            <div>
+                <div class="summary-title">Inactive</div>
+                <div id="admin-users-inactive-count" class="summary-value">0</div>
+                <div class="summary-hint">Disabled users</div>
+            </div>
+        </div>
+
+        <div class="summary-card summary-info">
+            <div class="summary-icon">A</div>
+            <div>
+                <div class="summary-title">Admins</div>
+                <div id="admin-users-admin-count" class="summary-value">0</div>
+                <div class="summary-hint">Global administrators</div>
+            </div>
         </div>
     </div>
-    <div class="card"><div class="card-header"><h2>Users</h2><button id="reload-admin-users" class="btn btn-primary">Reload</button></div><div class="table-wrapper"><table class="data-table"><thead><tr><th>ID</th><th>Username</th><th>Email</th><th>Admin</th><th>Active</th><th>Actions</th></tr></thead><tbody id="admin-users-table"></tbody></table></div></div>
+
+    <div class="card">
+        <div class="card-header">
+            <div>
+                <h2>Users</h2>
+                <div class="card-subtitle">
+                    Manage local users, notification IDs and administrator access.
+                </div>
+            </div>
+
+            <div class="card-header-actions">
+                <input
+                    id="admin-users-search"
+                    class="input"
+                    type="search"
+                    placeholder="Search users..."
+                >
+                <button id="reload-admin-users" type="button" class="btn btn-primary">
+                    Reload
+                </button>
+                <button id="new-admin-user" type="button" class="btn">
+                    New user
+                </button>
+            </div>
+        </div>
+
+        <div class="table-wrapper">
+            <table class="data-table">
+                <thead>
+                <tr>
+                    <th>ID</th>
+                    <th>User</th>
+                    <th>Contacts</th>
+                    <th>Messengers</th>
+                    <th>Role</th>
+                    <th>Status</th>
+                    <th>Actions</th>
+                </tr>
+                </thead>
+                <tbody id="admin-users-table"></tbody>
+            </table>
+        </div>
+    </div>
+
+    <div id="admin-user-modal" class="app-modal is-hidden">
+        <div class="app-modal-dialog app-modal-dialog-wide">
+            <div class="app-modal-header">
+                <div>
+                    <h2 id="admin-user-modal-title">User details</h2>
+                    <div id="admin-user-modal-subtitle" class="card-subtitle">
+                        Create or update user account.
+                    </div>
+                </div>
+
+                <button
+                    id="close-admin-user-modal"
+                    type="button"
+                    class="app-modal-close"
+                    aria-label="Close"
+                >
+                    ×
+                </button>
+            </div>
+
+            <div class="app-modal-body">
+                <div class="grid-two">
+                    <div class="card">
+                        <div class="card-header details-header">
+                            <div>
+                                <h2>Account</h2>
+                                <div class="card-subtitle">
+                                    Login, display name and access flags.
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-body">
+                            <input id="admin-user-id" type="hidden">
+
+                            <label for="admin-user-username">Username</label>
+                            <input
+                                id="admin-user-username"
+                                class="input"
+                                placeholder="ivan"
+                                autocomplete="username"
+                            >
+
+                            <label for="admin-user-display">Display name</label>
+                            <input
+                                id="admin-user-display"
+                                class="input"
+                                placeholder="Ivan"
+                            >
+
+                            <label for="admin-user-password">Password</label>
+                            <input
+                                id="admin-user-password"
+                                class="input"
+                                type="password"
+                                autocomplete="new-password"
+                                placeholder="Leave empty to keep current password"
+                            >
+
+                            <label>
+                                <input id="admin-user-is-admin" type="checkbox">
+                                Global administrator
+                            </label>
+
+                            <label>
+                                <input id="admin-user-active" type="checkbox" checked>
+                                Active
+                            </label>
+                        </div>
+                    </div>
+
+                    <div class="card">
+                        <div class="card-header details-header">
+                            <div>
+                                <h2>Contacts</h2>
+                                <div class="card-subtitle">
+                                    Used by notification channels and integrations.
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-body">
+                            <label for="admin-user-email">Email</label>
+                            <input
+                                id="admin-user-email"
+                                class="input"
+                                type="email"
+                                placeholder="ivan@example.com"
+                            >
+
+                            <label for="admin-user-phone">Phone</label>
+                            <input
+                                id="admin-user-phone"
+                                class="input"
+                                placeholder="+77001234567"
+                            >
+
+                            <label for="admin-user-telegram">Telegram chat ID</label>
+                            <input
+                                id="admin-user-telegram"
+                                class="input"
+                                placeholder="123456789"
+                            >
+
+                            <label for="admin-user-slack">Slack user ID</label>
+                            <input
+                                id="admin-user-slack"
+                                class="input"
+                                placeholder="U012ABCDEF"
+                            >
+
+                            <label for="admin-user-mattermost">Mattermost user ID</label>
+                            <input
+                                id="admin-user-mattermost"
+                                class="input"
+                                placeholder="9x8y7z6abc"
+                            >
+                        </div>
+                    </div>
+                </div>
+
+                <div class="card">
+                    <div class="card-header details-header">
+                        <div>
+                            <h2>Security note</h2>
+                            <div class="card-subtitle">
+                                Password is write-only and is never shown after save.
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="details-list">
+                        <div class="details-item">
+                            <div class="details-label">Create user</div>
+                            <div class="details-value">
+                                Password is required by validation when creating a new user.
+                            </div>
+                        </div>
+
+                        <div class="details-item">
+                            <div class="details-label">Update user</div>
+                            <div class="details-value">
+                                Leave password empty to keep the current password hash unchanged.
+                            </div>
+                        </div>
+
+                        <div class="details-item">
+                            <div class="details-label">Disable user</div>
+                            <div class="details-value">
+                                Disabled users stay visible in the admin workspace and can be enabled again.
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="app-modal-footer">
+                <button id="admin-save-user" type="button" class="btn btn-primary">
+                    Save user
+                </button>
+                <button id="admin-reset-user-form" type="button" class="btn">
+                    Reset
+                </button>
+                <button id="close-admin-user-modal-footer" type="button" class="btn">
+                    Close
+                </button>
+            </div>
+        </div>
+    </div>
 </div>

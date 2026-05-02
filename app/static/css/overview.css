@@ -1,11 +1,3 @@
-/* Overview page */
-
-.overview-page {
-    display: flex;
-    flex-direction: column;
-    gap: 18px;
-}
-
 .overview-layout-grid {
     display: grid;
     grid-template-columns: minmax(0, 2.1fr) minmax(320px, 0.9fr);

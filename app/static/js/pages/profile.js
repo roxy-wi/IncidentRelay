@@ -159,6 +159,10 @@ function loadProfile() {
         $("#profile-slack").val(profile.slack_user_id || "");
         $("#profile-mattermost").val(profile.mattermost_user_id || "");
 
+        if (!profile.is_admin) {
+            $('#profile-token-scopes option[value="*"]').remove();
+        }
+
         renderProfileHeader(profile);
         renderProfileGroupsList(profile.groups || []);
         fillProfileGroupSelects(profile);
