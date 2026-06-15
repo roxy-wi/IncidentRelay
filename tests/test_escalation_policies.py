@@ -1,8 +1,11 @@
 from datetime import datetime, timedelta
 
 from app.modules.db.models import AlertEvent, AlertGroup
-from app.services import alerts as alerts_service
-from app.services.alerts import maybe_escalate_alert, send_unacked_reminders, upsert_alert
+from app.services.alerts.escalation import maybe_escalate_alert
+from app.services.alerts.lifecycle import upsert_alert
+from app.services.alerts.reminders import send_unacked_reminders
+import app.services.alerts.escalation as alert_escalation
+import app.services.alerts.notification_queue as notification_queue
 from app.settings import Config
 from tests.factories import (
     add_user_to_team,
@@ -43,9 +46,7 @@ def test_admin_can_create_policy_and_rotation_rule(client, admin_headers, db):
     group = create_group(slug=unique("group"))
     team = create_team(group, slug=unique("team"))
     user = create_user("alice", group)
-
     add_user_to_team(team, user)
-
     rotation = create_rotation(team, users=[user])
 
     response = client.post(
@@ -97,9 +98,7 @@ def test_policy_rule_rejects_rotation_from_another_team(client, admin_headers, d
     team = create_team(group, slug=unique("team"))
     other_team = create_team(group, slug=unique("other-team"))
     user = create_user("alice", group)
-
     add_user_to_team(other_team, user)
-
     rotation = create_rotation(other_team, users=[user])
     policy = create_escalation_policy(team)
 
@@ -125,9 +124,7 @@ def test_policy_rule_rejects_user_outside_team(client, admin_headers, db):
     other_group = create_group(slug=unique("other-group"))
     other_team = create_team(other_group, slug=unique("other-team"))
     outsider = create_user("outsider", other_group)
-
     add_user_to_team(other_team, outsider)
-
     policy = create_escalation_policy(team)
 
     response = client.post(
@@ -150,9 +147,7 @@ def test_upsert_alert_with_policy_uses_first_rule_target(monkeypatch, db):
     group = create_group(slug="infra")
     team = create_team(group, slug="sre")
     user = create_user("alice", group)
-
     add_user_to_team(team, user)
-
     rotation = create_rotation(team, users=[user])
     policy = create_escalation_policy(team)
     rule = create_escalation_policy_rule(
@@ -162,15 +157,17 @@ def test_upsert_alert_with_policy_uses_first_rule_target(monkeypatch, db):
         target_type="rotation",
         rotation=rotation,
     )
-
     route = create_route(team, escalation_policy=policy)
-
     calls = []
 
     monkeypatch.setattr(Config, "ALERT_GROUP_WAIT_SECONDS", 0, raising=False)
     monkeypatch.setattr(
-        "app.services.alerts.notify_alert",
-        lambda alert_group, event_type="notification": calls.append((alert_group.id, event_type)) or 1,
+        notification_queue,
+        "notify_alert",
+        lambda alert_group, event_type="notification": calls.append(
+            (alert_group.id, event_type)
+        )
+        or 1,
     )
 
     alert_group, created = upsert_alert(normalized_alert())
@@ -183,7 +180,7 @@ def test_upsert_alert_with_policy_uses_first_rule_target(monkeypatch, db):
     assert alert_group.assignee.id == user.id
     assert alert_group.next_escalation_at is not None
 
-    result = alerts_service.process_due_alert_group_notifications()
+    result = notification_queue.process_due_alert_group_notifications()
 
     assert result["sent"] == 1
     assert calls == [(alert_group.id, "notification")]
@@ -194,13 +191,10 @@ def test_policy_escalation_moves_alert_to_next_rule(monkeypatch, db):
     team = create_team(group, slug="sre")
     first_user = create_user("alice", group)
     second_user = create_user("bob", group)
-
     add_user_to_team(team, first_user)
     add_user_to_team(team, second_user)
-
     first_rotation = create_rotation(team, name="Primary", users=[first_user])
     second_rotation = create_rotation(team, name="Backup", users=[second_user])
-
     policy = create_escalation_policy(team)
     first_rule = create_escalation_policy_rule(
         policy,
@@ -216,15 +210,15 @@ def test_policy_escalation_moves_alert_to_next_rule(monkeypatch, db):
         target_type="rotation",
         rotation=second_rotation,
     )
-
     create_route(team, escalation_policy=policy)
 
     monkeypatch.setattr(
-        "app.services.alerts.has_matching_notification_channel",
-        lambda alert_group: True,
+        "app.services.notifications.rules.has_deliverable_user_notification",
+        lambda alert_group, event_type="notification": True,
     )
     monkeypatch.setattr(
-        "app.services.alerts.notify_alert",
+        notification_queue,
+        "notify_alert",
         lambda alert_group, event_type="notification": 1,
     )
 
@@ -238,9 +232,9 @@ def test_policy_escalation_moves_alert_to_next_rule(monkeypatch, db):
     alert_group.save()
 
     calls = []
-
     monkeypatch.setattr(
-        "app.services.alerts.notify_alert",
+        alert_escalation,
+        "notify_alert",
         lambda alert_group, event_type="escalation": calls.append(event_type) or 1,
     )
 
@@ -255,30 +249,23 @@ def test_policy_escalation_moves_alert_to_next_rule(monkeypatch, db):
     assert alert_group.reminder_count == 0
     assert alert_group.last_escalated_at is not None
     assert calls == ["escalation"]
-
     assert AlertEvent.select().where(
-        (AlertEvent.group == alert_group.id)
-        & (AlertEvent.event_type == "escalated")
+        (AlertEvent.group == alert_group.id) & (AlertEvent.event_type == "escalated")
     ).exists()
 
 
 def test_policy_alert_ignores_team_escalation_after_reminders(monkeypatch, db):
     group = create_group(slug="infra")
     team = create_team(group, slug="sre")
-
     team.escalation_enabled = True
     team.escalation_after_reminders = 1
     team.save()
-
     first_user = create_user("alice", group)
     second_user = create_user("bob", group)
-
     add_user_to_team(team, first_user)
     add_user_to_team(team, second_user)
-
     first_rotation = create_rotation(team, name="Primary", users=[first_user])
     second_rotation = create_rotation(team, name="Backup", users=[second_user])
-
     policy = create_escalation_policy(team)
     first_rule = create_escalation_policy_rule(
         policy,
@@ -294,11 +281,13 @@ def test_policy_alert_ignores_team_escalation_after_reminders(monkeypatch, db):
         target_type="rotation",
         rotation=second_rotation,
     )
-
     create_route(team, escalation_policy=policy)
 
-    monkeypatch.setattr("app.services.alerts.notify_alert", lambda *args, **kwargs: 1)
-    monkeypatch.setattr("app.services.alerts.has_matching_notification_channel", lambda alert_group: True)
+    monkeypatch.setattr(notification_queue, "notify_alert", lambda *args, **kwargs: 1)
+    monkeypatch.setattr(
+        "app.services.notifications.rules.has_deliverable_user_notification",
+        lambda alert_group, event_type="notification": True,
+    )
 
     alert_group, created = upsert_alert(normalized_alert())
 
@@ -321,16 +310,12 @@ def test_policy_escalation_runs_when_reminder_interval_is_disabled(monkeypatch, 
     team = create_team(group, slug="sre")
     first_user = create_user("alice", group)
     second_user = create_user("bob", group)
-
     add_user_to_team(team, first_user)
     add_user_to_team(team, second_user)
-
     first_rotation = create_rotation(team, name="Primary", users=[first_user])
     second_rotation = create_rotation(team, name="Backup", users=[second_user])
-
     first_rotation.reminder_interval_seconds = 0
     first_rotation.save()
-
     policy = create_escalation_policy(team)
     create_escalation_policy_rule(
         policy,
@@ -346,11 +331,13 @@ def test_policy_escalation_runs_when_reminder_interval_is_disabled(monkeypatch, 
         target_type="rotation",
         rotation=second_rotation,
     )
-
     create_route(team, escalation_policy=policy)
 
-    monkeypatch.setattr("app.services.alerts.notify_alert", lambda *args, **kwargs: 1)
-    monkeypatch.setattr("app.services.alerts.has_matching_notification_channel", lambda alert_group: True)
+    monkeypatch.setattr(alert_escalation, "notify_alert", lambda *args, **kwargs: 1)
+    monkeypatch.setattr(
+        "app.services.notifications.rules.has_deliverable_user_notification",
+        lambda alert_group, event_type="notification": True,
+    )
 
     alert_group, created = upsert_alert(normalized_alert())
 
@@ -371,9 +358,7 @@ def test_alert_details_include_policy_state(client, admin_headers, monkeypatch, 
     group = create_group(slug="infra")
     team = create_team(group, slug="sre")
     user = create_user("alice", group)
-
     add_user_to_team(team, user)
-
     rotation = create_rotation(team, users=[user])
     policy = create_escalation_policy(team, name="Critical escalation")
     rule = create_escalation_policy_rule(
@@ -383,13 +368,12 @@ def test_alert_details_include_policy_state(client, admin_headers, monkeypatch, 
         target_type="rotation",
         rotation=rotation,
     )
-
     create_route(team, escalation_policy=policy)
 
-    monkeypatch.setattr("app.services.alerts.notify_alert", lambda *args, **kwargs: 1)
+    monkeypatch.setattr(notification_queue, "notify_alert", lambda *args, **kwargs: 1)
     monkeypatch.setattr(
-        "app.services.alerts.has_matching_notification_channel",
-        lambda alert_group: True,
+        "app.services.notifications.rules.has_deliverable_user_notification",
+        lambda alert_group, event_type="notification": True,
     )
 
     alert_group, created = upsert_alert(normalized_alert())
@@ -419,9 +403,7 @@ def test_policy_exhausted_alert_does_not_send_more_reminders(monkeypatch, db):
     group = create_group(slug="infra")
     team = create_team(group, slug="sre")
     user = create_user("alice", group)
-
     add_user_to_team(team, user)
-
     rotation = create_rotation(team, users=[user])
     policy = create_escalation_policy(
         team,
@@ -434,18 +416,17 @@ def test_policy_exhausted_alert_does_not_send_more_reminders(monkeypatch, db):
         target_type="rotation",
         rotation=rotation,
     )
-
     create_route(team, escalation_policy=policy)
-
     calls = []
 
     monkeypatch.setattr(
-        "app.services.alerts.notify_alert",
+        notification_queue,
+        "notify_alert",
         lambda alert_group, event_type="notification": calls.append(event_type) or 1,
     )
     monkeypatch.setattr(
-        "app.services.alerts.has_matching_notification_channel",
-        lambda alert_group: True,
+        "app.services.notifications.rules.has_deliverable_user_notification",
+        lambda alert_group, event_type="notification": True,
     )
 
     alert_group, created = upsert_alert(normalized_alert())
@@ -455,7 +436,6 @@ def test_policy_exhausted_alert_does_not_send_more_reminders(monkeypatch, db):
 
     alert_group.next_escalation_at = None
     alert_group.save()
-
     calls.clear()
 
     assert send_unacked_reminders() == 0

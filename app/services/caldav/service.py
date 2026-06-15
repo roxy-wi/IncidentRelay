@@ -2,8 +2,7 @@ from datetime import datetime, timedelta, timezone
 
 from app.modules.db.models import Team, TeamUser
 from app.services.calendar_service import build_team_calendar
-from app.services.caldav.ics import event_href, event_uid
-
+from app.services.caldav.ics import event_uid
 
 DEFAULT_PAST_DAYS = 7
 DEFAULT_FUTURE_DAYS = 90
@@ -74,10 +73,3 @@ def find_event_by_uid(team, uid):
             return event
 
     return None
-
-
-def event_hrefs_for_team(team):
-    return [
-        event_href(team.id, event)
-        for event in list_team_caldav_events(team)
-    ]

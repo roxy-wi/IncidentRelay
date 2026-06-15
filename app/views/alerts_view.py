@@ -1,7 +1,7 @@
 from flask import Blueprint, jsonify, request
 
 from app.modules.db import alerts_repo, notifications_repo
-from app.services.alerts import acknowledge_alert, resolve_alert
+from app.services.alerts.actions import acknowledge_alert, resolve_alert
 from app.services.audit import write_audit
 from app.services.rbac import get_allowed_team_ids, require_team_read, require_team_respond
 from app.services.serializers import (
@@ -73,6 +73,7 @@ def list_alerts():
         status=_get_query_values("status"),
         source=_get_query_values("source"),
         severity=_get_query_values("severity"),
+        priority=_get_query_values("priority"),
         service_id=_get_query_values("service_id", int),
         service_slug=request.args.get("service_slug"),
         service_status=request.args.get("service_status"),

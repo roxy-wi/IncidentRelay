@@ -5,7 +5,7 @@ from pydantic import ValidationError
 
 from app.api.schemas.rotations import RotationCreateSchema
 from app.modules.db.models import AlertEvent
-from app.services.alerts import send_unacked_reminders, should_send_reminder
+from app.services.alerts.reminders import should_send_reminder, send_unacked_reminders
 from tests.factories import attach_channel, create_alert, create_channel, create_group, create_route, create_rotation, create_team
 
 
@@ -79,7 +79,7 @@ def test_send_unacked_reminders_skips_rotation_with_zero_interval(monkeypatch, d
     def fail_notify(*args, **kwargs):
         raise AssertionError("notify_alert must not be called when reminder interval is 0")
 
-    monkeypatch.setattr("app.services.alerts.notify_alert", fail_notify)
+    monkeypatch.setattr("app.services.alerts.notification_queue.notify_alert", fail_notify)
 
     assert send_unacked_reminders() == 0
 

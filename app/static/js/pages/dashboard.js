@@ -31,7 +31,62 @@ function dashboardGroupCount(alerts, fieldName, fallback) {
     });
     return result;
 }
+function dashboardPrioritySlug(alert) {
+    if (!alert) {
+        return "p3";
+    }
 
+    if (alert.priority && alert.priority.slug) {
+        return normalizeAlertValue(alert.priority.slug);
+    }
+
+    return normalizeAlertValue(alert.priority_slug || "p3");
+}
+
+
+function dashboardPriorityLabel(priority) {
+    const slug = normalizeAlertValue(priority);
+
+    if (slug === "p1") {
+        return "P1 Critical";
+    }
+
+    if (slug === "p2") {
+        return "P2 High";
+    }
+
+    if (slug === "p3") {
+        return "P3 Medium";
+    }
+
+    if (slug === "p4") {
+        return "P4 Low";
+    }
+
+    if (slug === "p5") {
+        return "P5 Informational";
+    }
+
+    return slug ? slug.toUpperCase() : "P3 Medium";
+}
+
+
+function dashboardPriorityShortLabel(alert) {
+    return dashboardPrioritySlug(alert).toUpperCase();
+}
+
+
+function dashboardPriorityCounts(alerts) {
+    const result = {};
+
+    alerts.forEach(function (alert) {
+        const slug = dashboardPrioritySlug(alert);
+
+        result[slug] = (result[slug] || 0) + 1;
+    });
+
+    return result;
+}
 function dashboardActiveAlerts(alerts) {
     return alerts.filter(function (alert) {
         return alert.status === "firing" || alert.status === "acknowledged";
@@ -69,6 +124,7 @@ function loadDashboard() {
         renderDashboardRecentAlerts(sortedAlerts.slice(0, 5));
         renderDashboardTeamsNow(activeAlerts);
         renderDashboardSeveritySplit(alerts);
+        renderDashboardPrioritySplit(alerts);
         renderDashboardTeamSummary(alerts);
         renderDashboardSystemStatus(alerts, activeAlerts);
     });
@@ -83,7 +139,7 @@ function renderDashboardAlertsTable(alerts) {
         tbody.append(
             $("<tr>").append(
                 $("<td>")
-                    .attr("colspan", "8")
+                    .attr("colspan", "9")
                     .addClass("empty-table-cell")
                     .text("No active incidents")
             )
@@ -127,12 +183,22 @@ function renderDashboardAlertRow(alert) {
             )
         )
     );
+
+    row.append(
+        $("<td>").append(
+            makeAlertBadge(
+                dashboardPriorityShortLabel(alert),
+                priorityBadgeClass(alert)
+            ).attr("title", dashboardPriorityLabel(dashboardPrioritySlug(alert)))
+        )
+    );
+
     row.append(
         $("<td>").append(
             makeAlertBadge(alert.status || "-", statusBadgeClass(alert.status))
         )
     );
-    row.append($("<td>").text(alert.team_slug || "-"));
+    row.append($("<td>").text(alert.team_name || alert.team_slug || "-"));
     row.append($("<td>").addClass("overview-duration-cell").text(alertDuration(alert)));
     row.append($("<td>").text(formatDateTimeMinutes(dashboardDateValue(alert))));
 
@@ -201,11 +267,13 @@ function renderDashboardRecentAlerts(alerts) {
                     $("<div>")
                         .addClass("list-subtitle")
                         .text(
-                            (alert.team_slug || "-") +
-                            " · " +
-                            severityLabel(alert.severity) +
-                            " · " +
-                            dashboardEscalationText(alert)
+                            (alert.team_name || alert.team_slug || "-")
+                            + " · "
+                            + severityLabel(alert.severity)
+                            + " · "
+                            + dashboardPriorityShortLabel(alert)
+                            + " · "
+                            + dashboardEscalationText(alert)
                         )
                 )
         );
@@ -267,7 +335,22 @@ function renderDashboardSeveritySplit(alerts) {
     const order = ["critical", "high", "medium", "low", "unknown"];
     renderDashboardBars(target, counts, order, alerts.length, severityLabel);
 }
+function renderDashboardPrioritySplit(alerts) {
+    const target = $("#dashboard-priority-split");
 
+    target.empty();
+
+    const counts = dashboardPriorityCounts(alerts);
+    const order = ["p1", "p2", "p3", "p4", "p5"];
+
+    renderDashboardBars(
+        target,
+        counts,
+        order,
+        alerts.length,
+        dashboardPriorityLabel
+    );
+}
 function renderDashboardTeamSummary(alerts) {
     const target = $("#dashboard-team-summary");
     target.empty();

@@ -4,6 +4,7 @@ from email.message import EmailMessage
 from app import Config
 from app.notifiers.base import BaseNotifier
 from app.notifiers.email.email_templates import render_email_html
+from app.services.alerts.priority import format_alert_title_with_priority
 
 
 class EmailNotifier(BaseNotifier):
@@ -23,7 +24,7 @@ class EmailNotifier(BaseNotifier):
             raise RuntimeError("smtp host is missing: set [smtp] host in config")
 
         message = EmailMessage()
-        message["Subject"] = f"[On-call] {alert.title}"
+        message["Subject"] = f"[On-call] {format_alert_title_with_priority(alert)}"
         message["From"] = Config.SMTP_FROM
         message["To"] = recipient
         message.set_content(text)

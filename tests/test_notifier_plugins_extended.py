@@ -78,7 +78,7 @@ def test_mattermost_resolved_payload_has_no_actions(db):
 
     attachment = payload["props"]["attachments"][0]
     assert "actions" not in attachment
-    assert attachment["title"] == f"RESOLVED: {alert.title}"
+    assert attachment["title"] == f"RESOLVED: [P3] {alert.title}"
 
 
 def test_incoming_webhook_requires_webhook_url(db):

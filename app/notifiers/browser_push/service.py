@@ -15,6 +15,11 @@ from app.db import database_proxy as db
 from app.services.audit import write_audit
 from app.services.links import build_alert_web_url
 from app.settings import Config
+from app.services.alerts.priority import (
+    alert_priority_label,
+    alert_priority_short_label,
+    format_alert_title_with_priority,
+)
 
 
 logger = logging.getLogger("oncall.notifications")
@@ -207,6 +212,8 @@ def build_alert_push_payload(group, user, event_type="notification"):
         "alert_group_id": group.id,
         "alert_title": group.title,
         "status": group.status,
+        "priority": alert_priority_short_label(group),
+        "priority_label": alert_priority_label(group),
         "url": build_alert_web_url(group) or f"/alerts/{group.id}",
         "tag": f"incidentrelay-alert-group-{group.id}",
         "require_interaction": True,
@@ -391,7 +398,7 @@ def execute_push_action(token, action):
 def _run_alert_push_action(group_id, user_id, action):
     """Run alert group action from browser push."""
 
-    from app.services.alerts import acknowledge_alert, resolve_alert
+    from app.services.alerts.actions import acknowledge_alert, resolve_alert
 
     if action == "ack":
         return acknowledge_alert(group_id, user_id=user_id)
@@ -405,21 +412,20 @@ def _run_alert_push_action(group_id, user_id, action):
 def _build_alert_push_title(alert, event_type):
     normalized_event_type = (event_type or "").lower()
     status = (alert.status or "").lower()
+    title = format_alert_title_with_priority(alert)
 
     if normalized_event_type in {"resolved", "resolve"} or status == "resolved":
-        return f"RESOLVED: {alert.title}"
-
+        return f"RESOLVED: {title}"
     if normalized_event_type in {"acknowledged", "ack"} or status == "acknowledged":
-        return f"ACKNOWLEDGED: {alert.title}"
-
+        return f"ACKNOWLEDGED: {title}"
     if normalized_event_type == "reminder":
-        return f"REMINDER: {alert.title}"
-
+        return f"REMINDER: {title}"
     if normalized_event_type == "escalation":
-        return f"ESCALATION: {alert.title}"
+        return f"ESCALATION: {title}"
 
     severity = alert.severity or "unknown"
-    return f"{severity.upper()}: {alert.title}"
+
+    return f"{severity.upper()}: {title}"
 
 
 def _build_alert_push_body(alert, event_type):

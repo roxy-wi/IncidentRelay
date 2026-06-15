@@ -9,7 +9,7 @@ from requests import exceptions as requests_exceptions
 from app.settings import Config
 from app.db import database_proxy as db
 from app.modules.db import alerts_repo, channels_repo, users_repo
-from app.services.alerts import acknowledge_alert, resolve_alert
+from app.services.alerts.actions import acknowledge_alert, resolve_alert
 from app.notifiers.telegram.templates import format_telegram_alert_message
 from app.notifiers.telegram.actions import parse_telegram_action_data
 from app.notifiers.telegram.bot import (

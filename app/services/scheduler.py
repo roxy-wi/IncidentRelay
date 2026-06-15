@@ -6,10 +6,8 @@ from apscheduler.schedulers.base import SchedulerAlreadyRunningError, SchedulerN
 
 from app.db import database_proxy as db
 from app.settings import Config
-from app.services.alerts import (
-    process_due_alert_group_notifications,
-    send_unacked_reminders,
-)
+from app.services.alerts.notification_queue import process_due_alert_group_notifications
+from app.services.alerts.lifecycle import logger as send_unacked_reminders
 from app.services.db_lock import acquire_db_lock, release_db_lock
 from app.services.notifications.shift_notifications import (
     send_due_oncall_shift_email_notifications,

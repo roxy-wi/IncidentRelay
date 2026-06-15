@@ -22,14 +22,18 @@ def make_headers(user):
     return {"Authorization": f"Bearer {token}"}
 
 
-def create_incident_fixture():
-    group = create_group(slug=unique_slug("group"))
-    team = create_team(group=group, slug=unique_slug("team"), name="Platform Team")
-    route = create_route(team=team)
+def create_incident_for_route(
+    team,
+    route,
+    *,
+    priority_slug="p3",
+    title="DiskFull",
+    severity="warning",
+    status="firing",
+):
+    priority = incidents_repo.get_priority_by_slug(priority_slug)
 
-    priority = incidents_repo.get_priority_by_slug("p3")
-
-    incident = AlertGroup.create(
+    return AlertGroup.create(
         team=team,
         route=route,
         service=route.service,
@@ -38,22 +42,41 @@ def create_incident_fixture():
         source=route.source,
         group_key_hash=unique_slug("group-hash"),
         group_key=unique_slug("group-key"),
-        title="DiskFull",
+        title=title,
         message="/var is 95% full",
-        severity="warning",
-        status="firing",
+        severity=severity,
+        status=status,
         alert_count=0,
         firing_count=0,
         priority=priority.id if priority else None,
-        priority_slug=priority.slug if priority else "p3",
+        priority_slug=priority.slug if priority else priority_slug,
         priority_order=priority.level if priority else 3,
         priority_set_manually=False,
         common_labels={
-            "alertname": "DiskFull",
+            "alertname": title,
             "instance": "host1",
         },
         label_values={},
         payload_summary={},
+    )
+
+
+def create_incident_fixture(
+    *,
+    priority_slug="p3",
+    title="DiskFull",
+    severity="warning",
+):
+    group = create_group(slug=unique_slug("group"))
+    team = create_team(group=group, slug=unique_slug("team"), name="Platform Team")
+    route = create_route(team=team)
+
+    incident = create_incident_for_route(
+        team,
+        route,
+        priority_slug=priority_slug,
+        title=title,
+        severity=severity,
     )
 
     return group, team, route, incident
@@ -367,3 +390,298 @@ def test_remove_incident_stakeholder(client, db):
 
     assert list_response.status_code == 200
     assert list_response.get_json() == []
+
+
+def test_list_incidents_filters_by_priority(client, db):
+    group, team, route, p1_incident = create_incident_fixture(
+        priority_slug="p1",
+        title="DatabaseDown",
+        severity="critical",
+    )
+    p3_incident = create_incident_for_route(
+        team,
+        route,
+        priority_slug="p3",
+        title="DiskFull",
+        severity="warning",
+    )
+
+    headers, user = create_viewer_headers(group, team)
+
+    response = client.get(
+        f"/api/incidents?team_id={team.id}&priority=p1",
+        headers=headers,
+    )
+
+    assert response.status_code == 200, response.get_json()
+
+    payload = response.get_json()
+    ids = [item["id"] for item in payload["items"]]
+
+    assert ids == [p1_incident.id]
+    assert p3_incident.id not in ids
+    assert payload["items"][0]["priority"]["slug"] == "p1"
+
+
+def test_list_incidents_filters_by_multiple_priorities(client, db):
+    group, team, route, p1_incident = create_incident_fixture(
+        priority_slug="p1",
+        title="DatabaseDown",
+        severity="critical",
+    )
+    p3_incident = create_incident_for_route(
+        team,
+        route,
+        priority_slug="p3",
+        title="DiskFull",
+        severity="warning",
+    )
+    p5_incident = create_incident_for_route(
+        team,
+        route,
+        priority_slug="p5",
+        title="DeployNotice",
+        severity="info",
+    )
+
+    headers, user = create_viewer_headers(group, team)
+
+    response = client.get(
+        f"/api/incidents?team_id={team.id}&priority=p1,p3",
+        headers=headers,
+    )
+
+    assert response.status_code == 200, response.get_json()
+
+    ids = {item["id"] for item in response.get_json()["items"]}
+
+    assert p1_incident.id in ids
+    assert p3_incident.id in ids
+    assert p5_incident.id not in ids
+
+
+def test_list_incidents_sorts_by_priority(client, db):
+    group, team, route, p3_incident = create_incident_fixture(
+        priority_slug="p3",
+        title="DiskFull",
+        severity="warning",
+    )
+    p1_incident = create_incident_for_route(
+        team,
+        route,
+        priority_slug="p1",
+        title="DatabaseDown",
+        severity="critical",
+    )
+    p5_incident = create_incident_for_route(
+        team,
+        route,
+        priority_slug="p5",
+        title="DeployNotice",
+        severity="info",
+    )
+
+    headers, user = create_viewer_headers(group, team)
+
+    response = client.get(
+        f"/api/incidents?team_id={team.id}&sort=priority&order=asc",
+        headers=headers,
+    )
+
+    assert response.status_code == 200, response.get_json()
+
+    payload = response.get_json()
+    ids = [item["id"] for item in payload["items"]]
+    priorities = [item["priority"]["slug"] for item in payload["items"]]
+
+    assert ids == [
+        p1_incident.id,
+        p3_incident.id,
+        p5_incident.id,
+    ]
+    assert priorities == ["p1", "p3", "p5"]
+    assert payload["sort"] == {
+        "field": "priority",
+        "order": "asc",
+    }
+
+
+def test_update_incident_priority_updates_existing_messages(client, db, monkeypatch):
+    group, team, route, incident = create_incident_fixture(
+        priority_slug="p3",
+        title="DiskFull",
+        severity="warning",
+    )
+
+    headers, user = create_responder_headers(group, team)
+
+    calls = []
+
+    monkeypatch.setattr(
+        "app.services.incidents.update_alert_messages",
+        lambda group, event_type: calls.append((group.id, event_type)) or 1,
+    )
+
+    response = client.put(
+        f"/api/incidents/{incident.id}/priority",
+        json={
+            "priority": "p1",
+        },
+        headers=headers,
+    )
+
+    assert response.status_code == 200, response.get_json()
+
+    payload = response.get_json()
+
+    assert payload["priority"]["slug"] == "p1"
+    assert calls == [
+        (incident.id, "priority_changed"),
+    ]
+
+
+def test_update_incident_priority_does_not_update_messages_when_unchanged(
+    client,
+    db,
+    monkeypatch,
+):
+    group, team, route, incident = create_incident_fixture(
+        priority_slug="p1",
+        title="DiskFull",
+        severity="critical",
+    )
+
+    headers, user = create_responder_headers(group, team)
+
+    calls = []
+
+    monkeypatch.setattr(
+        "app.services.incidents.update_alert_messages",
+        lambda group, event_type: calls.append((group.id, event_type)) or 1,
+    )
+
+    response = client.put(
+        f"/api/incidents/{incident.id}/priority",
+        json={
+            "priority": "p1",
+        },
+        headers=headers,
+    )
+
+    assert response.status_code == 200, response.get_json()
+    assert response.get_json()["priority"]["slug"] == "p1"
+    assert calls == []
+
+
+def test_update_incident_priority_notifies_stakeholders(client, db, monkeypatch):
+    group, team, route, incident = create_incident_fixture(
+        priority_slug="p3",
+        title="DiskFull",
+        severity="warning",
+    )
+
+    stakeholder = create_user(
+        unique_slug("stakeholder"),
+        group=group,
+        email="stakeholder@example.com",
+    )
+
+    incidents_repo.create_incident_stakeholder(
+        incident.id,
+        {
+            "user_id": stakeholder.id,
+            "role": "business_owner",
+            "source": "manual",
+            "notify_on_priority_change": True,
+        },
+    )
+
+    headers, user = create_responder_headers(group, team)
+
+    emails = []
+
+    monkeypatch.setattr(
+        "app.services.incidents.update_alert_messages",
+        lambda group, event_type: 1,
+    )
+
+    monkeypatch.setattr(
+        "app.services.incidents.send_stakeholder_email",
+        lambda recipient, subject, body: emails.append(
+            {
+                "recipient": recipient,
+                "subject": subject,
+                "body": body,
+            }
+        ),
+    )
+
+    response = client.put(
+        f"/api/incidents/{incident.id}/priority",
+        json={
+            "priority": "p1",
+        },
+        headers=headers,
+    )
+
+    assert response.status_code == 200, response.get_json()
+    assert response.get_json()["priority"]["slug"] == "p1"
+
+    assert len(emails) == 1
+    assert emails[0]["recipient"] == "stakeholder@example.com"
+    assert "[P1] DiskFull priority changed" in emails[0]["subject"]
+    assert "Incident priority changed: p3 -> P1 Critical" in emails[0]["body"]
+    assert "Priority: P1 Critical" in emails[0]["body"]
+
+
+def test_update_incident_priority_does_not_notify_opted_out_stakeholders(
+    client,
+    db,
+    monkeypatch,
+):
+    group, team, route, incident = create_incident_fixture(
+        priority_slug="p3",
+        title="DiskFull",
+        severity="warning",
+    )
+
+    stakeholder = create_user(
+        unique_slug("stakeholder"),
+        group=group,
+        email="stakeholder@example.com",
+    )
+
+    incidents_repo.create_incident_stakeholder(
+        incident.id,
+        {
+            "user_id": stakeholder.id,
+            "role": "business_owner",
+            "source": "manual",
+            "notify_on_priority_change": False,
+        },
+    )
+
+    headers, user = create_responder_headers(group, team)
+
+    emails = []
+
+    monkeypatch.setattr(
+        "app.services.incidents.update_alert_messages",
+        lambda group, event_type: 1,
+    )
+
+    monkeypatch.setattr(
+        "app.services.incidents.send_stakeholder_email",
+        lambda recipient, subject, body: emails.append(recipient),
+    )
+
+    response = client.put(
+        f"/api/incidents/{incident.id}/priority",
+        json={
+            "priority": "p1",
+        },
+        headers=headers,
+    )
+
+    assert response.status_code == 200, response.get_json()
+    assert emails == []

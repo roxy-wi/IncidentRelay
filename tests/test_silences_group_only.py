@@ -1,5 +1,5 @@
 from app.modules.db import alerts_repo
-from app.services.alerts import upsert_alert
+from app.services.alerts.lifecycle import upsert_alert
 from tests.factories import create_group, create_route, create_silence, create_team
 
 
@@ -39,7 +39,7 @@ def test_silenced_alert_creates_silenced_group_without_notification(monkeypatch,
     calls = []
 
     monkeypatch.setattr(
-        "app.services.alerts.notify_alert",
+        "app.services.alerts.notification_queue.notify_alert",
         lambda alert_group, event_type="notification": calls.append(event_type) or 1,
     )
 
@@ -83,7 +83,7 @@ def test_silenced_child_does_not_reopen_acknowledged_group(monkeypatch, db):
     calls = []
 
     monkeypatch.setattr(
-        "app.services.alerts.notify_alert",
+        "app.services.alerts.notification_queue.notify_alert",
         lambda alert_group, event_type="notification": calls.append(event_type) or 1,
     )
 

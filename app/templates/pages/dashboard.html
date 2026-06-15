@@ -29,14 +29,15 @@
         <table class="data-table dashboard-alerts-table">
           <thead>
             <tr>
-              <th>ID</th>
-              <th>Alert</th>
-              <th>Severity</th>
-              <th>Status</th>
-              <th>Team</th>
-              <th>Duration</th>
-              <th>Updated</th>
-              <th>Actions</th>
+                <th>ID</th>
+                <th>Alert</th>
+                <th>Severity</th>
+                <th>Priority</th>
+                <th>Status</th>
+                <th>Team</th>
+                <th>Duration</th>
+                <th>Updated</th>
+                <th>Actions</th>
             </tr>
           </thead>
 
@@ -117,18 +118,24 @@
   </section>
 
   <section class="bottom-grid">
-    <div class="card dashboard-chart-card">
-      <div class="card-header">
-        <div>
-          <h2>Severity split</h2>
-          <div class="card-subtitle">
-            Current alert distribution
+      <div class="card dashboard-chart-card">
+          <div class="card-header">
+              <div>
+                  <h2>Severity split</h2>
+                  <div class="card-subtitle">Current alert distribution</div>
+              </div>
           </div>
-        </div>
+          <div id="dashboard-severity-split" class="dashboard-bars"></div>
       </div>
-
-      <div id="dashboard-severity-split" class="dashboard-bars"></div>
-    </div>
+      <div class="card dashboard-chart-card">
+          <div class="card-header">
+              <div>
+                  <h2>Priority split</h2>
+                  <div class="card-subtitle">Current incident priority distribution</div>
+              </div>
+          </div>
+          <div id="dashboard-priority-split" class="dashboard-bars"></div>
+      </div>
 
     <div class="card dashboard-chart-card">
       <div class="card-header">

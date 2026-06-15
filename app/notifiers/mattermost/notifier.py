@@ -9,6 +9,10 @@ from app.services.routing.service_context import (
     format_service_links_markdown,
     format_service_runbooks_markdown,
 )
+from app.services.alerts.priority import (
+    alert_priority_label,
+    format_alert_title_with_priority,
+)
 
 
 class MattermostNotifier(IncomingWebhookNotifier):
@@ -125,15 +129,17 @@ class MattermostNotifier(IncomingWebhookNotifier):
 
     def _title_for_alert(self, alert, event_type):
         """Return the attachment title."""
+        title = format_alert_title_with_priority(alert)
         if alert.status == "resolved" or event_type == "resolved":
-            return f"RESOLVED: {alert.title}"
+            return f"RESOLVED: {title}"
         if alert.status == "acknowledged" or event_type == "acknowledged":
-            return f"ACKNOWLEDGED: {alert.title}"
+            return f"ACKNOWLEDGED: {title}"
         if event_type == "reminder":
-            return f"REMINDER: {alert.title}"
+            return f"REMINDER: {title}"
         if event_type == "escalation":
-            return f"ESCALATION: {alert.title}"
-        return alert.title
+            return f"ESCALATION: {title}"
+
+        return title
 
     def _text_for_alert(self, alert, text, event_type):
         """Return the main attachment text."""
@@ -167,6 +173,7 @@ class MattermostNotifier(IncomingWebhookNotifier):
             {"short": True, "title": "Service", "value": alert_service_label(alert)},
             {"short": True, "title": "Status", "value": alert.status},
             {"short": True, "title": "Severity", "value": alert.severity or "-"},
+            {"short": True, "title": "Priority", "value": alert_priority_label(alert)},
             {"short": True, "title": "Assignee", "value": assignee},
             {"short": True, "title": "Source", "value": alert.source},
             {"short": True, "title": "Alert ID", "value": str(alert.id)},

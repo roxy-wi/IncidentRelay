@@ -2,7 +2,8 @@ from datetime import datetime, timedelta
 
 from app.modules.db.models import UserNotificationDelivery
 from app.services.notifications import rules
-from app.services.alerts import resolve_alert, upsert_alert
+from app.services.alerts.actions import resolve_alert
+from app.services.alerts.lifecycle import upsert_alert
 from tests.factories import add_user_to_team, create_group, create_route, create_team, create_user
 
 

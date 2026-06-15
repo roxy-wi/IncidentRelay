@@ -8,7 +8,10 @@ from app.services.routing.service_context import (
     link_display_label,
     runbook_display_label,
 )
-
+from app.services.alerts.priority import (
+    alert_priority_label,
+    format_alert_title_with_priority,
+)
 
 MAX_TELEGRAM_MESSAGE_LENGTH = 4096
 MAX_ALERT_MESSAGE_LENGTH = 1600
@@ -184,7 +187,7 @@ def _severity_icon(alert: Any) -> str:
 def _title(alert: Any, event_type: str) -> str:
     """Return a title line for Telegram."""
 
-    title = _html(getattr(alert, "title", None), "Alert")
+    title = _html(format_alert_title_with_priority(alert), "Alert")
     status = str(getattr(alert, "status", "") or "").lower()
 
     if event_type == "resolved" or status == "resolved":
@@ -277,6 +280,7 @@ def format_telegram_alert_message(
             f"Service: {_service_name(alert)}",
             f"Status: {_html(getattr(alert, 'status', None))}",
             f"Severity: {_html(getattr(alert, 'severity', None))}",
+            f"Priority: {_html(alert_priority_label(alert))}",
             f"Assignee: {_person_name(getattr(alert, 'assignee', None))}",
             f"Source: {_html(getattr(alert, 'source', None))}",
             f"Alert ID: #{_html(getattr(alert, 'id', None))}",

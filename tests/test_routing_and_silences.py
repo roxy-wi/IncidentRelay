@@ -2,7 +2,7 @@ from app.services.routing.routing import build_group_key, find_route_for_alert, 
 from app.services.silences import find_active_silence
 from tests.factories import create_group, create_route, create_silence, create_team
 from app.modules.db import alerts_repo
-from app.services.alerts import upsert_alert
+from app.services.alerts.lifecycle import upsert_alert
 
 
 def test_is_route_active_requires_route_team_and_group_to_be_active(db):
@@ -116,7 +116,7 @@ def test_silenced_alert_creates_silenced_group_without_notification(monkeypatch,
     calls = []
 
     monkeypatch.setattr(
-        "app.services.alerts.notify_alert",
+        "app.services.alerts.notification_queue.notify_alert",
         lambda alert_group, event_type="notification": calls.append(event_type) or 1,
     )
 

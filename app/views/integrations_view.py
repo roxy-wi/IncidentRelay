@@ -12,7 +12,8 @@ from app.api.schemas.integrations import (
 )
 from app.settings import Config
 from app.modules.db import channels_repo, users_repo, alerts_repo, routes_repo
-from app.services.alerts import acknowledge_alert, resolve_alert, upsert_alert
+from app.services.alerts.actions import acknowledge_alert, resolve_alert
+from app.services.alerts.lifecycle import upsert_alert
 from app.services.integrations.auth import require_alert_token
 from app.services.integrations.normalizers.sentry import normalize_sentry
 from app.services.integrations.normalizers.webhook import normalize_webhook

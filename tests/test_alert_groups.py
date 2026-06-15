@@ -1,17 +1,16 @@
 from datetime import datetime, timedelta
 
+from app.modules.db import alerts_repo
 from app.modules.db.models import AlertGroup
 from app.settings import Config
-from app.services import alerts as alerts_service
-from app.modules.db import alerts_repo
-from app.services.alerts import upsert_alert
+from app.services.alerts.lifecycle import upsert_alert
+import app.services.alerts.notification_queue as notification_queue
 from tests.factories import create_group, create_route, create_team
 
 
 def _route(group_by):
     group = create_group()
     team = create_team(group)
-
     return create_route(
         team,
         source="webhook",
@@ -59,11 +58,9 @@ def test_alerts_with_same_group_key_create_one_group(db):
 
 def test_ack_group_does_not_ack_each_child_alert(db):
     route = _route(group_by=["alertname", "severity"])
-
     group, _ = upsert_alert(_alert(route, "DiskFull", "host1"))
 
     group = alerts_repo.acknowledge_alert_group(group.id, user_id=None)
-
     child = alerts_repo.list_alerts_for_group(group.id)[0]
 
     assert group.status == "acknowledged"
@@ -72,11 +69,9 @@ def test_ack_group_does_not_ack_each_child_alert(db):
 
 def test_resolve_group_resolves_child_alerts(db):
     route = _route(group_by=["alertname", "severity"])
-
     group, _ = upsert_alert(_alert(route, "DiskFull", "host1"))
 
     group = alerts_repo.resolve_alert_group(group.id)
-
     child = alerts_repo.list_alerts_for_group(group.id)[0]
 
     assert group.status == "resolved"
@@ -198,7 +193,6 @@ def test_grouping_respects_configured_labels(db):
             "mount": "/var",
         },
     })
-
     group2, created2 = upsert_alert({
         **_alert(route, "DiskFull", "host2"),
         "labels": {
@@ -208,7 +202,6 @@ def test_grouping_respects_configured_labels(db):
             "mount": "/var",
         },
     })
-
     group3, created3 = upsert_alert({
         **_alert(route, "DiskFull", "host3"),
         "labels": {
@@ -222,22 +215,19 @@ def test_grouping_respects_configured_labels(db):
     assert created1 is True
     assert created2 is False
     assert created3 is True
-
     assert group1.id == group2.id
     assert group1.id != group3.id
 
 
 def test_acknowledged_group_stays_acknowledged_after_recalculate(db):
     route = _route(group_by=["alertname", "severity"])
-
     group, _ = upsert_alert(_alert(route, "DiskFull", "host1"))
 
     group = alerts_repo.acknowledge_alert_group(group.id)
     group = alerts_repo.recalculate_alert_group(group)
+    child = alerts_repo.list_alerts_for_group(group.id)[0]
 
     assert group.status == "acknowledged"
-
-    child = alerts_repo.list_alerts_for_group(group.id)[0]
     assert child.status == "firing"
 
 
@@ -245,9 +235,7 @@ def test_new_child_alert_reopens_acknowledged_group(db):
     route = _route(group_by=["alertname", "severity"])
 
     group1, _ = upsert_alert(_alert(route, "DiskFull", "host1"))
-
     alerts_repo.acknowledge_alert_group(group1.id)
-
     group2, created2 = upsert_alert(_alert(route, "DiskFull", "host2"))
 
     assert created2 is False
@@ -258,14 +246,16 @@ def test_new_child_alert_reopens_acknowledged_group(db):
 
 def test_new_group_schedules_notification_instead_of_sending_immediately(db, monkeypatch):
     route = _route(group_by=["alertname", "severity"])
-
     sent = []
 
     monkeypatch.setattr(Config, "ALERT_GROUP_WAIT_SECONDS", 30)
-    monkeypatch.setattr(alerts_service, "notify_alert", lambda *args, **kwargs: sent.append(args))
+    monkeypatch.setattr(
+        notification_queue,
+        "notify_alert",
+        lambda *args, **kwargs: sent.append(args),
+    )
 
     group, created = upsert_alert(_alert(route, "DiskFull", "host1"))
-
     group = alerts_repo.get_alert_group(group.id)
 
     assert created is True
@@ -312,32 +302,24 @@ def test_due_group_notification_is_sent(db, monkeypatch):
     alert_group.save()
 
     calls = []
-
     monkeypatch.setattr(
-        alerts_service,
-        "has_matching_notification_channel",
-        lambda group: True,
+        "app.services.notifications.rules.has_deliverable_user_notification",
+        lambda group, event_type="notification": True,
     )
-
     monkeypatch.setattr(
-        alerts_service,
+        notification_queue,
         "notify_alert",
-        lambda group, event_type="notification": calls.append(
-            (group.id, event_type)
-        ) or 1,
+        lambda group, event_type="notification": calls.append((group.id, event_type)) or 1,
     )
 
-    result = alerts_service.process_due_alert_group_notifications()
-
+    result = notification_queue.process_due_alert_group_notifications()
     alert_group = AlertGroup.get_by_id(alert_group.id)
 
     assert result["processed"] == 1
     assert result["sent"] == 1
     assert result["skipped"] == 0
     assert result["failed"] == 0
-
     assert calls == [(alert_group.id, "notification")]
-
     assert alert_group.notification_pending is False
     assert alert_group.notification_due_at is None
     assert alert_group.notification_reason is None
@@ -346,14 +328,16 @@ def test_due_group_notification_is_sent(db, monkeypatch):
 
 def test_group_resolved_before_group_wait_does_not_send_notification(db, monkeypatch):
     route = _route(group_by=["alertname", "severity"])
-
     sent = []
 
     monkeypatch.setattr(Config, "ALERT_GROUP_WAIT_SECONDS", 60)
-    monkeypatch.setattr(alerts_service, "notify_alert", lambda *args, **kwargs: sent.append(args))
+    monkeypatch.setattr(
+        notification_queue,
+        "notify_alert",
+        lambda *args, **kwargs: sent.append(args),
+    )
 
     group, _ = upsert_alert(_alert(route, "DiskFull", "host1"))
-
     child = alerts_repo.list_alerts_for_group(group.id)[0]
 
     upsert_alert({
@@ -366,7 +350,7 @@ def test_group_resolved_before_group_wait_does_not_send_notification(db, monkeyp
     assert group.status == "resolved"
     assert group.notification_pending is False
 
-    result = alerts_service.process_due_alert_group_notifications()
+    result = notification_queue.process_due_alert_group_notifications()
 
     assert result["sent"] == 0
     assert sent == []
@@ -382,13 +366,13 @@ def test_new_child_after_notification_schedules_group_interval_update(db, monkey
     )
 
     monkeypatch.setattr(
-        alerts_service.Config,
+        notification_queue.Config,
         "ALERT_GROUP_WAIT_SECONDS",
         30,
         raising=False,
     )
     monkeypatch.setattr(
-        alerts_service.Config,
+        notification_queue.Config,
         "ALERT_GROUP_INTERVAL_SECONDS",
         300,
         raising=False,
@@ -422,17 +406,13 @@ def test_new_child_after_notification_schedules_group_interval_update(db, monkey
     alert_group.save()
 
     calls = []
-
     monkeypatch.setattr(
-        alerts_service,
+        notification_queue,
         "notify_alert",
-        lambda group, event_type="notification": calls.append(
-            (group.id, event_type)
-        ) or 1,
+        lambda group, event_type="notification": calls.append((group.id, event_type)) or 1,
     )
 
-    result = alerts_service.process_due_alert_group_notifications()
-
+    result = notification_queue.process_due_alert_group_notifications()
     alert_group = AlertGroup.get_by_id(alert_group.id)
 
     assert result["processed"] == 1
@@ -440,7 +420,6 @@ def test_new_child_after_notification_schedules_group_interval_update(db, monkey
     assert result["skipped"] == 0
     assert result["failed"] == 0
     assert calls == [(alert_group.id, "notification")]
-
     assert alert_group.notification_pending is False
     assert alert_group.notification_due_at is None
     assert alert_group.notification_reason is None
@@ -473,7 +452,6 @@ def test_new_child_after_notification_schedules_group_interval_update(db, monkey
     assert alert_group.status == "firing"
     assert alert_group.alert_count == 2
     assert alert_group.firing_count == 2
-
     assert alert_group.notification_pending is True
     assert alert_group.notification_reason == "update"
     assert alert_group.notification_due_at == first_notification_at + timedelta(seconds=300)

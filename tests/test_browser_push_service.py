@@ -8,7 +8,7 @@ from app.modules.db.models import (
     BrowserPushSubscription,
 )
 from app.notifiers.browser_push import service as browser_push
-from app.services.alerts import upsert_alert
+from app.services.alerts.lifecycle import upsert_alert
 from tests.factories import (
     create_group,
     create_route,
@@ -235,7 +235,7 @@ def test_build_alert_push_payload_for_firing_group_creates_ack_and_resolve_token
         event_type="notification",
     )
 
-    assert payload["title"] == "CRITICAL: DiskFull"
+    assert payload["title"] == "CRITICAL: [P1] DiskFull"
     assert payload["alert_id"] == alert_group.id
     assert payload["alert_group_id"] == alert_group.id
     assert payload["tag"] == f"incidentrelay-alert-group-{alert_group.id}"
@@ -244,6 +244,8 @@ def test_build_alert_push_payload_for_firing_group_creates_ack_and_resolve_token
     assert payload["silent"] is False
     assert payload["action_tokens"]["ack"]
     assert payload["action_tokens"]["resolve"]
+    assert payload["priority"] == "P1"
+    assert payload["priority_label"] == "P1 Critical"
 
     assert (
         BrowserPushActionToken

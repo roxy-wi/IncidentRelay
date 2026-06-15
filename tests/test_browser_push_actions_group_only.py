@@ -4,7 +4,7 @@ import pytest
 
 from app.modules.db.models import AlertGroup, BrowserPushActionToken
 from app.notifiers.browser_push import service as browser_push
-from app.services.alerts import upsert_alert
+from app.services.alerts.lifecycle import upsert_alert
 from tests.factories import add_user_to_team, create_group, create_route, create_team, create_user
 
 

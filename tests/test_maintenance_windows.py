@@ -7,7 +7,7 @@ from app.api.schemas.roles import GROUP_USER_ADMIN_ROLE
 from app.login import create_access_token
 from app.modules.db import services_repo, maintenance_repo
 from app.modules.db.models import AlertEvent, AlertGroup, Alert
-from app.services.alerts import upsert_alert
+from app.services.alerts.lifecycle import upsert_alert
 from tests.factories import (
     add_user_to_team,
     create_group,

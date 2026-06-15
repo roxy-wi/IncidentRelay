@@ -1,5 +1,14 @@
-from app.modules.db import alerts_repo
-from app.modules.db import incidents_repo
+import smtplib
+from email.message import EmailMessage
+
+from app.modules.db import alerts_repo, incidents_repo
+from app import Config
+from app.services.alerts.priority import (
+    alert_priority_label,
+    format_alert_title_with_priority,
+)
+from app.services.links import build_alert_web_url
+from app.services.notifications.delivery import update_alert_messages
 
 
 VALID_RESPONDER_TARGETS = {
@@ -27,6 +36,165 @@ VALID_STAKEHOLDER_ROLES = {
 }
 
 
+def stakeholder_email(stakeholder):
+    """Return notification email for an incident stakeholder."""
+    email = str(getattr(stakeholder, "email", None) or "").strip()
+
+    if email:
+        return email
+
+    user = getattr(stakeholder, "user", None)
+
+    if not user:
+        return None
+
+    if getattr(user, "deleted", False) or not getattr(user, "active", True):
+        return None
+
+    email = str(getattr(user, "email", None) or "").strip()
+
+    return email or None
+
+
+def stakeholder_display_name(stakeholder):
+    """Return stakeholder display name for email text."""
+    display_name = str(getattr(stakeholder, "display_name", None) or "").strip()
+
+    if display_name:
+        return display_name
+
+    user = getattr(stakeholder, "user", None)
+
+    if user:
+        return (
+            getattr(user, "display_name", None)
+            or getattr(user, "username", None)
+            or getattr(user, "email", None)
+            or "stakeholder"
+        )
+
+    return stakeholder_email(stakeholder) or "stakeholder"
+
+
+def build_stakeholder_priority_changed_email(group, old_priority=None):
+    """Build subject and body for stakeholder priority change notification."""
+    priority_label = alert_priority_label(group)
+    old_priority = old_priority or "-"
+
+    subject = (
+        "[IncidentRelay] "
+        f"{format_alert_title_with_priority(group)} priority changed"
+    )
+
+    alert_url = build_alert_web_url(group) or "-"
+    team = group.team.slug if group.team else "-"
+    service = getattr(group.service, "name", None) if group.service else None
+
+    body = "\n".join([
+        f"Incident priority changed: {old_priority} -> {priority_label}",
+        "",
+        f"Incident: {format_alert_title_with_priority(group)}",
+        f"Status: {group.status or '-'}",
+        f"Severity: {group.severity or '-'}",
+        f"Priority: {priority_label}",
+        f"Team: {team}",
+        f"Service: {service or '-'}",
+        f"URL: {alert_url}",
+        "",
+        "You are receiving this email because you are an incident stakeholder.",
+    ])
+
+    return subject, body
+
+
+def send_stakeholder_email(recipient, subject, body):
+    """Send a plain stakeholder notification email."""
+    smtp_host = Config.SMTP_HOST
+    smtp_port = int(Config.SMTP_PORT)
+
+    if not smtp_host:
+        raise RuntimeError("smtp host is missing: set [smtp] host in config")
+
+    message = EmailMessage()
+    message["Subject"] = subject
+    message["From"] = Config.SMTP_FROM
+    message["To"] = recipient
+    message.set_content(body)
+
+    username = (Config.SMTP_USER or "").strip()
+    password = Config.SMTP_PASSWORD or ""
+
+    with smtplib.SMTP(smtp_host, smtp_port, timeout=10) as smtp:
+        smtp.ehlo()
+
+        if Config.SMTP_USE_TLS:
+            smtp.starttls()
+            smtp.ehlo()
+
+        if username or password:
+            if not username or not password:
+                raise RuntimeError(
+                    "SMTP auth is partially configured: both [smtp] user "
+                    "and password must be set, or both must be empty"
+                )
+
+            if not smtp.has_extn("auth"):
+                raise RuntimeError(
+                    "SMTP auth is configured, but the SMTP server does not "
+                    "support AUTH"
+                )
+
+            smtp.login(username, password)
+
+        smtp.send_message(message)
+
+
+def notify_stakeholders_on_priority_change(group, old_priority=None):
+    """Notify active stakeholders that requested priority change emails."""
+    stakeholders = incidents_repo.list_incident_stakeholders(group.id)
+
+    sent = 0
+    skipped = 0
+    failed = 0
+
+    subject, body = build_stakeholder_priority_changed_email(
+        group,
+        old_priority=old_priority,
+    )
+
+    for stakeholder in stakeholders:
+        if not getattr(stakeholder, "notify_on_priority_change", True):
+            skipped += 1
+            continue
+
+        recipient = stakeholder_email(stakeholder)
+
+        if not recipient:
+            skipped += 1
+            continue
+
+        try:
+            send_stakeholder_email(recipient, subject, body)
+            sent += 1
+        except Exception as exc:
+            failed += 1
+            alerts_repo.create_alert_event(
+                group_id=group.id,
+                event_type="stakeholder_notification_failed",
+                message=(
+                    "Stakeholder priority change notification failed for "
+                    f"{stakeholder_display_name(stakeholder)}: {exc}"
+                ),
+                user_id=None,
+            )
+
+    return {
+        "sent": sent,
+        "skipped": skipped,
+        "failed": failed,
+    }
+
+
 def set_incident_priority(*, group_id, priority, user_id=None):
     if not priority:
         raise ValueError("priority is required")
@@ -36,12 +204,23 @@ def set_incident_priority(*, group_id, priority, user_id=None):
     if not group:
         raise LookupError("incident not found")
 
-    return incidents_repo.set_incident_priority(
+    old_priority = group.priority_slug
+
+    group = incidents_repo.set_incident_priority(
         group.id,
         priority,
         user_id=user_id,
         manual=True,
     )
+
+    if old_priority != group.priority_slug:
+        update_alert_messages(group, event_type="priority_changed")
+        notify_stakeholders_on_priority_change(
+            group,
+            old_priority=old_priority,
+        )
+
+    return group
 
 
 def create_incident_responder(*, group_id, payload, user_id=None):

@@ -4,7 +4,7 @@ from app.modules.db.models import (
     UserNotificationDelivery,
 )
 from app.services.notifications import rules
-from app.services.alerts import upsert_alert
+from app.services.alerts.lifecycle import upsert_alert
 from tests.factories import (
     create_group,
     create_route,

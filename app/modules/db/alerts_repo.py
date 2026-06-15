@@ -23,7 +23,10 @@ from app.modules.db.models import (
     MaintenanceWindowService,
     ServiceOwner,
 )
-from app.modules.db.query_filters import apply_field_values_filter
+from app.modules.db.query_filters import (
+    apply_field_values_filter,
+    normalize_filter_values,
+)
 
 
 MAX_ALERTS_PAGE_SIZE = 100
@@ -51,11 +54,14 @@ ALERT_GROUP_SEVERITY_SORT = Case(
     0,
 )
 
+ALERT_GROUP_PRIORITY_SORT = fn.COALESCE(AlertGroup.priority_order, 3)
+
 ALERT_GROUP_SORT_FIELDS = {
     "id": AlertGroup.id,
     "status": ALERT_GROUP_STATUS_SORT,
     "title": AlertGroup.title,
     "severity": ALERT_GROUP_SEVERITY_SORT,
+    "priority": ALERT_GROUP_PRIORITY_SORT,
     "team": Team.slug,
     "assignee": User.username,
     "created": AlertGroup.first_seen_at,
@@ -74,12 +80,43 @@ def normalize_alert_group_sort(sort):
     return "activity"
 
 
+def apply_alert_group_priority_filter(query, values):
+    """Apply incident priority filter by priority slug.
+
+    Old groups can have NULL priority_slug if they were created before
+    incident priorities were introduced. Treat NULL as the default P3
+    priority when filtering by p3.
+    """
+    priorities = []
+    seen = set()
+
+    for value in normalize_filter_values(values):
+        value = str(value).strip().lower()
+
+        if not value or value in seen:
+            continue
+
+        seen.add(value)
+        priorities.append(value)
+
+    if not priorities:
+        return query
+
+    conditions = [AlertGroup.priority_slug.in_(priorities)]
+
+    if "p3" in priorities:
+        conditions.append(AlertGroup.priority_slug.is_null(True))
+
+    return query.where(reduce(or_, conditions))
+
+
 def build_alert_groups_query(
     team_id=None,
     team_ids=None,
     status=None,
     source=None,
     severity=None,
+    priority=None,
     service_id=None,
     service_slug=None,
     service_status=None,
@@ -130,7 +167,10 @@ def build_alert_groups_query(
         AlertGroup.severity,
         severity,
     )
-
+    query = apply_alert_group_priority_filter(
+        query,
+        priority,
+    )
     query = apply_field_values_filter(
         query,
         AlertGroup.service,
@@ -315,6 +355,7 @@ def paginate_alert_groups(
     status=None,
     source=None,
     severity=None,
+    priority=None,
     service_id=None,
     service_slug=None,
     service_status=None,
@@ -339,6 +380,7 @@ def paginate_alert_groups(
         status=status,
         source=source,
         severity=severity,
+        priority=priority,
         service_id=service_id,
         service_slug=service_slug,
         service_status=service_status,

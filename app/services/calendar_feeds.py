@@ -1,9 +1,9 @@
-"""Tokenized ICS subscription feeds."""
-
 import hashlib
 import hmac
 import secrets
 from datetime import datetime, timedelta
+
+from peewee import DoesNotExist
 
 from app.modules.db import calendar_feeds_repo
 from app.services.calendar_service import build_team_calendar
@@ -45,7 +45,7 @@ def get_calendar_feed_by_token(token):
 
     try:
         feed = calendar_feeds_repo.get_calendar_feed_by_prefix(prefix)
-    except Exception:
+    except DoesNotExist:
         return None
 
     if not feed.enabled or feed.deleted:

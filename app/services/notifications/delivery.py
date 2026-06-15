@@ -7,6 +7,10 @@ from app.services.links import build_alert_web_url
 from app.services.severity import normalize_severity, normalize_severity_list
 from app.services.routing.service_context import format_service_context_plain, service_display_name
 from app.services.notifications import rules
+from app.services.alerts.priority import (
+    alert_priority_label,
+    format_alert_title_with_priority,
+)
 
 EDITABLE_EVENTS = {"acknowledged", "resolved"}
 
@@ -48,11 +52,12 @@ def format_alert_message(alert, event_type="notification"):
     alert_url = build_alert_web_url(alert)
 
     lines = [
-        f"{event_type.upper()}: {alert.title}",
+        f"{event_type.upper()}: {format_alert_title_with_priority(alert)}",
         f"Team: {team}",
         f"Service: {service}",
         f"Status: {alert.status}",
         f"Severity: {alert.severity or '-'}",
+        f"Priority: {alert_priority_label(alert)}",
         f"Assignee: {assignee}",
         f"Source: {alert.source}",
         f"Message: {alert.message or '-'}",

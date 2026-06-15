@@ -1,5 +1,4 @@
 from __future__ import annotations
-
 from html import escape
 from string import Formatter
 
@@ -9,6 +8,7 @@ from app.services.routing.service_context import (
     format_service_runbooks_html,
     service_display_name,
 )
+from app.services.alerts.priority import alert_priority_label
 
 EMAIL_HTML_TEMPLATE_MAX_LENGTH = 20000
 
@@ -18,6 +18,7 @@ EMAIL_TEMPLATE_PLACEHOLDERS = (
     "title",
     "message",
     "severity",
+    "priority",
     "status",
     "team",
     "service",
@@ -49,6 +50,7 @@ DEFAULT_EMAIL_HTML_TEMPLATE = """<!doctype html>
                   <tr><td style="padding:8px 0;color:#64748b;">Team</td><td style="padding:8px 0;font-weight:600;">{team}</td></tr>
                   <tr><td style="padding:8px 0;color:#64748b;">Status</td><td style="padding:8px 0;font-weight:600;">{status}</td></tr>
                   <tr><td style="padding:8px 0;color:#64748b;">Severity</td><td style="padding:8px 0;font-weight:600;">{severity}</td></tr>
+                  <tr><td style="padding:8px 0;color:#64748b;">Priority</td><td style="padding:8px 0;font-weight:600;">{priority}</td></tr>
                   <tr><td style="padding:8px 0;color:#64748b;">Assignee</td><td style="padding:8px 0;font-weight:600;">{assignee}</td></tr>
                   <tr><td style="padding:8px 0;color:#64748b;">Source</td><td style="padding:8px 0;font-weight:600;">{source}</td></tr>
                 </table>
@@ -128,6 +130,7 @@ def build_email_template_context(alert, text, event_type="notification"):
         title=_escape_value(getattr(alert, "title", None), "Alert"),
         message=_escape_value(getattr(alert, "message", None) or text or ""),
         severity=_escape_value(getattr(alert, "severity", None)),
+        priority=_escape_value(alert_priority_label(alert)),
         status=_escape_value(getattr(alert, "status", None)),
         team=_escape_value(team_slug),
         assignee=_escape_value(assignee_name),

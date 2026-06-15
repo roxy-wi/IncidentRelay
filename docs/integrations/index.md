@@ -17,12 +17,12 @@ Profile-level browser push is separate from notification channels. Users enable 
 
 Incoming integrations create or update alerts in IncidentRelay. They are selected by the route `source` field and require a route intake token.
 
-| Source          | Endpoint                              | Documentation                         |
-|-----------------|---------------------------------------|---------------------------------------|
-| Alertmanager    | `POST /api/integrations/alertmanager` | [Alertmanager](alertmanager.md)       |
-| Zabbix          | `POST /api/integrations/zabbix`       | [Zabbix](zabbix.md)                   |
-| Sentry          | `POST /api/integrations/sentry`       | [Sentry](sentry.md)                   |
-| Generic webhook | `POST /api/integrations/webhook`      | [Generic webhook](generic-webhook.md) |
+| Source          | Endpoint                                   | Documentation                         |
+|-----------------|--------------------------------------------|---------------------------------------|
+| Alertmanager    | `POST /api/integrations/alertmanager`      | [Alertmanager](alertmanager.md)       |
+| Zabbix          | `POST /api/integrations/zabbix`            | [Zabbix](zabbix.md)                   |
+| Sentry          | `POST /api/integrations/sentry/<route_id>` | [Sentry](sentry.md)                   |
+| Generic webhook | `POST /api/integrations/webhook`           | [Generic webhook](generic-webhook.md) |
 
 Route intake tokens belong to routes, not to channels. Create a route first, copy its intake token, and use that token in the monitoring system.
 

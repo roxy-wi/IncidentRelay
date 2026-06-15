@@ -2,7 +2,7 @@ from datetime import datetime
 
 from app.modules.db.models import AlertEvent, AlertGroup, BrowserPushSubscription
 from app.services.notifications import delivery, rules
-from app.services.alerts import upsert_alert
+from app.services.alerts.lifecycle import upsert_alert
 from tests.factories import (
     attach_channel,
     create_channel,

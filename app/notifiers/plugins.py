@@ -10,6 +10,10 @@ from app.services.routing.service_context import (
     link_display_label,
     runbook_display_label,
 )
+from app.services.alerts.priority import (
+    alert_priority_label,
+    alert_priority_short_label,
+)
 
 logger = logging.getLogger("oncall.alerts")
 
@@ -67,6 +71,8 @@ class IncomingWebhookNotifier(BaseNotifier):
                 "title": alert.title,
                 "message": alert.message,
                 "severity": alert.severity,
+                "priority": alert_priority_short_label(alert),
+                "priority_label": alert_priority_label(alert),
                 "assignee": alert.assignee.username if alert.assignee else None,
                 "service": alert_service_label(alert),
                 "service_id": alert.service.id if getattr(alert, "service", None) else None,

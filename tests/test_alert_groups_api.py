@@ -1,5 +1,5 @@
 from app.modules.db import alerts_repo
-from app.services.alerts import upsert_alert
+from app.services.alerts.lifecycle import upsert_alert
 from tests.factories import create_group, create_route, create_team
 
 

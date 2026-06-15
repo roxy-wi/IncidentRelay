@@ -2,11 +2,11 @@ from datetime import datetime, timedelta
 
 from app.db import init_database
 from app.modules.db.models import AlertEvent, AlertGroup, UserNotificationDelivery
-from app.services import alerts as alerts_service
+from app.services.alerts.lifecycle import upsert_alert
+import app.services.alerts.notification_queue as notification_queue
+import app.services.alerts.reminders as alert_reminders
 from app.services.notifications import delivery as notification_service
 from app.services.notifications import rules as notification_rules
-from app.services.notifications.delivery import notify_alert
-from app.services.alerts import upsert_alert
 from tests.factories import (
     create_group,
     create_route,
@@ -18,14 +18,12 @@ from tests.factories import (
 def _create_alert_route(*, rotation=None):
     group = create_group()
     team = create_team(group)
-
     route = create_route(
         team,
         source="alertmanager",
         rotation=rotation,
         group_by=["alertname", "severity", "instance"],
     )
-
     return group, team, route
 
 
@@ -57,7 +55,6 @@ def _create_firing_alert_group(route, *, dedup_key, instance="host1"):
 
 def test_due_group_notification_without_delivery_target_is_skipped(db, monkeypatch):
     group, team, route = _create_alert_route()
-
     alert_group = _create_firing_alert_group(
         route,
         dedup_key="dedup-due-no-target",
@@ -71,32 +68,29 @@ def test_due_group_notification_without_delivery_target_is_skipped(db, monkeypat
     alert_group.save()
 
     monkeypatch.setattr(
-        alerts_service.alerts_repo,
+        notification_queue.alerts_repo,
         "list_due_alert_group_notifications",
         lambda now=None, limit=100: [AlertGroup.get_by_id(alert_group.id)],
     )
 
     calls = []
-
     monkeypatch.setattr(
-        alerts_service,
+        notification_queue,
         "notify_alert",
         lambda group, event_type="notification": calls.append(
             (group.id, event_type)
-        ) or 0,
+        )
+        or 0,
     )
 
-    result = alerts_service.process_due_alert_group_notifications()
-
+    result = notification_queue.process_due_alert_group_notifications()
     alert_group = AlertGroup.get_by_id(alert_group.id)
 
     assert result["processed"] == 1
     assert result["sent"] == 0
     assert result["skipped"] == 1
     assert result["failed"] == 0
-
     assert calls == [(alert_group.id, "notification")]
-
     assert alert_group.notification_pending is False
     assert alert_group.notification_due_at is None
     assert alert_group.notification_reason is None
@@ -106,7 +100,6 @@ def test_due_group_notification_without_delivery_target_is_skipped(db, monkeypat
         (AlertEvent.group == alert_group.id)
         & (AlertEvent.event_type == "notification_skipped")
     )
-
     assert event.message == "Due alert group notification skipped: no delivery target"
 
 
@@ -115,7 +108,6 @@ def test_due_group_update_without_delivery_target_does_not_change_last_notificat
     monkeypatch,
 ):
     group, team, route = _create_alert_route()
-
     alert_group = _create_firing_alert_group(
         route,
         dedup_key="dedup-due-update-no-target",
@@ -131,32 +123,26 @@ def test_due_group_update_without_delivery_target_does_not_change_last_notificat
     alert_group.save()
 
     monkeypatch.setattr(
-        alerts_service.alerts_repo,
+        notification_queue.alerts_repo,
         "list_due_alert_group_notifications",
         lambda now=None, limit=100: [AlertGroup.get_by_id(alert_group.id)],
     )
 
     calls = []
-
     monkeypatch.setattr(
-        alerts_service,
+        notification_queue,
         "notify_alert",
-        lambda group, event_type="update": calls.append(
-            (group.id, event_type)
-        ) or 0,
+        lambda group, event_type="update": calls.append((group.id, event_type)) or 0,
     )
 
-    result = alerts_service.process_due_alert_group_notifications()
-
+    result = notification_queue.process_due_alert_group_notifications()
     alert_group = AlertGroup.get_by_id(alert_group.id)
 
     assert result["processed"] == 1
     assert result["sent"] == 0
     assert result["skipped"] == 1
     assert result["failed"] == 0
-
     assert calls == [(alert_group.id, "update")]
-
     assert alert_group.notification_pending is False
     assert alert_group.notification_due_at is None
     assert alert_group.notification_reason is None
@@ -166,13 +152,11 @@ def test_due_group_update_without_delivery_target_does_not_change_last_notificat
         (AlertEvent.group == alert_group.id)
         & (AlertEvent.event_type == "update_skipped")
     )
-
     assert event.message == "Due alert group notification skipped: no delivery target"
 
 
 def test_send_unacked_reminders_skips_group_with_pending_notification(db, monkeypatch):
     group, team, route = _create_alert_route()
-
     alert_group = _create_firing_alert_group(
         route,
         dedup_key="dedup-reminder-pending",
@@ -187,29 +171,25 @@ def test_send_unacked_reminders_skips_group_with_pending_notification(db, monkey
     alert_group.save()
 
     monkeypatch.setattr(
-        alerts_service.alerts_repo,
+        alert_reminders.alerts_repo,
         "list_firing_alert_groups",
         lambda: [AlertGroup.get_by_id(alert_group.id)],
     )
-
     monkeypatch.setattr(
-        alerts_service,
+        alert_reminders,
         "notify_alert",
         lambda *args, **kwargs: (_ for _ in ()).throw(
             AssertionError("reminder must not be sent while notification is pending")
         ),
     )
 
-    count = alerts_service.send_unacked_reminders()
-
+    count = alert_reminders.send_unacked_reminders()
     alert_group = AlertGroup.get_by_id(alert_group.id)
 
     assert count == 0
     assert alert_group.reminder_count == 0
-
     assert not (
-        AlertEvent
-        .select()
+        AlertEvent.select()
         .where(
             (AlertEvent.group == alert_group.id)
             & (AlertEvent.event_type == "reminder_sent")
@@ -223,7 +203,6 @@ def test_send_unacked_reminders_skips_group_without_initial_notification(
     monkeypatch,
 ):
     group, team, route = _create_alert_route()
-
     alert_group = _create_firing_alert_group(
         route,
         dedup_key="dedup-reminder-no-initial-notification",
@@ -238,29 +217,25 @@ def test_send_unacked_reminders_skips_group_without_initial_notification(
     alert_group.save()
 
     monkeypatch.setattr(
-        alerts_service.alerts_repo,
+        alert_reminders.alerts_repo,
         "list_firing_alert_groups",
         lambda: [AlertGroup.get_by_id(alert_group.id)],
     )
-
     monkeypatch.setattr(
-        alerts_service,
+        alert_reminders,
         "notify_alert",
         lambda *args, **kwargs: (_ for _ in ()).throw(
             AssertionError("reminder must not be sent before initial notification")
         ),
     )
 
-    count = alerts_service.send_unacked_reminders()
-
+    count = alert_reminders.send_unacked_reminders()
     alert_group = AlertGroup.get_by_id(alert_group.id)
 
     assert count == 0
     assert alert_group.reminder_count == 0
-
     assert not (
-        AlertEvent
-        .select()
+        AlertEvent.select()
         .where(
             (AlertEvent.group == alert_group.id)
             & (AlertEvent.event_type == "reminder_sent")
@@ -276,18 +251,15 @@ def test_notify_alert_creates_user_notification_delivery_with_group_id(
     group = create_group()
     team = create_team(group)
     user = create_user("alice", group)
-
     route = create_route(
         team,
         source="alertmanager",
         group_by=["alertname", "severity", "instance"],
     )
-
     alert_group = _create_firing_alert_group(
         route,
         dedup_key="dedup-user-delivery-group-id",
     )
-
     alert_group.assignee = user.id
     alert_group.status = "firing"
     alert_group.save()
@@ -315,7 +287,6 @@ def test_notify_alert_creates_user_notification_delivery_with_group_id(
     assert delivery.event_type == "notification"
     assert delivery.status == "sent"
     assert delivery.provider == "browser_push"
-
     assert getattr(delivery, "alert_id", None) is None
 
 
@@ -328,7 +299,6 @@ def test_legacy_alert_id_columns_are_nullable_or_removed(db):
         "user_notification_delivery",
         "group_id",
     )
-
     push_token_alert_id = _get_column(
         "browser_push_action_token",
         "alert_id",
@@ -340,7 +310,6 @@ def test_legacy_alert_id_columns_are_nullable_or_removed(db):
 
     assert user_delivery_group_id is not None
     assert user_delivery_group_id.null is False
-
     assert push_token_group_id is not None
     assert push_token_group_id.null is False
 

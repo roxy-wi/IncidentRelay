@@ -34,6 +34,13 @@ const alertsSortColumns = {
     id: { path: "id", type: "number", defaultDirection: "desc" },
     title: { path: "title", type: "text", defaultDirection: "asc" },
     severity: { type: "rank", defaultDirection: "desc" },
+    priority: {
+        value: function (alert) {
+            return alertPriorityOrder(alert);
+        },
+        type: "number",
+        defaultDirection: "asc",
+    },
     team: {
         value: function (alert) { return alert.team_slug || ""; },
         type: "text",
@@ -210,6 +217,7 @@ function buildAlertsStateParams() {
 
     appendTableFilterParams(params, "status", getTableFilterValues("#status-filter"));
     appendTableFilterParams(params, "severity", getTableFilterValues("#severity-filter"));
+    appendTableFilterParams(params, "priority", getTableFilterValues("#priority-filter"));
     appendTableFilterParams(params, "service_id", getTableFilterValues("#alerts-service-filter"));
 
     const search = String($("#alerts-search").val() || "").trim();
@@ -337,6 +345,113 @@ function severityLabel(severity) {
     }
     return severity || "-";
 }
+function alertPrioritySlug(alert) {
+    if (!alert) {
+        return "p3";
+    }
+
+    if (alert.priority && alert.priority.slug) {
+        return normalizeAlertValue(alert.priority.slug);
+    }
+
+    return normalizeAlertValue(alert.priority_slug || "p3");
+}
+
+
+function alertPriorityLabel(alert) {
+    const slug = alertPrioritySlug(alert);
+    const priority = alert && alert.priority ? alert.priority : null;
+
+    if (priority && priority.name) {
+        return slug.toUpperCase() + " " + priority.name;
+    }
+
+    if (slug === "p1") {
+        return "P1 Critical";
+    }
+    if (slug === "p2") {
+        return "P2 High";
+    }
+    if (slug === "p3") {
+        return "P3 Medium";
+    }
+    if (slug === "p4") {
+        return "P4 Low";
+    }
+    if (slug === "p5") {
+        return "P5 Informational";
+    }
+
+    return slug ? slug.toUpperCase() : "P3 Medium";
+}
+
+
+function alertPriorityShortLabel(alert) {
+    return alertPrioritySlug(alert).toUpperCase();
+}
+
+
+function alertPriorityOrder(alert) {
+    if (alert && alert.priority && alert.priority.level) {
+        return Number(alert.priority.level) || 3;
+    }
+
+    if (alert && alert.priority_order) {
+        return Number(alert.priority_order) || 3;
+    }
+
+    const slug = alertPrioritySlug(alert);
+    const match = slug.match(/^p([1-5])$/);
+
+    return match ? Number(match[1]) : 3;
+}
+
+
+function priorityBadgeClass(alert) {
+    const slug = alertPrioritySlug(alert);
+
+    if (slug === "p1") {
+        return "ui-pill-critical";
+    }
+    if (slug === "p2") {
+        return "ui-pill-high";
+    }
+    if (slug === "p3") {
+        return "ui-pill-medium";
+    }
+    if (slug === "p4") {
+        return "ui-pill-low";
+    }
+    if (slug === "p5") {
+        return "ui-pill-info";
+    }
+
+    return "ui-pill-muted";
+}
+
+
+function priorityFilterLabel(priority) {
+    const slug = normalizeAlertValue(priority);
+
+    if (slug === "p1") {
+        return "P1 Critical";
+    }
+    if (slug === "p2") {
+        return "P2 High";
+    }
+    if (slug === "p3") {
+        return "P3 Medium";
+    }
+    if (slug === "p4") {
+        return "P4 Low";
+    }
+    if (slug === "p5") {
+        return "P5 Informational";
+    }
+
+    return priority || "-";
+}
+
 
 function statusLabel(status) {
     const value = normalizeAlertValue(status);
@@ -447,17 +562,14 @@ function resetAlertsPagination() {
 
 function renderActiveAlertFilters() {
     const chips = [];
-
     const search = String($("#alerts-search").val() || "").trim();
     const statuses = getTableFilterValues("#status-filter");
     const severities = getTableFilterValues("#severity-filter");
+    const priorities = getTableFilterValues("#priority-filter");
     const serviceIds = getTableFilterValues("#alerts-service-filter");
 
     if (search) {
-        chips.push({
-            label: "Search",
-            value: search
-        });
+        chips.push({ label: "Search", value: search });
     }
 
     if (statuses.length) {
@@ -482,6 +594,17 @@ function renderActiveAlertFilters() {
         });
     }
 
+    if (priorities.length) {
+        chips.push({
+            label: "Priority",
+            value: priorities
+                .map(function (priority) {
+                    return priorityFilterLabel(priority);
+                })
+                .join(", ")
+        });
+    }
+
     if (serviceIds.length) {
         chips.push({
             label: "Service",
@@ -494,14 +617,10 @@ function renderActiveAlertFilters() {
     }
 
     if (typeof selectedTeamId === "function" && selectedTeamId()) {
-        chips.push({
-            label: "Team",
-            value: getSelectedTeamLabel()
-        });
+        chips.push({ label: "Team", value: getSelectedTeamLabel() });
     }
 
     renderTableFilterChips("#alerts-active-filters", chips);
-
     $("#alerts-active-filters").toggle(chips.length > 0);
 }
 function getSelectedTeamLabel() {
@@ -626,10 +745,16 @@ function renderAlertPageRow(alert) {
             makeAlertBadge(severityLabel(alert.severity), severityBadgeClass(alert.severity))
         )
     );
+    row.append(
+        $("<td>").append(
+            makeAlertBadge(alertPriorityShortLabel(alert), priorityBadgeClass(alert))
+                .attr("title", alertPriorityLabel(alert))
+        )
+    );
 
     row.append(
         $("<td>")
-            .append($("<div>").addClass("alerts-team").text(alert.team_slug || "-"))
+            .append($("<div>").addClass("alerts-team").text(alert.team_name || alert.team_slug || "-"))
             .append($("<div>").addClass("table-subtitle").text(alert.route_name || "No route"))
             .append(
                 $("<div>")
@@ -642,7 +767,7 @@ function renderAlertPageRow(alert) {
     row.append($("<td>").text(formatDateTimeMinutes(alertCreatedValue(alert))));
     row.append($("<td>").text(formatDateTimeMinutes(alert.last_seen_at)));
     row.append($("<td>").append(renderEscalationCell(alert)));
-    row.append($("<td>").append(renderReminderCount(alert)));
+    // row.append($("<td>").append(renderReminderCount(alert)));
 
     const actionsCell = $("<td>").addClass("actions-cell");
     const actions = $("<div>").addClass("table-actions");
@@ -723,13 +848,13 @@ function alertServiceDetailsLabel(alert) {
 
     return parts.join(" / ");
 }
-function renderReminderCount(alert) {
-    const count = alert.reminder_count || 0;
-    return $("<span>")
-        .addClass("counter-badge")
-        .toggleClass("is-active", count > 0)
-        .text(count);
-}
+// function renderReminderCount(alert) {
+//     const count = alert.reminder_count || 0;
+//     return $("<span>")
+//         .addClass("counter-badge")
+//         .toggleClass("is-active", count > 0)
+//         .text(count);
+// }
 function renderEscalationModeBadge(alert) {
     const isPolicy = !!alert.escalation_policy_name;
     const label = isPolicy ? "Policy" : "Rotation";
@@ -876,7 +1001,8 @@ function buildAlertDetailsSubtitle(alert) {
         alert.source || null,
         alert.team_slug || null,
         alert.status || null,
-        alert.severity || null
+        alert.severity || null,
+        alertPriorityShortLabel(alert)
     ].filter(Boolean).join(" / ");
 }
 
@@ -1283,9 +1409,10 @@ function renderAlertDetailsSummary(alert, modal) {
     summary.append(detailItem("Group key", alert.group_key));
     summary.append(detailItem("Dedup key", alert.dedup_key));
 
-    summary.append(detailItem("Team", alert.team_slug));
+    summary.append(detailItem("Team", alert.team_name || alert.team_slug));
     summary.append(detailItem("Route", alert.route_name));
     summary.append(detailItem("Service", alertServiceDetailsLabel(alert)));
+    summary.append(detailItem("Priority", alertPriorityLabel(alert)));
     summary.append(detailItem("Service status", alert.service_status));
     summary.append(detailItem("Service criticality", alert.service_criticality));
 
@@ -1523,6 +1650,11 @@ function applyAlertsQueryParams() {
     );
 
     setTableFilterValues(
+        "#priority-filter",
+        getTableFilterParamValues(params, "priority", ["priorities"])
+    );
+
+    setTableFilterValues(
         "#alerts-service-filter",
         getTableFilterParamValues(params, "service_id", ["service_ids"])
     );
@@ -1542,8 +1674,8 @@ $(document).on("click", "#reload-alerts", function () {
     loadAlerts();
 });
 $(document)
-    .off("change.tableFilters", "#status-filter, #severity-filter, #alerts-service-filter")
-    .on("change.tableFilters", "#status-filter, #severity-filter, #alerts-service-filter", function () {
+    .off("change.tableFilters", "#status-filter, #severity-filter, #priority-filter, #alerts-service-filter")
+    .on("change.tableFilters", "#status-filter, #severity-filter, #priority-filter, #alerts-service-filter", function () {
         if (
             typeof isTableFilterSilent === "function"
             && isTableFilterSilent(this)

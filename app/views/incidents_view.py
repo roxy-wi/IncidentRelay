@@ -110,6 +110,7 @@ def list_incidents():
         status=_get_query_values("status"),
         source=_get_query_values("source"),
         severity=_get_query_values("severity"),
+        priority=_get_query_values("priority"),
         service_id=_get_query_values("service_id", int),
         service_slug=request.args.get("service_slug"),
         service_status=request.args.get("service_status"),

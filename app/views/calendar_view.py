@@ -7,7 +7,6 @@ from app.services.calendar_service import build_team_calendar
 from app.services.rbac import parse_date_or_datetime, require_team_oncall_read, require_team_write
 from app.modules.db import calendar_feeds_repo
 from app.services.calendar_feeds import (
-    build_calendar_feed_url,
     build_ics_for_calendar_feed,
     generate_calendar_feed_token,
     get_calendar_feed_by_token,
@@ -216,7 +215,7 @@ def delete_calendar_feed(feed_id):
 
     calendar_feeds_repo.soft_delete_calendar_feed(feed)
 
-    return jsonify({"deleted": True})
+    return jsonify({"deleted": True, "id": feed_id})
 
 
 @calendar_bp.route("/feeds/<token>.ics", methods=["GET"])

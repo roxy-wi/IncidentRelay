@@ -1,5 +1,5 @@
 from app.modules.db.models import AlertEvent, AlertNotification
-from app.services.alerts import upsert_alert
+from app.services.alerts.lifecycle import upsert_alert
 from app.services.notifications.delivery import (
     channel_matches_alert_severity,
     format_alert_message,
@@ -89,7 +89,7 @@ def test_format_alert_message_contains_core_alert_fields(db):
 
     message = format_alert_message(alert_group, event_type="notification")
 
-    assert "NOTIFICATION: DiskFull" in message
+    assert "NOTIFICATION: [P1] DiskFull" in message
     assert "Team: sre" in message
     assert "Status: firing" in message
     assert "Severity: critical" in message

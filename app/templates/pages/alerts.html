@@ -67,11 +67,20 @@
                     <option value="info">Info</option>
                 </select>
 
+            <select id="priority-filter" class="table-filter-select" multiple data-table-multi-select data-placeholder="Priority">
+                <option value="p1">P1 Critical</option>
+                <option value="p2">P2 High</option>
+                <option value="p3">P3 Medium</option>
+                <option value="p4">P4 Low</option>
+                <option value="p5">P5 Informational</option>
+            </select>
+
             <select id="alerts-sort" class="input table-filter-select page-toolbar-filter">
                 <option value="activity_desc">Newest activity</option>
                 <option value="created_desc">Newest created</option>
                 <option value="created_asc">Oldest created</option>
                 <option value="severity_desc">Severity first</option>
+                <option value="priority:asc">Priority first</option>
                 <option value="status_asc">Status</option>
             </select>
         </div>
@@ -85,12 +94,13 @@
               <th data-sort="status">Status</th>
               <th data-sort="title">Alert</th>
               <th data-sort="severity">Severity</th>
+              <th data-sort="priority">Priority</th>
               <th data-sort="team">Team</th>
               <th data-sort="assignee">Assignee</th>
               <th data-sort="created">Created</th>
               <th data-sort="last_seen">Last seen</th>
               <th>Escalations</th>
-              <th data-sort="reminders">Reminders</th>
+{#              <th data-sort="reminders">Reminders</th>#}
               <th class="alerts-actions-th">Actions</th>
           </tr>
         </thead>

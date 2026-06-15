@@ -1,17 +1,16 @@
 from datetime import datetime, timedelta
 
+from app.modules.db import alerts_repo
 from app.modules.db.models import AlertGroup
 from app.settings import Config
-from app.modules.db import alerts_repo
-from app.services import alerts as alerts_service
-from app.services.alerts import upsert_alert
+from app.services.alerts.lifecycle import upsert_alert
+import app.services.alerts.notification_queue as notification_queue
 from tests.factories import create_group, create_route, create_team
 
 
 def _route(group_by=None):
     group = create_group()
     team = create_team(group)
-
     return create_route(
         team,
         source="webhook",
@@ -44,12 +43,11 @@ def _alert(route, alertname, instance, status="firing"):
 
 def test_new_group_schedules_notification_instead_of_sending_immediately(db, monkeypatch):
     route = _route(group_by=["alertname", "severity"])
-
     sent = []
 
     monkeypatch.setattr(Config, "ALERT_GROUP_WAIT_SECONDS", 30)
     monkeypatch.setattr(
-        alerts_service,
+        notification_queue,
         "notify_alert",
         lambda *args, **kwargs: sent.append((args, kwargs)),
     )
@@ -97,15 +95,13 @@ def test_due_group_notification_is_sent(db, monkeypatch):
     alert_group.save()
 
     calls = []
-
     monkeypatch.setattr(
-        alerts_service,
+        notification_queue,
         "notify_alert",
         lambda group, event_type="notification": calls.append((group.id, event_type)) or 1,
     )
 
-    result = alerts_service.process_due_alert_group_notifications()
-
+    result = notification_queue.process_due_alert_group_notifications()
     alert_group = AlertGroup.get_by_id(alert_group.id)
 
     assert result["processed"] == 1
@@ -119,18 +115,16 @@ def test_due_group_notification_is_sent(db, monkeypatch):
 
 def test_group_resolved_before_group_wait_does_not_send_notification(db, monkeypatch):
     route = _route(group_by=["alertname", "severity"])
-
     sent = []
 
     monkeypatch.setattr(Config, "ALERT_GROUP_WAIT_SECONDS", 60)
     monkeypatch.setattr(
-        alerts_service,
+        notification_queue,
         "notify_alert",
         lambda *args, **kwargs: sent.append((args, kwargs)),
     )
 
     group, _ = upsert_alert(_alert(route, "DiskFull", "host1"))
-
     upsert_alert(_alert(route, "DiskFull", "host1", status="resolved"))
 
     group = alerts_repo.get_alert_group(group.id)
@@ -138,7 +132,7 @@ def test_group_resolved_before_group_wait_does_not_send_notification(db, monkeyp
     assert group.status == "resolved"
     assert group.notification_pending is False
 
-    result = alerts_service.process_due_alert_group_notifications()
+    result = notification_queue.process_due_alert_group_notifications()
 
     assert result["sent"] == 0
     assert sent == []
