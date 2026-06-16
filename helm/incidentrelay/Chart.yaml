@@ -1,0 +1,14 @@
+apiVersion: v2
+name: incidentrelay
+description: On-call scheduling, alert routing and incident notification service
+type: application
+version: 0.1.0
+appVersion: "1.0.15-beta"
+home: https://github.com/roxy-wi/IncidentRelay
+sources:
+  - https://github.com/roxy-wi/IncidentRelay
+keywords:
+  - oncall
+  - incident
+  - alerting
+  - notifications

@@ -1,0 +1,44 @@
+IncidentRelay {{ .Chart.AppVersion }} has been deployed.
+
+Components:
+  web        {{ .Values.web.replicaCount }} replica(s)
+  scheduler  {{ .Values.scheduler.enabled | ternary "enabled" "disabled" }}
+  telegram   {{ .Values.telegram.enabled | ternary "enabled" "disabled" }}
+
+Access the web UI:
+{{- if .Values.ingress.enabled }}
+{{- range .Values.ingress.hosts }}
+  http{{ if $.Values.ingress.tls }}s{{ end }}://{{ .host }}
+{{- end }}
+{{- else }}
+  kubectl --namespace {{ .Release.Namespace }} port-forward svc/{{ include "incidentrelay.fullname" . }} {{ .Values.service.port }}:{{ .Values.service.port }}
+  then open http://127.0.0.1:{{ .Values.service.port }}
+{{- end }}
+
+{{- if eq .Values.image.repository "roxywi/incidentrelay" }}
+
+WARNING: image.repository is left at its default ("roxywi/incidentrelay").
+No public image is published under that name yet, so pods will sit in
+ImagePullBackOff. Build the image yourself and set image.repository /
+image.tag to your registry.
+{{- end }}
+
+{{- $dbType := "" }}
+{{- if .Values.config }}{{- if .Values.config.database }}{{- $dbType = .Values.config.database.type | default "" }}{{- end }}{{- end }}
+{{- if eq ($dbType | toString) "sqlite" }}
+
+NOTE: you are running SQLite. All components share one
+PersistentVolumeClaim, which is only safe while every pod runs on the
+same node — SQLite over network-backed ReadWriteMany storage (NFS and
+friends) is a known way to corrupt the database. For any multi-node
+setup switch config.database to PostgreSQL. Migrations run on web pod
+start: keep web.replicaCount at 1, or disable web.runMigrations and
+migrate out of band before scaling.
+{{- end }}
+
+{{- if not .Values.existingConfigSecret }}
+
+NOTE: the application config (including secret_key) is rendered from
+values into Secret "{{ include "incidentrelay.configSecretName" . }}".
+Change the default "change-me" values before exposing the service.
+{{- end }}
