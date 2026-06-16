@@ -630,7 +630,7 @@ def test_update_incident_priority_notifies_stakeholders(client, db, monkeypatch)
     assert len(emails) == 1
     assert emails[0]["recipient"] == "stakeholder@example.com"
     assert "[P1] DiskFull priority changed" in emails[0]["subject"]
-    assert "Incident priority changed: p3 -> P1 Critical" in emails[0]["body"]
+    assert "Incident priority changed: P3 Medium -> P1 Critical" in emails[0]["body"]
     assert "Priority: P1 Critical" in emails[0]["body"]
 
 

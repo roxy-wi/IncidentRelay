@@ -17,7 +17,9 @@ from app.api.schemas.services import (
     ServiceRunbookCreateSchema,
     ServiceRunbookUpdateSchema,
     ServiceUpdateSchema,
-    ServiceAnalyticsQuerySchema
+    ServiceAnalyticsQuerySchema,
+    ServiceOwnerCreateSchema,
+    ServiceOwnerUpdateSchema,
 )
 from app.modules.db import (
     escalation_policies_repo,
@@ -42,6 +44,7 @@ from app.services.serializers import (
     serialize_service_match_rule,
     serialize_service_runbook,
     serialize_utc_datetime,
+    serialize_service_owner,
 )
 from app.services.service_analytics import build_service_analytics_v2
 from app.services.validation import validate_body, validate_query
@@ -542,6 +545,18 @@ def _validate_service_payload(payload):
     return None
 
 
+def _service_owner_data_from_payload(payload):
+    return {
+        "user": payload.user_id,
+        "role": payload.role,
+        "active": payload.active,
+        "notify_on_created": payload.notify_on_created,
+        "notify_on_priority_change": payload.notify_on_priority_change,
+        "notify_on_status_change": payload.notify_on_status_change,
+        "notify_on_resolved": payload.notify_on_resolved,
+    }
+
+
 def _service_data_from_payload(payload):
     return {
         "team": payload.team_id,
@@ -764,6 +779,164 @@ def delete_service(service_id):
     )
 
     return jsonify({"deleted": True, "id": service.id})
+
+
+@services_bp.route("/<int:service_id>/owners", methods=["GET"])
+def list_service_owners(service_id):
+    """Return service owners/default stakeholders."""
+    service = services_repo.get_service(service_id)
+
+    error = require_team_read(service.team_id)
+    if error:
+        return error
+
+    include_inactive = request.args.get("include_inactive") == "1"
+
+    return jsonify([
+        serialize_service_owner(owner, current_user())
+        for owner in services_repo.list_service_owners(
+            service_id,
+            active_only=not include_inactive,
+        )
+    ])
+
+
+@services_bp.route("/<int:service_id>/owners", methods=["POST"])
+def create_service_owner(service_id):
+    """Create a service owner/default stakeholder."""
+    service = services_repo.get_service(service_id)
+
+    error = require_team_write(service.team_id)
+    if error:
+        return error
+
+    payload, error = validate_body(ServiceOwnerCreateSchema)
+    if error:
+        return error
+
+    try:
+        owner, created = services_repo.create_service_owner(
+            service_id,
+            _service_owner_data_from_payload(payload),
+        )
+    except DoesNotExist:
+        return _json_error(
+            "user_not_found",
+            "User was not found",
+            404,
+            user_id=payload.user_id,
+        )
+    except IntegrityError:
+        return integrity_conflict(
+            "Service owner could not be saved because it conflicts with "
+            "existing data"
+        )
+
+    write_audit(
+        "service_owner.create" if created else "service_owner.update",
+        object_type="service_owner",
+        object_id=owner.id,
+        group_id=service.group_id,
+        team_id=service.team_id,
+        data=payload.model_dump(),
+    )
+
+    return (
+        jsonify(serialize_service_owner(owner, current_user())),
+        201 if created else 200,
+    )
+
+
+@services_bp.route("/<int:service_id>/owners/<int:owner_id>", methods=["PUT"],)
+def update_service_owner(service_id, owner_id):
+    """Update a service owner/default stakeholder."""
+    service = services_repo.get_service(service_id)
+
+    error = require_team_write(service.team_id)
+    if error:
+        return error
+
+    owner_before = services_repo.get_service_owner_for_service(
+        service_id,
+        owner_id,
+    )
+
+    if not owner_before:
+        return _json_error(
+            "service_owner_not_found",
+            "Service owner was not found",
+            404,
+            owner_id=owner_id,
+        )
+
+    payload, error = validate_body(ServiceOwnerUpdateSchema)
+    if error:
+        return error
+
+    try:
+        owner = services_repo.update_service_owner(
+            owner_id,
+            _service_owner_data_from_payload(payload),
+        )
+    except DoesNotExist:
+        return _json_error(
+            "user_not_found",
+            "User was not found",
+            404,
+            user_id=payload.user_id,
+        )
+    except IntegrityError:
+        return integrity_conflict(
+            "Service owner could not be saved because it conflicts with "
+            "existing data"
+        )
+
+    write_audit(
+        "service_owner.update",
+        object_type="service_owner",
+        object_id=owner.id,
+        group_id=service.group_id,
+        team_id=service.team_id,
+        data=payload.model_dump(),
+    )
+
+    return jsonify(serialize_service_owner(owner, current_user()))
+
+
+@services_bp.route("/<int:service_id>/owners/<int:owner_id>", methods=["DELETE"],)
+def delete_service_owner(service_id, owner_id):
+    """Deactivate a service owner/default stakeholder."""
+    service = services_repo.get_service(service_id)
+
+    error = require_team_write(service.team_id)
+    if error:
+        return error
+
+    owner_before = services_repo.get_service_owner_for_service(
+        service_id,
+        owner_id,
+    )
+
+    if not owner_before:
+        return _json_error(
+            "service_owner_not_found",
+            "Service owner was not found",
+            404,
+            owner_id=owner_id,
+        )
+
+    owner = services_repo.deactivate_service_owner(owner_id)
+
+    write_audit(
+        "service_owner.delete",
+        object_type="service_owner",
+        object_id=owner.id,
+        group_id=service.group_id,
+        team_id=service.team_id,
+        data={"active": False},
+    )
+
+    return jsonify({"deleted": True, "id": owner.id})
 
 
 @services_bp.route("/match-rules", methods=["GET"])

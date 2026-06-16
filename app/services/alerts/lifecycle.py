@@ -15,6 +15,7 @@ from app.services.routing.routing import find_route_for_alert, build_group_key
 from app.services.routing.service_resolution import get_effective_escalation_policy, resolve_alert_service, \
     get_effective_route_rotation
 from app.services.silences import find_active_silence
+from app.services.incidents import notify_stakeholders
 
 logger = logging.getLogger("oncall.alerts")
 
@@ -22,7 +23,10 @@ logger = logging.getLogger("oncall.alerts")
 def _add_service_stakeholders_for_new_group(group):
     """Auto-add service stakeholders to a newly created incident."""
     try:
-        incidents_repo.add_service_stakeholders_to_incident(group)
+        stakeholders = incidents_repo.add_service_stakeholders_to_incident(group)
+
+        if stakeholders:
+            notify_stakeholders(group, "created")
     except Exception as exc:
         logger.exception(
             "failed to auto-add service stakeholders to incident",
@@ -210,6 +214,7 @@ def upsert_alert(alert_data):
                 maintenance_decision,
             )
 
+        old_group_status = group.status
         existing_alert, previous_status = alerts_repo.update_alert_from_payload(
             existing_alert,
             alert_data,
@@ -265,6 +270,8 @@ def upsert_alert(alert_data):
             if group.status == "resolved":
                 alerts_repo.clear_alert_group_notification(group)
 
+                if old_group_status != "resolved":
+                    notify_stakeholders(group, "resolved", old_value=old_group_status)
                 if group.last_notification_at:
                     notify_alert(group, event_type="resolved")
 

@@ -137,12 +137,14 @@ Choose the installation method that matches your environment.
 Recommended for quick start, testing, and simple self-hosted deployments.
 
 ```bash
+cd docker
 docker compose up -d --build
 ```
 
 With PostgreSQL:
 
 ```bash
+cd docker
 docker compose \
   -f docker-compose.yml \
   -f docker-compose.postgres.yml \

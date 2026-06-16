@@ -2,7 +2,7 @@ import json
 from datetime import datetime
 
 from app.modules.sso.saml_security import get_saml_security
-from app.modules.db import maintenance_repo
+from app.modules.db import maintenance_repo, services_repo
 from app.modules.common import as_naive_datetime, as_utc_aware
 
 
@@ -316,6 +316,13 @@ def serialize_service(service, current_user=None):
             team_id=service.team_id,
             service_id=service.id,
         ),
+        "owners": [
+            serialize_service_owner(owner, current_user)
+            for owner in services_repo.list_service_owners(
+                service.id,
+                active_only=True,
+            )
+        ],
     }
 
     return attach_team_permissions(data, service.team_id, current_user)
@@ -787,6 +794,35 @@ def serialize_service_link(link, current_user=None):
     )
 
 
+def serialize_service_owner(owner, current_user=None):
+    """Serialize a service owner."""
+    service = owner.service
+    user = owner.user
+
+    return {
+        "id": owner.id,
+        "service_id": service.id if service else None,
+        "team_id": service.team_id if service else None,
+        "group_id": service.group_id if service else None,
+        "user_id": user.id if user else None,
+        "username": user.username if user else None,
+        "user_email": user.email if user else None,
+        "user_display_name": getattr(user, "display_name", None)
+        if user
+        else None,
+        "role": owner.role,
+        "active": owner.active,
+        "notify_on_created": bool(getattr(owner, "notify_on_created", True)),
+        "notify_on_priority_change": bool(getattr(owner, "notify_on_priority_change", True)),
+        "notify_on_status_change": bool(getattr(owner, "notify_on_status_change", True)),
+        "notify_on_resolved": bool(getattr(owner, "notify_on_resolved", True)),
+        "notify_on_comment": bool(getattr(owner, "notify_on_comment", True)),
+        "created_at": owner.created_at.isoformat()
+        if owner.created_at
+        else None,
+    }
+
+
 def serialize_service_runbook(runbook, current_user=None):
     """Serialize a service runbook."""
     service = runbook.service
@@ -1055,63 +1091,6 @@ def serialize_alert_comment(comment):
 def serialize_incident_responder(responder):
     return {
         "id": responder.id,
-        "group_id": responder.group_id,
-        "target_type": responder.target_type,
-        "target_user_id": responder.target_user_id,
-        "target_team_id": responder.target_team_id,
-        "target_rotation_id": responder.target_rotation_id,
-        "target_escalation_policy_id": responder.target_escalation_policy_id,
-        "requested_by_id": responder.requested_by_id,
-        "status": responder.status,
-        "message": responder.message,
-        "created_at": responder.created_at.isoformat() if responder.created_at else None,
-        "updated_at": responder.updated_at.isoformat() if responder.updated_at else None,
-        "responded_at": responder.responded_at.isoformat() if responder.responded_at else None,
-    }
-
-
-def serialize_incident_stakeholder(stakeholder):
-    user = stakeholder.user if stakeholder.user_id else None
-
-    return {
-        "id": stakeholder.id,
-        "group_id": stakeholder.group_id,
-        "user_id": stakeholder.user_id,
-        "user": {
-            "id": user.id,
-            "username": user.username,
-            "display_name": user.display_name,
-            "email": user.email,
-        } if user else None,
-        "email": stakeholder.email,
-        "display_name": stakeholder.display_name,
-        "role": stakeholder.role,
-        "source": stakeholder.source,
-        "notify": stakeholder.notify,
-        "created_at": stakeholder.created_at.isoformat() if stakeholder.created_at else None,
-        "updated_at": stakeholder.updated_at.isoformat() if stakeholder.updated_at else None,
-    }
-
-
-def serialize_incident_priority(priority):
-    if not priority:
-        return None
-
-    return {
-        "id": priority.id,
-        "slug": priority.slug,
-        "name": priority.name,
-        "description": priority.description,
-        "level": priority.level,
-        "color": priority.color,
-        "enabled": priority.enabled,
-        "default": priority.default,
-    }
-
-
-def serialize_incident_responder(responder):
-    return {
-        "id": responder.id,
         "incident_id": responder.group_id,
         "target_type": responder.target_type,
         "target_user_id": responder.target_user_id,
@@ -1155,6 +1134,7 @@ def serialize_incident_stakeholder(stakeholder):
         "notify_on_priority_change": stakeholder.notify_on_priority_change,
         "notify_on_status_change": stakeholder.notify_on_status_change,
         "notify_on_resolved": stakeholder.notify_on_resolved,
+        "notify_on_comment": bool(getattr(stakeholder, "notify_on_comment", True)),
         "active": stakeholder.active,
         "created_by_id": stakeholder.created_by_id,
         "created_at": stakeholder.created_at.isoformat() if stakeholder.created_at else None,

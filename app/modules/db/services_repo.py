@@ -8,6 +8,8 @@ from app.modules.db.models import (
     ServiceRunbook,
     ServiceStatusHistory,
     Team,
+    ServiceOwner,
+    User,
 )
 
 
@@ -482,3 +484,117 @@ def list_service_status_history(service_id, *, limit=20):
         .order_by(ServiceStatusHistory.created_at.desc(), ServiceStatusHistory.id.desc())
         .limit(limit)
     )
+
+
+def list_service_owners(service_id, active_only=True):
+    """Return service owners for a service."""
+    query = (
+        ServiceOwner
+        .select(ServiceOwner, User)
+        .join(User)
+        .where(ServiceOwner.service == service_id)
+        .order_by(ServiceOwner.role, User.username, ServiceOwner.id)
+    )
+
+    if active_only:
+        query = query.where(ServiceOwner.active == True)  # noqa: E712
+
+    return list(query)
+
+
+def get_service_owner(owner_id):
+    """Return one service owner."""
+    return ServiceOwner.get_by_id(owner_id)
+
+
+def get_service_owner_for_service(service_id, owner_id):
+    """Return one service owner belonging to a service."""
+    return ServiceOwner.get_or_none(
+        ServiceOwner.id == owner_id,
+        ServiceOwner.service == service_id,
+    )
+
+
+def find_service_owner(service_id, user_id, role):
+    """Return existing service owner for user/role."""
+    return ServiceOwner.get_or_none(
+        ServiceOwner.service == service_id,
+        ServiceOwner.user == user_id,
+        ServiceOwner.role == role,
+    )
+
+
+def create_service_owner(service_id, data):
+    """Create or reactivate a service owner."""
+    User.get_by_id(data["user"])
+
+    existing = find_service_owner(
+        service_id,
+        data["user"],
+        data.get("role") or "owner",
+    )
+
+    if existing:
+        existing.active = data.get("active", True)
+        existing.notify_on_created = data.get("notify_on_created", True)
+        existing.notify_on_priority_change = data.get(
+            "notify_on_priority_change",
+            True,
+        )
+        existing.notify_on_status_change = data.get(
+            "notify_on_status_change",
+            True,
+        )
+        existing.notify_on_resolved = data.get("notify_on_resolved", True)
+        existing.save()
+
+        return existing, False
+
+    owner = ServiceOwner.create(
+        service=service_id,
+        user=data["user"],
+        role=data.get("role") or "owner",
+        active=data.get("active", True),
+        notify_on_created=data.get("notify_on_created", True),
+        notify_on_priority_change=data.get("notify_on_priority_change", True),
+        notify_on_status_change=data.get("notify_on_status_change", True),
+        notify_on_resolved=data.get("notify_on_resolved", True),
+        notify_on_comment=data.get("notify_on_comment", True),
+    )
+
+    return owner, True
+
+
+def update_service_owner(owner_id, data):
+    """Update a service owner."""
+    owner = get_service_owner(owner_id)
+
+    User.get_by_id(data["user"])
+
+    owner.user = data["user"]
+    owner.role = data.get("role") or "owner"
+    owner.active = data.get("active", True)
+    owner.notify_on_created = data.get("notify_on_created", True)
+    owner.notify_on_priority_change = data.get(
+        "notify_on_priority_change",
+        True,
+    )
+    owner.notify_on_status_change = data.get(
+        "notify_on_status_change",
+        True,
+    )
+    owner.notify_on_resolved = data.get("notify_on_resolved", True)
+    if "notify_on_comment" in data:
+        owner.notify_on_comment = bool(data.get("notify_on_comment"))
+    owner.save()
+
+    return owner
+
+
+def deactivate_service_owner(owner_id):
+    """Deactivate a service owner."""
+    owner = get_service_owner(owner_id)
+    owner.active = False
+    owner.save()
+
+    return owner

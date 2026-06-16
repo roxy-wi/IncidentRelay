@@ -13,12 +13,12 @@ RUN apt-get update \
         libpq-dev \
     && rm -rf /var/lib/apt/lists/*
 
-COPY ../requirements.txt /opt/incidentrelay/requirements.txt
+COPY requirements.txt /opt/incidentrelay/requirements.txt
 
 RUN pip install --no-cache-dir -r requirements.txt \
     && pip install --no-cache-dir gunicorn psycopg2-binary
 
-COPY .. /opt/incidentrelay
+COPY . /opt/incidentrelay
 
 RUN mkdir -p \
       /etc/incidentrelay \
@@ -27,7 +27,7 @@ RUN mkdir -p \
       /usr/local/lib/incidentrelay/voice_providers
 
 COPY docker/incidentrelay.docker.conf /etc/incidentrelay/incidentrelay.conf
-COPY entrypoint.sh /entrypoint.sh
+COPY docker/entrypoint.sh /entrypoint.sh
 
 RUN chmod +x /entrypoint.sh
 

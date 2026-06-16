@@ -13,6 +13,7 @@ from app.modules.db.models import (
 )
 from app.db import database_proxy as db
 from app.services.audit import write_audit
+from app.modules.common import truncate_text
 from app.services.links import build_alert_web_url
 from app.settings import Config
 from app.services.alerts.priority import (
@@ -259,6 +260,141 @@ def send_alert_push_to_user(user, group, event_type="notification"):
                 extra={
                     "extra": {
                         "event_type": "browser_push_failed",
+                        "user_id": user.id,
+                        "subscription_id": subscription.id,
+                        "status_code": status_code,
+                        "error": str(exc),
+                    }
+                },
+            )
+
+    return sent
+
+
+def build_stakeholder_alert_push_payload(
+    group,
+    event_type="incident_created",
+    context=None,
+):
+    """Build browser push payload for incident stakeholders.
+
+    Stakeholder push notifications are informational and do not include
+    ack/resolve action tokens.
+    """
+    normalized_event_type = (event_type or "").lower()
+
+    if normalized_event_type in {"created", "incident_created", "notification"}:
+        title = f"INCIDENT CREATED: {format_alert_title_with_priority(group)}"
+        body = (
+            group.message
+            or f"Priority: {alert_priority_label(group)}"
+        )
+    elif normalized_event_type in {
+            "priority_changed",
+            "incident_priority_changed",
+        }:
+        title = f"PRIORITY CHANGED: {format_alert_title_with_priority(group)}"
+        body = f"Priority: {alert_priority_label(group)}"
+    elif normalized_event_type in {
+        "status_changed",
+        "incident_status_changed",
+        "acknowledged",
+    }:
+        title = f"STATUS CHANGED: {format_alert_title_with_priority(group)}"
+        body = f"Status: {group.status or '-'}"
+    elif normalized_event_type in {"resolved", "incident_resolved"}:
+        title = f"RESOLVED: {format_alert_title_with_priority(group)}"
+        body = group.message or "Incident has been resolved."
+    elif normalized_event_type in {
+        "comment_added",
+        "incident_comment_added",
+    }:
+        context = context or {}
+        author_name = context.get("author_name") or "Unknown user"
+        comment_body = truncate_text(context.get("comment_body"), limit=180)
+
+        title = f"COMMENT: {format_alert_title_with_priority(group)}"
+
+        if comment_body:
+            body = f"{author_name}: {comment_body}"
+        else:
+            body = f"{author_name} added a comment."
+    else:
+        title = format_alert_title_with_priority(group)
+        body = group.message or f"Priority: {alert_priority_label(group)}"
+
+    return {
+        "title": title,
+        "body": body,
+        "alert_id": group.id,
+        "alert_group_id": group.id,
+        "alert_title": group.title,
+        "status": group.status,
+        "severity": group.severity,
+        "priority": getattr(group, "priority_slug", None) or "p3",
+        "priority_label": alert_priority_label(group),
+        "url": build_alert_web_url(group) or f"/alerts/{group.id}",
+        "tag": f"incidentrelay-stakeholder-alert-group-{group.id}",
+        "require_interaction": True,
+        "renotify": True,
+        "silent": False,
+        "vibrate": [300, 100, 300],
+        "event_type": event_type,
+        "action_tokens": {},
+    }
+
+
+def send_stakeholder_push_to_user(
+    user,
+    group,
+    event_type="incident_created",
+    context=None,
+):
+    """Send informational browser push notification to a stakeholder user."""
+    if not Config.BROWSER_PUSH_ENABLED:
+        return 0
+
+    if not user:
+        return 0
+
+    subscriptions = _active_user_subscriptions(user.id)
+
+    if not subscriptions:
+        return 0
+
+    payload = build_stakeholder_alert_push_payload(
+        group,
+        event_type=event_type,
+        context=context,
+    )
+
+    sent = 0
+
+    for subscription in subscriptions:
+        try:
+            _webpush(subscription, payload)
+            subscription.last_seen_at = datetime.utcnow()
+            subscription.save()
+            sent += 1
+        except WebPushException as exc:
+            status_code = getattr(
+                getattr(exc, "response", None),
+                "status_code",
+                None,
+            )
+
+            if status_code in {404, 410}:
+                subscription.enabled = False
+                subscription.deleted = True
+                subscription.deleted_at = datetime.utcnow()
+                subscription.updated_at = datetime.utcnow()
+                subscription.save()
+
+            logger.warning(
+                "stakeholder browser push failed",
+                extra={
+                    "extra": {
+                        "event_type": "stakeholder_browser_push_failed",
                         "user_id": user.id,
                         "subscription_id": subscription.id,
                         "status_code": status_code,

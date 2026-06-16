@@ -399,6 +399,7 @@ function renderServiceDetailsPayload(payload) {
     );
 
     body.append(renderServiceDetailsQuickActions(payload));
+    body.append(renderServiceDetailsOwners(payload));
     body.append(renderServiceDetailsImpact(payload));
     body.append(renderServiceDetailsMaintenance(payload));
     body.append(renderServiceDetailsRunbooks(payload));
@@ -532,6 +533,15 @@ function renderServiceDetailsQuickActions(payload) {
             fillServiceSelect("#service-link-service", service.id);
             $("#service-link-service").prop("disabled", true);
             openAppModal("#service-link-modal");
+        },
+    });
+
+    appendIconActionIfAllowed(actions, service, {
+        required: "write",
+        icon: "fas fa-users",
+        label: "Add stakeholder",
+        onClick: function () {
+            openCreateServiceOwnerModal(service);
         },
     });
 
@@ -1667,13 +1677,17 @@ $(document).on("click", "#close-service-dependency-modal", function () {
     closeAppModal("#service-dependency-modal");
 });
 
-$(document).on("click", "#service-form-modal, #service-link-modal, #service-runbook-modal, #service-dependency-modal", function (event) {
-    if (event.target !== this) {
-        return;
-    }
+$(document).on(
+    "click",
+    "#service-form-modal, #service-link-modal, #service-runbook-modal, #service-dependency-modal, #service-owner-modal",
+    function (event) {
+        if (event.target !== this) {
+            return;
+        }
 
-    closeAppModal("#" + this.id);
-});
+        closeAppModal("#" + this.id);
+    }
+);
 function refreshServiceAnalytics() {
     const days = Number($("#service-analytics-days").val() || 30);
     const separator = selectedTeamQuery() ? "&" : "?";
@@ -3114,3 +3128,306 @@ function formatAnalyticsBucketLabel(value) {
 
     return String(value);
 }
+
+function serviceOwnerDisplayName(owner) {
+    return (
+        owner.user_display_name
+        || owner.username
+        || owner.user_email
+        || ("User #" + owner.user_id)
+        || "-"
+    );
+}
+
+
+function serviceOwnerNotificationText(owner) {
+    const flags = [];
+
+    if (owner.notify_on_created) {
+        flags.push("created");
+    }
+    if (owner.notify_on_priority_change) {
+        flags.push("priority");
+    }
+    if (owner.notify_on_status_change) {
+        flags.push("status");
+    }
+    if (owner.notify_on_resolved) {
+        flags.push("resolved");
+    }
+    if (owner.notify_on_comment) {
+        flags.push("comments");
+    }
+
+    return flags.length ? flags.join(", ") : "off";
+}
+
+
+function renderServiceDetailsOwners(payload) {
+    const service = payload.service || {};
+    const owners = asArray(service.owners || payload.owners);
+
+    const section = serviceDetailsSection(
+        "Default stakeholders",
+        "Service owners copied to new incidents as incident stakeholders."
+    );
+
+    const actions = $("<div>").addClass("details-actions");
+
+    appendIconActionIfAllowed(actions, service, {
+        required: "write",
+        icon: "fas fa-plus",
+        label: "Add stakeholder",
+        onClick: function () {
+            openCreateServiceOwnerModal(service);
+        },
+    });
+
+    section.append(actions);
+
+    if (!owners.length) {
+        section.append(
+            $("<div>")
+                .addClass("empty-state")
+                .text("No default stakeholders.")
+        );
+
+        return section;
+    }
+
+    const table = $("<table>").addClass("data-table");
+
+    table.append(
+        $("<thead>").append(
+            $("<tr>")
+                .append($("<th>").text("User"))
+                .append($("<th>").text("Role"))
+                .append($("<th>").text("Notifications"))
+                .append($("<th>").text("Active"))
+                .append($("<th>").text("Actions"))
+        )
+    );
+
+    const tbody = $("<tbody>");
+
+    owners.forEach(function (owner) {
+        tbody.append(renderServiceOwnerRow(service, owner));
+    });
+
+    table.append(tbody);
+
+    section.append(
+        $("<div>")
+            .addClass("table-wrapper")
+            .append(table)
+    );
+
+    return section;
+}
+
+function renderServiceOwnerRow(service, owner) {
+    const row = $("<tr>");
+
+    row.append(
+        $("<td>")
+            .addClass("table-cell-truncate")
+            .attr("title", serviceOwnerDisplayName(owner))
+            .text(serviceOwnerDisplayName(owner))
+    );
+
+    row.append(
+        $("<td>").text(owner.role || "owner")
+    );
+
+    row.append(
+        $("<td>").text(serviceOwnerNotificationText(owner))
+    );
+
+    row.append(
+        $("<td>").append(
+            renderStatusBadge(
+                !!owner.active,
+                "Active",
+                "Inactive"
+            )
+        )
+    );
+
+    row.append(
+        $("<td>")
+            .addClass("actions-cell")
+            .append(renderServiceOwnerActions(service, owner))
+    );
+
+    return row;
+}
+
+
+function renderServiceOwnerActions(service, owner) {
+    return makeActionMenu({
+        object: service,
+        items: [
+            {
+                label: "Edit",
+                icon: "fas fa-edit",
+                required: "write",
+                onClick: function () {
+                    editServiceOwner(service, owner);
+                },
+            },
+            {
+                label: "Delete",
+                icon: "fas fa-trash",
+                required: "write",
+                danger: true,
+                onClick: function () {
+                    deleteServiceOwner(service, owner);
+                },
+            },
+        ],
+    });
+}
+
+
+function resetServiceOwnerForm() {
+    $("#service-owner-form-title").text("Add default stakeholder");
+    $("#service-owner-id").val("");
+    $("#service-owner-service-id").val("");
+    $("#service-owner-role").val("owner");
+    $("#service-owner-active").prop("checked", true);
+    $("#service-owner-notify-created").prop("checked", true);
+    $("#service-owner-notify-priority").prop("checked", true);
+    $("#service-owner-notify-status").prop("checked", true);
+    $("#service-owner-notify-resolved").prop("checked", true);
+    $("#service-owner-notify-comment").prop("checked", true);
+
+    fillUserSelect("#service-owner-user", null, "/api/users?all=1");
+}
+
+
+function openCreateServiceOwnerModal(service) {
+    resetServiceOwnerForm();
+
+    $("#service-owner-service-id").val(service.id);
+    $("#service-owner-user").prop("disabled", false);
+
+    openAppModal("#service-owner-modal");
+}
+
+
+function editServiceOwner(service, owner) {
+    resetServiceOwnerForm();
+
+    $("#service-owner-form-title").text("Edit default stakeholder");
+    $("#service-owner-id").val(owner.id);
+    $("#service-owner-service-id").val(service.id);
+    $("#service-owner-role").val(owner.role || "owner");
+    $("#service-owner-active").prop("checked", !!owner.active);
+    $("#service-owner-notify-created").prop("checked", !!owner.notify_on_created);
+    $("#service-owner-notify-priority").prop(
+        "checked",
+        !!owner.notify_on_priority_change
+    );
+    $("#service-owner-notify-status").prop(
+        "checked",
+        !!owner.notify_on_status_change
+    );
+    $("#service-owner-notify-resolved").prop(
+        "checked",
+        !!owner.notify_on_resolved
+    );
+    $("#service-owner-notify-comment").prop(
+        "checked",
+        !!owner.notify_on_comment
+    );
+
+    fillUserSelect("#service-owner-user", function () {
+        $("#service-owner-user").val(String(owner.user_id || ""));
+    }, "/api/users?all=1");
+
+    openAppModal("#service-owner-modal");
+}
+
+
+function collectServiceOwnerPayload() {
+    return {
+        user_id: Number($("#service-owner-user").val()),
+        role: $("#service-owner-role").val() || "owner",
+        active: $("#service-owner-active").is(":checked"),
+        notify_on_created: $("#service-owner-notify-created").is(":checked"),
+        notify_on_priority_change: $("#service-owner-notify-priority").is(":checked"),
+        notify_on_status_change: $("#service-owner-notify-status").is(":checked"),
+        notify_on_resolved: $("#service-owner-notify-resolved").is(":checked"),
+        notify_on_comment: $("#service-owner-notify-comment").is(":checked"),
+    };
+}
+
+
+function saveServiceOwner() {
+    const serviceId = Number($("#service-owner-service-id").val());
+    const ownerId = $("#service-owner-id").val();
+    const payload = collectServiceOwnerPayload();
+
+    if (!serviceId) {
+        showAppError("Service is required.");
+        return;
+    }
+
+    if (!payload.user_id) {
+        showAppError("User is required.");
+        return;
+    }
+
+    if (ownerId) {
+        apiPut(
+            "/api/services/" + encodeURIComponent(serviceId)
+            + "/owners/" + encodeURIComponent(ownerId),
+            payload,
+            function () {
+                closeAppModal("#service-owner-modal");
+                refreshServiceContextAfterDetailsChange();
+            }
+        );
+
+        return;
+    }
+
+    apiPost(
+        "/api/services/" + encodeURIComponent(serviceId) + "/owners",
+        payload,
+        function () {
+            closeAppModal("#service-owner-modal");
+            refreshServiceContextAfterDetailsChange();
+        }
+    );
+}
+
+
+function deleteServiceOwner(service, owner) {
+    showAppConfirm({
+        title: "Delete this default stakeholder?",
+        message: (
+            "Delete default stakeholder \""
+            + serviceOwnerDisplayName(owner)
+            + "\" from service \""
+            + (service.name || service.slug || service.id)
+            + "\"?"
+        ),
+        confirmText: "Delete",
+        confirmClass: "btn-danger",
+    }).done(function () {
+        apiDelete(
+            "/api/services/" + encodeURIComponent(service.id)
+            + "/owners/" + encodeURIComponent(owner.id),
+            function () {
+                refreshServiceContextAfterDetailsChange();
+            }
+        );
+    });
+}
+$(document).on("click", "#save-service-owner", saveServiceOwner);
+$(document).on("click", "#reset-service-owner-form", resetServiceOwnerForm);
+
+$(document).on("click", "#close-service-owner-modal", function () {
+    closeAppModal("#service-owner-modal");
+});

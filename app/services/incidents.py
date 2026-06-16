@@ -1,14 +1,17 @@
 import smtplib
 from email.message import EmailMessage
 
+from app.modules.common import truncate_text
 from app.modules.db import alerts_repo, incidents_repo
 from app import Config
 from app.services.alerts.priority import (
+    PRIORITY_DISPLAY_LABELS,
     alert_priority_label,
     format_alert_title_with_priority,
 )
 from app.services.links import build_alert_web_url
 from app.services.notifications.delivery import update_alert_messages
+from app.notifiers.browser_push import service as browser_push
 
 
 VALID_RESPONDER_TARGETS = {
@@ -34,6 +37,269 @@ VALID_STAKEHOLDER_ROLES = {
     "customer_success",
     "custom",
 }
+
+STAKEHOLDER_NOTIFICATION_EVENTS = {
+    "created": {
+        "flag": "notify_on_created",
+        "subject_suffix": "created",
+        "push_event_type": "incident_created",
+        "failure_label": "incident-created",
+    },
+    "priority_changed": {
+        "flag": "notify_on_priority_change",
+        "subject_suffix": "priority changed",
+        "push_event_type": "priority_changed",
+        "failure_label": "priority change",
+    },
+    "status_changed": {
+        "flag": "notify_on_status_change",
+        "subject_suffix": "status changed",
+        "push_event_type": "status_changed",
+        "failure_label": "status change",
+    },
+    "resolved": {
+        "flag": "notify_on_resolved",
+        "subject_suffix": "resolved",
+        "push_event_type": "incident_resolved",
+        "failure_label": "resolved",
+    },
+    "comment_added": {
+        "flag": "notify_on_comment",
+        "subject_suffix": "new comment",
+        "push_event_type": "incident_comment_added",
+        "failure_label": "comment",
+    },
+}
+
+
+def _stakeholder_comment_lines(context):
+    context = context or {}
+
+    author_name = context.get("author_name") or "Unknown user"
+    comment_body = context.get("comment_body") or ""
+    comment_target = context.get("comment_target") or "incident"
+
+    return [
+        f"Comment target: {comment_target}",
+        f"Author: {author_name}",
+        "",
+        "Comment:",
+        comment_body,
+    ]
+
+
+def _stakeholder_notification_config(event_type):
+    config = STAKEHOLDER_NOTIFICATION_EVENTS.get(event_type)
+
+    if not config:
+        raise ValueError(f"unknown stakeholder notification event: {event_type}")
+
+    return config
+
+
+def _priority_label_from_slug(priority_slug):
+    slug = str(priority_slug or "").strip().lower()
+
+    if not slug:
+        return "-"
+
+    return PRIORITY_DISPLAY_LABELS.get(slug, slug.upper())
+
+
+def _stakeholder_notification_headline(group, event_type, old_value=None):
+    incident_title = format_alert_title_with_priority(group)
+
+    if event_type == "created":
+        return f"New incident created: {incident_title}"
+
+    if event_type == "priority_changed":
+        return (
+            "Incident priority changed: "
+            f"{_priority_label_from_slug(old_value)} -> {alert_priority_label(group)}"
+        )
+
+    if event_type == "comment_added":
+        context = old_value or {}
+        author_name = context.get("author_name") or "Unknown user"
+        comment_body = truncate_text(context.get("comment_body"), limit=140)
+
+        if comment_body:
+            return f"New comment from {author_name}: {comment_body}"
+
+        return f"New comment from {author_name}"
+
+    if event_type == "status_changed":
+        return (
+            "Incident status changed: "
+            f"{old_value or '-'} -> {group.status or '-'}"
+        )
+
+    if event_type == "resolved":
+        return f"Incident resolved: {incident_title}"
+
+    return f"Incident updated: {incident_title}"
+
+
+def build_stakeholder_notification_email(group, event_type, old_value=None):
+    """Build subject and body for a stakeholder notification."""
+    config = _stakeholder_notification_config(event_type)
+
+    subject = (
+        "[IncidentRelay] "
+        f"{format_alert_title_with_priority(group)} {config['subject_suffix']}"
+    )
+
+    alert_url = build_alert_web_url(group) or "-"
+    team = group.team.slug if group.team else "-"
+    service = getattr(group.service, "name", None) if group.service else None
+    extra_lines = []
+
+    if event_type == "comment_added":
+        extra_lines = [""] + _stakeholder_comment_lines(old_value)
+
+    body = "\n".join([
+        _stakeholder_notification_headline(
+            group,
+            event_type,
+            old_value=old_value,
+        ),
+        "",
+        f"Incident: {format_alert_title_with_priority(group)}",
+        f"Status: {group.status or '-'}",
+        f"Severity: {group.severity or '-'}",
+        f"Priority: {alert_priority_label(group)}",
+        f"Team: {team}",
+        f"Service: {service or '-'}",
+        *extra_lines,
+        f"URL: {alert_url}",
+        "",
+        "You are receiving this email because you are an incident stakeholder.",
+    ])
+
+    return subject, body
+
+
+def notify_stakeholders(group, event_type, old_value=None, skip_user_id=None):
+    """Notify incident stakeholders for one incident event.
+
+    Sends email and browser push when possible. The corresponding notify_on_*
+    flag controls both channels for this event.
+    """
+    config = _stakeholder_notification_config(event_type)
+    stakeholders = incidents_repo.list_incident_stakeholders(group.id)
+
+    sent = 0
+    skipped = 0
+    failed = 0
+
+    subject, body = build_stakeholder_notification_email(
+        group,
+        event_type,
+        old_value=old_value,
+    )
+
+    for stakeholder in stakeholders:
+        if skip_user_id and getattr(stakeholder, "user_id", None) == skip_user_id:
+            skipped += 1
+            continue
+
+        if not getattr(stakeholder, config["flag"], True):
+            skipped += 1
+            continue
+
+        delivered = False
+        recipient = stakeholder_email(stakeholder)
+
+        if recipient:
+            try:
+                send_stakeholder_email(recipient, subject, body)
+                sent += 1
+                delivered = True
+            except Exception as exc:
+                failed += 1
+                alerts_repo.create_alert_event(
+                    group_id=group.id,
+                    event_type="stakeholder_notification_failed",
+                    message=(
+                        f"Stakeholder {config['failure_label']} "
+                        "notification failed for "
+                        f"{stakeholder_display_name(stakeholder)}: {exc}"
+                    ),
+                    user_id=None,
+                )
+
+        try:
+            push_context = old_value if event_type == "comment_added" else None
+
+            push_sent = send_stakeholder_push(
+                stakeholder,
+                group,
+                event_type=config["push_event_type"],
+                context=push_context,
+            )
+
+            if push_sent:
+                sent += push_sent
+                delivered = True
+        except Exception as exc:
+            failed += 1
+            alerts_repo.create_alert_event(
+                group_id=group.id,
+                event_type="stakeholder_push_notification_failed",
+                message=(
+                    f"Stakeholder {config['failure_label']} push "
+                    "notification failed for "
+                    f"{stakeholder_display_name(stakeholder)}: {exc}"
+                ),
+                user_id=None,
+            )
+
+        if not delivered:
+            skipped += 1
+
+    return {
+        "sent": sent,
+        "skipped": skipped,
+        "failed": failed,
+    }
+
+
+def stakeholder_user(stakeholder):
+    """Return active stakeholder user for profile-level notifications."""
+    user = getattr(stakeholder, "user", None)
+
+    if not user:
+        return None
+
+    if getattr(user, "deleted", False):
+        return None
+
+    if not getattr(user, "active", True):
+        return None
+
+    return user
+
+
+def send_stakeholder_push(stakeholder, group, event_type, context=None):
+    """Send stakeholder browser push if stakeholder is an active user."""
+    user = stakeholder_user(stakeholder)
+
+    if not user:
+        return 0
+
+    if context is None:
+        return browser_push.send_stakeholder_push_to_user(
+            user,
+            group,
+            event_type=event_type,
+        )
+
+    return browser_push.send_stakeholder_push_to_user(
+        user,
+        group,
+        event_type=event_type,
+        context=context,
+    )
 
 
 def stakeholder_email(stakeholder):
@@ -74,37 +340,6 @@ def stakeholder_display_name(stakeholder):
         )
 
     return stakeholder_email(stakeholder) or "stakeholder"
-
-
-def build_stakeholder_priority_changed_email(group, old_priority=None):
-    """Build subject and body for stakeholder priority change notification."""
-    priority_label = alert_priority_label(group)
-    old_priority = old_priority or "-"
-
-    subject = (
-        "[IncidentRelay] "
-        f"{format_alert_title_with_priority(group)} priority changed"
-    )
-
-    alert_url = build_alert_web_url(group) or "-"
-    team = group.team.slug if group.team else "-"
-    service = getattr(group.service, "name", None) if group.service else None
-
-    body = "\n".join([
-        f"Incident priority changed: {old_priority} -> {priority_label}",
-        "",
-        f"Incident: {format_alert_title_with_priority(group)}",
-        f"Status: {group.status or '-'}",
-        f"Severity: {group.severity or '-'}",
-        f"Priority: {priority_label}",
-        f"Team: {team}",
-        f"Service: {service or '-'}",
-        f"URL: {alert_url}",
-        "",
-        "You are receiving this email because you are an incident stakeholder.",
-    ])
-
-    return subject, body
 
 
 def send_stakeholder_email(recipient, subject, body):
@@ -149,52 +384,6 @@ def send_stakeholder_email(recipient, subject, body):
         smtp.send_message(message)
 
 
-def notify_stakeholders_on_priority_change(group, old_priority=None):
-    """Notify active stakeholders that requested priority change emails."""
-    stakeholders = incidents_repo.list_incident_stakeholders(group.id)
-
-    sent = 0
-    skipped = 0
-    failed = 0
-
-    subject, body = build_stakeholder_priority_changed_email(
-        group,
-        old_priority=old_priority,
-    )
-
-    for stakeholder in stakeholders:
-        if not getattr(stakeholder, "notify_on_priority_change", True):
-            skipped += 1
-            continue
-
-        recipient = stakeholder_email(stakeholder)
-
-        if not recipient:
-            skipped += 1
-            continue
-
-        try:
-            send_stakeholder_email(recipient, subject, body)
-            sent += 1
-        except Exception as exc:
-            failed += 1
-            alerts_repo.create_alert_event(
-                group_id=group.id,
-                event_type="stakeholder_notification_failed",
-                message=(
-                    "Stakeholder priority change notification failed for "
-                    f"{stakeholder_display_name(stakeholder)}: {exc}"
-                ),
-                user_id=None,
-            )
-
-    return {
-        "sent": sent,
-        "skipped": skipped,
-        "failed": failed,
-    }
-
-
 def set_incident_priority(*, group_id, priority, user_id=None):
     if not priority:
         raise ValueError("priority is required")
@@ -215,9 +404,10 @@ def set_incident_priority(*, group_id, priority, user_id=None):
 
     if old_priority != group.priority_slug:
         update_alert_messages(group, event_type="priority_changed")
-        notify_stakeholders_on_priority_change(
+        notify_stakeholders(
             group,
-            old_priority=old_priority,
+            "priority_changed",
+            old_value=old_priority,
         )
 
     return group

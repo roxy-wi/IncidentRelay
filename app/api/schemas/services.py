@@ -60,6 +60,32 @@ SERVICE_IMPACT_MAX_DEPTH_LIMIT = 10
 SERVICE_IMPACT_LIMIT_DEFAULT = 100
 SERVICE_IMPACT_LIMIT_MAX = 500
 
+SERVICE_OWNER_ROLE_PATTERN = (
+    r"^(owner|stakeholder|business_owner|executive|support|"
+    r"customer_success|custom)$"
+)
+
+
+class ServiceOwnerBaseSchema(ApiModel):
+    """Validate service owner input."""
+
+    user_id: int = Field(ge=1)
+    role: str = Field(default="owner", pattern=SERVICE_OWNER_ROLE_PATTERN)
+    active: bool = True
+    notify_on_created: bool = True
+    notify_on_priority_change: bool = True
+    notify_on_status_change: bool = True
+    notify_on_resolved: bool = True
+    notify_on_comment: bool = True
+
+
+class ServiceOwnerCreateSchema(ServiceOwnerBaseSchema):
+    """Validate service owner creation."""
+
+
+class ServiceOwnerUpdateSchema(ServiceOwnerBaseSchema):
+    """Validate service owner update."""
+
 
 class ServiceBaseSchema(ApiModel):
     """Validate service input."""

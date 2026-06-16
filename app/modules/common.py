@@ -61,3 +61,12 @@ def as_naive_datetime(value):
         return value.replace(tzinfo=None)
 
     return value
+
+
+def truncate_text(value, limit=500):
+    value = str(value or "").strip()
+
+    if len(value) <= limit:
+        return value
+
+    return value[: limit - 1].rstrip() + "…"

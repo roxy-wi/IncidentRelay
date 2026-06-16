@@ -1,8 +1,63 @@
 from __future__ import annotations
 
-from app.modules.db import alerts_repo
+from app.modules.db import alerts_repo, users_repo
+from app.services.incidents import notify_stakeholders
 
 MAX_COMMENT_LENGTH = 5000
+
+
+def _comment_author_name(user_id):
+    if not user_id:
+        return "Unknown user"
+
+    user = users_repo.get_user_or_none(user_id)
+
+    if not user:
+        return "Unknown user"
+
+    display_name = getattr(user, "display_name", None)
+
+    if display_name:
+        return display_name
+
+    username = getattr(user, "username", None)
+
+    if username:
+        return username
+
+    email = getattr(user, "email", None)
+
+    if email:
+        return email
+
+    return f"User #{user_id}"
+
+
+def _notify_stakeholders_about_comment(
+    *,
+    group,
+    comment,
+    body,
+    user_id=None,
+    child_alert=None,
+):
+    context = {
+        "comment_id": comment.id,
+        "comment_body": body,
+        "author_name": _comment_author_name(user_id),
+        "comment_target": "alert" if child_alert else "incident",
+    }
+
+    if child_alert:
+        context["alert_id"] = child_alert.id
+        context["alert_title"] = getattr(child_alert, "title", None)
+
+    notify_stakeholders(
+        group,
+        "comment_added",
+        old_value=context,
+        skip_user_id=user_id,
+    )
 
 
 def normalize_comment_body(body: str | None) -> str:
@@ -42,6 +97,13 @@ def create_group_comment(
         user_id=user_id,
     )
 
+    _notify_stakeholders_about_comment(
+        group=group,
+        comment=comment,
+        body=body,
+        user_id=user_id,
+    )
+
     return comment
 
 
@@ -75,6 +137,14 @@ def create_child_alert_comment(
         event_type="commented",
         message=body,
         user_id=user_id,
+    )
+
+    _notify_stakeholders_about_comment(
+        group=group,
+        comment=comment,
+        body=body,
+        user_id=user_id,
+        child_alert=alert,
     )
 
     return comment

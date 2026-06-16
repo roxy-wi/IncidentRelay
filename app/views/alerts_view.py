@@ -11,7 +11,7 @@ from app.services.serializers import (
     serialize_incident_responder,
     serialize_incident_stakeholder,
 )
-from app.services.alert_comments import (
+from app.services.alerts.alert_comments import (
     create_group_comment,
     create_child_alert_comment,
     update_group_comment,

@@ -715,3 +715,77 @@
     </div>
   </div>
 </div>
+<div id="service-owner-modal" class="app-modal is-hidden" style="display: none;">
+    <div class="app-modal-dialog">
+        <div class="app-modal-header">
+            <h2 id="service-owner-form-title">Add default stakeholder</h2>
+            <button id="close-service-owner-modal" type="button" class="app-modal-close" aria-label="Close">×</button>
+        </div>
+        <div class="app-modal-body">
+            <input id="service-owner-id" type="hidden">
+            <input id="service-owner-service-id" type="hidden">
+            <div class="form-body">
+                <div class="form-field">
+                    <label for="service-owner-user">User</label>
+                    <select id="service-owner-user" class="js-user-select" data-placeholder="Select user">
+                        <option value="">Select user</option>
+                    </select>
+                </div>
+                <div class="form-field">
+                    <label for="service-owner-role">Role</label>
+                    <select id="service-owner-role" class="input">
+                        <option value="owner">Owner</option>
+                        <option value="stakeholder">Stakeholder</option>
+                        <option value="business_owner">Business owner</option>
+                        <option value="executive">Executive</option>
+                        <option value="support">Support</option>
+                        <option value="customer_success">Customer success</option>
+                        <option value="custom">Custom</option>
+                    </select>
+                </div>
+                <div class="form-field">
+                    <label>Active</label>
+                    <label class="checkbox-label">
+                        <input id="service-owner-active" type="checkbox" checked>
+                        Use this owner for new incidents
+                    </label>
+                </div>
+                <div class="form-field">
+                    <label>Notifications</label>
+                    <label class="checkbox-label">
+                        <input id="service-owner-notify-created" type="checkbox" checked>
+                        Incident created
+                    </label>
+                    <label class="checkbox-label">
+                        <input id="service-owner-notify-priority" type="checkbox" checked>
+                        Priority changed
+                    </label>
+                    <label class="checkbox-label">
+                        <input id="service-owner-notify-status" type="checkbox" checked>
+                        Status changed
+                    </label>
+                    <label class="checkbox-label">
+                        <input id="service-owner-notify-resolved" type="checkbox" checked>
+                        Incident resolved
+                    </label>
+                    <label class="checkbox-label">
+                        <input id="service-owner-notify-comment" type="checkbox" checked>
+                        Comment added
+                    </label>
+                    <div class="help-text">
+                        Default stakeholders are copied to new incidents for this service.
+                        Existing incidents are not changed.
+                    </div>
+                </div>
+            </div>
+        </div>
+        <div class="app-modal-footer">
+            <button id="reset-service-owner-form" type="button" class="btn">
+                Reset
+            </button>
+            <button id="save-service-owner" type="button" class="btn btn-primary">
+                Save
+            </button>
+        </div>
+    </div>
+</div>

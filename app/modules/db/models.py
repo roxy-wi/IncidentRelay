@@ -492,9 +492,14 @@ class ServiceOwner(BaseModel):
 
     id = AutoField()
     service = ForeignKeyField(Service, backref="owners", on_delete="CASCADE")
-    user = ForeignKeyField(User, backref="owned_services", on_delete="CASCADE")
+    user = ForeignKeyField(User, backref="service_ownerships", on_delete="CASCADE")
     role = CharField(default="owner")
     active = BooleanField(default=True)
+    notify_on_created = BooleanField(default=True)
+    notify_on_priority_change = BooleanField(default=True)
+    notify_on_status_change = BooleanField(default=True)
+    notify_on_resolved = BooleanField(default=True)
+    notify_on_comment = BooleanField(default=True)
     created_at = DateTimeField(default=datetime.utcnow)
 
     class Meta:
@@ -1113,6 +1118,7 @@ class IncidentStakeholder(BaseModel):
     notify_on_priority_change = BooleanField(default=True)
     notify_on_status_change = BooleanField(default=True)
     notify_on_resolved = BooleanField(default=True)
+    notify_on_comment = BooleanField(default=True)
 
     active = BooleanField(default=True, index=True)
 

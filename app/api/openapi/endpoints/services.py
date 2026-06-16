@@ -963,6 +963,71 @@ SERVICE_DETAILS_QUERY_PARAMS = [
     query_param("days", "Analytics window in days.", {"type": "integer", "minimum": 1, "maximum": 365, "default": 30}),
 ]
 
+SERVICE_OWNER_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "id": {"type": "integer"},
+        "service_id": {"type": "integer"},
+        "user_id": {"type": "integer", "nullable": True},
+        "user": {
+            "type": "object",
+            "nullable": True,
+            "properties": {
+                "id": {"type": "integer"},
+                "username": {"type": "string"},
+                "email": {"type": "string", "nullable": True},
+                "display_name": {"type": "string", "nullable": True},
+            },
+        },
+        "role": {"type": "string"},
+        "active": {"type": "boolean"},
+        "source": {"type": "string", "nullable": True},
+        "notify_on_created": {"type": "boolean"},
+        "notify_on_priority_change": {"type": "boolean"},
+        "notify_on_status_change": {"type": "boolean"},
+        "notify_on_resolved": {"type": "boolean"},
+        "created_at": {"type": "string", "nullable": True},
+        "updated_at": {"type": "string", "nullable": True},
+    },
+}
+
+
+SERVICE_OWNER_INPUT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "user_id": {
+            "type": "integer",
+            "nullable": True,
+            "description": "IncidentRelay user copied as stakeholder for new incidents.",
+        },
+        "role": {
+            "type": "string",
+            "description": "Stakeholder role, for example owner, business_owner, support.",
+            "example": "business_owner",
+        },
+        "active": {
+            "type": "boolean",
+            "default": True,
+        },
+        "notify_on_created": {
+            "type": "boolean",
+            "default": True,
+        },
+        "notify_on_priority_change": {
+            "type": "boolean",
+            "default": True,
+        },
+        "notify_on_status_change": {
+            "type": "boolean",
+            "default": True,
+        },
+        "notify_on_resolved": {
+            "type": "boolean",
+            "default": True,
+        },
+    },
+    "required": ["user_id"],
+}
 
 # ---------------------------------------------------------------------------
 # OpenAPI endpoint module interface
@@ -1431,6 +1496,152 @@ def paths():
                     "400": response("Validation error.", ERROR_SCHEMA),
                     "403": response("Access denied.", ERROR_SCHEMA),
                     "404": response("Service not found.", ERROR_SCHEMA),
+                },
+            },
+        },
+        "/api/services/{service_id}/owners": {
+            "get": {
+                "tags": ["services"],
+                "summary": "List service default stakeholders",
+                "description": (
+                    "Returns default stakeholders configured for a service. "
+                    "Active service owners are copied to newly created incidents "
+                    "as incident stakeholders."
+                ),
+                "security": [{"bearerAuth": []}],
+                "parameters": [
+                    {
+                        "name": "service_id",
+                        "in": "path",
+                        "required": True,
+                        "schema": {"type": "integer"},
+                    }
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Service default stakeholders",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "array",
+                                    "items": SERVICE_OWNER_SCHEMA,
+                                }
+                            }
+                        },
+                    }
+                },
+            },
+            "post": {
+                "tags": ["services"],
+                "summary": "Create service default stakeholder",
+                "description": (
+                    "Creates a default stakeholder for a service. "
+                    "The stakeholder is copied to new incidents created for this service."
+                ),
+                "security": [{"bearerAuth": []}],
+                "parameters": [
+                    {
+                        "name": "service_id",
+                        "in": "path",
+                        "required": True,
+                        "schema": {"type": "integer"},
+                    }
+                ],
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "application/json": {
+                            "schema": SERVICE_OWNER_INPUT_SCHEMA,
+                        }
+                    },
+                },
+                "responses": {
+                    "201": {
+                        "description": "Service default stakeholder created",
+                        "content": {
+                            "application/json": {
+                                "schema": SERVICE_OWNER_SCHEMA,
+                            }
+                        },
+                    }
+                },
+            },
+        },
+        "/api/services/{service_id}/owners/{owner_id}": {
+            "put": {
+                "tags": ["services"],
+                "summary": "Update service default stakeholder",
+                "security": [{"bearerAuth": []}],
+                "parameters": [
+                    {
+                        "name": "service_id",
+                        "in": "path",
+                        "required": True,
+                        "schema": {"type": "integer"},
+                    },
+                    {
+                        "name": "owner_id",
+                        "in": "path",
+                        "required": True,
+                        "schema": {"type": "integer"},
+                    },
+                ],
+                "requestBody": {
+                    "required": True,
+                    "content": {
+                        "application/json": {
+                            "schema": SERVICE_OWNER_INPUT_SCHEMA,
+                        }
+                    },
+                },
+                "responses": {
+                    "200": {
+                        "description": "Service default stakeholder updated",
+                        "content": {
+                            "application/json": {
+                                "schema": SERVICE_OWNER_SCHEMA,
+                            }
+                        },
+                    }
+                },
+            },
+            "delete": {
+                "tags": ["services"],
+                "summary": "Deactivate service default stakeholder",
+                "description": (
+                    "Deactivates a service default stakeholder. "
+                    "Existing incident stakeholders are not changed."
+                ),
+                "security": [{"bearerAuth": []}],
+                "parameters": [
+                    {
+                        "name": "service_id",
+                        "in": "path",
+                        "required": True,
+                        "schema": {"type": "integer"},
+                    },
+                    {
+                        "name": "owner_id",
+                        "in": "path",
+                        "required": True,
+                        "schema": {"type": "integer"},
+                    },
+                ],
+                "responses": {
+                    "200": {
+                        "description": "Service default stakeholder deactivated",
+                        "content": {
+                            "application/json": {
+                                "schema": {
+                                    "type": "object",
+                                    "properties": {
+                                        "deleted": {"type": "boolean"},
+                                        "id": {"type": "integer"},
+                                    },
+                                }
+                            }
+                        },
+                    }
                 },
             },
         },

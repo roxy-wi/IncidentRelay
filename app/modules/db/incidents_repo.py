@@ -242,6 +242,7 @@ def create_incident_stakeholder(group_id, data):
         notify_on_priority_change=data.get("notify_on_priority_change", True),
         notify_on_status_change=data.get("notify_on_status_change", True),
         notify_on_resolved=data.get("notify_on_resolved", True),
+        notify_on_comment=data.get("notify_on_comment", True),
         active=data.get("active", True),
         created_by=data.get("created_by_id"),
         created_at=datetime.utcnow(),
@@ -290,10 +291,27 @@ def deactivate_incident_stakeholder(stakeholder_id):
 
 
 def add_service_stakeholders_to_incident(group):
-    if not group.service_id:
+    """Copy active service owners to incident stakeholders.
+
+    Service owners are default stakeholders for a service. They are copied as a
+    snapshot to a newly created incident, so later service owner changes do not
+    rewrite existing incident stakeholders.
+    """
+    if not group or not getattr(group, "service_id", None):
         return []
 
-    rows = []
+    existing_user_ids = set(
+        row.user_id
+        for row in (
+            IncidentStakeholder
+            .select(IncidentStakeholder.user)
+            .where(
+                IncidentStakeholder.group == group.id,
+                IncidentStakeholder.active == True,  # noqa: E712
+                IncidentStakeholder.user.is_null(False),
+            )
+        )
+    )
 
     owners = (
         ServiceOwner
@@ -301,27 +319,17 @@ def add_service_stakeholders_to_incident(group):
         .where(
             ServiceOwner.service == group.service_id,
             ServiceOwner.active == True,  # noqa: E712
-            ServiceOwner.role.in_((
-                "stakeholder",
-                "business_owner",
-                "owner",
-            )),
         )
+        .order_by(ServiceOwner.id)
     )
 
-    for owner in owners:
-        exists = (
-            IncidentStakeholder
-            .select()
-            .where(
-                IncidentStakeholder.group == group.id,
-                IncidentStakeholder.user == owner.user_id,
-                IncidentStakeholder.active == True,  # noqa: E712
-            )
-            .exists()
-        )
+    rows = []
 
-        if exists:
+    for owner in owners:
+        if not owner.user_id:
+            continue
+
+        if owner.user_id in existing_user_ids:
             continue
 
         rows.append(
@@ -332,12 +340,17 @@ def add_service_stakeholders_to_incident(group):
                     "role": owner.role,
                     "source": "service_owner",
                     "created_by_id": None,
-                    "notify_on_created": True,
-                    "notify_on_priority_change": True,
-                    "notify_on_status_change": True,
-                    "notify_on_resolved": True,
+                    "notify_on_created": owner.notify_on_created,
+                    "notify_on_priority_change": (
+                        owner.notify_on_priority_change
+                    ),
+                    "notify_on_status_change": owner.notify_on_status_change,
+                    "notify_on_resolved": owner.notify_on_resolved,
+                    "notify_on_comment": owner.notify_on_comment,
                 },
             )
         )
+
+        existing_user_ids.add(owner.user_id)
 
     return rows

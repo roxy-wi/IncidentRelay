@@ -156,6 +156,11 @@ Notification channels do not have intake tokens. Routes receive alerts, then sen
 CalDAV uses personal API tokens with the `calendar:read` scope.
 ICS calendar feeds use secret subscription URLs and do not require login.
 
+
+## Services
+
+- [Service default stakeholders](services/default-stakeholders.md)
+
 ## API and automation
 
 Swagger UI:

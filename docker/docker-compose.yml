@@ -2,8 +2,8 @@ services:
   incidentrelay:
     image: roxywi/incidentrelay:latest
     build:
-      context: docker
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: docker/Dockerfile
     container_name: incidentrelay
     restart: unless-stopped
     environment:
@@ -30,8 +30,8 @@ services:
   incidentrelay-scheduler:
     image: roxywi/incidentrelay:latest
     build:
-      context: docker
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: docker/Dockerfile
     container_name: incidentrelay-scheduler
     restart: unless-stopped
     environment:
@@ -49,8 +49,8 @@ services:
   incidentrelay-telegram:
     image: roxywi/incidentrelay:latest
     build:
-      context: docker
-      dockerfile: Dockerfile
+      context: ..
+      dockerfile: docker/Dockerfile
     container_name: incidentrelay-telegram
     restart: unless-stopped
     environment:
