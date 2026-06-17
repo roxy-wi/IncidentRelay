@@ -1,3 +1,8 @@
+---
+title: Telegram Channel
+description: Telegram Bot notification setup and troubleshooting.
+---
+
 # Telegram channel
 
 Telegram is an outgoing notification channel based on Telegram Bot API.

@@ -1,3 +1,8 @@
+---
+title: Quickstart Checklist
+description: Checklist for validating a first IncidentRelay installation.
+---
+
 # Quickstart Checklist
 
 Use this checklist after installation.

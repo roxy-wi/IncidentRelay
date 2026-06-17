@@ -17,12 +17,9 @@ from app.services.alerts.alert_comments import (
     update_group_comment,
     delete_group_comment,
 )
-from app.services.incidents import (
-    create_incident_responder,
-    create_incident_stakeholder,
-    set_incident_priority,
-    set_incident_responder_status,
-)
+from app.services.incidents.stakeholders import create_incident_stakeholder
+from app.services.incidents.priorities import set_incident_priority
+from app.services.incidents.responders import create_incident_responder, set_incident_responder_status
 
 alerts_bp = Blueprint("alerts_api", __name__)
 

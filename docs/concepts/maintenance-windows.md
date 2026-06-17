@@ -1,3 +1,8 @@
+---
+title: Maintenance Windows
+description: Planned maintenance schedules, scopes and alert behavior control.
+---
+
 # Maintenance Windows
 
 Maintenance Windows define planned periods when IncidentRelay should change how matching alerts are handled. A window can target a group, team, service, or route and can either suppress notifications, suppress incident creation, create a maintenance incident, or pause escalations.

@@ -1,6 +1,6 @@
 ---
 title: Browser Push
-summary: Profile-level PWA and browser push notifications for assigned users.
+description: Profile-level PWA and browser push notifications for assigned users.
 ---
 
 # Browser Push

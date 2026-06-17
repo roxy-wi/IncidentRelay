@@ -1,3 +1,8 @@
+---
+title: SSO
+description: Configure OIDC and SAML single sign-on in IncidentRelay.
+---
+
 # SSO
 
 IncidentRelay supports authentication through external Identity Providers using:

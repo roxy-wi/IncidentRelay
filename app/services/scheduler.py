@@ -13,6 +13,7 @@ from app.services.notifications.shift_notifications import (
     send_due_oncall_shift_email_notifications,
 )
 from app.services.notifications.rules import process_due_user_notifications
+from app.services.incidents.responders import expire_due_incident_responders
 
 logger = logging.getLogger("oncall.scheduler")
 _scheduler = None
@@ -198,6 +199,67 @@ def alert_group_notification_job():
             db.close()
 
 
+def incident_responder_expire_job():
+    """Expire pending incident responder requests under a database lock."""
+    if db.is_closed():
+        db.connect(reuse_if_open=True)
+
+    owner = None
+
+    try:
+        owner = acquire_db_lock("incident_responder_expire_job")
+        if not owner:
+            logger.debug(
+                "incident responder expire job skipped because lock is busy"
+            )
+            return {
+                "processed": 0,
+                "expired": 0,
+                "skipped": 0,
+            }
+
+        logger.info("incident responder expire job started")
+
+        result = expire_due_incident_responders(
+            limit=int(
+                getattr(
+                    Config,
+                    "INCIDENT_RESPONDER_EXPIRE_BATCH_SIZE",
+                    100,
+                )
+            )
+        )
+
+        logger.info(
+            "incident responder expire job finished",
+            extra={
+                "extra": {
+                    "event_type": "scheduler",
+                    "processed": result.get("processed", 0),
+                    "expired": result.get("expired", 0),
+                    "skipped": result.get("skipped", 0),
+                }
+            },
+        )
+
+        return result
+
+    except Exception:
+        logger.exception("incident responder expire job failed")
+        return {
+            "processed": 0,
+            "expired": 0,
+            "skipped": 0,
+        }
+
+    finally:
+        if owner:
+            release_db_lock("incident_responder_expire_job", owner)
+
+        if not db.is_closed():
+            db.close()
+
+
 def start_scheduler():
     """
     Start the background scheduler.
@@ -265,6 +327,23 @@ def start_scheduler():
         coalesce=True,
         next_run_time=datetime.utcnow(),
         id="alert_group_notification_job",
+        replace_existing=True,
+    )
+
+    _scheduler.add_job(
+        incident_responder_expire_job,
+        "interval",
+        seconds=int(
+            getattr(
+                Config,
+                "INCIDENT_RESPONDER_EXPIRE_CHECK_INTERVAL_SECONDS",
+                30,
+            )
+        ),
+        max_instances=1,
+        coalesce=True,
+        next_run_time=datetime.utcnow(),
+        id="incident_responder_expire_job",
         replace_existing=True,
     )
 

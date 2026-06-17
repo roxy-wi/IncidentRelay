@@ -1,5 +1,7 @@
-title Alert comments
-description Creating, viewing, editing and deleting alert group comments in IncidentRelay
+---
+title: Alert comments
+description: Creating, viewing, editing and deleting alert group comments in IncidentRelay
+---
 
 # Alert comments
 

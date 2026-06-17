@@ -1,3 +1,8 @@
+---
+title: Email Channel
+description: Email notification channel setup and troubleshooting.
+---
+
 # Email channel
 
 Email is an outgoing notification channel. It sends alert notifications to the assigned user's profile email address.

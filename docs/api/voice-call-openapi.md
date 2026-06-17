@@ -1,3 +1,8 @@
+---
+title: Voice Call OpenAPI Notes
+description: OpenAPI notes for IncidentRelay voice call endpoints.
+---
+
 # Voice Call OpenAPI Notes
 
 Voice call channels use the same notification channel API as other channel types.

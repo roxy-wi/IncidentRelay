@@ -1,3 +1,8 @@
+---
+title: Schema Check
+description: Check the IncidentRelay database schema after migrations.
+---
+
 # Schema Check
 
 Keep request schemas, OpenAPI documentation and UI forms aligned.

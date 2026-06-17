@@ -1,3 +1,8 @@
+---
+title: Generic Webhook Integration
+description: Generic incoming webhook route setup and payload format.
+---
+
 # Generic webhook integration
 
 Generic webhook is an incoming alert source for custom systems.

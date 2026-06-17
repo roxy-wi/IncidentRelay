@@ -1,3 +1,8 @@
+---
+title: Alertmanager Integration
+description: Prometheus Alertmanager route setup and payload handling.
+---
+
 # Alertmanager integration
 
 Alertmanager is an incoming alert source.

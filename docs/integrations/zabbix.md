@@ -1,3 +1,8 @@
+---
+title: Zabbix Integration
+description: Zabbix incoming alert route setup and payload format.
+---
+
 # Zabbix integration
 
 Zabbix is an incoming alert source.

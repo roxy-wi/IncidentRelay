@@ -1,3 +1,8 @@
+---
+title: IncidentRelay Project README
+description: Repository overview, workflow, installation and API summary.
+---
+
 # IncidentRelay
 
 IncidentRelay is a self-hosted on-call scheduling, alert routing and notification service.

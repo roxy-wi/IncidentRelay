@@ -1,3 +1,8 @@
+---
+title: Mattermost Channel
+description: Mattermost webhook and Bot API notification setup.
+---
+
 # Mattermost channel
 
 Mattermost is an outgoing notification channel.

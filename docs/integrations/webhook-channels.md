@@ -1,3 +1,8 @@
+---
+title: Webhook-Based Notification Channels
+description: Slack, Discord, Microsoft Teams and generic webhook channels.
+---
+
 # Webhook-based notification channels
 
 Webhook-based notification channels send outgoing HTTP requests to external services.

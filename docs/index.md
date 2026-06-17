@@ -127,7 +127,7 @@ IncidentRelay has two integration layers.
 |-----------------|---------------------------------------|----------------------------------------------------|
 | Alertmanager    | `POST /api/integrations/alertmanager` | [Alertmanager](integrations/alertmanager.md)       |
 | Zabbix          | `POST /api/integrations/zabbix`       | [Zabbix](integrations/zabbix.md)                   |
-| Sentry          | `POST /api/integrations/sentry`       | [Zabbix](integrations/sentry.md)                   |
+| Sentry          | `POST /api/integrations/sentry/<route_id>` | [Sentry](integrations/sentry.md)               |
 | Generic webhook | `POST /api/integrations/webhook`      | [Generic webhook](integrations/generic-webhook.md) |
 
 Incoming integrations use route intake tokens.
@@ -157,9 +157,27 @@ CalDAV uses personal API tokens with the `calendar:read` scope.
 ICS calendar feeds use secret subscription URLs and do not require login.
 
 
+## Incident management
+
+- [Alerts and alert groups](usage/alerts.md)
+- [Incident priorities](incidents/priorities.md)
+- [Incident responders](incidents/responders.md)
+- [Incident stakeholders](incidents/stakeholders.md)
+- [Alert comments](usage/alert-comments.md)
+- [Silences](usage/silences.md)
+- [Maintenance Windows](concepts/maintenance-windows.md)
+
 ## Services
 
+- [Services](concepts/services.md)
 - [Service default stakeholders](services/default-stakeholders.md)
+
+## Scheduling
+
+- [Calendar](usage/calendar.md)
+- [Rotation Layers](usage/rotation-layers.md)
+- [Rotation Overrides](usage/rotation-overrides.md)
+- [Teams, Rotations, Layers and Routes](concepts/teams-rotations-routes.md)
 
 ## API and automation
 
@@ -178,6 +196,8 @@ OpenAPI JSON:
 Useful pages:
 
 - [API Overview](api/index.md)
+- [Escalation Policies API](api/escalation-policies.md)
+- [Sentry Integration API](api/sentry-integration.md)
 - [Profile and Personal API Tokens](usage/profile-and-tokens.md)
 - [Browser Push Notifications](usage/browser-push.md)
 - [Voice Call OpenAPI Notes](api/voice-call-openapi.md)

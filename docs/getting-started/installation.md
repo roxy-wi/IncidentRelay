@@ -1,3 +1,8 @@
+---
+title: Installation
+description: Installation guide dispatcher for IncidentRelay deployment methods.
+---
+
 # Installation
 
 This page is kept as a short dispatcher for older links.

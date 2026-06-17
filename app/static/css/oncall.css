@@ -1472,3 +1472,109 @@ body.has-app-sticky-x-scroll {
 .muted {
     color: var(--text-muted, #6b7280);
 }
+.notification-center-mount {
+    display: inline-flex;
+    align-items: center;
+}
+
+.notification-center-root {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+}
+
+.notification-center-button {
+    position: relative;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: 40px;
+    height: 40px;
+    border: 0;
+    border-radius: 999px;
+    background: transparent;
+    color: var(--text-color, #1f2937);
+    cursor: pointer;
+}
+
+.notification-center-button:hover {
+    background: var(--surface-hover, rgba(0, 0, 0, 0.06));
+}
+
+.notification-center-button i {
+    font-size: 18px;
+    line-height: 1;
+}
+
+.notification-center-badge {
+    position: absolute;
+    top: 5px;
+    right: 5px;
+    min-width: 17px;
+    height: 17px;
+    padding: 0 5px;
+    border-radius: 999px;
+    font-size: 10px;
+    font-weight: 700;
+    line-height: 17px;
+    color: #fff;
+    background: #d93025;
+}
+
+.notification-center-panel {
+    position: absolute;
+    right: 0;
+    top: calc(100% + 8px);
+    width: min(420px, calc(100vw - 24px));
+    max-height: min(560px, calc(100vh - 80px));
+    overflow: auto;
+    border-radius: 16px;
+    background: var(--surface, #fff);
+    box-shadow: var(--shadow-lg, 0 12px 40px rgba(0, 0, 0, 0.22));
+    padding: 12px;
+    z-index: 1200;
+}
+
+.notification-center-title {
+    font-weight: 700;
+    padding: 8px 8px 12px;
+}
+
+.notification-center-empty {
+    padding: 16px 8px;
+    color: var(--text-muted, #6b7280);
+}
+
+.notification-center-item {
+    border-radius: 12px;
+    padding: 10px;
+    margin-bottom: 8px;
+    background: var(--surface-variant, #f5f5f5);
+}
+
+.notification-center-item-title {
+    font-weight: 700;
+    margin-bottom: 4px;
+}
+
+.notification-center-item-body {
+    font-size: 13px;
+    margin-bottom: 8px;
+}
+
+.notification-center-item-meta {
+    font-size: 12px;
+    color: var(--text-muted, #6b7280);
+    margin-bottom: 8px;
+}
+
+.notification-center-actions {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+}
+
+.notification-center-open {
+    display: inline-flex;
+    font-size: 13px;
+}

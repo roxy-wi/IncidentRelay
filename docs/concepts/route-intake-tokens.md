@@ -1,3 +1,8 @@
+---
+title: Route Intake Tokens
+description: Per-route alert intake tokens and security model.
+---
+
 # Route Intake Tokens
 
 Incoming integrations authenticate with route intake tokens.

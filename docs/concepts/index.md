@@ -1,3 +1,8 @@
+---
+title: Main Concepts
+description: Core IncidentRelay concepts and recommended reading order.
+---
+
 # Main Concepts
 
 IncidentRelay resources are organized around groups, teams, services, rotations, routes and channels.
@@ -19,10 +24,13 @@ IncidentRelay resources are organized around groups, teams, services, rotations,
 Recommended reading order:
 
 1. [Groups and RBAC](groups-and-rbac.md)
-2. [Teams, Rotations and Routes](teams-rotations-routes.md)
-3. [Route Intake Tokens](route-intake-tokens.md)
-4. [Channels](channels.md)
-5. [Reminders and Escalations](reminders-and-escalations.md)
-6. [Escalation policy](escalation-policies.md)
-7. [Service](services.md)
-8. [Maintenance window](maintenance-windows.md)
+2. [Route Intake Tokens](route-intake-tokens.md)
+3. [Channels](channels.md)
+4. [Reminders and Escalations](reminders-and-escalations.md)
+5. [Escalation Policies](escalation-policies.md)
+
+For domain-specific workflows, continue with:
+
+- [Incident Management](../incidents/index.md)
+- [Services](../services/index.md)
+- [Scheduling](../scheduling/index.md)

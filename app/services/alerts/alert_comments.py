@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 from app.modules.db import alerts_repo, users_repo
-from app.services.incidents import notify_stakeholders
+from app.services.incidents.stakeholders import notify_stakeholders
 
 MAX_COMMENT_LENGTH = 5000
 

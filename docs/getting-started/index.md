@@ -1,3 +1,8 @@
+---
+title: Getting Started
+description: Installation methods and first setup steps for IncidentRelay.
+---
+
 # Getting Started
 
 Choose the installation method that matches your environment.
@@ -27,6 +32,13 @@ After installation:
 4. Open the web interface and follow [First Login and Setup](first-login.md).
 5. Configure at least one route and one notification channel.
 6. Send a test alert.
+
+After the first alert works, continue with:
+
+- [Incident Management](../incidents/index.md)
+- [Services](../services/index.md)
+- [Scheduling](../scheduling/index.md)
+- [Integrations](../integrations/index.md)
 
 ## Important path and environment names
 

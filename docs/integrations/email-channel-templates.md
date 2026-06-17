@@ -1,3 +1,8 @@
+---
+title: Email Templates
+description: Customize IncidentRelay email notification templates.
+---
+
 # Email templates
 
 Email channels can define an optional HTML template.

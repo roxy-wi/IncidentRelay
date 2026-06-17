@@ -1,3 +1,8 @@
+---
+title: Logging
+description: IncidentRelay logging locations, fields and troubleshooting notes.
+---
+
 # Logging
 
 IncidentRelay writes structured JSON-style logs for alert intake, notifications, scheduler activity and errors.

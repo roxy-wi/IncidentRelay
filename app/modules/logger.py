@@ -1,7 +1,6 @@
 import json
 import logging
 import os
-import sys
 import uuid
 from datetime import datetime
 
@@ -9,6 +8,7 @@ from flask import jsonify, request
 from werkzeug.exceptions import HTTPException
 from peewee import DoesNotExist
 
+from app.services.incidents import responders
 from app.settings import Config
 from app.modules.redaction import redact_secrets
 
@@ -138,6 +138,7 @@ def _allowed_loggers_for_role(log_role):
         "oncall.error",
         "oncall.notifications",
         "oncall.voice",
+        "oncall.incidents",
     }
 
 
@@ -165,9 +166,9 @@ def setup_json_logging(app=None, log_role=None):
     logging.getLogger("werkzeug").disabled = True
 
     if app is not None:
-        app.logger.handlers.clear()
-        app.logger.propagate = True
-        app.logger.setLevel(level)
+        responders.logger.handlers.clear()
+        responders.logger.propagate = True
+        responders.logger.setLevel(level)
         register_error_handlers(app)
 
     logging.getLogger("oncall.error").info(

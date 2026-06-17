@@ -1,3 +1,8 @@
+---
+title: Voice Call Channel
+description: Voice call notification channel setup and DTMF actions.
+---
+
 # Voice call channel
 
 Voice call is an outgoing notification channel. It calls the assigned user's profile phone number through the globally configured voice provider.

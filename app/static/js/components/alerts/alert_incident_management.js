@@ -318,19 +318,81 @@ window.AlertIncidentManagement = (function () {
         }
 
         responders.forEach(function (responder) {
-            container.append(renderResponderItem(responder));
+            container.append(renderResponderItem(responder, incident));
         });
     }
 
-    function renderResponderItem(responder) {
-        return $("<div>")
-            .addClass("details-list-item incident-responder-item")
-            .append($("<div>").addClass("details-list-title").text(responderTitle(responder)))
-            .append($("<div>").addClass("details-list-meta").text(responderMeta(responder)))
-            .append(renderOptionalText(responder.message));
+    function renderResponderItem(responder, incident) {
+        const canWrite = canWriteIncident(incident);
+        const item = $("<div>").addClass("details-list-item incident-responder-item");
+
+        const row = $("<div>").addClass("details-list-row").appendTo(item);
+
+        $("<div>")
+            .addClass("details-list-title")
+            .text(responderTitle(responder))
+            .appendTo(row);
+
+        row.append(renderResponderStatusBadge(responder.status));
+
+        const actions = renderResponderActions(responder, incident, canWrite);
+        if (actions.children().length) {
+            row.append(actions);
+        }
+
+        item.append(
+            $("<div>")
+                .addClass("details-list-meta")
+                .text(responderMeta(responder))
+        );
+
+        item.append(renderOptionalText(responder.message));
+
+        const responseText = responderResponseText(responder);
+        if (responseText) {
+            item.append(
+                $("<div>")
+                    .addClass("details-list-text")
+                    .text(responseText)
+            );
+        }
+
+        const warning = responderNotificationWarning(responder);
+        if (warning) {
+            item.append(
+                $("<div>")
+                    .addClass("alert alert-warning incident-responder-warning")
+                    .text(warning)
+            );
+        }
+
+        return item;
     }
 
     function responderTitle(responder) {
+        if (responder.target && responder.target.label) {
+            return responder.target.label;
+        }
+
+        if (responder.target && responder.target.user) {
+            return displayObjectName(responder.target.user, "User");
+        }
+
+        if (responder.target && responder.target.team) {
+            return displayObjectName(responder.target.team, "Team");
+        }
+
+        if (responder.target && responder.target.rotation) {
+            return displayObjectName(responder.target.rotation, "Rotation");
+        }
+
+        if (responder.target && responder.target.escalation_policy) {
+            return displayObjectName(
+                responder.target.escalation_policy,
+                "Escalation policy"
+            );
+        }
+
         if (responder.target_user) {
             return displayObjectName(responder.target_user, "User");
         }
@@ -344,7 +406,10 @@ window.AlertIncidentManagement = (function () {
         }
 
         if (responder.target_escalation_policy) {
-            return displayObjectName(responder.target_escalation_policy, "Escalation policy");
+            return displayObjectName(
+                responder.target_escalation_policy,
+                "Escalation policy"
+            );
         }
 
         if (responder.target_user_id) {
@@ -364,6 +429,129 @@ window.AlertIncidentManagement = (function () {
         }
 
         return "Responder";
+    }
+
+    function renderResponderStatusBadge(status) {
+        const value = String(status || "").toLowerCase();
+        const labels = {
+            requested: "Requested",
+            accepted: "Accepted",
+            declined: "Declined",
+            expired: "Expired",
+            resolved: "Resolved",
+        };
+
+        return $("<span>")
+            .addClass("pill")
+            .addClass(responderStatusBadgeClass(value))
+            .text(labels[value] || status || "-");
+    }
+
+
+    function responderStatusBadgeClass(status) {
+        if (status === "requested") {
+            return "badge-muted";
+        }
+
+        if (status === "accepted") {
+            return "badge-success";
+        }
+
+        if (status === "declined") {
+            return "badge-warning";
+        }
+
+        if (status === "expired") {
+            return "badge-muted";
+        }
+
+        if (status === "resolved") {
+            return "badge-success";
+        }
+
+        return "badge-muted";
+    }
+
+
+    function renderResponderActions(responder, incident, canWrite) {
+        const actions = $("<div>").addClass("details-list-actions");
+        const status = String(responder.status || "").toLowerCase();
+
+        if (incidentIsResolved(incident)) {
+            return actions;
+        }
+
+        if (status === "requested") {
+            actions
+                .append(
+                    $("<button>")
+                        .attr("type", "button")
+                        .addClass("btn btn-success btn-sm incident-responder-action")
+                        .attr("data-responder-id", responder.id)
+                        .attr("data-status", "accepted")
+                        .text("Accept")
+                )
+                .append(
+                    $("<button>")
+                        .attr("type", "button")
+                        .addClass("btn btn-secondary btn-sm incident-responder-action")
+                        .attr("data-responder-id", responder.id)
+                        .attr("data-status", "declined")
+                        .text("Decline")
+                );
+
+            return actions;
+        }
+
+        if (status === "accepted" && canWrite) {
+            actions.append(
+                $("<button>")
+                    .attr("type", "button")
+                    .addClass("btn btn-secondary btn-sm incident-responder-action")
+                    .attr("data-responder-id", responder.id)
+                    .attr("data-status", "resolved")
+                    .text("Resolve")
+            );
+        }
+
+        return actions;
+    }
+
+
+    function incidentIsResolved(incident) {
+        return String((incident && incident.status) || "").toLowerCase() === "resolved";
+    }
+
+
+    function responderResponseText(responder) {
+        const status = String(responder.status || "").toLowerCase();
+
+        if (!responder.response_message) {
+            return "";
+        }
+
+        if (status === "declined") {
+            return "Decline reason: " + responder.response_message;
+        }
+
+        if (status === "resolved") {
+            return "Resolution note: " + responder.response_message;
+        }
+
+        return "Response: " + responder.response_message;
+    }
+
+
+    function responderNotificationWarning(responder) {
+        const status = String(responder.notification_status || "").toLowerCase();
+
+        if (status !== "failed") {
+            return "";
+        }
+
+        return responder.notification_error
+            ? "Notification failed: " + responder.notification_error
+            : "Notification failed.";
     }
 
     function responderMeta(responder) {
@@ -473,6 +661,16 @@ window.AlertIncidentManagement = (function () {
             .on("click.incidentManagement", function () {
                 confirmStakeholderRemoval(section, $(this).data("stakeholder-id"));
             });
+        section
+            .find(".incident-responder-action")
+            .off("click.incidentManagement")
+            .on("click.incidentManagement", function () {
+                updateResponderStatus(
+                    section,
+                    $(this).data("responder-id"),
+                    $(this).data("status")
+                );
+            });
     }
 
     function updatePriority(section, priority) {
@@ -502,6 +700,50 @@ window.AlertIncidentManagement = (function () {
                 }
             );
         });
+    }
+
+    function updateResponderStatus(section, responderId, status) {
+        const incidentId = section.data("incident-id");
+
+        if (!incidentId || !responderId || !status) {
+            return;
+        }
+
+        const runUpdate = function () {
+            apiPut(
+                "/api/incidents/" + incidentId + "/responders/" + responderId,
+                {
+                    status: status,
+                },
+                function () {
+                    refreshIncident(section);
+                }
+            );
+        };
+
+        if (status === "declined") {
+            showAppConfirm({
+                type: "warning",
+                title: "Decline responder request",
+                message: "Decline this responder request?",
+                confirmText: "Decline",
+                confirmClass: "btn-warning",
+            }).done(runUpdate);
+            return;
+        }
+
+        if (status === "resolved") {
+            showAppConfirm({
+                type: "info",
+                title: "Resolve responder request",
+                message: "Mark this responder request as resolved?",
+                confirmText: "Resolve",
+                confirmClass: "btn-secondary",
+            }).done(runUpdate);
+            return;
+        }
+
+        runUpdate();
     }
 
     function openResponderModal(section) {

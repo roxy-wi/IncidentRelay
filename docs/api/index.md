@@ -1,3 +1,8 @@
+---
+title: API
+description: IncidentRelay API overview, authentication and endpoint groups.
+---
+
 # API
 
 Swagger UI is available at:
@@ -102,11 +107,12 @@ name -> slug -> "-"
 
 ## More API documentation
 
-1. [Voice API](voice-api.md)
-2. [Escalation policy](escalation-policies.md)
+1. [Escalation Policies API](escalation-policies.md)
+2. [Sentry Integration API](sentry-integration.md)
+3. [Voice Call OpenAPI Notes](voice-call-openapi.md)
 
 
-# Service impact v2
+## Service impact v2
 
 ```text
 GET /api/services/impact

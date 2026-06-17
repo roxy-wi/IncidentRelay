@@ -219,3 +219,22 @@ class Config:
         "alert_group_notification_batch_size",
         100,
     )
+
+    INCIDENT_RESPONDER_EXPIRE_CHECK_INTERVAL_SECONDS = settings.get_int(
+        "incidents",
+        "responder_expire_check_interval_seconds",
+        30,
+    )
+
+    INCIDENT_RESPONDER_EXPIRE_BATCH_SIZE = settings.get_int(
+        "incidents",
+        "responder_expire_batch_size",
+        100,
+    )
+
+    INCIDENT_RESPONDER_DEFAULT_EXPIRES_AFTER_MINUTES = settings.get_int(
+        "incidents",
+        "responder_default_expires_after_minutes",
+        30,
+    )
+

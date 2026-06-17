@@ -1,3 +1,8 @@
+---
+title: Troubleshooting
+description: Common IncidentRelay operational problems and checks.
+---
+
 # Troubleshooting
 
 ## 500 on duplicate names or slugs

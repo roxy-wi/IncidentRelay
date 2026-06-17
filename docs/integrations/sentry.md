@@ -1,3 +1,8 @@
+---
+title: Sentry Integration
+description: Signed Sentry issue, metric alert and lifecycle webhooks.
+---
+
 # Sentry integration
 
 IncidentRelay can receive signed webhooks from Sentry Internal Integrations and turn Sentry issue alerts, metric alerts and issue lifecycle events into IncidentRelay alerts.

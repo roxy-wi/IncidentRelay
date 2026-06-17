@@ -2,8 +2,9 @@ import json
 from datetime import datetime
 
 from app.modules.sso.saml_security import get_saml_security
-from app.modules.db import maintenance_repo, services_repo
+from app.modules.db import incidents_repo, maintenance_repo, services_repo
 from app.modules.common import as_naive_datetime, as_utc_aware
+from app.services.incidents.responder_display import responder_target_label
 
 
 def extract_alert_event_link(alert):
@@ -168,6 +169,56 @@ def serialize_user_short(user):
         "telegram_user_id": user.telegram_user_id,
         "slack_user_id": user.slack_user_id,
         "mattermost_user_id": user.mattermost_user_id,
+    }
+
+
+def serialize_team_short(team):
+    """Serialize a compact team object."""
+    if not team:
+        return None
+
+    return {
+        "id": team.id,
+        "slug": team.slug,
+        "name": team.name,
+        "active": team.active,
+        "group_id": team.group.id if team.group else None,
+        "group_slug": team.group.slug if team.group else None,
+    }
+
+
+def serialize_rotation_short(rotation):
+    """Serialize a compact rotation object."""
+    if not rotation:
+        return None
+
+    team = rotation.team if getattr(rotation, "team_id", None) else None
+
+    return {
+        "id": rotation.id,
+        "name": rotation.name,
+        "team_id": team.id if team else None,
+        "team_slug": team.slug if team else None,
+        "team_name": team.name if team else None,
+        "enabled": rotation.enabled,
+        "timezone": rotation.timezone,
+    }
+
+
+def serialize_escalation_policy_short(policy):
+    """Serialize a compact escalation policy object."""
+    if not policy:
+        return None
+
+    team = policy.team if getattr(policy, "team_id", None) else None
+
+    return {
+        "id": policy.id,
+        "name": policy.name,
+        "team_id": team.id if team else None,
+        "team_slug": team.slug if team else None,
+        "team_name": team.name if team else None,
+        "enabled": policy.enabled,
     }
 
 
@@ -892,6 +943,114 @@ def serialize_service_dependency(dependency, current_user=None):
     return attach_team_permissions(data, service.team_id, current_user)
 
 
+def serialize_incident_responder_target(responder):
+    """Serialize responder target as one consistent object."""
+    target_type = responder.target_type
+    label = responder_target_label(responder)
+
+    if target_type == "user":
+        user = responder.target_user if responder.target_user_id else None
+        return {
+            "type": "user",
+            "id": responder.target_user_id,
+            "label": label,
+            "user": serialize_user_short(user),
+        }
+
+    if target_type == "team":
+        team = responder.target_team if responder.target_team_id else None
+        return {
+            "type": "team",
+            "id": responder.target_team_id,
+            "label": label,
+            "team": serialize_team_short(team),
+        }
+
+    if target_type == "rotation":
+        rotation = (
+            responder.target_rotation
+            if responder.target_rotation_id
+            else None
+        )
+        return {
+            "type": "rotation",
+            "id": responder.target_rotation_id,
+            "label": label,
+            "rotation": serialize_rotation_short(rotation),
+        }
+
+    if target_type == "escalation_policy":
+        policy = (
+            responder.target_escalation_policy
+            if responder.target_escalation_policy_id
+            else None
+        )
+        return {
+            "type": "escalation_policy",
+            "id": responder.target_escalation_policy_id,
+            "label": label,
+            "escalation_policy": serialize_escalation_policy_short(policy),
+        }
+
+    return {
+        "type": target_type,
+        "id": None,
+        "label": label,
+    }
+
+
+def serialize_incident_responder(responder):
+    """Serialize incident responder request."""
+    return {
+        "id": responder.id,
+        "incident_id": responder.group_id,
+        "group_id": responder.group_id,
+
+        "target_type": responder.target_type,
+        "target_user_id": responder.target_user_id,
+        "target_team_id": responder.target_team_id,
+        "target_rotation_id": responder.target_rotation_id,
+        "target_escalation_policy_id": (
+            responder.target_escalation_policy_id
+        ),
+        "target": serialize_incident_responder_target(responder),
+
+        "requested_by_id": responder.requested_by_id,
+        "requested_by": serialize_user_short(
+            responder.requested_by
+            if responder.requested_by_id
+            else None
+        ),
+
+        "accepted_by_id": responder.accepted_by_id,
+        "accepted_by": serialize_user_short(
+            responder.accepted_by
+            if responder.accepted_by_id
+            else None
+        ),
+
+        "declined_by_id": responder.declined_by_id,
+        "declined_by": serialize_user_short(
+            responder.declined_by
+            if responder.declined_by_id
+            else None
+        ),
+
+        "status": responder.status,
+        "message": responder.message,
+        "response_message": responder.response_message,
+
+        "notification_status": responder.notification_status,
+        "notification_error": responder.notification_error,
+
+        "requested_at": serialize_utc_datetime(responder.requested_at),
+        "responded_at": serialize_utc_datetime(responder.responded_at),
+        "expires_at": serialize_utc_datetime(responder.expires_at),
+        "created_at": serialize_utc_datetime(responder.created_at),
+        "updated_at": serialize_utc_datetime(responder.updated_at),
+    }
+
+
 def serialize_incident_priority(priority):
     """Serialize incident priority object."""
     if not priority:
@@ -947,6 +1106,7 @@ def serialize_alert_group(
     alerts=None,
     events=None,
     notifications=None,
+    responders=None,
     current_user=None,
 ):
     """Serialize an alert group as the primary incident object."""
@@ -1054,6 +1214,13 @@ def serialize_alert_group(
             serialize_alert_notification(notification)
             for notification in notifications or []
         ]
+        if responders is None:
+            responders = incidents_repo.list_incident_responders(group.id)
+
+        data["responders"] = [
+            serialize_incident_responder(item)
+            for item in responders
+        ]
 
     data["active_maintenance"] = serialize_attached_maintenance_ref(group)
 
@@ -1085,31 +1252,6 @@ def serialize_alert_comment(comment):
             and comment.updated_at
             and comment.updated_at > comment.created_at
         ),
-    }
-
-
-def serialize_incident_responder(responder):
-    return {
-        "id": responder.id,
-        "incident_id": responder.group_id,
-        "target_type": responder.target_type,
-        "target_user_id": responder.target_user_id,
-        "target_team_id": responder.target_team_id,
-        "target_rotation_id": responder.target_rotation_id,
-        "target_escalation_policy_id": responder.target_escalation_policy_id,
-        "requested_by_id": responder.requested_by_id,
-        "accepted_by_id": responder.accepted_by_id,
-        "declined_by_id": responder.declined_by_id,
-        "status": responder.status,
-        "message": responder.message,
-        "response_message": responder.response_message,
-        "notification_status": responder.notification_status,
-        "notification_error": responder.notification_error,
-        "requested_at": responder.requested_at.isoformat() if responder.requested_at else None,
-        "responded_at": responder.responded_at.isoformat() if responder.responded_at else None,
-        "expires_at": responder.expires_at.isoformat() if responder.expires_at else None,
-        "created_at": responder.created_at.isoformat() if responder.created_at else None,
-        "updated_at": responder.updated_at.isoformat() if responder.updated_at else None,
     }
 
 

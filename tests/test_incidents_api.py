@@ -3,7 +3,7 @@ from uuid import uuid4
 from app.api.schemas.roles import GROUP_USER_ADMIN_ROLE
 from app.login import create_access_token
 from app.modules.db import incidents_repo
-from app.modules.db.models import AlertEvent, AlertGroup
+from app.modules.db.models import AlertEvent, AlertGroup, IncidentResponder
 from tests.factories import (
     add_user_to_team,
     create_group,
@@ -11,6 +11,14 @@ from tests.factories import (
     create_team,
     create_user,
 )
+
+
+def disable_responder_notifications(monkeypatch):
+    monkeypatch.setattr(
+        "app.services.incidents.responders."
+        "notify_incident_responder_requested",
+        lambda responder: {"status": "sent", "sent": 1, "error": None},
+    )
 
 
 def unique_slug(prefix):
@@ -518,7 +526,7 @@ def test_update_incident_priority_updates_existing_messages(client, db, monkeypa
     calls = []
 
     monkeypatch.setattr(
-        "app.services.incidents.update_alert_messages",
+        "app.services.incidents.priorities.update_alert_messages",
         lambda group, event_type: calls.append((group.id, event_type)) or 1,
     )
 
@@ -556,7 +564,7 @@ def test_update_incident_priority_does_not_update_messages_when_unchanged(
     calls = []
 
     monkeypatch.setattr(
-        "app.services.incidents.update_alert_messages",
+        "app.services.incidents.priorities.update_alert_messages",
         lambda group, event_type: calls.append((group.id, event_type)) or 1,
     )
 
@@ -601,12 +609,12 @@ def test_update_incident_priority_notifies_stakeholders(client, db, monkeypatch)
     emails = []
 
     monkeypatch.setattr(
-        "app.services.incidents.update_alert_messages",
+        "app.services.incidents.priorities.update_alert_messages",
         lambda group, event_type: 1,
     )
 
     monkeypatch.setattr(
-        "app.services.incidents.send_stakeholder_email",
+        "app.services.incidents.stakeholders.send_stakeholder_email",
         lambda recipient, subject, body: emails.append(
             {
                 "recipient": recipient,
@@ -666,12 +674,12 @@ def test_update_incident_priority_does_not_notify_opted_out_stakeholders(
     emails = []
 
     monkeypatch.setattr(
-        "app.services.incidents.update_alert_messages",
+        "app.services.incidents.priorities.update_alert_messages",
         lambda group, event_type: 1,
     )
 
     monkeypatch.setattr(
-        "app.services.incidents.send_stakeholder_email",
+        "app.services.incidents.stakeholders.send_stakeholder_email",
         lambda recipient, subject, body: emails.append(recipient),
     )
 
@@ -685,3 +693,585 @@ def test_update_incident_priority_does_not_notify_opted_out_stakeholders(
 
     assert response.status_code == 200, response.get_json()
     assert emails == []
+
+
+def test_add_duplicate_open_responder_is_rejected(client, db, monkeypatch):
+    disable_responder_notifications(monkeypatch)
+
+    group, team, route, incident = create_incident_fixture()
+    headers, requester = create_responder_headers(group, team)
+
+    target = create_user(
+        username=unique_slug("target"),
+        group=group,
+        group_role="viewer",
+    )
+    add_user_to_team(team, target, role="responder")
+
+    payload = {
+        "target_type": "user",
+        "target_user_id": target.id,
+        "expires_after_minutes": 30,
+    }
+
+    first_response = client.post(
+        f"/api/incidents/{incident.id}/responders",
+        json=payload,
+        headers=headers,
+    )
+    assert first_response.status_code == 201, first_response.get_json()
+
+    second_response = client.post(
+        f"/api/incidents/{incident.id}/responders",
+        json=payload,
+        headers=headers,
+    )
+    assert second_response.status_code == 400
+    assert second_response.get_json()["error"] == "validation_error"
+    assert (
+        second_response.get_json()["message"]
+        == "active responder request already exists for this target"
+    )
+
+
+def test_responder_declined_cannot_be_accepted_later(client, db, monkeypatch):
+    disable_responder_notifications(monkeypatch)
+
+    group, team, route, incident = create_incident_fixture()
+    headers, requester = create_responder_headers(group, team)
+
+    target = create_user(
+        username=unique_slug("target"),
+        group=group,
+        group_role="viewer",
+    )
+    add_user_to_team(team, target, role="responder")
+
+    create_response = client.post(
+        f"/api/incidents/{incident.id}/responders",
+        json={
+            "target_type": "user",
+            "target_user_id": target.id,
+        },
+        headers=headers,
+    )
+    assert create_response.status_code == 201, create_response.get_json()
+    responder_id = create_response.get_json()["id"]
+
+    decline_response = client.put(
+        f"/api/incidents/{incident.id}/responders/{responder_id}",
+        json={
+            "status": "declined",
+            "response_message": "Busy",
+        },
+        headers=headers,
+    )
+    assert decline_response.status_code == 200, decline_response.get_json()
+    assert decline_response.get_json()["status"] == "declined"
+
+    accept_response = client.put(
+        f"/api/incidents/{incident.id}/responders/{responder_id}",
+        json={
+            "status": "accepted",
+            "response_message": "Actually joining",
+        },
+        headers=headers,
+    )
+    assert accept_response.status_code == 400
+    assert accept_response.get_json()["error"] == "validation_error"
+    assert (
+        "cannot change responder status from declined to accepted"
+        in accept_response.get_json()["message"]
+    )
+
+
+def test_target_user_can_accept_own_responder_request(client, db, monkeypatch):
+    disable_responder_notifications(monkeypatch)
+
+    group, team, route, incident = create_incident_fixture()
+    requester_headers, requester = create_responder_headers(group, team)
+
+    target = create_user(
+        username=unique_slug("target"),
+        group=group,
+        group_role="viewer",
+    )
+    target.display_name = "Alice Smith"
+    target.save(only=[target.__class__.display_name])
+    add_user_to_team(team, target, role="viewer")
+
+    create_response = client.post(
+        f"/api/incidents/{incident.id}/responders",
+        json={
+            "target_type": "user",
+            "target_user_id": target.id,
+        },
+        headers=requester_headers,
+    )
+    assert create_response.status_code == 201, create_response.get_json()
+    responder_id = create_response.get_json()["id"]
+
+    target_headers = make_headers(target)
+
+    accept_response = client.put(
+        f"/api/incidents/{incident.id}/responders/{responder_id}",
+        json={
+            "status": "accepted",
+            "response_message": "I am joining",
+        },
+        headers=target_headers,
+    )
+    assert accept_response.status_code == 200, accept_response.get_json()
+
+    payload = accept_response.get_json()
+    assert payload["status"] == "accepted"
+    assert payload["accepted_by_id"] == target.id
+
+    event = (
+        AlertEvent
+        .select()
+        .where(
+            AlertEvent.group == incident,
+            AlertEvent.event_type == "responder_accepted",
+        )
+        .order_by(AlertEvent.id.desc())
+        .get()
+    )
+
+    assert "Alice Smith accepted responder request" in event.message
+    assert "I am joining" in event.message
+
+
+def test_non_target_viewer_cannot_accept_responder_request(client, db, monkeypatch):
+    disable_responder_notifications(monkeypatch)
+
+    group, team, route, incident = create_incident_fixture()
+    requester_headers, requester = create_responder_headers(group, team)
+
+    target = create_user(
+        username=unique_slug("target"),
+        group=group,
+        group_role="viewer",
+    )
+    add_user_to_team(team, target, role="viewer")
+
+    stranger = create_user(
+        username=unique_slug("stranger"),
+        group=group,
+        group_role="viewer",
+    )
+    add_user_to_team(team, stranger, role="viewer")
+
+    create_response = client.post(
+        f"/api/incidents/{incident.id}/responders",
+        json={
+            "target_type": "user",
+            "target_user_id": target.id,
+        },
+        headers=requester_headers,
+    )
+    assert create_response.status_code == 201, create_response.get_json()
+    responder_id = create_response.get_json()["id"]
+
+    response = client.put(
+        f"/api/incidents/{incident.id}/responders/{responder_id}",
+        json={
+            "status": "accepted",
+        },
+        headers=make_headers(stranger),
+    )
+
+    assert response.status_code == 403
+    assert response.get_json()["error"] == "access_denied"
+
+
+def test_add_responder_rejects_extra_target_id(client, db, monkeypatch):
+    disable_responder_notifications(monkeypatch)
+
+    group, team, route, incident = create_incident_fixture()
+    headers, requester = create_responder_headers(group, team)
+
+    target = create_user(
+        username=unique_slug("target"),
+        group=group,
+        group_role="viewer",
+    )
+    add_user_to_team(team, target, role="responder")
+
+    response = client.post(
+        f"/api/incidents/{incident.id}/responders",
+        json={
+            "target_type": "user",
+            "target_user_id": target.id,
+            "target_team_id": team.id,
+        },
+        headers=headers,
+    )
+
+    assert response.status_code == 400
+    assert response.get_json()["error"] == "validation_error"
+
+
+def test_expire_due_incident_responders_expires_requested(db, monkeypatch):
+    disable_responder_notifications(monkeypatch)
+
+    from datetime import datetime, timedelta
+
+    from app.modules.db import incidents_repo
+    from app.services.incidents.responders import expire_due_incident_responders
+
+    group, team, route, incident = create_incident_fixture()
+
+    target = create_user(
+        username=unique_slug("target"),
+        group=group,
+        group_role="viewer",
+    )
+    target.display_name = "Alice Smith"
+    target.save(only=[target.__class__.display_name])
+    add_user_to_team(team, target, role="responder")
+
+    responder = incidents_repo.create_incident_responder(
+        incident.id,
+        {
+            "target_type": "user",
+            "target_user_id": target.id,
+            "requested_by_id": None,
+            "message": None,
+            "expires_after_minutes": 30,
+            "status": "requested",
+        },
+    )
+
+    responder.expires_at = datetime.utcnow() - timedelta(seconds=1)
+    responder.save(only=[IncidentResponder.expires_at])
+
+    result = expire_due_incident_responders(limit=10)
+
+    assert result["expired"] == 1
+    assert result["skipped"] == 0
+
+    responder = incidents_repo.get_incident_responder(responder.id)
+    assert responder.status == "expired"
+    assert responder.response_message == "Responder request expired"
+
+    event = (
+        AlertEvent
+        .select()
+        .where(
+            AlertEvent.group == incident,
+            AlertEvent.event_type == "responder_expired",
+        )
+        .get_or_none()
+    )
+    assert event is not None
+    assert "Responder request expired for Alice Smith" in event.message
+
+
+def test_incident_details_responder_contains_target_label(
+    client,
+    db,
+    monkeypatch,
+):
+    disable_responder_notifications(monkeypatch)
+
+    group, team, route, incident = create_incident_fixture()
+    headers, requester = create_responder_headers(group, team)
+
+    target = create_user(
+        username=unique_slug("target"),
+        group=group,
+        group_role="viewer",
+    )
+    target.display_name = "Alice Smith"
+    target.save(only=[target.__class__.display_name])
+    add_user_to_team(team, target, role="responder")
+
+    response = client.post(
+        f"/api/incidents/{incident.id}/responders",
+        json={
+            "target_type": "user",
+            "target_user_id": target.id,
+            "message": "Please help with this incident.",
+        },
+        headers=headers,
+    )
+    assert response.status_code == 201, response.get_json()
+
+    details_response = client.get(
+        f"/api/incidents/{incident.id}",
+        headers=headers,
+    )
+    assert details_response.status_code == 200, details_response.get_json()
+
+    payload = details_response.get_json()
+    responders = payload["responders"]
+
+    assert len(responders) == 1
+    assert responders[0]["target"]["type"] == "user"
+    assert responders[0]["target"]["id"] == target.id
+    assert responders[0]["target"]["label"] == "Alice Smith"
+    assert responders[0]["target"]["user"]["id"] == target.id
+
+
+def test_add_responder_event_mentions_target_name(
+    client,
+    db,
+    monkeypatch,
+):
+    disable_responder_notifications(monkeypatch)
+
+    group, team, route, incident = create_incident_fixture()
+    headers, requester = create_responder_headers(group, team)
+
+    target = create_user(
+        username=unique_slug("target"),
+        group=group,
+        group_role="viewer",
+    )
+    target.display_name = "Alice Smith"
+    target.save(only=[target.__class__.display_name])
+    add_user_to_team(team, target, role="responder")
+
+    response = client.post(
+        f"/api/incidents/{incident.id}/responders",
+        json={
+            "target_type": "user",
+            "target_user_id": target.id,
+            "message": "Please help with this incident.",
+        },
+        headers=headers,
+    )
+    assert response.status_code == 201, response.get_json()
+
+    event = (
+        AlertEvent
+        .select()
+        .where(
+            AlertEvent.group == incident,
+            AlertEvent.event_type == "responder_requested",
+        )
+        .order_by(AlertEvent.id.desc())
+        .get()
+    )
+
+    assert "Responder requested: Alice Smith" in event.message
+    assert "Please help with this incident." in event.message
+
+
+def test_decline_responder_event_mentions_actor_and_target(
+    client,
+    db,
+    monkeypatch,
+):
+    disable_responder_notifications(monkeypatch)
+
+    group, team, route, incident = create_incident_fixture()
+    requester_headers, requester = create_responder_headers(group, team)
+
+    target = create_user(
+        username=unique_slug("target"),
+        group=group,
+        group_role="viewer",
+    )
+    target.display_name = "Alice Smith"
+    target.save(only=[target.__class__.display_name])
+    add_user_to_team(team, target, role="responder")
+
+    response = client.post(
+        f"/api/incidents/{incident.id}/responders",
+        json={
+            "target_type": "user",
+            "target_user_id": target.id,
+            "message": "Please help with this incident.",
+        },
+        headers=requester_headers,
+    )
+    assert response.status_code == 201, response.get_json()
+
+    responder_id = response.get_json()["id"]
+
+    target_headers = make_headers(target)
+
+    decline_response = client.put(
+        f"/api/incidents/{incident.id}/responders/{responder_id}",
+        json={
+            "status": "declined",
+            "response_message": "Busy now",
+        },
+        headers=target_headers,
+    )
+    assert decline_response.status_code == 200, decline_response.get_json()
+
+    event = (
+        AlertEvent
+        .select()
+        .where(
+            AlertEvent.group == incident,
+            AlertEvent.event_type == "responder_declined",
+        )
+        .order_by(AlertEvent.id.desc())
+        .get()
+    )
+
+    assert "Alice Smith declined responder request for Alice Smith" in event.message
+    assert "Busy now" in event.message
+
+
+def test_list_incident_responders_contains_target_label(
+    client,
+    db,
+    monkeypatch,
+):
+    disable_responder_notifications(monkeypatch)
+
+    group, team, route, incident = create_incident_fixture()
+    headers, requester = create_responder_headers(group, team)
+
+    target = create_user(
+        username=unique_slug("target"),
+        group=group,
+        group_role="viewer",
+    )
+    target.display_name = "Alice Smith"
+    target.save(only=[target.__class__.display_name])
+    add_user_to_team(team, target, role="responder")
+
+    create_response = client.post(
+        f"/api/incidents/{incident.id}/responders",
+        json={
+            "target_type": "user",
+            "target_user_id": target.id,
+            "message": "Please help with this incident.",
+        },
+        headers=headers,
+    )
+    assert create_response.status_code == 201, create_response.get_json()
+
+    response = client.get(
+        f"/api/incidents/{incident.id}/responders",
+        headers=headers,
+    )
+    assert response.status_code == 200, response.get_json()
+
+    payload = response.get_json()
+
+    assert len(payload) == 1
+    assert payload[0]["target"]["type"] == "user"
+    assert payload[0]["target"]["id"] == target.id
+    assert payload[0]["target"]["label"] == "Alice Smith"
+    assert payload[0]["target"]["user"]["id"] == target.id
+
+
+def test_notification_center_shows_pending_responder_request(
+    client,
+    db,
+    monkeypatch,
+):
+    disable_responder_notifications(monkeypatch)
+
+    group, team, route, incident = create_incident_fixture()
+    requester_headers, requester = create_responder_headers(group, team)
+
+    target = create_user(
+        username=unique_slug("target"),
+        group=group,
+        group_role="viewer",
+    )
+    target.display_name = "Alice Smith"
+    target.save(only=[target.__class__.display_name])
+    add_user_to_team(team, target, role="responder")
+
+    create_response = client.post(
+        f"/api/incidents/{incident.id}/responders",
+        json={
+            "target_type": "user",
+            "target_user_id": target.id,
+            "message": "Please help with database.",
+        },
+        headers=requester_headers,
+    )
+    assert create_response.status_code == 201, create_response.get_json()
+
+    response = client.get(
+        "/api/notification-center",
+        headers=make_headers(target),
+    )
+    assert response.status_code == 200, response.get_json()
+
+    payload = response.get_json()
+
+    assert payload["unread_count"] == 1
+    assert len(payload["items"]) == 1
+
+    item = payload["items"][0]
+
+    assert item["type"] == "responder_request"
+    assert item["incident_id"] == incident.id
+    assert item["responder"]["id"] == create_response.get_json()["id"]
+    assert item["responder"]["target"]["label"] == "Alice Smith"
+    assert "Please help with database." in item["body"]
+
+    action_statuses = {
+        action["status"]
+        for action in item["actions"]
+    }
+    assert action_statuses == {"accepted", "declined"}
+
+
+def test_notification_center_hides_responder_request_after_accept(
+    client,
+    db,
+    monkeypatch,
+):
+    disable_responder_notifications(monkeypatch)
+
+    group, team, route, incident = create_incident_fixture()
+    requester_headers, requester = create_responder_headers(group, team)
+
+    target = create_user(
+        username=unique_slug("target"),
+        group=group,
+        group_role="viewer",
+    )
+    add_user_to_team(team, target, role="responder")
+
+    create_response = client.post(
+        f"/api/incidents/{incident.id}/responders",
+        json={
+            "target_type": "user",
+            "target_user_id": target.id,
+        },
+        headers=requester_headers,
+    )
+    assert create_response.status_code == 201, create_response.get_json()
+
+    responder_id = create_response.get_json()["id"]
+    target_headers = make_headers(target)
+
+    before_response = client.get(
+        "/api/notification-center",
+        headers=target_headers,
+    )
+    assert before_response.status_code == 200, before_response.get_json()
+    assert before_response.get_json()["unread_count"] == 1
+
+    accept_response = client.put(
+        f"/api/incidents/{incident.id}/responders/{responder_id}",
+        json={
+            "status": "accepted",
+        },
+        headers=target_headers,
+    )
+    assert accept_response.status_code == 200, accept_response.get_json()
+
+    after_response = client.get(
+        "/api/notification-center",
+        headers=target_headers,
+    )
+    assert after_response.status_code == 200, after_response.get_json()
+
+    payload = after_response.get_json()
+
+    assert payload["unread_count"] == 0
+    assert payload["items"] == []

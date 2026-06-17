@@ -1,5 +1,5 @@
 from app.modules.db import alerts_repo, users_repo
-from app.services.incidents import notify_stakeholders
+from app.services.incidents.stakeholders import notify_stakeholders
 from app.services.notifications.delivery import update_alert_messages
 
 

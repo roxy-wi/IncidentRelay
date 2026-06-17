@@ -1,3 +1,8 @@
+---
+title: Profile and Personal API Tokens
+description: User profile settings, contact fields and personal API tokens.
+---
+
 # Profile and Personal API Tokens
 
 Open:

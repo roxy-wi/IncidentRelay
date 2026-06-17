@@ -1,3 +1,8 @@
+---
+title: Service Default Stakeholders
+description: Automatically attach service owners as incident stakeholders.
+---
+
 # Service default stakeholders
 
 Service default stakeholders let you define users who should automatically be attached to new incidents for a service.
@@ -172,12 +177,4 @@ Example response:
   "deleted": true,
   "id": 10
 }
-```
-
-## Recommended documentation index link
-
-Add this link to the Services section in `docs/index.md`:
-
-```md
-- [Service default stakeholders](services/default-stakeholders.md)
 ```

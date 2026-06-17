@@ -1,3 +1,8 @@
+---
+title: Sentry Integration Troubleshooting
+description: Troubleshoot Sentry signatures, routing, deduplication and resolves.
+---
+
 # Sentry integration troubleshooting
 
 This guide covers common problems with the IncidentRelay Sentry integration.

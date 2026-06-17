@@ -15,7 +15,7 @@ from app.services.routing.routing import find_route_for_alert, build_group_key
 from app.services.routing.service_resolution import get_effective_escalation_policy, resolve_alert_service, \
     get_effective_route_rotation
 from app.services.silences import find_active_silence
-from app.services.incidents import notify_stakeholders
+from app.services.incidents.stakeholders import notify_stakeholders
 
 logger = logging.getLogger("oncall.alerts")
 

@@ -59,6 +59,7 @@ DEFAULT_INCIDENT_PRIORITIES = [
         "default": False,
     },
 ]
+OPEN_RESPONDER_STATUSES = ("requested", "accepted")
 
 
 def ensure_default_priorities():
@@ -161,6 +162,57 @@ def set_incident_priority(group_id, priority_slug, *, user_id=None, manual=True)
     return group
 
 
+def find_open_incident_responder(group_id, target_type, target_id):
+    target_filters = {
+        "user": IncidentResponder.target_user == target_id,
+        "team": IncidentResponder.target_team == target_id,
+        "rotation": IncidentResponder.target_rotation == target_id,
+        "escalation_policy": (
+            IncidentResponder.target_escalation_policy == target_id
+        ),
+    }
+
+    target_filter = target_filters.get(target_type)
+    if target_filter is None:
+        return None
+
+    return (
+        IncidentResponder
+        .select()
+        .where(
+            IncidentResponder.group == group_id,
+            IncidentResponder.target_type == target_type,
+            IncidentResponder.status.in_(OPEN_RESPONDER_STATUSES),
+            target_filter,
+        )
+        .order_by(IncidentResponder.created_at.desc())
+        .first()
+    )
+
+
+def update_incident_responder_notification(
+    responder_id,
+    *,
+    status,
+    error=None,
+):
+    updated = (
+        IncidentResponder
+        .update(
+            notification_status=status,
+            notification_error=error,
+            updated_at=datetime.utcnow(),
+        )
+        .where(IncidentResponder.id == responder_id)
+        .execute()
+    )
+
+    if not updated:
+        return None
+
+    return get_incident_responder(responder_id)
+
+
 def create_incident_responder(group_id, data):
     expires_at = data.get("expires_at")
 
@@ -219,15 +271,70 @@ def update_incident_responder_status(
     responder.responded_at = datetime.utcnow()
     responder.updated_at = datetime.utcnow()
 
+    save_fields = [
+        IncidentResponder.status,
+        IncidentResponder.response_message,
+        IncidentResponder.responded_at,
+        IncidentResponder.updated_at,
+    ]
+
     if status == "accepted":
         responder.accepted_by = user_id
+        save_fields.append(IncidentResponder.accepted_by)
 
     if status == "declined":
         responder.declined_by = user_id
+        save_fields.append(IncidentResponder.declined_by)
 
-    responder.save()
-
+    responder.save(only=save_fields)
     return responder
+
+
+def list_expired_requested_responders(*, now=None, limit=100):
+    """Return requested responder rows whose expiration time has passed."""
+    now = now or datetime.utcnow()
+
+    return list(
+        IncidentResponder
+        .select()
+        .where(
+            IncidentResponder.status == "requested",
+            IncidentResponder.expires_at.is_null(False),
+            IncidentResponder.expires_at <= now,
+        )
+        .order_by(
+            IncidentResponder.expires_at.asc(),
+            IncidentResponder.id.asc(),
+        )
+        .limit(limit)
+    )
+
+
+def expire_incident_responder(responder_id, *, now=None):
+    """Expire one responder request only if it is still requested."""
+    now = now or datetime.utcnow()
+
+    updated = (
+        IncidentResponder
+        .update(
+            status="expired",
+            response_message="Responder request expired",
+            responded_at=now,
+            updated_at=now,
+        )
+        .where(
+            IncidentResponder.id == responder_id,
+            IncidentResponder.status == "requested",
+            IncidentResponder.expires_at.is_null(False),
+            IncidentResponder.expires_at <= now,
+        )
+        .execute()
+    )
+
+    if not updated:
+        return None
+
+    return get_incident_responder(responder_id)
 
 
 def create_incident_stakeholder(group_id, data):
@@ -354,3 +461,17 @@ def add_service_stakeholders_to_incident(group):
         existing_user_ids.add(owner.user_id)
 
     return rows
+
+
+def list_requested_incident_responders(limit=100):
+    """Return recent requested incident responder records."""
+    return list(
+        IncidentResponder
+        .select()
+        .where(IncidentResponder.status == "requested")
+        .order_by(
+            IncidentResponder.requested_at.desc(),
+            IncidentResponder.id.desc(),
+        )
+        .limit(limit)
+    )

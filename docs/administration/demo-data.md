@@ -1,3 +1,8 @@
+---
+title: Demo Data
+description: Create and verify IncidentRelay demo data for local testing.
+---
+
 # Demo Data
 
 Use demo data only for local testing and development.

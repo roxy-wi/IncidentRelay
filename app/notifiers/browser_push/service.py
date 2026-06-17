@@ -290,6 +290,33 @@ def build_stakeholder_alert_push_payload(
             or f"Priority: {alert_priority_label(group)}"
         )
     elif normalized_event_type in {
+            "responder_requested",
+            "incident_responder_requested",
+        }:
+        context = context or {}
+
+        requester = context.get("requested_by_name") or "Someone"
+        target_type = context.get("target_type") or "responder"
+        message = truncate_text(context.get("message"), limit=120)
+
+        team = group.team.slug if group.team else "-"
+        service = getattr(group.service, "name", None) if group.service else None
+
+        title = f"RESPONDER REQUESTED: {format_alert_title_with_priority(group)}"
+
+        body_parts = [
+            f"{requester} requested you as {target_type.replace('_', ' ')}.",
+            f"Team: {team}",
+        ]
+
+        if service:
+            body_parts.append(f"Service: {service}")
+
+        if message:
+            body_parts.append(f"Message: {message}")
+
+        body = "\n".join(body_parts)
+    elif normalized_event_type in {
             "priority_changed",
             "incident_priority_changed",
         }:
@@ -323,6 +350,15 @@ def build_stakeholder_alert_push_payload(
         title = format_alert_title_with_priority(group)
         body = group.message or f"Priority: {alert_priority_label(group)}"
 
+    tag = f"incidentrelay-stakeholder-alert-group-{group.id}"
+
+    if normalized_event_type in {
+        "responder_requested",
+        "incident_responder_requested",
+    }:
+        responder_id = (context or {}).get("responder_id")
+        tag = f"incidentrelay-responder-{group.id}-{responder_id or 'request'}"
+
     return {
         "title": title,
         "body": body,
@@ -334,7 +370,7 @@ def build_stakeholder_alert_push_payload(
         "priority": getattr(group, "priority_slug", None) or "p3",
         "priority_label": alert_priority_label(group),
         "url": build_alert_web_url(group) or f"/alerts/{group.id}",
-        "tag": f"incidentrelay-stakeholder-alert-group-{group.id}",
+        "tag": tag,
         "require_interaction": True,
         "renotify": True,
         "silent": False,

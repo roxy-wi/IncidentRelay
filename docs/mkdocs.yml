@@ -21,8 +21,10 @@ markdown_extensions:
 
 nav:
   - Home: index.md
+  - Project README: project-readme.md
   - Getting Started:
       - Overview: getting-started/index.md
+      - Installation: getting-started/installation.md
       - Docker Installation: getting-started/docker.md
       - RPM Installation: getting-started/rpm-installation.md
       - Manual systemd Installation: getting-started/systemd.md
@@ -32,16 +34,40 @@ nav:
   - Main Concepts:
       - Overview: concepts/index.md
       - Groups and RBAC: concepts/groups-and-rbac.md
-      - Teams, Rotations and Routes: concepts/teams-rotations-routes.md
       - Channels: concepts/channels.md
       - Route Intake Tokens: concepts/route-intake-tokens.md
       - Reminders and Escalations: concepts/reminders-and-escalations.md
+      - Escalation Policies: concepts/escalation-policies.md
+  - Incident Management:
+      - Overview: incidents/index.md
+      - Alerts and Alert Groups: usage/alerts.md
+      - Incident Priorities: incidents/priorities.md
+      - Incident Responders: incidents/responders.md
+      - Incident Stakeholders: incidents/stakeholders.md
+      - Alert Comments: usage/alert-comments.md
+      - Silences: usage/silences.md
+      - Maintenance Windows: concepts/maintenance-windows.md
+  - Services:
+      - Overview: services/index.md
+      - Service Model: concepts/services.md
+      - Service Default Stakeholders: services/default-stakeholders.md
+  - Scheduling:
+      - Overview: scheduling/index.md
+      - Teams, Rotations and Routes: concepts/teams-rotations-routes.md
+      - Calendar: usage/calendar.md
+      - Rotation Layers: usage/rotation-layers.md
+      - Rotation Overrides: usage/rotation-overrides.md
   - Integrations:
       - Overview: integrations/index.md
       - Incoming alert sources:
           - Alertmanager: integrations/alertmanager.md
           - Zabbix: integrations/zabbix.md
+          - Sentry: integrations/sentry.md
+          - Sentry Troubleshooting: integrations/sentry-troubleshooting.md
           - Generic Webhook: integrations/generic-webhook.md
+      - Calendar sync:
+          - CalDAV Calendar Sync: integrations/caldav.md
+          - ICS Calendar Feeds: integrations/ics-calendar-feed.md
       - Notification channels:
           - Common Behavior: integrations/channels.md
           - Mattermost: integrations/mattermost.md
@@ -50,14 +76,10 @@ nav:
           - Email Templates: integrations/email-channel-templates.md
           - Webhook-based Channels: integrations/webhook-channels.md
           - Voice Call: integrations/voice-call.md
-  - Usage:
+  - User Guide:
       - Overview: usage/index.md
-      - Alerts: usage/alerts.md
-      - Silences: usage/silences.md
-      - Calendar: usage/calendar.md
       - Profile and Personal API Tokens: usage/profile-and-tokens.md
       - Browser Push Notifications: usage/browser-push.md
-      - Rotation Overrides: usage/rotation-overrides.md
   - Voice Providers:
       - Overview: voice-providers/index.md
       - Provider API: voice-providers/provider-api.md
@@ -67,9 +89,12 @@ nav:
       - Troubleshooting: voice-providers/troubleshooting.md
   - API:
       - Overview: api/index.md
+      - Escalation Policies API: api/escalation-policies.md
+      - Sentry Integration API: api/sentry-integration.md
       - Voice Call OpenAPI Notes: api/voice-call-openapi.md
   - Administration:
       - Overview: administration/index.md
+      - SSO: administration/sso.md
       - Scheduler: administration/scheduler.md
       - Logging: administration/logging.md
       - Demo Data: administration/demo-data.md

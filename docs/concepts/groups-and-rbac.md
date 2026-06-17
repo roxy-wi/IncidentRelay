@@ -1,3 +1,8 @@
+---
+title: Groups and RBAC
+description: Access boundaries, group roles, team roles and permissions.
+---
+
 # Groups and RBAC
 
 IncidentRelay uses two permission layers:

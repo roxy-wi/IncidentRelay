@@ -1,3 +1,8 @@
+---
+title: Silences
+description: Suppress notifications for matching alerts with silence rules.
+---
+
 # Silences
 
 Silences temporarily suppress alert notifications for planned maintenance, noisy alerts, or known incidents that do not need paging.

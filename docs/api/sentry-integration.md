@@ -1,3 +1,8 @@
+---
+title: Sentry Integration API
+description: Signed Sentry webhook endpoint, payload normalization and response codes.
+---
+
 # Sentry integration API
 
 This document describes the IncidentRelay backend API behavior for the Sentry incoming integration.

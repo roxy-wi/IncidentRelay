@@ -1,3 +1,8 @@
+---
+title: Alerts and Alert Groups
+description: Alert group lifecycle, grouping, comments and API examples.
+---
+
 # Alerts and alert groups
 
 IncidentRelay stores every incoming monitoring signal as an **alert** and shows operators an **alert group** in the Alerts page.

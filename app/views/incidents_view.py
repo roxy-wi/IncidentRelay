@@ -4,13 +4,12 @@ from app.modules.db.models import Alert
 from app.modules.db import alerts_repo
 from app.modules.db import incidents_repo
 from app.services.audit import write_audit
-from app.services.incidents import (
-    create_incident_responder,
+from app.services.incidents.stakeholders import (
     create_incident_stakeholder,
     remove_incident_stakeholder,
-    set_incident_priority,
-    set_incident_responder_status,
 )
+from app.services.incidents.priorities import set_incident_priority
+from app.services.incidents.responders import create_incident_responder, set_incident_responder_status
 from app.services.rbac import (
     get_allowed_team_ids,
     require_team_read,
@@ -23,6 +22,11 @@ from app.services.serializers import (
     serialize_incident_priority,
     serialize_incident_responder,
     serialize_incident_stakeholder,
+)
+from app.services.validation import validate_body
+from app.api.schemas.incidents import (
+    IncidentResponderCreateSchema,
+    IncidentResponderUpdateSchema,
 )
 
 
@@ -241,9 +245,11 @@ def list_incident_responders(incident_id):
     if error:
         return error
 
+    responders = incidents_repo.list_incident_responders(group.id)
+
     return jsonify([
         serialize_incident_responder(responder)
-        for responder in incidents_repo.list_incident_responders(group.id)
+        for responder in responders
     ])
 
 
@@ -254,12 +260,14 @@ def add_incident_responder(incident_id):
     if error:
         return error
 
-    payload = request.get_json(silent=True) or {}
+    payload, error = validate_body(IncidentResponderCreateSchema)
+    if error:
+        return error
 
     try:
         responder = create_incident_responder(
             group_id=group.id,
-            payload=payload,
+            payload=payload.model_dump(),
             user_id=_request_user_id(),
         )
     except ValueError as exc:
@@ -284,6 +292,13 @@ def add_incident_responder(incident_id):
         data={
             "responder_id": responder.id,
             "target_type": responder.target_type,
+            "target_user_id": responder.target_user_id,
+            "target_team_id": responder.target_team_id,
+            "target_rotation_id": responder.target_rotation_id,
+            "target_escalation_policy_id": (
+                responder.target_escalation_policy_id
+            ),
+            "status": responder.status,
         },
     )
 
@@ -295,20 +310,32 @@ def add_incident_responder(incident_id):
     methods=["PUT"],
 )
 def update_incident_responder(incident_id, responder_id):
-    group, error = _get_incident_or_error(incident_id, respond=True)
+    group = alerts_repo.get_alert_group(incident_id)
+    if not group:
+        return _json_error(
+            "not_found",
+            "Incident not found",
+            404,
+        )
 
+    payload, error = validate_body(IncidentResponderUpdateSchema)
     if error:
         return error
-
-    payload = request.get_json(silent=True) or {}
 
     try:
         responder = set_incident_responder_status(
             group_id=group.id,
             responder_id=responder_id,
-            status=payload.get("status"),
-            response_message=payload.get("response_message"),
+            status=payload.status,
+            response_message=payload.response_message,
             user_id=_request_user_id(),
+            user=_request_user(),
+        )
+    except PermissionError as exc:
+        return _json_error(
+            "access_denied",
+            str(exc),
+            403,
         )
     except ValueError as exc:
         return _json_error(

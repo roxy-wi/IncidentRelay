@@ -1,11 +1,17 @@
+---
+title: Usage
+description: Common day-to-day IncidentRelay workflows.
+---
+
 # Usage
 
-This section describes common day-to-day workflows:
+This section describes user-owned settings and daily personal workflows:
 
-- [Alerts](alerts.md)
-- [Silences](silences.md)
-- [Calendar](calendar.md)
 - [Profile and Personal API Tokens](profile-and-tokens.md)
 - [Browser Push](browser-push.md)
-- [Rotation Overrides](rotation-overrides.md)
-- [Maintenance Windows](../concepts/maintenance-windows.md)
+
+Operational workflows now live in focused sections:
+
+- [Incident Management](../incidents/index.md)
+- [Services](../services/index.md)
+- [Scheduling](../scheduling/index.md)

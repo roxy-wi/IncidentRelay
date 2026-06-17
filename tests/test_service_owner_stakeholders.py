@@ -381,7 +381,7 @@ def test_new_alert_notifies_service_owner_stakeholder_on_created(
     emails = []
 
     monkeypatch.setattr(
-        "app.services.incidents.send_stakeholder_email",
+        "app.services.incidents.stakeholders.send_stakeholder_email",
         lambda recipient, subject, body: emails.append(
             {
                 "recipient": recipient,
@@ -443,7 +443,7 @@ def test_new_alert_does_not_notify_service_owner_when_created_notifications_disa
     emails = []
 
     monkeypatch.setattr(
-        "app.services.incidents.send_stakeholder_email",
+        "app.services.incidents.stakeholders.send_stakeholder_email",
         lambda recipient, subject, body: emails.append(recipient),
     )
 
@@ -488,12 +488,12 @@ def test_new_alert_sends_browser_push_to_service_owner_stakeholder(
     pushes = []
 
     monkeypatch.setattr(
-        "app.services.incidents.send_stakeholder_email",
+        "app.services.incidents.stakeholders.send_stakeholder_email",
         lambda recipient, subject, body: emails.append(recipient),
     )
 
     monkeypatch.setattr(
-        "app.services.incidents.browser_push.send_stakeholder_push_to_user",
+        "app.services.incidents.stakeholders.browser_push.send_stakeholder_push_to_user",
         lambda user, group, event_type="incident_created": pushes.append(
             {
                 "user_id": user.id,
@@ -549,12 +549,12 @@ def test_new_alert_does_not_push_stakeholder_when_created_notifications_disabled
     pushes = []
 
     monkeypatch.setattr(
-        "app.services.incidents.send_stakeholder_email",
+        "app.services.incidents.stakeholders.send_stakeholder_email",
         lambda recipient, subject, body: None,
     )
 
     monkeypatch.setattr(
-        "app.services.incidents.browser_push.send_stakeholder_push_to_user",
+        "app.services.incidents.stakeholders.browser_push.send_stakeholder_push_to_user",
         lambda user, group, event_type="incident_created": pushes.append(user.id) or 1,
     )
 
@@ -645,7 +645,7 @@ def test_acknowledge_alert_notifies_stakeholder_status_change(db, monkeypatch):
     pushes = []
 
     monkeypatch.setattr(
-        "app.services.incidents.send_stakeholder_email",
+        "app.services.incidents.stakeholders.send_stakeholder_email",
         lambda recipient, subject, body: emails.append(
             {
                 "recipient": recipient,
@@ -656,7 +656,7 @@ def test_acknowledge_alert_notifies_stakeholder_status_change(db, monkeypatch):
     )
 
     monkeypatch.setattr(
-        "app.services.incidents.browser_push.send_stakeholder_push_to_user",
+        "app.services.incidents.stakeholders.browser_push.send_stakeholder_push_to_user",
         lambda user, group, event_type="status_changed": pushes.append(
             {
                 "user_id": user.id,
@@ -703,12 +703,12 @@ def test_acknowledge_alert_respects_stakeholder_status_flag(db, monkeypatch):
     pushes = []
 
     monkeypatch.setattr(
-        "app.services.incidents.send_stakeholder_email",
+        "app.services.incidents.stakeholders.send_stakeholder_email",
         lambda recipient, subject, body: emails.append(recipient),
     )
 
     monkeypatch.setattr(
-        "app.services.incidents.browser_push.send_stakeholder_push_to_user",
+        "app.services.incidents.stakeholders.browser_push.send_stakeholder_push_to_user",
         lambda user, group, event_type="status_changed": pushes.append(user.id) or 1,
     )
 
@@ -739,7 +739,7 @@ def test_resolve_alert_notifies_stakeholder_resolved(db, monkeypatch):
     pushes = []
 
     monkeypatch.setattr(
-        "app.services.incidents.send_stakeholder_email",
+        "app.services.incidents.stakeholders.send_stakeholder_email",
         lambda recipient, subject, body: emails.append(
             {
                 "recipient": recipient,
@@ -750,7 +750,7 @@ def test_resolve_alert_notifies_stakeholder_resolved(db, monkeypatch):
     )
 
     monkeypatch.setattr(
-        "app.services.incidents.browser_push.send_stakeholder_push_to_user",
+        "app.services.incidents.stakeholders.browser_push.send_stakeholder_push_to_user",
         lambda user, group, event_type="incident_resolved": pushes.append(
             {
                 "user_id": user.id,
@@ -797,12 +797,12 @@ def test_resolve_alert_respects_stakeholder_resolved_flag(db, monkeypatch):
     pushes = []
 
     monkeypatch.setattr(
-        "app.services.incidents.send_stakeholder_email",
+        "app.services.incidents.stakeholders.send_stakeholder_email",
         lambda recipient, subject, body: emails.append(recipient),
     )
 
     monkeypatch.setattr(
-        "app.services.incidents.browser_push.send_stakeholder_push_to_user",
+        "app.services.incidents.stakeholders.browser_push.send_stakeholder_push_to_user",
         lambda user, group, event_type="incident_resolved": pushes.append(user.id) or 1,
     )
 
@@ -833,7 +833,7 @@ def test_incoming_resolved_payload_notifies_stakeholder_resolved(
     pushes = []
 
     monkeypatch.setattr(
-        "app.services.incidents.send_stakeholder_email",
+        "app.services.incidents.stakeholders.send_stakeholder_email",
         lambda recipient, subject, body: emails.append(
             {
                 "recipient": recipient,
@@ -844,7 +844,7 @@ def test_incoming_resolved_payload_notifies_stakeholder_resolved(
     )
 
     monkeypatch.setattr(
-        "app.services.incidents.browser_push.send_stakeholder_push_to_user",
+        "app.services.incidents.stakeholders.browser_push.send_stakeholder_push_to_user",
         lambda user, group, event_type="incident_created": pushes.append(
             {
                 "user_id": user.id,
@@ -917,12 +917,12 @@ def test_incoming_resolved_payload_respects_stakeholder_resolved_flag(
     pushes = []
 
     monkeypatch.setattr(
-        "app.services.incidents.send_stakeholder_email",
+        "app.services.incidents.stakeholders.send_stakeholder_email",
         lambda recipient, subject, body: emails.append(recipient),
     )
 
     monkeypatch.setattr(
-        "app.services.incidents.browser_push.send_stakeholder_push_to_user",
+        "app.services.incidents.stakeholders.browser_push.send_stakeholder_push_to_user",
         lambda user, group, event_type="incident_resolved": pushes.append(user.id) or 1,
     )
 
@@ -979,7 +979,7 @@ def test_group_comment_notifies_stakeholder(db, monkeypatch):
     pushes = []
 
     monkeypatch.setattr(
-        "app.services.incidents.send_stakeholder_email",
+        "app.services.incidents.stakeholders.send_stakeholder_email",
         lambda recipient, subject, body: emails.append(
             {
                 "recipient": recipient,
@@ -990,7 +990,7 @@ def test_group_comment_notifies_stakeholder(db, monkeypatch):
     )
 
     monkeypatch.setattr(
-        "app.services.incidents.browser_push.send_stakeholder_push_to_user",
+        "app.services.incidents.stakeholders.browser_push.send_stakeholder_push_to_user",
         lambda user, group, event_type="incident_comment_added", context=None: pushes.append(
             {
                 "user_id": user.id,
@@ -1044,12 +1044,12 @@ def test_group_comment_respects_stakeholder_comment_flag(db, monkeypatch):
     pushes = []
 
     monkeypatch.setattr(
-        "app.services.incidents.send_stakeholder_email",
+        "app.services.incidents.stakeholders.send_stakeholder_email",
         lambda recipient, subject, body: emails.append(recipient),
     )
 
     monkeypatch.setattr(
-        "app.services.incidents.browser_push.send_stakeholder_push_to_user",
+        "app.services.incidents.stakeholders.browser_push.send_stakeholder_push_to_user",
         lambda user, group, event_type="incident_comment_added", context=None: pushes.append(user.id) or 1,
     )
 

@@ -32,6 +32,7 @@ from app.views.notification_rules_view import notification_rules_bp
 from app.views.incidents_view import incidents_bp
 from app.views.maintenance_view import maintenance_bp
 from app.views.caldav_view import caldav_bp
+from app.views.notification_center_view import notification_center_bp
 
 
 def create_app(log_role=None):
@@ -112,3 +113,4 @@ def register_blueprints(flask_app):
     flask_app.register_blueprint(sso_admin_bp, url_prefix="/api/admin/sso")
     flask_app.register_blueprint(push_bp, url_prefix="/api")
     flask_app.register_blueprint(notification_rules_bp, url_prefix="/api")
+    flask_app.register_blueprint(notification_center_bp, url_prefix="/api/notification-center")
