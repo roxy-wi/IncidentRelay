@@ -224,6 +224,117 @@ window.AppTimezones = (function () {
         return timezone ? result + " " + timezone : result;
     }
 
+    function normalizeTimezone(value) {
+        const timezone = String(value || "").trim();
+
+        return timezone || null;
+    }
+
+    function getUserTimezone(user) {
+        if (!user) {
+            return null;
+        }
+
+        return normalizeTimezone(user.timezone);
+    }
+
+    function getDisplayTimezone(user) {
+        return (
+            getUserTimezone(user) ||
+            getBrowserDefaultTimezone() ||
+            "UTC"
+        );
+    }
+
+    function fillOptionalSelect(selector, selectedTimezone, emptyLabel) {
+        const select = $(selector);
+        const value = normalizeTimezone(selectedTimezone) || "";
+        const browserTimezone = getBrowserDefaultTimezone();
+        const zones = getBrowserTimezones();
+
+        if (!select.length) {
+            return;
+        }
+
+        select.empty();
+
+        $("<option>")
+            .val("")
+            .text(
+                emptyLabel ||
+                ("Use browser timezone (" + browserTimezone + ")")
+            )
+            .appendTo(select);
+
+        zones.forEach(function (zone) {
+            $("<option>")
+                .val(zone)
+                .text(zone)
+                .appendTo(select);
+        });
+
+        if (value && zones.indexOf(value) === -1) {
+            $("<option>")
+                .val(value)
+                .text(value)
+                .appendTo(select);
+        }
+
+        select.val(value);
+    }
+
+    function initOptionalSelect(selector, selectedTimezone, dropdownParent) {
+        const select = $(selector);
+
+        if (!select.length) {
+            return;
+        }
+
+        fillOptionalSelect(select, selectedTimezone);
+
+        if (!$.fn.select2) {
+            return;
+        }
+
+        if (select.hasClass("select2-hidden-accessible")) {
+            select.select2("destroy");
+        }
+
+        select.select2({
+            width: "100%",
+            placeholder: "Use browser timezone",
+            allowClear: true,
+            dropdownParent: dropdownParent ? $(dropdownParent) : undefined,
+        });
+    }
+
+    function setOptionalSelectValue(selector, value) {
+        const select = $(selector);
+        const timezone = normalizeTimezone(value) || "";
+
+        if (!select.length) {
+            return;
+        }
+
+        if (
+            timezone &&
+            !select.find("option").filter(function () {
+                return $(this).val() === timezone;
+            }).length
+        ) {
+            $("<option>")
+                .val(timezone)
+                .text(timezone)
+                .appendTo(select);
+        }
+
+        select.val(timezone).trigger("change");
+    }
+
+    function getOptionalSelectValue(selector) {
+        return normalizeTimezone($(selector).val());
+    }
+
     return {
         getBrowserTimezones: getBrowserTimezones,
         getBrowserDefaultTimezone: getBrowserDefaultTimezone,
@@ -235,5 +346,12 @@ window.AppTimezones = (function () {
         normalizeDatetimeLocal: normalizeDatetimeLocal,
         toDatetimeLocalInput: toDatetimeLocalInput,
         formatPlainDatetime: formatPlainDatetime,
+        normalizeTimezone: normalizeTimezone,
+        getUserTimezone: getUserTimezone,
+        getDisplayTimezone: getDisplayTimezone,
+        fillOptionalSelect: fillOptionalSelect,
+        initOptionalSelect: initOptionalSelect,
+        setOptionalSelectValue: setOptionalSelectValue,
+        getOptionalSelectValue: getOptionalSelectValue,
     };
 })();

@@ -1,4 +1,4 @@
-from typing import Any, Dict, List
+from typing import Any, Dict
 
 from pydantic import ConfigDict, Field, model_validator
 
@@ -170,3 +170,92 @@ class SentryWebhookSchema(ApiModel):
     actor: Dict[str, Any] | None = None
     installation: Dict[str, Any] | None = None
     data: Dict[str, Any] = Field(default_factory=dict)
+
+
+class LibreNMSWebhookSchema(ApiModel):
+    """Validate LibreNMS API transport payload."""
+
+    model_config = ConfigDict(extra="allow")
+
+    id: str | int | None = None
+    uid: str | None = None
+    alert_id: str | int | None = None
+    alert_uid: str | None = None
+    external_id: str | int | None = None
+
+    title: str | None = None
+    subject: str | None = None
+    name: str | None = None
+    rule: str | None = None
+
+    message: str | None = None
+    msg: str | None = None
+    description: str | None = None
+    alert_notes: str | None = None
+
+    state: str | int | None = None
+    status: str | None = None
+    severity: str | None = None
+
+    hostname: str | None = None
+    display: str | None = None
+    sysName: str | None = None
+    device_id: str | int | None = None
+    ip: str | None = None
+    os: str | None = None
+    type: str | None = None
+    hardware: str | None = None
+    version: str | None = None
+    location: str | None = None
+
+    timestamp: str | None = None
+    elapsed: str | None = None
+    proc: str | None = None
+
+    team: str | None = None
+    labels: Dict[str, Any] = Field(default_factory=dict)
+
+    fingerprint: str | None = None
+    event_link: str | None = None
+    event_url: str | None = None
+    alert_url: str | None = None
+    source_url: str | None = None
+    device_url: str | None = None
+    librenms_url: str | None = None
+
+    faults: Any = None
+    contacts: Any = None
+    applications: Any = None
+
+    @model_validator(mode="after")
+    def validate_not_empty(self):
+        has_identity = bool(
+            self.external_id
+            or self.id
+            or self.uid
+            or self.alert_id
+            or self.alert_uid
+            or self.fingerprint
+        )
+        has_content = bool(
+            self.title
+            or self.subject
+            or self.name
+            or self.rule
+            or self.message
+            or self.msg
+            or self.description
+            or self.hostname
+            or self.display
+            or self.sysName
+        )
+        has_labels = bool(self.labels)
+
+        if not (has_identity or has_content or has_labels):
+            raise ValueError(
+                "LibreNMS webhook payload must contain at least one of: "
+                "id, uid, alert_id, title, name, rule, message, msg, "
+                "description, hostname, display, sysName, fingerprint or labels"
+            )
+
+        return self

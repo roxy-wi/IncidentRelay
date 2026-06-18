@@ -24,6 +24,12 @@ from app.services.incidents.responders import create_incident_responder, set_inc
 alerts_bp = Blueprint("alerts_api", __name__)
 
 
+def _get_bool_query_arg(name):
+    value = str(request.args.get(name) or "").strip().lower()
+
+    return value in {"1", "true", "yes", "on"}
+
+
 def _get_query_values(name, cast=None):
     values = request.args.getlist(name)
 
@@ -64,6 +70,14 @@ def list_alerts():
     else:
         team_ids = get_allowed_team_ids()
 
+    assigned_to_me = _get_bool_query_arg("assigned_to_me")
+    current_user = _request_user()
+    assigned_to_user_id = (
+        getattr(current_user, "id", None)
+        if assigned_to_me
+        else None
+    )
+
     page = alerts_repo.paginate_alert_groups(
         team_id=team_id,
         team_ids=team_ids,
@@ -76,6 +90,7 @@ def list_alerts():
         service_status=request.args.get("service_status"),
         service_criticality=request.args.get("service_criticality"),
         search=request.args.get("search"),
+        assigned_to_user_id=assigned_to_user_id,
         page=request.args.get("page", 1, type=int),
         page_size=request.args.get("page_size", 25, type=int),
         sort=request.args.get("sort", "activity"),

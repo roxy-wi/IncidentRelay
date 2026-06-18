@@ -124,6 +124,7 @@ function loadProfile() {
         $("#profile-display-name").val(profile.display_name || "");
         $("#profile-email").val(profile.email || "");
         $("#profile-phone").val(profile.phone || "");
+        $("#profile-timezone").val(profile.timezone || "");
         $("#profile-telegram").val(profile.telegram_user_id || "");
         $("#profile-slack").val(profile.slack_user_id || "");
         $("#profile-mattermost").val(profile.mattermost_user_id || "");
@@ -136,6 +137,11 @@ function loadProfile() {
             "checked",
             profile.notify_oncall_shift_end_email !== false
         );
+
+        if (window.AppTimezones) {
+            AppTimezones.initOptionalSelect("#profile-timezone", profile.timezone);
+            AppTimezones.setOptionalSelectValue("#profile-timezone", profile.timezone);
+        }
 
         if (!profile.is_admin) {
             $('#profile-token-scopes option[value="*"]').remove();
@@ -157,6 +163,9 @@ function saveProfile() {
             display_name: $("#profile-display-name").val() || null,
             email: $("#profile-email").val() || null,
             phone: $("#profile-phone").val() || null,
+            timezone: window.AppTimezones
+                ? AppTimezones.getOptionalSelectValue("#profile-timezone")
+                : ($("#profile-timezone").val() || null),
             telegram_user_id: $("#profile-telegram").val() || null,
             slack_user_id: $("#profile-slack").val() || null,
             mattermost_user_id: $("#profile-mattermost").val() || null,
@@ -417,14 +426,30 @@ function profileOncallDisplayName(name, slug, fallback) {
 function renderProfileOncallSlot(slot) {
     const item = $("<div>").addClass("profile-oncall-slot");
 
+    const sourceTimezone = slot.timezone || "UTC";
+    const displayTimezone = window.AppTimezones
+        ? AppTimezones.getDisplayTimezone(currentUser)
+        : sourceTimezone;
+
     const title = $("<div>")
         .addClass("profile-oncall-slot-title")
-        .text(profileOncallDisplayName(slot.team_name, slot.team_slug, "Team"));
+        .text(profileOncallDisplayName(
+            slot.team_name,
+            slot.team_slug,
+            "Team"
+        ));
 
     const meta = [
         slot.rotation_name || ("Rotation #" + slot.rotation_id),
-        slot.layer_name || (slot.type === "override" ? "Override" : "Layer"),
-        slot.timezone || "UTC"
+        slot.layer_name || (
+            slot.type === "override"
+                ? "Override"
+                : "Layer"
+        ),
+        "Shown in " + displayTimezone,
+        sourceTimezone !== displayTimezone
+            ? "Source " + sourceTimezone
+            : null,
     ].filter(Boolean).join(" · ");
 
     item.append(title);
@@ -439,9 +464,15 @@ function renderProfileOncallSlot(slot) {
         $("<div>")
             .addClass("profile-oncall-slot-time")
             .text(
-                formatShortDateTimeMinutesInTimezone(slot.start, slot.timezone)
-                + " → "
-                + formatShortDateTimeMinutesInTimezone(slot.end, slot.timezone)
+                formatShortDateTimeMinutesInTimezone(
+                    slot.start,
+                    displayTimezone
+                ) +
+                " → " +
+                formatShortDateTimeMinutesInTimezone(
+                    slot.end,
+                    displayTimezone
+                )
             )
     );
 

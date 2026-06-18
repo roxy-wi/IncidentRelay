@@ -1,4 +1,5 @@
 from typing import List, Optional
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from pydantic import EmailStr, Field, field_validator
 
@@ -25,6 +26,7 @@ class ProfileUpdateSchema(ApiModel):
         default=None,
         max_length=PHONE_MAX_LENGTH,
     )
+    timezone: Optional[str] = Field(default=None, max_length=64)
     telegram_user_id: Optional[str] = Field(
         default=None,
         max_length=CONTACT_ID_MAX_LENGTH,
@@ -45,6 +47,25 @@ class ProfileUpdateSchema(ApiModel):
     def validate_phone_field(cls, value):
         """Validate profile phone number."""
         return normalize_phone(value)
+
+    @field_validator("timezone")
+    @classmethod
+    def validate_timezone_field(cls, value):
+        """Validate optional IANA timezone name."""
+        if value is None:
+            return None
+
+        value = value.strip()
+
+        if not value:
+            return None
+
+        try:
+            ZoneInfo(value)
+        except ZoneInfoNotFoundError as exc:
+            raise ValueError("invalid timezone") from exc
+
+        return value
 
 
 class ProfileTokenCreateSchema(ApiModel):

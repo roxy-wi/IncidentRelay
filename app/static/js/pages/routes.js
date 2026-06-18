@@ -215,7 +215,7 @@ function renderRoutesSummary(routes) {
 function fillRouteSourceFilter(routes) {
     const filter = $("#routes-source-filter");
     const selected = filter.val();
-    const sources = { alertmanager: true, zabbix: true, webhook: true, sentry: true };
+    const sources = { alertmanager: true, zabbix: true, webhook: true, sentry: true, librenms: true };
 
     asArray(routes).forEach(function (route) {
         if (route.source) {

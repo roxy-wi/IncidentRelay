@@ -334,6 +334,286 @@ VOICE_CALLBACK_RESPONSE_SCHEMA = {
     },
 }
 
+librenms_body = {
+    "type": "object",
+    "description": (
+        "LibreNMS API transport payload. Configure LibreNMS to send JSON "
+        "using alert template variables such as id, uid, state, severity, "
+        "title, msg, hostname and device_id."
+    ),
+    "additionalProperties": True,
+    "properties": {
+        "id": {
+            "type": "string",
+            "nullable": True,
+            "description": "LibreNMS alert id.",
+            "example": "12345",
+        },
+        "uid": {
+            "type": "string",
+            "nullable": True,
+            "description": "LibreNMS unique alert uid. Prefer this as stable external id.",
+            "example": "lnms-alert-12345",
+        },
+        "alert_id": {
+            "type": "string",
+            "nullable": True,
+            "description": "Alternative alert id field.",
+            "example": "12345",
+        },
+        "alert_uid": {
+            "type": "string",
+            "nullable": True,
+            "description": "Alternative alert uid field.",
+            "example": "lnms-alert-12345",
+        },
+        "external_id": {
+            "type": "string",
+            "nullable": True,
+            "description": (
+                "Stable LibreNMS alert identifier used by IncidentRelay for "
+                "deduplication. Must be the same for firing and recovery events."
+            ),
+            "example": "12345",
+        },
+        "state": {
+            "oneOf": [
+                {"type": "string"},
+                {"type": "integer"},
+            ],
+            "nullable": True,
+            "description": (
+                "LibreNMS alert state. 0/ok/clear/recovered/resolved are "
+                "normalized as resolved, other values are normalized as firing."
+            ),
+            "example": "1",
+        },
+        "status": {
+            "type": "string",
+            "nullable": True,
+            "description": "Alternative status/state field.",
+            "example": "firing",
+        },
+        "severity": {
+            "type": "string",
+            "nullable": True,
+            "description": "LibreNMS severity.",
+            "example": "critical",
+        },
+        "title": {
+            "type": "string",
+            "nullable": True,
+            "description": "Alert title.",
+            "example": "Device down",
+        },
+        "subject": {
+            "type": "string",
+            "nullable": True,
+            "description": "Alternative alert title.",
+            "example": "Device down",
+        },
+        "name": {
+            "type": "string",
+            "nullable": True,
+            "description": "LibreNMS alert rule name.",
+            "example": "Device down",
+        },
+        "rule": {
+            "type": "string",
+            "nullable": True,
+            "description": "Alternative alert rule name.",
+            "example": "Device down",
+        },
+        "message": {
+            "type": "string",
+            "nullable": True,
+            "description": "Alert message.",
+            "example": "Device router1 is unreachable",
+        },
+        "msg": {
+            "type": "string",
+            "nullable": True,
+            "description": "LibreNMS alert message variable.",
+            "example": "Device router1 is unreachable",
+        },
+        "description": {
+            "type": "string",
+            "nullable": True,
+            "description": "Alternative alert description.",
+            "example": "Device router1 is unreachable",
+        },
+        "alert_notes": {
+            "type": "string",
+            "nullable": True,
+            "description": "LibreNMS alert notes.",
+            "example": "Check uplink and power.",
+        },
+        "hostname": {
+            "type": "string",
+            "nullable": True,
+            "description": "Device hostname.",
+            "example": "router1",
+        },
+        "display": {
+            "type": "string",
+            "nullable": True,
+            "description": "Device display name.",
+            "example": "router1",
+        },
+        "sysName": {
+            "type": "string",
+            "nullable": True,
+            "description": "Device sysName.",
+            "example": "router1.example.com",
+        },
+        "device_id": {
+            "oneOf": [
+                {"type": "string"},
+                {"type": "integer"},
+            ],
+            "nullable": True,
+            "description": "LibreNMS device id.",
+            "example": "77",
+        },
+        "ip": {
+            "type": "string",
+            "nullable": True,
+            "description": "Device IP address.",
+            "example": "10.0.0.1",
+        },
+        "os": {
+            "type": "string",
+            "nullable": True,
+            "description": "Device OS.",
+            "example": "linux",
+        },
+        "type": {
+            "type": "string",
+            "nullable": True,
+            "description": "Device type.",
+            "example": "network",
+        },
+        "hardware": {
+            "type": "string",
+            "nullable": True,
+            "description": "Device hardware.",
+            "example": "Cisco IOS",
+        },
+        "version": {
+            "type": "string",
+            "nullable": True,
+            "description": "Device OS or hardware version.",
+            "example": "17.9",
+        },
+        "location": {
+            "type": "string",
+            "nullable": True,
+            "description": "Device location.",
+            "example": "DC1",
+        },
+        "timestamp": {
+            "type": "string",
+            "nullable": True,
+            "description": "LibreNMS alert timestamp.",
+            "example": "2026-06-17 10:00:00",
+        },
+        "elapsed": {
+            "type": "string",
+            "nullable": True,
+            "description": "Alert elapsed time.",
+            "example": "5m",
+        },
+        "proc": {
+            "type": "string",
+            "nullable": True,
+            "description": "LibreNMS procedure or source link when available.",
+        },
+        "team": {
+            "type": "string",
+            "nullable": True,
+            "description": "Optional IncidentRelay team slug override.",
+            "example": "sre",
+        },
+        "fingerprint": {
+            "type": "string",
+            "nullable": True,
+            "description": "Optional explicit IncidentRelay dedup key.",
+            "example": "librenms-router1-device-down",
+        },
+        "event_link": {
+            "type": "string",
+            "nullable": True,
+            "description": "External alert URL.",
+            "example": "https://librenms.example.com/alerts",
+        },
+        "event_url": {
+            "type": "string",
+            "nullable": True,
+            "description": "Alternative external alert URL.",
+        },
+        "alert_url": {
+            "type": "string",
+            "nullable": True,
+            "description": "Alternative external alert URL.",
+        },
+        "source_url": {
+            "type": "string",
+            "nullable": True,
+            "description": "Alternative external source URL.",
+        },
+        "device_url": {
+            "type": "string",
+            "nullable": True,
+            "description": "LibreNMS device URL.",
+        },
+        "librenms_url": {
+            "type": "string",
+            "nullable": True,
+            "description": (
+                "LibreNMS base URL. IncidentRelay can build a device link "
+                "from this plus hostname/device_id."
+            ),
+            "example": "https://librenms.example.com",
+        },
+        "labels": {
+            "type": "object",
+            "additionalProperties": True,
+            "description": "Additional labels copied to the normalized alert.",
+            "example": {
+                "environment": "prod",
+                "service": "network",
+            },
+        },
+        "faults": {
+            "description": "LibreNMS faults payload, if included by the transport.",
+            "nullable": True,
+        },
+        "contacts": {
+            "description": "LibreNMS contacts payload, if included by the transport.",
+            "nullable": True,
+        },
+        "applications": {
+            "description": "LibreNMS applications payload, if included by the transport.",
+            "nullable": True,
+        },
+    },
+    "example": {
+        "id": "12345",
+        "uid": "lnms-alert-12345",
+        "state": "1",
+        "severity": "critical",
+        "title": "Device down",
+        "message": "Device router1 is unreachable",
+        "hostname": "router1",
+        "device_id": "77",
+        "ip": "10.0.0.1",
+        "rule": "Device down",
+        "timestamp": "2026-06-17 10:00:00",
+        "team": "sre",
+        "librenms_url": "https://librenms.example.com",
+    },
+}
+
 
 def tags():
     """
@@ -906,6 +1186,25 @@ def paths():
                     "409": response(
                         "Sentry webhook secret is not configured for this route."
                     ),
+                },
+            }
+        },
+        "/api/integrations/librenms": {
+            "post": {
+                "tags": ["integrations"],
+                "summary": "Receive LibreNMS alerts",
+                "description": (
+                    "Receives a LibreNMS API transport payload. The route intake "
+                    "token must belong to a route with source=librenms. Use the "
+                    "same uid/id for firing and recovery events."
+                ),
+                "operationId": "receiveLibreNMSAlerts",
+                "security": [{"bearerAuth": []}],
+                "requestBody": json_body("LibreNMS API transport payload.", librenms_body),
+                "responses": {
+                    "200": response("Alert accepted."),
+                    "400": response("Invalid LibreNMS payload."),
+                    "401": response("Route intake token or API token is required."),
                 },
             }
         },

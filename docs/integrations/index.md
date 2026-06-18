@@ -22,6 +22,7 @@ Incoming integrations create or update alerts in IncidentRelay. They are selecte
 | Alertmanager    | `POST /api/integrations/alertmanager`      | [Alertmanager](alertmanager.md)       |
 | Zabbix          | `POST /api/integrations/zabbix`            | [Zabbix](zabbix.md)                   |
 | Sentry          | `POST /api/integrations/sentry/<route_id>` | [Sentry](sentry.md)                   |
+| LibreNMS        | `POST /api/integrations/librenms`          | [LibreNMS](librenms.md)               |
 | Generic webhook | `POST /api/integrations/webhook`           | [Generic webhook](generic-webhook.md) |
 
 Route intake tokens belong to routes, not to channels. Create a route first, copy its intake token, and use that token in the monitoring system.
@@ -75,4 +76,4 @@ alert assignee -> assignee has active browser push subscription -> service worke
 
 If a test channel notification works but real alerts do not, the issue is usually route matching, route-channel binding, severity filtering, missing assignee contact data, or a silence rule.
 
-If browser push test works but real alert push does not, check that the alert is assigned to the same user who enabled push in Profile.
+If the browser push test works but the real alert push does not, check that the alert is assigned to the same user who enabled push in Profile.

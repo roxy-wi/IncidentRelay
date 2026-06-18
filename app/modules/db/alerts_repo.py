@@ -122,6 +122,7 @@ def build_alert_groups_query(
     service_status=None,
     service_criticality=None,
     search=None,
+    assigned_to_user_id=None,
     include_merged=False,
 ):
     """Build the base alert groups query with filters."""
@@ -149,6 +150,9 @@ def build_alert_groups_query(
             return None
 
         query = query.where(AlertGroup.team.in_(team_ids))
+
+    if assigned_to_user_id:
+        query = query.where(AlertGroup.assignee == assigned_to_user_id)
 
     query = apply_field_values_filter(
         query,
@@ -361,6 +365,7 @@ def paginate_alert_groups(
     service_status=None,
     service_criticality=None,
     search=None,
+    assigned_to_user_id=None,
     page=1,
     page_size=25,
     sort="activity",
@@ -386,6 +391,7 @@ def paginate_alert_groups(
         service_status=service_status,
         service_criticality=service_criticality,
         search=search,
+        assigned_to_user_id=assigned_to_user_id,
         include_merged=include_merged,
     )
 

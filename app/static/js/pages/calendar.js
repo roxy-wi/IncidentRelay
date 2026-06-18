@@ -24,7 +24,19 @@ const calendarUserColors = [
     "#005f73"
 ];
 
+function getCalendarDisplayTimezone() {
+    if (window.AppTimezones) {
+        return AppTimezones.getDisplayTimezone(currentUser);
+    }
+
+    return "UTC";
+}
+
 function getCalendarEventTimezone(event) {
+    return getCalendarDisplayTimezone();
+}
+
+function getCalendarSourceTimezone(event) {
     return event && event.timezone ? event.timezone : "UTC";
 }
 
@@ -55,6 +67,87 @@ function parseCalendarDate(value) {
     return new Date(Number(parts[0]), Number(parts[1]) - 1, Number(parts[2]));
 }
 
+function getTimezoneOffsetMs(date, timezone) {
+    const parts = new Intl.DateTimeFormat("en-US", {
+        timeZone: timezone || "UTC",
+        year: "numeric",
+        month: "2-digit",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+        second: "2-digit",
+        hour12: false,
+        hourCycle: "h23",
+    }).formatToParts(date);
+
+    const values = {};
+
+    parts.forEach(function (part) {
+        if (part.type !== "literal") {
+            values[part.type] = part.value;
+        }
+    });
+
+    const localAsUtc = Date.UTC(
+        Number(values.year),
+        Number(values.month) - 1,
+        Number(values.day),
+        Number(values.hour),
+        Number(values.minute),
+        Number(values.second)
+    );
+
+    return localAsUtc - date.getTime();
+}
+
+function calendarZonedDateTimeToDate(
+    year,
+    month,
+    day,
+    hour,
+    minute,
+    second,
+    timezone
+) {
+    const utcGuess = Date.UTC(
+        year,
+        month - 1,
+        day,
+        hour || 0,
+        minute || 0,
+        second || 0
+    );
+
+    const firstOffset = getTimezoneOffsetMs(
+        new Date(utcGuess),
+        timezone
+    );
+    const adjusted = utcGuess - firstOffset;
+    const secondOffset = getTimezoneOffsetMs(
+        new Date(adjusted),
+        timezone
+    );
+
+    return new Date(utcGuess - secondOffset);
+}
+
+function calendarDisplayDayStart(day) {
+    const timezone = getCalendarDisplayTimezone();
+
+    return calendarZonedDateTimeToDate(
+        day.getFullYear(),
+        day.getMonth() + 1,
+        day.getDate(),
+        0,
+        0,
+        0,
+        timezone
+    );
+}
+
+function calendarDisplayNextDayStart(day) {
+    return calendarDisplayDayStart(addCalendarDays(day, 1));
+}
 
 function parseCalendarDateTime(value) {
     /*
@@ -995,22 +1088,19 @@ function renderRotationMonthGrid(calendar, days, rangeStart, rangeEnd) {
 
 function renderRotationCalendarDayTimeline(calendar, day, cell, monthMode) {
     /*
-     * Render final schedule timeline for one rotation/day.
+     * Render final schedule timeline for one rotation/day in the current
+     * display timezone.
      */
-
-    const dayStart = new Date(
-        day.getFullYear(),
-        day.getMonth(),
-        day.getDate(),
-        0,
-        0,
-        0,
-        0
-    );
-    const dayEnd = addCalendarDays(dayStart, 1);
+    const dayStart = calendarDisplayDayStart(day);
+    const dayEnd = calendarDisplayNextDayStart(day);
     const events = getCalendarEventsForRotation(calendar, dayStart, dayEnd);
 
-    cell.append(renderCalendarDayTimeline(events, dayStart, dayEnd, monthMode));
+    cell.append(renderCalendarDayTimeline(
+        events,
+        dayStart,
+        dayEnd,
+        monthMode
+    ));
 }
 
 
@@ -1108,6 +1198,7 @@ function renderCalendarTimelineAssignment(event, dayStart, dayEnd, monthMode) {
 
     const eventStart = parseCalendarDateTime(event.start);
     const eventEnd = parseCalendarDateTime(event.end);
+    const displayTimezone = getCalendarEventTimezone(event);
 
     if (!eventStart || !eventEnd) {
         return $("<span>");
@@ -1143,9 +1234,9 @@ function renderCalendarTimelineAssignment(event, dayStart, dayEnd, monthMode) {
             " / " +
             layerLabel +
             " / " +
-            formatTimeMinutesInTimezone(clippedStart, getCalendarEventTimezone(event))
-            + " - "
-            + formatTimeMinutesInTimezone(clippedEnd, getCalendarEventTimezone(event))
+            formatTimeMinutesInTimezone(clippedStart, displayTimezone) +
+            " - " +
+            formatTimeMinutesInTimezone(clippedEnd, displayTimezone)
         )
         .on("click", function () {
             renderCalendarDetails(event, clippedStart, clippedEnd);
@@ -1356,6 +1447,8 @@ function renderCalendarDetails(event, clippedStart, clippedEnd) {
     const userLabel = getCalendarUserLabel(event);
     const body = $("#calendar-details-body");
     const typeLabel = event.type === "override" ? "override" : "scheduled layer";
+    const displayTimezone = getCalendarEventTimezone(event);
+    const sourceTimezone = getCalendarSourceTimezone(event);
 
     selectedCalendarEvent = event;
     selectedCalendarClippedStart = clippedStart;
@@ -1394,24 +1487,27 @@ function renderCalendarDetails(event, clippedStart, clippedEnd) {
         .append(calendarDetailsItem("Rotation", event.rotation_name))
         .append(calendarDetailsItem("Layer", event.layer_name || (event.type === "override" ? "Override" : "Final schedule")))
         .append(calendarDetailsItem("Layer priority", event.layer_priority === null || event.layer_priority === undefined ? "-" : String(event.layer_priority)))
-        .append(calendarDetailsItem("Timezone", event.timezone || "-"))
+        .append(calendarDetailsItem("Timezone", displayTimezone))
+        .append(
+            sourceTimezone !== displayTimezone
+                ? calendarDetailsItem("Source timezone", sourceTimezone)
+                : $("")
+        )
         .append(calendarDetailsItem("Type", typeLabel))
         .append(calendarDetailsItem(
-                "Start",
-                formatDateTimeMinutesInTimezone(
-                    clippedStart || event.start,
-                    getCalendarEventTimezone(event)
-                )
+            "Start",
+            formatDateTimeMinutesInTimezone(
+                clippedStart || event.start,
+                displayTimezone
             )
-        )
+        ))
         .append(calendarDetailsItem(
-                "End",
-                formatDateTimeMinutesInTimezone(
-                    clippedEnd || event.end,
-                    getCalendarEventTimezone(event)
-                )
+            "End",
+            formatDateTimeMinutesInTimezone(
+                clippedEnd || event.end,
+                displayTimezone
             )
-        );
+        ))
 
     if (event.reason) {
         details.append(calendarDetailsItem("Reason", event.reason));

@@ -11,7 +11,7 @@ It provides the core building blocks of an on-call system:
 - access groups and RBAC-style group roles;
 - teams and on-call rotations;
 - alert intake routes with per-route tokens;
-- Alertmanager, Zabbix, Sentry, and generic webhook integrations;
+- Alertmanager, Zabbix, Sentry, LibreNMS, and generic webhook integrations;
 - Mattermost, Slack, Telegram, Discord, Microsoft Teams, email, webhook, and voice-call notifications;
 - profile-level browser/PWA push notifications;
 - profile notification rules for browser push, email, and voice-call follow-up;
@@ -104,12 +104,13 @@ IncidentRelay includes Swagger/OpenAPI documentation and personal API tokens wit
 
 ### Incoming alert sources
 
-| Source          | Endpoint                                   |
-|-----------------|--------------------------------------------|
-| Alertmanager    | `POST /api/integrations/alertmanager`      |
-| Zabbix          | `POST /api/integrations/zabbix`            |
+| Source          | Endpoint                                  |
+|-----------------|-------------------------------------------|
+| Alertmanager    | `POST /api/integrations/alertmanager`     |
+| Zabbix          | `POST /api/integrations/zabbix`           |
 | Sentry          | `POST /api/integrations/sentry/<route_id>` |
-| Generic webhook | `POST /api/integrations/webhook`           |
+| LibreNMS        | `POST /api/integrations/librenms`         |
+| Generic webhook | `POST /api/integrations/webhook`          |
 
 ### Notification channels
 
@@ -157,7 +158,7 @@ Read more: [Docker installation](docs/getting-started/docker.md)
 
 A Helm chart lives in [`helm/incidentrelay`](helm/incidentrelay). It deploys the web UI plus the scheduler and Telegram workers, renders the application config from values into a Secret, and wires up the `/healthz` and `/readyz` probes.
 
-> **Note:** no public image is published yet — the default `image.repository` (`roxywi/incidentrelay`) does not exist on Docker Hub, so an out-of-the-box install ends in `ImagePullBackOff`. Build the image yourself, push it to your registry and set `image.repository` / `image.tag`.
+> **Note:** no public image is published yet — the default `image.repository` (`roxywi/incidentrelay`) does not exist on Docker Hub, so an out-of-the-box install ends in `ImagePullBackOff`. Build the image yourself, push it to your registry, and set `image.repository` / `image.tag`.
 
 ```bash
 helm install incidentrelay ./helm/incidentrelay \

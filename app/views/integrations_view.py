@@ -7,6 +7,7 @@ from peewee import DoesNotExist
 from app.api.schemas.integrations import (
     AlertmanagerWebhookSchema,
     GenericWebhookSchema,
+    LibreNMSWebhookSchema,
     SentryWebhookSchema,
     ZabbixWebhookSchema,
 )
@@ -19,6 +20,7 @@ from app.services.integrations.normalizers.sentry import normalize_sentry
 from app.services.integrations.normalizers.webhook import normalize_webhook
 from app.services.integrations.normalizers.zabbix import normalize_zabbix
 from app.services.integrations.normalizers.alertmanager import normalize_alertmanager
+from app.services.integrations.normalizers.librenms import normalize_librenms
 from app.services.validation import validate_body
 from app.notifiers.voice.loader import create_voice_provider
 from app.services.routing.routing import find_route_for_alert
@@ -127,6 +129,20 @@ def sentry_webhook(route_id):
             payload.model_dump(),
             headers=dict(request.headers),
         )
+    )
+
+
+@integrations_bp.route("/librenms", methods=["POST"])
+@require_alert_token()
+def librenms_webhook():
+    """Receive alerts from LibreNMS API transport."""
+    payload, error = validate_body(LibreNMSWebhookSchema)
+
+    if error:
+        return error
+
+    return process_incoming_alerts(
+        normalize_librenms(payload.model_dump())
     )
 
 

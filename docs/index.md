@@ -128,6 +128,7 @@ IncidentRelay has two integration layers.
 | Alertmanager    | `POST /api/integrations/alertmanager` | [Alertmanager](integrations/alertmanager.md)       |
 | Zabbix          | `POST /api/integrations/zabbix`       | [Zabbix](integrations/zabbix.md)                   |
 | Sentry          | `POST /api/integrations/sentry/<route_id>` | [Sentry](integrations/sentry.md)               |
+| LibreNMS        | `POST /api/integrations/librenms`     | [LibreNMS](integrations/librenms.md)               |
 | Generic webhook | `POST /api/integrations/webhook`      | [Generic webhook](integrations/generic-webhook.md) |
 
 Incoming integrations use route intake tokens.
@@ -196,6 +197,7 @@ OpenAPI JSON:
 Useful pages:
 
 - [API Overview](api/index.md)
+- [Services API](api/services.md)
 - [Escalation Policies API](api/escalation-policies.md)
 - [Sentry Integration API](api/sentry-integration.md)
 - [Profile and Personal API Tokens](usage/profile-and-tokens.md)

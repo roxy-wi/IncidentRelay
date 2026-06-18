@@ -102,6 +102,7 @@ class User(SoftDeleteModel):
     display_name = CharField(null=True)
     email = CharField(null=True)
     phone = CharField(null=True)
+    timezone = CharField(null=True)
     telegram_user_id = CharField(null=True)
     slack_user_id = CharField(null=True)
     mattermost_user_id = CharField(null=True)

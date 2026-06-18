@@ -9,6 +9,7 @@ let alertsSortState = createTableSortState("activity", "desc");
 let alertsServiceFilterApplying = false;
 let alertsServiceFilterLoaded = false;
 let alertsServiceFilterTeamKey = null;
+const ALERTS_QUERY_STORAGE_KEY = "incidentrelay.alerts.query";
 let selectedAlertGroupIds = new Set();
 let alertsPagination = {
     page: 1,
@@ -205,12 +206,85 @@ function buildAlertDetailsUrl(alertId) {
     return "/alerts/" + encodeURIComponent(alertId) + query;
 }
 function buildAlertListUrl() {
-    const query = window.location.search || buildAlertsQueryString();
+    const query = (
+        normalizeAlertsQueryString(window.location.search || "") ||
+        readStoredAlertsQueryString() ||
+        buildAlertsQueryString()
+    );
 
     return "/alerts" + query;
 }
 
+function isAlertBoolQueryParamEnabled(params, name) {
+    return ["1", "true", "yes", "on"].indexOf(
+        String(params.get(name) || "").toLowerCase()
+    ) !== -1;
+}
+function normalizeAlertsQueryString(queryString) {
+    queryString = String(queryString || "");
 
+    if (!queryString) {
+        return "";
+    }
+
+    return queryString.charAt(0) === "?"
+        ? queryString
+        : "?" + queryString;
+}
+
+function readStoredAlertsQueryString() {
+    try {
+        return normalizeAlertsQueryString(
+            sessionStorage.getItem(ALERTS_QUERY_STORAGE_KEY) || ""
+        );
+    } catch (error) {
+        return "";
+    }
+}
+
+function storeAlertsQueryString(queryString) {
+    queryString = normalizeAlertsQueryString(queryString);
+
+    try {
+        if (queryString) {
+            sessionStorage.setItem(ALERTS_QUERY_STORAGE_KEY, queryString);
+        } else {
+            sessionStorage.removeItem(ALERTS_QUERY_STORAGE_KEY);
+        }
+    } catch (error) {
+        // Ignore storage errors, for example private mode restrictions.
+    }
+}
+
+function getAlertsQueryStringForApply() {
+    let queryString = normalizeAlertsQueryString(window.location.search || "");
+
+    if (queryString) {
+        return queryString;
+    }
+
+    if (getAlertIdFromPath(window.location.pathname)) {
+        return "";
+    }
+
+    queryString = readStoredAlertsQueryString();
+
+    if (
+        queryString &&
+        window.location.pathname === "/alerts"
+    ) {
+        history.replaceState(
+            Object.assign({}, history.state || {}, {
+                path: window.location.pathname + queryString,
+                alerts_state: true
+            }),
+            "",
+            window.location.pathname + queryString
+        );
+    }
+
+    return queryString;
+}
 
 function buildAlertsStateParams() {
     const params = new URLSearchParams();
@@ -224,6 +298,10 @@ function buildAlertsStateParams() {
 
     if (search) {
         params.set("search", search);
+    }
+
+    if ($("#assigned-to-me-filter").is(":checked")) {
+        params.set("assigned_to_me", "1");
     }
 
     params.set("page", String(alertsCurrentPage || 1));
@@ -256,7 +334,8 @@ function buildAlertsApiUrl() {
 
 
 function writeAlertsQueryParams() {
-    const nextUrl = window.location.pathname + buildAlertsQueryString();
+    const queryString = buildAlertsQueryString();
+    const nextUrl = window.location.pathname + queryString;
 
     history.replaceState(
         Object.assign({}, history.state || {}, {
@@ -268,6 +347,13 @@ function writeAlertsQueryParams() {
     );
 
     alertsLastAppliedQueryString = window.location.search || "";
+
+    if (
+        window.location.pathname === "/alerts" ||
+        getAlertIdFromPath(window.location.pathname)
+    ) {
+        storeAlertsQueryString(queryString);
+    }
 }
 
 function openAlertDetailsPage(alertId) {
@@ -567,9 +653,10 @@ function renderActiveAlertFilters() {
     const severities = getTableFilterValues("#severity-filter");
     const priorities = getTableFilterValues("#priority-filter");
     const serviceIds = getTableFilterValues("#alerts-service-filter");
+    const assignedToMe = $("#assigned-to-me-filter").is(":checked");
 
     if (search) {
-        chips.push({ label: "Search", value: search });
+        chips.push({label: "Search", value: search});
     }
 
     if (statuses.length) {
@@ -615,9 +702,15 @@ function renderActiveAlertFilters() {
                 .join(", ")
         });
     }
+    if (assignedToMe) {
+        chips.push({
+            label: "Assignee",
+            value: "Me"
+        });
+    }
 
     if (typeof selectedTeamId === "function" && selectedTeamId()) {
-        chips.push({ label: "Team", value: getSelectedTeamLabel() });
+        chips.push({label: "Team", value: getSelectedTeamLabel()});
     }
 
     renderTableFilterChips("#alerts-active-filters", chips);
@@ -1631,12 +1724,7 @@ function renderAlertsInboxCounter(pagination) {
 }
 
 function applyAlertsQueryParams() {
-    const queryString = window.location.search || "";
-
-    if (alertsLastAppliedQueryString === queryString) {
-        return;
-    }
-
+    const queryString = getAlertsQueryStringForApply();
     const params = new URLSearchParams(queryString);
 
     setTableFilterValues(
@@ -1661,6 +1749,11 @@ function applyAlertsQueryParams() {
 
     $("#alerts-search").val(params.get("search") || "");
 
+    $("#assigned-to-me-filter").prop(
+        "checked",
+        isAlertBoolQueryParamEnabled(params, "assigned_to_me")
+    );
+
     alertsCurrentPage = parseInt(params.get("page") || "1", 10) || 1;
     alertsPageSize = parseInt(params.get("page_size") || "25", 10) || 25;
 
@@ -1674,23 +1767,30 @@ $(document).on("click", "#reload-alerts", function () {
     loadAlerts();
 });
 $(document)
-    .off("change.tableFilters", "#status-filter, #severity-filter, #priority-filter, #alerts-service-filter")
-    .on("change.tableFilters", "#status-filter, #severity-filter, #priority-filter, #alerts-service-filter", function () {
-        if (
-            typeof isTableFilterSilent === "function"
-            && isTableFilterSilent(this)
-        ) {
-            return;
-        }
+    .off(
+        "change.tableFilters",
+        "#status-filter, #severity-filter, #priority-filter, #alerts-service-filter, #assigned-to-me-filter"
+    )
+    .on(
+        "change.tableFilters",
+        "#status-filter, #severity-filter, #priority-filter, #alerts-service-filter, #assigned-to-me-filter",
+        function () {
+            if (
+                typeof isTableFilterSilent === "function"
+                && isTableFilterSilent(this)
+            ) {
+                return;
+            }
 
-        if (alertsServiceFilterApplying) {
-            return;
-        }
+            if (alertsServiceFilterApplying) {
+                return;
+            }
 
-        resetAlertsPagination();
-        writeAlertsQueryParams();
-        loadAlerts();
-    });
+            resetAlertsPagination();
+            writeAlertsQueryParams();
+            loadAlerts();
+        }
+    );
 $(document).on("input", "#alerts-search", function () {
     resetAlertsPagination();
     writeAlertsQueryParams();

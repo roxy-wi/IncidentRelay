@@ -13,7 +13,7 @@ class RouteBaseSchema(ApiModel):
 
     team_id: int = Field(ge=1)
     name: str = Field(min_length=2, max_length=120)
-    source: str = Field(pattern=r"^(alertmanager|zabbix|webhook|sentry)$")
+    source: str = Field(pattern=r"^(alertmanager|zabbix|webhook|sentry|librenms)$")
     rotation_id: int | None = Field(default=None, ge=1)
     channel_ids: List[int] = Field(default_factory=list)
     matchers: Dict[str, Any] = Field(default_factory=dict)

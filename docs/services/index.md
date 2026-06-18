@@ -11,6 +11,7 @@ Use this section for service ownership and impact modeling:
 
 - [Service model](../concepts/services.md)
 - [Service default stakeholders](default-stakeholders.md)
+- [Services API](../api/services.md)
 
 ## Why services matter
 
@@ -33,4 +34,3 @@ Service context can improve:
 3. Configure service match rules or route default services.
 4. Add service default stakeholders when lifecycle notifications are useful.
 5. Review service impact and analytics during incident response.
-

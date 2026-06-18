@@ -238,6 +238,7 @@ def update_user(user_id, data):
         "display_name",
         "email",
         "phone",
+        "timezone",
         "telegram_user_id",
         "slack_user_id",
         "mattermost_user_id",

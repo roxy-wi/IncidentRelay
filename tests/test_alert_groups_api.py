@@ -1,6 +1,6 @@
 from app.modules.db import alerts_repo
 from app.services.alerts.lifecycle import upsert_alert
-from tests.factories import create_group, create_route, create_team
+from tests.factories import create_group, create_route, create_team, create_user
 
 
 def _route(group_by=None):
@@ -200,3 +200,113 @@ def test_alert_group_events_endpoint_returns_group_and_child_events(client, admi
 
     assert "group_test" in event_types
     assert "child_test" in event_types
+
+
+def test_alerts_api_filters_alert_groups_assigned_to_me(
+    client,
+    admin_headers,
+    admin_user,
+    db,
+):
+    route = _route(group_by=["alertname", "severity", "instance"])
+
+    my_group, _ = upsert_alert(_alert(route, "DiskFull", "host1"))
+    other_group, _ = upsert_alert(_alert(route, "DiskFull", "host2"))
+    unassigned_group, _ = upsert_alert(_alert(route, "DiskFull", "host3"))
+
+    other_user = create_user(username="other-user")
+
+    my_group.assignee = admin_user
+    my_group.save(only=[my_group.__class__.assignee])
+
+    other_group.assignee = other_user
+    other_group.save(only=[other_group.__class__.assignee])
+
+    response = client.get(
+        "/api/alerts?assigned_to_me=1",
+        headers=admin_headers,
+    )
+
+    assert response.status_code == 200
+
+    payload = response.get_json()
+    ids = {item["id"] for item in payload["items"]}
+
+    assert ids == {my_group.id}
+    assert other_group.id not in ids
+    assert unassigned_group.id not in ids
+    assert payload["pagination"]["total_items"] == 1
+    assert payload["summary"]["total"] == 1
+
+
+def test_alerts_api_assigned_to_me_filter_combines_with_status(
+    client,
+    admin_headers,
+    admin_user,
+    db,
+):
+    route = _route(group_by=["alertname", "severity", "instance"])
+
+    firing_group, _ = upsert_alert(_alert(route, "DiskFull", "host1"))
+    resolved_group, _ = upsert_alert(_alert(route, "DiskFull", "host2"))
+
+    firing_group.assignee = admin_user
+    firing_group.save(only=[firing_group.__class__.assignee])
+
+    resolved_group.assignee = admin_user
+    resolved_group.status = "resolved"
+    resolved_group.save(
+        only=[
+            resolved_group.__class__.assignee,
+            resolved_group.__class__.status,
+        ]
+    )
+
+    response = client.get(
+        "/api/alerts?assigned_to_me=1&status=firing",
+        headers=admin_headers,
+    )
+
+    assert response.status_code == 200
+
+    payload = response.get_json()
+    ids = {item["id"] for item in payload["items"]}
+
+    assert ids == {firing_group.id}
+    assert payload["pagination"]["total_items"] == 1
+    assert payload["summary"]["firing"] == 1
+    assert payload["summary"]["resolved"] == 0
+
+
+def test_alerts_api_assigned_to_me_false_does_not_filter(
+    client,
+    admin_headers,
+    admin_user,
+    db,
+):
+    route = _route(group_by=["alertname", "severity", "instance"])
+
+    my_group, _ = upsert_alert(_alert(route, "DiskFull", "host1"))
+    other_group, _ = upsert_alert(_alert(route, "DiskFull", "host2"))
+
+    other_user = create_user(username="other-user")
+
+    my_group.assignee = admin_user
+    my_group.save(only=[my_group.__class__.assignee])
+
+    other_group.assignee = other_user
+    other_group.save(only=[other_group.__class__.assignee])
+
+    response = client.get(
+        "/api/alerts?assigned_to_me=false",
+        headers=admin_headers,
+    )
+
+    assert response.status_code == 200
+
+    payload = response.get_json()
+    ids = {item["id"] for item in payload["items"]}
+
+    assert my_group.id in ids
+    assert other_group.id in ids
+    assert payload["pagination"]["total_items"] == 2

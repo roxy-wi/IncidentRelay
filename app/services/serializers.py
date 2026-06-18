@@ -132,6 +132,7 @@ def serialize_user(user, groups=None):
         "display_name": user.display_name,
         "email": user.email,
         "phone": user.phone,
+        "timezone": user.timezone,
         "telegram_user_id": user.telegram_user_id,
         "slack_user_id": user.slack_user_id,
         "mattermost_user_id": user.mattermost_user_id,

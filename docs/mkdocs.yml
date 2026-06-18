@@ -43,6 +43,7 @@ nav:
       - Alerts and Alert Groups: usage/alerts.md
       - Incident Priorities: incidents/priorities.md
       - Incident Responders: incidents/responders.md
+      - Notification Center: incidents/notification-center.md
       - Incident Stakeholders: incidents/stakeholders.md
       - Alert Comments: usage/alert-comments.md
       - Silences: usage/silences.md
@@ -64,6 +65,7 @@ nav:
           - Zabbix: integrations/zabbix.md
           - Sentry: integrations/sentry.md
           - Sentry Troubleshooting: integrations/sentry-troubleshooting.md
+          - LibreNMS: integrations/librenms.md
           - Generic Webhook: integrations/generic-webhook.md
       - Calendar sync:
           - CalDAV Calendar Sync: integrations/caldav.md
@@ -89,6 +91,7 @@ nav:
       - Troubleshooting: voice-providers/troubleshooting.md
   - API:
       - Overview: api/index.md
+      - Services API: api/services.md
       - Escalation Policies API: api/escalation-policies.md
       - Sentry Integration API: api/sentry-integration.md
       - Voice Call OpenAPI Notes: api/voice-call-openapi.md

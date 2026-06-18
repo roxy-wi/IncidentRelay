@@ -12,6 +12,7 @@ Use this section for responder workflows:
 - [Alerts and alert groups](../usage/alerts.md)
 - [Incident priorities](priorities.md)
 - [Incident responders](responders.md)
+- [Notification Center](notification-center.md)
 - [Incident stakeholders](stakeholders.md)
 - [Alert comments](../usage/alert-comments.md)
 - [Silences](../usage/silences.md)
@@ -35,6 +36,6 @@ The assignee is the primary owner of the incident. Responders are additional peo
 1. Read [Alerts and alert groups](../usage/alerts.md) to understand grouping, lifecycle and API compatibility.
 2. Read [Incident priorities](priorities.md) to understand the P1-P5 scale and automatic priority behavior.
 3. Read [Incident responders](responders.md) for request, accept and decline flows.
-4. Read [Incident stakeholders](stakeholders.md) for lifecycle notifications and service defaults.
-5. Read [Alert comments](../usage/alert-comments.md) for responder notes and handover context.
-
+4. Read [Notification Center](notification-center.md) for pending responder requests and user actions.
+5. Read [Incident stakeholders](stakeholders.md) for lifecycle notifications and service defaults.
+6. Read [Alert comments](../usage/alert-comments.md) for responder notes and handover context.
