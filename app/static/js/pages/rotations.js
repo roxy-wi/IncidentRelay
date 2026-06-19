@@ -582,7 +582,12 @@ function layerTimezoneField(layerId, value) {
         );
     });
 
-    if (value && !select.find('option[value="' + value.replace(/"/g, '\\"') + '"]').length) {
+    if (
+        value &&
+        !select.find("option").filter(function () {
+            return $(this).val() === String(value);
+        }).length
+    ) {
         select.append(
             $("<option>")
                 .val(value)

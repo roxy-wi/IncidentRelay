@@ -22,7 +22,7 @@ from app.services.serializers import (
     serialize_maintenance_window,
     serialize_utc_datetime,
 )
-from app.services.validation import validate_body
+from app.services.validation import make_error_response, validate_body
 
 
 maintenance_bp = Blueprint("maintenance_api", __name__)
@@ -39,13 +39,6 @@ def _current_user_id():
         raise PermissionError("authentication required")
 
     return user.id
-
-
-def _json_error(error, message, status_code):
-    return jsonify({
-        "error": error,
-        "message": message,
-    }), status_code
 
 
 def _maintenance_audit_data(window, payload=None):
@@ -204,7 +197,7 @@ def get_window(window_id):
     window = maintenance_repo.get_maintenance_window(window_id)
 
     if not window:
-        return _json_error("not_found", "Maintenance window not found", 404)
+        return make_error_response("not_found", "Maintenance window not found", 404)
 
     error = _check_window_read(window)
     if error:

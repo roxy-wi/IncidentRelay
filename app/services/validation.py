@@ -1,7 +1,8 @@
+import logging
 import json
 from json import JSONDecodeError
 
-from flask import jsonify, request
+from flask import current_app, jsonify, request
 from pydantic import ValidationError
 from werkzeug.datastructures import MultiDict
 
@@ -57,15 +58,50 @@ def make_body_validation_detail(message, error_type, input_value=None):
     return detail
 
 
+def make_error_response(error, message, status_code, **extra):
+    """Build a normalized API error response."""
+    payload = {
+        "error": error,
+        "message": message,
+    }
+
+    payload.update(extra)
+
+    return jsonify(payload), status_code
+
+
+def safe_exception_response(
+    exc,
+    *,
+    error="invalid_request",
+    message="Invalid request.",
+    status_code=400,
+    log_level=logging.WARNING,
+    **extra,
+):
+    """Log exception details server-side without exposing them to clients."""
+    current_app.logger.log(
+        log_level,
+        "%s while handling API request",
+        exc.__class__.__name__,
+        exc_info=True,
+    )
+
+    return make_error_response(
+        error,
+        message,
+        status_code,
+        **extra,
+    )
+
+
 def make_validation_response(message, details):
     """Build a normalized validation error response."""
-    return (
-        jsonify({
-            "error": "validation_error",
-            "message": message,
-            "details": details,
-        }),
+    return make_error_response(
+        "validation_error",
+        message,
         400,
+        details=details,
     )
 
 

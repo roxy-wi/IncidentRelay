@@ -47,7 +47,11 @@ from app.services.serializers import (
     serialize_service_owner,
 )
 from app.services.service_analytics import build_service_analytics_v2
-from app.services.validation import validate_body, validate_query
+from app.services.validation import (
+    make_error_response,
+    validate_body,
+    validate_query,
+)
 from app.services.service_impact import (
     build_service_impact_v2,
     build_single_service_impact_v2,
@@ -340,7 +344,7 @@ def _readable_services_from_request(*, include_disabled=True):
         try:
             service = services_repo.get_service(service_id)
         except DoesNotExist:
-            return None, _json_error(
+            return None, make_error_response(
                 "service_not_found",
                 "Service was not found",
                 404,
@@ -348,7 +352,7 @@ def _readable_services_from_request(*, include_disabled=True):
             )
 
         if not include_disabled and not services_repo.is_service_active(service):
-            return None, _json_error(
+            return None, make_error_response(
                 "service_not_found",
                 "Service was not found",
                 404,
@@ -385,7 +389,7 @@ def _validate_dependency_service(service, depends_on_service_id):
     User must be able to edit source service and read target service.
     """
     if service.id == depends_on_service_id:
-        return _json_error(
+        return make_error_response(
             "dependency_self_reference",
             "Service cannot depend on itself",
             400,
@@ -395,7 +399,7 @@ def _validate_dependency_service(service, depends_on_service_id):
     try:
         depends_on = services_repo.get_service(depends_on_service_id)
     except DoesNotExist:
-        return _json_error(
+        return make_error_response(
             "dependency_service_not_found",
             "Dependency service was not found",
             400,
@@ -403,7 +407,7 @@ def _validate_dependency_service(service, depends_on_service_id):
         )
 
     if not depends_on.enabled:
-        return _json_error(
+        return make_error_response(
             "dependency_service_disabled",
             "Dependency service is disabled",
             400,
@@ -424,7 +428,7 @@ def _validate_rotation(team_id, rotation_id):
     try:
         rotation = rotations_repo.get_rotation(rotation_id)
     except DoesNotExist:
-        return _json_error(
+        return make_error_response(
             "rotation_not_found",
             "Default rotation was not found",
             400,
@@ -432,7 +436,7 @@ def _validate_rotation(team_id, rotation_id):
         )
 
     if rotation.team_id != team_id:
-        return _json_error(
+        return make_error_response(
             "rotation_team_mismatch",
             "Default rotation does not belong to service team",
             400,
@@ -451,7 +455,7 @@ def _validate_escalation_policy(team_id, policy_id):
     try:
         policy = escalation_policies_repo.get_policy(policy_id)
     except DoesNotExist:
-        return _json_error(
+        return make_error_response(
             "escalation_policy_not_found",
             "Default escalation policy was not found",
             400,
@@ -459,7 +463,7 @@ def _validate_escalation_policy(team_id, policy_id):
         )
 
     if policy.team_id != team_id:
-        return _json_error(
+        return make_error_response(
             "escalation_policy_team_mismatch",
             "Default escalation policy does not belong to service team",
             400,
@@ -478,7 +482,7 @@ def _validate_route(team_id, route_id):
     try:
         route = routes_repo.get_route(route_id)
     except DoesNotExist:
-        return _json_error(
+        return make_error_response(
             "route_not_found",
             "Route was not found",
             400,
@@ -486,7 +490,7 @@ def _validate_route(team_id, route_id):
         )
 
     if route.team_id != team_id:
-        return _json_error(
+        return make_error_response(
             "route_team_mismatch",
             "Route does not belong to service match rule team",
             400,
@@ -502,7 +506,7 @@ def _validate_service(team_id, service_id):
     try:
         service = services_repo.get_service(service_id)
     except DoesNotExist:
-        return _json_error(
+        return make_error_response(
             "service_not_found",
             "Service was not found",
             400,
@@ -510,7 +514,7 @@ def _validate_service(team_id, service_id):
         )
 
     if service.team_id != team_id:
-        return _json_error(
+        return make_error_response(
             "service_team_mismatch",
             "Service does not belong to match rule team",
             400,
@@ -520,7 +524,7 @@ def _validate_service(team_id, service_id):
         )
 
     if not service.enabled:
-        return _json_error(
+        return make_error_response(
             "service_disabled",
             "Service is disabled",
             400,
@@ -646,7 +650,7 @@ def get_service_details(service_id):
     try:
         service = services_repo.get_service(service_id)
     except DoesNotExist:
-        return _json_error(
+        return make_error_response(
             "service_not_found",
             "Service was not found",
             404,
@@ -820,7 +824,7 @@ def create_service_owner(service_id):
             _service_owner_data_from_payload(payload),
         )
     except DoesNotExist:
-        return _json_error(
+        return make_error_response(
             "user_not_found",
             "User was not found",
             404,
@@ -862,7 +866,7 @@ def update_service_owner(service_id, owner_id):
     )
 
     if not owner_before:
-        return _json_error(
+        return make_error_response(
             "service_owner_not_found",
             "Service owner was not found",
             404,
@@ -879,7 +883,7 @@ def update_service_owner(service_id, owner_id):
             _service_owner_data_from_payload(payload),
         )
     except DoesNotExist:
-        return _json_error(
+        return make_error_response(
             "user_not_found",
             "User was not found",
             404,
@@ -918,7 +922,7 @@ def delete_service_owner(service_id, owner_id):
     )
 
     if not owner_before:
-        return _json_error(
+        return make_error_response(
             "service_owner_not_found",
             "Service owner was not found",
             404,
@@ -950,7 +954,7 @@ def list_match_rules():
         try:
             route = routes_repo.get_route(route_id)
         except DoesNotExist:
-            return _json_error(
+            return make_error_response(
                 "route_not_found",
                 "Route was not found",
                 404,
@@ -978,7 +982,7 @@ def list_match_rules():
             return error
 
     else:
-        return _json_error(
+        return make_error_response(
             "team_required",
             "team_id, route_id or service_id is required",
             400,
@@ -1019,7 +1023,7 @@ def create_service_match_rule(service_id):
         return error
 
     if payload.service_id != service_id:
-        return _json_error(
+        return make_error_response(
             "service_id_mismatch",
             "service_id in URL and body must match",
             400,
@@ -1489,7 +1493,7 @@ def service_analytics():
         try:
             service = services_repo.get_service(query.service_id)
         except DoesNotExist:
-            return _json_error(
+            return make_error_response(
                 "service_not_found",
                 "Service was not found",
                 404,
@@ -1497,7 +1501,7 @@ def service_analytics():
             )
 
         if getattr(service, "deleted", False):
-            return _json_error(
+            return make_error_response(
                 "service_not_found",
                 "Service was not found",
                 404,
@@ -1505,7 +1509,7 @@ def service_analytics():
             )
 
         if not query.include_disabled and not service.enabled:
-            return _json_error(
+            return make_error_response(
                 "service_not_found",
                 "Service was not found",
                 404,
@@ -1601,7 +1605,7 @@ def get_service_impact(service_id):
     )
 
     if not payload:
-        return _json_error(
+        return make_error_response(
             "service_not_found",
             "Service was not found",
             404,

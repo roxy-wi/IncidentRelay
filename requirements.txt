@@ -14,3 +14,4 @@ Authlib==1.7.2
 python3-saml==1.16.0
 cryptography>=41.0.5,<49
 pywebpush>=2.0.0
+defusedxml>=0.7.1

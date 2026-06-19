@@ -1,5 +1,4 @@
-from xml.etree import ElementTree
-
+from defusedxml import ElementTree
 from flask import Blueprint, Response, g, request
 
 from app.services.caldav.auth import require_caldav_auth

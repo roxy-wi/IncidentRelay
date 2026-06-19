@@ -12,7 +12,7 @@ def event_uid(event):
         str(event.get("start") or "start"),
     ]
 
-    digest = hashlib.sha1(":".join(parts).encode("utf-8")).hexdigest()
+    digest = hashlib.sha256(":".join(parts).encode("utf-8")).hexdigest()
     return f"{digest}@incidentrelay"
 
 
@@ -31,7 +31,7 @@ def event_etag(event):
         str(event.get("display_name") or event.get("username")),
     ])
 
-    digest = hashlib.sha1(raw.encode("utf-8")).hexdigest()
+    digest = hashlib.sha256(raw.encode("utf-8")).hexdigest()
     return f'"{digest}"'
 
 

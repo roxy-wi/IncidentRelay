@@ -23,7 +23,11 @@ from app.services.serializers import (
     serialize_incident_responder,
     serialize_incident_stakeholder,
 )
-from app.services.validation import validate_body
+from app.services.validation import (
+    make_error_response,
+    safe_exception_response,
+    validate_body,
+)
 from app.api.schemas.incidents import (
     IncidentResponderCreateSchema,
     IncidentResponderUpdateSchema,
@@ -40,15 +44,6 @@ def _request_user():
 def _request_user_id():
     user = _request_user()
     return getattr(user, "id", None)
-
-
-def _json_error(error, message, status_code, **extra):
-    payload = {
-        "error": error,
-        "message": message,
-    }
-    payload.update(extra)
-    return jsonify(payload), status_code
 
 
 def _get_query_values(name, cast=None):
@@ -76,7 +71,7 @@ def _get_incident_or_error(incident_id, *, respond=False):
     group = alerts_repo.get_alert_group(incident_id)
 
     if not group:
-        return None, _json_error(
+        return None, make_error_response(
             "not_found",
             "Incident not found",
             404,
@@ -206,16 +201,18 @@ def update_incident_priority(incident_id):
             user_id=_request_user_id(),
         )
     except ValueError as exc:
-        return _json_error(
-            "validation_error",
-            str(exc),
-            400,
+        return safe_exception_response(
+            exc,
+            error="validation_error",
+            message="Invalid incident priority request.",
+            status_code=400,
         )
     except LookupError as exc:
-        return _json_error(
-            "not_found",
-            str(exc),
-            404,
+        return safe_exception_response(
+            exc,
+            error="not_found",
+            message="Incident priority target not found.",
+            status_code=404,
         )
 
     write_audit(
@@ -271,16 +268,18 @@ def add_incident_responder(incident_id):
             user_id=_request_user_id(),
         )
     except ValueError as exc:
-        return _json_error(
-            "validation_error",
-            str(exc),
-            400,
+        return safe_exception_response(
+            exc,
+            error="validation_error",
+            message="Invalid incident responder request.",
+            status_code=400,
         )
     except LookupError as exc:
-        return _json_error(
-            "not_found",
-            str(exc),
-            404,
+        return safe_exception_response(
+            exc,
+            error="not_found",
+            message="Incident responder target not found.",
+            status_code=404,
         )
 
     write_audit(
@@ -312,7 +311,7 @@ def add_incident_responder(incident_id):
 def update_incident_responder(incident_id, responder_id):
     group = alerts_repo.get_alert_group(incident_id)
     if not group:
-        return _json_error(
+        return make_error_response(
             "not_found",
             "Incident not found",
             404,
@@ -332,22 +331,25 @@ def update_incident_responder(incident_id, responder_id):
             user=_request_user(),
         )
     except PermissionError as exc:
-        return _json_error(
-            "access_denied",
-            str(exc),
-            403,
+        return safe_exception_response(
+            exc,
+            error="access_denied",
+            message="You do not have permission to update this responder.",
+            status_code=403,
         )
     except ValueError as exc:
-        return _json_error(
-            "validation_error",
-            str(exc),
-            400,
+        return safe_exception_response(
+            exc,
+            error="validation_error",
+            message="Invalid incident responder update request.",
+            status_code=400,
         )
     except LookupError as exc:
-        return _json_error(
-            "not_found",
-            str(exc),
-            404,
+        return safe_exception_response(
+            exc,
+            error="not_found",
+            message="Incident responder not found.",
+            status_code=404,
         )
 
     write_audit(
@@ -394,16 +396,18 @@ def add_incident_stakeholder(incident_id):
             user_id=_request_user_id(),
         )
     except ValueError as exc:
-        return _json_error(
-            "validation_error",
-            str(exc),
-            400,
+        return safe_exception_response(
+            exc,
+            error="validation_error",
+            message="Invalid incident stakeholder request.",
+            status_code=400,
         )
     except LookupError as exc:
-        return _json_error(
-            "not_found",
-            str(exc),
-            404,
+        return safe_exception_response(
+            exc,
+            error="not_found",
+            message="Incident stakeholder target not found.",
+            status_code=404,
         )
 
     write_audit(
@@ -437,10 +441,11 @@ def delete_incident_stakeholder(incident_id, stakeholder_id):
             user_id=_request_user_id(),
         )
     except LookupError as exc:
-        return _json_error(
-            "not_found",
-            str(exc),
-            404,
+        return safe_exception_response(
+            exc,
+            error="not_found",
+            message="Incident stakeholder not found.",
+            status_code=404,
         )
 
     write_audit(

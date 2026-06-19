@@ -11,22 +11,20 @@ from app.modules.db import escalation_policies_repo
 from app.services import escalation_policies as escalation_policy_service
 from app.services.audit import write_audit
 from app.services.rbac import get_allowed_team_ids, require_team_read, require_team_write
-from app.services.validation import validate_body
+from app.services.validation import (
+    make_error_response,
+    safe_exception_response,
+    validate_body,
+)
 
 escalation_policies_bp = Blueprint("escalation_policies_api", __name__)
-
-
-def _json_error(error, message, status=400, **extra):
-    payload = {"error": error, "message": message}
-    payload.update(extra)
-    return jsonify(payload), status
 
 
 def _validate_rule_target_values(policy, target_type, target_id):
     """Ensure rule target exists and belongs to the same team as the policy."""
     if target_type == "rotation":
         if not escalation_policies_repo.rotation_belongs_to_team(target_id, policy.team.id):
-            return _json_error(
+            return make_error_response(
                 "rotation_team_mismatch",
                 "Rotation does not belong to policy team",
                 400,
@@ -36,7 +34,7 @@ def _validate_rule_target_values(policy, target_type, target_id):
 
     if target_type == "user":
         if not escalation_policies_repo.user_belongs_to_team(target_id, policy.team.id):
-            return _json_error(
+            return make_error_response(
                 "user_team_mismatch",
                 "User is not an active member of policy team",
                 400,
@@ -66,7 +64,7 @@ def _validate_rule_update_target(policy, rule, payload):
     elif target_type == "user" and rule.target_user:
         target_id = rule.target_user.id
     else:
-        return _json_error(
+        return make_error_response(
             "rule_target_required",
             "target_id is required for this rule target",
             400,
@@ -222,7 +220,12 @@ def create_escalation_policy_rule(policy_id):
     try:
         rule = escalation_policies_repo.create_rule(policy.id, **payload.model_dump())
     except ValueError as exc:
-        return _json_error("rule_conflict", str(exc), 409)
+        return safe_exception_response(
+            exc,
+            error="rule_conflict",
+            message="Escalation policy rule conflicts with an existing rule.",
+            status_code=409,
+        )
 
     write_audit(
         "escalation_policy_rule.create",
@@ -259,7 +262,12 @@ def update_escalation_policy_rule(rule_id):
             payload.model_dump(exclude_unset=True),
         )
     except ValueError as exc:
-        return _json_error("rule_validation_failed", str(exc), 400)
+        return safe_exception_response(
+            exc,
+            error="rule_validation_failed",
+            message="Invalid escalation policy rule request.",
+            status_code=400,
+        )
 
     write_audit(
         "escalation_policy_rule.update",
