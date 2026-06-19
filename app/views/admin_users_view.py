@@ -13,7 +13,11 @@ from app.services.rbac import (
     require_user_management_access,
 )
 from app.services.serializers import serialize_user
-from app.services.validation import validate_body
+from app.services.validation import (
+    make_error_response,
+    safe_exception_response,
+    validate_body,
+)
 
 
 admin_users_bp = Blueprint("admin_users_api", __name__)
@@ -323,15 +327,28 @@ def admin_delete_user(user_id):
         return admin_error
 
     if request.current_user and request.current_user.id == user_id:
-        return jsonify({"error": "You cannot remove your own user account"}), 400
+        return make_error_response(
+            error="self_delete_denied",
+            message="You cannot remove your own user account.",
+            status_code=400,
+        )
 
     try:
         user = users_repo.soft_delete_user(user_id)
     except ValueError as exc:
-        return jsonify({"error": str(exc)}), 409
+        return safe_exception_response(
+            exc,
+            error="user_delete_conflict",
+            message="User cannot be removed.",
+            status_code=409,
+        )
 
     if not user:
-        return jsonify({"error": "User not found"}), 404
+        return make_error_response(
+            error="not_found",
+            message="User not found.",
+            status_code=404,
+        )
 
     write_audit(
         "admin.user.remove",

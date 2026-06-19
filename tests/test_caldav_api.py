@@ -17,6 +17,10 @@ from tests.factories import (
 )
 
 
+def unfold_ics(value: str) -> str:
+    return value.replace("\r\n ", "").replace("\n ", "")
+
+
 def basic_auth(username, token):
     value = base64.b64encode(f"{username}:{token}".encode("utf-8")).decode("ascii")
     return {"Authorization": f"Basic {value}"}
@@ -471,7 +475,7 @@ def test_caldav_get_calendar_object_returns_ics(client, db):
     assert response.mimetype == "text/calendar"
     assert response.headers["ETag"]
 
-    body = response.data.decode("utf-8")
+    body = unfold_ics(response.data.decode("utf-8"))
 
     assert "BEGIN:VCALENDAR" in body
     assert "BEGIN:VEVENT" in body

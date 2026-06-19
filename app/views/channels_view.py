@@ -11,7 +11,7 @@ from app.notifiers.email.email_templates import DEFAULT_EMAIL_HTML_TEMPLATE
 from app.services.audit import write_audit
 from app.services.rbac import get_allowed_team_ids, require_team_read, require_team_write
 from app.services.serializers import serialize_channel
-from app.services.validation import validate_body
+from app.services.validation import make_error_response, validate_body
 
 channels_bp = Blueprint("channels_api", __name__)
 
@@ -300,7 +300,12 @@ def test_channel(channel_id):
             team_id=team.id if team else None,
             message=str(exc),
         )
-        return jsonify({"status": "failed", "error": str(exc)}), 400
+        return make_error_response(
+            error="channel_test_failed",
+            message="Channel test failed.",
+            status_code=400,
+            status="failed",
+        )
 
     write_audit(
         "channel.test.sent",

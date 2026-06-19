@@ -21,7 +21,11 @@ from app.services.audit import write_audit
 from app.services.rbac import get_allowed_team_ids, require_team_read, require_team_write
 from app.services.oncall import get_current_oncall_user
 from app.services.serializers import serialize_rotation, serialize_rotation_layer, serialize_rotation_layer_member, serialize_rotation_layer_restriction
-from app.services.validation import validate_body
+from app.services.validation import (
+    make_error_response,
+    safe_exception_response,
+    validate_body,
+)
 
 
 rotations_bp = Blueprint("rotations_api", __name__)
@@ -174,10 +178,12 @@ def create_rotation():
             enabled=payload.enabled,
         )
     except ValueError as exc:
-        return jsonify({
-            "error": "rotation_conflict",
-            "message": str(exc),
-        }), 400
+        return safe_exception_response(
+            exc,
+            error="rotation_conflict",
+            message="Rotation conflicts with an existing rotation.",
+            status_code=400,
+        )
     write_audit("rotation.create", object_type="rotation", object_id=rotation.id, team_id=rotation.team.id, data=payload.model_dump(mode="json"))
 
     if payload.add_team_members:
@@ -339,7 +345,12 @@ def add_rotation_member(rotation_id):
     try:
         rotations_repo.ensure_user_in_rotation_team(rotation_id, payload.user_id)
     except ValueError as exc:
-        return jsonify({"error": str(exc)}), 400
+        return safe_exception_response(
+            exc,
+            error="validation_error",
+            message="User cannot be added to this rotation.",
+            status_code=400,
+        )
 
     member = rotations_repo.add_rotation_member(rotation_id, payload.user_id, payload.position)
     write_audit("rotation.member.add", object_type="rotation", object_id=rotation_id, team_id=member.rotation.team.id, data=payload.model_dump())
@@ -496,16 +507,22 @@ def create_rotation_override(rotation_id):
     try:
         rotations_repo.ensure_user_in_rotation_team(rotation_id, payload.user_id)
     except ValueError as exc:
-        return jsonify({"error": str(exc)}), 400
+        return safe_exception_response(
+            exc,
+            error="validation_error",
+            message="User cannot be used for this rotation override.",
+            status_code=400,
+        )
 
     starts_at = _rotation_local_to_utc_naive(payload.starts_at, rotation)
     ends_at = _rotation_local_to_utc_naive(payload.ends_at, rotation)
 
     if ends_at <= starts_at:
-        return jsonify({
-            "error": "validation_error",
-            "message": "ends_at must be greater than starts_at",
-        }), 400
+        return make_error_response(
+            error="validation_error",
+            message="ends_at must be greater than starts_at.",
+            status_code=400,
+        )
 
     override = rotations_repo.create_rotation_override(
         rotation_id=rotation_id,
@@ -680,7 +697,12 @@ def add_rotation_layer_member(layer_id):
     try:
         rotations_repo.ensure_user_in_rotation_team(layer.rotation.id, payload.user_id)
     except ValueError as exc:
-        return jsonify({"error": str(exc)}), 400
+        return safe_exception_response(
+            exc,
+            error="validation_error",
+            message="User cannot be added to this rotation layer.",
+            status_code=400,
+        )
 
     starts_at = _layer_local_to_utc_naive(payload.starts_at, layer)
 
@@ -692,10 +714,12 @@ def add_rotation_layer_member(layer_id):
             starts_at=starts_at,
         )
     except ValueError as exc:
-        return jsonify({
-            "error": "rotation_layer_member_conflict",
-            "message": str(exc),
-        }), 400
+        return safe_exception_response(
+            exc,
+            error="rotation_layer_member_conflict",
+            message="Rotation layer member conflicts with an existing member.",
+            status_code=400,
+        )
 
     write_audit(
         "rotation.layer.member.add",
@@ -726,7 +750,12 @@ def update_rotation_layer_member(member_id):
             active=payload.active,
         )
     except ValueError as exc:
-        return jsonify({"error": str(exc)}), 400
+        return safe_exception_response(
+            exc,
+            error="validation_error",
+            message="Invalid rotation layer member update request.",
+            status_code=400,
+        )
 
     write_audit(
         "rotation.layer.member.update",

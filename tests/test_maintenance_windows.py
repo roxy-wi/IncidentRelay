@@ -1632,7 +1632,7 @@ def test_update_maintenance_window_rejects_past_ends_at_in_existing_timezone(
 
     assert response.status_code == 400
     assert data["error"] == "validation_error"
-    assert data["message"] == "ends_at must be in the future"
+    assert data["message"] == "Invalid maintenance window update request."
 
 
 def test_maintenance_window_serializes_wall_clock_times_without_utc_conversion(

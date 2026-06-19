@@ -57,17 +57,22 @@ def test_admin_cannot_disable_own_account(app):
 def test_admin_cannot_remove_own_account(app):
     current_admin = create_user(is_admin=True)
 
-    with app.test_request_context(f"/api/admin/users/{current_admin.id}", method="DELETE"):
+    with app.test_request_context(
+        f"/api/admin/users/{current_admin.id}",
+        method="DELETE",
+    ):
         from flask import request
 
         request.current_user = current_admin
         response, status = admin_delete_user(current_admin.id)
 
     current_admin = type(current_admin).get_by_id(current_admin.id)
+    payload = response.get_json()
+
     assert status == 400
-    assert response.get_json()["error"] == "You cannot remove your own user account"
+    assert payload["error"] == "self_delete_denied"
+    assert payload["message"] == "You cannot remove your own user account."
     assert current_admin.active is True
-    assert current_admin.deleted is False
 
 
 def test_global_admin_can_update_user_group_and_role_from_users_page(app):

@@ -22,7 +22,11 @@ from app.services.serializers import (
     serialize_maintenance_window,
     serialize_utc_datetime,
 )
-from app.services.validation import make_error_response, validate_body
+from app.services.validation import (
+    make_error_response,
+    safe_exception_response,
+    validate_body,
+)
 
 
 maintenance_bp = Blueprint("maintenance_api", __name__)
@@ -179,9 +183,19 @@ def create_window():
             user_id=_current_user_id(),
         )
     except ValueError as exc:
-        return jsonify({"error": "validation_error", "message": str(exc)}), 400
+        return safe_exception_response(
+            exc,
+            error="validation_error",
+            message="Invalid maintenance window request.",
+            status_code=400,
+        )
     except PermissionError as exc:
-        return jsonify({"error": "forbidden", "message": str(exc)}), 403
+        return safe_exception_response(
+            exc,
+            error="forbidden",
+            message="Access denied.",
+            status_code=403,
+        )
 
     _write_maintenance_audit(
         "maintenance_window.create",
@@ -197,7 +211,11 @@ def get_window(window_id):
     window = maintenance_repo.get_maintenance_window(window_id)
 
     if not window:
-        return make_error_response("not_found", "Maintenance window not found", 404)
+        return make_error_response(
+            error="not_found",
+            message="Maintenance window not found.",
+            status_code=404,
+        )
 
     error = _check_window_read(window)
     if error:
@@ -221,11 +239,26 @@ def update_window(window_id):
             user_id=_current_user_id(),
         )
     except ValueError as exc:
-        return jsonify({"error": "validation_error", "message": str(exc)}), 400
+        return safe_exception_response(
+            exc,
+            error="validation_error",
+            message="Invalid maintenance window update request.",
+            status_code=400,
+        )
     except PermissionError as exc:
-        return jsonify({"error": "forbidden", "message": str(exc)}), 403
+        return safe_exception_response(
+            exc,
+            error="forbidden",
+            message="Access denied.",
+            status_code=403,
+        )
     except LookupError as exc:
-        return jsonify({"error": "not_found", "message": str(exc)}), 404
+        return safe_exception_response(
+            exc,
+            error="not_found",
+            message="Maintenance window not found.",
+            status_code=404,
+        )
 
     _write_maintenance_audit(
         "maintenance_window.update",
@@ -254,11 +287,26 @@ def cancel_window(window_id):
             user_id=_current_user_id(),
         )
     except ValueError as exc:
-        return jsonify({"error": "validation_error", "message": str(exc)}), 400
+        return safe_exception_response(
+            exc,
+            error="validation_error",
+            message="Invalid maintenance window cancellation request.",
+            status_code=400,
+        )
     except PermissionError as exc:
-        return jsonify({"error": "forbidden", "message": str(exc)}), 403
+        return safe_exception_response(
+            exc,
+            error="forbidden",
+            message="Access denied.",
+            status_code=403,
+        )
     except LookupError as exc:
-        return jsonify({"error": "not_found", "message": str(exc)}), 404
+        return safe_exception_response(
+            exc,
+            error="not_found",
+            message="Maintenance window not found.",
+            status_code=404,
+        )
 
     _write_maintenance_audit(
         "maintenance_window.cancel",
@@ -277,9 +325,19 @@ def delete_window(window_id):
             user_id=_current_user_id(),
         )
     except PermissionError as exc:
-        return jsonify({"error": "forbidden", "message": str(exc)}), 403
+        return safe_exception_response(
+            exc,
+            error="forbidden",
+            message="Access denied.",
+            status_code=403,
+        )
     except LookupError as exc:
-        return jsonify({"error": "not_found", "message": str(exc)}), 404
+        return safe_exception_response(
+            exc,
+            error="not_found",
+            message="Maintenance window not found.",
+            status_code=404,
+        )
 
     _write_maintenance_audit(
         "maintenance_window.delete",

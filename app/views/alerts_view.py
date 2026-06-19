@@ -20,6 +20,7 @@ from app.services.alerts.alert_comments import (
 from app.services.incidents.stakeholders import create_incident_stakeholder
 from app.services.incidents.priorities import set_incident_priority
 from app.services.incidents.responders import create_incident_responder, set_incident_responder_status
+from app.services.validation import make_error_response, safe_exception_response
 
 alerts_bp = Blueprint("alerts_api", __name__)
 
@@ -242,16 +243,18 @@ def merge_alert_groups_view():
     reason = data.get("reason")
 
     if not target_group_id:
-        return jsonify({
-            "error": "validation_error",
-            "message": "target_group_id is required",
-        }), 400
+        return make_error_response(
+            error="validation_error",
+            message="target_group_id is required.",
+            status_code=400,
+        )
 
     if not source_group_ids:
-        return jsonify({
-            "error": "validation_error",
-            "message": "source_group_ids is required",
-        }), 400
+        return make_error_response(
+            error="validation_error",
+            message="source_group_ids is required.",
+            status_code=400,
+        )
 
     target = alerts_repo.get_alert_group(target_group_id)
 
@@ -303,7 +306,11 @@ def merge_alert_groups_view():
 def list_alert_group_comments(alert_id):
     group = alerts_repo.get_alert_group(alert_id)
     if not group:
-        return jsonify({"error": "not_found", "message": "Alert group not found"}), 404
+        return make_error_response(
+            error="not_found",
+            message="Alert group not found.",
+            status_code=404,
+        )
 
     if group.team_id:
         error = require_team_read(group.team_id)
@@ -319,7 +326,11 @@ def list_alert_group_comments(alert_id):
 def add_alert_group_comment(alert_id):
     group = alerts_repo.get_alert_group(alert_id)
     if not group:
-        return jsonify({"error": "not_found", "message": "Alert group not found"}), 404
+        return make_error_response(
+            error="not_found",
+            message="Alert group not found.",
+            status_code=404,
+        )
 
     if group.team_id:
         error = require_team_respond(group.team_id)
@@ -336,15 +347,19 @@ def add_alert_group_comment(alert_id):
             user_id=getattr(user, "id", None),
         )
     except ValueError as exc:
-        return jsonify({
-            "error": "validation_error",
-            "message": str(exc),
-        }), 400
+        return safe_exception_response(
+            exc,
+            error="validation_error",
+            message="Invalid alert group comment request.",
+            status_code=400,
+        )
     except LookupError as exc:
-        return jsonify({
-            "error": "not_found",
-            "message": str(exc),
-        }), 404
+        return safe_exception_response(
+            exc,
+            error="not_found",
+            message="Alert group comment target not found.",
+            status_code=404,
+        )
 
     write_audit(
         "alert_group.comment",
@@ -371,7 +386,11 @@ def list_child_alert_comments(group_id, child_alert_id):
 
     alert = alerts_repo.get_alert(child_alert_id)
     if not alert or alert.group_id != group.id:
-        return jsonify({"error": "not_found", "message": "Alert not found in this group"}), 404
+        return make_error_response(
+            error="not_found",
+            message="Alert not found in this group.",
+            status_code=404,
+        )
 
     comments = alerts_repo.list_alert_comments(alert.id)
 
@@ -400,15 +419,19 @@ def add_child_alert_comment(group_id, child_alert_id):
             user_id=getattr(user, "id", None),
         )
     except ValueError as exc:
-        return jsonify({
-            "error": "validation_error",
-            "message": str(exc),
-        }), 400
+        return safe_exception_response(
+            exc,
+            error="validation_error",
+            message="Invalid child alert comment request.",
+            status_code=400,
+        )
     except LookupError as exc:
-        return jsonify({
-            "error": "not_found",
-            "message": str(exc),
-        }), 404
+        return safe_exception_response(
+            exc,
+            error="not_found",
+            message="Child alert comment target not found.",
+            status_code=404,
+        )
 
     write_audit(
         "alert.comment",
@@ -451,15 +474,19 @@ def update_alert_group_comment(alert_id, comment_id):
             user_id=user_id,
         )
     except ValueError as exc:
-        return jsonify({
-            "error": "validation_error",
-            "message": str(exc),
-        }), 400
+        return safe_exception_response(
+            exc,
+            error="validation_error",
+            message="Invalid alert group comment update request.",
+            status_code=400,
+        )
     except LookupError as exc:
-        return jsonify({
-            "error": "not_found",
-            "message": str(exc),
-        }), 404
+        return safe_exception_response(
+            exc,
+            error="not_found",
+            message="Alert group comment not found.",
+            status_code=404,
+        )
 
     write_audit(
         "alert_group.comment.update",
@@ -499,10 +526,12 @@ def delete_alert_group_comment(alert_id, comment_id):
             user_id=user_id,
         )
     except LookupError as exc:
-        return jsonify({
-            "error": "not_found",
-            "message": str(exc),
-        }), 404
+        return safe_exception_response(
+            exc,
+            error="not_found",
+            message="Alert group comment not found.",
+            status_code=404,
+        )
 
     write_audit(
         "alert_group.comment.delete",
@@ -543,7 +572,12 @@ def update_incident_priority(alert_id):
             user_id=getattr(user, "id", None),
         )
     except ValueError as exc:
-        return jsonify({"error": "validation_error", "message": str(exc)}), 400
+        return safe_exception_response(
+            exc,
+            error="validation_error",
+            message="Invalid incident priority request.",
+            status_code=400,
+        )
 
     return jsonify(serialize_alert_group(group, current_user=user))
 
@@ -588,7 +622,12 @@ def add_incident_responder(alert_id):
             user_id=getattr(user, "id", None),
         )
     except ValueError as exc:
-        return jsonify({"error": "validation_error", "message": str(exc)}), 400
+        return safe_exception_response(
+            exc,
+            error="validation_error",
+            message="Invalid incident responder request.",
+            status_code=400,
+        )
 
     return jsonify(serialize_incident_responder(responder)), 201
 
@@ -616,9 +655,19 @@ def update_incident_responder(alert_id, responder_id):
             user_id=getattr(user, "id", None),
         )
     except ValueError as exc:
-        return jsonify({"error": "validation_error", "message": str(exc)}), 400
+        return safe_exception_response(
+            exc,
+            error="validation_error",
+            message="Invalid incident responder update request.",
+            status_code=400,
+        )
     except LookupError as exc:
-        return jsonify({"error": "not_found", "message": str(exc)}), 404
+        return safe_exception_response(
+            exc,
+            error="not_found",
+            message="Incident responder not found.",
+            status_code=404,
+        )
 
     return jsonify(serialize_incident_responder(responder))
 
@@ -663,6 +712,11 @@ def add_incident_stakeholder(alert_id):
             user_id=getattr(user, "id", None),
         )
     except ValueError as exc:
-        return jsonify({"error": "validation_error", "message": str(exc)}), 400
+        return safe_exception_response(
+            exc,
+            error="validation_error",
+            message="Invalid incident stakeholder request.",
+            status_code=400,
+        )
 
     return jsonify(serialize_incident_stakeholder(stakeholder)), 201

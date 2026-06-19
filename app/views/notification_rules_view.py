@@ -1,11 +1,14 @@
 from flask import Blueprint, jsonify, request
-from pydantic import ValidationError
 
 from app.api.schemas.notification_rules import (
     NotificationRuleCreateSchema,
     NotificationRuleUpdateSchema,
 )
 from app.services.notifications import rules
+from app.services.validation import (
+    safe_exception_response,
+    validate_body,
+)
 
 notification_rules_bp = Blueprint("notification_rules_api", __name__)
 
@@ -19,10 +22,12 @@ def list_profile_notification_rules():
 
 @notification_rules_bp.route("/profile/notification-rules", methods=["POST"])
 def create_profile_notification_rule():
-    payload = request.get_json(silent=True) or {}
+    data, error_response = validate_body(NotificationRuleCreateSchema)
+
+    if error_response:
+        return error_response
 
     try:
-        data = NotificationRuleCreateSchema.model_validate(payload)
         rule = rules.create_user_rule(
             request.current_user,
             method=data.method,
@@ -31,51 +36,37 @@ def create_profile_notification_rule():
             event_types=data.event_types,
             enabled=data.enabled,
         )
-    except ValidationError as exc:
-        return jsonify(
-            {
-                "error": "validation_error",
-                "message": "Request validation failed",
-                "details": exc.errors(),
-            }
-        ), 400
     except ValueError as exc:
-        return jsonify(
-            {
-                "error": "validation_error",
-                "message": str(exc),
-            }
-        ), 400
+        return safe_exception_response(
+            exc,
+            error="validation_error",
+            message="Invalid notification rule request.",
+            status_code=400,
+        )
 
     return jsonify(rules.serialize_rule(rule)), 201
 
 
 @notification_rules_bp.route("/profile/notification-rules/<int:rule_id>", methods=["PUT"])
 def update_profile_notification_rule(rule_id):
-    payload = request.get_json(silent=True) or {}
+    data, error_response = validate_body(NotificationRuleUpdateSchema)
+
+    if error_response:
+        return error_response
 
     try:
-        data = NotificationRuleUpdateSchema.model_validate(payload)
         rule = rules.update_user_rule(
             request.current_user,
             rule_id,
             data.model_dump(exclude_unset=True),
         )
-    except ValidationError as exc:
-        return jsonify(
-            {
-                "error": "validation_error",
-                "message": "Request validation failed",
-                "details": exc.errors(),
-            }
-        ), 400
     except ValueError as exc:
-        return jsonify(
-            {
-                "error": "validation_error",
-                "message": str(exc),
-            }
-        ), 400
+        return safe_exception_response(
+            exc,
+            error="validation_error",
+            message="Invalid notification rule update request.",
+            status_code=400,
+        )
 
     return jsonify(rules.serialize_rule(rule))
 
@@ -88,12 +79,12 @@ def delete_profile_notification_rule(rule_id):
             rule_id,
         )
     except ValueError as exc:
-        return jsonify(
-            {
-                "error": "not_found",
-                "message": str(exc),
-            }
-        ), 404
+        return safe_exception_response(
+            exc,
+            error="not_found",
+            message="Notification rule not found.",
+            status_code=404,
+        )
 
     return jsonify(
         {

@@ -726,12 +726,11 @@ def test_add_duplicate_open_responder_is_rejected(client, db, monkeypatch):
         json=payload,
         headers=headers,
     )
+    payload = second_response.get_json()
+
     assert second_response.status_code == 400
-    assert second_response.get_json()["error"] == "validation_error"
-    assert (
-        second_response.get_json()["message"]
-        == "active responder request already exists for this target"
-    )
+    assert payload["error"] == "validation_error"
+    assert payload["message"] == "Invalid incident responder request."
 
 
 def test_responder_declined_cannot_be_accepted_later(client, db, monkeypatch):
@@ -777,12 +776,11 @@ def test_responder_declined_cannot_be_accepted_later(client, db, monkeypatch):
         },
         headers=headers,
     )
+    payload = accept_response.get_json()
+
     assert accept_response.status_code == 400
-    assert accept_response.get_json()["error"] == "validation_error"
-    assert (
-        "cannot change responder status from declined to accepted"
-        in accept_response.get_json()["message"]
-    )
+    assert payload["error"] == "validation_error"
+    assert payload["message"] == "Invalid incident responder update request."
 
 
 def test_target_user_can_accept_own_responder_request(client, db, monkeypatch):

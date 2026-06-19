@@ -22,7 +22,7 @@ from app.modules.sso.sso_login import (
 )
 from app.settings import Config
 from app.modules.sso.saml_security import get_saml_security, validate_saml_crypto_config
-
+from app.services.validation import safe_exception_response
 
 sso_auth_bp = Blueprint("sso_auth_api", __name__)
 
@@ -93,7 +93,7 @@ def _load_json_url(url, error_code, error_message):
     except (HTTPError, URLError, TimeoutError, json.JSONDecodeError) as exc:
         raise SsoLoginError(
             error_code,
-            f"{error_message}: {exc}",
+            error_message,
             502,
         ) from exc
 
@@ -213,7 +213,7 @@ def _validate_oidc_id_token(provider, metadata, token, expected_nonce):
     except (AuthlibJoseError, JoseRFCError) as exc:
         raise SsoLoginError(
             "sso_oidc_id_token_invalid",
-            f"OIDC id_token validation failed: {exc}",
+            "OIDC id_token validation failed",
             401,
         ) from exc
 
@@ -247,7 +247,7 @@ def _fetch_oidc_userinfo(provider, metadata, token):
     except Exception as exc:
         raise SsoLoginError(
             "sso_oidc_userinfo_failed",
-            f"Could not fetch OIDC userinfo: {exc}",
+            "Could not fetch OIDC userinfo",
             502,
         ) from exc
 
@@ -388,10 +388,12 @@ def _oidc_callback(provider):
             "message": exc.message,
         }), exc.status_code
     except Exception as exc:
-        return jsonify({
-            "error": "sso_oidc_callback_failed",
-            "message": str(exc),
-        }), 502
+        return safe_exception_response(
+            exc,
+            error="sso_oidc_callback_failed",
+            message="OIDC callback failed.",
+            status_code=502,
+        )
 
     try:
         user = complete_sso_login(provider, claims)

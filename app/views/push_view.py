@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify, request
 
 from app.notifiers.browser_push import service as browser_push
+from app.services.validation import make_error_response, safe_exception_response
 
 push_bp = Blueprint("push_api", __name__)
 
@@ -33,10 +34,12 @@ def save_subscription():
             user_agent=payload.get("user_agent") or request.headers.get("User-Agent"),
         )
     except ValueError as exc:
-        return jsonify({
-            "error": "validation_error",
-            "message": str(exc),
-        }), 400
+        return safe_exception_response(
+            exc,
+            error="validation_error",
+            message="Invalid browser push subscription request.",
+            status_code=400,
+        )
 
     return jsonify(browser_push.serialize_subscription(subscription)), 201
 
@@ -50,10 +53,11 @@ def disable_subscription(subscription_id):
     )
 
     if not subscription:
-        return jsonify({
-            "error": "not_found",
-            "message": "push subscription was not found",
-        }), 404
+        return make_error_response(
+            error="not_found",
+            message="Push subscription was not found.",
+            status_code=404,
+        )
 
     return jsonify({"disabled": True, "id": subscription_id})
 
