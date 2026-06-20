@@ -17,59 +17,191 @@
     </div>
 
     <div class="app-modal-body">
-      <div id="alert-details-summary" class="details-grid"></div>
+      <div
+        id="alert-details-tabs"
+        class="page-tabs alert-details-tabs"
+        role="tablist"
+        aria-label="Alert details tabs"
+      >
+        <button
+          type="button"
+          class="page-tab alert-details-tab is-active active"
+          data-alert-details-tab="summary"
+          role="tab"
+          aria-selected="true"
+          aria-controls="alert-details-summary-tab"
+        >
+          Summary
+        </button>
 
-        <section class="details-section alert-comments-section">
-          <div class="details-section-header">
-            <h3>Comments</h3>
-                <button
-                    type="button"
-                    id="alert-comments-refresh"
-                    class="btn btn-secondary btn-small"
-                  >
-                    Refresh
-                </button>
-          </div>
+        <button
+          type="button"
+          class="page-tab alert-details-tab"
+          data-alert-details-tab="details"
+          role="tab"
+          aria-selected="false"
+          aria-controls="alert-details-details-tab"
+        >
+          Details
+        </button>
 
-          <div id="alert-comments-list" class="alert-comments-list"></div>
+        <button
+          type="button"
+          class="page-tab alert-details-tab"
+          data-alert-details-tab="alerts"
+          role="tab"
+          aria-selected="false"
+          aria-controls="alert-details-alerts-tab"
+        >
+          Alerts
+        </button>
 
-          <form id="alert-comment-form" class="alert-comment-form">
-            <textarea
-              id="alert-comment-body"
-              class="form-control"
-              rows="3"
-              maxlength="5000"
-              placeholder="Add a comment..."
-            ></textarea>
+        <button
+          type="button"
+          class="page-tab alert-details-tab"
+          data-alert-details-tab="events"
+          role="tab"
+          aria-selected="false"
+          aria-controls="alert-details-events-tab"
+        >
+          Events
+        </button>
 
-            <div class="modal-actions">
-              <button type="submit" class="btn btn-primary">
-                Add comment
+        <button
+          type="button"
+          class="page-tab alert-details-tab"
+          data-alert-details-tab="explain"
+          role="tab"
+          aria-selected="false"
+          aria-controls="alert-details-explain-tab"
+        >
+          Explain
+        </button>
+      </div>
+
+      <div class="alert-details-tab-panels">
+        <section
+          id="alert-details-summary-tab"
+          class="alert-details-tab-panel is-active active"
+          data-alert-details-panel="summary"
+          role="tabpanel"
+        >
+          <div id="alert-details-overview"></div>
+
+          <section class="details-section alert-comments-section">
+            <div class="details-section-header">
+              <h3>Comments</h3>
+              <button
+                type="button"
+                id="alert-comments-refresh"
+                class="btn btn-secondary btn-small"
+              >
+                Refresh
               </button>
             </div>
-          </form>
-        </section>
+            <div id="alert-comments-list" class="alert-comments-list"></div>
 
-      <div class="details-section">
-        <div class="details-section-title">Labels</div>
-        <pre id="alert-details-labels" class="details-code"></pre>
-      </div>
-        <div class="details-section">
+            <form id="alert-comment-form" class="alert-comment-form">
+              <textarea
+                id="alert-comment-body"
+                class="form-control"
+                rows="3"
+                maxlength="5000"
+                placeholder="Add a comment..."
+              ></textarea>
+
+              <div class="modal-actions">
+                <button type="submit" class="btn btn-primary">
+                  Add comment
+                </button>
+              </div>
+            </form>
+          </section>
+
+          <div class="details-section">
+            <div class="details-section-title">Labels</div>
+            <pre id="alert-details-labels" class="details-code"></pre>
+          </div>
+
+          <div class="details-section">
             <div class="details-section-title">Payload</div>
             <pre id="alert-details-payload" class="details-code"></pre>
-        </div>
-        <section id="alert-group-children-section" class="details-section" hidden>
-            <h3>Alerts in this group</h3>
-            <div id="alert-group-children"></div>
+          </div>
         </section>
-      <div class="details-section">
-        <div class="details-section-title">Events</div>
-        <div id="alert-details-events" class="event-list"></div>
-      </div>
 
-      <div class="details-section">
-        <div class="details-section-title">Notification delivery</div>
-        <div id="alert-details-notifications" class="event-list"></div>
+        <section
+          id="alert-details-details-tab"
+          class="alert-details-tab-panel"
+          data-alert-details-panel="details"
+          role="tabpanel"
+          hidden
+        >
+          <div class="details-section">
+            <div class="details-section-title">Routing and escalation</div>
+            <div id="alert-details-summary" class="details-grid"></div>
+          </div>
+        </section>
+
+        <section
+          id="alert-details-alerts-tab"
+          class="alert-details-tab-panel"
+          data-alert-details-panel="alerts"
+          role="tabpanel"
+          hidden
+        >
+          <section id="alert-group-children-section" class="details-section">
+            <div class="details-section-title">Alerts in this group</div>
+            <div id="alert-group-children"></div>
+          </section>
+        </section>
+
+        <section
+          id="alert-details-events-tab"
+          class="alert-details-tab-panel"
+          data-alert-details-panel="events"
+          role="tabpanel"
+          hidden
+        >
+          <div class="details-section">
+            <div class="details-section-title">Events</div>
+            <div id="alert-details-events" class="event-list"></div>
+          </div>
+
+          <div class="details-section">
+            <div class="details-section-title">Notification delivery</div>
+            <div id="alert-details-notifications" class="event-list"></div>
+          </div>
+        </section>
+
+        <section
+          id="alert-details-explain-tab"
+          class="alert-details-tab-panel"
+          data-alert-details-panel="explain"
+          role="tabpanel"
+          hidden
+        >
+          <div class="details-section">
+            <div class="details-section-header">
+              <div>
+                <div class="details-section-title">Explain routing</div>
+                <div class="card-subtitle">
+                  Route match, service resolution, grouping, assignment, maintenance and notification decisions.
+                </div>
+              </div>
+
+              <button
+                type="button"
+                id="alert-explain-refresh"
+                class="btn btn-secondary btn-small"
+              >
+                Refresh
+              </button>
+            </div>
+
+            <div id="alert-explain-summary" class="details-grid"></div>
+            <div id="alert-explain-steps" class="event-list"></div>
+          </div>
+        </section>
       </div>
     </div>
 
@@ -274,4 +406,59 @@
             </button>
         </div>
     </div>
+</div>
+<div id="alert-explain-lookup-modal" class="app-modal" style="display: none;">
+  <div class="app-modal-dialog">
+    <div class="app-modal-header">
+      <div>
+        <h2>Open explain trace</h2>
+        <div class="card-subtitle">
+          Paste trace_id returned by an integration API response.
+        </div>
+      </div>
+
+      <button
+        type="button"
+        class="app-modal-close"
+        data-alert-explain-lookup-close
+        aria-label="Close"
+      >
+        ×
+      </button>
+    </div>
+
+    <div class="app-modal-body">
+      <label for="alert-explain-trace-id">Trace ID</label>
+      <input
+        id="alert-explain-trace-id"
+        class="input"
+        type="text"
+        autocomplete="off"
+        placeholder="trace_id"
+      >
+
+      <div
+        id="alert-explain-lookup-error"
+        class="alert alert-danger is-hidden"
+      ></div>
+    </div>
+
+    <div class="app-modal-footer">
+      <button
+        type="button"
+        class="btn"
+        data-alert-explain-lookup-close
+      >
+        Cancel
+      </button>
+
+      <button
+        id="alert-explain-lookup-submit"
+        type="button"
+        class="btn btn-primary"
+      >
+        Open
+      </button>
+    </div>
+  </div>
 </div>

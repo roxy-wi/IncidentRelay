@@ -43,7 +43,9 @@ def test_silenced_alert_creates_silenced_group_without_notification(monkeypatch,
         lambda alert_group, event_type="notification": calls.append(event_type) or 1,
     )
 
-    alert_group, created = upsert_alert(_alert(route, "host1"))
+    result = upsert_alert(_alert(route, "host1"))
+    alert_group = result.group
+    created = result.created_group
 
     assert created is True
     assert alert_group.status == "silenced"
@@ -65,7 +67,9 @@ def test_silenced_child_does_not_reopen_acknowledged_group(monkeypatch, db):
     team = create_team(group, slug="sre")
     route = create_route(team, group_by=["alertname", "severity"])
 
-    alert_group, created = upsert_alert(_alert(route, "host1", "dedup-host1"))
+    result = upsert_alert(_alert(route, "host1", "dedup-host1"))
+    alert_group = result.group
+    created = result.created_group
 
     assert created is True
 
@@ -87,7 +91,9 @@ def test_silenced_child_does_not_reopen_acknowledged_group(monkeypatch, db):
         lambda alert_group, event_type="notification": calls.append(event_type) or 1,
     )
 
-    alert_group, created = upsert_alert(_alert(route, "host2", "dedup-host2"))
+    result = upsert_alert(_alert(route, "host2", "dedup-host2"))
+    alert_group = result.group
+    created = result.created_group
 
     assert created is False
     assert alert_group.status == "acknowledged"
@@ -109,7 +115,9 @@ def test_silenced_child_does_not_schedule_update_for_existing_firing_group(monke
     team = create_team(group, slug="sre")
     route = create_route(team, group_by=["alertname", "severity"])
 
-    alert_group, created = upsert_alert(_alert(route, "host1", "dedup-host1"))
+    result = upsert_alert(_alert(route, "host1", "dedup-host1"))
+    alert_group = result.group
+    created = result.created_group
 
     assert created is True
 
@@ -127,7 +135,9 @@ def test_silenced_child_does_not_schedule_update_for_existing_firing_group(monke
         },
     )
 
-    alert_group, created = upsert_alert(_alert(route, "host2", "dedup-host2"))
+    result = upsert_alert(_alert(route, "host2", "dedup-host2"))
+    alert_group = result.group
+    created = result.created_group
 
     assert created is False
     assert alert_group.status == "firing"

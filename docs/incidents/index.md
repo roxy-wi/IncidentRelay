@@ -17,6 +17,7 @@ Use this section for responder workflows:
 - [Alert comments](../usage/alert-comments.md)
 - [Silences](../usage/silences.md)
 - [Maintenance Windows](../concepts/maintenance-windows.md)
+- [Explain Trace](explain-trace.md)
 
 ## Response model
 

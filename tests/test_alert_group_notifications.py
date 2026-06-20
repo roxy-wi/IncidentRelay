@@ -52,7 +52,9 @@ def test_new_group_schedules_notification_instead_of_sending_immediately(db, mon
         lambda *args, **kwargs: sent.append((args, kwargs)),
     )
 
-    group, created = upsert_alert(_alert(route, "DiskFull", "host1"))
+    result = upsert_alert(_alert(route, "DiskFull", "host1"))
+    group = result.group
+    created = result.created_group
     group = alerts_repo.get_alert_group(group.id)
 
     assert created is True
@@ -68,7 +70,7 @@ def test_due_group_notification_is_sent(db, monkeypatch):
     team = create_team(group)
     route = create_route(team, group_by=["alertname", "severity"])
 
-    alert_group, created = upsert_alert(
+    result = upsert_alert(
         {
             "source": "alertmanager",
             "forced_route_id": route.id,
@@ -86,6 +88,8 @@ def test_due_group_notification_is_sent(db, monkeypatch):
             "status": "firing",
         }
     )
+    alert_group = result.group
+    created = result.created_group
 
     assert created is True
 
@@ -124,7 +128,9 @@ def test_group_resolved_before_group_wait_does_not_send_notification(db, monkeyp
         lambda *args, **kwargs: sent.append((args, kwargs)),
     )
 
-    group, _ = upsert_alert(_alert(route, "DiskFull", "host1"))
+    result = upsert_alert(_alert(route, "DiskFull", "host1"))
+    group = result.group
+
     upsert_alert(_alert(route, "DiskFull", "host1", status="resolved"))
 
     group = alerts_repo.get_alert_group(group.id)

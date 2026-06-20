@@ -220,6 +220,18 @@ class Config:
         100,
     )
 
+    ALERT_EXPLAIN_TRACE_RETENTION_DAYS = settings.get_int(
+        "alerts",
+        "alert_explain_trace_retention_days",
+        30,
+    )
+
+    ALERT_EXPLAIN_TRACE_CLEANUP_INTERVAL_SECONDS = settings.get_int(
+        "scheduler",
+        "alert_explain_trace_cleanup_interval_seconds",
+        86400,
+    )
+
     INCIDENT_RESPONDER_EXPIRE_CHECK_INTERVAL_SECONDS = settings.get_int(
         "incidents",
         "responder_expire_check_interval_seconds",

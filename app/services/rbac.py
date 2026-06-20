@@ -285,7 +285,7 @@ def can_write_team(user, team_id):
     if not can_read_group(user, team.group_id):
         return False
 
-    if can_manage_group_users(user, team.group_id):
+    if can_write_group(user, team.group_id):
         return True
 
     return teams_repo.get_user_team_role(user.id, team_id) in TEAM_WRITE_ROLES

@@ -28,7 +28,7 @@ def _create_alert_route(*, rotation=None):
 
 
 def _create_firing_alert_group(route, *, dedup_key, instance="host1"):
-    alert_group, created = upsert_alert(
+    result = upsert_alert(
         {
             "source": "alertmanager",
             "forced_route_id": route.id,
@@ -46,6 +46,9 @@ def _create_firing_alert_group(route, *, dedup_key, instance="host1"):
             "status": "firing",
         }
     )
+
+    alert_group = result.group
+    created = result.created_group
 
     assert alert_group is not None
     assert created is True

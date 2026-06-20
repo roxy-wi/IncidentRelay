@@ -1,5 +1,8 @@
 let currentDetailsAlertId = null;
 let currentDetailsAlertCanRespond = false;
+let currentDetailsActiveTab = "summary";
+let currentDetailsExplainLoadedAlertId = null;
+let currentDetailsExplainTraceId = null;
 let alertsCache = [];
 let alertsAutoRefreshTimer = null;
 let alertsLastAppliedQueryString = null;
@@ -1038,6 +1041,232 @@ function alertTeamEscalationLabel(alert) {
 
     return "Disabled";
 }
+
+function setAlertDetailsTab(tabName) {
+    tabName = tabName || "summary";
+    currentDetailsActiveTab = tabName;
+
+    const modal = alertDetailsModal();
+
+    modal.find("[data-alert-details-tab]").each(function () {
+        const button = $(this);
+        const isActive = button.data("alert-details-tab") === tabName;
+
+        button
+            .toggleClass("is-active", isActive)
+            .toggleClass("active", isActive)
+            .attr("aria-selected", isActive ? "true" : "false");
+    });
+
+    modal.find("[data-alert-details-panel]").each(function () {
+        const panel = $(this);
+        const isActive = panel.data("alert-details-panel") === tabName;
+
+        panel
+            .toggleClass("is-active", isActive)
+            .toggleClass("active", isActive)
+            .prop("hidden", !isActive);
+    });
+
+    if (tabName === "explain") {
+        loadAlertExplainForCurrentDetails();
+    }
+}
+
+function resetAlertDetailsTabs(alertId) {
+    currentDetailsActiveTab = "summary";
+    currentDetailsExplainLoadedAlertId = null;
+    currentDetailsExplainTraceId = null;
+
+    renderAlertExplainEmpty("Open the Explain tab to load routing trace.");
+    setAlertDetailsTab("summary");
+}
+
+function renderAlertExplainEmpty(message) {
+    const modal = alertDetailsModal();
+
+    modal.find("#alert-explain-summary")
+        .empty()
+        .append(
+            $("<div>")
+                .addClass("help-text")
+                .text(message || "No explain trace.")
+        );
+
+    modal.find("#alert-explain-steps").empty();
+}
+
+function renderAlertExplainLoading(message) {
+    renderAlertExplainEmpty(message || "Loading explain trace...");
+}
+
+function alertExplainStatusBadge(status) {
+    const normalized = normalizeAlertValue(status);
+
+    if (normalized === "success" || normalized === "completed") {
+        return makeUiPill(status || "success", "ui-pill-resolved");
+    }
+
+    if (normalized === "warning") {
+        return makeUiPill(status || "warning", "ui-pill-medium");
+    }
+
+    if (normalized === "error" || normalized === "failed") {
+        return makeUiPill(status || "error", "ui-pill-critical");
+    }
+
+    if (normalized === "scheduled") {
+        return makeUiPill(status || "scheduled", "ui-pill-info");
+    }
+
+    if (normalized === "stopped" || normalized === "skipped") {
+        return makeUiPill(status || normalized, "ui-pill-muted");
+    }
+
+    return makeUiPill(status || "info", "ui-pill-muted");
+}
+
+function renderAlertExplainSummary(trace) {
+    const modal = alertDetailsModal();
+    const target = modal.find("#alert-explain-summary");
+
+    target.empty();
+    target.append(detailItem("Trace", trace.trace_id));
+    target.append(
+        $("<div>")
+            .addClass("detail-item")
+            .append($("<div>").addClass("detail-label").text("Status"))
+            .append(
+                $("<div>")
+                    .addClass("detail-value")
+                    .append(alertExplainStatusBadge(trace.status))
+            )
+    );
+    target.append(detailItem("Outcome", trace.outcome));
+    target.append(detailItem("Source", trace.source));
+    target.append(detailItem("Dedup key", trace.dedup_key));
+    target.append(detailItem("Started", formatDateTimeMinutes(trace.started_at)));
+    target.append(detailItem("Finished", formatDateTimeMinutes(trace.finished_at)));
+
+    if (trace.reason) {
+        target.append(detailItem("Reason", trace.reason));
+    }
+}
+
+function renderAlertExplainSteps(steps) {
+    const modal = alertDetailsModal();
+    const target = modal.find("#alert-explain-steps");
+
+    steps = asArray(steps);
+    target.empty();
+
+    if (!steps.length) {
+        target.append($("<div>").addClass("help-text").text("No explain steps recorded."));
+        return;
+    }
+
+    steps.forEach(function (step) {
+        const item = $("<div>").addClass("event-item");
+        const header = $("<div>")
+            .addClass("alert-explain-step-header")
+            .append(
+                $("<strong>").text(
+                    "#" + (step.position || "-") + " " + (step.title || step.code || "Step")
+                )
+            )
+            .append(" ")
+            .append(alertExplainStatusBadge(step.status));
+
+        item.append(header);
+        item.append(
+            $("<div>")
+                .addClass("table-subtitle")
+                .text([
+                    step.stage || null,
+                    step.code || null,
+                    formatDateTimeMinutes(step.created_at) || null,
+                ].filter(Boolean).join(" / ") || "-")
+        );
+
+        if (step.message) {
+            item.append($("<div>").text(step.message));
+        }
+
+        if (step.data && Object.keys(step.data).length) {
+            item.append(
+                $("<details>")
+                    .addClass("alert-explain-step-data")
+                    .append($("<summary>").text("Data"))
+                    .append(
+                        $("<pre>")
+                            .addClass("details-code")
+                            .text(JSON.stringify(step.data, null, 2))
+                    )
+            );
+        }
+
+        target.append(item);
+    });
+}
+
+function pickLatestAlertExplainTrace(traces) {
+    traces = asArray(traces);
+
+    if (!traces.length) {
+        return null;
+    }
+
+    return traces
+        .slice()
+        .sort(function (left, right) {
+            return Number(right.id || 0) - Number(left.id || 0);
+        })[0];
+}
+
+function loadAlertExplainTrace(traceId) {
+    if (!traceId) {
+        renderAlertExplainEmpty("No explain trace selected.");
+        return;
+    }
+
+    renderAlertExplainLoading("Loading explain trace...");
+
+    apiGet("/api/alerts/explain/" + encodeURIComponent(traceId), function (trace) {
+        currentDetailsExplainTraceId = trace.trace_id;
+        renderAlertExplainSummary(trace);
+        renderAlertExplainSteps(trace.steps || []);
+    });
+}
+
+function loadAlertExplainForCurrentDetails() {
+    if (!currentAlertDetailsGroupId) {
+        if (currentAlertExplainTraceId) {
+            return;
+        }
+
+        renderAlertExplainEmpty("No incident selected.");
+        return;
+    }
+
+    if (currentDetailsExplainLoadedAlertId === currentDetailsAlertId) {
+        return;
+    }
+
+    currentDetailsExplainLoadedAlertId = currentDetailsAlertId;
+    renderAlertExplainLoading("Loading explain traces...");
+
+    apiGet("/api/alerts/" + encodeURIComponent(currentDetailsAlertId) + "/explain", function (traces) {
+        const latestTrace = pickLatestAlertExplainTrace(traces);
+
+        if (!latestTrace) {
+            renderAlertExplainEmpty("No explain trace recorded for this incident.");
+            return;
+        }
+
+        loadAlertExplainTrace(latestTrace.trace_id);
+    });
+}
+
 function showAlertDetails(alertId) {
     currentDetailsAlertId = alertId;
 
@@ -1051,6 +1280,7 @@ function showAlertDetails(alertId) {
 
         currentDetailsAlertId = alert.id;
         currentDetailsAlertCanRespond = canRespondObject(alert);
+        resetAlertDetailsTabs(alert.id);
 
         modal.find("#alert-details-title").text(alert.title || "Alert #" + alert.id);
         modal.find("#alert-details-subtitle").text(buildAlertDetailsSubtitle(alert));
@@ -1111,7 +1341,13 @@ function ensureAlertPrimaryDetails(modal) {
         .attr("id", "alert-primary-details")
         .addClass("alert-primary-details");
 
-    modal.find("#alert-details-summary").before(target);
+    const overview = modal.find("#alert-details-overview");
+
+    if (overview.length) {
+        overview.append(target);
+    } else {
+        modal.find("#alert-details-summary").before(target);
+    }
 
     return target;
 }
@@ -1314,9 +1550,12 @@ function ensureAlertServiceContext(modal) {
         .addClass("alert-service-context");
 
     const primary = modal.find("#alert-primary-details");
+    const overview = modal.find("#alert-details-overview");
 
     if (primary.length) {
         primary.after(target);
+    } else if (overview.length) {
+        overview.append(target);
     } else {
         modal.find("#alert-details-summary").before(target);
     }
@@ -1544,9 +1783,10 @@ function renderAlertGroupChildren(alerts, modal) {
     alerts = asArray(alerts);
 
     target.empty();
-    section.prop("hidden", !alerts.length);
+    section.prop("hidden", false);
 
     if (!alerts.length) {
+        target.append($("<div>").addClass("help-text").text("No child alerts in this group."));
         return;
     }
 
@@ -1659,6 +1899,9 @@ function closeAlertDetailsModal(options) {
 
     currentDetailsAlertId = null;
     currentDetailsAlertCanRespond = false;
+    currentDetailsActiveTab = "summary";
+    currentDetailsExplainLoadedAlertId = null;
+    currentDetailsExplainTraceId = null;
 
     if (options.updateUrl === false) {
         return;
@@ -1857,6 +2100,14 @@ $(document)
 $(document).on("change", "#alerts-auto-refresh", function () {
     setAlertsAutoRefresh($(this).is(":checked"));
 });
+$(document).on("click", "[data-alert-details-tab]", function () {
+    setAlertDetailsTab($(this).data("alert-details-tab"));
+});
+$(document).on("click", "#alert-explain-refresh", function () {
+    currentDetailsExplainLoadedAlertId = null;
+    currentDetailsExplainTraceId = null;
+    loadAlertExplainForCurrentDetails();
+});
 $(document).on("click", "#close-alert-details", closeAlertDetailsModal);
 $(document).on("click", "#close-alert-details-footer", closeAlertDetailsModal);
 $(document).on("click", "#alert-details-modal", function (event) {
@@ -1981,6 +2232,17 @@ window.addEventListener("popstate", function () {
     loadAlerts();
 });
 initTableMultiSelects(document);
+
+const initialExplainTraceId =
+    getAlertsQueryParam("trace_id") ||
+    getAlertsQueryParam("explain_trace_id");
+
+if (initialExplainTraceId) {
+    window.setTimeout(function () {
+        openAlertDetailsForTrace(initialExplainTraceId);
+    }, 100);
+}
+
 $(document).on("click", "#alerts-clear-selection", function () {
     clearAlertGroupSelection();
 });
@@ -2032,4 +2294,97 @@ function mergeSelectedAlertGroups() {
             loadAlerts();
         });
     });
+}
+function openAlertExplainLookupModal() {
+    $("#alert-explain-trace-id").val("");
+    $("#alert-explain-lookup-error").addClass("is-hidden").text("");
+    $("#alert-explain-lookup-modal").show();
+    $("#alert-explain-trace-id").trigger("focus");
+}
+
+function closeAlertExplainLookupModal() {
+    $("#alert-explain-lookup-modal").hide();
+}
+
+function showAlertExplainLookupError(message) {
+    $("#alert-explain-lookup-error")
+        .removeClass("is-hidden")
+        .text(message || "Failed to open explain trace.");
+}
+
+function openAlertDetailsForTrace(traceId) {
+    if (!traceId) {
+        showAlertExplainLookupError("Trace ID is required.");
+        return;
+    }
+
+    $.getJSON(`/api/alerts/explain/${encodeURIComponent(traceId)}`)
+        .done((trace) => {
+            closeAlertExplainLookupModal();
+
+            currentAlertDetailsGroupId = trace.group_id || null;
+            currentAlertDetailsActiveTab = "explain";
+            currentAlertExplainTraceId = trace.trace_id;
+            currentAlertExplainLoadedGroupId = trace.group_id || null;
+
+            $("#alert-details-title").text("Explain trace");
+            $("#alert-details-subtitle").text(
+                trace.group_id
+                    ? `Alert group #${trace.group_id}`
+                    : "No alert group was created"
+            );
+
+            $("#alert-details-overview").html("");
+            $("#alert-details-summary").html("");
+            $("#alert-details-alerts").html("");
+            $("#alert-details-events").html("");
+            $("#alert-details-notifications").html("");
+
+            renderAlertExplainSummary(trace);
+            renderAlertExplainSteps(trace.steps || []);
+
+            $("#alert-details-modal").show();
+            setAlertDetailsTab("explain");
+
+            const url = new URL(window.location.href);
+
+            url.searchParams.delete("trace_id");
+            url.searchParams.delete("explain_trace_id");
+
+            window.history.replaceState({}, document.title, url.toString());
+        })
+        .fail((xhr) => {
+            const payload = xhr.responseJSON || {};
+            showAlertExplainLookupError(
+                payload.message || "Explain trace not found."
+            );
+        });
+}
+$(document).on("click", "#open-alert-explain-trace", function () {
+    openAlertExplainLookupModal();
+});
+
+$(document).on("click", "[data-alert-explain-lookup-close]", function () {
+    closeAlertExplainLookupModal();
+});
+
+$(document).on("click", "#alert-explain-lookup-submit", function () {
+    openAlertDetailsForTrace(
+        $.trim($("#alert-explain-trace-id").val())
+    );
+});
+
+$(document).on("keydown", "#alert-explain-trace-id", function (event) {
+    if (event.key === "Enter") {
+        event.preventDefault();
+
+        openAlertDetailsForTrace(
+            $.trim($("#alert-explain-trace-id").val())
+        );
+    }
+});
+function getAlertsQueryParam(name) {
+    const params = new URLSearchParams(window.location.search);
+
+    return params.get(name);
 }

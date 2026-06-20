@@ -1190,6 +1190,64 @@ class AlertEvent(BaseModel):
     created_at = DateTimeField(default=datetime.utcnow)
 
 
+class AlertExplainTrace(BaseModel):
+    """One alert routing/execution explain trace."""
+
+    id = AutoField()
+    trace_id = CharField(unique=True, index=True)
+
+    group = ForeignKeyField(
+        AlertGroup,
+        null=True,
+        backref="explain_traces",
+        on_delete="CASCADE",
+    )
+    alert = ForeignKeyField(
+        Alert,
+        null=True,
+        backref="explain_traces",
+        on_delete="CASCADE",
+    )
+
+    mode = CharField(default="live", index=True)  # live, dry_run
+    source = CharField(null=True, index=True)
+    dedup_key = CharField(null=True, index=True)
+
+    status = CharField(default="running", index=True)  # running, completed, stopped, failed
+    outcome = CharField(null=True, index=True)  # created, updated, suppressed, ignored, routing_failed
+    reason = TextField(null=True)
+
+    input_summary = JSONTextField(null=True)
+    result = JSONTextField(null=True)
+
+    started_at = DateTimeField(default=datetime.utcnow, index=True)
+    finished_at = DateTimeField(null=True, index=True)
+
+
+class AlertExplainStep(BaseModel):
+    """One ordered step inside alert explain trace."""
+
+    id = AutoField()
+
+    trace = ForeignKeyField(
+        AlertExplainTrace,
+        backref="steps",
+        on_delete="CASCADE",
+    )
+
+    position = IntegerField(default=0, index=True)
+
+    stage = CharField(index=True)
+    code = CharField(index=True)
+    status = CharField(default="info", index=True)
+
+    title = CharField()
+    message = TextField(null=True)
+
+    data = JSONTextField(null=True)
+    created_at = DateTimeField(default=datetime.utcnow, index=True)
+
+
 class AlertGroupMerge(BaseModel):
     """Manual alert group merge history."""
 

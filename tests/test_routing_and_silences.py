@@ -120,7 +120,7 @@ def test_silenced_alert_creates_silenced_group_without_notification(monkeypatch,
         lambda alert_group, event_type="notification": calls.append(event_type) or 1,
     )
 
-    alert_group, created = upsert_alert(
+    result = upsert_alert(
         {
             "source": "alertmanager",
             "team_slug": "sre",
@@ -138,6 +138,8 @@ def test_silenced_alert_creates_silenced_group_without_notification(monkeypatch,
             "status": "firing",
         }
     )
+    alert_group = result.group
+    created = result.created_group
 
     assert created is True
     assert alert_group.status == "silenced"

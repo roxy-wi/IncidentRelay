@@ -53,7 +53,8 @@ def create_alert_group_for_route(route, **overrides):
     )
     data.update(overrides)
 
-    alert_group, _ = upsert_alert(data)
+    result = upsert_alert(data)
+    alert_group = result.group
 
     assert alert_group is not None
 
@@ -78,7 +79,9 @@ def test_upsert_alert_creates_routed_alert_with_current_oncall(monkeypatch, db):
         or 1,
     )
 
-    alert_group, created = upsert_alert(normalized_alert())
+    result = upsert_alert(normalized_alert())
+    alert_group = result.group
+    created = result.created_group
 
     assert created is True
     assert alert_group.team == team
@@ -118,7 +121,9 @@ def test_upsert_alert_ignores_orphan_resolved_payload(monkeypatch, db):
         ),
     )
 
-    alert_group, created = upsert_alert(normalized_alert(status="resolved"))
+    result = upsert_alert(normalized_alert(status="resolved"))
+    alert_group = result.group
+    created = result.created_group
 
     assert alert_group is None
     assert created is False
@@ -131,12 +136,17 @@ def test_upsert_alert_preserves_acknowledged_status_when_payload_fires_again(db)
     team = create_team(group, slug="sre")
     create_route(team)
 
-    alert_group, created = upsert_alert(normalized_alert())
+    result = upsert_alert(normalized_alert())
+    alert_group = result.group
+    created = result.created_group
+
     assert created is True
 
     alerts_repo.acknowledge_alert_group(alert_group.id)
 
-    alert_group, created = upsert_alert(normalized_alert(message="updated message"))
+    result = upsert_alert(normalized_alert(message="updated message"))
+    alert_group = result.group
+    created = result.created_group
 
     assert created is False
     assert alert_group.status == "acknowledged"
@@ -156,7 +166,10 @@ def test_upsert_alert_resolves_existing_alert_and_notifies(monkeypatch, db):
     team = create_team(group, slug="sre")
     create_route(team)
 
-    alert_group, created = upsert_alert(normalized_alert())
+    result = upsert_alert(normalized_alert())
+    alert_group = result.group
+    created = result.created_group
+
     assert created is True
 
     alert_group.last_notification_at = datetime.utcnow()
@@ -169,7 +182,9 @@ def test_upsert_alert_resolves_existing_alert_and_notifies(monkeypatch, db):
         lambda alert_group, event_type="notification": calls.append(event_type) or 1,
     )
 
-    alert_group, created = upsert_alert(normalized_alert(status="resolved"))
+    result = upsert_alert(normalized_alert(status="resolved"))
+    alert_group = result.group
+    created = result.created_group
 
     assert created is False
     assert alert_group.status == "resolved"
@@ -196,7 +211,9 @@ def test_upsert_alert_creates_silenced_alert_without_notification(monkeypatch, d
         ),
     )
 
-    alert_group, created = upsert_alert(normalized_alert())
+    result = upsert_alert(normalized_alert())
+    alert_group = result.group
+    created = result.created_group
 
     assert created is True
     assert alert_group.status == "silenced"
@@ -222,7 +239,10 @@ def test_acknowledge_and_resolve_alert_update_statuses_and_create_events(
     user = create_user("alice", group)
     create_route(team)
 
-    alert_group, created = upsert_alert(normalized_alert())
+    result = upsert_alert(normalized_alert())
+    alert_group = result.group
+    created = result.created_group
+
     assert created is True
 
     updates = []
@@ -258,7 +278,7 @@ def test_acknowledge_and_resolve_alert_update_statuses_and_create_events(
 
 
 def _create_firing_alert_group_for_reminder(route, *, dedup_key, instance):
-    alert_group, created = upsert_alert(
+    result = upsert_alert(
         {
             "source": "alertmanager",
             "forced_route_id": route.id,
@@ -276,6 +296,8 @@ def _create_firing_alert_group_for_reminder(route, *, dedup_key, instance):
             "status": "firing",
         }
     )
+    alert_group = result.group
+    created = result.created_group
 
     assert alert_group is not None
     assert created is True
@@ -532,7 +554,7 @@ def test_policy_alert_assigns_user_when_first_enabled_rule_position_is_not_one(d
     route.escalation_policy = policy
     route.save()
 
-    alert_group, created = upsert_alert(
+    result = upsert_alert(
         {
             "source": "test",
             "dedup_key": "policy-user-position-2",
@@ -547,6 +569,8 @@ def test_policy_alert_assigns_user_when_first_enabled_rule_position_is_not_one(d
             "status": "firing",
         }
     )
+    alert_group = result.group
+    created = result.created_group
 
     assert alert_group is not None
     assert created is True
@@ -585,7 +609,7 @@ def test_policy_alert_assigns_rotation_when_first_enabled_rule_position_is_not_o
     route.escalation_policy = policy
     route.save()
 
-    alert_group, created = upsert_alert(
+    result = upsert_alert(
         {
             "source": "test",
             "dedup_key": "policy-rotation-position-2",
@@ -600,6 +624,8 @@ def test_policy_alert_assigns_rotation_when_first_enabled_rule_position_is_not_o
             "status": "firing",
         }
     )
+    alert_group = result.group
+    created = result.created_group
 
     assert alert_group is not None
     assert created is True
@@ -649,7 +675,7 @@ def test_policy_alert_assigns_rotation_when_first_rule_was_deleted_and_second_is
     route.escalation_policy = policy
     route.save()
 
-    alert_group, created = upsert_alert(
+    result = upsert_alert(
         {
             "source": "test",
             "dedup_key": "policy-second-rule-rotation",
@@ -664,6 +690,8 @@ def test_policy_alert_assigns_rotation_when_first_rule_was_deleted_and_second_is
             "status": "firing",
         }
     )
+    alert_group = result.group
+    created = result.created_group
 
     assert alert_group is not None
     assert created is True

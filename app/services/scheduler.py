@@ -14,6 +14,7 @@ from app.services.notifications.shift_notifications import (
 )
 from app.services.notifications.rules import process_due_user_notifications
 from app.services.incidents.responders import expire_due_incident_responders
+from app.services.alerts.explain_cleanup import cleanup_alert_explain_traces
 
 logger = logging.getLogger("oncall.scheduler")
 _scheduler = None
@@ -260,6 +261,72 @@ def incident_responder_expire_job():
             db.close()
 
 
+def alert_explain_trace_cleanup_job():
+    """Delete old alert explain traces under a database lock."""
+    if db.is_closed():
+        db.connect(reuse_if_open=True)
+
+    owner = None
+
+    try:
+        owner = acquire_db_lock("alert_explain_trace_cleanup_job")
+
+        if not owner:
+            logger.debug("alert explain trace cleanup job skipped because lock is busy")
+            return {
+                "traces_deleted": 0,
+                "steps_deleted": 0,
+            }
+
+        retention_days = int(
+            getattr(Config, "ALERT_EXPLAIN_TRACE_RETENTION_DAYS", 30)
+        )
+
+        logger.info(
+            "alert explain trace cleanup job started",
+            extra={
+                "extra": {
+                    "event_type": "scheduler",
+                    "retention_days": retention_days,
+                }
+            },
+        )
+
+        result = cleanup_alert_explain_traces(
+            retention_days=retention_days,
+        )
+
+        logger.info(
+            "alert explain trace cleanup job finished",
+            extra={
+                "extra": {
+                    "event_type": "scheduler",
+                    "traces_deleted": result.get("traces_deleted", 0),
+                    "steps_deleted": result.get("steps_deleted", 0),
+                    "cutoff": str(result.get("cutoff")),
+                }
+            },
+        )
+
+        return result
+
+    except Exception:
+        logger.exception("alert explain trace cleanup job failed")
+
+        return {
+            "traces_deleted": 0,
+            "steps_deleted": 0,
+            "failed": 1,
+        }
+
+    finally:
+        if owner:
+            release_db_lock("alert_explain_trace_cleanup_job", owner)
+
+        if not db.is_closed():
+            db.close()
+
+
 def start_scheduler():
     """
     Start the background scheduler.
@@ -344,6 +411,23 @@ def start_scheduler():
         coalesce=True,
         next_run_time=datetime.utcnow(),
         id="incident_responder_expire_job",
+        replace_existing=True,
+    )
+
+    _scheduler.add_job(
+        alert_explain_trace_cleanup_job,
+        "interval",
+        seconds=int(
+            getattr(
+                Config,
+                "ALERT_EXPLAIN_TRACE_CLEANUP_INTERVAL_SECONDS",
+                86400,
+            )
+        ),
+        max_instances=1,
+        coalesce=True,
+        next_run_time=datetime.utcnow(),
+        id="alert_explain_trace_cleanup_job",
         replace_existing=True,
     )
 

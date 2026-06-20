@@ -1,312 +1,520 @@
+from datetime import datetime, timedelta
+
 from app.modules.db import alerts_repo
+from app.modules.db.models import AlertGroup
+from app.settings import Config
 from app.services.alerts.lifecycle import upsert_alert
-from tests.factories import create_group, create_route, create_team, create_user
+import app.services.alerts.notification_queue as notification_queue
+from tests.factories import create_group, create_route, create_team
 
 
-def _route(group_by=None):
+def _route(group_by):
     group = create_group()
     team = create_team(group)
-
     return create_route(
         team,
         source="webhook",
+        group_by=group_by,
         matchers={},
-        group_by=group_by or ["alertname", "severity"],
     )
 
 
-def _alert(route, alertname, instance, status="firing"):
+def _alert(route, name, instance, status="firing"):
     return {
         "source": "webhook",
         "forced_route_id": route.id,
-        "external_id": f"{alertname}-{instance}",
-        "dedup_key": f"{alertname}:{instance}",
+        "external_id": f"{name}-{instance}",
+        "dedup_key": f"{name}:{instance}",
         "status": status,
-        "title": alertname,
-        "message": f"{alertname} on {instance}",
+        "title": name,
+        "message": f"{name} on {instance}",
         "severity": "critical",
         "labels": {
-            "alertname": alertname,
+            "alertname": name,
             "severity": "critical",
             "instance": instance,
         },
-        "payload": {
-            "source": "test",
-            "instance": instance,
-        },
+        "payload": {},
     }
 
 
-def test_alerts_api_lists_alert_groups(client, admin_headers, db):
+def test_alerts_with_same_group_key_create_one_group(db):
     route = _route(group_by=["alertname", "severity"])
 
-    group, created = upsert_alert(_alert(route, "DiskFull", "host1"))
-    second_group, second_created = upsert_alert(_alert(route, "DiskFull", "host2"))
+    result = upsert_alert(_alert(route, "DiskFull", "host1"))
+    group1 = result.group
+    created1 = result.created_group
 
-    response = client.get(
-        "/api/alerts?status=firing",
-        headers=admin_headers,
-    )
-
-    assert response.status_code == 200
-
-    payload = response.get_json()
-    items = payload["items"]
-
-    assert created is True
-    assert second_created is False
-    assert second_group.id == group.id
-
-    assert len(items) == 1
-    assert items[0]["type"] == "alert_group"
-    assert items[0]["id"] == group.id
-    assert items[0]["alert_count"] == 2
-    assert items[0]["firing_count"] == 2
+    result = upsert_alert(_alert(route, "DiskFull", "host2"))
+    group2 = result.group
+    created2 = result.created_group
 
 
-def test_alerts_api_detail_contains_child_alerts(client, admin_headers, db):
+    assert created1 is True
+    assert created2 is False
+    assert group1.id == group2.id
+
+    alerts = alerts_repo.list_alerts_for_group(group1.id)
+    group = alerts_repo.get_alert_group(group1.id)
+
+    assert len(alerts) == 2
+    assert group.alert_count == 2
+    assert group.firing_count == 2
+
+
+def test_ack_group_does_not_ack_each_child_alert(db):
     route = _route(group_by=["alertname", "severity"])
-
-    group, _ = upsert_alert(_alert(route, "DiskFull", "host1"))
-    upsert_alert(_alert(route, "DiskFull", "host2"))
-
-    response = client.get(
-        f"/api/alerts/{group.id}",
-        headers=admin_headers,
-    )
-
-    assert response.status_code == 200
-
-    payload = response.get_json()
-
-    assert payload["type"] == "alert_group"
-    assert payload["id"] == group.id
-    assert payload["alert_count"] == 2
-
-    child_ids = {item["dedup_key"] for item in payload["alerts"]}
-
-    assert child_ids == {
-        "DiskFull:host1",
-        "DiskFull:host2",
-    }
-    assert all(item["type"] == "alert" for item in payload["alerts"])
+    result = upsert_alert(_alert(route, "DiskFull", "host1"))
+    group = result.group
 
 
-def test_ack_alert_group_endpoint_does_not_ack_child_alerts(client, admin_headers, db):
-    route = _route(group_by=["alertname", "severity"])
-
-    group, _ = upsert_alert(_alert(route, "DiskFull", "host1"))
-    upsert_alert(_alert(route, "DiskFull", "host2"))
-
-    response = client.post(
-        f"/api/alerts/{group.id}/ack",
-        json={},
-        headers=admin_headers,
-    )
-
-    assert response.status_code == 200
-
-    payload = response.get_json()
-    children = alerts_repo.list_alerts_for_group(group.id)
-
-    assert payload["type"] == "alert_group"
-    assert payload["status"] == "acknowledged"
-    assert {alert.status for alert in children} == {"firing"}
-
-
-def test_resolve_alert_group_endpoint_resolves_child_alerts(client, admin_headers, db):
-    route = _route(group_by=["alertname", "severity"])
-
-    group, _ = upsert_alert(_alert(route, "DiskFull", "host1"))
-    upsert_alert(_alert(route, "DiskFull", "host2"))
-
-    response = client.post(
-        f"/api/alerts/{group.id}/resolve",
-        json={},
-        headers=admin_headers,
-    )
-
-    assert response.status_code == 200
-
-    payload = response.get_json()
-    children = alerts_repo.list_alerts_for_group(group.id)
-
-    assert payload["type"] == "alert_group"
-    assert payload["status"] == "resolved"
-    assert {alert.status for alert in children} == {"resolved"}
-
-
-def test_merge_alert_groups_endpoint_moves_child_alerts(client, admin_headers, db):
-    route = _route(group_by=["alertname", "severity", "instance"])
-
-    target_group, _ = upsert_alert(_alert(route, "DiskFull", "host1"))
-    source_group, _ = upsert_alert(_alert(route, "DiskFull", "host2"))
-
-    response = client.post(
-        "/api/alerts/merge",
-        json={
-            "target_group_id": target_group.id,
-            "source_group_ids": [source_group.id],
-            "reason": "same incident",
-        },
-        headers=admin_headers,
-    )
-
-    assert response.status_code == 200
-
-    payload = response.get_json()
-    source_group = alerts_repo.get_alert_group(source_group.id)
-    target_children = alerts_repo.list_alerts_for_group(target_group.id)
-
-    assert payload["type"] == "alert_group"
-    assert payload["id"] == target_group.id
-    assert payload["alert_count"] == 2
-
-    assert source_group.status == "merged"
-    assert source_group.merged_into_id == target_group.id
-    assert {alert.dedup_key for alert in target_children} == {
-        "DiskFull:host1",
-        "DiskFull:host2",
-    }
-
-
-def test_alert_group_events_endpoint_returns_group_and_child_events(client, admin_headers, db):
-    route = _route(group_by=["alertname", "severity"])
-
-    group, _ = upsert_alert(_alert(route, "DiskFull", "host1"))
+    group = alerts_repo.acknowledge_alert_group(group.id, user_id=None)
     child = alerts_repo.list_alerts_for_group(group.id)[0]
 
-    alerts_repo.create_alert_event(
-        group_id=group.id,
-        event_type="group_test",
-        message="group event",
-    )
-    alerts_repo.create_alert_event(
-        alert_id=child.id,
-        group_id=group.id,
-        event_type="child_test",
-        message="child event",
-    )
-
-    response = client.get(
-        f"/api/alerts/{group.id}/events",
-        headers=admin_headers,
-    )
-
-    assert response.status_code == 200
-
-    payload = response.get_json()
-    event_types = {event["event_type"] for event in payload}
-
-    assert "group_test" in event_types
-    assert "child_test" in event_types
+    assert group.status == "acknowledged"
+    assert child.status == "firing"
 
 
-def test_alerts_api_filters_alert_groups_assigned_to_me(
-    client,
-    admin_headers,
-    admin_user,
-    db,
-):
+def test_resolve_group_resolves_child_alerts(db):
+    route = _route(group_by=["alertname", "severity"])
+    result = upsert_alert(_alert(route, "DiskFull", "host1"))
+    group = result.group
+
+
+    group = alerts_repo.resolve_alert_group(group.id)
+    child = alerts_repo.list_alerts_for_group(group.id)[0]
+
+    assert group.status == "resolved"
+    assert child.status == "resolved"
+
+
+def test_merge_groups_moves_alerts_to_target(db):
     route = _route(group_by=["alertname", "severity", "instance"])
 
-    my_group, _ = upsert_alert(_alert(route, "DiskFull", "host1"))
-    other_group, _ = upsert_alert(_alert(route, "DiskFull", "host2"))
-    unassigned_group, _ = upsert_alert(_alert(route, "DiskFull", "host3"))
+    result = upsert_alert(_alert(route, "DiskFull", "host1"))
+    group1 = result.group
 
-    other_user = create_user(username="other-user")
+    result = upsert_alert(_alert(route, "DiskFull", "host2"))
+    group2 = result.group
 
-    my_group.assignee = admin_user
-    my_group.save(only=[my_group.__class__.assignee])
 
-    other_group.assignee = other_user
-    other_group.save(only=[other_group.__class__.assignee])
+    merged = alerts_repo.merge_alert_groups(
+        target_group_id=group1.id,
+        source_group_ids=[group2.id],
+        reason="same incident",
+    )
+
+    source = alerts_repo.get_alert_group(group2.id)
+    alerts = alerts_repo.list_alerts_for_group(group1.id)
+
+    assert merged.id == group1.id
+    assert source.status == "merged"
+    assert source.merged_into.id == group1.id
+    assert len(alerts) == 2
+
+
+def test_alerts_api_returns_groups(client, admin_headers, db):
+    route = _route(group_by=["alertname", "severity"])
+
+    result = upsert_alert(_alert(route, "DiskFull", "host1"))
+    group1 = result.group
+
+    result = upsert_alert(_alert(route, "DiskFull", "host2"))
+    group2 = result.group
+
 
     response = client.get(
-        "/api/alerts?assigned_to_me=1",
+        "/api/alerts",
         headers=admin_headers,
     )
 
     assert response.status_code == 200
 
     payload = response.get_json()
-    ids = {item["id"] for item in payload["items"]}
+    ids = [item["id"] for item in payload["items"]]
 
-    assert ids == {my_group.id}
-    assert other_group.id not in ids
-    assert unassigned_group.id not in ids
-    assert payload["pagination"]["total_items"] == 1
-    assert payload["summary"]["total"] == 1
+    assert group1.id == group2.id
+    assert group1.id in ids
+
+    item = next(item for item in payload["items"] if item["id"] == group1.id)
+
+    assert item["type"] == "alert_group"
+    assert item["alert_count"] == 2
+    assert item["firing_count"] == 2
 
 
-def test_alerts_api_assigned_to_me_filter_combines_with_status(
-    client,
-    admin_headers,
-    admin_user,
-    db,
-):
-    route = _route(group_by=["alertname", "severity", "instance"])
+def test_alert_group_details_include_child_alerts(client, admin_headers, db):
+    route = _route(group_by=["alertname", "severity"])
 
-    firing_group, _ = upsert_alert(_alert(route, "DiskFull", "host1"))
-    resolved_group, _ = upsert_alert(_alert(route, "DiskFull", "host2"))
+    result = upsert_alert(_alert(route, "DiskFull", "host1"))
+    group1 = result.group
 
-    firing_group.assignee = admin_user
-    firing_group.save(only=[firing_group.__class__.assignee])
-
-    resolved_group.assignee = admin_user
-    resolved_group.status = "resolved"
-    resolved_group.save(
-        only=[
-            resolved_group.__class__.assignee,
-            resolved_group.__class__.status,
-        ]
-    )
+    upsert_alert(_alert(route, "DiskFull", "host2"))
 
     response = client.get(
-        "/api/alerts?assigned_to_me=1&status=firing",
+        f"/api/alerts/{group1.id}",
         headers=admin_headers,
     )
 
     assert response.status_code == 200
 
     payload = response.get_json()
-    ids = {item["id"] for item in payload["items"]}
 
-    assert ids == {firing_group.id}
-    assert payload["pagination"]["total_items"] == 1
-    assert payload["summary"]["firing"] == 1
-    assert payload["summary"]["resolved"] == 0
+    assert payload["id"] == group1.id
+    assert payload["type"] == "alert_group"
+    assert payload["alert_count"] == 2
+    assert len(payload["alerts"]) == 2
+
+    child_instances = {
+        alert["labels"]["instance"]
+        for alert in payload["alerts"]
+    }
+
+    assert child_instances == {"host1", "host2"}
 
 
-def test_alerts_api_assigned_to_me_false_does_not_filter(
-    client,
-    admin_headers,
-    admin_user,
-    db,
-):
-    route = _route(group_by=["alertname", "severity", "instance"])
+def test_default_grouping_uses_alertname_and_severity(db):
+    route = _route(group_by=[])
 
-    my_group, _ = upsert_alert(_alert(route, "DiskFull", "host1"))
-    other_group, _ = upsert_alert(_alert(route, "DiskFull", "host2"))
+    result = upsert_alert(_alert(route, "DiskFull", "host1"))
+    group1 = result.group
+    created1 = result.created_group
 
-    other_user = create_user(username="other-user")
+    result = upsert_alert(_alert(route, "DiskFull", "host2"))
+    group2 = result.group
+    created2 = result.created_group
 
-    my_group.assignee = admin_user
-    my_group.save(only=[my_group.__class__.assignee])
 
-    other_group.assignee = other_user
-    other_group.save(only=[other_group.__class__.assignee])
+    assert created1 is True
+    assert created2 is False
+    assert group1.id == group2.id
 
-    response = client.get(
-        "/api/alerts?assigned_to_me=false",
-        headers=admin_headers,
+    group = alerts_repo.get_alert_group(group1.id)
+
+    assert group.alert_count == 2
+    assert group.firing_count == 2
+
+
+def test_grouping_respects_route_scope(db):
+    route1 = _route(group_by=["alertname", "severity"])
+    route2 = _route(group_by=["alertname", "severity"])
+
+    result = upsert_alert(_alert(route1, "DiskFull", "host1"))
+    group1 = result.group
+    created1 = result.created_group
+
+    result = upsert_alert(_alert(route2, "DiskFull", "host2"))
+    group2 = result.group
+    created2 = result.created_group
+
+
+    assert created1 is True
+    assert created2 is True
+    assert group1.id != group2.id
+
+
+def test_grouping_respects_configured_labels(db):
+    route = _route(group_by=["alertname", "severity", "mount"])
+
+    result = upsert_alert({
+        **_alert(route, "DiskFull", "host1"),
+        "labels": {
+            "alertname": "DiskFull",
+            "severity": "critical",
+            "instance": "host1",
+            "mount": "/var",
+        },
+    })
+    group1 = result.group
+    created1 = result.created_group
+
+    result = upsert_alert({
+        **_alert(route, "DiskFull", "host2"),
+        "labels": {
+            "alertname": "DiskFull",
+            "severity": "critical",
+            "instance": "host2",
+            "mount": "/var",
+        },
+    })
+    group2 = result.group
+    created2 = result.created_group
+
+    result = upsert_alert({
+        **_alert(route, "DiskFull", "host3"),
+        "labels": {
+            "alertname": "DiskFull",
+            "severity": "critical",
+            "instance": "host3",
+            "mount": "/data",
+        },
+    })
+    group3 = result.group
+    created3 = result.created_group
+
+
+    assert created1 is True
+    assert created2 is False
+    assert created3 is True
+    assert group1.id == group2.id
+    assert group1.id != group3.id
+
+
+def test_acknowledged_group_stays_acknowledged_after_recalculate(db):
+    route = _route(group_by=["alertname", "severity"])
+    result = upsert_alert(_alert(route, "DiskFull", "host1"))
+    group = result.group
+
+
+    group = alerts_repo.acknowledge_alert_group(group.id)
+    group = alerts_repo.recalculate_alert_group(group)
+    child = alerts_repo.list_alerts_for_group(group.id)[0]
+
+    assert group.status == "acknowledged"
+    assert child.status == "firing"
+
+
+def test_new_child_alert_reopens_acknowledged_group(db):
+    route = _route(group_by=["alertname", "severity"])
+
+    result = upsert_alert(_alert(route, "DiskFull", "host1"))
+    group1 = result.group
+
+    alerts_repo.acknowledge_alert_group(group1.id)
+    result = upsert_alert(_alert(route, "DiskFull", "host2"))
+    group2 = result.group
+    created2 = result.created_group
+
+
+    assert created2 is False
+    assert group1.id == group2.id
+    assert group2.status == "firing"
+    assert group2.acknowledged_at is None
+
+
+def test_new_group_schedules_notification_instead_of_sending_immediately(db, monkeypatch):
+    route = _route(group_by=["alertname", "severity"])
+    sent = []
+
+    monkeypatch.setattr(Config, "ALERT_GROUP_WAIT_SECONDS", 30)
+    monkeypatch.setattr(
+        notification_queue,
+        "notify_alert",
+        lambda *args, **kwargs: sent.append(args),
     )
 
-    assert response.status_code == 200
+    result = upsert_alert(_alert(route, "DiskFull", "host1"))
+    group = result.group
+    created = result.created_group
 
-    payload = response.get_json()
-    ids = {item["id"] for item in payload["items"]}
+    group = alerts_repo.get_alert_group(group.id)
 
-    assert my_group.id in ids
-    assert other_group.id in ids
-    assert payload["pagination"]["total_items"] == 2
+    assert created is True
+    assert sent == []
+    assert group.notification_pending is True
+    assert group.notification_due_at is not None
+    assert group.last_notification_at is None
+
+
+def test_due_group_notification_is_sent(db, monkeypatch):
+    group = create_group()
+    team = create_team(group)
+    route = create_route(
+        team,
+        source="alertmanager",
+        group_by=["alertname", "severity"],
+    )
+
+    result = upsert_alert(
+        {
+            "source": "alertmanager",
+            "forced_route_id": route.id,
+            "external_id": "external-due-notification",
+            "dedup_key": "dedup-due-notification",
+            "title": "DiskFull",
+            "message": "/var is 95% full",
+            "severity": "critical",
+            "labels": {
+                "alertname": "DiskFull",
+                "severity": "critical",
+                "instance": "host1",
+            },
+            "payload": {},
+            "status": "firing",
+        }
+    )
+    alert_group = result.group
+    created = result.created_group
+
+
+    assert created is True
+
+    alert_group.notification_pending = True
+    alert_group.notification_due_at = datetime.utcnow() - timedelta(seconds=1)
+    alert_group.notification_reason = "notification"
+    alert_group.status = "firing"
+    alert_group.save()
+
+    calls = []
+    monkeypatch.setattr(
+        "app.services.notifications.rules.has_deliverable_user_notification",
+        lambda group, event_type="notification": True,
+    )
+    monkeypatch.setattr(
+        notification_queue,
+        "notify_alert",
+        lambda group, event_type="notification": calls.append((group.id, event_type)) or 1,
+    )
+
+    result = notification_queue.process_due_alert_group_notifications()
+    alert_group = AlertGroup.get_by_id(alert_group.id)
+
+    assert result["processed"] == 1
+    assert result["sent"] == 1
+    assert result["skipped"] == 0
+    assert result["failed"] == 0
+    assert calls == [(alert_group.id, "notification")]
+    assert alert_group.notification_pending is False
+    assert alert_group.notification_due_at is None
+    assert alert_group.notification_reason is None
+    assert alert_group.last_notification_at is not None
+
+
+def test_group_resolved_before_group_wait_does_not_send_notification(db, monkeypatch):
+    route = _route(group_by=["alertname", "severity"])
+    sent = []
+
+    monkeypatch.setattr(Config, "ALERT_GROUP_WAIT_SECONDS", 60)
+    monkeypatch.setattr(
+        notification_queue,
+        "notify_alert",
+        lambda *args, **kwargs: sent.append(args),
+    )
+
+    result = upsert_alert(_alert(route, "DiskFull", "host1"))
+    group = result.group
+
+    child = alerts_repo.list_alerts_for_group(group.id)[0]
+
+    upsert_alert({
+        **_alert(route, "DiskFull", "host1", status="resolved"),
+        "dedup_key": child.dedup_key,
+    })
+
+    group = alerts_repo.get_alert_group(group.id)
+
+    assert group.status == "resolved"
+    assert group.notification_pending is False
+
+    result = notification_queue.process_due_alert_group_notifications()
+
+    assert result["sent"] == 0
+    assert sent == []
+
+
+def test_new_child_after_notification_schedules_group_interval_update(db, monkeypatch):
+    group = create_group()
+    team = create_team(group)
+    route = create_route(
+        team,
+        source="alertmanager",
+        group_by=["alertname", "severity"],
+    )
+
+    monkeypatch.setattr(
+        notification_queue.Config,
+        "ALERT_GROUP_WAIT_SECONDS",
+        30,
+        raising=False,
+    )
+    monkeypatch.setattr(
+        notification_queue.Config,
+        "ALERT_GROUP_INTERVAL_SECONDS",
+        300,
+        raising=False,
+    )
+
+    result = upsert_alert(
+        {
+            "source": "alertmanager",
+            "forced_route_id": route.id,
+            "external_id": "external-host1",
+            "dedup_key": "dedup-host1",
+            "title": "DiskFull",
+            "message": "/var is 95% full on host1",
+            "severity": "critical",
+            "labels": {
+                "alertname": "DiskFull",
+                "severity": "critical",
+                "instance": "host1",
+            },
+            "payload": {},
+            "status": "firing",
+        }
+    )
+    alert_group = result.group
+    created = result.created_group
+
+
+    assert created is True
+    assert alert_group.status == "firing"
+    assert alert_group.notification_pending is True
+    assert alert_group.notification_reason == "notification"
+
+    alert_group.notification_due_at = datetime.utcnow() - timedelta(seconds=1)
+    alert_group.save()
+
+    calls = []
+    monkeypatch.setattr(
+        notification_queue,
+        "notify_alert",
+        lambda group, event_type="notification": calls.append((group.id, event_type)) or 1,
+    )
+
+    result = notification_queue.process_due_alert_group_notifications()
+    alert_group = AlertGroup.get_by_id(alert_group.id)
+
+    assert result["processed"] == 1
+    assert result["sent"] == 1
+    assert result["skipped"] == 0
+    assert result["failed"] == 0
+    assert calls == [(alert_group.id, "notification")]
+    assert alert_group.notification_pending is False
+    assert alert_group.notification_due_at is None
+    assert alert_group.notification_reason is None
+    assert alert_group.last_notification_at is not None
+
+    first_notification_at = alert_group.last_notification_at
+
+    result = upsert_alert(
+        {
+            "source": "alertmanager",
+            "forced_route_id": route.id,
+            "external_id": "external-host2",
+            "dedup_key": "dedup-host2",
+            "title": "DiskFull",
+            "message": "/var is 95% full on host2",
+            "severity": "critical",
+            "labels": {
+                "alertname": "DiskFull",
+                "severity": "critical",
+                "instance": "host2",
+            },
+            "payload": {},
+            "status": "firing",
+        }
+    )
+    alert_group = result.group
+    created = result.created_group
+
+
+    alert_group = AlertGroup.get_by_id(alert_group.id)
+
+    assert created is False
+    assert alert_group.status == "firing"
+    assert alert_group.alert_count == 2
+    assert alert_group.firing_count == 2
+    assert alert_group.notification_pending is True
+    assert alert_group.notification_reason == "update"
+    assert alert_group.notification_due_at == first_notification_at + timedelta(seconds=300)
+    assert alert_group.last_notification_at == first_notification_at

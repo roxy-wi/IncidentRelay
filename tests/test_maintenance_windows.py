@@ -39,46 +39,13 @@ def create_test_alert_group(*, route, service, suffix, status="firing"):
         status=status,
     )
 
-    group = extract_alert_group_from_upsert_result(result)
+    assert result.group is not None, result
 
-    assert group is not None, result
-
-    return AlertGroup.get_by_id(group.id)
+    return AlertGroup.get_by_id(result.group.id)
 
 
 def extract_alert_group_from_upsert_result(result):
-    if isinstance(result, AlertGroup):
-        return result
-
-    if isinstance(result, Alert):
-        return AlertGroup.get_by_id(result.group_id)
-
-    if isinstance(result, dict):
-        group = result.get("group") or result.get("alert_group")
-
-        if isinstance(group, AlertGroup):
-            return group
-
-        alert = result.get("alert")
-
-        if isinstance(alert, Alert):
-            return AlertGroup.get_by_id(alert.group_id)
-
-        group_id = result.get("group_id")
-
-        if group_id:
-            return AlertGroup.get_by_id(group_id)
-
-        return None
-
-    if isinstance(result, (tuple, list)):
-        for item in result:
-            group = extract_alert_group_from_upsert_result(item)
-
-            if group:
-                return group
-
-    return None
+    return result.group
 
 
 def latest_maintenance_audit(action, window_id):
@@ -431,7 +398,9 @@ def test_service_maintenance_suppresses_alert_notifications(client, db):
         "team_slug": team.slug,
     }
 
-    incident, created = upsert_alert(alert_data)
+    result = upsert_alert(alert_data)
+    incident = result.group
+    created = result.created_group
     incident = reload_incident(incident)
 
     assert created is True
@@ -555,7 +524,9 @@ def test_pause_escalation_only_keeps_firing_but_removes_next_escalation(client, 
         "team_slug": team.slug,
     }
 
-    incident, created = upsert_alert(alert_data)
+    result = upsert_alert(alert_data)
+    incident = result.group
+    created = result.created_group
     incident = reload_incident(incident)
 
     assert created is True
@@ -1450,9 +1421,7 @@ def test_maintenance_suppress_incident_does_not_create_alert_group(client, db):
         suffix=suffix,
     )
 
-    alert_group = extract_alert_group_from_upsert_result(result)
-
-    assert alert_group is None
+    assert result.group is None
 
     assert (
         AlertGroup

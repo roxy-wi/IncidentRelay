@@ -9,7 +9,7 @@ from app.services.serializers import (
     serialize_alert_comment,
     serialize_alert_group,
     serialize_incident_responder,
-    serialize_incident_stakeholder,
+    serialize_incident_stakeholder, serialize_alert_explain_trace,
 )
 from app.services.alerts.alert_comments import (
     create_group_comment,
@@ -720,3 +720,74 @@ def add_incident_stakeholder(alert_id):
         )
 
     return jsonify(serialize_incident_stakeholder(stakeholder)), 201
+
+
+@alerts_bp.route("/<int:alert_id>/explain", methods=["GET"])
+def list_alert_group_explain_traces(alert_id):
+    group = alerts_repo.get_alert_group(alert_id)
+
+    if not group:
+        return make_error_response(
+            error="not_found",
+            message="Alert group not found.",
+            status_code=404,
+        )
+
+    if group.team_id:
+        error = require_team_read(group.team_id)
+
+        if error:
+            return error
+
+    traces = alerts_repo.list_alert_explain_traces_for_group(group.id)
+
+    return jsonify([
+        serialize_alert_explain_trace(trace)
+        for trace in traces
+    ])
+
+
+@alerts_bp.route("/explain/<trace_id>", methods=["GET"])
+def get_alert_explain_trace(trace_id):
+    trace = alerts_repo.get_alert_explain_trace(trace_id)
+
+    if not trace:
+        return make_error_response(
+            error="not_found",
+            message="Alert explain trace not found.",
+            status_code=404,
+        )
+
+    if trace.group_id:
+        group = alerts_repo.get_alert_group(trace.group_id)
+
+        if not group:
+            return make_error_response(
+                error="not_found",
+                message="Alert group not found.",
+                status_code=404,
+            )
+
+        if group.team_id:
+            error = require_team_read(group.team_id)
+
+            if error:
+                return error
+    else:
+        current_user = getattr(request, "current_user", None)
+
+        if not getattr(current_user, "is_admin", False):
+            return make_error_response(
+                error="forbidden",
+                message="Only administrators can read orphan explain traces.",
+                status_code=403,
+            )
+
+    steps = alerts_repo.list_alert_explain_steps(trace)
+
+    return jsonify(
+        serialize_alert_explain_trace(
+            trace,
+            steps=steps,
+        )
+    )

@@ -393,7 +393,9 @@ def test_new_alert_notifies_service_owner_stakeholder_on_created(
 
     alert_data = create_upsert_alert_data(route)
 
-    incident, created = upsert_alert(alert_data)
+    result = upsert_alert(alert_data)
+    incident = result.group
+    created = result.created_group
 
     assert created is True
     assert incident is not None
@@ -449,7 +451,9 @@ def test_new_alert_does_not_notify_service_owner_when_created_notifications_disa
 
     alert_data = create_upsert_alert_data(route)
 
-    incident, created = upsert_alert(alert_data)
+    result = upsert_alert(alert_data)
+    incident = result.group
+    created = result.created_group
 
     assert created is True
     assert incident is not None
@@ -505,7 +509,9 @@ def test_new_alert_sends_browser_push_to_service_owner_stakeholder(
 
     alert_data = create_upsert_alert_data(route)
 
-    incident, created = upsert_alert(alert_data)
+    result = upsert_alert(alert_data)
+    incident = result.group
+    created = result.created_group
 
     assert created is True
     assert incident is not None
@@ -560,7 +566,9 @@ def test_new_alert_does_not_push_stakeholder_when_created_notifications_disabled
 
     alert_data = create_upsert_alert_data(route)
 
-    incident, created = upsert_alert(alert_data)
+    result = upsert_alert(alert_data)
+    incident = result.group
+    created = result.created_group
 
     assert created is True
     assert incident is not None
@@ -856,13 +864,15 @@ def test_incoming_resolved_payload_notifies_stakeholder_resolved(
 
     dedup_key = unique("disk-full")
 
-    incident, created = upsert_alert(
+    result = upsert_alert(
         create_upsert_alert_data(
             route,
             status="firing",
             dedup_key=dedup_key,
         )
     )
+    incident = result.group
+    created = result.created_group
 
     assert created is True
     assert incident is not None
@@ -870,13 +880,15 @@ def test_incoming_resolved_payload_notifies_stakeholder_resolved(
     emails.clear()
     pushes.clear()
 
-    incident, created = upsert_alert(
+    result = upsert_alert(
         create_upsert_alert_data(
             route,
             status="resolved",
             dedup_key=dedup_key,
         )
     )
+    incident = result.group
+    created = result.created_group
 
     assert created is False
     assert incident is not None
@@ -928,13 +940,15 @@ def test_incoming_resolved_payload_respects_stakeholder_resolved_flag(
 
     dedup_key = unique("disk-full")
 
-    incident, created = upsert_alert(
+    result = upsert_alert(
         create_upsert_alert_data(
             route,
             status="firing",
             dedup_key=dedup_key,
         )
     )
+    incident = result.group
+    created = result.created_group
 
     assert created is True
     assert incident is not None
@@ -942,13 +956,15 @@ def test_incoming_resolved_payload_respects_stakeholder_resolved_flag(
     emails.clear()
     pushes.clear()
 
-    incident, created = upsert_alert(
+    result = upsert_alert(
         create_upsert_alert_data(
             route,
             status="resolved",
             dedup_key=dedup_key,
         )
     )
+    incident = result.group
+    created = result.created_group
 
     assert created is False
     assert incident is not None

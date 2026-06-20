@@ -45,7 +45,7 @@ def create_assigned_group(user, *, with_regular_channel=False):
         )
         attach_channel(route, channel)
 
-    alert_group, created = upsert_alert(
+    result = upsert_alert(
         {
             "source": "alertmanager",
             "forced_route_id": route.id,
@@ -63,6 +63,9 @@ def create_assigned_group(user, *, with_regular_channel=False):
             "status": "firing",
         }
     )
+
+    alert_group = result.group
+    created = result.created_group
 
     assert alert_group is not None
     assert created is True
@@ -158,7 +161,7 @@ def test_notify_alert_does_not_send_browser_push_without_assignee(db, monkeypatc
     team = create_team(group)
     route = create_route(team, group_by=["alertname", "severity"])
 
-    alert_group, created = upsert_alert(
+    result = upsert_alert(
         {
             "source": "alertmanager",
             "forced_route_id": route.id,
@@ -176,6 +179,9 @@ def test_notify_alert_does_not_send_browser_push_without_assignee(db, monkeypatc
             "status": "firing",
         }
     )
+
+    alert_group = result.group
+    created = result.created_group
 
     assert created is True
 

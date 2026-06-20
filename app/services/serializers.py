@@ -1568,3 +1568,92 @@ def serialize_maintenance_window_occurrence(window):
         "timezone": occurrence.get("timezone"),
         "recurring": bool(occurrence.get("recurring")),
     }
+
+
+def serialize_alert_explain_step(row):
+    created_at = getattr(row, "created_at", None)
+
+    return {
+        "id": row.id,
+        "position": row.position,
+        "stage": row.stage,
+        "code": row.code,
+        "status": row.status,
+        "title": row.title,
+        "message": row.message,
+        "data": row.data or {},
+        "created_at": created_at.isoformat() if created_at else None,
+    }
+
+
+def serialize_alert_explain_trace(row, steps=None):
+    started_at = getattr(row, "started_at", None)
+    finished_at = getattr(row, "finished_at", None)
+
+    return {
+        "id": row.id,
+        "trace_id": row.trace_id,
+        "mode": row.mode,
+        "group_id": row.group_id,
+        "alert_id": row.alert_id,
+        "source": row.source,
+        "dedup_key": row.dedup_key,
+        "status": row.status,
+        "outcome": row.outcome,
+        "reason": row.reason,
+        "input_summary": row.input_summary or {},
+        "result": row.result or {},
+        "started_at": started_at.isoformat() if started_at else None,
+        "finished_at": finished_at.isoformat() if finished_at else None,
+        "steps": [
+            serialize_alert_explain_step(step)
+            for step in (steps or [])
+        ],
+    }
+
+
+def serialize_alert_processing_result(result, *, status=None, routing_error=None):
+    group = result.group
+    alert = result.alert
+
+    payload = {
+        "created": result.created_group,
+        "id": getattr(group, "id", None),
+        "group_id": getattr(group, "id", None),
+        "alert_id": getattr(alert, "id", None),
+        "status": (
+            getattr(group, "status", None)
+            or getattr(alert, "status", None)
+            or status
+        ),
+        "outcome": result.outcome,
+        "processing_status": result.processing_status,
+        "reason": result.reason,
+        "trace_id": result.trace_id,
+        "routing_error": routing_error,
+        "team_id": None,
+        "team_slug": None,
+        "route_id": None,
+        "rotation_id": None,
+        "assignee": None,
+    }
+
+    if group:
+        payload["team_id"] = getattr(group, "team_id", None)
+        payload["route_id"] = getattr(group, "route_id", None)
+        payload["rotation_id"] = getattr(group, "rotation_id", None)
+
+        team = getattr(group, "team", None)
+
+        if team:
+            payload["team_slug"] = getattr(team, "slug", None)
+
+        assignee = getattr(group, "assignee", None)
+
+        if assignee:
+            payload["assignee"] = getattr(assignee, "username", None)
+
+    if result.outcome == "routing_failed":
+        payload["routing_error"] = result.reason or routing_error
+
+    return payload

@@ -170,7 +170,10 @@ def test_upsert_alert_with_policy_uses_first_rule_target(monkeypatch, db):
         or 1,
     )
 
-    alert_group, created = upsert_alert(normalized_alert())
+    result = upsert_alert(normalized_alert())
+    alert_group = result.group
+    created = result.created_group
+
 
     assert created is True
     assert alert_group.route.id == route.id
@@ -222,7 +225,10 @@ def test_policy_escalation_moves_alert_to_next_rule(monkeypatch, db):
         lambda alert_group, event_type="notification": 1,
     )
 
-    alert_group, created = upsert_alert(normalized_alert())
+    result = upsert_alert(normalized_alert())
+    alert_group = result.group
+    created = result.created_group
+
 
     assert created is True
     assert alert_group.escalation_rule.id == first_rule.id
@@ -289,7 +295,10 @@ def test_policy_alert_ignores_team_escalation_after_reminders(monkeypatch, db):
         lambda alert_group, event_type="notification": True,
     )
 
-    alert_group, created = upsert_alert(normalized_alert())
+    result = upsert_alert(normalized_alert())
+    alert_group = result.group
+    created = result.created_group
+
 
     assert created is True
 
@@ -339,7 +348,10 @@ def test_policy_escalation_runs_when_reminder_interval_is_disabled(monkeypatch, 
         lambda alert_group, event_type="notification": True,
     )
 
-    alert_group, created = upsert_alert(normalized_alert())
+    result = upsert_alert(normalized_alert())
+    alert_group = result.group
+    created = result.created_group
+
 
     assert created is True
 
@@ -376,7 +388,10 @@ def test_alert_details_include_policy_state(client, admin_headers, monkeypatch, 
         lambda alert_group, event_type="notification": True,
     )
 
-    alert_group, created = upsert_alert(normalized_alert())
+    result = upsert_alert(normalized_alert())
+    alert_group = result.group
+    created = result.created_group
+
 
     assert created is True
 
@@ -429,7 +444,10 @@ def test_policy_exhausted_alert_does_not_send_more_reminders(monkeypatch, db):
         lambda alert_group, event_type="notification": True,
     )
 
-    alert_group, created = upsert_alert(normalized_alert())
+    result = upsert_alert(normalized_alert())
+    alert_group = result.group
+    created = result.created_group
+
 
     assert created is True
     assert alert_group.escalation_rule.id == rule.id

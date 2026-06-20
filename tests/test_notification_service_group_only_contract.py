@@ -11,7 +11,7 @@ def _group_and_child():
     team = create_team(group, slug="sre")
     route = create_route(team, group_by=["alertname", "severity"])
 
-    alert_group, created = upsert_alert(
+    result = upsert_alert(
         {
             "source": "alertmanager",
             "forced_route_id": route.id,
@@ -29,6 +29,9 @@ def _group_and_child():
             "status": "firing",
         }
     )
+
+    alert_group = result.group
+    created = result.created_group
 
     assert created is True
 

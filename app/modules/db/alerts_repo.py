@@ -19,9 +19,8 @@ from app.modules.db.models import (
     User,
     IncidentResponder,
     IncidentStakeholder,
-    MaintenanceWindow,
-    MaintenanceWindowService,
-    ServiceOwner,
+    AlertExplainStep,
+    AlertExplainTrace,
 )
 from app.modules.db.query_filters import (
     apply_field_values_filter,
@@ -1073,3 +1072,147 @@ def list_incident_responders(group_id):
             IncidentResponder.id.asc(),
         )
     )
+
+
+def create_alert_explain_trace(
+    *,
+    trace_id,
+    mode="live",
+    source=None,
+    dedup_key=None,
+    input_summary=None,
+):
+    return AlertExplainTrace.create(
+        trace_id=trace_id,
+        mode=mode,
+        source=source,
+        dedup_key=dedup_key,
+        input_summary=input_summary or {},
+    )
+
+
+def create_alert_explain_step(
+    *,
+    trace,
+    position,
+    stage,
+    code,
+    status,
+    title,
+    message=None,
+    data=None,
+):
+    return AlertExplainStep.create(
+        trace=trace,
+        position=position,
+        stage=stage,
+        code=code,
+        status=status,
+        title=title,
+        message=message,
+        data=data or {},
+    )
+
+
+def attach_alert_explain_trace(trace, *, group=None, alert=None):
+    changed = False
+
+    if group and trace.group_id != group.id:
+        trace.group = group
+        changed = True
+
+    if alert and trace.alert_id != alert.id:
+        trace.alert = alert
+        changed = True
+
+    if changed:
+        trace.save(
+            only=[
+                AlertExplainTrace.group,
+                AlertExplainTrace.alert,
+            ]
+        )
+
+    return trace
+
+
+def finish_alert_explain_trace(
+    trace,
+    *,
+    status="completed",
+    outcome=None,
+    reason=None,
+    result=None,
+    finished_at=None,
+):
+    from datetime import datetime
+
+    trace.status = status
+    trace.outcome = outcome
+    trace.reason = reason
+    trace.result = result or {}
+    trace.finished_at = finished_at or datetime.utcnow()
+
+    trace.save(
+        only=[
+            AlertExplainTrace.status,
+            AlertExplainTrace.outcome,
+            AlertExplainTrace.reason,
+            AlertExplainTrace.result,
+            AlertExplainTrace.finished_at,
+        ]
+    )
+
+    return trace
+
+
+def get_alert_explain_trace(trace_id):
+    return AlertExplainTrace.get_or_none(
+        AlertExplainTrace.trace_id == trace_id
+    )
+
+
+def list_alert_explain_traces_for_group(group_id):
+    return list(
+        AlertExplainTrace
+        .select()
+        .where(AlertExplainTrace.group == group_id)
+        .order_by(AlertExplainTrace.id.desc())
+    )
+
+
+def list_alert_explain_steps(trace):
+    return list(
+        AlertExplainStep
+        .select()
+        .where(AlertExplainStep.trace == trace)
+        .order_by(AlertExplainStep.position.asc(), AlertExplainStep.id.asc())
+    )
+
+
+def delete_alert_explain_traces_older_than(cutoff):
+    stale_trace_ids = (
+        AlertExplainTrace
+        .select(AlertExplainTrace.id)
+        .where(AlertExplainTrace.started_at < cutoff)
+    )
+
+    steps_deleted = (
+        AlertExplainStep
+        .delete()
+        .where(AlertExplainStep.trace.in_(stale_trace_ids))
+        .execute()
+    )
+
+    traces_deleted = (
+        AlertExplainTrace
+        .delete()
+        .where(AlertExplainTrace.id.in_(stale_trace_ids))
+        .execute()
+    )
+
+    return {
+        "traces_deleted": traces_deleted,
+        "steps_deleted": steps_deleted,
+        "cutoff": cutoff,
+    }

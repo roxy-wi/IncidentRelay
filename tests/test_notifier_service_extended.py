@@ -73,7 +73,8 @@ def create_alert_group_for_route(route, **overrides):
     }
     data.update(overrides)
 
-    alert_group, _ = upsert_alert(data)
+    result = upsert_alert(data)
+    alert_group = result.group
 
     assert alert_group is not None
 

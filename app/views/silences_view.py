@@ -3,7 +3,13 @@ from flask import Blueprint, jsonify, request
 from app.api.schemas.silences import SilenceCreateSchema, SilenceUpdateSchema
 from app.modules.db import silences_repo
 from app.services.audit import write_audit
-from app.services.rbac import get_allowed_team_ids, require_team_read, require_team_write
+from app.services.rbac import (
+    current_user,
+    get_allowed_team_ids,
+    require_team_read,
+    require_team_write,
+)
+from app.services.serializers import attach_team_permissions
 from app.services.validation import validate_body
 
 
@@ -36,7 +42,10 @@ def list_silences():
             include_expired_history=include_expired_history,
         )
 
-    return jsonify([serialize_silence(silence) for silence in silences])
+    return jsonify([
+        serialize_silence(silence, current_user=current_user())
+        for silence in silences
+    ])
 
 
 @silences_bp.route("/<int:silence_id>", methods=["GET"])
@@ -49,7 +58,7 @@ def get_silence(silence_id):
     error = require_team_read(silence.team_id)
     if error:
         return error
-    return jsonify(serialize_silence(silence))
+    return jsonify(serialize_silence(silence, current_user=current_user()))
 
 
 @silences_bp.route("", methods=["POST"])
@@ -76,7 +85,7 @@ def create_silence():
         created_by=payload.created_by,
     )
     write_audit("silence.create", object_type="silence", object_id=silence.id, team_id=silence.team.id, data=payload.model_dump(mode="json"))
-    return jsonify(serialize_silence(silence)), 201
+    return jsonify(serialize_silence(silence, current_user=current_user())), 201
 
 
 @silences_bp.route("/<int:silence_id>", methods=["PUT"])
@@ -111,7 +120,7 @@ def update_silence(silence_id):
         },
     )
     write_audit("silence.update", object_type="silence", object_id=silence.id, team_id=silence.team.id, data=payload.model_dump(mode="json"))
-    return jsonify(serialize_silence(silence))
+    return jsonify(serialize_silence(silence, current_user=current_user()))
 
 
 @silences_bp.route("/<int:silence_id>", methods=["DELETE"])
@@ -126,15 +135,12 @@ def delete_silence(silence_id):
         return error
     silence = silences_repo.disable_silence(silence_id)
     write_audit("silence.disable", object_type="silence", object_id=silence.id, team_id=silence.team.id)
-    return jsonify(serialize_silence(silence))
+    return jsonify(serialize_silence(silence, current_user=current_user()))
 
 
-def serialize_silence(silence):
-    """
-    Serialize a silence rule.
-    """
-
-    return {
+def serialize_silence(silence, current_user=None):
+    """Serialize a silence rule."""
+    data = {
         "id": silence.id,
         "team_id": silence.team.id,
         "team_slug": silence.team.slug,
@@ -146,3 +152,5 @@ def serialize_silence(silence):
         "created_by": silence.created_by.username if silence.created_by else None,
         "enabled": silence.enabled,
     }
+
+    return attach_team_permissions(data, silence.team.id, current_user)

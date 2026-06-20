@@ -70,6 +70,142 @@ def header_param(name, description, schema=None, required=False):
     }
 
 
+ALERT_PROCESSING_RESULT_SCHEMA = {
+    "type": "object",
+    "description": "Result of processing one normalized incoming alert.",
+    "properties": {
+        "created": {
+            "type": "boolean",
+            "description": "True when a new alert group was created.",
+            "example": True,
+        },
+        "id": {
+            "type": "integer",
+            "nullable": True,
+            "description": "Alert group id. Kept for backward compatibility.",
+            "example": 123,
+        },
+        "group_id": {
+            "type": "integer",
+            "nullable": True,
+            "description": "Alert group id when an alert group exists.",
+            "example": 123,
+        },
+        "alert_id": {
+            "type": "integer",
+            "nullable": True,
+            "description": "Child alert id when an alert exists.",
+            "example": 456,
+        },
+        "status": {
+            "type": "string",
+            "nullable": True,
+            "description": "Resulting alert group or alert status.",
+            "example": "firing",
+        },
+        "outcome": {
+            "type": "string",
+            "description": "Alert processing outcome.",
+            "enum": [
+                "created",
+                "updated",
+                "resolved",
+                "routing_failed",
+                "suppressed",
+                "orphan_resolved_ignored",
+                "failed",
+            ],
+            "example": "created",
+        },
+        "processing_status": {
+            "type": "string",
+            "description": "High-level processing status.",
+            "enum": [
+                "completed",
+                "stopped",
+                "failed",
+            ],
+            "example": "completed",
+        },
+        "reason": {
+            "type": "string",
+            "nullable": True,
+            "description": "Reason for stopped or failed processing.",
+            "example": "Alert did not match any active route.",
+        },
+        "trace_id": {
+            "type": "string",
+            "nullable": True,
+            "description": (
+                "Explain trace id. Use GET /api/alerts/explain/{trace_id} "
+                "to inspect routing and processing steps."
+            ),
+            "example": "4fd2a8c9-8c2f-44e8-96fd-77b7f03e72f2",
+        },
+        "routing_error": {
+            "type": "string",
+            "nullable": True,
+            "description": "Routing error alias for routing_failed responses.",
+            "example": "Alert did not match any active route.",
+        },
+        "team_id": {
+            "type": "integer",
+            "nullable": True,
+            "description": "Matched team id.",
+        },
+        "team_slug": {
+            "type": "string",
+            "nullable": True,
+            "description": "Matched team slug.",
+        },
+        "route_id": {
+            "type": "integer",
+            "nullable": True,
+            "description": "Matched route id.",
+        },
+        "rotation_id": {
+            "type": "integer",
+            "nullable": True,
+            "description": "Resolved rotation id.",
+        },
+        "assignee": {
+            "type": "string",
+            "nullable": True,
+            "description": "Assigned username, when available.",
+        },
+    },
+    "additionalProperties": True,
+}
+
+
+ALERT_PROCESSING_RESULT_LIST_SCHEMA = {
+    "type": "array",
+    "items": ALERT_PROCESSING_RESULT_SCHEMA,
+}
+
+
+def incoming_alert_responses(success_description="Alerts accepted."):
+    """Build standard incoming alert processing responses."""
+    return {
+        "200": response(
+            success_description,
+            ALERT_PROCESSING_RESULT_LIST_SCHEMA,
+        ),
+        "202": response(
+            "Alerts processed, but no alert group was created.",
+            ALERT_PROCESSING_RESULT_LIST_SCHEMA,
+        ),
+        "207": response(
+            "Batch contains both accepted and failed alerts.",
+            ALERT_PROCESSING_RESULT_LIST_SCHEMA,
+        ),
+        "400": response(
+            "Invalid payload or all alerts failed routing.",
+        ),
+        "401": response("Route intake token or API token is required."),
+    }
+
+
 SENTRY_WEBHOOK_BODY_SCHEMA = {
     "type": "object",
     "description": (
@@ -168,15 +304,7 @@ SENTRY_WEBHOOK_BODY_SCHEMA = {
 }
 
 
-SENTRY_WEBHOOK_RESPONSE_SCHEMA = {
-    "type": "object",
-    "additionalProperties": True,
-    "description": (
-        "Standard IncidentRelay incoming alert response. The exact fields match "
-        "process_incoming_alerts() output and may include created, id, status, "
-        "team_id, route_id and routing_error."
-    ),
-}
+SENTRY_WEBHOOK_RESPONSE_SCHEMA = ALERT_PROCESSING_RESULT_LIST_SCHEMA
 
 SENTRY_WEBHOOK_PATH_ITEM = {
     "post": {
@@ -1098,11 +1226,7 @@ def paths():
                 "operationId": "receiveAlertmanagerAlerts",
                 "security": [{"bearerAuth": []}],
                 "requestBody": json_body("Standard Alertmanager webhook payload.", alertmanager_body),
-                "responses": {
-                    "200": response("Alerts accepted."),
-                    "400": response("Invalid Alertmanager payload."),
-                    "401": response("Route intake token or API token is required."),
-                },
+                "responses": incoming_alert_responses("Alertmanager alerts accepted."),
             }
         },
         "/api/integrations/zabbix": {
@@ -1116,11 +1240,7 @@ def paths():
                 "operationId": "receiveZabbixAlerts",
                 "security": [{"bearerAuth": []}],
                 "requestBody": json_body("Zabbix webhook payload.", zabbix_body),
-                "responses": {
-                    "200": response("Alert accepted."),
-                    "400": response("Invalid Zabbix payload."),
-                    "401": response("Route intake token or API token is required."),
-                },
+                "responses": incoming_alert_responses("Zabbix alert accepted."),
             }
         },
         "/api/integrations/sentry/{route_id}": {
@@ -1175,17 +1295,22 @@ def paths():
                 "responses": {
                     "200": response(
                         "Sentry webhook accepted.",
-                        SENTRY_WEBHOOK_RESPONSE_SCHEMA,
+                        ALERT_PROCESSING_RESULT_LIST_SCHEMA,
+                    ),
+                    "202": response(
+                        "Sentry webhook processed, but no alert group was created.",
+                        ALERT_PROCESSING_RESULT_LIST_SCHEMA,
+                    ),
+                    "207": response(
+                        "Batch contains both accepted and failed alerts.",
+                        ALERT_PROCESSING_RESULT_LIST_SCHEMA,
                     ),
                     "400": response("Invalid payload or route source mismatch."),
                     "403": response(
-                        "Missing or invalid Sentry-Hook-Signature, disabled route, "
-                        "or inactive team/group."
+                        "Missing or invalid Sentry-Hook-Signature, disabled route, or inactive team/group."
                     ),
                     "404": response("Sentry route was not found."),
-                    "409": response(
-                        "Sentry webhook secret is not configured for this route."
-                    ),
+                    "409": response("Sentry webhook secret is not configured for this route."),
                 },
             }
         },
@@ -1201,11 +1326,7 @@ def paths():
                 "operationId": "receiveLibreNMSAlerts",
                 "security": [{"bearerAuth": []}],
                 "requestBody": json_body("LibreNMS API transport payload.", librenms_body),
-                "responses": {
-                    "200": response("Alert accepted."),
-                    "400": response("Invalid LibreNMS payload."),
-                    "401": response("Route intake token or API token is required."),
-                },
+                "responses": incoming_alert_responses("LibreNMS alert accepted."),
             }
         },
         "/api/integrations/webhook": {
@@ -1219,11 +1340,7 @@ def paths():
                 "operationId": "receiveGenericWebhookAlerts",
                 "security": [{"bearerAuth": []}],
                 "requestBody": json_body("Generic webhook payload.", webhook_body),
-                "responses": {
-                    "200": response("Alert accepted."),
-                    "400": response("Invalid webhook payload."),
-                    "401": response("Route intake token or API token is required."),
-                },
+                "responses": incoming_alert_responses("Generic webhook alert accepted."),
             }
         },
         "/api/integrations/mattermost/actions": {

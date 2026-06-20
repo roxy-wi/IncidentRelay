@@ -9,7 +9,12 @@ from app.modules.db import channels_repo, teams_repo
 from app.notifiers.registry import get_notifier, list_notifier_types
 from app.notifiers.email.email_templates import DEFAULT_EMAIL_HTML_TEMPLATE
 from app.services.audit import write_audit
-from app.services.rbac import get_allowed_team_ids, require_team_read, require_team_write
+from app.services.rbac import (
+    current_user,
+    get_allowed_team_ids,
+    require_team_read,
+    require_team_write,
+)
 from app.services.serializers import serialize_channel
 from app.services.validation import make_error_response, validate_body
 
@@ -73,7 +78,10 @@ def list_channels():
     else:
         channels = channels_repo.list_channels(team_ids=get_allowed_team_ids())
 
-    return jsonify([serialize_channel(channel) for channel in channels])
+    return jsonify([
+        serialize_channel(channel, current_user=current_user())
+        for channel in channels
+    ])
 
 
 @channels_bp.route("/<int:channel_id>", methods=["GET"])
@@ -86,7 +94,7 @@ def get_channel(channel_id):
         if error:
             return error
 
-    return jsonify(serialize_channel(channel))
+    return jsonify(serialize_channel(channel, current_user=current_user()))
 
 
 @channels_bp.route("", methods=["POST"])
@@ -130,7 +138,7 @@ def create_channel():
         data=payload.model_dump(),
     )
 
-    return jsonify(serialize_channel(channel)), 201
+    return jsonify(serialize_channel(channel, current_user=current_user())), 201
 
 
 @channels_bp.route("/<int:channel_id>", methods=["PUT"])
@@ -187,7 +195,7 @@ def update_channel(channel_id):
         data=payload.model_dump(),
     )
 
-    return jsonify(serialize_channel(channel))
+    return jsonify(serialize_channel(channel, current_user=current_user()))
 
 
 @channels_bp.route("/<int:channel_id>/disable", methods=["POST"])
@@ -210,7 +218,7 @@ def disable_channel(channel_id):
         data={"name": channel.name, "enabled": False},
     )
 
-    return jsonify(serialize_channel(channel))
+    return jsonify(serialize_channel(channel, current_user=current_user()))
 
 
 @channels_bp.route("/<int:channel_id>/enable", methods=["POST"])
@@ -233,7 +241,7 @@ def enable_channel(channel_id):
         data={"name": channel.name, "enabled": True},
     )
 
-    return jsonify(serialize_channel(channel))
+    return jsonify(serialize_channel(channel, current_user=current_user()))
 
 
 @channels_bp.route("/<int:channel_id>", methods=["DELETE"])

@@ -16,7 +16,7 @@ def _group_with_assignee():
 
     route = create_route(team, group_by=["alertname", "severity"])
 
-    alert_group, created = upsert_alert(
+    result = upsert_alert(
         {
             "source": "alertmanager",
             "forced_route_id": route.id,
@@ -34,6 +34,9 @@ def _group_with_assignee():
             "status": "firing",
         }
     )
+
+    alert_group = result.group
+    created = result.created_group
 
     assert created is True
 

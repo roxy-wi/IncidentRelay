@@ -11,6 +11,7 @@ from app.api.schemas.integrations import (
     SentryWebhookSchema,
     ZabbixWebhookSchema,
 )
+from app.services.serializers import serialize_alert_processing_result
 from app.settings import Config
 from app.modules.db import channels_repo, users_repo, alerts_repo, routes_repo
 from app.services.alerts.actions import acknowledge_alert, resolve_alert
@@ -23,7 +24,6 @@ from app.services.integrations.normalizers.alertmanager import normalize_alertma
 from app.services.integrations.normalizers.librenms import normalize_librenms
 from app.services.validation import validate_body
 from app.notifiers.voice.loader import create_voice_provider
-from app.services.routing.routing import find_route_for_alert
 from app.modules.db.models import UserNotificationDelivery
 from app.services.integrations.sentry import validate_sentry_route_signature
 
@@ -148,13 +148,16 @@ def librenms_webhook():
 
 def process_incoming_alerts(normalized_alerts):
     """
-    Store normalized alerts and return created or updated records.
+    Store normalized alerts and return created, updated, ignored or failed records.
+
+    Routing decisions are intentionally delegated to upsert_alert(), because
+    upsert_alert() creates an explain trace for both successful and stopped
+    processing paths.
     """
-    result = []
-    routing_errors = []
+    items = []
     intake_route = getattr(request, "current_intake_route", None)
 
-    for index, alert_data in enumerate(normalized_alerts):
+    for alert_data in normalized_alerts:
         if intake_route:
             # The route intake token is the routing boundary.
             # Alerts submitted with this token are forced to this route,
@@ -163,68 +166,15 @@ def process_incoming_alerts(normalized_alerts):
             alert_data["forced_team_id"] = intake_route.team.id
             alert_data["team_slug"] = intake_route.team.slug
 
-        route = find_route_for_alert(alert_data)
+        result = upsert_alert(alert_data)
 
-        if not route:
-            routing_errors.append(
-                {
-                    "index": index,
-                    "source": alert_data.get("source"),
-                    "team_slug": alert_data.get("team_slug"),
-                    "title": alert_data.get("title"),
-                    "dedup_key": alert_data.get("dedup_key"),
-                    "routing_error": alert_data.get("routing_error")
-                    or "no enabled route matched alert labels",
-                }
-            )
-
-    if routing_errors:
-        logging.getLogger("oncall.alerts").warning(
-            "incoming alerts rejected by routing",
-            extra={
-                "extra": {
-                    "event_type": "alert_intake_routing_error",
-                    "source": normalized_alerts[0].get("source") if normalized_alerts else None,
-                    "alerts_count": len(normalized_alerts),
-                    "errors": routing_errors,
-                    "route_id": intake_route.id if intake_route else None,
-                    "team_id": intake_route.team.id if intake_route else None,
-                }
-            },
+        item = serialize_alert_processing_result(
+            result,
+            status=alert_data.get("status") or "firing",
+            routing_error=alert_data.get("routing_error"),
         )
 
-        return jsonify(
-            {
-                "error": "routing_error",
-                "message": "Alert routing failed",
-                "details": routing_errors,
-            }
-        ), 400
-
-    for alert_data in normalized_alerts:
-        alert, created = upsert_alert(alert_data)
-
-        if alert is None:
-            return jsonify(
-                {
-                    "status": "ignored",
-                    "reason": "orphan_resolved",
-                }
-            ), 202
-
-        result.append(
-            {
-                "id": alert.id,
-                "team_id": alert.team.id if alert.team else None,
-                "team_slug": alert.team.slug if alert.team else None,
-                "route_id": alert.route.id if alert.route else None,
-                "rotation_id": alert.rotation.id if alert.rotation else None,
-                "routing_error": alert_data.get("routing_error"),
-                "created": created,
-                "status": alert.status,
-                "assignee": alert.assignee.username if alert.assignee else None,
-            }
-        )
+        items.append(item)
 
     logging.getLogger("oncall.alerts").info(
         "incoming alerts processed",
@@ -235,12 +185,41 @@ def process_incoming_alerts(normalized_alerts):
                 "alerts_count": len(normalized_alerts),
                 "route_id": intake_route.id if intake_route else None,
                 "team_id": intake_route.team.id if intake_route else None,
-                "results": result,
+                "results": items,
             }
         },
     )
 
-    return jsonify(result)
+    return jsonify(items), _incoming_alerts_status_code(items)
+
+
+def _incoming_alerts_status_code(items):
+    if not items:
+        return 200
+
+    has_group = any(item.get("group_id") for item in items)
+
+    has_failure = any(
+        item.get("processing_status") == "failed"
+        or item.get("outcome") == "routing_failed"
+        for item in items
+    )
+
+    has_stopped = any(
+        item.get("processing_status") == "stopped"
+        for item in items
+    )
+
+    if has_failure and has_group:
+        return 207
+
+    if has_failure:
+        return 400
+
+    if has_stopped and not has_group:
+        return 202
+
+    return 200
 
 
 @integrations_bp.route("/mattermost/actions", methods=["POST"])

@@ -10,6 +10,17 @@ def path_param(name, description):
     }
 
 
+def string_path_param(name, description):
+    """Build a string path parameter."""
+    return {
+        "name": name,
+        "in": "path",
+        "required": True,
+        "description": description,
+        "schema": {"type": "string", "minLength": 1},
+    }
+
+
 def query_param(name, description, schema=None, required=False):
     """Build a query parameter."""
 
@@ -192,6 +203,139 @@ def alert_notification_schema():
             "created_at": date_time_property("Notification record creation timestamp in UTC.", nullable=True),
             "updated_at": date_time_property("Notification record update timestamp in UTC.", nullable=True),
         },
+        "additionalProperties": True,
+    }
+
+
+def alert_explain_step_schema():
+    """Build alert explain step response schema."""
+    return {
+        "type": "object",
+        "properties": {
+            "id": {"type": "integer"},
+            "position": {
+                "type": "integer",
+                "description": "Step order inside this trace.",
+            },
+            "stage": {
+                "type": "string",
+                "description": "Processing stage, for example intake, routing, grouping or notification.",
+                "example": "routing",
+            },
+            "code": {
+                "type": "string",
+                "description": "Machine-readable step code.",
+                "example": "route_matched",
+            },
+            "status": {
+                "type": "string",
+                "description": "Step status.",
+                "example": "success",
+            },
+            "title": {
+                "type": "string",
+                "description": "Human-readable step title.",
+                "example": "Route matched",
+            },
+            "message": {
+                "type": "string",
+                "nullable": True,
+                "description": "Optional human-readable details.",
+            },
+            "data": {
+                "type": "object",
+                "additionalProperties": True,
+                "description": "Step-specific diagnostic data.",
+            },
+            "created_at": date_time_property(
+                "Step creation timestamp in UTC.",
+                nullable=True,
+            ),
+        },
+        "additionalProperties": True,
+    }
+
+
+def alert_explain_trace_schema(include_steps=False):
+    """Build alert explain trace response schema."""
+    properties = {
+        "id": {"type": "integer"},
+        "trace_id": {
+            "type": "string",
+            "description": "Public trace id returned by integration ingest responses.",
+            "example": "4fd2a8c9-8c2f-44e8-96fd-77b7f03e72f2",
+        },
+        "mode": {
+            "type": "string",
+            "description": "Trace mode.",
+            "example": "live",
+        },
+        "group_id": {
+            "type": "integer",
+            "nullable": True,
+            "description": "Alert group id when processing created or reused an alert group.",
+        },
+        "alert_id": {
+            "type": "integer",
+            "nullable": True,
+            "description": "Child alert id when processing created or updated an alert.",
+        },
+        "source": {
+            "type": "string",
+            "nullable": True,
+            "description": "Alert source.",
+            "example": "alertmanager",
+        },
+        "dedup_key": {
+            "type": "string",
+            "nullable": True,
+            "description": "Normalized alert deduplication key.",
+        },
+        "status": {
+            "type": "string",
+            "description": "Trace processing status.",
+            "example": "completed",
+        },
+        "outcome": {
+            "type": "string",
+            "nullable": True,
+            "description": "Processing outcome.",
+            "example": "created",
+        },
+        "reason": {
+            "type": "string",
+            "nullable": True,
+            "description": "Reason for stopped or failed processing.",
+        },
+        "input_summary": {
+            "type": "object",
+            "additionalProperties": True,
+            "description": "Safe summary of the incoming alert payload.",
+        },
+        "result": {
+            "type": "object",
+            "additionalProperties": True,
+            "description": "Safe summary of the processing result.",
+        },
+        "started_at": date_time_property(
+            "Trace start timestamp in UTC.",
+            nullable=True,
+        ),
+        "finished_at": date_time_property(
+            "Trace finish timestamp in UTC.",
+            nullable=True,
+        ),
+    }
+
+    if include_steps:
+        properties["steps"] = {
+            "type": "array",
+            "items": alert_explain_step_schema(),
+        }
+
+    return {
+        "type": "object",
+        "properties": properties,
         "additionalProperties": True,
     }
 
@@ -816,6 +960,64 @@ def paths():
                     "404": response("Alert group not found."),
                 },
             }
+        },
+        "/api/alerts/{alert_id}/explain": {
+            "get": {
+                "tags": ["alerts"],
+                "summary": "List alert explain traces",
+                "description": (
+                    "Returns explain traces linked to an alert group. "
+                    "The alert_id path parameter is the alert group id used by the alert details endpoint."
+                ),
+                "operationId": "listAlertExplainTraces",
+                "security": bearer_security(),
+                "parameters": [
+                    path_param("alert_id", "Alert group id."),
+                ],
+                "responses": {
+                    "200": response(
+                        "List of explain traces linked to the alert group.",
+                        {
+                            "type": "array",
+                            "items": alert_explain_trace_schema(
+                                include_steps=False,
+                            ),
+                        },
+                    ),
+                    "401": response("Authentication required."),
+                    "403": response("Access denied."),
+                    "404": response("Alert group not found."),
+                },
+            },
+        },
+
+        "/api/alerts/explain/{trace_id}": {
+            "get": {
+                "tags": ["alerts"],
+                "summary": "Get alert explain trace",
+                "description": (
+                    "Returns one explain trace with ordered processing steps. "
+                    "Traces linked to an alert group use alert group read access checks. "
+                    "Orphan traces without group_id can be read only by administrators."
+                ),
+                "operationId": "getAlertExplainTrace",
+                "security": bearer_security(),
+                "parameters": [
+                    string_path_param(
+                        "trace_id",
+                        "Explain trace id returned by an integration ingest response.",
+                    ),
+                ],
+                "responses": {
+                    "200": response(
+                        "Explain trace with ordered processing steps.",
+                        alert_explain_trace_schema(include_steps=True),
+                    ),
+                    "401": response("Authentication required."),
+                    "403": response("Access denied."),
+                    "404": response("Alert explain trace not found."),
+                },
+            },
         },
         "/api/alerts/{alert_id}/ack": {
             "post": {

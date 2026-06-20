@@ -18,7 +18,7 @@ def create_assigned_group(user, *, status="firing", severity="critical"):
     team = create_team(group)
     route = create_route(team, group_by=["alertname", "severity"])
 
-    alert_group, created = upsert_alert(
+    result = upsert_alert(
         {
             "source": "alertmanager",
             "forced_route_id": route.id,
@@ -36,6 +36,9 @@ def create_assigned_group(user, *, status="firing", severity="critical"):
             "status": "firing",
         }
     )
+
+    alert_group = result.group
+    created = result.created_group
 
     assert created is True
 
