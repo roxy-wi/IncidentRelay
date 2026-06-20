@@ -285,10 +285,94 @@ def can_write_team(user, team_id):
     if not can_read_group(user, team.group_id):
         return False
 
-    if can_write_group(user, team.group_id):
+    if can_manage_group_users(user, team.group_id):
         return True
 
     return teams_repo.get_user_team_role(user.id, team_id) in TEAM_WRITE_ROLES
+
+
+def can_access_team_or_group_resource(user, team_id, write_required=False):
+    """Return True when a user can access a team-owned operational resource.
+
+    Used for resources such as notification channels and silences:
+    - team members keep their normal team-level permissions;
+    - group editors/admins can manage operational resources in their group;
+    - this does not make group editors team writers.
+    """
+    if not user:
+        return False
+
+    if write_required:
+        if can_write_team(user, team_id):
+            return True
+    else:
+        if can_read_team(user, team_id):
+            return True
+
+    team = teams_repo.get_team(team_id)
+    if not team or not team.group_id:
+        return False
+
+    return can_write_group(user, team.group_id)
+
+
+def get_allowed_team_or_group_resource_ids(
+    user=None,
+    write_required=False,
+    use_active_group=True,
+    active_only=True,
+):
+    """Return team ids available for team-owned operational resources."""
+    user = user or current_user()
+
+    team_ids = set(
+        get_allowed_team_ids(
+            user=user,
+            write_required=write_required,
+            use_active_group=use_active_group,
+            active_only=active_only,
+        )
+    )
+
+    group_ids = get_allowed_group_ids(
+        user=user,
+        write_required=True,
+        use_active_group=use_active_group,
+    )
+
+    team_ids.update(
+        team.id
+        for team in teams_repo.list_teams(
+            active_only=active_only,
+            group_ids=group_ids,
+        )
+    )
+
+    return sorted(team_ids)
+
+
+def require_team_or_group_resource_access(team_id, write_required=False):
+    """Return an error response when user cannot access an operational resource."""
+    if is_admin_user():
+        return None
+
+    if can_access_team_or_group_resource(
+        current_user(),
+        team_id,
+        write_required=write_required,
+    ):
+        return None
+
+    if write_required:
+        return jsonify({
+            "error": "team_or_group_write_required",
+            "message": "Team manager or group editor role is required for this team",
+        }), 403
+
+    return jsonify({
+        "error": "team_or_group_access_denied",
+        "message": "Access to this team resource is denied",
+    }), 403
 
 
 def require_admin_user():

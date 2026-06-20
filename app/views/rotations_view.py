@@ -1,6 +1,7 @@
 from datetime import datetime, timezone as dt_timezone
 from zoneinfo import ZoneInfo
 
+from peewee import DoesNotExist
 from flask import Blueprint, jsonify, request
 
 from app.api.schemas.rotations import (
@@ -14,27 +15,38 @@ from app.api.schemas.rotations import (
     RotationLayerMemberAddSchema,
     RotationLayerMemberUpdateSchema,
     RotationLayerRestrictionsReplaceSchema,
-    RotationEnabledUpdateSchema
+    RotationEnabledUpdateSchema,
 )
 from app.modules.db import rotations_repo, teams_repo
 from app.services.audit import write_audit
 from app.services.rbac import get_allowed_team_ids, require_team_read, require_team_write
 from app.services.oncall import get_current_oncall_user
-from app.services.serializers import serialize_rotation, serialize_rotation_layer, serialize_rotation_layer_member, serialize_rotation_layer_restriction
+from app.services.serializers import (
+    serialize_rotation,
+    serialize_rotation_layer,
+    serialize_rotation_layer_member,
+    serialize_rotation_layer_restriction,
+)
 from app.services.validation import (
     make_error_response,
     safe_exception_response,
     validate_body,
 )
 
-
 rotations_bp = Blueprint("rotations_api", __name__)
+
+
+def _not_found(resource):
+    return make_error_response(
+        error="not_found",
+        message=f"{resource} not found.",
+        status_code=404,
+    )
 
 
 def _rotation_timezone(rotation):
     """Return ZoneInfo for rotation timezone."""
     timezone_name = getattr(rotation, "timezone", None) or "UTC"
-
     try:
         return ZoneInfo(timezone_name)
     except Exception:
@@ -43,13 +55,11 @@ def _rotation_timezone(rotation):
 
 def _layer_timezone(layer):
     """Return ZoneInfo for layer timezone."""
-
     timezone_name = (
         getattr(layer, "timezone", None)
         or getattr(layer.rotation, "timezone", None)
         or "UTC"
     )
-
     try:
         return ZoneInfo(timezone_name)
     except Exception:
@@ -63,12 +73,10 @@ def _layer_local_to_utc_naive(value, layer):
     datetime-local from browser comes without tzinfo, so we treat it as
     local time in layer.timezone.
     """
-
     if value is None:
         return None
 
     zone = _layer_timezone(layer)
-
     if value.tzinfo is None:
         value = value.replace(tzinfo=zone)
 
@@ -86,7 +94,6 @@ def _rotation_local_to_utc_naive(value, rotation):
         return None
 
     zone = _rotation_timezone(rotation)
-
     if value.tzinfo is None:
         value = value.replace(tzinfo=zone)
 
@@ -99,20 +106,161 @@ def _utc_naive_to_rotation_local(value, rotation):
         return None
 
     zone = _rotation_timezone(rotation)
-
     if value.tzinfo is None:
         value = value.replace(tzinfo=dt_timezone.utc)
 
     return value.astimezone(zone).replace(tzinfo=None)
 
 
+def _get_rotation_or_404(rotation_id):
+    try:
+        rotation = rotations_repo.get_rotation(rotation_id)
+    except (DoesNotExist, TypeError, ValueError):
+        return None, _not_found("Rotation")
+
+    if not rotation:
+        return None, _not_found("Rotation")
+
+    return rotation, None
+
+
+def _require_rotation_read(rotation_id):
+    rotation, error = _get_rotation_or_404(rotation_id)
+    if error:
+        return None, error
+
+    error = require_team_read(rotation.team_id)
+    if error:
+        return None, error
+
+    return rotation, None
+
+
+def _require_rotation_write(rotation_id):
+    rotation, error = _get_rotation_or_404(rotation_id)
+    if error:
+        return None, error
+
+    error = require_team_write(rotation.team_id)
+    if error:
+        return None, error
+
+    return rotation, None
+
+
+def _get_rotation_member_or_404(member_id):
+    try:
+        member = rotations_repo.get_rotation_member(member_id)
+    except (DoesNotExist, TypeError, ValueError):
+        return None, _not_found("Rotation member")
+
+    if not member:
+        return None, _not_found("Rotation member")
+
+    return member, None
+
+
+def _require_rotation_member_write(member_id):
+    member, error = _get_rotation_member_or_404(member_id)
+    if error:
+        return None, error
+
+    error = require_team_write(member.rotation.team.id)
+    if error:
+        return None, error
+
+    return member, None
+
+
+def _get_rotation_override_or_404(override_id):
+    try:
+        override = rotations_repo.get_rotation_override(override_id)
+    except (DoesNotExist, TypeError, ValueError):
+        return None, _not_found("Rotation override")
+
+    if not override:
+        return None, _not_found("Rotation override")
+
+    return override, None
+
+
+def _require_rotation_override_write(override_id):
+    override, error = _get_rotation_override_or_404(override_id)
+    if error:
+        return None, error
+
+    error = require_team_write(override.rotation.team_id)
+    if error:
+        return None, error
+
+    return override, None
+
+
+def _get_rotation_layer_or_404(layer_id):
+    try:
+        layer = rotations_repo.get_rotation_layer(layer_id)
+    except (DoesNotExist, TypeError, ValueError):
+        return None, _not_found("Rotation layer")
+
+    if not layer:
+        return None, _not_found("Rotation layer")
+
+    return layer, None
+
+
+def _require_rotation_layer_read(layer_id):
+    layer, error = _get_rotation_layer_or_404(layer_id)
+    if error:
+        return None, error
+
+    error = require_team_read(layer.rotation.team_id)
+    if error:
+        return None, error
+
+    return layer, None
+
+
+def _require_rotation_layer_write(layer_id):
+    layer, error = _get_rotation_layer_or_404(layer_id)
+    if error:
+        return None, error
+
+    error = require_team_write(layer.rotation.team_id)
+    if error:
+        return None, error
+
+    return layer, None
+
+
+def _get_rotation_layer_member_or_404(member_id):
+    try:
+        member = rotations_repo.get_rotation_layer_member(member_id)
+    except (DoesNotExist, TypeError, ValueError):
+        return None, _not_found("Rotation layer member")
+
+    if not member:
+        return None, _not_found("Rotation layer member")
+
+    return member, None
+
+
+def _require_rotation_layer_member_write(member_id):
+    member, error = _get_rotation_layer_member_or_404(member_id)
+    if error:
+        return None, error
+
+    error = require_team_write(member.layer.rotation.team_id)
+    if error:
+        return None, error
+
+    return member, None
+
+
 @rotations_bp.route("", methods=["GET"])
 def list_rotations():
-    """
-    Return rotations.
-    """
-
+    """Return rotations."""
     team_id = request.args.get("team_id", type=int)
+
     if team_id:
         error = require_team_read(team_id)
         if error:
@@ -120,6 +268,7 @@ def list_rotations():
         rotations = rotations_repo.list_rotations(team_id=team_id)
     else:
         rotations = rotations_repo.list_rotations(team_ids=get_allowed_team_ids())
+
     return jsonify([
         serialize_rotation(
             rotation,
@@ -132,14 +281,11 @@ def list_rotations():
 
 @rotations_bp.route("/<int:rotation_id>", methods=["GET"])
 def get_rotation(rotation_id):
-    """
-    Return a single rotation.
-    """
-
-    rotation = rotations_repo.get_rotation(rotation_id)
-    error = require_team_read(rotation.team_id)
+    """Return a single rotation."""
+    rotation, error = _require_rotation_read(rotation_id)
     if error:
         return error
+
     return jsonify(serialize_rotation(
         rotation,
         get_current_oncall_user(rotation),
@@ -149,10 +295,7 @@ def get_rotation(rotation_id):
 
 @rotations_bp.route("", methods=["POST"])
 def create_rotation():
-    """
-    Create a rotation.
-    """
-
+    """Create a rotation."""
     payload, error = validate_body(RotationCreateSchema)
     if error:
         return error
@@ -184,13 +327,20 @@ def create_rotation():
             message="Rotation conflicts with an existing rotation.",
             status_code=400,
         )
-    write_audit("rotation.create", object_type="rotation", object_id=rotation.id, team_id=rotation.team.id, data=payload.model_dump(mode="json"))
+
+    write_audit(
+        "rotation.create",
+        object_type="rotation",
+        object_id=rotation.id,
+        team_id=rotation.team.id,
+        data=payload.model_dump(mode="json"),
+    )
 
     if payload.add_team_members:
         default_layer = rotations_repo.get_or_create_default_layer(rotation.id)
         team_members = teams_repo.list_team_users(payload.team_id)
-
         position = 0
+
         for membership in team_members:
             if not membership.active:
                 continue
@@ -211,18 +361,15 @@ def create_rotation():
 
 @rotations_bp.route("/<int:rotation_id>", methods=["PUT"])
 def update_rotation(rotation_id):
-    """
-    Update a rotation.
-    """
-
+    """Update a rotation."""
     payload, error = validate_body(RotationUpdateSchema)
     if error:
         return error
 
-    current_rotation = rotations_repo.get_rotation(rotation_id)
-    error = require_team_write(current_rotation.team_id)
+    current_rotation, error = _require_rotation_write(rotation_id)
     if error:
         return error
+
     if payload.team_id != current_rotation.team_id:
         error = require_team_write(payload.team_id)
         if error:
@@ -246,7 +393,15 @@ def update_rotation(rotation_id):
             "enabled": payload.enabled,
         },
     )
-    write_audit("rotation.update", object_type="rotation", object_id=rotation.id, team_id=rotation.team.id, data=payload.model_dump(mode="json"))
+
+    write_audit(
+        "rotation.update",
+        object_type="rotation",
+        object_id=rotation.id,
+        team_id=rotation.team.id,
+        data=payload.model_dump(mode="json"),
+    )
+
     return jsonify(serialize_rotation(
         rotation,
         get_current_oncall_user(rotation),
@@ -261,12 +416,11 @@ def set_rotation_enabled(rotation_id):
     if error:
         return error
 
-    current_rotation = rotations_repo.get_rotation(rotation_id)
-    error = require_team_write(current_rotation.team_id)
+    current_rotation, error = _require_rotation_write(rotation_id)
     if error:
         return error
 
-    rotation = rotations_repo.set_rotation_enabled(rotation_id, payload.enabled)
+    rotation = rotations_repo.set_rotation_enabled(current_rotation.id, payload.enabled)
 
     write_audit(
         "rotation.enable" if payload.enabled else "rotation.disable",
@@ -276,18 +430,21 @@ def set_rotation_enabled(rotation_id):
         data={"enabled": payload.enabled},
     )
 
-    return jsonify(serialize_rotation(rotation, get_current_oncall_user(rotation)))
+    return jsonify(serialize_rotation(
+        rotation,
+        get_current_oncall_user(rotation),
+        request.current_user,
+    ))
 
 
 @rotations_bp.route("/<int:rotation_id>", methods=["DELETE"])
 def delete_rotation(rotation_id):
     """Remove a rotation and detach related route references."""
-    current_rotation = rotations_repo.get_rotation(rotation_id)
-    error = require_team_write(current_rotation.team_id)
+    current_rotation, error = _require_rotation_write(rotation_id)
     if error:
         return error
 
-    rotation = rotations_repo.soft_delete_rotation(rotation_id)
+    rotation = rotations_repo.soft_delete_rotation(current_rotation.id)
 
     write_audit(
         "rotation.delete",
@@ -305,12 +462,8 @@ def delete_rotation(rotation_id):
 
 @rotations_bp.route("/<int:rotation_id>/members", methods=["GET"])
 def list_rotation_members(rotation_id):
-    """
-    Return rotation members.
-    """
-
-    rotation = rotations_repo.get_rotation(rotation_id)
-    error = require_team_read(rotation.team_id)
+    """Return rotation members."""
+    rotation, error = _require_rotation_read(rotation_id)
     if error:
         return error
 
@@ -323,27 +476,23 @@ def list_rotation_members(rotation_id):
             "position": member.position,
             "active": member.active,
         }
-        for member in rotations_repo.list_rotation_members(rotation_id)
+        for member in rotations_repo.list_rotation_members(rotation.id)
     ])
 
 
 @rotations_bp.route("/<int:rotation_id>/members", methods=["POST"])
 def add_rotation_member(rotation_id):
-    """
-    Add a user to a rotation.
-    """
-
+    """Add a user to a rotation."""
     payload, error = validate_body(RotationMemberAddSchema)
     if error:
         return error
 
-    rotation = rotations_repo.get_rotation(rotation_id)
-    error = require_team_write(rotation.team_id)
+    rotation, error = _require_rotation_write(rotation_id)
     if error:
         return error
 
     try:
-        rotations_repo.ensure_user_in_rotation_team(rotation_id, payload.user_id)
+        rotations_repo.ensure_user_in_rotation_team(rotation.id, payload.user_id)
     except ValueError as exc:
         return safe_exception_response(
             exc,
@@ -352,8 +501,20 @@ def add_rotation_member(rotation_id):
             status_code=400,
         )
 
-    member = rotations_repo.add_rotation_member(rotation_id, payload.user_id, payload.position)
-    write_audit("rotation.member.add", object_type="rotation", object_id=rotation_id, team_id=member.rotation.team.id, data=payload.model_dump())
+    member = rotations_repo.add_rotation_member(
+        rotation.id,
+        payload.user_id,
+        payload.position,
+    )
+
+    write_audit(
+        "rotation.member.add",
+        object_type="rotation",
+        object_id=rotation.id,
+        team_id=member.rotation.team.id,
+        data=payload.model_dump(),
+    )
+
     return jsonify({"id": member.id}), 201
 
 
@@ -364,13 +525,11 @@ def list_rotation_eligible_users(rotation_id):
 
     These users can be added as rotation members or selected for overrides.
     """
-    rotation = rotations_repo.get_rotation(rotation_id)
-
-    error = require_team_read(rotation.team_id)
+    rotation, error = _require_rotation_read(rotation_id)
     if error:
         return error
 
-    memberships = rotations_repo.list_rotation_team_users(rotation_id, active_only=True)
+    memberships = rotations_repo.list_rotation_team_users(rotation.id, active_only=True)
 
     return jsonify([
         {
@@ -387,12 +546,8 @@ def list_rotation_eligible_users(rotation_id):
 
 @rotations_bp.route("/members/<int:member_id>", methods=["PUT"])
 def update_rotation_member(member_id):
-    """
-    Update a rotation member.
-    """
-
-    member = rotations_repo.get_rotation_member(member_id)
-    error = require_team_write(member.rotation.team.id)
+    """Update a rotation member."""
+    member_before, error = _require_rotation_member_write(member_id)
     if error:
         return error
 
@@ -401,7 +556,7 @@ def update_rotation_member(member_id):
         return error
 
     member = rotations_repo.update_rotation_member(
-        member_id=member_id,
+        member_id=member_before.id,
         position=payload.position,
         active=payload.active,
     )
@@ -426,16 +581,12 @@ def update_rotation_member(member_id):
 
 @rotations_bp.route("/members/<int:member_id>", methods=["DELETE"])
 def delete_rotation_member(member_id):
-    """
-    Remove a user from a rotation.
-    """
-    member = rotations_repo.get_rotation_member(member_id)
-
-    error = require_team_write(member.rotation.team.id)
+    """Remove a user from a rotation."""
+    member, error = _require_rotation_member_write(member_id)
     if error:
         return error
 
-    data = rotations_repo.delete_rotation_member(member_id)
+    data = rotations_repo.delete_rotation_member(member.id)
 
     write_audit(
         "rotation.member.remove",
@@ -456,9 +607,7 @@ def list_rotation_overrides(rotation_id):
     Expired overrides are hidden by default. Pass include_expired=1 to show
     historical overrides.
     """
-    rotation = rotations_repo.get_rotation(rotation_id)
-
-    error = require_team_read(rotation.team_id)
+    rotation, error = _require_rotation_read(rotation_id)
     if error:
         return error
 
@@ -483,7 +632,7 @@ def list_rotation_overrides(rotation_id):
             "expired": override.ends_at <= datetime.utcnow(),
         }
         for override in rotations_repo.list_rotation_overrides(
-            rotation_id,
+            rotation.id,
             include_expired=include_expired,
         )
     ])
@@ -491,21 +640,17 @@ def list_rotation_overrides(rotation_id):
 
 @rotations_bp.route("/<int:rotation_id>/overrides", methods=["POST"])
 def create_rotation_override(rotation_id):
-    """
-    Create a temporary rotation override.
-    """
-
+    """Create a temporary rotation override."""
     payload, error = validate_body(RotationOverrideCreateSchema)
     if error:
         return error
 
-    rotation = rotations_repo.get_rotation(rotation_id)
-    error = require_team_write(rotation.team_id)
+    rotation, error = _require_rotation_write(rotation_id)
     if error:
         return error
 
     try:
-        rotations_repo.ensure_user_in_rotation_team(rotation_id, payload.user_id)
+        rotations_repo.ensure_user_in_rotation_team(rotation.id, payload.user_id)
     except ValueError as exc:
         return safe_exception_response(
             exc,
@@ -525,52 +670,61 @@ def create_rotation_override(rotation_id):
         )
 
     override = rotations_repo.create_rotation_override(
-        rotation_id=rotation_id,
+        rotation_id=rotation.id,
         user_id=payload.user_id,
         starts_at=starts_at,
         ends_at=ends_at,
         reason=payload.reason,
     )
-    write_audit("rotation.override.create", object_type="rotation", object_id=rotation_id, team_id=override.rotation.team.id, data=payload.model_dump(mode="json"))
+
+    write_audit(
+        "rotation.override.create",
+        object_type="rotation",
+        object_id=rotation.id,
+        team_id=override.rotation.team.id,
+        data=payload.model_dump(mode="json"),
+    )
+
     return jsonify({"id": override.id}), 201
 
 
 @rotations_bp.route("/overrides/<int:override_id>", methods=["DELETE"])
 def delete_rotation_override(override_id):
-    """
-    Delete a rotation override.
-    """
-
-    override = rotations_repo.get_rotation_override(override_id)
-    error = require_team_write(override.rotation.team_id)
+    """Delete a rotation override."""
+    override, error = _require_rotation_override_write(override_id)
     if error:
         return error
 
     rotation_id = override.rotation.id
     team_id = override.rotation.team.id
-    rotations_repo.delete_rotation_override(override_id)
-    write_audit("rotation.override.delete", object_type="rotation", object_id=rotation_id, team_id=team_id, data={"override_id": override_id})
+    rotations_repo.delete_rotation_override(override.id)
+
+    write_audit(
+        "rotation.override.delete",
+        object_type="rotation",
+        object_id=rotation_id,
+        team_id=team_id,
+        data={"override_id": override_id},
+    )
 
     return jsonify({"deleted": True})
 
 
 @rotations_bp.route("/<int:rotation_id>/layers", methods=["GET"])
 def list_rotation_layers(rotation_id):
-    rotation = rotations_repo.get_rotation(rotation_id)
-    error = require_team_read(rotation.team_id)
+    rotation, error = _require_rotation_read(rotation_id)
     if error:
         return error
 
     return jsonify([
         serialize_rotation_layer(layer)
-        for layer in rotations_repo.list_rotation_layers(rotation_id)
+        for layer in rotations_repo.list_rotation_layers(rotation.id)
     ])
 
 
 @rotations_bp.route("/<int:rotation_id>/layers", methods=["POST"])
 def create_rotation_layer(rotation_id):
-    rotation = rotations_repo.get_rotation(rotation_id)
-    error = require_team_write(rotation.team_id)
+    rotation, error = _require_rotation_write(rotation_id)
     if error:
         return error
 
@@ -579,7 +733,7 @@ def create_rotation_layer(rotation_id):
         return error
 
     layer = rotations_repo.create_rotation_layer(
-        rotation_id=rotation_id,
+        rotation_id=rotation.id,
         name=payload.name,
         description=payload.description,
         priority=payload.priority,
@@ -597,7 +751,7 @@ def create_rotation_layer(rotation_id):
     write_audit(
         "rotation.layer.create",
         object_type="rotation",
-        object_id=rotation_id,
+        object_id=rotation.id,
         team_id=rotation.team.id,
         data=payload.model_dump(mode="json"),
     )
@@ -607,8 +761,7 @@ def create_rotation_layer(rotation_id):
 
 @rotations_bp.route("/layers/<int:layer_id>", methods=["PUT"])
 def update_rotation_layer(layer_id):
-    layer_before = rotations_repo.get_rotation_layer(layer_id)
-    error = require_team_write(layer_before.rotation.team_id)
+    layer_before, error = _require_rotation_layer_write(layer_id)
     if error:
         return error
 
@@ -617,7 +770,7 @@ def update_rotation_layer(layer_id):
         return error
 
     layer = rotations_repo.update_rotation_layer(
-        layer_id,
+        layer_before.id,
         {
             "name": payload.name,
             "description": payload.description,
@@ -647,12 +800,11 @@ def update_rotation_layer(layer_id):
 
 @rotations_bp.route("/layers/<int:layer_id>", methods=["DELETE"])
 def delete_rotation_layer(layer_id):
-    layer_before = rotations_repo.get_rotation_layer(layer_id)
-    error = require_team_write(layer_before.rotation.team_id)
+    layer_before, error = _require_rotation_layer_write(layer_id)
     if error:
         return error
 
-    layer = rotations_repo.soft_delete_rotation_layer(layer_id)
+    layer = rotations_repo.soft_delete_rotation_layer(layer_before.id)
 
     write_audit(
         "rotation.layer.delete",
@@ -667,15 +819,14 @@ def delete_rotation_layer(layer_id):
 
 @rotations_bp.route("/layers/<int:layer_id>/members", methods=["GET"])
 def list_rotation_layer_members(layer_id):
-    layer = rotations_repo.get_rotation_layer(layer_id)
-    error = require_team_read(layer.rotation.team_id)
+    layer, error = _require_rotation_layer_read(layer_id)
     if error:
         return error
 
     return jsonify([
         serialize_rotation_layer_member(member)
         for member in rotations_repo.list_rotation_layer_members(
-            layer_id,
+            layer.id,
             active_only=True,
             at=None,
             include_inactive_users=False,
@@ -685,8 +836,7 @@ def list_rotation_layer_members(layer_id):
 
 @rotations_bp.route("/layers/<int:layer_id>/members", methods=["POST"])
 def add_rotation_layer_member(layer_id):
-    layer = rotations_repo.get_rotation_layer(layer_id)
-    error = require_team_write(layer.rotation.team_id)
+    layer, error = _require_rotation_layer_write(layer_id)
     if error:
         return error
 
@@ -708,7 +858,7 @@ def add_rotation_layer_member(layer_id):
 
     try:
         member = rotations_repo.add_rotation_layer_member(
-            layer_id=layer_id,
+            layer_id=layer.id,
             user_id=payload.user_id,
             position=payload.position,
             starts_at=starts_at,
@@ -734,8 +884,7 @@ def add_rotation_layer_member(layer_id):
 
 @rotations_bp.route("/layers/members/<int:member_id>", methods=["PUT"])
 def update_rotation_layer_member(member_id):
-    member_before = rotations_repo.get_rotation_layer_member(member_id)
-    error = require_team_write(member_before.layer.rotation.team_id)
+    member_before, error = _require_rotation_layer_member_write(member_id)
     if error:
         return error
 
@@ -745,7 +894,7 @@ def update_rotation_layer_member(member_id):
 
     try:
         member = rotations_repo.update_rotation_layer_member(
-            member_id=member_id,
+            member_id=member_before.id,
             position=payload.position,
             active=payload.active,
         )
@@ -770,12 +919,11 @@ def update_rotation_layer_member(member_id):
 
 @rotations_bp.route("/layers/members/<int:member_id>", methods=["DELETE"])
 def delete_rotation_layer_member(member_id):
-    member = rotations_repo.get_rotation_layer_member(member_id)
-    error = require_team_write(member.layer.rotation.team_id)
+    member, error = _require_rotation_layer_member_write(member_id)
     if error:
         return error
 
-    data = rotations_repo.delete_rotation_layer_member(member_id)
+    data = rotations_repo.delete_rotation_layer_member(member.id)
 
     write_audit(
         "rotation.layer.member.remove",
@@ -790,21 +938,19 @@ def delete_rotation_layer_member(member_id):
 
 @rotations_bp.route("/layers/<int:layer_id>/restrictions", methods=["GET"])
 def list_rotation_layer_restrictions(layer_id):
-    layer = rotations_repo.get_rotation_layer(layer_id)
-    error = require_team_read(layer.rotation.team_id)
+    layer, error = _require_rotation_layer_read(layer_id)
     if error:
         return error
 
     return jsonify([
         serialize_rotation_layer_restriction(item)
-        for item in rotations_repo.list_rotation_layer_restrictions(layer_id)
+        for item in rotations_repo.list_rotation_layer_restrictions(layer.id)
     ])
 
 
 @rotations_bp.route("/layers/<int:layer_id>/restrictions", methods=["PUT"])
 def replace_rotation_layer_restrictions(layer_id):
-    layer = rotations_repo.get_rotation_layer(layer_id)
-    error = require_team_write(layer.rotation.team_id)
+    layer, error = _require_rotation_layer_write(layer_id)
     if error:
         return error
 
@@ -813,7 +959,7 @@ def replace_rotation_layer_restrictions(layer_id):
         return error
 
     restrictions = rotations_repo.replace_rotation_layer_restrictions(
-        layer_id,
+        layer.id,
         [item.model_dump() for item in payload.restrictions],
     )
 

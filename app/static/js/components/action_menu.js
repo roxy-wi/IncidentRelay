@@ -11,7 +11,6 @@
         if (typeof value === "function") {
             return value(object);
         }
-
         return value;
     }
 
@@ -54,6 +53,13 @@
 
     function getActionItemIcon(item, object) {
         return callMaybe(item.icon, object) || "";
+    }
+
+    function setMenuExpanded(menu, expanded) {
+        const toggle = menu && menu.data("action-menu-toggle");
+        if (toggle && toggle.length) {
+            toggle.attr("aria-expanded", expanded ? "true" : "false");
+        }
     }
 
     function placeActionMenu(menu) {
@@ -123,14 +129,13 @@
         closeOpenedActionMenu();
 
         const list = menu.data("action-menu-list");
-
         if (!list || !list.length) {
             return;
         }
 
         openedActionMenu = menu;
-
         menu.addClass("is-open");
+        setMenuExpanded(menu, true);
 
         list
             .appendTo(document.body)
@@ -150,6 +155,7 @@
         const list = menu.data("action-menu-list");
 
         menu.removeClass("is-open");
+        setMenuExpanded(menu, false);
 
         if (list && list.length) {
             list
@@ -177,6 +183,30 @@
         }
     }
 
+    function focusNextMenuItem(list, direction) {
+        const items = list.find(".app-action-menu-item:enabled");
+        if (!items.length) {
+            return;
+        }
+
+        const activeElement = document.activeElement;
+        let currentIndex = items.index(activeElement);
+
+        if (currentIndex < 0) {
+            currentIndex = direction > 0 ? -1 : 0;
+        }
+
+        let nextIndex = currentIndex + direction;
+        if (nextIndex >= items.length) {
+            nextIndex = 0;
+        }
+        if (nextIndex < 0) {
+            nextIndex = items.length - 1;
+        }
+
+        items.eq(nextIndex).trigger("focus");
+    }
+
     function bindActionMenuGlobalHandlers() {
         if (window.__appActionMenuGlobalHandlersBound) {
             return;
@@ -201,8 +231,31 @@
         });
 
         $(document).on("keydown.appActionMenu", function (event) {
+            if (!openedActionMenu) {
+                return;
+            }
+
+            const list = openedActionMenu.data("action-menu-list");
+
             if (event.key === "Escape") {
+                event.preventDefault();
                 closeOpenedActionMenu();
+                const toggle = openedActionMenu && openedActionMenu.data("action-menu-toggle");
+                if (toggle && toggle.length) {
+                    toggle.trigger("focus");
+                }
+                return;
+            }
+
+            if (event.key === "ArrowDown") {
+                event.preventDefault();
+                focusNextMenuItem(list, 1);
+                return;
+            }
+
+            if (event.key === "ArrowUp") {
+                event.preventDefault();
+                focusNextMenuItem(list, -1);
             }
         });
 
@@ -226,7 +279,6 @@
     function makeActionMenuItem(item, object, menu) {
         const label = getActionItemLabel(item, object);
         const icon = getActionItemIcon(item, object);
-
         const button = $("<button>")
             .attr("type", "button")
             .attr("role", "menuitem")
@@ -261,11 +313,9 @@
 
             if (!canUseActionItem(object, item)) {
                 closeActionMenu(menu);
-
                 if (item.denyMessage && typeof window.showAppError === "function") {
                     window.showAppError(callMaybe(item.denyMessage, object));
                 }
-
                 return;
             }
 
@@ -284,18 +334,22 @@
 
         const object = options.object || {};
         const items = actionItems(options.items);
-
         const menu = $("<div>").addClass("app-action-menu");
-
         const toggle = $("<button>")
             .attr("type", "button")
             .attr("aria-label", options.label || "Actions")
+            .attr("aria-haspopup", "menu")
+            .attr("aria-expanded", "false")
             .addClass("app-action-menu-toggle")
             .append(
                 $("<i>")
-                    .addClass("fas fa-ellipsis-v")
+                    .addClass(options.icon || "fas fa-ellipsis-v")
                     .attr("aria-hidden", "true")
             );
+
+        if (options.className) {
+            menu.addClass(options.className);
+        }
 
         const list = $("<div>")
             .addClass("app-action-menu-list")

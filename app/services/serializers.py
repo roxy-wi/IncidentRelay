@@ -267,7 +267,20 @@ def serialize_channel(channel, current_user=None):
         "enabled": channel.enabled,
     }
 
-    return attach_team_permissions(data, team_id, current_user)
+    data = attach_team_permissions(data, team_id, current_user)
+
+    if current_user and team_id:
+        from app.services.rbac import can_access_team_or_group_resource
+
+        data.setdefault("permissions", {})["can_write"] = (
+            can_access_team_or_group_resource(
+                current_user,
+                team_id,
+                write_required=True,
+            )
+        )
+
+    return data
 
 
 def serialize_channel_short(channel):

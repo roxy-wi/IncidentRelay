@@ -5,9 +5,8 @@ from app.modules.db import silences_repo
 from app.services.audit import write_audit
 from app.services.rbac import (
     current_user,
-    get_allowed_team_ids,
-    require_team_read,
-    require_team_write,
+    get_allowed_team_or_group_resource_ids,
+    require_team_or_group_resource_access,
 )
 from app.services.serializers import attach_team_permissions
 from app.services.validation import validate_body
@@ -28,7 +27,7 @@ def list_silences():
     }
 
     if team_id:
-        error = require_team_read(team_id)
+        error = require_team_or_group_resource_access(team_id)
         if error:
             return error
 
@@ -38,7 +37,7 @@ def list_silences():
         )
     else:
         silences = silences_repo.list_silences(
-            team_ids=get_allowed_team_ids(),
+            team_ids=get_allowed_team_or_group_resource_ids(),
             include_expired_history=include_expired_history,
         )
 
@@ -55,7 +54,7 @@ def get_silence(silence_id):
     """
 
     silence = silences_repo.get_silence(silence_id)
-    error = require_team_read(silence.team_id)
+    error = require_team_or_group_resource_access(silence.team_id)
     if error:
         return error
     return jsonify(serialize_silence(silence, current_user=current_user()))
@@ -71,7 +70,10 @@ def create_silence():
     if error:
         return error
 
-    error = require_team_write(payload.team_id)
+    error = require_team_or_group_resource_access(
+        payload.team_id,
+        write_required=True,
+    )
     if error:
         return error
 
@@ -99,11 +101,17 @@ def update_silence(silence_id):
         return error
 
     current_silence = silences_repo.get_silence(silence_id)
-    error = require_team_write(current_silence.team_id)
+    error = require_team_or_group_resource_access(
+        current_silence.team_id,
+        write_required=True,
+    )
     if error:
         return error
     if payload.team_id != current_silence.team_id:
-        error = require_team_write(payload.team_id)
+        error = require_team_or_group_resource_access(
+            payload.team_id,
+            write_required=True,
+        )
         if error:
             return error
 
@@ -130,7 +138,10 @@ def delete_silence(silence_id):
     """
 
     current_silence = silences_repo.get_silence(silence_id)
-    error = require_team_write(current_silence.team_id)
+    error = require_team_or_group_resource_access(
+        current_silence.team_id,
+        write_required=True,
+    )
     if error:
         return error
     silence = silences_repo.disable_silence(silence_id)
@@ -153,4 +164,17 @@ def serialize_silence(silence, current_user=None):
         "enabled": silence.enabled,
     }
 
-    return attach_team_permissions(data, silence.team.id, current_user)
+    data = attach_team_permissions(data, silence.team.id, current_user)
+
+    if current_user:
+        from app.services.rbac import can_access_team_or_group_resource
+
+        data.setdefault("permissions", {})["can_write"] = (
+            can_access_team_or_group_resource(
+                current_user,
+                silence.team.id,
+                write_required=True,
+            )
+        )
+
+    return data

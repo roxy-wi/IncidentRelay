@@ -227,7 +227,7 @@ def test_alert_group_explain_api_returns_404_for_missing_group(client, admin_hea
     payload = response.get_json()
 
     assert payload["error"] == "not_found"
-    assert payload["message"] == "Resource was not found"
+    assert payload["message"] == "Alert group not found."
 
 
 def make_alertmanager_payload(*, alertname="DiskFull", status="firing", labels=None):

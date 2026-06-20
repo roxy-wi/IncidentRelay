@@ -11,9 +11,8 @@ from app.notifiers.email.email_templates import DEFAULT_EMAIL_HTML_TEMPLATE
 from app.services.audit import write_audit
 from app.services.rbac import (
     current_user,
-    get_allowed_team_ids,
-    require_team_read,
-    require_team_write,
+    get_allowed_team_or_group_resource_ids,
+    require_team_or_group_resource_access,
 )
 from app.services.serializers import serialize_channel
 from app.services.validation import make_error_response, validate_body
@@ -71,12 +70,14 @@ def list_channels():
     team_id = request.args.get("team_id", type=int)
 
     if team_id:
-        error = require_team_read(team_id)
+        error = require_team_or_group_resource_access(team_id)
         if error:
             return error
         channels = channels_repo.list_channels(team_id=team_id)
     else:
-        channels = channels_repo.list_channels(team_ids=get_allowed_team_ids())
+        channels = channels_repo.list_channels(
+            team_ids=get_allowed_team_or_group_resource_ids()
+        )
 
     return jsonify([
         serialize_channel(channel, current_user=current_user())
@@ -90,7 +91,7 @@ def get_channel(channel_id):
     channel = channels_repo.get_channel(channel_id)
 
     if channel.team_id:
-        error = require_team_read(channel.team_id)
+        error = require_team_or_group_resource_access(channel.team_id)
         if error:
             return error
 
@@ -104,7 +105,10 @@ def create_channel():
     if error:
         return error
 
-    error = require_team_write(payload.team_id)
+    error = require_team_or_group_resource_access(
+        payload.team_id,
+        write_required=True,
+    )
     if error:
         return error
     team = teams_repo.get_team(payload.team_id)
@@ -151,12 +155,18 @@ def update_channel(channel_id):
     current_channel = channels_repo.get_channel(channel_id)
 
     if current_channel.team_id:
-        error = require_team_write(current_channel.team_id)
+        error = require_team_or_group_resource_access(
+            current_channel.team_id,
+            write_required=True,
+        )
         if error:
             return error
 
     if payload.team_id and payload.team_id != current_channel.team_id:
-        error = require_team_write(payload.team_id)
+        error = require_team_or_group_resource_access(
+            payload.team_id,
+            write_required=True,
+        )
         if error:
             return error
 
@@ -204,7 +214,10 @@ def disable_channel(channel_id):
     channel_before = channels_repo.get_channel(channel_id)
 
     if channel_before.team_id:
-        error = require_team_write(channel_before.team_id)
+        error = require_team_or_group_resource_access(
+            channel_before.team_id,
+            write_required=True,
+        )
         if error:
             return error
 
@@ -227,7 +240,10 @@ def enable_channel(channel_id):
     channel_before = channels_repo.get_channel(channel_id)
 
     if channel_before.team_id:
-        error = require_team_write(channel_before.team_id)
+        error = require_team_or_group_resource_access(
+            channel_before.team_id,
+            write_required=True,
+        )
         if error:
             return error
 
@@ -253,7 +269,10 @@ def delete_channel(channel_id):
     channel_before = channels_repo.get_channel(channel_id)
 
     if channel_before.team_id:
-        error = require_team_write(channel_before.team_id)
+        error = require_team_or_group_resource_access(
+            channel_before.team_id,
+            write_required=True,
+        )
         if error:
             return error
 
@@ -280,7 +299,7 @@ def test_channel(channel_id):
     channel = channels_repo.get_channel(channel_id)
 
     if channel.team_id:
-        error = require_team_read(channel.team_id)
+        error = require_team_or_group_resource_access(channel.team_id)
         if error:
             return error
 

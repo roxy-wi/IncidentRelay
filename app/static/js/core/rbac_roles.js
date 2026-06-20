@@ -1,6 +1,7 @@
 var GROUP_VIEWER_ROLE = "viewer";
 var GROUP_EDITOR_ROLE = "editor";
 var GROUP_USER_ADMIN_ROLE = "user_admin";
+
 var GROUP_ROLES = [
     { value: GROUP_VIEWER_ROLE, label: "Group Viewer" },
     { value: GROUP_EDITOR_ROLE, label: "Group Editor" },
@@ -10,6 +11,7 @@ var GROUP_ROLES = [
 var TEAM_VIEWER_ROLE = "viewer";
 var TEAM_RESPONDER_ROLE = "responder";
 var TEAM_MANAGER_ROLE = "manager";
+
 var TEAM_ROLES = [
     { value: TEAM_VIEWER_ROLE, label: "Team Viewer" },
     { value: TEAM_RESPONDER_ROLE, label: "Team Responder" },
@@ -27,6 +29,7 @@ window.RbacRoles = (function () {
         const item = safeRoles.find(function (role) {
             return role.value === selected;
         });
+
         return item ? item.label : selected;
     }
 
@@ -36,6 +39,7 @@ window.RbacRoles = (function () {
         const selected = selectedValue || select.val() || fallbackValue;
 
         select.empty();
+
         safeRoles.forEach(function (role) {
             select.append(
                 $("<option>")
@@ -64,23 +68,29 @@ window.RbacRoles = (function () {
 
     function groupClass(role) {
         const value = getValue(role, GROUP_VIEWER_ROLE);
+
         if (value === GROUP_USER_ADMIN_ROLE) {
             return "role-user-admin";
         }
+
         if (value === GROUP_EDITOR_ROLE) {
             return "role-editor";
         }
+
         return "role-viewer";
     }
 
     function teamClass(role) {
         const value = getValue(role, TEAM_VIEWER_ROLE);
+
         if (value === TEAM_MANAGER_ROLE) {
             return "role-manager";
         }
+
         if (value === TEAM_RESPONDER_ROLE) {
             return "role-responder";
         }
+
         return "role-viewer";
     }
 
@@ -113,7 +123,8 @@ function getCurrentUserGroupRole(groupId) {
     }
 
     const group = asArray(currentUser.groups).find(function (item) {
-        return Number(item.id) === Number(groupId) || Number(item.group_id) === Number(groupId);
+        return Number(item.id) === Number(groupId)
+            || Number(item.group_id) === Number(groupId);
     });
 
     return group ? group.role : null;
@@ -121,14 +132,15 @@ function getCurrentUserGroupRole(groupId) {
 
 function canEditGroup(groupId) {
     /*
-     * Return true when current user can edit objects in a group.
+     * Return true when current user can edit operational objects in a group.
      */
     const role = getCurrentUserGroupRole(groupId);
+
     return !!(
         currentUser && (
-            currentUser.is_admin ||
-            role === GROUP_EDITOR_ROLE ||
-            role === GROUP_USER_ADMIN_ROLE
+            currentUser.is_admin
+            || role === GROUP_EDITOR_ROLE
+            || role === GROUP_USER_ADMIN_ROLE
         )
     );
 }
@@ -138,10 +150,11 @@ function canManageGroupUsers(groupId) {
      * Return true when current user can manage users in a group.
      */
     const role = getCurrentUserGroupRole(groupId);
+
     return !!(
         currentUser && (
-            currentUser.is_admin ||
-            role === GROUP_USER_ADMIN_ROLE
+            currentUser.is_admin
+            || role === GROUP_USER_ADMIN_ROLE
         )
     );
 }
@@ -158,16 +171,34 @@ function hasObjectPermissions(item) {
     return !!Object.keys(permissions).length;
 }
 
+function getObjectTeamRole(item) {
+    return item && (item.current_user_role || item.user_role || item.role);
+}
+
 function canReadObject(item) {
     const permissions = getObjectPermissions(item);
+
     if (typeof permissions.can_read !== "undefined") {
         return !!permissions.can_read;
     }
-    return canWriteObject(item);
+
+    if (!currentUser) {
+        return false;
+    }
+
+    if (currentUser.is_admin) {
+        return true;
+    }
+
+    const teamRole = getObjectTeamRole(item);
+    return teamRole === TEAM_VIEWER_ROLE
+        || teamRole === TEAM_RESPONDER_ROLE
+        || teamRole === TEAM_MANAGER_ROLE;
 }
 
 function canWriteObject(item) {
     const permissions = getObjectPermissions(item);
+
     if (typeof permissions.can_write !== "undefined") {
         return !!permissions.can_write;
     }
@@ -175,27 +206,28 @@ function canWriteObject(item) {
     if (!currentUser) {
         return false;
     }
+
     if (currentUser.is_admin) {
         return true;
     }
-    if (item && item.group_id && canEditGroup(item.group_id)) {
-        return true;
-    }
 
-    const teamRole = item && (item.current_user_role || item.user_role || item.role);
+    const teamRole = getObjectTeamRole(item);
     return teamRole === TEAM_MANAGER_ROLE;
 }
 
 function canDeleteObject(item) {
     const permissions = getObjectPermissions(item);
+
     if (typeof permissions.can_delete !== "undefined") {
         return !!permissions.can_delete;
     }
+
     return canWriteObject(item);
 }
 
 function canRespondObject(item) {
     const permissions = getObjectPermissions(item);
+
     if (typeof permissions.can_respond !== "undefined") {
         return !!permissions.can_respond;
     }
@@ -203,16 +235,18 @@ function canRespondObject(item) {
     if (!currentUser) {
         return false;
     }
+
     if (currentUser.is_admin) {
         return true;
     }
 
-    const teamRole = item && (item.current_user_role || item.user_role || item.role);
-    return teamRole === TEAM_RESPONDER_ROLE || teamRole === TEAM_MANAGER_ROLE || canWriteObject(item);
+    const teamRole = getObjectTeamRole(item);
+    return teamRole === TEAM_RESPONDER_ROLE || teamRole === TEAM_MANAGER_ROLE;
 }
 
 function canManageUsersObject(item) {
     const permissions = getObjectPermissions(item);
+
     if (typeof permissions.can_manage_users !== "undefined") {
         return !!permissions.can_manage_users;
     }
@@ -220,71 +254,39 @@ function canManageUsersObject(item) {
     if (!currentUser) {
         return false;
     }
+
     if (currentUser.is_admin) {
         return true;
     }
+
     if (item && item.group_id && canManageGroupUsers(item.group_id)) {
         return true;
     }
 
-    const teamRole = item && (item.current_user_role || item.user_role || item.role);
+    const teamRole = getObjectTeamRole(item);
     return teamRole === TEAM_MANAGER_ROLE;
 }
 
 function canActionObject(item, required) {
     const action = required || "write";
+
     if (action === "read") {
         return canReadObject(item);
     }
+
     if (action === "respond") {
         return canRespondObject(item);
     }
+
     if (action === "manage_users") {
         return canManageUsersObject(item);
     }
+
     if (action === "delete") {
         return canDeleteObject(item);
     }
+
     return canWriteObject(item);
-}
-
-function appendActionIfAllowed(container, item, options) {
-    /*
-     * Append a text action button only when object permissions allow it.
-     */
-    options = options || {};
-    if (!canActionObject(item, options.required || "write")) {
-        return container;
-    }
-
-    container.append(
-        $("<button>")
-            .attr("type", "button")
-            .addClass(options.className || "btn btn-small btn-secondary")
-            .text(options.text || "Action")
-            .on("click", options.onClick)
-    );
-    return container;
-}
-
-function appendIconActionIfAllowed(container, item, options) {
-    /*
-     * Append an icon action button only when object permissions allow it.
-     */
-    options = options || {};
-    if (!canActionObject(item, options.required || "write")) {
-        return container;
-    }
-
-    container.append(
-        makeIconButton({
-            icon: options.icon,
-            label: options.label,
-            className: options.className,
-            onClick: options.onClick,
-        })
-    );
-    return container;
 }
 
 function getCurrentUserActiveGroupId() {
@@ -316,6 +318,7 @@ function getCurrentUserActiveGroupRole() {
     const group = groups.find(function (item) {
         return Number(item.group_id || item.id) === Number(activeGroupId);
     });
+
     return group ? group.role : null;
 }
 
@@ -326,6 +329,7 @@ function hasCurrentUserGroupWriteAccess() {
     if (!currentUser) {
         return false;
     }
+
     if (currentUser.is_admin) {
         return true;
     }
@@ -342,6 +346,7 @@ function isCurrentUserViewerOnly() {
     if (!currentUser) {
         return true;
     }
+
     if (currentUser.is_admin) {
         return false;
     }
@@ -364,9 +369,11 @@ function currentUserCanCreateUiObjects() {
     if (!currentUser) {
         return false;
     }
+
     if (currentUser.is_admin) {
         return true;
     }
+
     if (isCurrentUserViewerOnly()) {
         return false;
     }
@@ -381,9 +388,11 @@ function currentUserCanCreateUiObjects() {
 
 function setElementAllowed(selector, allowed) {
     const element = $(selector);
+
     if (!element.length) {
         return;
     }
+
     element.toggleClass("is-hidden", !allowed);
     element.prop("disabled", !allowed);
 }
@@ -403,7 +412,7 @@ function applyCreateButtonsVisibility() {
         "#open-rotation-create-modal",
         "#open-route-create-modal",
         "#open-channel-create-modal",
-        "#open-silence-create-modal"
+        "#open-silence-create-modal",
     ].forEach(function (selector) {
         setElementAllowed(selector, canCreateOperationalObjects);
     });
@@ -420,6 +429,7 @@ function applyRbacUiState() {
      */
     applyCreateButtonsVisibility();
 }
+
 function isGlobalAdminUser() {
     return !!(currentUser && currentUser.is_admin);
 }

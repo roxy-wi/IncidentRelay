@@ -1239,8 +1239,8 @@ function loadAlertExplainTrace(traceId) {
 }
 
 function loadAlertExplainForCurrentDetails() {
-    if (!currentAlertDetailsGroupId) {
-        if (currentAlertExplainTraceId) {
+    if (!currentDetailsAlertId) {
+        if (currentDetailsExplainTraceId) {
             return;
         }
 
@@ -2322,35 +2322,39 @@ function openAlertDetailsForTrace(traceId) {
         .done((trace) => {
             closeAlertExplainLookupModal();
 
-            currentAlertDetailsGroupId = trace.group_id || null;
-            currentAlertDetailsActiveTab = "explain";
-            currentAlertExplainTraceId = trace.trace_id;
-            currentAlertExplainLoadedGroupId = trace.group_id || null;
+            const modal = alertDetailsModal();
 
-            $("#alert-details-title").text("Explain trace");
-            $("#alert-details-subtitle").text(
+            currentDetailsAlertId = trace.group_id || null;
+            currentDetailsAlertCanRespond = false;
+            currentDetailsActiveTab = "explain";
+            currentDetailsExplainTraceId = trace.trace_id;
+            currentDetailsExplainLoadedAlertId = trace.group_id || null;
+
+            modal.find("#alert-details-title").text("Explain trace");
+            modal.find("#alert-details-subtitle").text(
                 trace.group_id
                     ? `Alert group #${trace.group_id}`
                     : "No alert group was created"
             );
 
-            $("#alert-details-overview").html("");
-            $("#alert-details-summary").html("");
-            $("#alert-details-alerts").html("");
-            $("#alert-details-events").html("");
-            $("#alert-details-notifications").html("");
+            modal.find("#alert-details-overview").html("");
+            modal.find("#alert-details-summary").html("");
+            modal.find("#alert-details-alerts").html("");
+            modal.find("#alert-details-events").html("");
+            modal.find("#alert-details-notifications").html("");
+
+            modal.find("#modal-alert-ack").hide();
+            modal.find("#modal-alert-resolve").hide();
 
             renderAlertExplainSummary(trace);
             renderAlertExplainSteps(trace.steps || []);
 
-            $("#alert-details-modal").show();
+            openAlertDetailsModal();
             setAlertDetailsTab("explain");
 
             const url = new URL(window.location.href);
-
             url.searchParams.delete("trace_id");
             url.searchParams.delete("explain_trace_id");
-
             window.history.replaceState({}, document.title, url.toString());
         })
         .fail((xhr) => {
