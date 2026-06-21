@@ -72,10 +72,6 @@
           >
         </div>
 
-{#        <select id="rotations-team-filter" class="input page-toolbar-filter">#}
-{#          <option value="">All teams</option>#}
-{#        </select>#}
-
         <select id="rotations-status-filter" class="input page-toolbar-filter">
           <option value="">All statuses</option>
           <option value="active">Active</option>
@@ -93,6 +89,7 @@
               <th>Current on call</th>
               <th>Handoff</th>
               <th>Reminder</th>
+              <th class="oncall-health-th">Health</th>
               <th>Status</th>
               <th class="actions-th">Actions</th>
             </tr>
@@ -100,7 +97,7 @@
 
           <tbody id="rotations-table">
             <tr>
-              <td colspan="8" class="empty-cell">No rotations loaded</td>
+              <td colspan="9" class="empty-cell">No rotations loaded</td>
             </tr>
           </tbody>
         </table>

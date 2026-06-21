@@ -232,6 +232,7 @@ def serialize_rotation(rotation, current_user=None, request_user=None):
     data = {
         "id": rotation.id,
         "team_id": rotation.team.id,
+        "team_name": rotation.team.name,
         "team_slug": rotation.team.slug,
         "name": rotation.name,
         "description": rotation.description,
@@ -260,6 +261,7 @@ def serialize_channel(channel, current_user=None):
         "group_id": channel.group.id if getattr(channel, "group", None) else None,
         "group_slug": channel.group.slug if getattr(channel, "group", None) else None,
         "team_id": team_id,
+        "team_name": channel.team.name if channel.team else None,
         "team_slug": channel.team.slug if channel.team else None,
         "name": channel.name,
         "channel_type": channel.channel_type,

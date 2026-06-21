@@ -91,6 +91,7 @@ function renderSilencesSummary(silences) {
 function getSilenceSearchText(silence) {
     return [
         silence.id,
+        silence.team_name,
         silence.team_slug,
         silence.name,
         silence.reason,
@@ -163,7 +164,7 @@ function renderSilenceRow(silence) {
             )
             .append($("<div>").addClass("row-subtitle").text("Silence #" + silence.id))
     );
-    row.append($("<td>").append($("<span>").addClass("pill").text(silence.team_slug || "-")));
+    row.append($("<td>").append($("<span>").addClass("pill").text(silence.team_name || silence.team_slug || "-")));
     row.append($("<td>").text(silence.reason || "-"));
     row.append(
         $("<td>").append(

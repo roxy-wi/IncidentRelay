@@ -170,7 +170,7 @@ function renderTeamsTable() {
         tbody.append(
             $("<tr>").append(
                 $("<td>")
-                    .attr("colspan", "6")
+                    .attr("colspan", "7")
                     .addClass("empty-cell")
                     .text("No teams")
             )
@@ -181,6 +181,9 @@ function renderTeamsTable() {
     teams.forEach(function (team) {
         tbody.append(renderTeamRow(team));
     });
+    if (typeof loadTeamHealthSummariesForVisibleRows === "function") {
+        loadTeamHealthSummariesForVisibleRows();
+    }
 }
 
 function renderTeamRow(team) {
@@ -221,6 +224,16 @@ function renderTeamRow(team) {
                 .addClass(team.escalation_enabled ? "status-enabled" : "status-disabled")
                 .text(team.escalation_enabled ? "simple after " + (team.escalation_after_reminders || 0) : "Disabled")
         )
+    );
+    row.append(
+        $("<td>")
+            .addClass("oncall-health-cell")
+            .attr("data-team-health-id", team.id)
+            .append(
+                typeof renderTeamHealthIndicator === "function"
+                    ? renderTeamHealthIndicator(null, team.id)
+                    : $("<span>").text("?")
+            )
     );
     row.append($("<td>").append(renderStatusBadge(team.active, "Active", "Inactive")));
     row.append($("<td>").addClass("actions-cell").append(renderTeamActions(team)));

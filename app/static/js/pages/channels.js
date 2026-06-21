@@ -291,7 +291,7 @@ function renderChannelRow(channel) {
             .append($("<div>").addClass("row-subtitle").text("Channel #" + channel.id))
     );
     row.append($("<td>").text(channel.group_slug || "-"));
-    row.append($("<td>").text(channel.team_slug || "-"));
+    row.append($("<td>").text(channel.team_name|| channel.team_slug || "-"));
     row.append($("<td>").append($("<span>").addClass("channel-type-pill").text(channel.channel_type || "-")));
     row.append($("<td>").append($("<span>").addClass("channel-mode-pill").text(mode)));
     row.append($("<td>").append(renderStatusBadge(channel.enabled, "Enabled", "Disabled")));
@@ -579,6 +579,7 @@ function getChannelSearchText(channel) {
     return [
         channel.id,
         channel.group_slug,
+        channel.team_name,
         channel.team_slug,
         channel.name,
         channel.channel_type,
@@ -671,7 +672,7 @@ function getSafeChannelConfigSummary(channel) {
 
 function renderChannelDetails(channel) {
     selectedChannelDetailsId = channel.id;
-    $("#channel-details-subtitle").text((channel.team_slug || "-") + " / " + (channel.enabled ? "Enabled" : "Disabled"));
+    $("#channel-details-subtitle").text((channel.team_name || channel.team_slug || "-") + " / " + (channel.enabled ? "Enabled" : "Disabled"));
 
     const body = $("#channel-details-body");
     body.empty();
@@ -680,7 +681,7 @@ function renderChannelDetails(channel) {
             .addClass("details-list")
             .append(channelDetailsItem("Name", channel.name))
             .append(channelDetailsItem("Group", channel.group_slug))
-            .append(channelDetailsItem("Team", channel.team_slug))
+            .append(channelDetailsItem("Team", channel.team_name || channel.team_slug || "-"))
             .append(channelDetailsItem("Type", channel.channel_type))
             .append(channelDetailsItem("Mode", getChannelModeLabel(channel)))
             .append(channelDetailsItem("Severity filter", getChannelSeverityLabel(channel)))

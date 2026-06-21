@@ -18,6 +18,7 @@ from app.views.profile_view import profile_bp
 from app.views.integrations_view import integrations_bp
 from app.views.pages_view import pages_bp
 from app.views.rotations_view import rotations_bp
+from app.views.oncall_health_view import oncall_health_bp
 from app.views.routes_view import routes_bp
 from app.views.silences_view import silences_bp
 from app.views.teams_view import teams_bp
@@ -99,6 +100,7 @@ def register_blueprints(flask_app):
     flask_app.register_blueprint(users_bp, url_prefix="/api/users")
     flask_app.register_blueprint(admin_users_bp, url_prefix="/api/admin/users")
     flask_app.register_blueprint(rotations_bp, url_prefix="/api/rotations")
+    flask_app.register_blueprint(oncall_health_bp, url_prefix="/api/oncall-health")
     flask_app.register_blueprint(calendar_bp, url_prefix="/api/calendar")
     flask_app.register_blueprint(caldav_bp)
     flask_app.register_blueprint(alerts_bp, url_prefix="/api/alerts")

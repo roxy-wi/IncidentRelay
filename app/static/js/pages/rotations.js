@@ -1835,6 +1835,10 @@ function renderRotationsTable() {
     rotations.forEach(function (rotation) {
         tbody.append(renderRotationRow(rotation));
     });
+
+    if (typeof window.loadRotationHealthSummariesForVisibleRows === "function") {
+        window.loadRotationHealthSummariesForVisibleRows();
+    }
 }
 
 function renderRotationRow(rotation) {

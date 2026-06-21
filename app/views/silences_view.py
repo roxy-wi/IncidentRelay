@@ -154,6 +154,7 @@ def serialize_silence(silence, current_user=None):
     data = {
         "id": silence.id,
         "team_id": silence.team.id,
+        "team_name": silence.team.name,
         "team_slug": silence.team.slug,
         "name": silence.name,
         "reason": silence.reason,

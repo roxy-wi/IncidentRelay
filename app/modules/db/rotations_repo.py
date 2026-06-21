@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from peewee import IntegrityError
+from peewee import IntegrityError, prefetch
 
 from app.db import database_proxy
 from app.modules.db.models import (
@@ -284,14 +284,6 @@ def update_rotation(rotation_id, data):
             setattr(rotation, field, data[field])
     rotation.save()
     return rotation
-
-
-def disable_rotation(rotation_id):
-    """
-    Soft-delete a rotation.
-    """
-
-    return soft_delete_rotation(rotation_id)
 
 
 def soft_delete_rotation(rotation_id):
@@ -834,11 +826,69 @@ def set_rotation_enabled(rotation_id: int, enabled: bool):
     return rotation
 
 
-def enable_rotation(rotation_id: int):
-    """Enable a rotation without restoring deleted data."""
-    return set_rotation_enabled(rotation_id, True)
+def list_rotations_for_health(rotation_ids, active_only=True):
+    """Return rotations with layers, layer members and users prefetched.
 
+    Used by the on-call health summaries endpoint to avoid N+1 queries.
+    This is intentionally separate from list_rotations(), because most
+    rotation list callers do not need layers and members loaded.
+    """
+    if not rotation_ids:
+        return []
 
-def disable_rotation(rotation_id: int):
-    """Disable a rotation without deleting layers, members, overrides or routes."""
-    return set_rotation_enabled(rotation_id, False)
+    query = (
+        Rotation
+        .select(Rotation)
+        .join(Team, on=(Rotation.team == Team.id))
+        .switch(Rotation)
+        .where(
+            (Rotation.id.in_(rotation_ids)) &
+            (Rotation.deleted == False)
+        )
+        .order_by(Rotation.id.asc())
+    )
+
+    if active_only:
+        query = query.where(
+            (Team.active == True) &
+            (Team.deleted == False)
+        )
+        query = (
+            query
+            .join(Group, on=(Team.group == Group.id))
+            .where(
+                (Group.active == True) &
+                (Group.deleted == False)
+            )
+            .switch(Rotation)
+        )
+
+    layers_query = (
+        RotationLayer
+        .select(RotationLayer)
+        .where(RotationLayer.deleted == False)
+        .order_by(
+            RotationLayer.rotation.asc(),
+            RotationLayer.priority.desc(),
+            RotationLayer.id.desc(),
+        )
+    )
+
+    members_query = (
+        RotationLayerMember
+        .select(RotationLayerMember)
+        .order_by(
+            RotationLayerMember.layer.asc(),
+            RotationLayerMember.position.asc(),
+            RotationLayerMember.id.asc(),
+        )
+    )
+
+    users_query = User.select(User)
+
+    return list(prefetch(
+        query,
+        layers_query,
+        members_query,
+        users_query,
+    ))

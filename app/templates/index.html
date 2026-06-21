@@ -275,6 +275,7 @@
         </section>
         {% include 'pages/include/alerts_modal.html' %}
         {% include 'pages/include/rotation_overrides_modal.html' %}
+        {% include "pages/include//oncall_health_modal.html" %}
         <div id="app-dialog-modal" class="app-modal is-hidden" role="dialog" aria-modal="true">
             <div class="app-modal-dialog app-modal-dialog-small">
             <div class="app-modal-header">
@@ -341,6 +342,7 @@
 <script src="{{ url_for('static', filename='js/components/notification_center.js') }}"></script>
 <script src="{{ url_for('static', filename='js/pages/alerts.js') }}"></script>
 <script src="/static/js/pages/rotations.js"></script>
+<script src="{{ url_for('static', filename='js/pages/oncall_health.js') }}"></script>
 <script src="/static/js/pages/calendar.js"></script>
 <script src="/static/js/pages/routes.js"></script>
 <script src="{{ url_for('static', filename='js/pages/services.js') }}"></script>

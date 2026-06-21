@@ -1,0 +1,48 @@
+<div
+    class="app-modal"
+    id="rotation-health-modal"
+    style="display: none;"
+    aria-hidden="true"
+>
+    <div class="app-modal-card app-modal-wide">
+        <div class="app-modal-header">
+            <div>
+                <h2 id="rotation-health-title">On-call health</h2>
+                <p id="rotation-health-subtitle" class="muted"></p>
+            </div>
+
+            <button
+                type="button"
+                class="modal-close"
+                onclick="closeAppModal('#rotation-health-modal')"
+                aria-label="Close"
+            >
+                ×
+            </button>
+        </div>
+
+        <div class="app-modal-body">
+            <div
+                id="rotation-health-window"
+                class="oncall-health-window"
+            ></div>
+
+            <div
+                id="rotation-health-summary"
+                class="oncall-health-summary-grid"
+            ></div>
+
+            <div id="rotation-health-issues"></div>
+        </div>
+
+        <div class="app-modal-footer">
+            <button
+                type="button"
+                class="btn"
+                onclick="closeAppModal('#rotation-health-modal')"
+            >
+                Close
+            </button>
+        </div>
+    </div>
+</div>

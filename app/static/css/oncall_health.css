@@ -1,0 +1,349 @@
+/* On-call health row indicator */
+
+.oncall-health-cell {
+    text-align: center;
+    white-space: nowrap;
+}
+
+.oncall-health-indicator {
+    width: 30px;
+    height: 30px;
+    border-radius: 999px;
+    border: 1px solid transparent;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 15px;
+    font-weight: 800;
+    line-height: 1;
+    cursor: pointer;
+    transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
+}
+
+.oncall-health-indicator:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 6px 18px rgba(15, 23, 42, 0.14);
+}
+
+.oncall-health-unknown {
+    background: #eef2f7;
+    color: #475569;
+    border-color: #cbd5e1;
+}
+
+.oncall-health-ok {
+    background: #e8f5e9;
+    color: #1b5e20;
+    border-color: #a5d6a7;
+}
+
+.oncall-health-warning {
+    background: #fff8e1;
+    color: #8a5a00;
+    border-color: #f2c94c;
+}
+
+.oncall-health-critical {
+    background: #ffebee;
+    color: #b71c1c;
+    border-color: #ef9a9a;
+}
+
+/* On-call health modal */
+
+#rotation-health-modal {
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+}
+
+#rotation-health-modal .app-modal-card {
+    width: min(1080px, calc(100vw - 48px));
+    max-height: calc(100vh - 48px);
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    background: #ffffff;
+    border-radius: 24px;
+    box-shadow: 0 24px 80px rgba(15, 23, 42, 0.28);
+}
+
+#rotation-health-modal .app-modal-header {
+    flex: 0 0 auto;
+    padding: 28px 36px;
+    background: #ffffff;
+    border-bottom: 1px solid rgba(148, 163, 184, 0.28);
+}
+
+#rotation-health-modal .app-modal-body {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow-y: auto;
+    padding: 28px 36px;
+    background: #ffffff;
+}
+
+#rotation-health-modal .app-modal-footer {
+    flex: 0 0 auto;
+    padding: 20px 36px 28px;
+    background: #ffffff;
+    border-top: 1px solid rgba(148, 163, 184, 0.28);
+}
+
+#rotation-health-modal .modal-close {
+    flex: 0 0 auto;
+}
+
+#rotation-health-subtitle {
+    margin-top: 8px;
+}
+
+.oncall-health-window {
+    margin: 0 0 20px;
+    color: #64748b;
+    font-size: 14px;
+}
+
+.oncall-health-summary-grid {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(150px, 1fr));
+    gap: 16px;
+    margin-bottom: 28px;
+}
+
+.oncall-health-summary-card {
+    position: relative;
+    min-width: 0;
+    min-height: 118px;
+    display: grid;
+    grid-template-rows: auto 1fr;
+    align-content: start;
+    gap: 12px;
+    padding: 22px 22px 20px 28px;
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    border-radius: 22px;
+    background: #ffffff;
+    box-shadow: 0 12px 30px rgba(15, 23, 42, 0.07);
+    overflow: hidden;
+}
+
+.oncall-health-summary-card::before {
+    content: "";
+    position: absolute;
+    left: 0;
+    top: 24px;
+    bottom: 24px;
+    width: 5px;
+    border-radius: 0 999px 999px 0;
+    background: #94a3b8;
+}
+
+.oncall-health-summary-card-ok::before {
+    background: #16a34a;
+}
+
+.oncall-health-summary-card-warning::before {
+    background: #d97706;
+}
+
+.oncall-health-summary-card-critical::before {
+    background: #dc2626;
+}
+
+.oncall-health-summary-card-info::before {
+    background: #0e7490;
+}
+
+.oncall-health-summary-card-unknown::before {
+    background: #64748b;
+}
+
+.oncall-health-summary-label {
+    display: block;
+    color: #607d8b;
+    font-size: 13px;
+    font-weight: 800;
+    letter-spacing: 0.08em;
+    line-height: 1.1;
+    text-transform: uppercase;
+}
+
+.oncall-health-summary-value {
+    display: block;
+    align-self: start;
+    color: #0f172a;
+    font-size: 34px;
+    font-weight: 850;
+    line-height: 1;
+    word-break: break-word;
+}
+
+.oncall-health-summary-card-status .oncall-health-summary-value {
+    font-size: 30px;
+    text-transform: capitalize;
+}
+
+@media (max-width: 1100px) {
+    .oncall-health-summary-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 560px) {
+    .oncall-health-summary-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .oncall-health-summary-card {
+        min-height: 104px;
+    }
+}
+
+.oncall-health-section {
+    margin-top: 26px;
+}
+
+.oncall-health-section:first-child {
+    margin-top: 0;
+}
+
+.oncall-health-section-title {
+    margin: 0 0 14px;
+    color: #0f172a;
+    font-size: 20px;
+    font-weight: 800;
+}
+
+.oncall-health-issues-list {
+    display: flex;
+    flex-direction: column;
+    gap: 14px;
+}
+
+.oncall-health-issue {
+    padding: 16px 18px;
+    border: 1px solid rgba(148, 163, 184, 0.35);
+    border-radius: 18px;
+    background: #ffffff;
+    box-shadow: 0 8px 22px rgba(15, 23, 42, 0.06);
+}
+
+.oncall-health-issue-critical {
+    border-left: 5px solid #dc2626;
+}
+
+.oncall-health-issue-warning {
+    border-left: 5px solid #d97706;
+}
+
+.oncall-health-issue-info {
+    border-left: 5px solid #0e7490;
+}
+
+.oncall-health-issue-header {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 8px;
+}
+
+.oncall-health-issue-badge {
+    flex: 0 0 auto;
+    padding: 4px 10px;
+    border-radius: 999px;
+    background: #eef2f7;
+    color: #0f172a;
+    font-size: 12px;
+    font-weight: 800;
+    line-height: 1;
+    text-transform: uppercase;
+}
+
+.oncall-health-issue-critical .oncall-health-issue-badge {
+    background: #fee2e2;
+    color: #991b1b;
+}
+
+.oncall-health-issue-warning .oncall-health-issue-badge {
+    background: #fef3c7;
+    color: #92400e;
+}
+
+.oncall-health-issue-info .oncall-health-issue-badge {
+    background: #cffafe;
+    color: #155e75;
+}
+
+.oncall-health-issue-title {
+    min-width: 0;
+    color: #0f172a;
+    font-size: 16px;
+    font-weight: 800;
+}
+
+.oncall-health-issue-message {
+    margin: 0;
+    color: #0f172a;
+    font-size: 15px;
+    line-height: 1.5;
+}
+
+.oncall-health-issue-meta {
+    margin-top: 8px;
+    color: #64748b;
+    font-size: 13px;
+}
+
+.oncall-health-issue-recommendation {
+    margin-top: 12px;
+    padding: 12px 14px;
+    border-radius: 12px;
+    background: #f8fafc;
+    color: #0f172a;
+    font-size: 14px;
+    line-height: 1.45;
+}
+
+.oncall-health-empty {
+    padding: 24px;
+    border: 1px dashed rgba(148, 163, 184, 0.55);
+    border-radius: 18px;
+    background: #f8fafc;
+    color: #475569;
+    text-align: center;
+}
+
+@media (max-width: 900px) {
+    #rotation-health-modal {
+        padding: 12px;
+    }
+
+    #rotation-health-modal .app-modal-card {
+        width: calc(100vw - 24px);
+        max-height: calc(100vh - 24px);
+        border-radius: 18px;
+    }
+
+    #rotation-health-modal .app-modal-header,
+    #rotation-health-modal .app-modal-body,
+    #rotation-health-modal .app-modal-footer {
+        padding-left: 20px;
+        padding-right: 20px;
+    }
+
+    .oncall-health-summary-grid {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+}
+
+@media (max-width: 560px) {
+    .oncall-health-summary-grid {
+        grid-template-columns: 1fr;
+    }
+
+    .oncall-health-issue-header {
+        align-items: flex-start;
+        flex-direction: column;
+        gap: 8px;
+    }
+}
