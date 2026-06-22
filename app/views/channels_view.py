@@ -3,7 +3,7 @@ from types import SimpleNamespace
 from flask import Blueprint, jsonify, request
 from peewee import IntegrityError
 
-import app.modules.db.common as db_common
+from app.services.db_errors import handle_integrity_error
 from app.api.schemas.channels import ChannelCreateSchema, ChannelUpdateSchema
 from app.modules.db import channels_repo, teams_repo
 from app.notifiers.registry import get_notifier, list_notifier_types
@@ -113,6 +113,38 @@ def create_channel():
         return error
     team = teams_repo.get_team(payload.team_id)
 
+    existing_channel = channels_repo.get_channel_by_team_and_name(
+        payload.team_id,
+        payload.name,
+    )
+
+    if existing_channel:
+        if not existing_channel.deleted:
+            return channel_name_conflict_response(payload.name)
+
+        channel = channels_repo.restore_channel(
+            existing_channel.id,
+            channel_type=payload.channel_type,
+            config=payload.config,
+            enabled=payload.enabled,
+            group_id=team.group_id,
+        )
+
+        write_audit(
+            "channel.restore",
+            object_type="channel",
+            object_id=channel.id,
+            team_id=channel.team.id if channel.team else None,
+            data=payload.model_dump(),
+        )
+
+        return jsonify(
+            serialize_channel(
+                channel,
+                current_user=current_user(),
+            )
+        ), 201
+
     try:
         channel = channels_repo.create_channel(
             team_id=payload.team_id,
@@ -123,16 +155,15 @@ def create_channel():
             group_id=team.group_id,
         )
     except IntegrityError as exc:
-        error_text = str(exc).lower()
+        existing_channel = channels_repo.get_channel_by_team_and_name(
+            payload.team_id,
+            payload.name,
+        )
 
-        if "slug" in error_text:
-            return db_common.unique_field_conflict(
-                "slug",
-                payload.slug,
-                "Channel with this slug already exists",
-            )
+        if existing_channel:
+            return channel_name_conflict_response(payload.name)
 
-        return db_common.integrity_conflict("Channel could not be saved because it conflicts with existing data")
+        return handle_integrity_error(exc)
 
     write_audit(
         "channel.create",
@@ -172,6 +203,15 @@ def update_channel(channel_id):
 
     target_team_id = payload.team_id or current_channel.team_id
 
+    existing_channel = channels_repo.get_channel_by_team_and_name(
+        target_team_id,
+        payload.name,
+        exclude_channel_id=channel_id,
+    )
+
+    if existing_channel:
+        return channel_name_conflict_response(payload.name)
+
     update_data = {
         "team": payload.team_id,
         "name": payload.name,
@@ -184,18 +224,21 @@ def update_channel(channel_id):
         update_data["group"] = teams_repo.get_team(payload.team_id).group_id
 
     try:
-        channel = channels_repo.update_channel(channel_id, update_data)
+        channel = channels_repo.update_channel(
+            channel_id,
+            update_data,
+        )
     except IntegrityError as exc:
-        error_text = str(exc).lower()
+        existing_channel = channels_repo.get_channel_by_team_and_name(
+            target_team_id,
+            payload.name,
+            exclude_channel_id=channel_id,
+        )
 
-        if "slug" in error_text:
-            return db_common.unique_field_conflict(
-                "slug",
-                payload.slug,
-                "Channel with this slug already exists",
-            )
+        if existing_channel:
+            return channel_name_conflict_response(payload.name)
 
-        return db_common.integrity_conflict("Channel could not be saved because it conflicts with existing data")
+        return handle_integrity_error(exc)
 
     write_audit(
         "channel.update",

@@ -1,7 +1,8 @@
 from flask import Blueprint, jsonify, request
-from peewee import DoesNotExist
+from peewee import DoesNotExist, IntegrityError
 
 from app.api.schemas.routes import RouteChannelsReplaceSchema, RouteCreateSchema, RouteUpdateSchema
+from app.services.db_errors import handle_integrity_error
 from app.modules.db import (
     routes_repo,
     channels_repo,
@@ -24,6 +25,31 @@ from app.services.validation import validate_body
 routes_bp = Blueprint("routes_api", __name__)
 
 
+def route_name_conflict_response(name):
+    """Return a consistent conflict response for route names."""
+    return jsonify(
+        {
+            "error": "conflict",
+            "message": (
+                "Route with this name already exists "
+                "in this team"
+            ),
+            "details": [
+                {
+                    "field": "name",
+                    "loc": ["name"],
+                    "message": (
+                        "Route name must be unique "
+                        "within a team"
+                    ),
+                    "type": "unique",
+                    "input": name,
+                }
+            ],
+        }
+    ), 409
+
+
 def mask_route_integration_config(config):
     """Mask provider-specific secrets before audit/API output."""
     config = dict(config or {})
@@ -39,33 +65,57 @@ def mask_route_integration_config(config):
 
 
 def build_route_integration_config(payload, current_route=None):
-    """Build provider-specific route integration config.
-
-    Empty Sentry secret on update means: keep existing secret.
-    Empty Sentry secret on create is allowed so the route can be created
-    first and used as the Sentry webhook URL.
-    """
-    if payload.source != "sentry":
-        return {}
-
+    """Build provider-specific route integration config."""
     incoming = payload.integration_config or {}
-    incoming_sentry = dict(incoming.get("sentry") or {})
 
-    current_config = current_route.integration_config or {} if current_route else {}
-    current_sentry = dict(current_config.get("sentry") or {})
+    if payload.source == "sentry":
+        incoming_sentry = dict(
+            incoming.get("sentry") or {}
+        )
 
-    new_secret = str(incoming_sentry.get("webhook_secret") or "").strip()
-    current_secret = current_sentry.get("webhook_secret")
+        current_config = (
+            current_route.integration_config or {}
+            if current_route
+            else {}
+        )
+        current_sentry = dict(
+            current_config.get("sentry") or {}
+        )
 
-    secret = new_secret or current_secret
+        new_secret = str(
+            incoming_sentry.get("webhook_secret") or ""
+        ).strip()
+        current_secret = current_sentry.get(
+            "webhook_secret"
+        )
 
-    sentry_config = {}
-    if secret:
-        sentry_config["webhook_secret"] = secret
+        secret = new_secret or current_secret
 
-    return {
-        "sentry": sentry_config,
-    }
+        sentry_config = {}
+
+        if secret:
+            sentry_config["webhook_secret"] = secret
+
+        return {
+            "sentry": sentry_config,
+        }
+
+    if payload.source == "aws_sns":
+        incoming_aws_sns = dict(
+            incoming.get("aws_sns") or {}
+        )
+
+        topic_arn = str(
+            incoming_aws_sns.get("topic_arn") or ""
+        ).strip()
+
+        return {
+            "aws_sns": {
+                "topic_arn": topic_arn,
+            },
+        }
+
+    return {}
 
 
 def validate_route_service(team_id, service_id):
@@ -280,31 +330,70 @@ def create_route():
 
     raw_token = create_raw_token()
     integration_config = build_route_integration_config(payload)
+    existing_route = routes_repo.get_route_by_team_and_name(payload.team_id, payload.name)
 
-    route = routes_repo.create_route(
-        team_id=payload.team_id,
-        name=payload.name,
-        source=payload.source,
-        rotation_id=payload.rotation_id,
-        escalation_policy_id=payload.escalation_policy_id,
-        matchers=payload.matchers,
-        group_by=payload.group_by,
-        enabled=payload.enabled,
-        intake_token_prefix=raw_token[:12],
-        intake_token_hash=hash_token(raw_token),
-        service_id=payload.service_id,
-        integration_config=integration_config,
-    )
+    if existing_route and not existing_route.deleted:
+        return route_name_conflict_response(payload.name)
 
-    for channel_id in payload.channel_ids:
-        routes_repo.link_route_channel(route.id, channel_id)
+    try:
+        if existing_route:
+            route = routes_repo.restore_route(
+                existing_route.id,
+                team_id=payload.team_id,
+                name=payload.name,
+                source=payload.source,
+                rotation_id=payload.rotation_id,
+                escalation_policy_id=(
+                    payload.escalation_policy_id
+                ),
+                matchers=payload.matchers,
+                group_by=payload.group_by,
+                enabled=payload.enabled,
+                intake_token_prefix=raw_token[:12],
+                intake_token_hash=hash_token(raw_token),
+                service_id=payload.service_id,
+                integration_config=integration_config,
+            )
+
+            routes_repo.replace_route_channels(route.id, payload.channel_ids)
+
+            audit_action = "route.restore"
+        else:
+            route = routes_repo.create_route(
+                team_id=payload.team_id,
+                name=payload.name,
+                source=payload.source,
+                rotation_id=payload.rotation_id,
+                escalation_policy_id=payload.escalation_policy_id,
+                matchers=payload.matchers,
+                group_by=payload.group_by,
+                enabled=payload.enabled,
+                intake_token_prefix=raw_token[:12],
+                intake_token_hash=hash_token(raw_token),
+                service_id=payload.service_id,
+                integration_config=integration_config,
+            )
+
+            routes_repo.replace_route_channels(
+                route.id,
+                payload.channel_ids,
+            )
+
+            audit_action = "route.create"
+    except IntegrityError as exc:
+        conflicting_route = routes_repo.get_route_by_team_and_name(payload.team_id, payload.name)
+
+        if conflicting_route:
+            return route_name_conflict_response(payload.name)
+
+        return handle_integrity_error(exc)
 
     audit_data = payload.model_dump()
     audit_data["integration_config"] = mask_route_integration_config(integration_config)
     audit_data["intake_token"] = "***"
 
     write_audit(
-        "route.create",
+        audit_action,
         object_type="route",
         object_id=route.id,
         team_id=route.team.id,
@@ -361,6 +450,17 @@ def update_route(route_id):
         payload,
         current_route=current_route,
     )
+
+    conflicting_route = (
+        routes_repo.get_route_by_team_and_name(
+            payload.team_id,
+            payload.name,
+            exclude_route_id=route_id,
+        )
+    )
+
+    if conflicting_route:
+        return route_name_conflict_response(payload.name)
 
     route = routes_repo.update_route(
         route_id,

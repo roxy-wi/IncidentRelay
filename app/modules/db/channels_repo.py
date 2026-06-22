@@ -170,3 +170,32 @@ def delete_channel(channel_id):
     ).execute()
 
     return soft_delete_channel(channel_id)
+
+
+def restore_channel(
+    channel_id,
+    *,
+    channel_type,
+    config,
+    enabled=True,
+    group_id=None,
+):
+    """Restore and reconfigure a soft-deleted channel."""
+    channel = get_channel(
+        channel_id,
+        include_deleted=True,
+    )
+
+    channel.channel_type = channel_type
+    channel.config = config or {}
+    channel.enabled = enabled
+    channel.deleted = False
+    channel.deleted_at = None
+
+    if group_id is not None:
+        channel.group = group_id
+
+    channel.save()
+
+    return channel
+

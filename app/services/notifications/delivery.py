@@ -194,7 +194,7 @@ def notify_alert(group, event_type="notification"):
                 can_update_existing_message = (
                     event_type in EDITABLE_EVENTS
                     and delivery
-                    and notifier.supports_update
+                    and notifier.can_update(channel)
                 )
 
                 if not can_update_existing_message:
@@ -213,7 +213,7 @@ def notify_alert(group, event_type="notification"):
                     continue
 
             try:
-                if event_type in EDITABLE_EVENTS and delivery and notifier.supports_update:
+                if event_type in EDITABLE_EVENTS and delivery and notifier.can_update(channel):
                     result = notifier.update(
                         channel,
                         group,
@@ -390,7 +390,7 @@ def update_alert_messages(group, event_type):
             )
             continue
 
-        if not notifier.supports_update:
+        if not notifier.can_update(channel):
             continue
 
         delivery = notifications_repo.get_notification(

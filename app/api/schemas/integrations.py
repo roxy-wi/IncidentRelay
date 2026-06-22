@@ -1,4 +1,4 @@
-from typing import Any, Dict
+from typing import Any, Dict, List
 
 from pydantic import ConfigDict, Field, model_validator
 
@@ -42,6 +42,53 @@ class AlertmanagerWebhookSchema(ApiModel):
     silenceURL: str | None = None
     dashboardURL: str | None = None
     panelURL: str | None = None
+
+
+class GrafanaAlertSchema(ApiModel):
+    """Validate one Grafana Alerting alert instance."""
+
+    model_config = ConfigDict(extra="allow")
+
+    status: str = "firing"
+    labels: Dict[str, Any] = Field(default_factory=dict)
+    annotations: Dict[str, Any] = Field(default_factory=dict)
+
+    startsAt: str | None = None
+    endsAt: str | None = None
+
+    generatorURL: str | None = None
+    fingerprint: str | None = None
+    silenceURL: str | None = None
+    dashboardURL: str | None = None
+    panelURL: str | None = None
+
+    values: Dict[str, Any] = Field(default_factory=dict)
+    valueString: str | None = None
+
+
+class GrafanaWebhookSchema(ApiModel):
+    """Validate a Grafana Alerting webhook payload."""
+
+    model_config = ConfigDict(extra="allow")
+
+    receiver: str | None = None
+    status: str = "firing"
+    orgId: int | str | None = None
+
+    alerts: List[GrafanaAlertSchema] = Field(min_length=1)
+
+    groupLabels: Dict[str, Any] = Field(default_factory=dict)
+    commonLabels: Dict[str, Any] = Field(default_factory=dict)
+    commonAnnotations: Dict[str, Any] = Field(default_factory=dict)
+
+    externalURL: str | None = None
+    version: str | None = None
+    groupKey: str | None = None
+    truncatedAlerts: int | None = None
+
+    title: str | None = None
+    state: str | None = None
+    message: str | None = None
 
 
 class ZabbixWebhookSchema(ApiModel):
@@ -161,6 +208,41 @@ class GenericWebhookSchema(ApiModel):
     runbook_url: str | None = None
 
 
+class RmonWebhookSchema(ApiModel):
+    """Validate an RMON alert payload."""
+
+    model_config = ConfigDict(extra="allow")
+
+    title: str = Field(min_length=1, max_length=255)
+    message: str | None = None
+    severity: str | None = None
+    status: str | None = None
+
+    fingerprint: str | None = None
+    external_id: str | int | None = None
+
+    team: str | None = None
+    labels: Dict[str, Any] = Field(default_factory=dict)
+
+    runbook: str | None = None
+    runbook_url: str | None = None
+    event_link: str | None = None
+
+    rmon_name: str | None = None
+
+    check_id: str | int | None = None
+    multi_check_id: str | int | None = None
+    state_id: str | int | None = None
+
+    check_name: str | None = None
+    check_type: str | None = None
+    target: str | None = None
+
+    agent: str | None = None
+    region: str | None = None
+    country: str | None = None
+
+
 class SentryWebhookSchema(ApiModel):
     """Validate Sentry integration webhook payload."""
 
@@ -257,5 +339,88 @@ class LibreNMSWebhookSchema(ApiModel):
                 "id, uid, alert_id, title, name, rule, message, msg, "
                 "description, hostname, display, sysName, fingerprint or labels"
             )
+
+        return self
+
+
+class AwsSnsEnvelopeSchema(ApiModel):
+    """Validate an Amazon SNS HTTP/HTTPS message envelope."""
+
+    model_config = ConfigDict(
+        extra="allow",
+        populate_by_name=True,
+    )
+
+    message_type: str = Field(
+        alias="Type",
+        pattern=(
+            r"^(Notification|SubscriptionConfirmation|"
+            r"UnsubscribeConfirmation)$"
+        ),
+    )
+    message_id: str = Field(
+        alias="MessageId",
+        min_length=1,
+    )
+    topic_arn: str = Field(
+        alias="TopicArn",
+        min_length=1,
+    )
+    message: str = Field(
+        alias="Message",
+    )
+    timestamp: str = Field(
+        alias="Timestamp",
+        min_length=1,
+    )
+    signature_version: str = Field(
+        alias="SignatureVersion",
+        pattern=r"^[12]$",
+    )
+    signature: str = Field(
+        alias="Signature",
+        min_length=1,
+    )
+    signing_cert_url: str = Field(
+        alias="SigningCertURL",
+        min_length=1,
+    )
+
+    subject: str | None = Field(
+        default=None,
+        alias="Subject",
+    )
+    token: str | None = Field(
+        default=None,
+        alias="Token",
+    )
+    subscribe_url: str | None = Field(
+        default=None,
+        alias="SubscribeURL",
+    )
+    unsubscribe_url: str | None = Field(
+        default=None,
+        alias="UnsubscribeURL",
+    )
+    message_attributes: Dict[str, Any] = Field(
+        default_factory=dict,
+        alias="MessageAttributes",
+    )
+
+    @model_validator(mode="after")
+    def validate_confirmation_fields(self):
+        if self.message_type in {
+            "SubscriptionConfirmation",
+            "UnsubscribeConfirmation",
+        }:
+            if not self.token:
+                raise ValueError(
+                    "Token is required for an SNS confirmation message"
+                )
+
+            if not self.subscribe_url:
+                raise ValueError(
+                    "SubscribeURL is required for an SNS confirmation message"
+                )
 
         return self

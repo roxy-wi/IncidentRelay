@@ -3,7 +3,7 @@ from typing import Any, Dict
 from pydantic import Field, model_validator
 
 from app.api.schemas.base import ApiModel
-from app.notifiers.types import CHANNEL_TYPE_PATTERN, WEBHOOK_STYLE_CHANNELS
+from app.notifiers.types import CHANNEL_TYPE_PATTERN, WEBHOOK_STYLE_CHANNELS, SLACK_CHANNEL
 from app.notifiers.email.email_templates import normalize_email_html_template
 from app.services.severity import normalize_severity_list
 
@@ -46,6 +46,80 @@ class ChannelBaseSchema(ApiModel):
 
             config["bot_token"] = bot_token
             config["chat_id"] = chat_id
+
+        if self.channel_type == SLACK_CHANNEL:
+            configured_mode = str(config.get("mode") or "").strip()
+
+            if configured_mode:
+                mode = configured_mode
+            elif config.get("bot_token") or config.get("channel_id"):
+                mode = "bot_api"
+            else:
+                mode = "webhook"
+
+            if mode not in {"bot_api", "webhook"}:
+                raise ValueError(
+                    "slack mode must be bot_api or webhook"
+                )
+
+            config["mode"] = mode
+
+            if mode == "bot_api":
+                bot_token = str(
+                    config.get("bot_token") or ""
+                ).strip()
+
+                channel_id = str(
+                    config.get("channel_id") or ""
+                ).strip()
+
+                missing = [
+                    name
+                    for name in (
+                        "bot_token",
+                        "channel_id",
+                        "signing_secret",
+                    )
+                    if not str(config.get(name) or "").strip()
+                ]
+
+                if missing:
+                    raise ValueError(
+                        "slack Bot API mode requires: "
+                        + ", ".join(missing)
+                    )
+
+                if not bot_token.startswith("xoxb-"):
+                    raise ValueError(
+                        "slack bot_token must start with 'xoxb-'"
+                    )
+
+                config["bot_token"] = str(
+                    config["bot_token"]
+                ).strip()
+
+                config["channel_id"] = str(
+                    config["channel_id"]
+                ).strip()
+
+                config["signing_secret"] = str(
+                    config["signing_secret"]
+                ).strip()
+                config.pop("webhook_url", None)
+
+            else:
+                webhook_url = str(
+                    config.get("webhook_url") or ""
+                ).strip()
+
+                if not webhook_url:
+                    raise ValueError(
+                        "slack webhook mode requires webhook_url"
+                    )
+
+                config["webhook_url"] = webhook_url
+                config.pop("bot_token", None)
+                config.pop("channel_id", None)
 
         if self.channel_type in WEBHOOK_STYLE_CHANNELS and not config.get("webhook_url"):
             raise ValueError(f"{self.channel_type} channel requires webhook_url")

@@ -123,27 +123,31 @@ IncidentRelay has two integration layers.
 
 ### Incoming alert sources
 
-| Source          | Endpoint                              | Documentation                                      |
-|-----------------|---------------------------------------|----------------------------------------------------|
-| Alertmanager    | `POST /api/integrations/alertmanager` | [Alertmanager](integrations/alertmanager.md)       |
-| Zabbix          | `POST /api/integrations/zabbix`       | [Zabbix](integrations/zabbix.md)                   |
-| Sentry          | `POST /api/integrations/sentry/<route_id>` | [Sentry](integrations/sentry.md)               |
-| LibreNMS        | `POST /api/integrations/librenms`     | [LibreNMS](integrations/librenms.md)               |
-| Generic webhook | `POST /api/integrations/webhook`      | [Generic webhook](integrations/generic-webhook.md) |
+| Source              | Endpoint                                   | Documentation                                             |
+|---------------------|--------------------------------------------|-----------------------------------------------------------|
+| Alertmanager        | `POST /api/integrations/alertmanager`      | [Alertmanager](integrations/alertmanager.md)              |
+| AWS SNS/Cloud watch | `POST /api/integrations/aws-sns`           | [AWS SNS/Cloud watch](integrations/aws-sns-cloudwatch.md) |
+| Grafana             | `POST /api/integrations/grafana`           | [Grafana](integrations/grafana.md)                        |
+| RMON                | `POST /api/integrations/rmon`              | [Grafana](integrations/rmon.md)                           |
+| Zabbix              | `POST /api/integrations/zabbix`            | [Zabbix](integrations/zabbix.md)                          |
+| Sentry              | `POST /api/integrations/sentry/<route_id>` | [Sentry](integrations/sentry.md)                          |
+| LibreNMS            | `POST /api/integrations/librenms`          | [LibreNMS](integrations/librenms.md)                      |
+| Generic webhook     | `POST /api/integrations/webhook`           | [Generic webhook](integrations/generic-webhook.md)        |
 
 Incoming integrations use route intake tokens.
 
 ### Notification delivery
 
-| Delivery method | Documentation |
-|---|---|
-| Common channel behavior | [Notification channels](integrations/channels.md) |
-| Mattermost | [Mattermost](integrations/mattermost.md) |
-| Telegram | [Telegram](integrations/telegram.md) |
-| Email | [Email](integrations/email.md) |
-| Slack, Discord, Microsoft Teams, custom webhook | [Webhook-based channels](integrations/webhook-channels.md) |
-| Voice call | [Voice call](integrations/voice-call.md) |
-| Browser/PWA push | [Browser Push Notifications](usage/browser-push.md) |
+| Delivery method                          | Documentation                                              |
+|------------------------------------------|------------------------------------------------------------|
+| Common channel behavior                  | [Notification channels](integrations/channels.md)          |
+| Mattermost                               | [Mattermost](integrations/mattermost.md)                   |
+| Telegram                                 | [Telegram](integrations/telegram.md)                       |
+| Email                                    | [Email](integrations/email.md)                             |
+| Slack                                    | [docs/integrations/slack.md](docs/integrations/slack.md)   |
+| Discord, Microsoft Teams, custom webhook | [Webhook-based channels](integrations/webhook-channels.md) |
+| Voice call                               | [Voice call](integrations/voice-call.md)                   |
+| Browser/PWA push                         | [Browser Push Notifications](usage/browser-push.md)        |
 
 Notification channels do not have intake tokens. Routes receive alerts, then send notifications to attached channels. Browser push is profile-level and is sent to the assigned user's active browser devices.
 

@@ -462,6 +462,105 @@ VOICE_CALLBACK_RESPONSE_SCHEMA = {
     },
 }
 
+SLACK_ACTION_FORM_SCHEMA = {
+    "type": "object",
+    "required": ["payload"],
+    "properties": {
+        "payload": {
+            "type": "string",
+            "description": (
+                "JSON-encoded Slack Block Kit interaction payload. "
+                "Slack sends this field using "
+                "application/x-www-form-urlencoded."
+            ),
+            "example": (
+                '{"type":"block_actions",'
+                '"user":{"id":"U0123456789"},'
+                '"channel":{"id":"C0123456789"},'
+                '"actions":[{'
+                '"action_id":"incidentrelay_acknowledge",'
+                '"value":"{\\"action\\":\\"acknowledge\\",'
+                '\\"alert_id\\":123,'
+                '\\"channel_id\\":12}"'
+                "}]}",
+            ),
+        },
+    },
+    "additionalProperties": True,
+}
+
+
+SLACK_ACTION_RESPONSE_SCHEMA = {
+    "type": "object",
+    "required": [
+        "ok",
+        "action",
+        "alert_id",
+        "user_id",
+    ],
+    "properties": {
+        "ok": {
+            "type": "boolean",
+            "description": "Whether the Slack action was processed.",
+            "example": True,
+        },
+        "action": {
+            "type": "string",
+            "enum": [
+                "acknowledge",
+                "resolve",
+            ],
+            "description": "Alert action performed by IncidentRelay.",
+            "example": "acknowledge",
+        },
+        "alert_id": {
+            "type": "integer",
+            "description": "IncidentRelay alert group ID.",
+            "example": 123,
+        },
+        "user_id": {
+            "type": "integer",
+            "nullable": True,
+            "description": (
+                "IncidentRelay user matched by Slack user ID. "
+                "Null when the Slack user is not linked."
+            ),
+            "example": 7,
+        },
+    },
+    "additionalProperties": False,
+}
+
+
+SLACK_ACTION_ERROR_SCHEMA = {
+    "type": "object",
+    "required": [
+        "error",
+        "message",
+    ],
+    "properties": {
+        "error": {
+            "type": "string",
+            "enum": [
+                "invalid_payload",
+                "invalid_action",
+                "invalid_signature",
+                "stale_request",
+                "action_rejected",
+                "alert_not_found",
+            ],
+            "description": "Machine-readable Slack action error.",
+            "example": "invalid_signature",
+        },
+        "message": {
+            "type": "string",
+            "description": "Human-readable error description.",
+            "example": "Slack request signature is invalid.",
+        },
+    },
+    "additionalProperties": False,
+}
+
 librenms_body = {
     "type": "object",
     "description": (
@@ -744,20 +843,20 @@ librenms_body = {
 
 
 def tags():
-    """
-    Return OpenAPI tags.
-    """
-
+    """Return OpenAPI tags."""
     return [
         {
             "name": "integrations",
             "description": (
-                "Incoming alert endpoints for Alertmanager, Zabbix, generic webhooks "
-                "and Sentry. Alertmanager, Zabbix and generic webhooks use route "
-                "intake tokens. Sentry uses Sentry-Hook-Signature verified against "
-                "the route-specific Sentry Client Secret."
+                "Incoming alert endpoints for Alertmanager, Grafana, RMON, "
+                "Amazon SNS and CloudWatch, Zabbix, LibreNMS, generic webhooks "
+                "and Sentry. Alertmanager, Grafana, RMON, Zabbix, LibreNMS "
+                "and generic webhooks use route intake tokens. Sentry uses a "
+                "route-specific webhook signature. Amazon SNS requests are "
+                "verified using the SNS signature and the exact Topic ARN "
+                "configured for the route."
             ),
-        }
+        },
     ]
 
 
@@ -955,6 +1054,732 @@ def paths():
             "groupKey": '{}/{severity="critical"}:{alertname="TargetMissingOrDown"}',
             "truncatedAlerts": 0,
         },
+    }
+
+    grafana_alert_schema = {
+        "type": "object",
+        "additionalProperties": True,
+        "properties": {
+            "status": {
+                "type": "string",
+                "description": (
+                    "Grafana alert instance status. Resolved-like values are "
+                    "normalized to resolved; other values are treated as firing."
+                ),
+                "example": "firing",
+            },
+            "labels": {
+                "type": "object",
+                "additionalProperties": True,
+                "description": "Labels attached to this Grafana alert instance.",
+                "example": {
+                    "alertname": "DiskFull",
+                    "severity": "critical",
+                    "instance": "host1",
+                    "grafana_folder": "Infrastructure",
+                    "__alert_rule_uid__": "disk-full-rule",
+                },
+            },
+            "annotations": {
+                "type": "object",
+                "additionalProperties": True,
+                "description": (
+                    "Annotations attached to this Grafana alert instance."
+                ),
+                "example": {
+                    "summary": "Disk is full",
+                    "description": "/var is 95% full",
+                },
+            },
+            "startsAt": {
+                "type": "string",
+                "format": "date-time",
+                "nullable": True,
+                "description": "Time when the alert instance started firing.",
+            },
+            "endsAt": {
+                "type": "string",
+                "format": "date-time",
+                "nullable": True,
+                "description": "Time when the alert instance was resolved.",
+            },
+            "generatorURL": {
+                "type": "string",
+                "nullable": True,
+                "description": "URL of the Grafana alert rule.",
+            },
+            "fingerprint": {
+                "type": "string",
+                "nullable": True,
+                "description": (
+                    "Stable Grafana alert instance fingerprint used for "
+                    "deduplication. When omitted, IncidentRelay generates a "
+                    "stable deduplication key."
+                ),
+                "example": "grafana-disk-full-host1",
+            },
+            "silenceURL": {
+                "type": "string",
+                "nullable": True,
+                "description": "Grafana URL for creating a matching silence.",
+            },
+            "dashboardURL": {
+                "type": "string",
+                "nullable": True,
+                "description": "Related Grafana dashboard URL.",
+                "example": (
+                    "https://grafana.example.com/d/system-overview"
+                ),
+            },
+            "panelURL": {
+                "type": "string",
+                "nullable": True,
+                "description": "Related Grafana panel URL.",
+                "example": (
+                    "https://grafana.example.com/d/system-overview"
+                    "?viewPanel=12"
+                ),
+            },
+            "values": {
+                "type": "object",
+                "additionalProperties": True,
+                "description": "Evaluated Grafana expression values.",
+                "example": {
+                    "A": 95,
+                },
+            },
+            "valueString": {
+                "type": "string",
+                "nullable": True,
+                "description": (
+                    "Human-readable Grafana expression values."
+                ),
+                "example": "[ var='A' value=95 ]",
+            },
+        },
+    }
+
+    grafana_body = {
+        "type": "object",
+        "required": ["alerts"],
+        "additionalProperties": True,
+        "properties": {
+            "receiver": {
+                "type": "string",
+                "nullable": True,
+                "description": "Grafana contact point receiver name.",
+                "example": "incidentrelay",
+            },
+            "status": {
+                "type": "string",
+                "nullable": True,
+                "description": (
+                    "Overall Grafana notification status. The status of each "
+                    "individual alert instance takes precedence."
+                ),
+                "example": "firing",
+            },
+            "orgId": {
+                "oneOf": [
+                    {"type": "integer"},
+                    {"type": "string"},
+                ],
+                "nullable": True,
+                "description": "Grafana organization id.",
+                "example": 1,
+            },
+            "alerts": {
+                "type": "array",
+                "minItems": 1,
+                "description": (
+                    "Grafana alert instances included in the notification."
+                ),
+                "items": grafana_alert_schema,
+            },
+            "groupLabels": {
+                "type": "object",
+                "additionalProperties": True,
+                "description": "Labels used by Grafana to group the notification.",
+                "example": {
+                    "alertname": "DiskFull",
+                },
+            },
+            "commonLabels": {
+                "type": "object",
+                "additionalProperties": True,
+                "description": "Labels common to all alert instances.",
+                "example": {
+                    "team": "sre",
+                    "environment": "production",
+                },
+            },
+            "commonAnnotations": {
+                "type": "object",
+                "additionalProperties": True,
+                "description": "Annotations common to all alert instances.",
+                "example": {
+                    "runbook_url": (
+                        "https://example.com/runbooks/disk"
+                    ),
+                },
+            },
+            "externalURL": {
+                "type": "string",
+                "nullable": True,
+                "description": "Base URL of the Grafana instance.",
+                "example": "https://grafana.example.com/",
+            },
+            "version": {
+                "type": "string",
+                "nullable": True,
+                "description": "Grafana webhook payload version.",
+            },
+            "groupKey": {
+                "type": "string",
+                "nullable": True,
+                "description": "Grafana notification group key.",
+                "example": '{}:{alertname="DiskFull"}',
+            },
+            "truncatedAlerts": {
+                "type": "integer",
+                "minimum": 0,
+                "nullable": True,
+                "description": (
+                    "Number of alert instances omitted from the payload."
+                ),
+                "example": 0,
+            },
+            "title": {
+                "type": "string",
+                "nullable": True,
+                "description": "Rendered Grafana notification title.",
+                "example": "[FIRING:1] DiskFull",
+            },
+            "state": {
+                "type": "string",
+                "nullable": True,
+                "description": "Rendered Grafana notification state.",
+                "example": "alerting",
+            },
+            "message": {
+                "type": "string",
+                "nullable": True,
+                "description": "Rendered Grafana notification message.",
+                "example": "Grafana notification",
+            },
+        },
+        "example": {
+            "receiver": "incidentrelay",
+            "status": "firing",
+            "orgId": 1,
+            "groupKey": '{}:{alertname="DiskFull"}',
+            "groupLabels": {
+                "alertname": "DiskFull",
+            },
+            "commonLabels": {
+                "team": "sre",
+                "environment": "production",
+            },
+            "commonAnnotations": {
+                "runbook_url": (
+                    "https://example.com/runbooks/disk"
+                ),
+            },
+            "externalURL": "https://grafana.example.com/",
+            "title": "[FIRING:1] DiskFull",
+            "state": "alerting",
+            "message": "Grafana notification",
+            "alerts": [
+                {
+                    "status": "firing",
+                    "labels": {
+                        "alertname": "DiskFull",
+                        "severity": "critical",
+                        "instance": "host1",
+                        "grafana_folder": "Infrastructure",
+                        "__alert_rule_uid__": "disk-full-rule",
+                    },
+                    "annotations": {
+                        "summary": "Disk is full",
+                        "description": "/var is 95% full",
+                    },
+                    "startsAt": "2026-06-21T10:00:00Z",
+                    "endsAt": "0001-01-01T00:00:00Z",
+                    "generatorURL": (
+                        "https://grafana.example.com/alerting/"
+                        "grafana/disk-full-rule/view"
+                    ),
+                    "fingerprint": "grafana-disk-full-host1",
+                    "silenceURL": (
+                        "https://grafana.example.com/alerting/silence/new"
+                    ),
+                    "dashboardURL": (
+                        "https://grafana.example.com/d/system-overview"
+                    ),
+                    "panelURL": (
+                        "https://grafana.example.com/d/system-overview"
+                        "?viewPanel=12"
+                    ),
+                    "values": {
+                        "A": 95,
+                    },
+                    "valueString": "[ var='A' value=95 ]",
+                },
+            ],
+        },
+    }
+
+    rmon_body = {
+        "type": "object",
+        "required": ["title"],
+        "additionalProperties": True,
+        "properties": {
+            "title": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 255,
+                "description": "RMON alert title.",
+                "example": "[rmon-production] critical: HTTP check failed",
+            },
+            "message": {
+                "type": "string",
+                "nullable": True,
+                "description": "Detailed alert message.",
+                "example": "critical: HTTP check failed",
+            },
+            "severity": {
+                "type": "string",
+                "nullable": True,
+                "description": "RMON alert severity.",
+                "example": "critical",
+            },
+            "status": {
+                "type": "string",
+                "nullable": True,
+                "description": (
+                    "RMON alert status. Resolved-like values such as resolved, "
+                    "recovered, ok and up are normalized to resolved. Other "
+                    "values are treated as firing."
+                ),
+                "example": "firing",
+            },
+            "fingerprint": {
+                "type": "string",
+                "nullable": True,
+                "description": (
+                    "Stable deduplication key. It must remain unchanged "
+                    "between firing and resolved notifications."
+                ),
+                "example": "42 7",
+            },
+            "external_id": {
+                "oneOf": [
+                    {"type": "string"},
+                    {"type": "integer"},
+                ],
+                "nullable": True,
+                "description": "External RMON check or event identifier.",
+                "example": 42,
+            },
+            "team": {
+                "type": "string",
+                "nullable": True,
+                "description": "Optional IncidentRelay team slug fallback.",
+                "example": "sre",
+            },
+            "labels": {
+                "type": "object",
+                "additionalProperties": True,
+                "description": (
+                    "Additional labels used for routing and grouping."
+                ),
+                "example": {
+                    "team": "sre",
+                    "environment": "production",
+                },
+            },
+            "runbook": {
+                "type": "string",
+                "nullable": True,
+                "description": (
+                    "Runbook text or URL configured for the RMON check."
+                ),
+            },
+            "runbook_url": {
+                "type": "string",
+                "nullable": True,
+                "description": "Runbook URL associated with the check.",
+                "example": (
+                    "https://example.com/runbooks/public-api"
+                ),
+            },
+            "event_link": {
+                "type": "string",
+                "nullable": True,
+                "description": "Direct URL to the source event or check.",
+            },
+            "rmon_name": {
+                "type": "string",
+                "nullable": True,
+                "description": "Name of the originating RMON instance.",
+                "example": "rmon-production",
+            },
+            "check_id": {
+                "oneOf": [
+                    {"type": "string"},
+                    {"type": "integer"},
+                ],
+                "nullable": True,
+                "description": "RMON check identifier.",
+                "example": 42,
+            },
+            "multi_check_id": {
+                "oneOf": [
+                    {"type": "string"},
+                    {"type": "integer"},
+                ],
+                "nullable": True,
+                "description": "RMON multi-check identifier.",
+                "example": 42,
+            },
+            "state_id": {
+                "oneOf": [
+                    {"type": "string"},
+                    {"type": "integer"},
+                ],
+                "nullable": True,
+                "description": "RMON check-state identifier.",
+                "example": 7,
+            },
+            "check_name": {
+                "type": "string",
+                "nullable": True,
+                "description": "Human-readable RMON check name.",
+                "example": "Public API",
+            },
+            "check_type": {
+                "type": "string",
+                "nullable": True,
+                "description": "RMON check type.",
+                "example": "http",
+            },
+            "target": {
+                "type": "string",
+                "nullable": True,
+                "description": "Host, URL or other checked target.",
+                "example": "https://api.example.com/health",
+            },
+            "agent": {
+                "type": "string",
+                "nullable": True,
+                "description": "RMON agent that executed the check.",
+                "example": "eu-west-agent",
+            },
+            "region": {
+                "type": "string",
+                "nullable": True,
+                "description": "Region associated with the check.",
+                "example": "eu-west",
+            },
+            "country": {
+                "type": "string",
+                "nullable": True,
+                "description": "Country associated with the check.",
+                "example": "DE",
+            },
+            "description": {
+                "type": "string",
+                "nullable": True,
+                "description": "Description configured for the RMON check.",
+            },
+        },
+        "example": {
+            "title": "[rmon-production] critical: HTTP check failed",
+            "message": "critical: HTTP check failed",
+            "severity": "critical",
+            "status": "firing",
+            "fingerprint": "42 7",
+            "external_id": 42,
+            "rmon_name": "rmon-production",
+            "multi_check_id": 42,
+            "state_id": 7,
+            "check_name": "Public API",
+            "check_type": "http",
+            "target": "https://api.example.com/health",
+            "agent": "eu-west-agent",
+            "region": "eu-west",
+            "country": "DE",
+            "runbook_url": (
+                "https://example.com/runbooks/public-api"
+            ),
+            "labels": {
+                "team": "sre",
+                "environment": "production",
+            },
+        },
+    }
+
+    aws_sns_message_attribute = {
+        "type": "object",
+        "additionalProperties": True,
+        "properties": {
+            "Type": {
+                "type": "string",
+                "example": "String",
+            },
+            "Value": {
+                "type": "string",
+                "example": "production",
+            },
+            "StringValue": {
+                "type": "string",
+                "nullable": True,
+            },
+        },
+    }
+
+    aws_sns_body = {
+        "type": "object",
+        "required": [
+            "Type",
+            "MessageId",
+            "TopicArn",
+            "Message",
+            "Timestamp",
+            "SignatureVersion",
+            "Signature",
+            "SigningCertURL",
+        ],
+        "additionalProperties": True,
+        "properties": {
+            "Type": {
+                "type": "string",
+                "enum": [
+                    "Notification",
+                    "SubscriptionConfirmation",
+                    "UnsubscribeConfirmation",
+                ],
+                "description": "Amazon SNS envelope type.",
+                "example": "Notification",
+            },
+            "MessageId": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Unique Amazon SNS message identifier.",
+                "example": "sns-message-1",
+            },
+            "TopicArn": {
+                "type": "string",
+                "minLength": 1,
+                "description": (
+                    "Amazon SNS Topic ARN. It must exactly match the Topic ARN "
+                    "configured for the IncidentRelay route."
+                ),
+                "example": (
+                    "arn:aws:sns:eu-west-1:"
+                    "123456789012:incidentrelay-alerts"
+                ),
+            },
+            "Subject": {
+                "type": "string",
+                "nullable": True,
+                "description": "Optional Amazon SNS message subject.",
+                "example": "ALARM: HighCPU",
+            },
+            "Message": {
+                "type": "string",
+                "description": (
+                    "SNS message body. CloudWatch alarm notifications contain "
+                    "a JSON-encoded CloudWatch alarm object."
+                ),
+            },
+            "Timestamp": {
+                "type": "string",
+                "format": "date-time",
+                "description": "Time when Amazon SNS created the message.",
+                "example": "2026-06-21T10:00:01.000Z",
+            },
+            "SignatureVersion": {
+                "type": "string",
+                "enum": ["1", "2"],
+                "description": (
+                    "Amazon SNS signature version. Version 1 uses SHA-1 and "
+                    "version 2 uses SHA-256."
+                ),
+                "example": "2",
+            },
+            "Signature": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Base64-encoded Amazon SNS RSA signature.",
+            },
+            "SigningCertURL": {
+                "type": "string",
+                "format": "uri",
+                "description": (
+                    "HTTPS URL of the Amazon SNS signing certificate. "
+                    "IncidentRelay only accepts approved Amazon SNS hosts "
+                    "and certificate paths."
+                ),
+                "example": (
+                    "https://sns.eu-west-1.amazonaws.com/"
+                    "SimpleNotificationService-example.pem"
+                ),
+            },
+            "Token": {
+                "type": "string",
+                "nullable": True,
+                "description": (
+                    "Subscription confirmation token. Required for "
+                    "confirmation messages."
+                ),
+            },
+            "SubscribeURL": {
+                "type": "string",
+                "format": "uri",
+                "nullable": True,
+                "description": (
+                    "Signed Amazon SNS subscription confirmation URL."
+                ),
+            },
+            "UnsubscribeURL": {
+                "type": "string",
+                "format": "uri",
+                "nullable": True,
+            },
+            "MessageAttributes": {
+                "type": "object",
+                "description": (
+                    "Optional SNS message attributes. String attributes are "
+                    "converted into IncidentRelay labels."
+                ),
+                "additionalProperties": aws_sns_message_attribute,
+                "example": {
+                    "team": {
+                        "Type": "String",
+                        "Value": "sre",
+                    },
+                    "environment": {
+                        "Type": "String",
+                        "Value": "production",
+                    },
+                },
+            },
+        },
+        "example": {
+            "Type": "Notification",
+            "MessageId": "sns-message-1",
+            "TopicArn": (
+                "arn:aws:sns:eu-west-1:"
+                "123456789012:incidentrelay-alerts"
+            ),
+            "Subject": "ALARM: HighCPU",
+            "Message": (
+                '{"AlarmName":"HighCPU",'
+                '"AlarmDescription":"CPU usage is too high",'
+                '"AWSAccountId":"123456789012",'
+                '"NewStateValue":"ALARM",'
+                '"NewStateReason":"Threshold crossed",'
+                '"Region":"EU (Ireland)",'
+                '"AlarmArn":"arn:aws:cloudwatch:eu-west-1:'
+                '123456789012:alarm:HighCPU",'
+                '"OldStateValue":"OK"}'
+            ),
+            "Timestamp": "2026-06-21T10:00:01.000Z",
+            "SignatureVersion": "2",
+            "Signature": "base64-signature",
+            "SigningCertURL": (
+                "https://sns.eu-west-1.amazonaws.com/"
+                "SimpleNotificationService-example.pem"
+            ),
+            "MessageAttributes": {
+                "team": {
+                    "Type": "String",
+                    "Value": "sre",
+                },
+                "environment": {
+                    "Type": "String",
+                    "Value": "production",
+                },
+            },
+        },
+    }
+
+    aws_sns_confirmation_response = {
+        "type": "object",
+        "required": [
+            "status",
+            "message_id",
+            "topic_arn",
+        ],
+        "properties": {
+            "status": {
+                "type": "string",
+                "enum": [
+                    "confirmed",
+                    "unsubscribed",
+                ],
+                "example": "confirmed",
+            },
+            "message_id": {
+                "type": "string",
+                "example": "sns-confirmation-1",
+            },
+            "topic_arn": {
+                "type": "string",
+                "example": (
+                    "arn:aws:sns:eu-west-1:"
+                    "123456789012:incidentrelay-alerts"
+                ),
+            },
+        },
+        "additionalProperties": False,
+    }
+
+    aws_sns_responses = incoming_alert_responses(
+        "Amazon SNS notification accepted."
+    )
+
+    aws_sns_ingest_response = aws_sns_responses[
+        "200"
+    ]["content"]["application/json"]["schema"]
+
+    aws_sns_responses["200"] = {
+        "description": (
+            "Notification processed or subscription state confirmed."
+        ),
+        "content": {
+            "application/json": {
+                "schema": {
+                    "oneOf": [
+                        aws_sns_ingest_response,
+                        aws_sns_confirmation_response,
+                    ],
+                },
+            },
+        },
+    }
+
+    # AWS SNS authenticates requests using the SNS signature and configured
+    # Topic ARN, not a route intake bearer token.
+    aws_sns_responses.pop("401", None)
+
+    aws_sns_responses["403"] = {
+        "description": (
+            "Signature validation failed, Topic ARN did not match, "
+            "or the route is not available."
+        ),
+    }
+
+    aws_sns_responses["404"] = {
+        "description": "AWS SNS route was not found.",
+    }
+
+    aws_sns_responses["502"] = {
+        "description": (
+            "The signing certificate could not be loaded or subscription "
+            "confirmation failed."
+        ),
     }
 
     zabbix_body = {
@@ -1229,6 +2054,87 @@ def paths():
                 "responses": incoming_alert_responses("Alertmanager alerts accepted."),
             }
         },
+        "/api/integrations/grafana": {
+            "post": {
+                "tags": ["integrations"],
+                "summary": "Receive Grafana Alerting alerts",
+                "description": (
+                    "Receives a Grafana Alerting webhook contact point payload. "
+                    "The route intake token must belong to an active route with "
+                    "source=grafana. Each object in alerts is normalized and "
+                    "processed independently. The individual alert status takes "
+                    "precedence over the top-level notification status."
+                ),
+                "operationId": "receiveGrafanaAlerts",
+                "security": [{"bearerAuth": []}],
+                "requestBody": json_body(
+                    "Grafana Alerting webhook payload.",
+                    grafana_body,
+                ),
+                "responses": incoming_alert_responses(
+                    "Grafana alerts accepted."
+                ),
+            },
+        },
+        "/api/integrations/rmon": {
+            "post": {
+                "tags": ["integrations"],
+                "summary": "Receive RMON alerts",
+                "description": (
+                    "Receives an alert from RMON. The route intake token "
+                    "must belong to an active route with source=rmon. "
+                    "The payload is normalized and processed through the "
+                    "standard IncidentRelay routing, grouping, suppression, "
+                    "notification and escalation pipeline."
+                ),
+                "operationId": "receiveRmonAlert",
+                "security": [{"bearerAuth": []}],
+                "requestBody": json_body(
+                    "RMON alert payload.",
+                    rmon_body,
+                ),
+                "responses": incoming_alert_responses(
+                    "RMON alert accepted."
+                ),
+            },
+        },
+        "/api/integrations/aws-sns/{route_id}": {
+            "post": {
+                "tags": ["integrations"],
+                "summary": "Receive Amazon SNS and CloudWatch notifications",
+                "description": (
+                    "Receives signed Amazon SNS messages for one IncidentRelay "
+                    "route. The route must use source=aws_sns and have an exact "
+                    "SNS Topic ARN configured. IncidentRelay verifies the SNS "
+                    "signature, signing certificate URL and Topic ARN before "
+                    "processing the message. CloudWatch ALARM and "
+                    "INSUFFICIENT_DATA states are normalized to firing, while "
+                    "OK is normalized to resolved. Subscription confirmation "
+                    "messages are verified and confirmed automatically."
+                ),
+                "operationId": "receiveAwsSnsNotification",
+                "security": [],
+                "parameters": [
+                    {
+                        "name": "route_id",
+                        "in": "path",
+                        "required": True,
+                        "description": (
+                            "IncidentRelay route configured for this SNS topic."
+                        ),
+                        "schema": {
+                            "type": "integer",
+                            "minimum": 1,
+                        },
+                    },
+                ],
+                "requestBody": json_body(
+                    "Signed Amazon SNS message envelope.",
+                    aws_sns_body,
+                ),
+                "responses": aws_sns_responses,
+            },
+        },
         "/api/integrations/zabbix": {
             "post": {
                 "tags": ["integrations"],
@@ -1371,6 +2277,94 @@ def paths():
                     "200": response("Action processed."),
                     "400": response("Invalid action payload."),
                     "403": response("Invalid callback secret."),
+                },
+            }
+        },
+        "/api/integrations/slack/actions": {
+            "post": {
+                "tags": ["integrations"],
+                "summary": "Handle Slack alert action",
+                "description": (
+                    "Receives Slack Block Kit button interactions for alert "
+                    "acknowledgement and resolution. "
+                    "The request body is application/x-www-form-urlencoded "
+                    "and contains a JSON-encoded payload field. "
+                    "IncidentRelay verifies the raw request body using the "
+                    "Slack signing secret configured on the referenced channel. "
+                    "Requests older than five minutes are rejected. "
+                    "This endpoint does not use IncidentRelay bearer tokens."
+                ),
+                "operationId": "handleSlackAlertAction",
+                "security": [],
+                "parameters": [
+                    header_param(
+                        "X-Slack-Request-Timestamp",
+                        (
+                            "Unix timestamp included in the Slack request. "
+                            "Requests older than five minutes are rejected."
+                        ),
+                        {
+                            "type": "string",
+                            "pattern": "^[0-9]+$",
+                            "example": "1782123456",
+                        },
+                        required=True,
+                    ),
+                    header_param(
+                        "X-Slack-Signature",
+                        (
+                            "Slack v0 HMAC-SHA256 signature calculated from "
+                            "the raw request body, timestamp and signing secret."
+                        ),
+                        {
+                            "type": "string",
+                            "pattern": "^v0=[a-f0-9]{64}$",
+                            "example": (
+                                "v0="
+                                "0123456789abcdef"
+                                "0123456789abcdef"
+                                "0123456789abcdef"
+                                "0123456789abcdef"
+                            ),
+                        },
+                        required=True,
+                    ),
+                ],
+                "requestBody": {
+                    "required": True,
+                    "description": (
+                        "Slack Block Kit interaction encoded as a form field."
+                    ),
+                    "content": {
+                        "application/x-www-form-urlencoded": {
+                            "schema": SLACK_ACTION_FORM_SCHEMA,
+                        },
+                    },
+                },
+                "responses": {
+                    "200": response(
+                        "Slack alert action processed.",
+                        SLACK_ACTION_RESPONSE_SCHEMA,
+                    ),
+                    "400": response(
+                        (
+                            "Malformed form body, unsupported interaction type, "
+                            "invalid action or invalid alert context."
+                        ),
+                        SLACK_ACTION_ERROR_SCHEMA,
+                    ),
+                    "403": response(
+                        (
+                            "Missing or invalid Slack signature, expired request, "
+                            "disabled or mismatched Slack channel, or alert and "
+                            "channel belong to different teams."
+                        ),
+                        SLACK_ACTION_ERROR_SCHEMA,
+                    ),
+                    "404": response(
+                        "Referenced IncidentRelay alert was not found.",
+                        SLACK_ACTION_ERROR_SCHEMA,
+                    ),
                 },
             }
         },

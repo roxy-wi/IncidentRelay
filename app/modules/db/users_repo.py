@@ -315,16 +315,25 @@ def soft_delete_user(user_id):
 
 
 def get_user_by_mattermost_id(mattermost_user_id):
-    """
-    Return a user by Mattermost user id.
-    """
-
+    """Return a user by Mattermost user id."""
     if not mattermost_user_id:
         return None
 
     return User.get_or_none(
         (User.mattermost_user_id == mattermost_user_id)
         & (User.deleted == False)
+    )
+
+
+def get_user_by_slack_id(slack_user_id):
+    """Return an active user by Slack user id."""
+    if not slack_user_id:
+        return None
+
+    return User.get_or_none(
+        (User.slack_user_id == str(slack_user_id))
+        & (User.deleted == False)
+        & (User.active == True)
     )
 
 

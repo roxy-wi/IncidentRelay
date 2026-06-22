@@ -1,4 +1,5 @@
 from typing import Any, Dict, List
+import re
 
 from pydantic import Field, model_validator
 
@@ -6,6 +7,11 @@ from app.api.schemas.base import ApiModel
 
 
 ROUTE_ESCALATION_MODE_PATTERN = r"^(rotation|policy)$"
+AWS_SNS_TOPIC_ARN_PATTERN = re.compile(
+    r"^arn:(aws|aws-us-gov|aws-cn):"
+    r"sns:[a-z0-9-]+:\d{12}:"
+    r"[A-Za-z0-9_-]{1,256}(?:\.fifo)?$"
+)
 
 
 class RouteBaseSchema(ApiModel):
@@ -13,7 +19,7 @@ class RouteBaseSchema(ApiModel):
 
     team_id: int = Field(ge=1)
     name: str = Field(min_length=2, max_length=120)
-    source: str = Field(pattern=r"^(alertmanager|zabbix|webhook|sentry|librenms)$")
+    source: str = Field(pattern=r"^(alertmanager|aws_sns|grafana|zabbix|webhook|sentry|librenms|rmon)$")
     rotation_id: int | None = Field(default=None, ge=1)
     channel_ids: List[int] = Field(default_factory=list)
     matchers: Dict[str, Any] = Field(default_factory=dict)
@@ -37,6 +43,37 @@ class RouteBaseSchema(ApiModel):
 
         if self.escalation_mode != "policy":
             self.escalation_policy_id = None
+
+        return self
+
+    @model_validator(mode="after")
+    def validate_integration_config(self):
+        if self.source != "aws_sns":
+            return self
+
+        config = self.integration_config or {}
+        aws_sns = config.get("aws_sns")
+
+        if not isinstance(aws_sns, dict):
+            raise ValueError(
+                "AWS SNS Topic ARN is required"
+            )
+
+        topic_arn = str(
+            aws_sns.get("topic_arn") or ""
+        ).strip()
+
+        if not topic_arn:
+            raise ValueError(
+                "AWS SNS Topic ARN is required"
+            )
+
+        if not AWS_SNS_TOPIC_ARN_PATTERN.fullmatch(
+                topic_arn
+        ):
+            raise ValueError(
+                "AWS SNS Topic ARN is invalid"
+            )
 
         return self
 

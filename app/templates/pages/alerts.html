@@ -7,13 +7,17 @@
         <div class="card-header table-card-header">
             <div>
                 <h2>Alert inbox</h2>
-                <div class="card-subtitle">
+                <div id="alerts-inbox-counter" class="card-subtitle">
                     Showing
-                    <span id="alerts-page-from">0</span>-<span id="alerts-page-to">0</span>
-                    of <span id="alerts-filtered-count">0</span>
+                    <span data-alerts-counter="from">0</span>-<span data-alerts-counter="to">0</span>
+                    of
+                    <span data-alerts-counter="filtered">0</span>
                     alerts
-                    <span id="alerts-total-wrapper">
-                        / <span id="alerts-total-count">0</span> total
+
+                    <span data-alerts-counter="total-wrapper">
+                        /
+                        <span data-alerts-counter="total">0</span>
+                        total
                     </span>
                 </div>
             </div>

@@ -63,6 +63,37 @@ def get_route(route_id, include_deleted=False):
     return query.get()
 
 
+def get_route_by_team_and_name(
+    team_id,
+    name,
+    *,
+    exclude_route_id=None,
+    include_deleted=True,
+):
+    """
+    Return a route with the same name in the same team.
+
+    Deleted routes are included by default because they continue
+    occupying the unique database key.
+    """
+    query = AlertRoute.select().where(
+        (AlertRoute.team == team_id)
+        & (AlertRoute.name == name)
+    )
+
+    if exclude_route_id is not None:
+        query = query.where(
+            AlertRoute.id != exclude_route_id
+        )
+
+    if not include_deleted:
+        query = query.where(
+            AlertRoute.deleted == False
+        )
+
+    return query.first()
+
+
 def get_route_by_intake_hash(token_hash):
     """
     Return an enabled route by alert intake token hash.
@@ -123,6 +154,48 @@ def create_route(
         intake_token_hash=intake_token_hash,
         integration_config=integration_config or {},
     )
+
+
+def restore_route(
+    route_id,
+    *,
+    team_id,
+    name,
+    source,
+    rotation_id=None,
+    escalation_policy_id=None,
+    matchers=None,
+    group_by=None,
+    enabled=True,
+    intake_token_prefix=None,
+    intake_token_hash=None,
+    service_id=None,
+    integration_config=None,
+):
+    """Restore and completely reconfigure a deleted route."""
+    route = get_route(
+        route_id,
+        include_deleted=True,
+    )
+
+    route.team = team_id
+    route.name = name
+    route.source = source
+    route.rotation = rotation_id
+    route.escalation_policy = escalation_policy_id
+    route.matchers = matchers or {}
+    route.group_by = group_by or []
+    route.enabled = enabled
+    route.intake_token_prefix = intake_token_prefix
+    route.intake_token_hash = intake_token_hash
+    route.service = service_id
+    route.integration_config = integration_config or {}
+    route.deleted = False
+    route.deleted_at = None
+
+    route.save()
+
+    return route
 
 
 def create_route_if_missing(team_id, name, source, rotation_id=None, matchers=None, group_by=None):

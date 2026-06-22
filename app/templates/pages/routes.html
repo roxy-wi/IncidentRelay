@@ -174,6 +174,9 @@
               <label for="route-source">Source</label>
               <select id="route-source" class="input">
                   <option value="alertmanager">Alertmanager</option>
+                  <option value="aws_sns">AWS SNS / CloudWatch</option>
+                  <option value="grafana">Grafana</option>
+                  <option value="rmon">RMON</option>
                   <option value="zabbix">Zabbix</option>
                   <option value="sentry">Sentry</option>
                   <option value="librenms">LibreNMS</option>
@@ -190,6 +193,46 @@
                     >
                     <div id="route-sentry-secret-help" class="help-text">
                         Create the route first to get the Sentry webhook URL. Then create a Sentry Internal Integration and paste its Client Secret here.
+                    </div>
+                </div>
+                <div id="route-aws-sns-settings" class="is-hidden">
+                    <div class="form-group">
+                        <label for="route-aws-sns-topic-arn">
+                            AWS SNS Topic ARN
+                        </label>
+
+                        <input
+                            id="route-aws-sns-topic-arn"
+                            type="text"
+                            autocomplete="off"
+                            spellcheck="false"
+                            placeholder="arn:aws:sns:eu-west-1:123456789012:incidentrelay-alerts"
+                        >
+
+                        <div class="form-help">
+                            Only signed SNS messages from this exact topic will be accepted.
+                        </div>
+                    </div>
+
+                    <div
+                        id="route-aws-sns-webhook-group"
+                        class="form-group is-hidden"
+                    >
+                        <label for="route-aws-sns-webhook-url">
+                            AWS SNS webhook URL
+                        </label>
+
+                        <input
+                            id="route-aws-sns-webhook-url"
+                            type="text"
+                            readonly
+                        >
+
+                        <div class="form-help">
+                            Add this HTTPS endpoint as an HTTP/S subscription of the SNS topic.
+                            No route intake token is required because SNS requests are verified
+                            by signature and Topic ARN.
+                        </div>
                     </div>
                 </div>
                 <label for="route-service">Default service</label>

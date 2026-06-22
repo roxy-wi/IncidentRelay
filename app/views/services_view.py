@@ -336,50 +336,77 @@ def _json_error(error, message, status=400, **extra):
 
 
 def _readable_services_from_request(*, include_disabled=True):
-    """Return services visible to current user for aggregate service context endpoints."""
-    team_id = request.args.get("team_id", type=int)
-    service_id = request.args.get("service_id", type=int)
+    """
+    Return services visible to the current user for aggregate
+    service context endpoints.
+    """
+    team_id = request.args.get(
+        "team_id",
+        type=int,
+    )
+    service_id = request.args.get(
+        "service_id",
+        type=int,
+    )
 
     if service_id:
         try:
-            service = services_repo.get_service(service_id)
+            service = services_repo.get_service(
+                service_id
+            )
         except DoesNotExist:
-            return None, make_error_response(
+            return None, _json_error(
                 "service_not_found",
                 "Service was not found",
                 404,
                 service_id=service_id,
             )
 
-        if not include_disabled and not services_repo.is_service_active(service):
-            return None, make_error_response(
+        if (
+            not include_disabled
+            and not services_repo.is_service_active(
+                service
+            )
+        ):
+            return None, _json_error(
                 "service_not_found",
                 "Service was not found",
                 404,
                 service_id=service_id,
             )
 
-        error = require_team_read(service.team_id)
+        error = require_team_read(
+            service.team_id
+        )
         if error:
             return None, error
 
         return [service], None
 
-    services = services_repo.list_services(
-        team_id=team_id,
-        include_disabled=include_disabled,
+    if team_id:
+        error = require_team_read(team_id)
+        if error:
+            return None, error
+
+        return (
+            services_repo.list_services(
+                team_id=team_id,
+                include_disabled=include_disabled,
+            ),
+            None,
+        )
+
+    allowed_team_ids = get_allowed_team_ids(
+        active_only=True,
     )
 
-    visible = []
-    for service in services:
-        if not include_disabled and not services_repo.is_service_active(service):
-            continue
-
-        error = require_team_read(service.team_id)
-        if not error:
-            visible.append(service)
-
-    return visible, None
+    return (
+        services_repo.list_services(
+            team_ids=allowed_team_ids,
+            include_disabled=include_disabled,
+        ),
+        None,
+    )
 
 
 def _validate_dependency_service(service, depends_on_service_id):

@@ -316,6 +316,90 @@
                   </div>
                 </div>
               </div>
+                
+                <div class="channel-config" data-channel-config="slack">
+                    <div class="form-section">
+                        <div class="form-section-header">
+                            <div>
+                                <div class="form-section-title">Slack connection</div>
+                                <div class="form-section-description">
+                                    Use a Slack bot to update alert messages after acknowledgment
+                                    or resolution, or use a simple incoming webhook.
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-grid">
+                            <div class="form-field form-field-full">
+                                <label for="cfg-slack-mode">Connection mode</label>
+                                <select id="cfg-slack-mode" class="input">
+                                    <option value="bot_api">
+                                        Bot API
+                                    </option>
+                                    <option value="webhook">
+                                        Incoming webhook
+                                    </option>
+                                </select>
+
+                                <div class="field-help">
+                                    Bot API supports sending and updating messages.
+                                    Incoming webhook supports sending only.
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="cfg-slack-bot-fields">
+                            <div class="form-grid">
+                                <div class="form-field form-field-full">
+                                    <label for="cfg-slack-bot-token">
+                                        Bot token
+                                    </label>
+                                    <input
+                                        id="cfg-slack-bot-token"
+                                        class="input"
+                                        type="password"
+                                        autocomplete="new-password"
+                                        placeholder="xoxb-..."
+                                    >
+                                    <div class="field-help">
+                                        Slack bot token with the chat:write permission.
+                                    </div>
+                                </div>
+
+                                <div class="form-field form-field-full">
+                                    <label for="cfg-slack-channel-id">
+                                        Channel ID
+                                    </label>
+                                    <input
+                                        id="cfg-slack-channel-id"
+                                        class="input"
+                                        type="text"
+                                        placeholder="C0123456789"
+                                    >
+                                    <div class="field-help">
+                                        Use the Slack channel ID, not its display name.
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        <div id="cfg-slack-webhook-fields" style="display: none;">
+                            <div class="form-grid">
+                                <div class="form-field form-field-full">
+                                    <label for="cfg-slack-webhook-url">
+                                        Incoming webhook URL
+                                    </label>
+                                    <input
+                                        id="cfg-slack-webhook-url"
+                                        class="input"
+                                        type="url"
+                                        placeholder="https://hooks.slack.com/services/..."
+                                    >
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
 
               <div class="channel-config" data-channel-config="webhook">
                 <div class="form-section">

@@ -259,6 +259,7 @@ def serialize_channel(channel, current_user=None):
     data = {
         "id": channel.id,
         "group_id": channel.group.id if getattr(channel, "group", None) else None,
+        "group_name": channel.group.name if getattr(channel, "name", None) else None,
         "group_slug": channel.group.slug if getattr(channel, "group", None) else None,
         "team_id": team_id,
         "team_name": channel.team.name if channel.team else None,
@@ -432,12 +433,34 @@ def serialize_route_integration_config(route):
     config = route.integration_config or {}
 
     if route.source == "sentry":
-        sentry = dict(config.get("sentry") or {})
+        sentry = dict(
+            config.get("sentry") or {}
+        )
 
         return {
             "sentry": {
-                "has_webhook_secret": bool(sentry.get("webhook_secret")),
-                "webhook_path": f"/api/integrations/sentry/{route.id}",
+                "has_webhook_secret": bool(
+                    sentry.get("webhook_secret")
+                ),
+                "webhook_path": (
+                    f"/api/integrations/sentry/{route.id}"
+                ),
+            }
+        }
+
+    if route.source == "aws_sns":
+        aws_sns = dict(
+            config.get("aws_sns") or {}
+        )
+
+        return {
+            "aws_sns": {
+                "topic_arn": aws_sns.get(
+                    "topic_arn"
+                ),
+                "webhook_path": (
+                    f"/api/integrations/aws-sns/{route.id}"
+                ),
             }
         }
 

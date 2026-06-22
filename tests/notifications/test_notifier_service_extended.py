@@ -18,12 +18,21 @@ from tests.factories import (
 
 
 class FakeNotifier:
-    def __init__(self, *, supports_update=False, fail_send=False, fail_update=False):
+    def __init__(
+        self,
+        *,
+        supports_update=False,
+        fail_send=False,
+        fail_update=False,
+    ):
         self.supports_update = supports_update
         self.fail_send = fail_send
         self.fail_update = fail_update
         self.sent = []
         self.updated = []
+
+    def can_update(self, channel, delivery=None):
+        return self.supports_update
 
     def send(self, channel, alert_group, text, event_type="notification"):
         if self.fail_send:

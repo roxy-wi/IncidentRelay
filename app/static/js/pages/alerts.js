@@ -621,11 +621,19 @@ function loadAlerts() {
 }
 
 function renderAlertsPage() {
-    renderAlertsSummaryGrid("#alerts-alerts-summary", alertsSummary);
-    renderAlertsInboxCounter(alertsPagination);
+    renderAlertsSummaryGrid(
+        "#alerts-alerts-summary",
+        alertsSummary
+    );
+
     renderActiveAlertFilters(alertsPagination);
     renderAlertsTable(alertsCache);
     renderAlertsPagination(alertsPagination);
+
+    // Pagination renderer may recreate elements using
+    // the same "alerts" prefix, so update the counter last.
+    renderAlertsInboxCounter(alertsPagination);
+
     syncAlertDetailsFromUrl();
     renderAlertsBulkActions();
 }
@@ -1959,11 +1967,40 @@ function alertsResponseSummary(response) {
 
 function renderAlertsInboxCounter(pagination) {
     pagination = pagination || {};
-    $("#alerts-page-from").text(pagination.from || 0);
-    $("#alerts-page-to").text(pagination.to || 0);
-    $("#alerts-filtered-count").text(pagination.total_items || 0);
-    $("#alerts-total-count").text(alertsSummary.total || pagination.total_items || 0);
-    $("#alerts-total-wrapper").hide();
+
+    const root = document.getElementById("alerts-inbox-counter");
+
+    if (!root) {
+        return;
+    }
+
+    const from = Number(pagination.from || 0);
+    const to = Number(pagination.to || 0);
+    const filteredTotal = Number(pagination.total_items || 0);
+    const summaryTotal = Number(alertsSummary.total || filteredTotal);
+
+    const setValue = function (name, value) {
+        const element = root.querySelector('[data-alerts-counter="' + name + '"]');
+
+        if (element) {
+            element.textContent = String(value);
+        }
+    };
+
+    setValue("from", from);
+    setValue("to", to);
+    setValue("filtered", filteredTotal);
+    setValue("total", summaryTotal);
+
+    const totalWrapper = root.querySelector(
+        '[data-alerts-counter="total-wrapper"]'
+    );
+
+    if (totalWrapper) {
+        totalWrapper.hidden = (
+            summaryTotal === filteredTotal
+        );
+    }
 }
 
 function applyAlertsQueryParams() {
@@ -2042,30 +2079,49 @@ $(document).on("input", "#alerts-search", function () {
 $(document)
     .off("change.alertsPageSize", "#alerts-page-size")
     .on("change.alertsPageSize", "#alerts-page-size", function () {
-        alertsPageSize = parseInt($(this).val(), 10) || 25;
+        alertsPageSize = parseInt(
+            $(this).val(),
+            10
+        ) || 25;
+
         alertsCurrentPage = 1;
+
+        writeAlertsQueryParams();
         loadAlerts();
     });
 
 $(document)
     .off("click.alertsPrevPage", "#alerts-prev-page")
     .on("click.alertsPrevPage", "#alerts-prev-page", function () {
-        if (alertsCurrentPage <= 1) {
+        if (
+            !alertsPagination
+            || !alertsPagination.has_prev
+        ) {
             return;
         }
 
-        alertsCurrentPage -= 1;
+        alertsCurrentPage = Math.max(
+            1,
+            alertsCurrentPage - 1
+        );
+
+        writeAlertsQueryParams();
         loadAlerts();
     });
 
 $(document)
     .off("click.alertsNextPage", "#alerts-next-page")
     .on("click.alertsNextPage", "#alerts-next-page", function () {
-        if (!alertsPagination || !alertsPagination.has_next) {
+        if (
+            !alertsPagination
+            || !alertsPagination.has_next
+        ) {
             return;
         }
 
         alertsCurrentPage += 1;
+
+        writeAlertsQueryParams();
         loadAlerts();
     });
 $(document)
@@ -2089,14 +2145,6 @@ $(document)
         writeAlertsQueryParams();
         loadAlerts();
     });
-// $(document).on("click", "#alerts-next-page", function () {
-//     if (!alertsPagination.has_next) {
-//         return;
-//     }
-//     alertsCurrentPage += 1;
-//     writeAlertsQueryParams();
-//     loadAlerts();
-// });
 $(document).on("change", "#alerts-auto-refresh", function () {
     setAlertsAutoRefresh($(this).is(":checked"));
 });

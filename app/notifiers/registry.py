@@ -1,12 +1,12 @@
 from app.notifiers.plugins import (
     DiscordNotifier,
     IncomingWebhookNotifier,
-    SlackNotifier,
     TeamsNotifier,
 )
 from app.notifiers.mattermost.notifier import MattermostNotifier
 from app.notifiers.email.notifier import EmailNotifier
 from app.notifiers.telegram.notifier import TelegramNotifier
+from app.notifiers.slack.notifier import SlackNotifier
 from app.notifiers.types import (
     CHANNEL_TYPE_VALUES,
     DISCORD_CHANNEL,

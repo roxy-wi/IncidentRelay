@@ -111,12 +111,6 @@ class IncomingWebhookNotifier(BaseNotifier):
         return {"provider": self.name}
 
 
-class SlackNotifier(IncomingWebhookNotifier):
-    """Send notifications through Slack Incoming Webhook."""
-
-    name = "slack"
-
-
 class TeamsNotifier(IncomingWebhookNotifier):
     """Send notifications through Microsoft Teams Incoming Webhook."""
 

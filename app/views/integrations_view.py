@@ -6,8 +6,11 @@ from peewee import DoesNotExist
 
 from app.api.schemas.integrations import (
     AlertmanagerWebhookSchema,
+    AwsSnsEnvelopeSchema,
     GenericWebhookSchema,
+    GrafanaWebhookSchema,
     LibreNMSWebhookSchema,
+    RmonWebhookSchema,
     SentryWebhookSchema,
     ZabbixWebhookSchema,
 )
@@ -22,10 +25,24 @@ from app.services.integrations.normalizers.webhook import normalize_webhook
 from app.services.integrations.normalizers.zabbix import normalize_zabbix
 from app.services.integrations.normalizers.alertmanager import normalize_alertmanager
 from app.services.integrations.normalizers.librenms import normalize_librenms
-from app.services.validation import validate_body
+from app.services.integrations.normalizers.grafana import normalize_grafana
+from app.services.integrations.normalizers.rmon import normalize_rmon
+from app.services.validation import make_error_response, validate_body
 from app.notifiers.voice.loader import create_voice_provider
 from app.modules.db.models import UserNotificationDelivery
 from app.services.integrations.sentry import validate_sentry_route_signature
+from app.services.integrations.aws_sns import (
+    AwsSnsError,
+    confirm_aws_sns_subscription,
+    validate_aws_sns_message,
+)
+from app.services.integrations.normalizers.aws_sns import (
+    normalize_aws_sns,
+)
+from app.notifiers.slack.actions import (
+    SlackActionError,
+    handle_slack_action,
+)
 
 integrations_bp = Blueprint("integrations_api", __name__)
 
@@ -41,6 +58,169 @@ def alertmanager_webhook():
     if error:
         return error
     return process_incoming_alerts(normalize_alertmanager(payload.model_dump()))
+
+
+@integrations_bp.route("/grafana", methods=["POST"])
+@require_alert_token()
+def grafana_webhook():
+    """Receive alerts from Grafana Alerting."""
+    payload, error = validate_body(GrafanaWebhookSchema)
+    if error:
+        return error
+
+    return process_incoming_alerts(
+        normalize_grafana(payload.model_dump())
+    )
+
+
+@integrations_bp.route("/rmon", methods=["POST"])
+@require_alert_token()
+def rmon_webhook():
+    """Receive alerts from RMON."""
+
+    payload, error = validate_body(RmonWebhookSchema)
+
+    if error:
+        return error
+
+    return process_incoming_alerts(
+        normalize_rmon(payload.model_dump())
+    )
+
+
+@integrations_bp.route("/aws-sns/<int:route_id>", methods=["POST"])
+def aws_sns_webhook(route_id):
+    """Receive signed Amazon SNS and CloudWatch notifications."""
+    try:
+        route = routes_repo.get_route(route_id)
+    except DoesNotExist:
+        return make_error_response(
+            error="not_found",
+            message="AWS SNS route was not found.",
+            status_code=404,
+        )
+
+    if route.source != "aws_sns":
+        return make_error_response(
+            error="route_source_mismatch",
+            message="Route source must be aws_sns.",
+            status_code=400,
+        )
+
+    if not route.enabled or route.deleted:
+        return make_error_response(
+            error="route_disabled",
+            message="AWS SNS route is disabled.",
+            status_code=403,
+        )
+
+    if not route.team or route.team.deleted or not route.team.active:
+        return make_error_response(
+            error="route_team_inactive",
+            message="AWS SNS route team is inactive.",
+            status_code=403,
+        )
+
+    if route.team.group and (route.team.group.deleted or not route.team.group.active):
+        return make_error_response(
+            error="route_group_inactive",
+            message="AWS SNS route group is inactive.",
+            status_code=403,
+        )
+
+    payload, error = validate_body(
+        AwsSnsEnvelopeSchema
+    )
+
+    if error:
+        return error
+
+    envelope = payload.model_dump(
+        by_alias=True,
+        exclude_none=True,
+    )
+
+    header_type = request.headers.get(
+        "x-amz-sns-message-type"
+    )
+    header_topic_arn = request.headers.get(
+        "x-amz-sns-topic-arn"
+    )
+
+    if header_type and header_type != envelope["Type"]:
+        return make_error_response(
+            error="aws_sns_header_mismatch",
+            message=(
+                "Amazon SNS message type header "
+                "does not match the payload."
+            ),
+            status_code=400,
+        )
+
+    if (
+            header_topic_arn
+            and header_topic_arn != envelope["TopicArn"]
+    ):
+        return make_error_response(
+            error="aws_sns_header_mismatch",
+            message=(
+                "Amazon SNS Topic ARN header "
+                "does not match the payload."
+            ),
+            status_code=400,
+        )
+
+    integration_config = (
+            route.integration_config or {}
+    )
+    aws_sns_config = dict(
+        integration_config.get("aws_sns") or {}
+    )
+    expected_topic_arn = str(
+        aws_sns_config.get("topic_arn") or ""
+    ).strip()
+
+    try:
+        validate_aws_sns_message(
+            envelope,
+            expected_topic_arn,
+        )
+
+        if envelope["Type"] == (
+                "SubscriptionConfirmation"
+        ):
+            confirm_aws_sns_subscription(
+                envelope["SubscribeURL"],
+                expected_topic_arn,
+            )
+
+            return jsonify({
+                "status": "confirmed",
+                "message_id": envelope["MessageId"],
+                "topic_arn": envelope["TopicArn"],
+            })
+
+        if envelope["Type"] == (
+                "UnsubscribeConfirmation"
+        ):
+            return jsonify({
+                "status": "unsubscribed",
+                "message_id": envelope["MessageId"],
+                "topic_arn": envelope["TopicArn"],
+            })
+    except AwsSnsError as exc:
+        return make_error_response(
+            error=exc.code,
+            message=exc.message,
+            status_code=exc.status_code,
+        )
+
+    request.current_intake_route = route
+    request.current_auth_type = "aws_sns_signature"
+
+    return process_incoming_alerts(
+        normalize_aws_sns(envelope)
+    )
 
 
 @integrations_bp.route("/zabbix", methods=["POST"])
@@ -99,7 +279,7 @@ def sentry_webhook(route_id):
         }), 403
 
     if route.team.group and (
-        route.team.group.deleted or not route.team.group.active
+            route.team.group.deleted or not route.team.group.active
     ):
         return jsonify({
             "error": "route_group_inactive",
@@ -261,6 +441,32 @@ def mattermost_action():
         "ephemeral_text": f"Alert #{alert.id} resolved",
         "skip_slack_parsing": True,
     })
+
+
+@integrations_bp.route("/slack/actions", methods=["POST"])
+def slack_action():
+    """Handle Slack Block Kit alert actions."""
+    raw_body = request.get_data(cache=True)
+
+    try:
+        result = handle_slack_action(
+            raw_body=raw_body,
+            timestamp=request.headers.get(
+                "X-Slack-Request-Timestamp"
+            ),
+            signature=request.headers.get(
+                "X-Slack-Signature"
+            ),
+        )
+    except SlackActionError as exc:
+        return jsonify(
+            {
+                "error": exc.error,
+                "message": exc.message,
+            }
+        ), exc.status_code
+
+    return jsonify(result)
 
 
 @integrations_bp.route("/voice/rule-callback/<int:delivery_id>/<secret>", methods=["POST"])

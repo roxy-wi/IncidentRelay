@@ -11,7 +11,7 @@ It provides the core building blocks of an on-call system:
 - access groups and RBAC-style group roles;
 - teams and on-call rotations;
 - alert intake routes with per-route tokens;
-- Alertmanager, Zabbix, Sentry, LibreNMS, and generic webhook integrations;
+- Alertmanager, Grafana, Zabbix, Sentry, LibreNMS, and generic webhook integrations;
 - Mattermost, Slack, Telegram, Discord, Microsoft Teams, email, webhook, and voice-call notifications;
 - profile-level browser/PWA push notifications;
 - profile notification rules for browser push, email, and voice-call follow-up;
@@ -78,6 +78,10 @@ Unacknowledged alerts can trigger repeated reminders and then escalate to the ne
 
 Mattermost Bot API mode supports interactive `Acknowledge` and `Resolve` buttons, message updates, and severity-based attachment colors.
 
+### Slack with interactive actions
+
+Slack Bot API mode supports interactive `Acknowledge` and `Resolve` buttons, message updates after alert state changes, and responder attribution by Slack user ID.
+
 ### Telegram actions and worker
 
 Telegram notifications can include action buttons and alert links. Telegram callback/polling processing is handled by the optional `incidentrelay-telegram-worker` service.
@@ -104,26 +108,28 @@ IncidentRelay includes Swagger/OpenAPI documentation and personal API tokens wit
 
 ### Incoming alert sources
 
-| Source          | Endpoint                                  |
-|-----------------|-------------------------------------------|
-| Alertmanager    | `POST /api/integrations/alertmanager`     |
-| Zabbix          | `POST /api/integrations/zabbix`           |
+| Source          | Endpoint                                   |
+|-----------------|--------------------------------------------|
+| Alertmanager    | `POST /api/integrations/alertmanager`      |
+| Grafana         | `POST /api/integrations/grafana`           |
+| RMON            | `POST /api/integrations/rmon`              |
+| Zabbix          | `POST /api/integrations/zabbix`            |
 | Sentry          | `POST /api/integrations/sentry/<route_id>` |
-| LibreNMS        | `POST /api/integrations/librenms`         |
-| Generic webhook | `POST /api/integrations/webhook`          |
+| LibreNMS        | `POST /api/integrations/librenms`          |
+| Generic webhook | `POST /api/integrations/webhook`           |
 
 ### Notification channels
 
-| Channel | Notes |
-|---|---|
-| Mattermost | Incoming webhook mode or Bot API mode with buttons and updates |
-| Slack | Webhook notifications |
-| Telegram | Bot notifications and optional action buttons |
-| Discord | Webhook notifications |
-| Microsoft Teams | Webhook notifications |
-| Email | Email recipients |
-| Webhook | Generic outbound webhook |
-| Voice call | Pluggable provider API for self-hosted voice integrations |
+| Channel         | Notes                                                          |
+|-----------------|----------------------------------------------------------------|
+| Mattermost      | Incoming webhook mode or Bot API mode with buttons and updates |
+| Slack           | Incoming webhook mode or Bot API mode with buttons and updates |
+| Telegram        | Bot notifications and optional action buttons                  |
+| Discord         | Webhook notifications                                          |
+| Microsoft Teams | Webhook notifications                                          |
+| Email           | Email recipients                                               |
+| Webhook         | Generic outbound webhook                                       |
+| Voice call      | Pluggable provider API for self-hosted voice integrations      |
 
 Browser/PWA push is profile-level, not a notification channel. Users enable it in Profile, and IncidentRelay sends push notifications to the assigned user's active browser/PWA devices.
 
@@ -358,7 +364,7 @@ After the first login:
 10. Copy the route intake token
 11. Configure browser push VAPID keys if browser/PWA notifications are required
 12. Ask users to enable browser push or profile notification rules if required
-13. Configure Alertmanager, Zabbix, or webhook sender
+13. Configure Alertmanager, Grafana , Zabbix, Sentry, LibreNMS or webhook sender
 14. Send a test alert
 15. Acknowledge or resolve the alert
 ```
@@ -397,6 +403,11 @@ curl -X POST http://127.0.0.1:8080/api/integrations/alertmanager \
 More examples:
 
 - [Alertmanager integration](docs/integrations/alertmanager.md)
+- AWS SNS/Cloud watch [AWS SNS/Cloud watch](integrations/aws-sns-cloudwatch.md)
+- [Grafana integration](docs/integrations/grafana.md)
+- [RMON integration](docs/integrations/rmon.md)
+- [Sentry integration](docs/integrations/sentry.md)
+- [LibreNMS integration](docs/integrations/librenms.md)
 - [Zabbix integration](docs/integrations/zabbix.md)
 - [Generic webhook integration](docs/integrations/generic-webhook.md)
 
@@ -468,35 +479,40 @@ OpenAPI JSON is available at:
 
 ## Documentation
 
-| Topic | Link |
-|---|---|
-| Getting started | [docs/getting-started/](docs/getting-started/index.md) |
-| Docker installation | [docs/getting-started/docker.md](docs/getting-started/docker.md) |
-| RedHat RPM installation | [docs/getting-started/rpm-installation.md](docs/getting-started/rpm-installation.md) |
-| Systemd installation | [docs/getting-started/systemd.md](docs/getting-started/systemd.md) |
-| Configuration | [docs/getting-started/configuration.md](docs/getting-started/configuration.md) |
-| First login | [docs/getting-started/first-login.md](docs/getting-started/first-login.md) |
-| Groups and RBAC | [docs/concepts/groups-and-rbac.md](docs/concepts/groups-and-rbac.md) |
-| Teams, rotations, routes | [docs/concepts/teams-rotations-routes.md](docs/concepts/teams-rotations-routes.md) |
-| Route intake tokens | [docs/concepts/route-intake-tokens.md](docs/concepts/route-intake-tokens.md) |
-| Maintenance Windows | [docs/concepts/maintenance-windows.md](docs/concepts/maintenance-windows.md) |
-| Services | [docs/concepts/services.md](docs/concepts/services.md) |
-| Channels | [docs/concepts/channels.md](docs/concepts/channels.md) |
-| Alertmanager | [docs/integrations/alertmanager.md](docs/integrations/alertmanager.md) |
-| Zabbix | [docs/integrations/zabbix.md](docs/integrations/zabbix.md) |
-| Generic webhook | [docs/integrations/generic-webhook.md](docs/integrations/generic-webhook.md) |
-| Mattermost | [docs/integrations/mattermost.md](docs/integrations/mattermost.md) |
-| Alerts | [docs/usage/alerts.md](docs/usage/alerts.md) |
-| Browser push | [docs/usage/browser-push.md](docs/usage/browser-push.md) |
-| Calendar | [docs/usage/calendar.md](docs/usage/calendar.md) |
-| Silences | [docs/usage/silences.md](docs/usage/silences.md) |
-| Rotation overrides | [docs/usage/rotation-overrides.md](docs/usage/rotation-overrides.md) |
-| Profile and API tokens | [docs/usage/profile-and-tokens.md](docs/usage/profile-and-tokens.md) |
-| Logging | [docs/administration/logging.md](docs/administration/logging.md) |
-| Troubleshooting | [docs/administration/troubleshooting.md](docs/administration/troubleshooting.md) |
-| Demo data | [docs/administration/demo-data.md](docs/administration/demo-data.md) |
-| Schema check | [docs/administration/schema-check.md](docs/administration/schema-check.md) |
-| Custom voice providers | [docs/voice-providers/index.md](docs/voice-providers/index.md) |
+| Topic                    | Link                                                                                 |
+|--------------------------|--------------------------------------------------------------------------------------|
+| Getting started          | [docs/getting-started/](docs/getting-started/index.md)                               |
+| Docker installation      | [docs/getting-started/docker.md](docs/getting-started/docker.md)                     |
+| RedHat RPM installation  | [docs/getting-started/rpm-installation.md](docs/getting-started/rpm-installation.md) |
+| Systemd installation     | [docs/getting-started/systemd.md](docs/getting-started/systemd.md)                   |
+| Configuration            | [docs/getting-started/configuration.md](docs/getting-started/configuration.md)       |
+| First login              | [docs/getting-started/first-login.md](docs/getting-started/first-login.md)           |
+| Groups and RBAC          | [docs/concepts/groups-and-rbac.md](docs/concepts/groups-and-rbac.md)                 |
+| Teams, rotations, routes | [docs/concepts/teams-rotations-routes.md](docs/concepts/teams-rotations-routes.md)   |
+| Route intake tokens      | [docs/concepts/route-intake-tokens.md](docs/concepts/route-intake-tokens.md)         |
+| Maintenance Windows      | [docs/concepts/maintenance-windows.md](docs/concepts/maintenance-windows.md)         |
+| Services                 | [docs/concepts/services.md](docs/concepts/services.md)                               |
+| Channels                 | [docs/concepts/channels.md](docs/concepts/channels.md)                               |
+| Alertmanager             | [docs/integrations/alertmanager.md](docs/integrations/alertmanager.md)               |
+| AWS SNS/Cloud watch      | [docs/integrations/aws-sns-cloudwatch.md](docs/integrations/aws-sns-cloudwatch.md)   |
+| Grafana                  | [docs/integrations/grafana.md](docs/integrations/grafana.md)                         |
+| RMON                     | [docs/integrations/rmon.md](docs/integrations/rmon.md)                               |
+| Sentry                   | [docs/integrations/sentry.md](docs/integrations/sentry.md)                           |
+| LibreNMS                 | [docs/integrations/librenms.md](docs/integrations/librenms.md)                       |
+| Zabbix                   | [docs/integrations/zabbix.md](docs/integrations/zabbix.md)                           |
+| Generic webhook          | [docs/integrations/generic-webhook.md](docs/integrations/generic-webhook.md)         |
+| Mattermost               | [docs/integrations/mattermost.md](docs/integrations/mattermost.md)                   |
+| Alerts                   | [docs/usage/alerts.md](docs/usage/alerts.md)                                         |
+| Browser push             | [docs/usage/browser-push.md](docs/usage/browser-push.md)                             |
+| Calendar                 | [docs/usage/calendar.md](docs/usage/calendar.md)                                     |
+| Silences                 | [docs/usage/silences.md](docs/usage/silences.md)                                     |
+| Rotation overrides       | [docs/usage/rotation-overrides.md](docs/usage/rotation-overrides.md)                 |
+| Profile and API tokens   | [docs/usage/profile-and-tokens.md](docs/usage/profile-and-tokens.md)                 |
+| Logging                  | [docs/administration/logging.md](docs/administration/logging.md)                     |
+| Troubleshooting          | [docs/administration/troubleshooting.md](docs/administration/troubleshooting.md)     |
+| Demo data                | [docs/administration/demo-data.md](docs/administration/demo-data.md)                 |
+| Schema check             | [docs/administration/schema-check.md](docs/administration/schema-check.md)           |
+| Custom voice providers   | [docs/voice-providers/index.md](docs/voice-providers/index.md)                       |
 
 ---
 

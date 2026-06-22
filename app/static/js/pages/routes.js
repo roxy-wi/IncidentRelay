@@ -215,7 +215,16 @@ function renderRoutesSummary(routes) {
 function fillRouteSourceFilter(routes) {
     const filter = $("#routes-source-filter");
     const selected = filter.val();
-    const sources = { alertmanager: true, zabbix: true, webhook: true, sentry: true, librenms: true };
+    const sources = {
+        alertmanager: true,
+        aws_sns: true,
+        grafana: true,
+        rmon: true,
+        zabbix: true,
+        webhook: true,
+        sentry: true,
+        librenms: true
+    };
 
     asArray(routes).forEach(function (route) {
         if (route.source) {
@@ -338,7 +347,7 @@ function renderRouteActions(route) {
         }
     ];
 
-    if (route.source !== "sentry") {
+    if (!["sentry", "aws_sns"].includes(route.source)) {
         items.push({
             label: "Regenerate token",
             icon: "fas fa-sync-alt",
@@ -681,33 +690,58 @@ function renderRouteDetails(route) {
             .append(routeDetailsItem("Team", getRouteTeamLabel(route)))
             .append(routeDetailsItem("Source", route.source))
             .append(
-                    route.source === "sentry"
-                        ? routeDetailsItem("Sentry webhook URL", getSentryWebhookUrl(route))
-                        : $()
+                route.source === "sentry"
+                    ? routeDetailsItem("Sentry webhook URL", getSentryWebhookUrl(route))
+                    : $()
+            )
+            .append(
+                route.source === "sentry"
+                    ? routeDetailsItem(
+                        "Sentry secret",
+                        getRouteSentryConfig(route).has_webhook_secret
+                            ? "Configured"
+                            : "Not configured"
+                    )
+                    : $()
+            )
+            .append(
+                routeDetailsItem(
+                    route.source === "aws_sns"
+                        ? "SNS webhook URL"
+                        : "Webhook URL",
+                    getRouteIntakeUrl(route)
                 )
-                .append(
-                    route.source === "sentry"
-                        ? routeDetailsItem(
-                            "Sentry secret",
-                            getRouteSentryConfig(route).has_webhook_secret
-                                ? "Configured"
-                                : "Not configured"
-                        )
-                        : $()
-                )
-            .append(routeDetailsItem("Webhook URL", getRouteIntakeUrl(route)))
+            )
             .append(routeDetailsItem("Maintenance", window.AppMaintenanceBadges.text(route, "-")))
             .append(routeDetailsItem("Escalation", getRouteEscalationLabel(route)))
             .append(routeDetailsItem("Team escalation", getRouteTeamEscalationLabel(route)))
             .append(routeDetailsItem("Channels", asArray(route.channels).map(function (channel) {
                 return channel.name;
             }).join(", ") || "-"))
-            .append(routeDetailsItem("Token prefix", route.intake_token_prefix))
+            .append(
+                !["sentry", "aws_sns"].includes(route.source)
+                    ? routeDetailsItem(
+                        "Token prefix",
+                        route.intake_token_prefix
+                    )
+                    : $()
+            )
             .append(routeDetailsItem("Status", route.enabled ? "Enabled" : "Disabled"))
             .append(routeDetailsCode("Matchers", route.matchers || {}))
             .append(routeDetailsCode("Group by", route.group_by || []))
             .append(routeDetailsItem("Service", route.service_name || route.service_slug || "-"))
     );
+
+    if (route.source === "aws_sns") {
+        const awsSnsConfig = getRouteAwsSnsConfig(route);
+
+        body.find(".details-list").append(
+            routeDetailsItem(
+                "SNS Topic ARN",
+                awsSnsConfig.topic_arn
+            )
+        );
+    }
 
     const actions = $("<div>").addClass("details-actions");
     appendIconActionIfAllowed(actions, route, {
@@ -718,14 +752,16 @@ function renderRouteDetails(route) {
             editRoute(route.id);
         },
     });
-    appendIconActionIfAllowed(actions, route, {
-        required: "write",
-        icon: "fas fa-sync-alt",
-        label: "Regenerate route token",
-        onClick: function () {
-            regenerateRouteToken(route.id);
-        },
-    });
+    if (!["sentry", "aws_sns"].includes(route.source)) {
+        appendIconActionIfAllowed(actions, route, {
+            required: "write",
+            icon: "fas fa-sync-alt",
+            label: "Regenerate route token",
+            onClick: function () {
+                regenerateRouteToken(route.id);
+            },
+        });
+    }
     appendIconActionIfAllowed(actions, route, {
         required: "write",
         icon: route.enabled ? "fas fa-pause" : "fas fa-play",
@@ -797,33 +833,89 @@ function getSentryWebhookUrl(route) {
     return window.location.origin + path;
 }
 
+function getRouteAwsSnsConfig(route) {
+    const integrationConfig = (
+        route && route.integration_config
+            ? route.integration_config
+            : {}
+    );
+
+    return integrationConfig.aws_sns || {};
+}
+
 function updateRouteSourceUi() {
-    const source = $("#route-source").val();
+    const source = String(
+        $("#route-source").val() || ""
+    );
 
-    $("#route-sentry-settings").toggleClass("is-hidden", source !== "sentry");
+    const isSentry = source === "sentry";
+    const isAwsSns = source === "aws_sns";
 
-    if (source === "sentry" && !$("#route-id").val()) {
-        $("#route-group-by").val('["project_slug","issue_id"]');
+    $("#route-sentry-settings").toggleClass("is-hidden", !isSentry);
+
+    $("#route-aws-sns-settings").toggleClass("is-hidden", !isAwsSns);
+
+    $("#route-aws-sns-topic-arn").prop("required", isAwsSns);
+
+    const hasAwsSnsWebhook = Boolean(
+        String(
+            $("#route-aws-sns-webhook-url").val() || ""
+        ).trim()
+    );
+
+    $("#route-aws-sns-webhook-group").toggleClass(
+        "is-hidden",
+        !isAwsSns || !hasAwsSnsWebhook
+    );
+
+    if (!$("#route-id").val()) {
+        if (source === "sentry") {
+            $("#route-group-by").val(
+                '["project_slug","issue_id"]'
+            );
+        } else if (source === "grafana") {
+            $("#route-group-by").val(
+                '["alertname","grafana_folder","instance"]'
+            );
+        } else if (source === "rmon") {
+            $("#route-group-by").val(
+                '["rmon_check_id","rmon_check_type"]'
+            );
+        } else if (source === "aws_sns") {
+            $("#route-group-by").val(
+                '["cloudwatch_alarm_arn"]'
+            );
+        }
     }
 }
 
 function collectRouteIntegrationConfig() {
     const source = $("#route-source").val();
 
-    if (source !== "sentry") {
-        return {};
+    if (source === "aws_sns") {
+        return {
+            aws_sns: {
+                topic_arn: String(
+                    $("#route-aws-sns-topic-arn").val() || ""
+                ).trim()
+            }
+        };
     }
 
-    const secret = String($("#route-sentry-webhook-secret").val() || "").trim();
-    const sentry = {};
+    if (source === "sentry") {
 
-    if (secret) {
-        sentry.webhook_secret = secret;
+        const secret = String($("#route-sentry-webhook-secret").val() || "").trim();
+        const sentry = {};
+
+        if (secret) {
+            sentry.webhook_secret = secret;
+        }
+
+        return {
+            sentry: sentry
+        };
     }
-
-    return {
-        sentry: sentry
-    };
+    return {};
 }
 
 function updateSentrySecretHelp(route) {
@@ -848,41 +940,43 @@ function updateSentrySecretHelp(route) {
     );
 }
 function collectRoutePayload() {
-    const selectedPolicyId = $("#route-escalation-policy").val();
-    const selectedRotationId = $("#route-rotation").val();
-
-    let escalationMode = $("#route-escalation-mode").val() || "rotation";
-
-    if (selectedPolicyId) {
-        escalationMode = "policy";
-    }
-
-    const usePolicy = escalationMode === "policy";
+    const mode = $("#route-escalation-mode").val() || "rotation";
+    const usePolicy = mode === "policy";
 
     return {
         team_id: Number($("#route-team").val()),
         name: $("#route-name").val(),
         source: $("#route-source").val(),
 
-        escalation_mode: escalationMode,
+        rotation_id: (
+            !usePolicy && $("#route-rotation").val()
+                ? Number($("#route-rotation").val())
+                : null
+        ),
 
-        rotation_id: !usePolicy && selectedRotationId
-            ? Number(selectedRotationId)
-            : null,
+        escalation_policy_id: (
+            usePolicy && $("#route-escalation-policy").val()
+                ? Number($("#route-escalation-policy").val())
+                : null
+        ),
 
-        escalation_policy_id: usePolicy && selectedPolicyId
-            ? Number(selectedPolicyId)
-            : null,
+        channel_ids: (
+            $("#route-channels").val() || []
+        ).map(Number),
 
-        service_id: $("#route-service").val()
-            ? Number($("#route-service").val())
-            : null,
+        matchers: parseJsonInput(
+            "#route-matchers",
+            {}
+        ),
 
-        channel_ids: ($("#route-channels").val() || []).map(Number),
-        matchers: parseJsonInput("#route-matchers", {}),
-        group_by: parseJsonInput("#route-group-by", []),
+        group_by: parseJsonInput(
+            "#route-group-by",
+            []
+        ),
+
         integration_config: collectRouteIntegrationConfig(),
-        enabled: $("#route-enabled").is(":checked"),
+
+        enabled: $("#route-enabled").is(":checked")
     };
 }
 
@@ -905,10 +999,20 @@ function saveRoute() {
         return;
     }
 
-    apiPost("/api/routes", collectRoutePayload(), function (response) {
+    const payload = collectRoutePayload();
+
+    apiPost("/api/routes", payload, function (response) {
         closeAppModal("#route-form-modal");
         resetRouteForm();
         refreshRoutes();
+
+        if (payload.source === "aws_sns") {
+            showAppSuccess(
+                "AWS SNS route created. Copy the webhook URL from route details."
+            );
+            return;
+        }
+
         showRouteIntakeDetails(response);
     });
 }
@@ -930,6 +1034,36 @@ function editRoute(id) {
     $("#route-team").val(route.team_id);
     $("#route-name").val(route.name);
     $("#route-source").val(route.source);
+    const integrationConfig = (
+        route.integration_config || {}
+    );
+
+    const awsSnsConfig = (
+        integrationConfig.aws_sns || {}
+    );
+
+    $("#route-aws-sns-topic-arn").val(
+        awsSnsConfig.topic_arn || ""
+    );
+
+    const awsSnsWebhookPath = (
+        awsSnsConfig.webhook_path || ""
+    );
+
+    if (route.source === "aws_sns" && awsSnsWebhookPath) {
+        $("#route-aws-sns-webhook-url").val(
+            window.location.origin + awsSnsWebhookPath
+        );
+
+        $("#route-aws-sns-webhook-group")
+            .removeClass("is-hidden");
+    } else {
+        $("#route-aws-sns-webhook-url").val("");
+
+        $("#route-aws-sns-webhook-group")
+            .addClass("is-hidden");
+    }
+
     $("#route-matchers").val(JSON.stringify(route.matchers || {}, null, 2));
     $("#route-group-by").val(JSON.stringify(route.group_by || [], null, 2));
     $("#route-enabled").prop("checked", !!route.enabled);
@@ -1023,6 +1157,9 @@ function resetRouteForm() {
     $("#route-escalation-mode").val("rotation");
     $("#route-escalation-policy").val("");
     $("#route-service").val("");
+    $("#route-aws-sns-topic-arn").val("");
+    $("#route-aws-sns-webhook-url").val("");
+    $("#route-aws-sns-webhook-group").addClass("is-hidden");
     updateRouteEscalationModeUi();
     $("#route-sentry-webhook-secret").val("");
     updateSentrySecretHelp(null);
@@ -1034,6 +1171,15 @@ function getRouteIntakePath(route) {
 
     if (source === "sentry") {
         return "/api/integrations/sentry/" + route.id;
+    }
+
+    if (source === "aws_sns") {
+        const awsSnsConfig = getRouteAwsSnsConfig(route);
+
+        return (
+            awsSnsConfig.webhook_path
+            || ("/api/integrations/aws-sns/" + route.id)
+        );
     }
 
     if (source === "alertmanager") {
@@ -1208,8 +1354,7 @@ function getFilteredRoutes() {
 $(document).on("change", "#route-team", function () {
     loadRouteDependencies();
 });
-$("#route-source").on("change", updateRouteSourceUi);
-$(document).on("change", "#route-escalation-mode", updateRouteEscalationModeUi);
+$(document).on("change", "#route-source", updateRouteSourceUi);
 $(document).on("input", "#routes-search", renderRoutesTable);
 $(document).on("change", "#routes-source-filter, #routes-status-filter", renderRoutesTable);
 $(document).on("click", "#open-route-create-modal", openCreateRouteModal);
@@ -1297,9 +1442,6 @@ $(document).on("click", "#route-service-rules-modal", function (event) {
     if (event.target === this) {
         closeAppModal("#route-service-rules-modal");
     }
-});
-$(document).on("click", "#format-service-rule-matchers", function () {
-    formatJsonTextarea("#service-rule-matchers", {}, "Matchers JSON");
 });
 $(document).on("click", "#copy-route-intake-url", copyRouteIntakeUrl);
 $(document).on("click", "#copy-route-intake-curl", copyRouteIntakeCurl);

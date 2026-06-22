@@ -104,15 +104,48 @@ function showChannelFields() {
         showMattermostModeFields();
         return;
     }
-    if (["slack", "webhook", "discord", "teams"].includes(type)) {
+    if (type === "slack") {
+        $('[data-channel-config="slack"]').show();
+        showSlackModeFields();
+        return;
+    }
+
+    if (["webhook", "discord", "teams"].includes(type)) {
         $('[data-channel-config="webhook"]').show();
-        updateWebhookLabel(type);
         return;
     }
     if (type === "email") {
         $('[data-channel-config="email"]').show();
         return;
     }
+}
+
+function buildSlackConfig(config) {
+    const mode = $("#cfg-slack-mode").val() || "bot_api";
+
+    config.mode = mode;
+
+    if (mode === "bot_api") {
+        config.bot_token = String(
+            $("#cfg-slack-bot-token").val() || ""
+        ).trim();
+
+        config.channel_id = String(
+            $("#cfg-slack-channel-id").val() || ""
+        ).trim();
+
+        delete config.webhook_url;
+        return config;
+    }
+
+    config.webhook_url = String(
+        $("#cfg-slack-webhook-url").val() || ""
+    ).trim();
+
+    delete config.bot_token;
+    delete config.channel_id;
+
+    return config;
 }
 
 function updateWebhookLabel(type) {
@@ -134,6 +167,19 @@ function showMattermostModeFields() {
     }
     $("#cfg-mm-bot-fields").show();
     $("#cfg-mm-webhook-fields").hide();
+}
+
+function showSlackModeFields() {
+    const mode = $("#cfg-slack-mode").val() || "bot_api";
+
+    if (mode === "webhook") {
+        $("#cfg-slack-bot-fields").hide();
+        $("#cfg-slack-webhook-fields").show();
+        return;
+    }
+
+    $("#cfg-slack-bot-fields").show();
+    $("#cfg-slack-webhook-fields").hide();
 }
 
 function getDefaultEmailHtmlTemplate() {
@@ -178,8 +224,15 @@ function buildChannelConfig() {
     if (type === "mattermost") {
         return buildMattermostConfig(config);
     }
-    if (["slack", "webhook", "discord", "teams"].includes(type)) {
-        config.webhook_url = $("#cfg-webhook-url").val();
+    if (type === "slack") {
+        return buildSlackConfig(config);
+    }
+
+    if (["webhook", "discord", "teams"].includes(type)) {
+        config.webhook_url = String(
+            $("#cfg-webhook-url").val() || ""
+        ).trim();
+
         return config;
     }
     if (type === "email") {
@@ -290,7 +343,7 @@ function renderChannelRow(channel) {
             )
             .append($("<div>").addClass("row-subtitle").text("Channel #" + channel.id))
     );
-    row.append($("<td>").text(channel.group_slug || "-"));
+    row.append($("<td>").text(channel.group_name || channel.group_slug || "-"));
     row.append($("<td>").text(channel.team_name|| channel.team_slug || "-"));
     row.append($("<td>").append($("<span>").addClass("channel-type-pill").text(channel.channel_type || "-")));
     row.append($("<td>").append($("<span>").addClass("channel-mode-pill").text(mode)));
@@ -433,7 +486,13 @@ function stripVisibleChannelConfig(type, config) {
         delete config.callback_secret;
         delete config.webhook_url;
     }
-    if (["slack", "webhook", "discord", "teams"].includes(type)) {
+    if (type === "slack") {
+        delete config.mode;
+        delete config.bot_token;
+        delete config.channel_id;
+        delete config.webhook_url;
+    }
+    if (["webhook", "discord", "teams"].includes(type)) {
         delete config.webhook_url;
     }
     return config;
@@ -456,7 +515,32 @@ function fillChannelFields(type, config) {
         $("#cfg-mm-webhook-url").val(config.webhook_url || "");
         showMattermostModeFields();
     }
-    if (["slack", "webhook", "discord", "teams"].includes(type)) {
+    if (type === "slack") {
+        const inferredMode = (
+            config.bot_token && config.channel_id
+                ? "bot_api"
+                : "webhook"
+        );
+
+        $("#cfg-slack-mode").val(
+            config.mode || inferredMode
+        );
+
+        $("#cfg-slack-bot-token").val(
+            config.bot_token || ""
+        );
+
+        $("#cfg-slack-channel-id").val(
+            config.channel_id || ""
+        );
+
+        $("#cfg-slack-webhook-url").val(
+            config.webhook_url || ""
+        );
+
+        showSlackModeFields();
+    }
+    if (["webhook", "discord", "teams"].includes(type)) {
         $("#cfg-webhook-url").val(config.webhook_url || "");
         updateWebhookLabel(type);
     }
@@ -476,6 +560,12 @@ function clearChannelFields() {
     $("#cfg-mm-callback-secret").val("");
     $("#cfg-mm-webhook-url").val("");
     $(".cfg-channel-severity").prop("checked", false);
+    $("#cfg-slack-mode").val("bot_api");
+    $("#cfg-slack-bot-token").val("");
+    $("#cfg-slack-channel-id").val("");
+    $("#cfg-slack-webhook-url").val("");
+
+    showSlackModeFields();
     resetEmailHtmlTemplate();
 }
 
@@ -566,7 +656,23 @@ function getChannelModeLabel(channel) {
     if (channel.channel_type === "mattermost") {
         return config.mode || (config.api_url ? "bot_api" : "webhook");
     }
-    if (["slack", "webhook", "discord", "teams"].includes(channel.channel_type)) {
+    if (channel.channel_type === "slack") {
+        if (config.mode) {
+            return config.mode;
+        }
+
+        return (
+            config.bot_token && config.channel_id
+                ? "bot_api"
+                : "webhook"
+        );
+    }
+
+    if (
+        ["webhook", "discord", "teams"].includes(
+            channel.channel_type
+        )
+    ) {
         return "webhook";
     }
     if (channel.channel_type === "email") {
@@ -661,7 +767,24 @@ function getSafeChannelConfigSummary(channel) {
     if (channel.channel_type === "email") {
         return "Assigned user profile email; " + (config.html_template ? "custom HTML template" : "default HTML template");
     }
-    if (["slack", "webhook", "discord", "teams"].includes(channel.channel_type)) {
+    if (channel.channel_type === "slack") {
+        const mode = getChannelModeLabel(channel);
+
+        if (mode === "bot_api") {
+            return (
+                config.bot_token && config.channel_id
+                    ? "Bot API configured"
+                    : "Bot API incomplete"
+            );
+        }
+
+        return (
+            config.webhook_url
+                ? "Webhook configured"
+                : "Webhook missing"
+        );
+    }
+    if (["webhook", "discord", "teams"].includes(channel.channel_type)) {
         return config.webhook_url ? "Webhook configured" : "Webhook missing";
     }
     if (channel.channel_type === "telegram") {
@@ -789,6 +912,7 @@ $(document).on("change", "#channel-group", function () {
 });
 $(document).on("change", "#channel-type", showChannelFields);
 $(document).on("change", "#cfg-mm-mode", showMattermostModeFields);
+$(document).on("change", "#cfg-slack-mode", showSlackModeFields);
 $(document).on("click", "#save-channel", saveChannel);
 $(document).on("click", "#reset-channel-form", resetChannelForm);
 $(document).on("click", "#reload-channels", function () {
