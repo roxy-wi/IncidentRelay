@@ -471,7 +471,7 @@
 
             <div class="form-grid-3">
               <div>
-                <label for="service-environment">Blast radius</label>
+                <label for="service-environment">Environment</label>
                 <select id="service-environment" class="input">
                   <option value="production">Production</option>
                   <option value="staging">Staging</option>
@@ -506,7 +506,7 @@
           <div class="card-header">
             <div>
               <h2>Status and defaults</h2>
-              <div class="card-subtitle">Status, default rotation and escalation policy.</div>
+              <div class="card-subtitle">Status, rotation, escalation, notification and priority policies.</div>
             </div>
           </div>
 
@@ -531,6 +531,24 @@
             <label for="service-default-policy">Default escalation policy</label>
             <select id="service-default-policy" class="input"><option value="">No default policy</option></select>
 
+              <label for="service-notification-policy">Notification policy</label>
+                <select id="service-notification-policy" class="input">
+                  <option value="">No notification policy</option>
+                </select>
+
+                <div class="help-text">
+                  Used when a route is configured to deliver through the service notification policy.
+                </div>
+
+              <label for="service-priority-policy">Priority policy</label>
+              <select id="service-priority-policy" class="input">
+                  <option value="">Use team default</option>
+              </select>
+
+              <div class="help-text">
+                  Overrides the team's default priority policy for incidents assigned to this service.
+              </div>
+
             <label class="md-checkbox"><input id="service-enabled" type="checkbox" checked><span>Enabled</span></label>
             <label class="md-checkbox"><input id="service-public" type="checkbox"><span>Show on status page later</span></label>
 
@@ -550,7 +568,7 @@
     <div class="app-modal-header">
       <div>
         <h2 id="service-link-form-title">Create link</h2>
-        <div class="card-subtitle">Dashboard, logs, docs, repository or other service link.</div>
+        <div class="card-subtitle">Dashboard, logs, docs, repository or another service link.</div>
       </div>
       <button id="close-service-link-modal" type="button" class="app-modal-close" aria-label="Close">×</button>
     </div>
@@ -653,11 +671,12 @@
             <textarea id="service-runbook-description" class="input" rows="3"></textarea>
 
             <label for="service-runbook-matchers">Matchers JSON</label>
-            <textarea id="service-runbook-matchers" class="input json-editr" rows="8" spellcheck="false">{}</textarea>
+            <textarea id="service-runbook-matchers" class="input code-textarea json-editor-textarea" rows="8" spellcheck="false">{}</textarea>
+
+            <div class="help-text">Use {} when the runbook should be available for every alert in the service.</div>
 
             <div class="form-actions">
               <button id="reset-service-runbook-form" type="button" class="btn">Reset</button>
-              <button id="format-service-runbook-matchers" type="button" class="btn">Format JSON</button>
               <button id="save-service-runbook" type="button" class="btn btn-primary">Save runbook</button>
             </div>
           </div>

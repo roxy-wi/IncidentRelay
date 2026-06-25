@@ -41,6 +41,16 @@ Manual priority changes:
 - add timeline context;
 - can notify stakeholders that requested priority-change notifications.
 
+A manual priority override can be removed from the incident details view by selecting **Reset to automatic**.
+
+After the reset, IncidentRelay restores priority according to the effective policy update mode:
+
+- `initial_only` restores the priority selected for the first alert;
+- `raise_only` restores the highest priority found in the incident alert history;
+- `recalculate` selects the highest priority among currently active alerts.
+
+If no eligible alert priority is available, the policy fallback or severity mapping is used.
+
 ## Filtering and sorting
 
 The Alerts page supports filtering by priority and sorting priority-first. Priority is also shown in alert details and dashboard summaries.

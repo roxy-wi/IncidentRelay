@@ -280,6 +280,18 @@ INCIDENT_PRIORITY_SCHEMA = {
     },
 }
 
+INCIDENT_PRIORITY_STATE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "id": {"type": "integer", "nullable": True, "example": 1},
+        "slug": {"type": "string", "example": "p1"},
+        "order": {"type": "integer", "nullable": True, "example": 1},
+        "set_manually": {"type": "boolean", "example": True},
+        "set_by_id": {"type": "integer", "nullable": True, "example": 42},
+        "set_at": date_time_schema("Timestamp of the manual priority override."),
+    },
+}
+
 INCIDENT_PRIORITY_UPDATE_SCHEMA = {
     "type": "object",
     "required": ["priority"],
@@ -381,11 +393,7 @@ INCIDENT_SUMMARY_SCHEMA = {
             "type": "string",
             "example": "firing",
         },
-        "priority": {
-            "type": "object",
-            "additionalProperties": True,
-            "description": "Current incident priority summary.",
-        },
+        "priority": INCIDENT_PRIORITY_STATE_SCHEMA,
         "maintenance": {
             "type": "object",
             "additionalProperties": True,
@@ -604,6 +612,26 @@ def paths():
                 "responses": {
                     "200": response("Incident priority updated.", INCIDENT_DETAILS_SCHEMA),
                     "400": response("Validation error.", ERROR_SCHEMA),
+                    "401": response("Valid JWT token is required.", ERROR_SCHEMA),
+                    "403": response("Access denied.", ERROR_SCHEMA),
+                    "404": response("Incident not found.", ERROR_SCHEMA),
+                },
+            },
+            "delete": {
+                "tags": ["incidents"],
+                "summary": "Reset incident priority",
+                "description": (
+                    "Removes the manual priority override and restores automatic "
+                    "priority management according to the effective priority policy."
+                ),
+                "operationId": "resetIncidentPriority",
+                "security": [{"bearerAuth": []}],
+                "parameters": [
+                    path_param("incident_id", "Incident id."),
+                ],
+                "responses": {
+                    "200": response("Automatic incident priority restored.", INCIDENT_DETAILS_SCHEMA),
+                    "400": response("Automatic priority could not be resolved.", ERROR_SCHEMA),
                     "401": response("Valid JWT token is required.", ERROR_SCHEMA),
                     "403": response("Access denied.", ERROR_SCHEMA),
                     "404": response("Incident not found.", ERROR_SCHEMA),

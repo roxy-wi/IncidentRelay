@@ -7,7 +7,7 @@ from app.services.alerts.priority import (
     alert_priority_label,
     format_alert_title_with_priority,
 )
-from app.services.links import build_alert_web_url
+from app.services.links import build_alert_web_url, build_source_event_url
 from app.services.routing.service_context import (
     get_alert_service_links,
     get_alert_service_runbooks,
@@ -329,21 +329,26 @@ class SlackNotifier(IncomingWebhookNotifier):
             )
 
         alert_url = build_alert_web_url(alert)
+        source_event_url = build_source_event_url(alert)
+        link_elements = []
+
         if alert_url:
-            blocks.append(
-                {
-                    "type": "context",
-                    "elements": [
-                        {
-                            "type": "mrkdwn",
-                            "text": (
-                                f"<{alert_url}|"
-                                "Open alert in IncidentRelay>"
-                            ),
-                        }
-                    ],
-                }
-            )
+            link_elements.append({
+                "type": "mrkdwn",
+                "text": f"<{alert_url}|Open alert in IncidentRelay>",
+            })
+
+        if source_event_url:
+            link_elements.append({
+                "type": "mrkdwn",
+                "text": f"<{source_event_url}|Open source event>",
+            })
+
+        if link_elements:
+            blocks.append({
+                "type": "context",
+                "elements": link_elements,
+            })
 
         if include_actions and self._can_show_actions(alert):
             blocks.append(

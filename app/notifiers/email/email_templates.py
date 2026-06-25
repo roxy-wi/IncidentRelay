@@ -27,6 +27,8 @@ EMAIL_TEMPLATE_PLACEHOLDERS = (
     "alert_url",
     "service_links",
     "service_runbooks",
+    "source_event_url",
+    "source_event_link",
 )
 
 DEFAULT_EMAIL_HTML_TEMPLATE = """<!doctype html>
@@ -56,6 +58,7 @@ DEFAULT_EMAIL_HTML_TEMPLATE = """<!doctype html>
                 </table>
                 <p style="margin:22px 0 0;">
                   <a href="{alert_url}" style="display:inline-block;background:#2563eb;color:#ffffff;text-decoration:none;padding:11px 16px;border-radius:9px;font-weight:600;">Open alert</a>
+                  {source_event_link}
                 </p>
               </td>
             </tr>
@@ -120,7 +123,8 @@ def build_email_template_context(alert, text, event_type="notification"):
     team_slug = getattr(team, "slug", None) if team else None
 
     # Imported lazily to avoid import cycles when tests import only this module.
-    from app.services.links import build_alert_web_url
+    from app.services.links import build_alert_web_url, build_source_event_url
+    source_event_url = build_source_event_url(alert)
 
     alert_url = build_alert_web_url(alert) or "#"
 
@@ -136,9 +140,28 @@ def build_email_template_context(alert, text, event_type="notification"):
         assignee=_escape_value(assignee_name),
         source=_escape_value(getattr(alert, "source", None)),
         alert_url=_escape_value(alert_url, "#"),
+        source_event_url=_escape_value(source_event_url, ""),
+        source_event_link=_build_source_event_link(source_event_url),
         service=_escape_value(service_display_name(alert)),
         service_links=format_service_links_html(alert),
         service_runbooks=format_service_runbooks_html(alert),
+    )
+
+
+def _build_source_event_link(source_event_url):
+    """Build an optional source event button."""
+    if not source_event_url:
+        return ""
+
+    escaped_url = escape(source_event_url, quote=True)
+
+    return (
+        '&nbsp;'
+        f'<a href="{escaped_url}" '
+        'style="display:inline-block;background:#ffffff;color:#2563eb;'
+        'text-decoration:none;padding:10px 15px;border-radius:9px;'
+        'font-weight:600;border:1px solid #2563eb;">'
+        'Open source event</a>'
     )
 
 

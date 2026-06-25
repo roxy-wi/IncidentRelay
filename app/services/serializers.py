@@ -322,6 +322,17 @@ def serialize_service(service, current_user=None):
     """Serialize a service."""
     team = service.team if service.team_id else None
     group = service.group if service.group_id else None
+    notification_policy = (
+        service.notification_policy
+        if getattr(service, "notification_policy_id", None)
+        else None
+    )
+
+    priority_policy = (
+        service.priority_policy
+        if getattr(service, "priority_policy_id", None)
+        else None
+    )
 
     data = {
         "id": service.id,
@@ -367,6 +378,19 @@ def serialize_service(service, current_user=None):
             else None
         ),
 
+        "notification_policy_id": (
+            notification_policy.id if notification_policy else None
+        ),
+        "notification_policy_name": (
+            notification_policy.name if notification_policy else None
+        ),
+        "priority_policy_id": (
+            priority_policy.id if priority_policy else None
+        ),
+        "priority_policy_name": (
+            priority_policy.name if priority_policy else None
+        ),
+
         "labels": service.labels or {},
         "tags": service.tags or [],
         "metadata": service.metadata or {},
@@ -401,6 +425,11 @@ def serialize_service_match_rule(rule, current_user=None):
     service = rule.service if rule.service_id else None
     route = rule.route if getattr(rule, "route_id", None) else None
     team = rule.team if rule.team_id else None
+    matcher_preset = (
+        rule.matcher_preset
+        if getattr(rule, "matcher_preset_id", None)
+        else None
+    )
 
     data = {
         "id": rule.id,
@@ -418,6 +447,13 @@ def serialize_service_match_rule(rule, current_user=None):
         "position": rule.position,
         "name": rule.name,
         "description": rule.description,
+        "matcher_preset_id": matcher_preset.id if matcher_preset else None,
+        "matcher_preset": {
+            "id": matcher_preset.id,
+            "name": matcher_preset.name,
+            "version": matcher_preset.version,
+            "enabled": matcher_preset.enabled,
+        } if matcher_preset else None,
         "matchers": rule.matchers or {},
         "enabled": rule.enabled,
 
@@ -473,6 +509,11 @@ def serialize_route(route, current_user=None):
     """
 
     channels = [serialize_channel_short(link.channel) for link in route.route_channels]
+    matcher_preset = (
+        route.matcher_preset
+        if getattr(route, "matcher_preset_id", None)
+        else None
+    )
 
     data = {
         "id": route.id,
@@ -490,9 +531,17 @@ def serialize_route(route, current_user=None):
         "team_escalation_after_reminders": (
             route.team.escalation_after_reminders if route.team else None
         ),
+        "matcher_preset_id": matcher_preset.id if matcher_preset else None,
+        "matcher_preset": {
+            "id": matcher_preset.id,
+            "name": matcher_preset.name,
+            "version": matcher_preset.version,
+            "enabled": matcher_preset.enabled,
+        } if matcher_preset else None,
         "matchers": route.matchers,
         "group_by": route.group_by,
         "integration_config": serialize_route_integration_config(route),
+        "notification_channel_mode": route.notification_channel_mode or "route_only",
         "enabled": route.enabled,
         "intake_token_prefix": route.intake_token_prefix,
         "has_intake_token": bool(route.intake_token_hash),

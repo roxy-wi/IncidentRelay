@@ -22,6 +22,22 @@ def _iso(value):
     return value.isoformat() if value else None
 
 
+def _normalize_severity(value):
+    """Return canonical severity used in explain output."""
+    severity = str(value or "").strip().lower()
+
+    aliases = {
+        "fatal": "critical",
+        "disaster": "critical",
+        "error": "high",
+        "warn": "warning",
+        "notice": "info",
+        "informational": "info",
+    }
+
+    return aliases.get(severity, severity or None)
+
+
 class AlertExplainTrace:
     """Explain trace for one alert processing run."""
 
@@ -224,16 +240,167 @@ class AlertExplainTrace:
             rotation_name=_obj_name(rotation),
         )
 
-    def priority_resolved(self, priority, *, severity=None):
+    def priority_resolution_resolved(self, resolution, *, severity=None):
+        priority = getattr(resolution, "priority", None)
+        data = resolution.to_dict() if resolution else {}
+        source = data.get("source")
+
+        messages = {
+            "source_priority": "Explicit priority supplied by the alert source was selected.",
+            "policy_rule": "Priority was selected by the first matching priority policy rule.",
+            "fixed_fallback": "No policy rule matched, so the fixed fallback priority was selected.",
+            "severity_mapping": "Priority was selected from alert severity.",
+            "unresolved": "Priority policy did not produce a priority.",
+        }
+
         self.step(
             "priority",
-            "priority_resolved" if priority else "priority_defaulted",
-            "success" if priority else "skipped",
-            "Priority resolved" if priority else "Default priority selected",
-            priority_id=_obj_id(priority),
-            priority_slug=getattr(priority, "slug", None) or "p3",
-            priority_order=getattr(priority, "level", None) or 3,
+            "priority_resolution",
+            "success" if priority else "warning",
+            "Priority resolved" if priority else "Priority was not resolved",
+            messages.get(source, "Priority resolution completed."),
             severity=severity,
+            normalized_severity=_normalize_severity(severity),
+            **data,
+        )
+
+    def priority_applied(
+            self,
+            group,
+            resolution,
+            *,
+            previous_priority_slug=None,
+            previous_priority_order=None,
+            created_group=False,
+    ):
+        current_priority_slug = getattr(group, "priority_slug", None)
+        current_priority_order = getattr(group, "priority_order", None)
+        manually_set = bool(
+            getattr(group, "priority_set_manually", False)
+        )
+
+        update_mode = getattr(resolution, "update_mode", None)
+        incoming_priority = getattr(resolution, "priority", None)
+        incoming_priority_slug = getattr(
+            incoming_priority,
+            "slug",
+            None,
+        )
+        incoming_priority_order = getattr(
+            incoming_priority,
+            "level",
+            None,
+        )
+
+        if created_group:
+            action = "initialized"
+            message = (
+                "Resolved priority was assigned when the incident "
+                "was created."
+            )
+
+        elif manually_set:
+            action = "manual_priority_preserved"
+            message = (
+                "Automatic priority was ignored because the incident "
+                "priority was set manually."
+            )
+
+        elif update_mode == "initial_only":
+            action = "initial_only_skipped"
+            message = (
+                "Automatic priority update was skipped because the "
+                "policy only applies during incident creation."
+            )
+
+        elif previous_priority_slug != current_priority_slug:
+            if update_mode == "recalculate":
+                action = "recalculated"
+                message = (
+                    "Incident priority was recalculated from active alerts."
+                )
+            else:
+                action = "raised"
+                message = (
+                    "Incident priority was raised automatically."
+                )
+
+        elif update_mode == "recalculate":
+            action = "recalculated_unchanged"
+            message = (
+                "Priority was recalculated from active alerts, but the "
+                "result was unchanged."
+            )
+
+        elif not incoming_priority_slug:
+            action = "priority_unresolved"
+            message = (
+                "Automatic priority was not changed because priority "
+                "resolution produced no priority."
+            )
+
+        elif (
+                previous_priority_order is not None
+                and incoming_priority_order is not None
+                and incoming_priority_order > previous_priority_order
+        ):
+            action = "less_severe_skipped"
+            message = (
+                "The incoming priority was less severe than the current "
+                "incident priority, so the incident was not downgraded."
+            )
+
+        elif (
+                previous_priority_order is not None
+                and incoming_priority_order is not None
+                and incoming_priority_order == previous_priority_order
+        ):
+            action = "same_priority_skipped"
+            message = (
+                "The incoming priority matched the current incident "
+                "priority."
+            )
+
+        else:
+            action = "unchanged"
+            message = (
+                "Resolved priority did not change the incident priority."
+            )
+
+        successful_actions = {
+            "initialized",
+            "raised",
+            "recalculated",
+            "recalculated_unchanged",
+        }
+
+        self.step(
+            "priority",
+            "priority_application",
+            "success" if action in successful_actions else "skipped",
+            (
+                "Priority applied"
+                if action in {"initialized", "raised", "recalculated"}
+                else "Priority unchanged"
+            ),
+            message,
+            action=action,
+            update_mode=update_mode,
+            policy_id=getattr(resolution, "policy_id", None),
+            policy_source=getattr(
+                resolution,
+                "policy_source",
+                None,
+            ),
+            rule_id=getattr(resolution, "rule_id", None),
+            resolution_source=getattr(resolution, "source", None),
+            incoming_priority_slug=incoming_priority_slug,
+            incoming_priority_order=incoming_priority_order,
+            previous_priority_slug=previous_priority_slug,
+            previous_priority_order=previous_priority_order,
+            priority_slug=current_priority_slug,
+            priority_order=current_priority_order,
+            priority_set_manually=manually_set,
         )
 
     def group_key_built(self, group_key):

@@ -36,6 +36,7 @@ nav:
       - Groups and RBAC: concepts/groups-and-rbac.md
       - Channels: concepts/channels.md
       - Route Intake Tokens: concepts/route-intake-tokens.md
+      - Alert Matchers: concepts/matchers.md
       - Reminders and Escalations: concepts/reminders-and-escalations.md
       - Escalation Policies: concepts/escalation-policies.md
   - Incident Management:
@@ -93,6 +94,7 @@ nav:
       - Overview: api/index.md
       - Services API: api/services.md
       - Escalation Policies API: api/escalation-policies.md
+      - Matcher Suggestions API: api/matchers.md
       - Sentry Integration API: api/sentry-integration.md
       - Voice Call OpenAPI Notes: api/voice-call-openapi.md
   - Administration:

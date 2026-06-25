@@ -12,7 +12,26 @@ let serviceAnalyticsPayload = null;
 let serviceAnalyticsCharts = {};
 
 
+function initializeServiceMatcherEditors() {
+    enhanceMatcherEditor("#service-runbook-matchers", {
+        label: "Matchers JSON",
+        header: "Matchers",
+        helpText: "Use {} when the runbook should be available for every alert in the service.",
+        context: function () {
+            const serviceId = Number($("#service-runbook-service").val()) || null;
+            const service = serviceId ? getServiceById(serviceId) : null;
+
+            return {
+                scope: "service_runbook",
+                teamId: service ? service.team_id : null,
+                serviceId: serviceId,
+            };
+        },
+    });
+}
+
 function loadServices() {
+    initializeServiceMatcherEditors();
     fillTeamSelect("#service-team", false, function () {
         resetServiceForm();
     });
@@ -104,6 +123,8 @@ function getServiceSearchText(service) {
         service.status,
         service.default_rotation_name,
         service.default_escalation_policy_name,
+        service.notification_policy_name,
+        service.priority_policy_name,
         service.enabled ? "enabled" : "disabled",
     ].join(" ").toLowerCase();
 }
@@ -247,6 +268,17 @@ function getServiceDefaultsLabel(service) {
 
     if (service.default_escalation_policy_name) {
         defaults.push("Policy: " + service.default_escalation_policy_name);
+    }
+
+    if (service.notification_policy_name) {
+        defaults.push(
+            "Notifications: " + service.notification_policy_name
+        );
+    }
+    if (service.priority_policy_name) {
+        defaults.push(
+            "Priority: " + service.priority_policy_name
+        );
     }
 
     return defaults.join(" / ") || "-";
@@ -416,7 +448,6 @@ function renderServiceDetailsImpact(payload) {
         "Impact",
         "Effective status, primary reason, root cause and downstream blast radius."
     );
-
     section.append(
         $("<div>")
             .addClass("metric-grid service-detail-metrics")
@@ -478,6 +509,8 @@ function renderServiceDetailsHero(payload) {
             .append(serviceDetailsItem("Maintenance", window.AppMaintenanceBadges.text(service, "-")))
             .append(serviceDetailsItem("Default rotation", service.default_rotation_name))
             .append(serviceDetailsItem("Default policy", service.default_escalation_policy_name))
+            .append(serviceDetailsItem("Notification policy", service.notification_policy_name))
+            .append(serviceDetailsItem("Priority policy", service.priority_policy_name || "Team default"))
             .append(serviceDetailsItem("Enabled", service.enabled ? "Yes" : "No"))
     );
 
@@ -770,10 +803,22 @@ function refreshAllServiceContext() {
 function loadServiceDefaults(callback) {
     const teamId = $("#service-team").val();
     const rotationSelect = $("#service-default-rotation");
-    const policySelect = $("#service-default-policy");
+    const escalationSelect = $("#service-default-policy");
+    const notificationSelect = $("#service-notification-policy");
+    const prioritySelect = $("#service-priority-policy");
 
-    rotationSelect.empty().append($("<option>").val("").text("No default rotation"));
-    policySelect.empty().append($("<option>").val("").text("No default policy"));
+    rotationSelect.empty().append(
+        $("<option>").val("").text("No default rotation")
+    );
+    escalationSelect.empty().append(
+        $("<option>").val("").text("No default policy")
+    );
+    notificationSelect.empty().append(
+        $("<option>").val("").text("No notification policy")
+    );
+    prioritySelect.empty().append(
+        $("<option>").val("").text("Use team default")
+    );
 
     if (!teamId) {
         if (typeof callback === "function") {
@@ -783,10 +828,17 @@ function loadServiceDefaults(callback) {
     }
 
     let rotationsLoaded = false;
-    let policiesLoaded = false;
+    let escalationsLoaded = false;
+    let notificationsLoaded = false;
+    let prioritiesLoaded = false;
 
     function finishWhenReady() {
-        if (!rotationsLoaded || !policiesLoaded) {
+        if (
+            !rotationsLoaded
+            || !escalationsLoaded
+            || !notificationsLoaded
+            || !prioritiesLoaded
+        ) {
             return;
         }
 
@@ -795,39 +847,77 @@ function loadServiceDefaults(callback) {
         }
     }
 
-    apiGet("/api/rotations?team_id=" + encodeURIComponent(teamId), function (rotations) {
-        asArray(rotations).forEach(function (rotation) {
-            if (!rotation.enabled) {
-                return;
-            }
+    apiGet(
+        "/api/rotations?team_id=" + encodeURIComponent(teamId),
+        function (rotations) {
+            asArray(rotations).forEach(function (rotation) {
+                if (!rotation.enabled) {
+                    return;
+                }
 
-            rotationSelect.append(
-                $("<option>")
-                    .val(String(rotation.id))
-                    .text(rotation.name)
-            );
-        });
+                rotationSelect.append(
+                    $("<option>").val(String(rotation.id)).text(rotation.name)
+                );
+            });
 
-        rotationsLoaded = true;
-        finishWhenReady();
-    });
+            rotationsLoaded = true;
+            finishWhenReady();
+        }
+    );
 
-    apiGet("/api/escalation-policies?team_id=" + encodeURIComponent(teamId), function (policies) {
-        asArray(policies).forEach(function (policy) {
-            if (!policy.enabled) {
-                return;
-            }
+    apiGet(
+        "/api/escalation-policies?team_id=" + encodeURIComponent(teamId),
+        function (policies) {
+            asArray(policies).forEach(function (policy) {
+                if (!policy.enabled) {
+                    return;
+                }
 
-            policySelect.append(
-                $("<option>")
-                    .val(String(policy.id))
-                    .text(policy.name)
-            );
-        });
+                escalationSelect.append(
+                    $("<option>").val(String(policy.id)).text(policy.name)
+                );
+            });
 
-        policiesLoaded = true;
-        finishWhenReady();
-    });
+            escalationsLoaded = true;
+            finishWhenReady();
+        }
+    );
+
+    apiGet(
+        "/api/notification-policies?team_id="
+        + encodeURIComponent(teamId)
+        + "&enabled_only=1",
+        function (policies) {
+            asArray(policies).forEach(function (policy) {
+                notificationSelect.append(
+                    $("<option>").val(String(policy.id)).text(policy.name)
+                );
+            });
+
+            notificationsLoaded = true;
+            finishWhenReady();
+        }
+    );
+    apiGet(
+        "/api/priority-policies?team_id="
+        + encodeURIComponent(teamId)
+        + "&enabled_only=1",
+        function (policies) {
+            asArray(policies).forEach(function (policy) {
+                prioritySelect.append(
+                    $("<option>")
+                        .val(String(policy.id))
+                        .text(
+                            policy.name
+                            + (policy.default_for_team ? " · Team default" : "")
+                        )
+                );
+            });
+
+            prioritiesLoaded = true;
+            finishWhenReady();
+        }
+    );
 }
 
 
@@ -851,6 +941,8 @@ function resetServiceForm() {
     $("#service-status-message").val("");
     $("#service-default-rotation").val("");
     $("#service-default-policy").val("");
+    $("#service-notification-policy").val("");
+    $("#service-priority-policy").val("");
     $("#service-enabled").prop("checked", true);
     $("#service-public").prop("checked", false);
 
@@ -876,6 +968,12 @@ function collectServicePayload() {
             : null,
         default_escalation_policy_id: $("#service-default-policy").val()
             ? Number($("#service-default-policy").val())
+            : null,
+        notification_policy_id: $("#service-notification-policy").val()
+            ? Number($("#service-notification-policy").val())
+            : null,
+        priority_policy_id: $("#service-priority-policy").val()
+            ? Number($("#service-priority-policy").val())
             : null,
         labels: {},
         tags: [],
@@ -943,6 +1041,8 @@ function editService(id) {
         $("#service-status-message").val(service.status_message || "");
         $("#service-default-rotation").val(service.default_rotation_id || "");
         $("#service-default-policy").val(service.default_escalation_policy_id || "");
+        $("#service-notification-policy").val(service.notification_policy_id || "");
+        $("#service-priority-policy").val(service.priority_policy_id || "");
         $("#service-enabled").prop("checked", !!service.enabled);
         $("#service-public").prop("checked", !!service.public);
 
@@ -983,6 +1083,8 @@ function setServiceEnabled(service, enabled) {
         status_message: service.status_message || null,
         default_rotation_id: service.default_rotation_id || null,
         default_escalation_policy_id: service.default_escalation_policy_id || null,
+        notification_policy_id: service.notification_policy_id || null,
+        priority_policy_id: service.priority_policy_id || null,
         labels: service.labels || {},
         tags: service.tags || [],
         metadata: service.metadata || {},
@@ -1413,7 +1515,7 @@ function resetServiceRunbookForm() {
     $("#service-runbook-severity").val("");
     $("#service-runbook-priority").val("100");
     $("#service-runbook-description").val("");
-    $("#service-runbook-matchers").val(JSON.stringify({}, null, 2));
+    setMatcherEditorValue("#service-runbook-matchers", {});
     $("#service-runbook-enabled").prop("checked", true);
 }
 
@@ -1435,7 +1537,7 @@ function editServiceRunbook(runbook) {
     $("#service-runbook-severity").val(runbook.severity || "");
     $("#service-runbook-priority").val(runbook.priority || 100);
     $("#service-runbook-description").val(runbook.description || "");
-    $("#service-runbook-matchers").val(JSON.stringify(runbook.matchers || {}, null, 2));
+    setMatcherEditorValue("#service-runbook-matchers", runbook.matchers || {});
     $("#service-runbook-enabled").prop("checked", !!runbook.enabled);
 
     openAppModal("#service-runbook-modal");
@@ -1449,7 +1551,7 @@ function collectServiceRunbookPayload() {
         severity: $("#service-runbook-severity").val() || null,
         priority: Number($("#service-runbook-priority").val() || 100),
         description: $("#service-runbook-description").val() || null,
-        matchers: parseJsonInput("#service-runbook-matchers", {}),
+        matchers: getMatcherEditorValue("#service-runbook-matchers", {}),
         enabled: $("#service-runbook-enabled").is(":checked"),
     };
 }
@@ -1650,9 +1752,6 @@ $(document).on("click", "#reset-service-link-form", resetServiceLinkForm);
 $(document).on("click", "#open-service-runbook-create-modal", openCreateServiceRunbookModal);
 $(document).on("click", "#save-service-runbook", saveServiceRunbook);
 $(document).on("click", "#reset-service-runbook-form", resetServiceRunbookForm);
-$(document).on("click", "#format-service-runbook-matchers", function () {
-    formatJsonTextarea("#service-runbook-matchers", {}, "Runbook matchers JSON");
-});
 
 $(document).on("click", "#open-service-dependency-create-modal", openCreateServiceDependencyModal);
 $(document).on("click", "#save-service-dependency", saveServiceDependency);

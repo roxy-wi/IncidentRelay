@@ -5,194 +5,101 @@ description: Suppress notifications for matching alerts with silence rules.
 
 # Silences
 
-Silences temporarily suppress alert notifications for planned maintenance, noisy alerts, or known incidents that do not need paging.
+Silences temporarily suppress alert notifications for planned maintenance, noisy alerts or known incidents that do not need paging.
 
-A silence belongs to a team and matches alerts by their labels. When an incoming alert matches an active silence, IncidentRelay marks it as silenced and does not send normal notifications for it.
+A silence belongs to one team and uses the shared IncidentRelay matcher format. When an incoming alert matches an active silence, IncidentRelay marks it as silenced and skips normal notifications.
 
 ## How matching works
 
-A silence contains one or more matchers. A silence matches an alert only when **all** matchers match the alert labels.
+All conditions in a silence matcher object use **AND** semantics. An empty object matches every alert in the team and should only be used intentionally.
 
-For example, this silence:
+```json
+{}
+```
+
+Match a specific alert on one instance:
 
 ```json
 {
-  "matchers": [
-    {
-      "name": "alertname",
-      "value": "DiskFull",
-      "is_regex": false
-    },
-    {
-      "name": "instance",
-      "value": "host1",
-      "is_regex": false
-    }
-  ]
+  "alertname": "DiskFull",
+  "instance": "host1.example.com"
 }
 ```
 
-matches only alerts where:
+The structured label form is equivalent:
 
-```text
-alert.labels.alertname = DiskFull
-alert.labels.instance = host1
+```json
+{
+  "labels": {
+    "alertname": "DiskFull",
+    "instance": "host1.example.com"
+  }
+}
 ```
 
-If any matcher does not match, the silence does not apply.
-
-## Matcher fields
-
-| Field | Description |
-|---|---|
-| `name` | Alert label name, for example `alertname`, `severity`, `instance`, `namespace`, or `service`. |
-| `value` | Expected label value or regular expression. |
-| `is_regex` | When `false`, the value must match exactly. When `true`, the value is treated as a regular expression. |
+See [Alert Matchers](../concepts/matchers.md) for the complete shared format, value operators and matcher editor behavior.
 
 ## Matcher examples
 
-### Silence one alert by name
-
-Use this when a specific alert is noisy across a team.
+### Silence warning CPU alerts
 
 ```json
 {
-  "matchers": [
-    {
-      "name": "alertname",
-      "value": "DiskFull",
-      "is_regex": false
-    }
-  ]
-}
-```
-
-### Silence one instance
-
-Use this during maintenance on a single host.
-
-```json
-{
-  "matchers": [
-    {
-      "name": "instance",
-      "value": "host1.example.com",
-      "is_regex": false
-    }
-  ]
-}
-```
-
-### Silence a specific alert on one instance
-
-Use multiple matchers when the silence must be narrow.
-
-```json
-{
-  "matchers": [
-    {
-      "name": "alertname",
-      "value": "HighCPU",
-      "is_regex": false
-    },
-    {
-      "name": "instance",
-      "value": "host1.example.com",
-      "is_regex": false
-    }
-  ]
-}
-```
-
-### Silence all warning CPU alerts
-
-Use this when only a specific severity should be suppressed.
-
-```json
-{
-  "matchers": [
-    {
-      "name": "alertname",
-      "value": "HighCPU",
-      "is_regex": false
-    },
-    {
-      "name": "severity",
-      "value": "warning",
-      "is_regex": false
-    }
-  ]
+  "alertname": "HighCPU",
+  "severity": "warning"
 }
 ```
 
 ### Silence critical alerts for a service
 
-Use service labels when the same service may run on many hosts.
-
 ```json
 {
-  "matchers": [
-    {
-      "name": "service",
-      "value": "billing-api",
-      "is_regex": false
-    },
-    {
-      "name": "severity",
-      "value": "critical",
-      "is_regex": false
-    }
-  ]
+  "service": "billing-api",
+  "severity": "critical"
 }
 ```
 
 ### Silence a group of hosts by regex
 
-Use regular expressions for host groups or naming patterns.
-
 ```json
 {
-  "matchers": [
-    {
-      "name": "instance",
-      "value": "^web-[0-9]+\\.example\\.com$",
-      "is_regex": true
-    }
-  ]
+  "instance": {
+    "regex": "^web-[0-9]+\\.example\\.com$"
+  }
 }
 ```
 
-### Silence Kubernetes pods by namespace
-
-Use Kubernetes labels when alerts include namespace metadata.
+### Silence Kubernetes alerts by namespace
 
 ```json
 {
-  "matchers": [
-    {
-      "name": "namespace",
-      "value": "staging",
-      "is_regex": false
-    }
-  ]
+  "namespace": "staging"
 }
 ```
 
-### Silence all alerts from a staging namespace except by time window
-
-Silences do not support negative matchers. To silence staging only, match the namespace exactly and set the required time window.
+### Exclude one value
 
 ```json
 {
-  "matchers": [
-    {
-      "name": "namespace",
-      "value": "staging",
-      "is_regex": false
-    }
-  ]
+  "environment": {
+    "not": "production"
+  }
 }
 ```
+
+### Match one of several values
+
+```json
+{
+  "severity": ["warning", "info"]
+}
+```
+
+## Matcher suggestions
+
+The shared matcher editor can load known label names and observed values from recent alerts in the selected team.
+
+Suggestions help avoid spelling mistakes, but they do not save the silence or guarantee that future alerts will use the same labels. Review the generated JSON before saving.
 
 ## Statuses
 
@@ -205,15 +112,13 @@ Silences do not support negative matchers. To silence staging only, match the na
 
 ## Expired silence history
 
-Expired silences are hidden after they are older than the configured retention window. By default, expired silences disappear from the normal list after 30 days from `ends_at`.
+Expired silences are hidden after they are older than the configured retention window. By default, expired silences disappear from the normal list 30 days after `ends_at`.
 
-Users can still search old expired silences by enabling the expired history option on the Silences page.
-
-This keeps the default page clean while still allowing audits and troubleshooting.
+Enable expired history on the Silences page to find older entries for audits and troubleshooting.
 
 ## Disabled silences
 
-Disabling a silence should not permanently delete it from the UI. A disabled silence remains visible so users can understand why a silence no longer applies.
+Disabling a silence does not delete it. A disabled silence remains visible so users can understand why it no longer applies.
 
 Use disabled silences for review and audit history. Use expired silences for time-based lifecycle.
 
@@ -225,32 +130,16 @@ Prefer:
 
 ```json
 {
-  "matchers": [
-    {
-      "name": "alertname",
-      "value": "DiskFull",
-      "is_regex": false
-    },
-    {
-      "name": "instance",
-      "value": "host1.example.com",
-      "is_regex": false
-    }
-  ]
+  "alertname": "DiskFull",
+  "instance": "host1.example.com"
 }
 ```
 
-Avoid broad matchers like this unless the maintenance window is intentional:
+Avoid broad matchers unless the maintenance window is intentional:
 
 ```json
 {
-  "matchers": [
-    {
-      "name": "severity",
-      "value": "critical",
-      "is_regex": false
-    }
-  ]
+  "severity": "critical"
 }
 ```
 
@@ -258,7 +147,7 @@ A broad silence can suppress unrelated incidents.
 
 ## Common labels
 
-The exact labels depend on the incoming integration payload. Common labels include:
+The exact labels depend on the incoming integration payload.
 
 | Label | Example |
 |---|---|
@@ -270,19 +159,17 @@ The exact labels depend on the incoming integration payload. Common labels inclu
 | `namespace` | `production` |
 | `cluster` | `prod-eu-1` |
 
-For Alertmanager payloads, matchers usually target values from `alerts[].labels`.
-
-For Zabbix or generic webhook payloads, use the labels that IncidentRelay stores on the resulting alert.
+Alertmanager matchers usually target values from `alerts[].labels`. For Zabbix or generic webhook payloads, use the labels stored on the resulting alert.
 
 ## Troubleshooting
 
 If a silence does not match an alert:
 
 1. Check the alert labels in the alert details page.
-2. Confirm each matcher name exists in the alert labels.
-3. Confirm exact matchers use the exact same value.
-4. For regex matchers, test the expression against the actual label value.
-5. Confirm the silence is active, enabled, and belongs to the same team as the alert.
-6. Confirm the alert was created after the silence became active, or resend the alert if needed.
+2. Confirm each matcher name exists in the stored alert labels or normalized context.
+3. Confirm exact values use the same spelling and case.
+4. Test regular expressions against the actual stored value.
+5. Confirm the silence is active, enabled and belongs to the same team as the alert.
+6. Confirm the alert was received while the silence was active.
 
-If too many alerts are silenced, narrow the matchers by adding labels such as `alertname`, `instance`, `service`, `namespace`, or `severity`.
+If too many alerts are silenced, add labels such as `alertname`, `instance`, `service`, `namespace` or `severity` to narrow the matcher.

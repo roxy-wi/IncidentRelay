@@ -1273,3 +1273,41 @@ def test_notification_center_hides_responder_request_after_accept(
 
     assert payload["unread_count"] == 0
     assert payload["items"] == []
+
+
+def test_reset_incident_priority_returns_to_automatic_mode(client, db):
+    group, team, route, incident = create_incident_fixture(priority_slug="p3", severity="warning")
+    headers, user = create_responder_headers(group, team)
+
+    incidents_repo.set_incident_priority(incident.id, "p1", user_id=user.id, manual=True)
+
+    response = client.delete(f"/api/incidents/{incident.id}/priority", headers=headers)
+
+    assert response.status_code == 200, response.get_json()
+
+    payload = response.get_json()
+    assert payload["priority"]["slug"] == "p3"
+    assert payload["priority"]["set_manually"] is False
+    assert payload["priority"]["set_by_id"] is None
+    assert payload["priority"]["set_at"] is None
+
+    event = (
+        AlertEvent
+        .select()
+        .where(
+            AlertEvent.group == incident,
+            AlertEvent.event_type == "priority_auto_restored",
+        )
+        .get_or_none()
+    )
+
+    assert event is not None
+
+
+def test_viewer_cannot_reset_incident_priority(client, db):
+    group, team, route, incident = create_incident_fixture()
+    headers, user = create_viewer_headers(group, team)
+
+    response = client.delete(f"/api/incidents/{incident.id}/priority", headers=headers)
+
+    assert response.status_code == 403

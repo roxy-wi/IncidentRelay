@@ -7,6 +7,7 @@ from app.notifiers.email.email_templates import (
     normalize_email_html_template,
     render_email_html,
 )
+from app.services.alerts.priority import format_alert_title_with_priority
 
 
 def make_alert():
@@ -17,6 +18,9 @@ def make_alert():
         severity="critical",
         status="firing",
         source="alertmanager",
+        priority=None,
+        priority_slug="p1",
+        priority_order=1,
         team=SimpleNamespace(slug="infra"),
         assignee=SimpleNamespace(username="ivan", display_name="Ivan"),
     )
@@ -27,6 +31,7 @@ def test_default_email_template_renders_escaped_values(monkeypatch):
 
     html = render_email_html(make_alert(), "fallback", "notification")
 
+    assert "P1 Critical" in html
     assert "IncidentRelay" in html
     assert "Disk &lt;Full&gt;" in html
     assert "/var is &gt; 95% &amp; growing" in html
@@ -46,3 +51,7 @@ def test_custom_email_template_renders_known_and_keeps_unknown_placeholders(monk
 def test_invalid_email_template_braces_are_rejected():
     with pytest.raises(ValueError):
         normalize_email_html_template("<b>{title</b>")
+
+
+def test_email_title_contains_incident_priority():
+    assert format_alert_title_with_priority(make_alert()) == "[P1] Disk <Full>"

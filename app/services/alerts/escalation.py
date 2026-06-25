@@ -50,7 +50,7 @@ def maybe_escalate_alert(group):
     if not group.team or not group.team.escalation_enabled:
         return False
 
-    if not has_matching_notification_channel(group):
+    if not has_matching_notification_channel(group, event_type="escalation"):
         logger.debug(
             "escalation skipped because no channel matches alert group severity",
             extra={
@@ -105,7 +105,7 @@ def maybe_escalate_alert_by_policy(group):
     if group.next_escalation_at > now:
         return False
 
-    if not has_matching_notification_channel(group):
+    if not has_matching_notification_channel(group, event_type="escalation"):
         logger.debug(
             "policy escalation skipped because no channel matches alert group severity",
             extra={

@@ -427,3 +427,37 @@ def test_slack_api_error_is_not_treated_as_success(monkeypatch):
 
     assert "Slack API" in error_message
     assert "invalid_auth" in error_message
+
+
+def test_slack_payload_contains_incident_priority():
+    notifier = SlackNotifier()
+    alert = SimpleNamespace(
+        id=123,
+        title="DiskFull",
+        message="/var is 95% full",
+        severity="critical",
+        status="firing",
+        source="alertmanager",
+        priority=None,
+        priority_slug="p1",
+        priority_order=1,
+        team=None,
+        service=None,
+        service_id=None,
+        assignee=None,
+    )
+
+    payload = notifier._build_message_payload(
+        make_channel({}),
+        alert,
+        "DiskFull",
+        "notification",
+        include_actions=False,
+    )
+
+    assert "[P1] DiskFull" in payload["blocks"][0]["text"]["text"]
+
+    fields = payload["blocks"][2]["fields"]
+    priority_field = next(field for field in fields if field["text"].startswith("*Priority*"))
+
+    assert priority_field["text"] == "*Priority*\nP1 Critical"

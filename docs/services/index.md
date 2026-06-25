@@ -10,6 +10,7 @@ Services describe the affected systems inside IncidentRelay: APIs, databases, qu
 Use this section for service ownership and impact modeling:
 
 - [Service model](../concepts/services.md)
+- [Service notification policies](notification-policies.md)
 - [Service default stakeholders](default-stakeholders.md)
 - [Services API](../api/services.md)
 
@@ -32,5 +33,8 @@ Service context can improve:
 1. Create services for the systems your teams operate.
 2. Add ownership, links and runbooks.
 3. Configure service match rules or route default services.
-4. Add service default stakeholders when lifecycle notifications are useful.
-5. Review service impact and analytics during incident response.
+4. Create notification policies for shared service delivery rules.
+5. Assign notification policies to services.
+6. Select the required notification channel mode on routes.
+7. Add service default stakeholders when lifecycle notifications are useful.
+8. Review service impact and analytics during incident response.

@@ -1,4 +1,4 @@
-from app.services.routing.matchers import get_nested_value, match_alert, match_value
+from app.services.routing.matcher.matchers import get_nested_value, match_alert, match_value
 
 
 ALERT = {

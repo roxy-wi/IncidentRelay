@@ -1,0 +1,239 @@
+<div class="first-div-page-layout page-stack">
+  <div class="summary-grid">
+    <div class="summary-card summary-primary">
+      <div class="summary-icon">↗</div>
+      <div>
+        <div class="summary-title">Policies</div>
+        <div id="priority-policies-summary-total" class="summary-value">0</div>
+        <div class="summary-hint">Automatic incident priority policies</div>
+      </div>
+    </div>
+
+    <div class="summary-card summary-success">
+      <div class="summary-icon">✓</div>
+      <div>
+        <div class="summary-title">Enabled</div>
+        <div id="priority-policies-summary-enabled" class="summary-value">0</div>
+        <div class="summary-hint">Available for services and teams</div>
+      </div>
+    </div>
+
+    <div class="summary-card summary-info">
+      <div class="summary-icon">D</div>
+      <div>
+        <div class="summary-title">Team defaults</div>
+        <div id="priority-policies-summary-defaults" class="summary-value">0</div>
+        <div class="summary-hint">Default policies for teams</div>
+      </div>
+    </div>
+
+    <div class="summary-card summary-muted">
+      <div class="summary-icon">S</div>
+      <div>
+        <div class="summary-title">Services</div>
+        <div id="priority-policies-summary-services" class="summary-value">0</div>
+        <div class="summary-hint">Services using policy overrides</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="page-layout-grid">
+    <section class="card page-layout-main">
+      <div class="card-header">
+        <div>
+          <h2>Priority policies</h2>
+          <div class="card-subtitle">
+            Showing
+            <span id="priority-policies-filtered-count">0</span>
+            of
+            <span id="priority-policies-total-count">0</span>
+            policies
+          </div>
+        </div>
+
+        <div class="card-header-actions">
+          <button id="open-priority-policy-create-modal" type="button" class="btn btn-primary">New policy</button>
+          <button id="reload-priority-policies" type="button" class="btn">Reload</button>
+        </div>
+      </div>
+
+      <div class="page-toolbar is-flush-top">
+        <div class="page-toolbar-search">
+          <span class="page-toolbar-search-icon">⌕</span>
+          <input id="priority-policies-search" class="input" type="search" placeholder="Search priority policies..." autocomplete="off">
+        </div>
+
+        <select id="priority-policies-status-filter" class="input page-toolbar-filter">
+          <option value="">All statuses</option>
+          <option value="enabled">Enabled</option>
+          <option value="disabled">Disabled</option>
+          <option value="default">Team defaults</option>
+          <option value="assigned">Assigned to services</option>
+        </select>
+      </div>
+
+      <div class="table-wrapper">
+        <table id="priority-policies-table-view" class="data-table">
+          <thead>
+            <tr>
+              <th>Policy</th>
+              <th>Team</th>
+              <th>Mode</th>
+              <th>Rules</th>
+              <th>Services</th>
+              <th>Status</th>
+              <th class="actions-th">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="priority-policies-table">
+            <tr>
+              <td colspan="7" class="empty-cell">No priority policies loaded</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <aside class="card page-details-card">
+      <div class="card-header">
+        <div>
+          <h2>Policy details</h2>
+          <div id="priority-policy-details-subtitle" class="card-subtitle">Select a policy</div>
+        </div>
+      </div>
+
+      <div id="priority-policy-details-body" class="details-body">
+        <div class="details-empty">Click a policy name to inspect its configuration.</div>
+      </div>
+    </aside>
+  </div>
+
+  <div id="priority-policy-form-modal" class="app-modal" style="display: none;">
+    <div class="app-modal-dialog app-modal-dialog-wide">
+      <div class="app-modal-header">
+        <div>
+          <h2 id="priority-policy-form-title">Create priority policy</h2>
+          <div class="card-subtitle">Define how incoming alerts select and update incident priority.</div>
+        </div>
+
+        <button id="close-priority-policy-form-modal" type="button" class="app-modal-close" aria-label="Close">×</button>
+      </div>
+
+      <div class="app-modal-body">
+        <div class="grid-two">
+          <section class="card">
+            <div class="card-header">
+              <div>
+                <h2>Policy</h2>
+                <div class="card-subtitle">Team, name, status and assignment.</div>
+              </div>
+            </div>
+
+            <div class="form-body">
+              <input id="priority-policy-id" type="hidden">
+
+              <label for="priority-policy-team">Team</label>
+              <select id="priority-policy-team" class="input"></select>
+
+              <label for="priority-policy-name">Name</label>
+              <input id="priority-policy-name" class="input" type="text" placeholder="Production priority" autocomplete="off">
+
+              <label for="priority-policy-description">Description</label>
+              <textarea id="priority-policy-description" class="input" rows="5" placeholder="Automatic priority rules for production incidents"></textarea>
+
+              <label class="md-checkbox">
+                <input id="priority-policy-enabled" type="checkbox" checked>
+                <span>Enabled</span>
+              </label>
+
+              <label class="md-checkbox">
+                <input id="priority-policy-default-for-team" type="checkbox">
+                <span>Default for team</span>
+              </label>
+
+              <div class="help-text">A team can have one enabled default policy. Services may override it with another policy.</div>
+            </div>
+          </section>
+
+          <section class="card">
+            <div class="card-header">
+              <div>
+                <h2>Resolution behavior</h2>
+                <div class="card-subtitle">Source priority, incident updates and fallback.</div>
+              </div>
+            </div>
+
+            <div class="form-body">
+              <label for="priority-policy-update-mode">Update mode</label>
+              <select id="priority-policy-update-mode" class="input">
+                <option value="raise_only">Raise only</option>
+                <option value="recalculate">Recalculate from active alerts</option>
+                <option value="initial_only">Initial priority only</option>
+              </select>
+
+              <div id="priority-policy-update-mode-hint" class="help-text"></div>
+
+              <label for="priority-policy-source-priority-mode">Source priority</label>
+              <select id="priority-policy-source-priority-mode" class="input">
+                <option value="ignore">Ignore source priority</option>
+                <option value="prefer">Prefer explicit source priority</option>
+              </select>
+
+              <div id="priority-policy-source-priority-mode-hint" class="help-text"></div>
+
+              <label for="priority-policy-fallback-mode">Fallback</label>
+              <select id="priority-policy-fallback-mode" class="input">
+                <option value="severity_mapping">Map alert severity</option>
+                <option value="fixed_priority">Use fixed priority</option>
+              </select>
+
+              <div id="priority-policy-fallback-mode-hint" class="help-text"></div>
+
+              <div id="priority-policy-fallback-priority-field">
+                <label for="priority-policy-fallback-priority">Fallback priority</label>
+                <select id="priority-policy-fallback-priority" class="input"></select>
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <div class="app-modal-footer">
+        <button id="reset-priority-policy-form" type="button" class="btn">Reset</button>
+        <button id="save-priority-policy" type="button" class="btn btn-primary">Save policy</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="priority-policy-rules-modal" class="app-modal" style="display: none;">
+    <div class="app-modal-dialog app-modal-dialog-wide">
+      <div class="app-modal-header">
+        <div>
+          <h2 id="priority-policy-rules-title">Priority policy rules</h2>
+          <div id="priority-policy-rules-subtitle" class="card-subtitle">Rules are evaluated from the lowest position.</div>
+        </div>
+
+        <button id="close-priority-policy-rules-modal" type="button" class="app-modal-close" aria-label="Close">×</button>
+      </div>
+
+      <div class="app-modal-body">
+        <div class="page-toolbar is-flush-top">
+          <div>Rules are evaluated by position. The first matching enabled rule selects the incident priority.</div>
+
+          <div class="card-header-actions">
+            <button id="add-priority-policy-rule" type="button" class="btn btn-primary">Add rule</button>
+            <button id="reload-priority-policy-rules" type="button" class="btn">Reload</button>
+          </div>
+        </div>
+
+        <div id="priority-policy-rule-cards" class="rotation-layer-list">
+          <div class="empty-cell">No policy selected</div>
+        </div>
+      </div>
+
+      <div class="app-modal-footer">
+        <button id="close-priority-policy-rules-modal-footer" type="button" class="btn">Close</button>
+      </div>
+    </div>
+  </div>
+</div>

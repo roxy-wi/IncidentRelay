@@ -150,7 +150,25 @@ ROUTE_SCHEMA = {
             "readOnly": True,
             "description": "Default service slug.",
         },
-        "channel_ids": {"type": "array", "items": {"type": "integer"}, "description": "Notification channels used by this route."},
+        "channel_ids": {
+            "type": "array",
+            "items": {"type": "integer"},
+            "description": (
+                "Channels configured directly on this route. They are used in route_only and service_policy_plus_route modes."
+            ),
+        },
+        "notification_channel_mode": {
+            "type": "string",
+            "enum": [
+                "route_only",
+                "service_policy",
+                "service_policy_plus_route",
+            ],
+            "default": "route_only",
+            "description": (
+                "Selects whether shared notifications use route channels, the matched service notification policy, or both."
+            ),
+        },
         "matchers": {
             "type": "object",
             "description": "Matcher object. Example: {'labels': {'team': 'infra'}, 'severity': 'critical'}",

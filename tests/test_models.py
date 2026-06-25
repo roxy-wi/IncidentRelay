@@ -1,5 +1,8 @@
 import pytest
-from peewee import IntegrityError
+import importlib.util
+from pathlib import Path
+
+from peewee import IntegrityError, ForeignKeyField
 
 from app.modules.db.models import Group, NotificationChannel, Team, UserGroup
 from tests.factories import create_channel, create_group, create_team, create_user
@@ -57,3 +60,59 @@ def test_active_flags_default_to_enabled(db):
     assert group.active is True
     assert user.active is True
     assert team.active is True
+
+
+MIGRATION_PATH = (
+    Path(__file__).resolve().parents[1]
+    / "app"
+    / "migrations"
+    / "20260427000001_initial_schema.py"
+)
+
+
+def load_initial_migration():
+    spec = importlib.util.spec_from_file_location(
+        "initial_schema_migration",
+        MIGRATION_PATH,
+    )
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
+def test_initial_schema_includes_foreign_key_dependencies():
+    migration = load_initial_migration()
+    models = migration.BOOTSTRAP_MODELS
+    positions = {model: index for index, model in enumerate(models)}
+
+    for model in models:
+        for field in model._meta.sorted_fields:
+            if not isinstance(field, ForeignKeyField):
+                continue
+
+            related_model = field.rel_model
+
+            if related_model is model:
+                continue
+
+            assert related_model in positions, (
+                f"{model.__name__}.{field.name} references "
+                f"{related_model.__name__}, but it is not included "
+                "in the initial schema"
+            )
+
+            assert positions[related_model] < positions[model], (
+                f"{related_model.__name__} must be created before "
+                f"{model.__name__}"
+            )
+
+
+def test_alert_route_dependencies_are_in_initial_schema():
+    migration = load_initial_migration()
+    model_names = {
+        model.__name__
+        for model in migration.BOOTSTRAP_MODELS
+    }
+
+    assert "EscalationPolicy" in model_names
+    assert "Service" in model_names

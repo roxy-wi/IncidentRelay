@@ -3,7 +3,7 @@ from typing import Any
 from types import SimpleNamespace
 
 from app.modules.db import services_repo
-from app.services.routing.matchers import match_alert
+from app.services.routing.matcher.matchers import match_alert
 
 
 MAX_SERVICE_CONTEXT_ITEMS = 5

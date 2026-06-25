@@ -260,22 +260,51 @@ window.AlertIncidentManagement = (function () {
     function renderPriority(section, incident) {
         const priority = normalizePriority(incident.priority);
         const canWrite = canWriteIncident(incident);
+        const container = section.find(".incident-priority-control");
 
-        section
-            .find(".incident-priority-current")
-            .text("Current: " + priority.name + " (" + priority.slug.toUpperCase() + ")");
+        container.empty().append(renderEmpty("Loading priority..."));
 
         loadPriorities(function (priorities) {
-            const container = section.find(".incident-priority-control");
+            const configuredPriority = priorities.find(function (item) {
+                return item.slug === priority.slug;
+            });
+            const priorityName = configuredPriority && configuredPriority.name
+                ? configuredPriority.name
+                : priority.name;
+            const modeLabel = priority.setManually ? "Manual override" : "Automatic";
+
+            section.find(".incident-priority-current").text(
+                "Current: " + priorityName + " (" + priority.slug.toUpperCase() + ")"
+            );
+
+            const controls = $("<div>").addClass("incident-priority-controls");
+            const mode = $("<div>").addClass("incident-priority-mode");
 
             container.empty();
 
-            if (!canWrite) {
-                container.append(renderBadge(priority.slug.toUpperCase()));
-                return;
+            if (canWrite) {
+                controls.append(renderPrioritySelect(priorities, priority.slug));
+            } else {
+                controls.append(renderBadge(priority.slug.toUpperCase()));
             }
 
-            container.append(renderPrioritySelect(priorities, priority.slug));
+            mode.append(
+                $("<span>")
+                    .addClass("pill " + (priority.setManually ? "badge-warning" : "badge-muted"))
+                    .text(modeLabel)
+            );
+
+            if (canWrite && priority.setManually) {
+                mode.append(
+                    $("<button>")
+                        .attr("type", "button")
+                        .addClass("btn btn-ghost btn-sm incident-priority-reset")
+                        .text("Reset to automatic")
+                );
+            }
+
+            controls.append(mode);
+            container.append(controls);
         });
     }
 
@@ -287,6 +316,9 @@ window.AlertIncidentManagement = (function () {
         return {
             slug: slug,
             name: priority && priority.name ? priority.name : slug.toUpperCase(),
+            setManually: Boolean(priority && priority.set_manually),
+            setById: priority ? priority.set_by_id : null,
+            setAt: priority ? priority.set_at : null,
         };
     }
 
@@ -649,10 +681,15 @@ window.AlertIncidentManagement = (function () {
             });
 
         section
-            .find(".incident-priority-select")
-            .off("change.incidentManagement")
-            .on("change.incidentManagement", function () {
+            .off("change.incidentManagement", ".incident-priority-select")
+            .on("change.incidentManagement", ".incident-priority-select", function () {
                 updatePriority(section, $(this).val());
+            });
+
+        section
+            .off("click.incidentManagement", ".incident-priority-reset")
+            .on("click.incidentManagement", ".incident-priority-reset", function () {
+                resetPriority(section);
             });
 
         section
@@ -683,6 +720,25 @@ window.AlertIncidentManagement = (function () {
                 refreshIncident(section);
             }
         );
+    }
+    function resetPriority(section) {
+        const incidentId = section.data("incident-id");
+
+        if (!incidentId) {
+            return;
+        }
+
+        showAppConfirm({
+            type: "warning",
+            title: "Reset incident priority",
+            message: "Return this incident to automatic priority management?",
+            confirmText: "Reset to automatic",
+            confirmClass: "btn-primary",
+        }).done(function () {
+            apiDelete("/api/incidents/" + incidentId + "/priority", function () {
+                refreshIncident(section);
+            });
+        });
     }
 
     function confirmStakeholderRemoval(section, stakeholderId) {

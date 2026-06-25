@@ -95,7 +95,15 @@ def test_format_alert_message_contains_core_alert_fields(db):
     team = create_team(group, name="sre", slug="sre")
     route = create_route(team)
 
-    alert_group = create_alert_group_for_route(route)
+    alert_group = create_alert_group_for_route(
+        route,
+        labels={
+            "alertname": "DiskFull",
+            "severity": "critical",
+            "instance": "host1",
+            "event_link": "https://monitoring.example.com/events/123",
+        },
+    )
 
     message = format_alert_message(alert_group, event_type="notification")
 
@@ -105,6 +113,7 @@ def test_format_alert_message_contains_core_alert_fields(db):
     assert "Severity: critical" in message
     assert "Source: alertmanager" in message
     assert "Message: /var is 95% full" in message
+    assert "Source event: https://monitoring.example.com/events/123" in message
 
 
 def test_channel_severity_filters_are_normalized(db):

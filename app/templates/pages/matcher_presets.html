@@ -1,0 +1,229 @@
+<div class="first-div-page-layout page-stack">
+  <div class="summary-grid">
+    <div class="summary-card summary-primary">
+      <div class="summary-icon">↗</div>
+      <div>
+        <div class="summary-title">Presets</div>
+        <div id="matcher-presets-summary-total" class="summary-value">0</div>
+        <div class="summary-hint">Reusable matcher definitions</div>
+      </div>
+    </div>
+
+    <div class="summary-card summary-success">
+      <div class="summary-icon">✓</div>
+      <div>
+        <div class="summary-title">Enabled</div>
+        <div id="matcher-presets-summary-enabled" class="summary-value">0</div>
+        <div class="summary-hint">Available for new rules</div>
+      </div>
+    </div>
+
+    <div class="summary-card summary-info">
+      <div class="summary-icon">#</div>
+      <div>
+        <div class="summary-title">Used presets</div>
+        <div id="matcher-presets-summary-used" class="summary-value">0</div>
+        <div class="summary-hint">Referenced by policy rules</div>
+      </div>
+    </div>
+
+    <div class="summary-card summary-muted">
+      <div class="summary-icon">R</div>
+      <div>
+        <div class="summary-title">Rule usages</div>
+        <div id="matcher-presets-summary-usages" class="summary-value">0</div>
+        <div class="summary-hint">Total policy rule references</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="page-layout-grid">
+    <section class="card page-layout-main">
+      <div class="card-header">
+        <div>
+          <h2>Matcher presets</h2>
+          <div class="card-subtitle">
+            Showing
+            <span id="matcher-presets-filtered-count">0</span>
+            of
+            <span id="matcher-presets-total-count">0</span>
+            presets
+          </div>
+        </div>
+
+        <div class="card-header-actions">
+          <button id="open-matcher-preset-create-modal" type="button" class="btn btn-primary">
+            New preset
+          </button>
+
+          <button id="reload-matcher-presets" type="button" class="btn">
+            Reload
+          </button>
+        </div>
+      </div>
+
+      <div class="page-toolbar is-flush-top">
+        <div class="page-toolbar-search">
+          <span class="page-toolbar-search-icon">⌕</span>
+          <input
+            id="matcher-presets-search"
+            class="input"
+            type="search"
+            placeholder="Search matcher presets..."
+            autocomplete="off"
+          >
+        </div>
+
+        <select id="matcher-presets-status-filter" class="input page-toolbar-filter">
+          <option value="">All statuses</option>
+          <option value="enabled">Enabled</option>
+          <option value="disabled">Disabled</option>
+          <option value="used">Used by rules</option>
+          <option value="unused">Not used</option>
+        </select>
+      </div>
+
+      <div class="table-wrapper">
+        <table class="data-table">
+          <thead>
+            <tr>
+              <th>Preset</th>
+              <th>Team</th>
+              <th>Version</th>
+              <th>Usages</th>
+              <th>Status</th>
+              <th class="actions-th">Actions</th>
+            </tr>
+          </thead>
+
+          <tbody id="matcher-presets-table">
+            <tr>
+              <td colspan="6" class="empty-cell">No matcher presets loaded</td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <aside class="card page-details-card">
+      <div class="card-header">
+        <div>
+          <h2>Preset details</h2>
+          <div id="matcher-preset-details-subtitle" class="card-subtitle">
+            Select a matcher preset
+          </div>
+        </div>
+      </div>
+
+      <div id="matcher-preset-details-body" class="details-body">
+        <div class="details-empty">
+          Click a matcher preset name to inspect its configuration.
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <div id="matcher-preset-form-modal" class="app-modal" style="display: none;">
+    <div class="app-modal-dialog app-modal-dialog-wide">
+      <div class="app-modal-header">
+        <div>
+          <h2 id="matcher-preset-form-title">Create matcher preset</h2>
+          <div class="card-subtitle">
+            Define a reusable condition for notification and priority rules.
+          </div>
+        </div>
+
+        <button
+          id="close-matcher-preset-form-modal"
+          type="button"
+          class="app-modal-close"
+          aria-label="Close"
+        >
+          ×
+        </button>
+      </div>
+
+      <div class="app-modal-body">
+        <div class="grid-two">
+          <section class="card">
+            <div class="card-header">
+              <div>
+                <h2>Preset</h2>
+                <div class="card-subtitle">Team, name and status.</div>
+              </div>
+            </div>
+
+            <div class="form-body">
+              <input id="matcher-preset-id" type="hidden">
+
+              <label for="matcher-preset-team">Team</label>
+              <select id="matcher-preset-team" class="input"></select>
+
+              <label for="matcher-preset-name">Name</label>
+              <input
+                id="matcher-preset-name"
+                class="input"
+                type="text"
+                placeholder="Production services"
+                autocomplete="off"
+              >
+
+              <label for="matcher-preset-description">Description</label>
+              <textarea
+                id="matcher-preset-description"
+                class="input"
+                rows="4"
+                placeholder="Matches production services."
+              ></textarea>
+
+              <label class="md-checkbox">
+                <input id="matcher-preset-enabled" type="checkbox" checked>
+                <span>Enabled</span>
+              </label>
+
+              <div class="help-text">
+                Disabled presets cannot be assigned to new rules. Existing rules stop matching.
+              </div>
+            </div>
+          </section>
+
+          <section class="card">
+            <div class="card-header">
+              <div>
+                <h2>Matchers</h2>
+                <div class="card-subtitle">
+                  The preset condition is combined with rule matchers using AND.
+                </div>
+              </div>
+            </div>
+
+            <div class="form-body">
+              <label for="matcher-preset-matchers">Matchers JSON</label>
+                <div class="json-editor">
+                  <div class="json-editor-header">
+                    <span>Matchers</span>
+                  </div>
+
+                  <textarea id="matcher-preset-matchers" class="input code-textarea json-editor-textarea" spellcheck="false" autocomplete="off">{}</textarea>
+                </div>
+
+                <div class="help-text">
+                  Use {} as a catch-all preset. The matcher format is shared with policy rules.
+                </div>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <div class="app-modal-footer">
+        <button id="reset-matcher-preset-form" type="button" class="btn">
+          Reset
+        </button>
+
+        <button id="save-matcher-preset" type="button" class="btn btn-primary">
+          Save preset
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

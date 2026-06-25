@@ -60,6 +60,38 @@ def get_service_or_none(service_id, include_deleted=False):
     return query.first()
 
 
+def get_service_by_team_and_slug(team_id, slug, include_deleted=False):
+    """Return a service by team and slug."""
+    query = Service.select().where(
+        Service.team == team_id,
+        Service.slug == slug,
+    )
+
+    if not include_deleted:
+        query = query.where(Service.deleted == False)
+
+    return query.first()
+
+
+def restore_service(service_id, data):
+    """Restore and reconfigure a soft-deleted service."""
+    service = get_service(service_id, include_deleted=True)
+
+    if "team" in data:
+        team = Team.get_by_id(data["team"])
+        data["group"] = team.group_id
+
+    for field, value in data.items():
+        setattr(service, field, value)
+
+    service.deleted = False
+    service.deleted_at = None
+    service.updated_at = datetime.utcnow()
+    service.save()
+
+    return service
+
+
 def is_service_active(service):
     """Return True when service, team and group are usable."""
     if not service:
@@ -86,11 +118,21 @@ def service_belongs_to_team(service_id, team_id):
 
 
 def create_service(data):
-    """Create a service."""
+    """Create or restore a service."""
+    data = dict(data)
     team = Team.get_by_id(data["team"])
 
     if not data.get("group"):
         data["group"] = team.group_id
+
+    existing = get_service_by_team_and_slug(
+        data["team"],
+        data["slug"],
+        include_deleted=True,
+    )
+
+    if existing and existing.deleted:
+        return restore_service(existing.id, data)
 
     data["updated_at"] = datetime.utcnow()
 

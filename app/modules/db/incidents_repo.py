@@ -108,7 +108,7 @@ def get_default_priority():
 
 
 def priority_from_severity(severity):
-    severity = (severity or "").lower()
+    severity = str(severity or "").strip().lower()
 
     if severity in ("critical", "fatal", "disaster"):
         return get_priority_by_slug("p1") or get_default_priority()
@@ -116,11 +116,14 @@ def priority_from_severity(severity):
     if severity in ("high", "error"):
         return get_priority_by_slug("p2") or get_default_priority()
 
-    if severity in ("warning", "warn"):
+    if severity in ("warning", "warn", "medium"):
         return get_priority_by_slug("p3") or get_default_priority()
 
-    if severity in ("info", "notice"):
+    if severity in ("low",):
         return get_priority_by_slug("p4") or get_default_priority()
+
+    if severity in ("info", "notice", "informational"):
+        return get_priority_by_slug("p5") or get_default_priority()
 
     return get_default_priority()
 
@@ -157,6 +160,44 @@ def set_incident_priority(group_id, priority_slug, *, user_id=None, manual=True)
         event_type="priority_changed",
         message=f"Priority changed from {old_priority or '-'} to {priority.slug}",
         user_id=user_id,
+    )
+
+    return group
+
+
+def reset_incident_priority(group_id, priority, *, update_mode=None):
+    """Return an incident to automatically managed priority."""
+    group = AlertGroup.get_by_id(group_id)
+
+    if not group.priority_set_manually:
+        return group
+
+    old_priority = group.priority_slug
+
+    group.priority = priority.id
+    group.priority_slug = priority.slug
+    group.priority_order = priority.level
+    group.priority_set_manually = False
+    group.priority_set_by = None
+    group.priority_set_at = None
+    group.updated_at = datetime.utcnow()
+
+    group.save(only=[
+        AlertGroup.priority,
+        AlertGroup.priority_slug,
+        AlertGroup.priority_order,
+        AlertGroup.priority_set_manually,
+        AlertGroup.priority_set_by,
+        AlertGroup.priority_set_at,
+        AlertGroup.updated_at,
+    ])
+
+    mode_suffix = f" ({update_mode})" if update_mode else ""
+
+    alerts_repo.create_alert_event(
+        group_id=group.id,
+        event_type="priority_auto_restored",
+        message=f"Priority returned to automatic mode{mode_suffix}: {old_priority or '-'} -> {priority.slug}",
     )
 
     return group

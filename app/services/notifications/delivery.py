@@ -1,16 +1,14 @@
 import logging
 from datetime import datetime
 
-from app.modules.db import alerts_repo, notifications_repo, routes_repo
+from app.modules.db import alerts_repo, notifications_repo
 from app.notifiers.registry import get_notifier
-from app.services.links import build_alert_web_url
+from app.services.links import build_alert_web_url, build_source_event_url
 from app.services.severity import normalize_severity, normalize_severity_list
 from app.services.routing.service_context import format_service_context_plain, service_display_name
 from app.services.notifications import rules
-from app.services.alerts.priority import (
-    alert_priority_label,
-    format_alert_title_with_priority,
-)
+from app.services.alerts.priority import alert_priority_label, format_alert_title_with_priority
+from app.services.notifications.policies.resolver import resolve_notification_channels
 
 EDITABLE_EVENTS = {"acknowledged", "resolved"}
 
@@ -50,6 +48,7 @@ def format_alert_message(alert, event_type="notification"):
     team = _team_display_name(alert)
     service = service_display_name(alert)
     alert_url = build_alert_web_url(alert)
+    source_event_url = build_source_event_url(alert)
 
     lines = [
         f"{event_type.upper()}: {format_alert_title_with_priority(alert)}",
@@ -65,6 +64,9 @@ def format_alert_message(alert, event_type="notification"):
 
     if alert_url:
         lines.append(f"Alert URL: {alert_url}")
+
+    if source_event_url:
+        lines.append(f"Source event: {source_event_url}")
 
     service_context = format_service_context_plain(alert)
     if service_context:
@@ -141,24 +143,43 @@ def channel_matches_alert_severity(channel, alert):
     return alert_severity in allowed_severities
 
 
-def has_matching_notification_channel(alert):
-    """Return True if the alert has at least one deliverable notification target.
+def has_matching_notification_channel(alert, event_type="notification"):
+    """Return True if the alert has at least one delivery target.
 
-    Browser push is profile-based, not route-channel-based.
-    If the assignee has active browser push subscriptions, reminders/escalations
-    can still be delivered even when the route has no regular channels.
+    Browser push and other user-level rules are independent from shared
+    notification channels.
     """
-    if alert.route:
-        for link in routes_repo.list_route_channels(alert.route.id):
-            channel = link.channel
+    resolution = resolve_notification_channels(alert, event_type)
 
-            if not channel.enabled:
-                continue
+    for channel in resolution.channels:
+        if channel_matches_alert_severity(channel, alert):
+            return True
 
-            if channel_matches_alert_severity(channel, alert):
-                return True
+    return rules.has_deliverable_user_notification(alert, event_type)
 
-    return rules.has_deliverable_user_notification(alert)
+
+def _notification_targets(group, event_type):
+    """Return channel and existing delivery pairs for an event."""
+    if event_type in EDITABLE_EVENTS:
+        return [
+            (delivery.channel, delivery)
+            for delivery in notifications_repo.list_notifications_for_group(
+                group.id
+            )
+        ]
+
+    resolution = resolve_notification_channels(group, event_type)
+
+    return [
+        (
+            channel,
+            notifications_repo.get_notification(
+                group_id=group.id,
+                channel_id=channel.id,
+            ),
+        )
+        for channel in resolution.channels
+    ]
 
 
 def notify_alert(group, event_type="notification"):
@@ -169,108 +190,50 @@ def notify_alert(group, event_type="notification"):
     text = format_alert_message(group, event_type)
     sent_count = 0
 
-    if group.route:
-        for link in routes_repo.list_route_channels(group.route.id):
-            channel = link.channel
+    for channel, delivery in _notification_targets(group, event_type):
+        if not channel.enabled:
+            continue
 
-            if not channel.enabled:
-                continue
+        try:
+            notifier = get_notifier(channel.channel_type)
+        except RuntimeError as exc:
+            logger.exception(
+                "unsupported notification channel type",
+                extra=notification_log_extra(channel, group, event_type, error=exc),
+            )
+            continue
 
-            try:
-                notifier = get_notifier(channel.channel_type)
-            except RuntimeError as exc:
-                logger.exception(
-                    "unsupported notification channel type",
-                    extra=notification_log_extra(channel, group, event_type, error=exc),
-                )
-                continue
-
-            delivery = notifications_repo.get_notification(
-                group_id=group.id,
-                channel_id=channel.id,
+        if not channel_matches_alert_severity(channel, group):
+            can_update_existing_message = (
+                event_type in EDITABLE_EVENTS
+                and delivery
+                and notifier.can_update(channel, delivery)
             )
 
-            if not channel_matches_alert_severity(channel, group):
-                can_update_existing_message = (
-                    event_type in EDITABLE_EVENTS
-                    and delivery
-                    and notifier.can_update(channel)
-                )
-
-                if not can_update_existing_message:
-                    logger.info(
-                        "notification skipped by channel severity filter",
-                        extra=notification_log_extra(
-                            channel,
-                            group,
-                            event_type,
-                            alert_severity=group.severity,
-                            allowed_severities=sorted(
-                                get_channel_notify_on_severities(channel)
-                            ),
-                        ),
-                    )
-                    continue
-
-            try:
-                if event_type in EDITABLE_EVENTS and delivery and notifier.can_update(channel):
-                    result = notifier.update(
+            if not can_update_existing_message:
+                logger.info(
+                    "notification skipped by channel severity filter",
+                    extra=notification_log_extra(
                         channel,
                         group,
-                        text,
-                        delivery,
-                        event_type=event_type,
-                    ) or {}
-
-                    notifications_repo.save_notification(
-                        group_id=group.id,
-                        channel_id=channel.id,
-                        provider=result.get("provider") or channel.channel_type,
-                        external_message_id=result.get("external_message_id"),
-                        external_channel_id=result.get("external_channel_id"),
-                        event_type=event_type,
-                        provider_status=result.get("provider_status"),
-                        provider_payload=result.get("provider_payload"),
-                    )
-
-                    alerts_repo.create_alert_event(
-                        group_id=group.id,
-                        event_type=f"{event_type}_message_updated",
-                        message=f"Updated {channel.channel_type}:{channel.name}",
-                    )
-
-                    logger.info(
-                        "notification message updated",
-                        extra=notification_log_extra(
-                            channel,
-                            group,
-                            event_type,
-                            result=result,
+                        event_type,
+                        alert_severity=group.severity,
+                        allowed_severities=sorted(
+                            get_channel_notify_on_severities(channel)
                         ),
-                    )
+                    ),
+                )
+                continue
 
-                    sent_count += 1
-                    continue
-
-                result = notifier.send(
+        try:
+            if event_type in EDITABLE_EVENTS and delivery and notifier.can_update(channel, delivery):
+                result = notifier.update(
                     channel,
                     group,
                     text,
+                    delivery,
                     event_type=event_type,
                 ) or {}
-
-                if result.get("skipped"):
-                    logger.info(
-                        "notification skipped",
-                        extra=notification_log_extra(
-                            channel,
-                            group,
-                            event_type,
-                            result=result,
-                            reason=result.get("skip_reason"),
-                        ),
-                    )
-                    continue
 
                 notifications_repo.save_notification(
                     group_id=group.id,
@@ -285,12 +248,12 @@ def notify_alert(group, event_type="notification"):
 
                 alerts_repo.create_alert_event(
                     group_id=group.id,
-                    event_type=f"{event_type}_sent",
-                    message=f"Sent to {channel.channel_type}:{channel.name}",
+                    event_type=f"{event_type}_message_updated",
+                    message=f"Updated {channel.channel_type}:{channel.name}",
                 )
 
                 logger.info(
-                    "notification sent",
+                    "notification message updated",
                     extra=notification_log_extra(
                         channel,
                         group,
@@ -300,31 +263,81 @@ def notify_alert(group, event_type="notification"):
                 )
 
                 sent_count += 1
+                continue
 
-            except Exception as exc:
-                notifications_repo.mark_notification_error(
-                    group_id=group.id,
-                    channel_id=channel.id,
-                    provider=channel.channel_type,
-                    event_type=event_type,
-                    error=exc,
-                )
+            result = notifier.send(
+                channel,
+                group,
+                text,
+                event_type=event_type,
+            ) or {}
 
-                alerts_repo.create_alert_event(
-                    group_id=group.id,
-                    event_type=f"{event_type}_failed",
-                    message=f"{channel.channel_type}:{channel.name}: {exc}",
-                )
-
-                logger.warning(
-                    "notification failed",
+            if result.get("skipped"):
+                logger.info(
+                    "notification skipped",
                     extra=notification_log_extra(
                         channel,
                         group,
                         event_type,
-                        error=exc,
+                        result=result,
+                        reason=result.get("skip_reason"),
                     ),
                 )
+                continue
+
+            notifications_repo.save_notification(
+                group_id=group.id,
+                channel_id=channel.id,
+                provider=result.get("provider") or channel.channel_type,
+                external_message_id=result.get("external_message_id"),
+                external_channel_id=result.get("external_channel_id"),
+                event_type=event_type,
+                provider_status=result.get("provider_status"),
+                provider_payload=result.get("provider_payload"),
+            )
+
+            alerts_repo.create_alert_event(
+                group_id=group.id,
+                event_type=f"{event_type}_sent",
+                message=f"Sent to {channel.channel_type}:{channel.name}",
+            )
+
+            logger.info(
+                "notification sent",
+                extra=notification_log_extra(
+                    channel,
+                    group,
+                    event_type,
+                    result=result,
+                ),
+            )
+
+            sent_count += 1
+
+        except Exception as exc:
+            notifications_repo.mark_notification_error(
+                group_id=group.id,
+                channel_id=channel.id,
+                provider=channel.channel_type,
+                event_type=event_type,
+                error=exc,
+            )
+
+            alerts_repo.create_alert_event(
+                group_id=group.id,
+                event_type=f"{event_type}_failed",
+                message=f"{channel.channel_type}:{channel.name}: {exc}",
+            )
+
+            logger.warning(
+                "notification failed",
+                extra=notification_log_extra(
+                    channel,
+                    group,
+                    event_type,
+                    error=exc,
+                ),
+            )
 
     try:
         user_sent_count = rules.enqueue_user_notifications(
@@ -365,20 +378,17 @@ def notify_alert(group, event_type="notification"):
 
 
 def update_alert_messages(group, event_type):
-    """Update previously sent editable group messages without creating new notifications."""
-
+    """Update previously sent editable group messages."""
     group = _ensure_alert_group(group)
-
-    if not group.route:
-        return 0
-
     text = format_alert_message(group, event_type)
     updated_count = 0
 
-    for link in routes_repo.list_route_channels(group.route.id):
-        channel = link.channel
+    deliveries = notifications_repo.list_notifications_for_group(group.id)
 
-        if not channel.enabled:
+    for delivery in deliveries:
+        channel = delivery.channel
+
+        if not channel.enabled or getattr(channel, "deleted", False):
             continue
 
         try:
@@ -386,19 +396,16 @@ def update_alert_messages(group, event_type):
         except RuntimeError as exc:
             logger.exception(
                 "unsupported notification channel type",
-                extra=notification_log_extra(channel, group, event_type, error=exc),
+                extra=notification_log_extra(
+                    channel,
+                    group,
+                    event_type,
+                    error=exc,
+                ),
             )
             continue
 
-        if not notifier.can_update(channel):
-            continue
-
-        delivery = notifications_repo.get_notification(
-            group_id=group.id,
-            channel_id=channel.id,
-        )
-
-        if not delivery:
+        if not notifier.can_update(channel, delivery):
             continue
 
         try:
@@ -438,7 +445,6 @@ def update_alert_messages(group, event_type):
             )
 
             updated_count += 1
-
         except Exception as exc:
             notifications_repo.mark_notification_error(
                 group_id=group.id,

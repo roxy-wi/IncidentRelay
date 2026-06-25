@@ -1,5 +1,5 @@
 from app.modules.db import services_repo
-from app.services.routing.matchers import match_alert
+from app.services.routing.matcher.match_context import alert_rule_matches
 
 
 def resolve_alert_service(route, alert_data):
@@ -20,7 +20,7 @@ def resolve_alert_service(route, alert_data):
     )
 
     for rule in rules:
-        if match_alert(alert_data, rule.matchers or {}):
+        if alert_rule_matches(alert_data, rule, team=route.team, route=route, service=rule.service):
             return rule.service
 
     if getattr(route, "service_id", None):

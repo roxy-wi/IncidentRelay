@@ -1,5 +1,12 @@
 from datetime import datetime, timedelta
 
+from types import SimpleNamespace
+
+from app.services.alerts.explain import AlertExplainTrace
+from app.services.incidents.priority_policies.resolver import (
+    PriorityResolution,
+)
+
 from app.services.alerts.explain_cleanup import cleanup_alert_explain_traces
 from app.modules.db import alerts_repo, tokens_repo
 from app.services.integrations.auth import hash_token
@@ -71,6 +78,32 @@ def _trace_steps(trace_id):
     return trace, alerts_repo.list_alert_explain_steps(trace)
 
 
+def _priority_resolution(
+    slug,
+    level,
+    *,
+    source="policy_rule",
+    update_mode="raise_only",
+    policy_id=10,
+    policy_source="service",
+    rule_id=20,
+):
+    priority = SimpleNamespace(
+        id=level,
+        slug=slug,
+        level=level,
+    )
+
+    return PriorityResolution(
+        priority=priority,
+        source=source,
+        update_mode=update_mode,
+        policy_id=policy_id,
+        policy_source=policy_source,
+        rule_id=rule_id,
+    )
+
+
 def test_upsert_alert_returns_processing_result_with_trace(db):
     group = create_group(slug=unique("group"))
     team = create_team(group, slug=unique("team"))
@@ -97,6 +130,28 @@ def test_upsert_alert_returns_processing_result_with_trace(db):
     assert trace.alert_id == result.alert.id
 
     codes = [step.code for step in steps]
+
+    assert "priority_resolution" in codes
+    assert "priority_application" in codes
+
+    resolution_step = next(
+        step
+        for step in steps
+        if step.code == "priority_resolution"
+    )
+
+    assert resolution_step.data["source"] == "severity_mapping"
+    assert resolution_step.data["policy_id"] is None
+    assert resolution_step.data["priority_slug"] == "p1"
+
+    application_step = next(
+        step
+        for step in steps
+        if step.code == "priority_application"
+    )
+
+    assert application_step.data["action"] == "initialized"
+    assert application_step.data["priority_slug"] == "p1"
 
     assert "alert_received" in codes
     assert "route_matched" in codes
@@ -491,3 +546,172 @@ def test_cleanup_alert_explain_traces_rejects_invalid_retention(db):
         assert str(exc) == "retention_days must be greater than 0"
     else:
         assert False, "cleanup_alert_explain_traces must reject non-positive retention"
+
+
+def test_priority_resolution_trace_contains_normalized_severity(db):
+    trace = AlertExplainTrace.start({
+        "source": "test",
+        "dedup_key": unique("dedup"),
+        "title": "Database unavailable",
+        "severity": "FATAL",
+        "status": "firing",
+        "labels": {},
+    })
+
+    resolution = _priority_resolution(
+        "p1",
+        1,
+        update_mode="initial_only",
+    )
+
+    trace.priority_resolution_resolved(
+        resolution,
+        severity="FATAL",
+    )
+
+    _, steps = _trace_steps(trace.trace_id)
+
+    step = next(
+        item
+        for item in steps
+        if item.code == "priority_resolution"
+    )
+
+    assert step.data["severity"] == "FATAL"
+    assert step.data["normalized_severity"] == "critical"
+    assert step.data["priority_slug"] == "p1"
+    assert step.data["policy_id"] == 10
+    assert step.data["policy_source"] == "service"
+    assert step.data["rule_id"] == 20
+    assert step.data["update_mode"] == "initial_only"
+
+
+def test_priority_application_trace_explains_initial_only(db):
+    trace = AlertExplainTrace.start({
+        "source": "test",
+        "dedup_key": unique("dedup"),
+        "title": "Critical alert",
+        "severity": "critical",
+        "status": "firing",
+        "labels": {},
+    })
+
+    group = SimpleNamespace(
+        priority_slug="p5",
+        priority_order=5,
+        priority_set_manually=False,
+    )
+
+    resolution = _priority_resolution(
+        "p1",
+        1,
+        update_mode="initial_only",
+    )
+
+    trace.priority_applied(
+        group,
+        resolution,
+        previous_priority_slug="p5",
+        previous_priority_order=5,
+        created_group=False,
+    )
+
+    _, steps = _trace_steps(trace.trace_id)
+
+    step = next(
+        item
+        for item in steps
+        if item.code == "priority_application"
+    )
+
+    assert step.status == "skipped"
+    assert step.data["action"] == "initial_only_skipped"
+    assert step.data["incoming_priority_slug"] == "p1"
+    assert step.data["previous_priority_slug"] == "p5"
+    assert step.data["priority_slug"] == "p5"
+
+
+def test_priority_application_trace_explains_manual_override(db):
+    trace = AlertExplainTrace.start({
+        "source": "test",
+        "dedup_key": unique("dedup"),
+        "title": "Critical alert",
+        "severity": "critical",
+        "status": "firing",
+        "labels": {},
+    })
+
+    group = SimpleNamespace(
+        priority_slug="p3",
+        priority_order=3,
+        priority_set_manually=True,
+    )
+
+    resolution = _priority_resolution("p1", 1)
+
+    trace.priority_applied(
+        group,
+        resolution,
+        previous_priority_slug="p3",
+        previous_priority_order=3,
+        created_group=False,
+    )
+
+    _, steps = _trace_steps(trace.trace_id)
+
+    step = next(
+        item
+        for item in steps
+        if item.code == "priority_application"
+    )
+
+    assert step.status == "skipped"
+    assert step.data["action"] == "manual_priority_preserved"
+    assert step.data["priority_set_manually"] is True
+    assert step.data["incoming_priority_slug"] == "p1"
+    assert step.data["priority_slug"] == "p3"
+
+
+def test_priority_application_trace_explains_less_severe_priority(db):
+    trace = AlertExplainTrace.start({
+        "source": "test",
+        "dedup_key": unique("dedup"),
+        "title": "Low priority alert",
+        "severity": "low",
+        "status": "firing",
+        "labels": {},
+    })
+
+    group = SimpleNamespace(
+        priority_slug="p2",
+        priority_order=2,
+        priority_set_manually=False,
+    )
+
+    resolution = _priority_resolution(
+        "p4",
+        4,
+        update_mode="raise_only",
+    )
+
+    trace.priority_applied(
+        group,
+        resolution,
+        previous_priority_slug="p2",
+        previous_priority_order=2,
+        created_group=False,
+    )
+
+    _, steps = _trace_steps(trace.trace_id)
+
+    step = next(
+        item
+        for item in steps
+        if item.code == "priority_application"
+    )
+
+    assert step.status == "skipped"
+    assert step.data["action"] == "less_severe_skipped"
+    assert step.data["incoming_priority_slug"] == "p4"
+    assert step.data["previous_priority_slug"] == "p2"
+    assert step.data["priority_slug"] == "p2"

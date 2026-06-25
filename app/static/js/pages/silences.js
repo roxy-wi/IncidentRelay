@@ -1,4 +1,5 @@
 let silencesCache = [];
+let silenceMatcherPresetsCache = [];
 let selectedSilenceDetailsId = null;
 let selectedSilenceSummaryFilter = "";
 
@@ -11,8 +12,86 @@ function buildSilencesApiUrl() {
     return url;
 }
 
+function initializeSilenceMatcherEditor() {
+    enhanceMatcherEditor("#silence-matchers", {
+        label: "Additional matchers JSON",
+        header: "Additional matchers",
+        context: function () {
+            return {
+                scope: "silence",
+                teamId: Number($("#silence-team").val()) || null,
+                silenceId: Number($("#silence-id").val()) || null,
+                matcherPresetId: Number($("#silence-matcher-preset").val()) || null,
+            };
+        },
+    });
+}
+
+function updateSilenceMatcherPresetHint() {
+    const preset = findMatcherPresetById(
+        silenceMatcherPresetsCache,
+        $("#silence-matcher-preset").val()
+    );
+
+    $("#silence-matcher-preset-hint").text(
+        matcherPresetAndLocalHint(preset)
+    );
+}
+
+
+function loadSilenceMatcherPresets(teamId, selectedPresetId, callback) {
+    silenceMatcherPresetsCache = [];
+
+    fillMatcherPresetSelect(
+        "#silence-matcher-preset",
+        [],
+        null
+    );
+    updateSilenceMatcherPresetHint();
+
+    if (!teamId) {
+        if (typeof callback === "function") {
+            callback([]);
+        }
+
+        return;
+    }
+
+    loadMatcherPresetsForTeam(teamId, function (presets) {
+        silenceMatcherPresetsCache = presets;
+
+        fillMatcherPresetSelect(
+            "#silence-matcher-preset",
+            presets,
+            selectedPresetId
+        );
+        updateSilenceMatcherPresetHint();
+
+        if (typeof callback === "function") {
+            callback(presets);
+        }
+    });
+}
+
 function loadSilences() {
-    fillTeamSelect("#silence-team", false);
+    initializeSilenceMatcherEditor();
+
+    fillTeamSelect("#silence-team", false, function () {
+        const selectedTeam = selectedTeamNumber();
+
+        if (
+            selectedTeam &&
+            $("#silence-team option[value='" + selectedTeam + "']").length
+        ) {
+            $("#silence-team").val(String(selectedTeam));
+        }
+
+        loadSilenceMatcherPresets(
+            Number($("#silence-team").val()) || null,
+            null
+        );
+    });
+
     refreshSilences();
 }
 
@@ -95,6 +174,9 @@ function getSilenceSearchText(silence) {
         silence.team_slug,
         silence.name,
         silence.reason,
+        silence.matcher_preset
+            ? silence.matcher_preset.name
+            : "",
         getSilenceStatus(silence),
         JSON.stringify(silence.matchers || {}),
     ].join(" ").toLowerCase();
@@ -174,14 +256,30 @@ function renderSilenceRow(silence) {
                 .append($("<div>").addClass("item-subtitle").text("until " + formatDateTime24(silence.ends_at)))
         )
     );
-    row.append(
-        $("<td>").append(
-            $("<code>")
-                .addClass("details-code")
-                .attr("title", JSON.stringify(silence.matchers || {}))
-                .text(JSON.stringify(silence.matchers || {}))
-        )
+    const matchingCell = $("<td>");
+
+    if (silence.matcher_preset) {
+        matchingCell.append(
+            $("<div>")
+                .addClass("row-subtitle")
+                .text(
+                    "Preset: " +
+                    formatMatcherPresetOption(silence.matcher_preset)
+                )
+        );
+    }
+
+    matchingCell.append(
+        $("<code>")
+            .addClass("details-code")
+            .attr(
+                "title",
+                JSON.stringify(silence.matchers || {})
+            )
+            .text(JSON.stringify(silence.matchers || {}))
     );
+
+    row.append(matchingCell);
     row.append(
         $("<td>").append(
             $("<span>")
@@ -259,7 +357,20 @@ function renderSilenceDetails(silence) {
             .append(silenceDetailsItem("Starts at", formatDateTime24(silence.starts_at)))
             .append(silenceDetailsItem("Ends at", formatDateTime24(silence.ends_at)))
             .append(silenceDetailsItem("Status", getSilenceStatusLabel(status)))
-            .append(silenceDetailsCode("Matchers", silence.matchers || {}))
+            .append(
+                silenceDetailsItem(
+                    "Matcher preset",
+                    silence.matcher_preset
+                        ? formatMatcherPresetOption(silence.matcher_preset)
+                        : "No preset"
+                )
+            )
+            .append(
+                silenceDetailsCode(
+                    "Additional matchers",
+                    silence.matchers || {}
+                )
+            )
     );
 
     const actions = $("<div>").addClass("details-actions");
@@ -337,7 +448,10 @@ function collectSilencePayload() {
         reason: $("#silence-reason").val(),
         starts_at: $("#silence-starts-at").val(),
         ends_at: $("#silence-ends-at").val(),
-        matchers: parseJsonInput("#silence-matchers", {}),
+        matcher_preset_id: $("#silence-matcher-preset").val()
+            ? Number($("#silence-matcher-preset").val())
+            : null,
+        matchers: getMatcherEditorValue("#silence-matchers", {}),
     };
 }
 
@@ -370,23 +484,35 @@ function editSilence(id) {
     const silence = silencesCache.find(function (item) {
         return Number(item.id) === Number(id);
     });
+
     if (!silence) {
         return;
     }
+
     if (!canWriteObject(silence)) {
         showAppError("You do not have permission to edit this silence.");
         return;
     }
 
+    const matcherPresetId = silence.matcher_preset_id ||
+        (silence.matcher_preset ? silence.matcher_preset.id : null);
+
     $("#silence-form-title").text("Edit silence #" + id);
     $("#silence-id").val(silence.id);
-    $("#silence-team").val(silence.team_id);
+    $("#silence-team").val(String(silence.team_id));
     $("#silence-name").val(silence.name);
     $("#silence-reason").val(silence.reason || "");
     $("#silence-starts-at").val(isoToDatetimeLocal(silence.starts_at));
     $("#silence-ends-at").val(isoToDatetimeLocal(silence.ends_at));
-    $("#silence-matchers").val(JSON.stringify(silence.matchers || {}, null, 2));
-    openAppModal("#silence-form-modal");
+    setMatcherEditorValue("#silence-matchers", silence.matchers || {});
+
+    loadSilenceMatcherPresets(
+        silence.team_id,
+        matcherPresetId,
+        function () {
+            openAppModal("#silence-form-modal");
+        }
+    );
 }
 
 function disableSilence(id) {
@@ -419,13 +545,35 @@ function resetSilenceForm() {
     $("#silence-reason").val("");
     $("#silence-starts-at").val("");
     $("#silence-ends-at").val("");
-    $("#silence-matchers").val('{"labels":{"host":"host1"}}');
+
+    fillMatcherPresetSelect(
+        "#silence-matcher-preset",
+        silenceMatcherPresetsCache,
+        null
+    );
+    updateSilenceMatcherPresetHint();
+
+    setMatcherEditorValue("#silence-matchers", {});
 }
 
 function openCreateSilenceModal() {
     resetSilenceForm();
-    $("#silence-form-title").text("Create silence");
-    openAppModal("#silence-form-modal");
+
+    const selectedTeam = selectedTeamNumber();
+
+    if (
+        selectedTeam &&
+        $("#silence-team option[value='" + selectedTeam + "']").length
+    ) {
+        $("#silence-team").val(String(selectedTeam));
+    }
+
+    const teamId = Number($("#silence-team").val()) || null;
+
+    loadSilenceMatcherPresets(teamId, null, function () {
+        $("#silence-form-title").text("Create silence");
+        openAppModal("#silence-form-modal");
+    });
 }
 
 $(document).on("input", "#silences-search", applySilenceFilters);
@@ -460,6 +608,27 @@ $(document).on("keydown", function (event) {
         closeAppModal("#silence-form-modal");
     }
 });
-$(document).on("click", "#format-silence-matchers", function () {
-    formatJsonTextarea("#silence-matchers", {}, "Matchers JSON");
-});
+function openCreateSilenceModal() {
+    resetSilenceForm();
+
+    const selectedTeam = selectedTeamNumber();
+
+    if (
+        selectedTeam &&
+        $("#silence-team option[value='" + selectedTeam + "']").length
+    ) {
+        $("#silence-team").val(String(selectedTeam));
+    }
+
+    const teamId = Number($("#silence-team").val()) || null;
+
+    loadSilenceMatcherPresets(teamId, null, function () {
+        $("#silence-form-title").text("Create silence");
+        openAppModal("#silence-form-modal");
+    });
+}
+$(document).on(
+    "change",
+    "#silence-matcher-preset",
+    updateSilenceMatcherPresetHint
+);

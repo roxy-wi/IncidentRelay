@@ -280,7 +280,21 @@ SERVICE_SCHEMA = {
             "minimum": 1,
             "description": "Default escalation policy for this service. Must belong to service team.",
         },
+        "notification_policy_id": {
+            "type": "integer",
+            "nullable": True,
+            "minimum": 1,
+            "description": (
+                "Notification policy used when a route selects service policy "
+                "delivery. The policy must belong to the service team."
+            ),
+        },
         "default_rotation_name": {"type": "string", "nullable": True, "readOnly": True},
+        "notification_policy_name": {
+            "type": "string",
+            "nullable": True,
+            "readOnly": True,
+        },
         "default_escalation_policy_name": {"type": "string", "nullable": True, "readOnly": True},
         "labels": {
             "type": "object",

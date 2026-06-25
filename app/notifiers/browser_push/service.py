@@ -14,7 +14,7 @@ from app.modules.db.models import (
 from app.db import database_proxy as db
 from app.services.audit import write_audit
 from app.modules.common import truncate_text
-from app.services.links import build_alert_web_url
+from app.services.links import build_alert_web_url, build_source_event_url
 from app.settings import Config
 from app.services.alerts.priority import (
     alert_priority_label,
@@ -216,6 +216,7 @@ def build_alert_push_payload(group, user, event_type="notification"):
         "priority": alert_priority_short_label(group),
         "priority_label": alert_priority_label(group),
         "url": build_alert_web_url(group) or f"/alerts/{group.id}",
+        "source_event_url": build_source_event_url(group) or None,
         "tag": f"incidentrelay-alert-group-{group.id}",
         "require_interaction": True,
         "renotify": True,

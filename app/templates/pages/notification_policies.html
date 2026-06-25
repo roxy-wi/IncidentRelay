@@ -1,0 +1,299 @@
+<div class="first-div-page-layout page-stack">
+  <div class="summary-grid">
+    <div class="summary-card summary-primary">
+      <div class="summary-icon">↗</div>
+      <div>
+        <div class="summary-title">Policies</div>
+        <div id="notification-policies-summary-total" class="summary-value">0</div>
+        <div class="summary-hint">Channel selection policies</div>
+      </div>
+    </div>
+
+    <div class="summary-card summary-success">
+      <div class="summary-icon">✓</div>
+      <div>
+        <div class="summary-title">Enabled</div>
+        <div id="notification-policies-summary-enabled" class="summary-value">0</div>
+        <div class="summary-hint">Available for services</div>
+      </div>
+    </div>
+
+    <div class="summary-card summary-info">
+      <div class="summary-icon">#</div>
+      <div>
+        <div class="summary-title">Rules</div>
+        <div id="notification-policies-summary-rules" class="summary-value">0</div>
+        <div class="summary-hint">Configured delivery rules</div>
+      </div>
+    </div>
+
+    <div class="summary-card summary-muted">
+      <div class="summary-icon">S</div>
+      <div>
+        <div class="summary-title">Services</div>
+        <div id="notification-policies-summary-services" class="summary-value">0</div>
+        <div class="summary-hint">Services using policies</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="page-layout-grid">
+    <section class="card page-layout-main">
+      <div class="card-header">
+        <div>
+          <h2>Notification policies</h2>
+          <div class="card-subtitle">
+            Showing
+            <span id="notification-policies-filtered-count">0</span>
+            of
+            <span id="notification-policies-total-count">0</span>
+            policies
+          </div>
+        </div>
+
+        <div class="card-header-actions">
+          <button
+            id="open-notification-policy-create-modal"
+            type="button"
+            class="btn btn-primary"
+          >
+            New policy
+          </button>
+
+          <button
+            id="reload-notification-policies"
+            type="button"
+            class="btn"
+          >
+            Reload
+          </button>
+        </div>
+      </div>
+
+      <div class="page-toolbar is-flush-top">
+        <div class="page-toolbar-search">
+          <span class="page-toolbar-search-icon">⌕</span>
+          <input
+            id="notification-policies-search"
+            class="input"
+            type="search"
+            placeholder="Search policies..."
+            autocomplete="off"
+          >
+        </div>
+
+        <select
+          id="notification-policies-status-filter"
+          class="input page-toolbar-filter"
+        >
+          <option value="">All statuses</option>
+          <option value="enabled">Enabled</option>
+          <option value="disabled">Disabled</option>
+        </select>
+      </div>
+
+      <div class="table-wrapper">
+        <table id="notification-policies-table-view" class="data-table">
+          <thead>
+            <tr>
+              <th>Policy</th>
+              <th>Team</th>
+              <th>Rules</th>
+              <th>Services</th>
+              <th>Status</th>
+              <th class="actions-th">Actions</th>
+            </tr>
+          </thead>
+          <tbody id="notification-policies-table">
+            <tr>
+              <td colspan="6" class="empty-cell">
+                No notification policies loaded
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <aside class="card page-details-card">
+      <div class="card-header">
+        <div>
+          <h2>Policy details</h2>
+          <div
+            id="notification-policy-details-subtitle"
+            class="card-subtitle"
+          >
+            Select a policy
+          </div>
+        </div>
+      </div>
+
+      <div id="notification-policy-details-body" class="details-body">
+        <div class="details-empty">
+          Click a policy name to inspect its configuration.
+        </div>
+      </div>
+    </aside>
+  </div>
+
+  <div
+    id="notification-policy-form-modal"
+    class="app-modal"
+    style="display: none;"
+  >
+    <div class="app-modal-dialog app-modal-dialog-wide">
+      <div class="app-modal-header">
+        <div>
+          <h2 id="notification-policy-form-title">
+            Create notification policy
+          </h2>
+          <div class="card-subtitle">
+            Define reusable notification behavior for services.
+          </div>
+        </div>
+
+        <button
+          id="close-notification-policy-form-modal"
+          type="button"
+          class="app-modal-close"
+          aria-label="Close"
+        >
+          ×
+        </button>
+      </div>
+
+      <div class="app-modal-body">
+        <div class="grid-two">
+          <section class="card">
+            <div class="card-header">
+              <div>
+                <h2>Policy</h2>
+                <div class="card-subtitle">
+                  Team, name and status.
+                </div>
+              </div>
+            </div>
+
+            <div class="form-body">
+              <input id="notification-policy-id" type="hidden">
+
+              <label for="notification-policy-team">Team</label>
+              <select
+                id="notification-policy-team"
+                class="input"
+              ></select>
+
+              <label for="notification-policy-name">Name</label>
+              <input
+                id="notification-policy-name"
+                class="input"
+                type="text"
+                placeholder="Production notifications"
+                autocomplete="off"
+              >
+
+              <label class="md-checkbox">
+                <input
+                  id="notification-policy-enabled"
+                  type="checkbox"
+                  checked
+                >
+                <span>Enabled</span>
+              </label>
+
+              <div class="help-text">
+                Disabled policies remain visible but cannot be assigned to new
+                services.
+              </div>
+            </div>
+          </section>
+
+          <section class="card">
+            <div class="card-header">
+              <div>
+                <h2>Description</h2>
+                <div class="card-subtitle">
+                  Explain which services should use this policy.
+                </div>
+              </div>
+            </div>
+
+            <div class="form-body">
+              <label for="notification-policy-description">
+                Description
+              </label>
+              <textarea id="notification-policy-description" class="input" rows="8" placeholder="Shared delivery rules for production services"></textarea>
+
+              <div class="help-text">
+                Rules and channels are configured after the policy is saved.
+              </div>
+            </div>
+          </section>
+        </div>
+      </div>
+
+      <div class="app-modal-footer">
+        <button
+          id="reset-notification-policy-form"
+          type="button"
+          class="btn"
+        >
+          Reset
+        </button>
+
+        <button
+          id="save-notification-policy"
+          type="button"
+          class="btn btn-primary"
+        >
+          Save policy
+        </button>
+      </div>
+    </div>
+  </div>
+    <div id="notification-policy-rules-modal" class="app-modal" style="display: none;">
+      <div class="app-modal-dialog app-modal-dialog-wide">
+        <div class="app-modal-header">
+          <div>
+            <h2 id="notification-policy-rules-title">Notification policy rules</h2>
+            <div id="notification-policy-rules-subtitle" class="card-subtitle">
+              Select channels for notification events.
+            </div>
+          </div>
+
+          <button id="close-notification-policy-rules-modal" type="button" class="app-modal-close" aria-label="Close">
+            ×
+          </button>
+        </div>
+
+        <div class="app-modal-body">
+          <div class="page-toolbar is-flush-top">
+            <div>
+              Rules are evaluated by position. Processing stops after the first
+              matching rule unless Continue matching is enabled.
+            </div>
+
+            <div class="card-header-actions">
+              <button id="add-notification-policy-rule" type="button" class="btn btn-primary">
+                Add rule
+              </button>
+
+              <button id="reload-notification-policy-rules" type="button" class="btn">
+                Reload
+              </button>
+            </div>
+          </div>
+
+          <div id="notification-policy-rule-cards" class="rotation-layer-list">
+            <div class="empty-cell">No policy selected</div>
+          </div>
+        </div>
+
+        <div class="app-modal-footer">
+          <button id="close-notification-policy-rules-modal-footer" type="button" class="btn">
+            Close
+          </button>
+        </div>
+      </div>
+    </div>
+</div>

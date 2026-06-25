@@ -10,6 +10,7 @@ from peewee import (
     IntegerField,
     Model,
     TextField,
+    DeferredForeignKey,
 )
 
 from app.db import database_proxy
@@ -92,6 +93,35 @@ class Team(SoftDeleteModel):
     escalation_after_reminders = IntegerField(default=2)
     active = BooleanField(default=True)
     created_at = DateTimeField(default=datetime.utcnow)
+
+
+class MatcherPreset(SoftDeleteModel):
+    """Reusable alert matcher owned by a team."""
+
+    id = AutoField()
+
+    team = ForeignKeyField(
+        Team,
+        backref="matcher",
+        on_delete="CASCADE",
+    )
+
+    name = CharField()
+    description = TextField(null=True)
+    matchers = JSONTextField(default=dict)
+
+    enabled = BooleanField(default=True, index=True)
+    version = IntegerField(default=1)
+
+    created_at = DateTimeField(default=datetime.utcnow)
+    updated_at = DateTimeField(default=datetime.utcnow)
+
+    class Meta:
+        table_name = "matcher_preset"
+        indexes = (
+            (("team", "name"), True),
+            (("team", "enabled"), False),
+        )
 
 
 class User(SoftDeleteModel):
@@ -304,6 +334,97 @@ class EscalationPolicyRule(BaseModel):
         )
 
 
+class NotificationPolicy(SoftDeleteModel):
+    """Reusable channel selection policy for services."""
+
+    id = AutoField()
+
+    team = ForeignKeyField(
+        Team,
+        backref="notification_policies",
+        on_delete="CASCADE",
+    )
+
+    name = CharField()
+    description = TextField(null=True)
+    enabled = BooleanField(default=True)
+
+    created_at = DateTimeField(default=datetime.utcnow)
+    updated_at = DateTimeField(default=datetime.utcnow)
+
+    class Meta:
+        table_name = "notification_policy"
+        indexes = (
+            (("team", "name"), True),
+            (("team", "enabled"), False),
+        )
+
+
+class NotificationPolicyRule(SoftDeleteModel):
+    """One ordered notification policy rule."""
+
+    id = AutoField()
+
+    policy = ForeignKeyField(
+        NotificationPolicy,
+        backref="rules",
+        on_delete="CASCADE",
+    )
+
+    name = CharField()
+    description = TextField(null=True)
+
+    position = IntegerField(default=0)
+
+    event_types = JSONTextField(null=True)
+    matchers = JSONTextField(null=True)
+    matcher_preset = ForeignKeyField(
+        MatcherPreset,
+        null=True,
+        backref="notification_policy_rules",
+        on_delete="RESTRICT",
+    )
+
+    continue_matching = BooleanField(default=False)
+    enabled = BooleanField(default=True)
+
+    created_at = DateTimeField(default=datetime.utcnow)
+    updated_at = DateTimeField(default=datetime.utcnow)
+
+    class Meta:
+        table_name = "notification_policy_rule"
+        indexes = (
+            (("policy", "position"), False),
+            (("policy", "enabled"), False),
+        )
+
+
+class NotificationPolicyRuleChannel(BaseModel):
+    """Link a notification policy rule to a channel."""
+
+    id = AutoField()
+
+    rule = ForeignKeyField(
+        NotificationPolicyRule,
+        backref="rule_channels",
+        on_delete="CASCADE",
+    )
+
+    channel = ForeignKeyField(
+        NotificationChannel,
+        backref="notification_policy_rules",
+        on_delete="CASCADE",
+    )
+
+    created_at = DateTimeField(default=datetime.utcnow)
+
+    class Meta:
+        table_name = "notification_policy_rule_channel"
+        indexes = (
+            (("rule", "channel"), True),
+        )
+
+
 class Service(SoftDeleteModel):
     """Technical service or system affected by alerts."""
 
@@ -341,6 +462,18 @@ class Service(SoftDeleteModel):
         EscalationPolicy,
         null=True,
         backref="default_for_services",
+        on_delete="SET NULL",
+    )
+    priority_policy = DeferredForeignKey(
+        "PriorityPolicy",
+        null=True,
+        backref="services",
+        on_delete="SET NULL",
+    )
+    notification_policy = ForeignKeyField(
+        NotificationPolicy,
+        null=True,
+        backref="services",
         on_delete="SET NULL",
     )
 
@@ -488,6 +621,88 @@ class IncidentPriority(BaseModel):
         )
 
 
+class PriorityPolicy(SoftDeleteModel):
+    """Automatic incident priority policy owned by a team."""
+
+    id = AutoField()
+
+    team = ForeignKeyField(
+        Team,
+        backref="priority_policies",
+        on_delete="CASCADE",
+    )
+
+    name = CharField()
+    description = TextField(null=True)
+
+    enabled = BooleanField(default=True, index=True)
+    default_for_team = BooleanField(default=False, index=True)
+
+    update_mode = CharField(default="raise_only")
+    source_priority_mode = CharField(default="ignore")
+    fallback_mode = CharField(default="severity_mapping")
+
+    fallback_priority = ForeignKeyField(
+        IncidentPriority,
+        null=True,
+        backref="fallback_for_priority_policies",
+        on_delete="SET NULL",
+    )
+
+    created_at = DateTimeField(default=datetime.utcnow)
+    updated_at = DateTimeField(default=datetime.utcnow)
+
+    class Meta:
+        table_name = "priority_policy"
+        indexes = (
+            (("team", "name"), True),
+            (("team", "enabled"), False),
+            (("team", "default_for_team"), False),
+        )
+
+
+class PriorityPolicyRule(SoftDeleteModel):
+    """One ordered priority resolution rule."""
+
+    id = AutoField()
+
+    policy = ForeignKeyField(
+        PriorityPolicy,
+        backref="rules",
+        on_delete="CASCADE",
+    )
+
+    name = CharField()
+    description = TextField(null=True)
+    position = IntegerField()
+
+    matchers = JSONTextField(default=dict)
+    matcher_preset = ForeignKeyField(
+        MatcherPreset,
+        null=True,
+        backref="priority_policy_rules",
+        on_delete="RESTRICT",
+    )
+
+    priority = ForeignKeyField(
+        IncidentPriority,
+        backref="priority_policy_rules",
+        on_delete="RESTRICT",
+    )
+
+    enabled = BooleanField(default=True, index=True)
+
+    created_at = DateTimeField(default=datetime.utcnow)
+    updated_at = DateTimeField(default=datetime.utcnow)
+
+    class Meta:
+        table_name = "priority_policy_rule"
+        indexes = (
+            (("policy", "position"), False),
+            (("policy", "enabled"), False),
+        )
+
+
 class ServiceOwner(BaseModel):
     """Additional service owner or stakeholder."""
 
@@ -550,9 +765,19 @@ class AlertRoute(SoftDeleteModel):
         null=True,
         on_delete="SET NULL",
     )
+    matcher_preset = ForeignKeyField(
+        MatcherPreset,
+        null=True,
+        backref="alert_routes",
+        on_delete="RESTRICT",
+    )
     matchers = JSONTextField(null=True)
     group_by = JSONTextField(null=True)
     integration_config = JSONTextField(null=True)
+    notification_channel_mode = CharField(
+        default="route_only",
+        index=True,
+    )
     intake_token_prefix = CharField(null=True, index=True)
     intake_token_hash = CharField(null=True)
     enabled = BooleanField(default=True)
@@ -722,6 +947,12 @@ class ServiceMatchRule(SoftDeleteModel):
     position = IntegerField(default=0)
     name = CharField()
     description = TextField(null=True)
+    matcher_preset = ForeignKeyField(
+        MatcherPreset,
+        null=True,
+        backref="service_match_rules",
+        on_delete="RESTRICT",
+    )
     matchers = JSONTextField(null=True)
 
     enabled = BooleanField(default=True)
@@ -1354,6 +1585,12 @@ class Silence(SoftDeleteModel):
     team = ForeignKeyField(Team, backref="silences", on_delete="CASCADE")
     name = CharField()
     reason = TextField(null=True)
+    matcher_preset = ForeignKeyField(
+        MatcherPreset,
+        null=True,
+        backref="silences",
+        on_delete="RESTRICT",
+    )
     matchers = JSONTextField(null=True)
     starts_at = DateTimeField()
     ends_at = DateTimeField()

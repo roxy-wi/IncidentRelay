@@ -47,15 +47,11 @@ from app.services.serializers import (
     serialize_service_owner,
 )
 from app.services.service_analytics import build_service_analytics_v2
-from app.services.validation import (
-    make_error_response,
-    validate_body,
-    validate_query,
-)
-from app.services.service_impact import (
-    build_service_impact_v2,
-    build_single_service_impact_v2,
-)
+from app.services.validation import make_error_response, validate_body, validate_query
+from app.services.service_impact import build_service_impact_v2, build_single_service_impact_v2
+from app.services.notifications.policies import service as notification_policy_service
+from app.services.incidents.priority_policies import service as priority_policy_service
+from app.services.routing.matcher import service as matcher_preset_service
 
 services_bp = Blueprint("services_api", __name__)
 
@@ -502,6 +498,76 @@ def _validate_escalation_policy(team_id, policy_id):
     return None
 
 
+def _validate_notification_policy(team_id, policy_id):
+    if not policy_id:
+        return None
+
+    try:
+        policy = notification_policy_service.get_policy(policy_id)
+    except notification_policy_service.NotificationPolicyNotFoundError:
+        return make_error_response(
+            "notification_policy_not_found",
+            "Notification policy was not found",
+            400,
+            notification_policy_id=policy_id,
+        )
+
+    if policy.team_id != team_id:
+        return make_error_response(
+            "notification_policy_team_mismatch",
+            "Notification policy does not belong to service team",
+            400,
+            notification_policy_id=policy_id,
+            policy_team_id=policy.team_id,
+            team_id=team_id,
+        )
+
+    if not policy.enabled:
+        return make_error_response(
+            "notification_policy_disabled",
+            "Notification policy is disabled",
+            400,
+            notification_policy_id=policy_id,
+        )
+
+    return None
+
+
+def _validate_priority_policy(team_id, policy_id):
+    if not policy_id:
+        return None
+
+    try:
+        policy = priority_policy_service.get_policy(policy_id)
+    except priority_policy_service.PriorityPolicyNotFoundError:
+        return make_error_response(
+            "priority_policy_not_found",
+            "Priority policy was not found",
+            400,
+            priority_policy_id=policy_id,
+        )
+
+    if policy.team_id != team_id:
+        return make_error_response(
+            "priority_policy_team_mismatch",
+            "Priority policy does not belong to service team",
+            400,
+            priority_policy_id=policy_id,
+            policy_team_id=policy.team_id,
+            team_id=team_id,
+        )
+
+    if not policy.enabled:
+        return make_error_response(
+            "priority_policy_disabled",
+            "Priority policy is disabled",
+            400,
+            priority_policy_id=policy_id,
+        )
+
+    return None
+
+
 def _validate_route(team_id, route_id):
     if not route_id:
         return None
@@ -573,6 +639,22 @@ def _validate_service_payload(payload):
     if policy_error:
         return policy_error
 
+    notification_policy_error = _validate_notification_policy(
+        payload.team_id,
+        payload.notification_policy_id,
+    )
+
+    if notification_policy_error:
+        return notification_policy_error
+
+    priority_policy_error = _validate_priority_policy(
+        payload.team_id,
+        payload.priority_policy_id,
+    )
+
+    if priority_policy_error:
+        return priority_policy_error
+
     return None
 
 
@@ -603,6 +685,8 @@ def _service_data_from_payload(payload):
         "status_message": payload.status_message,
         "default_rotation": payload.default_rotation_id,
         "default_escalation_policy": payload.default_escalation_policy_id,
+        "notification_policy": payload.notification_policy_id,
+        "priority_policy": payload.priority_policy_id,
         "labels": payload.labels,
         "tags": payload.tags,
         "metadata": payload.metadata,
@@ -617,16 +701,34 @@ def _service_data_from_payload(payload):
 def _validate_match_rule_payload(payload):
     service_error = _validate_service(payload.team_id, payload.service_id)
     if service_error:
-        return service_error
+        return None, service_error
 
     route_error = _validate_route(payload.team_id, payload.route_id)
     if route_error:
-        return route_error
+        return None, route_error
 
-    return None
+    try:
+        preset = matcher_preset_service.validate_preset_assignment(
+            payload.matcher_preset_id,
+            team_id=payload.team_id,
+        )
+    except matcher_preset_service.MatcherPresetNotFoundError as exc:
+        return None, make_error_response(
+            "matcher_preset_not_found",
+            str(exc),
+            400,
+        )
+    except matcher_preset_service.MatcherPresetError as exc:
+        return None, make_error_response(
+            "matcher_preset_invalid",
+            str(exc),
+            400,
+        )
+
+    return preset, None
 
 
-def _match_rule_data_from_payload(payload):
+def _match_rule_data_from_payload(payload, preset):
     return {
         "team": payload.team_id,
         "route": payload.route_id,
@@ -634,6 +736,7 @@ def _match_rule_data_from_payload(payload):
         "position": payload.position,
         "name": payload.name,
         "description": payload.description,
+        "matcher_preset": preset.id if preset else None,
         "matchers": payload.matchers,
         "enabled": payload.enabled,
     }
@@ -1062,11 +1165,11 @@ def create_service_match_rule(service_id):
     if error:
         return error
 
-    validation_error = _validate_match_rule_payload(payload)
+    preset, validation_error = _validate_match_rule_payload(payload)
     if validation_error:
         return validation_error
 
-    rule = services_repo.create_match_rule(_match_rule_data_from_payload(payload))
+    rule = services_repo.create_match_rule(_match_rule_data_from_payload(payload, preset))
 
     write_audit(
         "service_match_rule.create",
@@ -1096,14 +1199,11 @@ def update_service_match_rule(rule_id):
     if error:
         return error
 
-    validation_error = _validate_match_rule_payload(payload)
+    preset, validation_error = _validate_match_rule_payload(payload)
     if validation_error:
         return validation_error
 
-    rule = services_repo.update_match_rule(
-        rule_id,
-        _match_rule_data_from_payload(payload),
-    )
+    rule = services_repo.update_match_rule(rule_id, _match_rule_data_from_payload(payload, preset))
 
     write_audit(
         "service_match_rule.update",

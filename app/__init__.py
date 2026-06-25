@@ -34,6 +34,10 @@ from app.views.incidents_view import incidents_bp
 from app.views.maintenance_view import maintenance_bp
 from app.views.caldav_view import caldav_bp
 from app.views.notification_center_view import notification_center_bp
+from app.views.notification_policies_view import notification_policies_bp
+from app.views.matcher_presets_view import matcher_presets_bp
+from app.views.priority_policies_view import priority_policies_bp
+from app.views.matchers_view import matchers_bp
 
 
 def create_app(log_role=None):
@@ -116,3 +120,7 @@ def register_blueprints(flask_app):
     flask_app.register_blueprint(push_bp, url_prefix="/api")
     flask_app.register_blueprint(notification_rules_bp, url_prefix="/api")
     flask_app.register_blueprint(notification_center_bp, url_prefix="/api/notification-center")
+    flask_app.register_blueprint(notification_policies_bp, url_prefix="/api/notification-policies")
+    flask_app.register_blueprint(matcher_presets_bp, url_prefix="/api/matcher-presets")
+    flask_app.register_blueprint(matchers_bp, url_prefix="/api/matchers")
+    flask_app.register_blueprint(priority_policies_bp, url_prefix="/api/priority-policies")

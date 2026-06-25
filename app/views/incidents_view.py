@@ -8,7 +8,7 @@ from app.services.incidents.stakeholders import (
     create_incident_stakeholder,
     remove_incident_stakeholder,
 )
-from app.services.incidents.priorities import set_incident_priority
+from app.services.incidents.priorities import reset_incident_priority, set_incident_priority
 from app.services.incidents.responders import create_incident_responder, set_incident_responder_status
 from app.services.rbac import (
     get_allowed_team_ids,
@@ -233,6 +233,45 @@ def update_incident_priority(incident_id):
             include_details=True,
         )
     )
+
+
+@incidents_bp.route("/<int:incident_id>/priority", methods=["DELETE"])
+def reset_incident_priority_override(incident_id):
+    group, error = _get_incident_or_error(incident_id, respond=True)
+
+    if error:
+        return error
+
+    try:
+        group = reset_incident_priority(group_id=group.id)
+    except ValueError as exc:
+        return safe_exception_response(
+            exc,
+            error="validation_error",
+            message="Incident priority could not be returned to automatic mode.",
+            status_code=400,
+        )
+    except LookupError as exc:
+        return safe_exception_response(
+            exc,
+            error="not_found",
+            message="Incident priority target not found.",
+            status_code=404,
+        )
+
+    write_audit(
+        "incident.priority.reset",
+        object_type="incident",
+        object_id=group.id,
+        team_id=group.team_id,
+        user_id=_request_user_id(),
+        data={
+            "priority": group.priority_slug,
+            "set_manually": False,
+        },
+    )
+
+    return jsonify(serialize_incident(group, current_user=_request_user(), include_details=True))
 
 
 @incidents_bp.route("/<int:incident_id>/responders", methods=["GET"])

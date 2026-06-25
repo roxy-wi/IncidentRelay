@@ -1,5 +1,5 @@
 from app.modules.db import routes_repo, teams_repo
-from app.services.routing.matchers import match_alert
+from app.services.routing.matcher.match_context import alert_rule_matches
 
 
 def get_active_team_by_slug(team_slug):
@@ -65,7 +65,7 @@ def find_route_for_alert(alert_data):
             )
             return None
 
-        if not match_alert(alert_data, route.matchers or {}):
+        if not alert_rule_matches(alert_data, route, team=route.team, route=route):
             alert_data["routing_error"] = "alert does not match route matchers"
             return None
 
@@ -106,7 +106,7 @@ def find_route_for_alert(alert_data):
             )
 
     for route in routes:
-        if match_alert(alert_data, route.matchers or {}):
+        if alert_rule_matches(alert_data, route, team=route.team, route=route):
             return route
 
     alert_data["routing_error"] = "no enabled route matched alert labels"

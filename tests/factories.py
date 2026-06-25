@@ -21,6 +21,12 @@ from app.modules.db.models import (
     EscalationPolicyRule,
     Service,
     ServiceDependency,
+    NotificationPolicy,
+    NotificationPolicyRule,
+    NotificationPolicyRuleChannel,
+    PriorityPolicy,
+    PriorityPolicyRule,
+    MatcherPreset,
 )
 
 _counter = 0
@@ -193,11 +199,14 @@ def create_route(
     group_by: list[str] | None = None,
     service: Service | None = None,
     integration_config: dict | None = None,
+    notification_channel_mode: str = "route_only",
+    matcher_preset: MatcherPreset | None = None,
 ) -> AlertRoute:
     return AlertRoute.create(
         team=team,
         rotation=rotation,
         escalation_policy=escalation_policy,
+        matcher_preset=matcher_preset,
         name=name or unique("route"),
         source=source,
         enabled=True,
@@ -207,6 +216,7 @@ def create_route(
         intake_token_hash=token_hash,
         service=service,
         integration_config=integration_config,
+        notification_channel_mode=notification_channel_mode,
     )
 
 
@@ -235,6 +245,7 @@ def create_alert(route: AlertRoute, *, status: str = "firing") -> Alert:
 def create_silence(
     team: Team,
     *,
+    matcher_preset: MatcherPreset | None = None,
     matchers: dict | None = None,
     starts_at: datetime | None = None,
     ends_at: datetime | None = None,
@@ -243,6 +254,7 @@ def create_silence(
         team=team,
         name=unique("silence"),
         reason="test silence",
+        matcher_preset=matcher_preset,
         matchers=matchers or {},
         starts_at=starts_at or datetime.utcnow() - timedelta(minutes=5),
         ends_at=ends_at or datetime.utcnow() + timedelta(minutes=5),
@@ -427,5 +439,117 @@ def create_service_dependency(
         depends_on_service=depends_on_service,
         dependency_type=dependency_type,
         criticality=criticality,
+        enabled=enabled,
+    )
+
+
+def create_notification_policy(
+    team: Team,
+    *,
+    name: str | None = None,
+    description: str | None = None,
+    enabled: bool = True,
+) -> NotificationPolicy:
+    return NotificationPolicy.create(
+        team=team,
+        name=name or unique("notification-policy"),
+        description=description,
+        enabled=enabled,
+    )
+
+
+def create_notification_policy_rule(
+    policy: NotificationPolicy,
+    *,
+    name: str | None = None,
+    position: int = 1,
+    event_types: list[str] | None = None,
+    matchers: dict | None = None,
+    channels: list[NotificationChannel] | None = None,
+    continue_matching: bool = False,
+    enabled: bool = True,
+    matcher_preset: MatcherPreset | None = None,
+) -> NotificationPolicyRule:
+    rule = NotificationPolicyRule.create(
+        policy=policy,
+        name=name or unique("notification-rule"),
+        position=position,
+        event_types=event_types or ["notification"],
+        matchers=matchers or {},
+        continue_matching=continue_matching,
+        enabled=enabled,
+        matcher_preset=matcher_preset,
+    )
+
+    for channel in channels or []:
+        NotificationPolicyRuleChannel.create(
+            rule=rule,
+            channel=channel,
+        )
+
+    return rule
+
+
+def create_priority_policy(
+    team: Team,
+    *,
+    name: str | None = None,
+    description: str | None = None,
+    enabled: bool = True,
+    default_for_team: bool = False,
+    update_mode: str = "raise_only",
+    source_priority_mode: str = "ignore",
+    fallback_mode: str = "severity_mapping",
+    fallback_priority=None,
+) -> PriorityPolicy:
+    return PriorityPolicy.create(
+        team=team,
+        name=name or unique("priority-policy"),
+        description=description,
+        enabled=enabled,
+        default_for_team=default_for_team,
+        update_mode=update_mode,
+        source_priority_mode=source_priority_mode,
+        fallback_mode=fallback_mode,
+        fallback_priority=fallback_priority,
+    )
+
+
+def create_priority_policy_rule(
+    policy: PriorityPolicy,
+    priority,
+    *,
+    name: str | None = None,
+    description: str | None = None,
+    position: int = 1,
+    matchers: dict | None = None,
+    enabled: bool = True,
+    matcher_preset: MatcherPreset | None = None,
+) -> PriorityPolicyRule:
+    return PriorityPolicyRule.create(
+        policy=policy,
+        name=name or unique("priority-rule"),
+        description=description,
+        position=position,
+        matchers=matchers or {},
+        priority=priority,
+        enabled=enabled,
+        matcher_preset=matcher_preset,
+    )
+
+
+def create_matcher_preset(
+    team: Team,
+    *,
+    name: str | None = None,
+    description: str | None = None,
+    matchers: dict | None = None,
+    enabled: bool = True,
+) -> MatcherPreset:
+    return MatcherPreset.create(
+        team=team,
+        name=name or unique("matcher-preset"),
+        description=description,
+        matchers=matchers or {},
         enabled=enabled,
     )

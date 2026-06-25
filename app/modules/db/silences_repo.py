@@ -72,15 +72,22 @@ def list_active_silences(team_id, now=None):
     )
 
 
-def create_silence(team_id, name, starts_at, ends_at, reason=None, matchers=None, created_by=None):
-    """
-    Create a silence rule.
-    """
-
+def create_silence(
+    team_id,
+    name,
+    starts_at,
+    ends_at,
+    reason=None,
+    matcher_preset_id=None,
+    matchers=None,
+    created_by=None,
+):
+    """Create a silence rule."""
     return Silence.create(
         team=team_id,
         name=name,
         reason=reason,
+        matcher_preset=matcher_preset_id,
         matchers=matchers or {},
         starts_at=starts_at,
         ends_at=ends_at,
@@ -107,7 +114,7 @@ def update_silence(silence_id, data):
     """
 
     silence = get_silence(silence_id)
-    for field in ["team", "name", "reason", "matchers", "starts_at", "ends_at", "created_by", "enabled"]:
+    for field in ["team", "name", "reason", "matcher_preset", "matchers", "starts_at", "ends_at", "created_by", "enabled"]:
         if field in data:
             setattr(silence, field, data[field])
     silence.save()

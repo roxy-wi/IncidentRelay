@@ -642,7 +642,7 @@ function renderLayerMembersEditor(layer) {
     const addRow = $("<div>").addClass("layer-member-add-grid");
 
     const userSelect = $("<select>")
-        .addClass("input js-user-select")
+        .addClass("js-user-select")
         .attr("data-layer-member-user", layer.id)
         .attr("data-placeholder", "Select user...");
 

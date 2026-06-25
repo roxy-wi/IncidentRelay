@@ -124,3 +124,93 @@ def test_discord_notifier_posts_content_payload(monkeypatch, db):
         10,
     )
     assert calls[1] == "raise_for_status"
+
+
+def test_mattermost_payload_contains_incident_priority(db):
+    group = create_group(slug="infra")
+    team = create_team(group, slug="sre")
+    route = create_route(team)
+    channel = create_channel(group, team, channel_type="mattermost", config={"channel_id": "mm-channel"})
+    alert = create_alert(route)
+    alert.priority_slug = "p1"
+    alert.priority_order = 1
+
+    payload = MattermostNotifier()._build_post_payload(
+        channel,
+        alert,
+        "plain text",
+        event_type="notification",
+        include_actions=False,
+    )
+
+    attachment = payload["props"]["attachments"][0]
+    priority_field = next(field for field in attachment["fields"] if field["title"] == "Priority")
+
+    assert attachment["title"] == f"[P1] {alert.title}"
+    assert priority_field["value"] == "P1 Critical"
+
+
+def test_mattermost_payload_contains_source_event_link(db):
+    group = create_group(slug="infra")
+    team = create_team(group, slug="sre")
+    route = create_route(team)
+    channel = create_channel(
+        group,
+        team,
+        channel_type="mattermost",
+        config={"channel_id": "mm-channel"},
+    )
+    alert = create_alert(route)
+    alert.labels = {
+        **(alert.labels or {}),
+        "event_link": "https://monitoring.example.com/events/123",
+    }
+    alert.save()
+
+    payload = MattermostNotifier()._build_post_payload(
+        channel,
+        alert,
+        "plain text",
+        event_type="notification",
+        include_actions=False,
+    )
+
+    fields = payload["props"]["attachments"][0]["fields"]
+
+    assert {
+        "short": False,
+        "title": "Source event",
+        "value": (
+            "[Open source event]"
+            "(https://monitoring.example.com/events/123)"
+        ),
+    } in fields
+
+
+def test_incoming_webhook_payload_contains_incident_priority(monkeypatch, db):
+    group = create_group(slug="infra")
+    team = create_team(group, slug="sre")
+    route = create_route(team)
+    channel = create_channel(group, team, config={"webhook_url": "https://example.test/webhook"})
+    alert = create_alert(route)
+    alert.priority_slug = "p1"
+    alert.priority_order = 1
+    captured = {}
+
+    class Response:
+        def raise_for_status(self):
+            return None
+
+    def fake_post(url, json, timeout):
+        captured["url"] = url
+        captured["json"] = json
+        captured["timeout"] = timeout
+        return Response()
+
+    monkeypatch.setattr("app.notifiers.plugins.requests.post", fake_post)
+
+    result = IncomingWebhookNotifier().send(channel, alert, "plain text")
+
+    assert result == {"provider": "webhook"}
+    assert captured["json"]["priority"] == "P1"
+    assert captured["json"]["priority_label"] == "P1 Critical"

@@ -91,23 +91,56 @@ def apply_priority_to_existing_alert(alert, priority):
     return alert
 
 
-def maybe_apply_auto_priority_to_group(group, priority):
-    """
-    Update incident priority automatically.
 
-    Manual priority must never be overwritten by incoming alert severity.
-    For auto priority, only upgrade to a more severe priority.
-    Example: p3 -> p1 is allowed, p1 -> p3 is not automatic.
-    """
-    if not group or not priority:
+def group_priority_state(group):
+    """Return the persisted priority fields that belong to an incident."""
+    if not group:
+        return None
+
+    return {
+        "priority_id": getattr(group, "priority_id", None),
+        "priority_slug": getattr(group, "priority_slug", None),
+        "priority_order": getattr(group, "priority_order", None),
+        "priority_set_manually": bool(
+            getattr(group, "priority_set_manually", False)
+        ),
+    }
+
+
+def restore_group_priority_state(group, state):
+    """Restore priority fields changed by a generic group recalculation."""
+    if not group or not state:
         return group
 
-    if getattr(group, "priority_set_manually", False):
+    current_state = group_priority_state(group)
+
+    if current_state == state:
         return group
 
-    current_order = group.priority_order or 999
+    group.priority = state["priority_id"]
+    group.priority_slug = state["priority_slug"]
+    group.priority_order = state["priority_order"]
+    group.priority_set_manually = state["priority_set_manually"]
 
-    if priority.level >= current_order:
+    group.save(only=[
+        group.__class__.priority,
+        group.__class__.priority_slug,
+        group.__class__.priority_order,
+        group.__class__.priority_set_manually,
+    ])
+
+    return group
+
+
+def _save_auto_priority(group, priority, *, event_type, message):
+    """Persist an automatically resolved incident priority."""
+    current_priority_id = getattr(group, "priority_id", None)
+
+    if (
+        current_priority_id == priority.id
+        and group.priority_slug == priority.slug
+        and group.priority_order == priority.level
+    ):
         return group
 
     group.priority = priority.id
@@ -126,8 +159,125 @@ def maybe_apply_auto_priority_to_group(group, priority):
 
     alerts_repo.create_alert_event(
         group_id=group.id,
-        event_type="priority_auto_updated",
-        message=f"Priority automatically updated to {priority.slug}",
+        event_type=event_type,
+        message=message,
     )
 
     return group
+
+
+def maybe_apply_auto_priority_to_group(group, priority):
+    """
+    Raise incident priority automatically.
+
+    Manual priority must never be overwritten. Lower numeric levels are more
+    severe, so p3 -> p1 is allowed while p1 -> p3 is ignored.
+    """
+    if not group or not priority:
+        return group
+
+    if getattr(group, "priority_set_manually", False):
+        return group
+
+    current_order = group.priority_order or 999
+
+    if priority.level >= current_order:
+        return group
+
+    return _save_auto_priority(
+        group,
+        priority,
+        event_type="priority_auto_updated",
+        message=(
+            "Priority automatically raised from "
+            f"{group.priority_slug or 'unknown'} to {priority.slug}"
+        ),
+    )
+
+
+def _is_priority_model(value):
+    return bool(
+        value
+        and getattr(value, "id", None) is not None
+        and getattr(value, "slug", None)
+        and getattr(value, "level", None) is not None
+    )
+
+
+def _recalculate_fallback_priority(resolution):
+    """Return the configured fallback priority for recalculate mode."""
+    policy = getattr(resolution, "policy", None)
+
+    candidates = (
+        getattr(resolution, "fallback_priority", None),
+        getattr(resolution, "default_priority", None),
+        getattr(policy, "default_priority", None) if policy else None,
+        getattr(resolution, "priority", None),
+    )
+
+    for candidate in candidates:
+        if _is_priority_model(candidate):
+            return candidate
+
+    return None
+
+
+def recalculate_auto_priority_from_active_alerts(
+    group,
+    *,
+    fallback_priority=None,
+):
+    """Set incident priority from active alerts or the policy fallback."""
+    if not group or getattr(group, "priority_set_manually", False):
+        return group
+
+    active_alerts = [
+        alert
+        for alert in alerts_repo.list_alerts_for_group(group.id)
+        if alert.status != "resolved" and getattr(alert, "priority_id", None)
+    ]
+
+    if active_alerts:
+        priority_alert = min(
+            active_alerts,
+            key=lambda alert: alert.priority_order or 999,
+        )
+        priority = priority_alert.priority
+    else:
+        priority = fallback_priority
+
+    if not _is_priority_model(priority):
+        return group
+
+    return _save_auto_priority(
+        group,
+        priority,
+        event_type="priority_auto_recalculated",
+        message=(
+            "Priority automatically recalculated from "
+            f"{group.priority_slug or 'unknown'} to {priority.slug}"
+        ),
+    )
+
+
+def apply_priority_resolution_to_group(group, resolution):
+    """Apply a priority policy resolution to an existing incident."""
+    if not group or not resolution:
+        return group
+
+    if getattr(group, "priority_set_manually", False):
+        return group
+
+    if resolution.update_mode == "initial_only":
+        return group
+
+    if resolution.update_mode == "recalculate":
+        return recalculate_auto_priority_from_active_alerts(group)
+
+    if not resolution.priority:
+        return group
+
+    return maybe_apply_auto_priority_to_group(
+        group,
+        resolution.priority,
+    )

@@ -9,10 +9,33 @@ from app.services.rbac import (
     require_team_or_group_resource_access,
 )
 from app.services.serializers import attach_team_permissions
-from app.services.validation import validate_body
+from app.services.routing.matcher import service as matcher_preset_service
+from app.services.validation import make_error_response, validate_body
 
 
 silences_bp = Blueprint("silences_api", __name__)
+
+
+def _validate_silence_matcher_preset(team_id, preset_id):
+    try:
+        preset = matcher_preset_service.validate_preset_assignment(
+            preset_id,
+            team_id=team_id,
+        )
+    except matcher_preset_service.MatcherPresetNotFoundError as exc:
+        return None, make_error_response(
+            "matcher_preset_not_found",
+            str(exc),
+            400,
+        )
+    except matcher_preset_service.MatcherPresetError as exc:
+        return None, make_error_response(
+            "matcher_preset_invalid",
+            str(exc),
+            400,
+        )
+
+    return preset, None
 
 
 @silences_bp.route("", methods=["GET"])
@@ -77,10 +100,18 @@ def create_silence():
     if error:
         return error
 
+    preset, preset_error = _validate_silence_matcher_preset(
+        payload.team_id,
+        payload.matcher_preset_id,
+    )
+    if preset_error:
+        return preset_error
+
     silence = silences_repo.create_silence(
         team_id=payload.team_id,
         name=payload.name,
         reason=payload.reason,
+        matcher_preset_id=preset.id if preset else None,
         matchers=payload.matchers,
         starts_at=payload.starts_at,
         ends_at=payload.ends_at,
@@ -115,12 +146,20 @@ def update_silence(silence_id):
         if error:
             return error
 
+    preset, preset_error = _validate_silence_matcher_preset(
+        payload.team_id,
+        payload.matcher_preset_id,
+    )
+    if preset_error:
+        return preset_error
+
     silence = silences_repo.update_silence(
         silence_id,
         {
             "team": payload.team_id,
             "name": payload.name,
             "reason": payload.reason,
+            "matcher_preset": preset.id if preset else None,
             "matchers": payload.matchers,
             "starts_at": payload.starts_at,
             "ends_at": payload.ends_at,
@@ -151,6 +190,11 @@ def delete_silence(silence_id):
 
 def serialize_silence(silence, current_user=None):
     """Serialize a silence rule."""
+    matcher_preset = (
+        silence.matcher_preset
+        if getattr(silence, "matcher_preset_id", None)
+        else None
+    )
     data = {
         "id": silence.id,
         "team_id": silence.team.id,
@@ -158,7 +202,14 @@ def serialize_silence(silence, current_user=None):
         "team_slug": silence.team.slug,
         "name": silence.name,
         "reason": silence.reason,
-        "matchers": silence.matchers,
+        "matcher_preset_id": matcher_preset.id if matcher_preset else None,
+        "matcher_preset": {
+            "id": matcher_preset.id,
+            "name": matcher_preset.name,
+            "version": matcher_preset.version,
+            "enabled": matcher_preset.enabled,
+        } if matcher_preset else None,
+        "matchers": silence.matchers or {},
         "starts_at": silence.starts_at.isoformat(),
         "ends_at": silence.ends_at.isoformat(),
         "created_by": silence.created_by.username if silence.created_by else None,

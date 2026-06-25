@@ -97,7 +97,7 @@
               <th>Team</th>
               <th>Reason</th>
               <th>Window</th>
-              <th>Matchers</th>
+              <th>Matching</th>
               <th>Status</th>
               <th class="actions-th">Actions</th>
             </tr>
@@ -217,19 +217,22 @@
             </div>
 
             <div class="form-body">
+                <label for="silence-matcher-preset">Matcher preset</label>
+                <select id="silence-matcher-preset" class="input">
+                  <option value="">No preset</option>
+                </select>
+
+                <div id="silence-matcher-preset-hint" class="help-text">
+                  No preset selected. Only the additional matchers below will be evaluated.
+                </div>
+
+                <label for="silence-matchers">Additional matchers JSON</label>
               <label for="silence-matchers">Matchers JSON</label>
 
               <div class="json-editor">
                 <div class="json-editor-header">
-                  <span>Matchers</span>
+                  <span>Additional matchers</span>
 
-                  <button
-                    id="format-silence-matchers"
-                    type="button"
-                    class="btn btn-small"
-                  >
-                    Format
-                  </button>
                 </div>
 
                 <textarea
@@ -241,8 +244,8 @@
               </div>
 
               <div class="help-text">
-                Example: {"labels":{"host":"host1"}}. Matching alerts will be suppressed during the silence window.
-              </div>
+                  The preset and additional matchers are combined using AND. Empty {} means no additional conditions.
+                </div>
             </div>
           </section>
         </div>

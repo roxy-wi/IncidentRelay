@@ -12,6 +12,7 @@ from app.services.alerts.priority import (
     alert_priority_label,
     format_alert_title_with_priority,
 )
+from app.services.links import build_source_event_url
 
 MAX_TELEGRAM_MESSAGE_LENGTH = 4096
 MAX_ALERT_MESSAGE_LENGTH = 1600
@@ -286,6 +287,13 @@ def format_telegram_alert_message(
             f"Alert ID: #{_html(getattr(alert, 'id', None))}",
         ]
     )
+
+    source_event_url = build_source_event_url(alert)
+
+    if source_event_url:
+        lines.append(
+            f'🔗 <a href="{_attr(source_event_url)}">Open source event</a>'
+        )
 
     lines.extend(_service_context_lines(alert))
 

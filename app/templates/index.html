@@ -34,92 +34,17 @@
 <body class="md-theme">
 <section class="layout">
     <aside id="app-sidebar" class="sidebar">
-        <svg class="icon-sprite" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
-            <symbol id="icon-overview" viewBox="0 0 24 24">
-                <path d="M3 13h8V3H3v10Zm10 8h8V3h-8v18ZM3 21h8v-6H3v6Z"/>
-            </symbol>
-            <symbol id="icon-alerts" viewBox="0 0 24 24">
-                <path d="M12 3 2 21h20L12 3Z"/>
-                <path d="M12 9v5M12 17h.01"/>
-            </symbol>
-            <symbol id="icon-rotations" viewBox="0 0 24 24">
-                <path d="M20 11a8 8 0 0 0-14-5l-2 2"/>
-                <path d="M4 4v4h4"/>
-                <path d="M4 13a8 8 0 0 0 14 5l2-2"/>
-                <path d="M20 20v-4h-4"/>
-            </symbol>
-            <symbol id="icon-calendar" viewBox="0 0 24 24">
-                <path d="M4 5h16v16H4V5Z"/>
-                <path d="M8 3v4M16 3v4M4 10h16"/>
-            </symbol>
-            <symbol id="icon-routes" viewBox="0 0 24 24">
-                <circle cx="6" cy="12" r="3"/>
-                <circle cx="18" cy="6" r="3"/>
-                <circle cx="18" cy="18" r="3"/>
-                <path d="M9 12h3c2 0 3-1 3-3"/>
-                <path d="M9 12h3c2 0 3 1 3 3"/>
-            </symbol>
-            <symbol id="icon-escalation-policies" viewBox="0 0 24 24">
-              <path d="M12 4v4"/>
-              <path d="M6 8h12"/>
-              <path d="M6 8v4"/>
-              <path d="M18 8v4"/>
-              <rect x="4" y="12" width="6" height="6" rx="1.5"/>
-              <rect x="14" y="12" width="6" height="6" rx="1.5"/>
-              <path d="M10 15h4"/>
-            </symbol>
-            <symbol id="icon-channels" viewBox="0 0 24 24">
-                <path d="M4 6h16v12H4V6Z"/>
-                <path d="m4 7 8 6 8-6"/>
-            </symbol>
-            <symbol id="icon-silences" viewBox="0 0 24 24">
-                <path d="M6 9a6 6 0 0 1 12 0v4l2 4H4l2-4V9Z"/>
-                <path d="M10 21h4"/>
-                <path d="M3 3l18 18"/>
-            </symbol>
-            <symbol id="icon-teams" viewBox="0 0 24 24">
-                <circle cx="9" cy="8" r="3"/>
-                <circle cx="17" cy="9" r="2"/>
-                <path d="M3 20c1-4 4-6 6-6s5 2 6 6"/>
-                <path d="M14 15c2 0 4 2 5 5"/>
-            </symbol>
-            <symbol id="icon-groups" viewBox="0 0 24 24">
-                <path d="M4 7h16M4 12h16M4 17h16"/>
-                <circle cx="7" cy="7" r="1"/>
-                <circle cx="12" cy="12" r="1"/>
-                <circle cx="17" cy="17" r="1"/>
-            </symbol>
-            <symbol id="icon-users" viewBox="0 0 24 24">
-                <circle cx="12" cy="8" r="4"/>
-                <path d="M4 21c1.5-5 5-7 8-7s6.5 2 8 7"/>
-            </symbol>
-            <symbol id="icon-swagger" viewBox="0 0 24 24">
-                <path d="M6 3h9l3 3v15H6V3Z"/>
-                <path d="M15 3v4h4"/>
-                <path d="M9 12h6M9 16h6"/>
-            </symbol>
-            <symbol id="icon-sso" viewBox="0 0 24 24">
-                <path d="M12 3a4 4 0 0 1 4 4c0 1.4-.7 2.6-1.8 3.3L20 16v5h-5v-3h-3v-3H9.5l-1.8-1.8A5 5 0 1 1 12 3Z"/>
-                <circle cx="7" cy="12" r="2"/>
-            </symbol>
-            <symbol id="icon-services" viewBox="0 0 24 24">
-              <rect x="4" y="4" width="7" height="7" rx="1.5"></rect>
-              <rect x="13" y="4" width="7" height="7" rx="1.5"></rect>
-              <rect x="4" y="13" width="7" height="7" rx="1.5"></rect>
-              <rect x="13" y="13" width="7" height="7" rx="1.5"></rect>
-            </symbol>
-        </svg>
+        {% include "pages/include/menu_svg.html" %}
+        <div class="brand">
+            <a href="/" class="brand-link" data-page="dashboard" title="IncidentRelay">
+                <img class="brand-logo-full" src="/static/images/incidentrelay-logo.svg" alt="IncidentRelay">
+                <img class="brand-logo-icon" src="/static/images/incidentrelay-icon.svg" alt="IncidentRelay">
+            </a>
 
-    <div class="brand">
-        <a href="/" class="brand-link" data-page="dashboard" title="IncidentRelay">
-            <img class="brand-logo-full" src="/static/images/incidentrelay-logo.svg" alt="IncidentRelay">
-            <img class="brand-logo-icon" src="/static/images/incidentrelay-icon.svg" alt="IncidentRelay">
-        </a>
-
-        <button id="sidebar-toggle" class="sidebar-toggle" type="button" aria-label="Collapse sidebar" aria-expanded="true">
-            <span class="sidebar-toggle-icon">‹</span>
-        </button>
-    </div>
+            <button id="sidebar-toggle" class="sidebar-toggle" type="button" aria-label="Collapse sidebar" aria-expanded="true">
+                <span class="sidebar-toggle-icon">‹</span>
+            </button>
+        </div>
 
     <nav class="menu">
         <a href="/" data-page="dashboard" class="menu-link" title="Overview">
@@ -147,15 +72,53 @@
             <span class="menu-text">Routes</span>
         </a>
 
-        <a href="/services" data-page="services" class="menu-link" title="Services">
-            <svg class="menu-icon"><use href="#icon-services"></use></svg>
-            <span class="menu-text">Services</span>
-        </a>
+        <div class="menu-group" data-menu-group="services">
+          <button id="services-menu-toggle" type="button" class="menu-group-toggle" title="Services" aria-expanded="false" aria-controls="services-menu-items">
+            <svg class="menu-icon">
+              <use href="#icon-services"></use>
+            </svg>
 
-        <a href="/maintenance-windows" data-page="maintenance-windows" class="menu-link" title="Maintenance">
-          <svg class="menu-icon"><use href="#icon-services"></use></svg>
-          <span class="menu-text">Maintenance</span>
-        </a>
+            <span class="menu-text">Services</span>
+            <i class="fa-solid fa-chevron-down menu-group-chevron" aria-hidden="true"></i>
+          </button>
+
+          <div id="services-menu-items" class="menu-group-items">
+            <a href="/services" data-page="services" class="menu-link menu-sub-link" title="Service Catalog">
+              <svg class="menu-icon">
+                <use href="#icon-services"></use>
+              </svg>
+
+              <span class="menu-text">Service Catalog</span>
+            </a>
+
+            <a href="/maintenance-windows" data-page="maintenance-windows" class="menu-link menu-sub-link" title="Maintenance">
+              <svg class="menu-icon">
+                <use href="#icon-calendar"></use>
+              </svg>
+
+              <span class="menu-text">Maintenance</span>
+            </a>
+
+            <a href="/notification-policies" data-page="notification-policies" class="menu-link menu-sub-link" title="Notification Policies">
+              <svg class="menu-icon">
+                <use href="#icon-notification-policies"></use>
+              </svg>
+
+              <span class="menu-text">Notification Policies</span>
+            </a>
+
+              <a href="/matcher-presets" data-page="matcher-presets" class="menu-link menu-sub-link" title="Matcher Presets">
+                  <svg class="menu-icon">
+                    <use href="#icon-matcher-presets"></use>
+                  </svg>
+                  <span class="menu-text">Matcher Presets</span>
+              </a>
+               <a href="/priority-policies" data-page="priority-policies" class="menu-link menu-sub-link" title="Priority Policies">
+                 <svg class="menu-icon"><use href="#icon-priority-policies"></use></svg>
+                 <span class="menu-text">Priority Policies</span>
+               </a>
+          </div>
+        </div>
 
         <a href="/escalation-policies" data-page="escalation-policies" class="menu-link" title="Escalation Policies">
           <svg class="menu-icon"><use href="#icon-escalation-policies"></use></svg>
@@ -265,6 +228,9 @@
             <div id="view-services" class="view">{% include "pages/services.html" %}</div>
             <div id="view-maintenance-windows" class="view">{% include "pages/maintenance_windows.html" %}</div>
             <div id="view-escalation-policies" class="view">{% include "pages/escalation_policies.html" %}</div>
+            <div id="view-notification-policies" class="view">{% include "pages/notification_policies.html" %}</div>
+            <div id="view-matcher-presets" class="view">{% include "pages/matcher_presets.html" %}</div>
+            <div id="view-priority-policies" class="view">{% include "pages/priority_policies.html" %}</div>
             <div id="view-channels" class="view">{% include "pages/channels.html" %}</div>
             <div id="view-silences" class="view">{% include "pages/silences.html" %}</div>
             <div id="view-teams" class="view">{% include "pages/teams.html" %}</div>
@@ -313,6 +279,7 @@
         </div>
     </main>
 </section>
+<script src="{{ url_for('static', filename='js/components/matcher_editor.js', v='20260625') }}"></script>
 <script src="/static/js/core/rbac_roles.js"></script>
 <script src="/static/js/core/state.js"></script>
 <script src="/static/js/core/dialogs.js"></script>
@@ -348,6 +315,9 @@
 <script src="{{ url_for('static', filename='js/pages/services.js') }}"></script>
 <script src="{{ url_for('static', filename='js/pages/maintenance_windows.js') }}"></script>
 <script src="{{ url_for('static', filename='js/pages/escalation_policies.js') }}"></script>
+<script src="{{ url_for('static', filename='js/pages/notification_policies.js') }}"></script>
+<script src="{{ url_for('static', filename='js/pages/priority_policies.js') }}"></script>
+<script src="{{ url_for('static', filename='js/pages/matcher_presets.js') }}"></script>
 <script src="/static/js/pages/channels.js"></script>
 <script src="/static/js/pages/silences.js"></script>
 <script src="/static/js/pages/teams.js"></script>

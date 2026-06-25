@@ -108,7 +108,7 @@ def send_unacked_reminders():
             )
             continue
 
-        if not has_matching_notification_channel(group):
+        if not has_matching_notification_channel(group, event_type="reminder"):
             logger.debug(
                 "reminder skipped because no channel matches alert group severity",
                 extra={

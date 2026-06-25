@@ -1,4 +1,4 @@
-SERVICE_VERSION = "1.0.23-beta"
+SERVICE_VERSION = "1.0.24-beta"
 
 
 def get_service_version():

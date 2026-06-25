@@ -971,7 +971,7 @@ function ruleUserTargetField(rule) {
         .attr("id", ruleFieldId(rule.id, "user-target-group"));
     const select = $("<select>")
         .attr("id", ruleFieldId(rule.id, "target-user"))
-        .addClass("input js-user-select")
+        .addClass("js-user-select")
         .attr("data-placeholder", "Select user...");
 
     if (!escalationRuleTargetUsersCache.length) {
@@ -1114,9 +1114,7 @@ function saveEscalationRuleFromCard(ruleId) {
     apiPut("/api/escalation-policies/rules/" + ruleId, payload, function () {
         expandedEscalationRuleId = ruleId;
 
-        loadEscalationRuleCards(selectedEscalationPolicyRulesId, function () {
-            showAppSuccess("Rule updated.");
-        });
+        loadEscalationRuleCards(selectedEscalationPolicyRulesId, function () {});
     });
 }
 

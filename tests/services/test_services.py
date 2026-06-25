@@ -1546,3 +1546,57 @@ def test_service_details_includes_impact_v2_block(client, admin_headers):
 
     assert data["analytics"]["widgets"]["impact"]["effective_status"] == "major_outage"
     assert data["analytics"]["widgets"]["impact"]["primary_reason"] == "upstream_dependency"
+
+
+def test_create_service_restores_deleted_service(client, admin_headers):
+    group = create_group()
+    team = create_team(group)
+
+    created = client.post(
+        "/api/services",
+        json=service_payload(
+            team,
+            slug="rabbitmq-cloud",
+            name="Old RabbitMQ",
+            description="Old description",
+        ),
+        headers=admin_headers,
+    )
+
+    assert created.status_code == 201
+    original = created.get_json()
+
+    deleted = client.delete(
+        f"/api/services/{original['id']}",
+        headers=admin_headers,
+    )
+
+    assert deleted.status_code == 200
+
+    restored = client.post(
+        "/api/services",
+        json=service_payload(
+            team,
+            slug="rabbitmq-cloud",
+            name="New RabbitMQ",
+            description="Restored description",
+        ),
+        headers=admin_headers,
+    )
+
+    assert restored.status_code == 201, restored.get_json()
+
+    payload = restored.get_json()
+
+    assert payload["id"] == original["id"]
+    assert payload["slug"] == "rabbitmq-cloud"
+    assert payload["name"] == "New RabbitMQ"
+    assert payload["description"] == "Restored description"
+    assert payload["enabled"] is True
+
+    loaded = client.get(
+        f"/api/services/{original['id']}",
+        headers=admin_headers,
+    )
+
+    assert loaded.status_code == 200

@@ -43,5 +43,6 @@ Read more: [Browser Push](../usage/browser-push.md).
 
 1. [Services API](services.md)
 2. [Escalation Policies API](escalation-policies.md)
-3. [Sentry Integration API](sentry-integration.md)
-4. [Voice Call OpenAPI Notes](voice-call-openapi.md)
+3. [Matcher Suggestions API](matchers.md)
+4. [Sentry Integration API](sentry-integration.md)
+5. [Voice Call OpenAPI Notes](voice-call-openapi.md)

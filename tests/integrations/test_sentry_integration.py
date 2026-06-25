@@ -37,6 +37,8 @@ def sentry_issue_alert_payload(action="triggered"):
             },
             "event": {
                 "event_id": "event-abc",
+                "issue_id": "12345",
+                "project": 42,
                 "environment": "production",
                 "message": "division by zero",
             },
@@ -63,6 +65,7 @@ def sentry_metric_alert_payload(action="resolved"):
                 "web_url": "https://sentry.example.com/alerts/metric/7/",
             },
             "project": {
+                "id": 42,
                 "slug": "backend-api",
                 "name": "Backend API",
             },
@@ -113,7 +116,8 @@ def test_normalize_sentry_event_alert_triggered():
     assert alert["labels"]["sentry_resource"] == "event_alert"
     assert alert["labels"]["sentry_action"] == "triggered"
     assert alert["labels"]["organization_slug"] == "acme"
-    assert alert["labels"]["project_slug"] == "backend-api"
+    assert alert["labels"]["project_id"] == 42
+    assert isinstance(alert["labels"]["project_id"], int)
     assert alert["labels"]["issue_id"] == "12345"
     assert alert["labels"]["issue_short_id"] == "BACKEND-1"
     assert alert["labels"]["environment"] == "production"
@@ -155,6 +159,8 @@ def test_normalize_sentry_metric_alert_resolved():
     assert alert["external_id"] == "metric-alert-7"
     assert alert["title"] == "High error rate"
     assert alert["labels"]["alertname"] == "SentryMetricAlert"
+    assert alert["labels"]["project_id"] == 42
+    assert isinstance(alert["labels"]["project_id"], int)
     assert alert["labels"]["project_slug"] == "backend-api"
     assert alert["labels"]["sentry_alert_id"] == "metric-alert-7"
 
@@ -318,4 +324,21 @@ def test_sentry_endpoint_accepts_valid_signature_without_incidentrelay_token(
     assert alert["source"] == "sentry"
     assert alert["status"] == "firing"
     assert alert["dedup_key"] == "sentry:issue:12345"
+    assert alert["labels"]["project_slug"] == "backend-api"
+
+
+def test_normalize_sentry_uses_event_project_id_when_data_project_has_no_id():
+    payload = sentry_issue_alert_payload()
+    payload["data"]["project"] = {
+        "slug": "backend-api",
+        "name": "Backend API",
+    }
+    payload["data"]["event"]["project"] = 42
+
+    alert = normalize_sentry(
+        payload,
+        headers={"Sentry-Hook-Resource": "event_alert"},
+    )[0]
+
+    assert alert["labels"]["project_id"] == 42
     assert alert["labels"]["project_slug"] == "backend-api"

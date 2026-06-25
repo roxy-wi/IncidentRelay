@@ -19,10 +19,23 @@ from app.services.rbac import (
     require_team_write,
 )
 from app.services.serializers import serialize_route
-from app.services.validation import validate_body
+from app.services.validation import make_error_response, validate_body
+from app.services.routing.matcher import service as matcher_preset_service
 
 
 routes_bp = Blueprint("routes_api", __name__)
+
+
+def validate_route_matcher_preset(team_id, preset_id):
+    """Validate route matcher preset assignment."""
+    try:
+        preset = matcher_preset_service.validate_preset_assignment(preset_id, team_id=team_id)
+    except matcher_preset_service.MatcherPresetNotFoundError as exc:
+        return None, make_error_response("matcher_preset_not_found", str(exc), 400)
+    except matcher_preset_service.MatcherPresetError as exc:
+        return None, make_error_response("matcher_preset_invalid", str(exc), 400)
+
+    return preset, None
 
 
 def route_name_conflict_response(name):
@@ -328,6 +341,10 @@ def create_route():
     if service_error:
         return service_error
 
+    matcher_preset, matcher_preset_error = validate_route_matcher_preset(payload.team_id, payload.matcher_preset_id)
+    if matcher_preset_error:
+        return matcher_preset_error
+
     raw_token = create_raw_token()
     integration_config = build_route_integration_config(payload)
     existing_route = routes_repo.get_route_by_team_and_name(payload.team_id, payload.name)
@@ -343,9 +360,8 @@ def create_route():
                 name=payload.name,
                 source=payload.source,
                 rotation_id=payload.rotation_id,
-                escalation_policy_id=(
-                    payload.escalation_policy_id
-                ),
+                escalation_policy_id=payload.escalation_policy_id,
+                matcher_preset_id=matcher_preset.id if matcher_preset else None,
                 matchers=payload.matchers,
                 group_by=payload.group_by,
                 enabled=payload.enabled,
@@ -353,6 +369,7 @@ def create_route():
                 intake_token_hash=hash_token(raw_token),
                 service_id=payload.service_id,
                 integration_config=integration_config,
+                notification_channel_mode=payload.notification_channel_mode,
             )
 
             routes_repo.replace_route_channels(route.id, payload.channel_ids)
@@ -365,6 +382,7 @@ def create_route():
                 source=payload.source,
                 rotation_id=payload.rotation_id,
                 escalation_policy_id=payload.escalation_policy_id,
+                matcher_preset_id=matcher_preset.id if matcher_preset else None,
                 matchers=payload.matchers,
                 group_by=payload.group_by,
                 enabled=payload.enabled,
@@ -372,6 +390,7 @@ def create_route():
                 intake_token_hash=hash_token(raw_token),
                 service_id=payload.service_id,
                 integration_config=integration_config,
+                notification_channel_mode=payload.notification_channel_mode,
             )
 
             routes_repo.replace_route_channels(
@@ -446,6 +465,10 @@ def update_route(route_id):
     if service_error:
         return service_error
 
+    matcher_preset, matcher_preset_error = validate_route_matcher_preset(payload.team_id, payload.matcher_preset_id)
+    if matcher_preset_error:
+        return matcher_preset_error
+
     integration_config = build_route_integration_config(
         payload,
         current_route=current_route,
@@ -470,11 +493,13 @@ def update_route(route_id):
             "source": payload.source,
             "rotation": payload.rotation_id,
             "escalation_policy": payload.escalation_policy_id,
+            "matcher_preset": matcher_preset.id if matcher_preset else None,
             "matchers": payload.matchers,
             "group_by": payload.group_by,
             "enabled": payload.enabled,
             "service": payload.service_id,
             "integration_config": integration_config,
+            "notification_channel_mode": payload.notification_channel_mode,
         },
     )
 

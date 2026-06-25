@@ -4,7 +4,7 @@ import requests
 
 from app import Config
 from app.notifiers.plugins import IncomingWebhookNotifier, alert_service_label
-from app.services.links import build_alert_web_url
+from app.services.links import build_alert_web_url, build_source_event_url
 from app.services.routing.service_context import (
     format_service_links_markdown,
     format_service_runbooks_markdown,
@@ -168,6 +168,7 @@ class MattermostNotifier(IncomingWebhookNotifier):
             else "-"
         )
         alert_url = build_alert_web_url(alert)
+        source_event_url = build_source_event_url(alert)
         fields = [
             {"short": True, "title": "Team", "value": team},
             {"short": True, "title": "Service", "value": alert_service_label(alert)},
@@ -202,6 +203,12 @@ class MattermostNotifier(IncomingWebhookNotifier):
                 "short": False,
                 "title": "Open",
                 "value": f"[Open alert]({alert_url})",
+            })
+        if source_event_url:
+            fields.append({
+                "short": False,
+                "title": "Source event",
+                "value": f"[Open source event]({source_event_url})",
             })
         return fields
 

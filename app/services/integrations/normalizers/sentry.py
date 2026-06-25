@@ -1,6 +1,9 @@
 from app.services.integrations.normalizers.common import first_non_empty, first_event_link, add_event_link_label, \
     make_dedup_key
 
+import logging
+
+logger = logging.getLogger("oncall.alerts")
 
 def normalize_sentry(payload, headers=None):
     """Normalize Sentry Integration Platform webhooks."""
@@ -23,14 +26,28 @@ def normalize_sentry(payload, headers=None):
 
     alert_obj = metric_alert or event_alert or data.get("alert") or {}
 
-    project = (
-        data.get("project")
-        or issue.get("project")
-        or event.get("project")
-        or alert_obj.get("project")
-        or {}
+    project_candidates = (
+        data.get("project"),
+        issue.get("project"),
+        event.get("project"),
+        alert_obj.get("project"),
     )
-    project_slug, project_name = normalize_sentry_named_object(project)
+
+    project_id = None
+    project_slug = None
+    project_name = None
+
+    for project_candidate in project_candidates:
+        if project_id is None:
+            project_id = normalize_sentry_integer_id(project_candidate)
+
+        candidate_slug, candidate_name = normalize_sentry_named_object(project_candidate)
+
+        if project_slug is None and candidate_slug:
+            project_slug = candidate_slug
+
+        if project_name is None and candidate_name:
+            project_name = candidate_name
 
     organization = (
         data.get("organization")
@@ -46,6 +63,7 @@ def normalize_sentry(payload, headers=None):
         issue.get("id"),
         issue.get("issue_id"),
         data.get("issue_id"),
+        event.get("issue_id"),
         event.get("groupID"),
         event.get("group_id"),
     )
@@ -134,6 +152,7 @@ def normalize_sentry(payload, headers=None):
         "sentry_action": action,
         "organization_slug": organization_slug,
         "organization_name": organization_name,
+        "project_id": project_id,
         "project_slug": project_slug,
         "project_name": project_name,
         "issue_id": str(issue_id) if issue_id else None,
@@ -194,6 +213,23 @@ def normalize_sentry(payload, headers=None):
             "status": status,
         }
     ]
+
+
+def normalize_sentry_integer_id(value):
+    """Return an integer ID from a Sentry project value."""
+    if isinstance(value, dict):
+        value = value.get("id")
+
+    if isinstance(value, bool):
+        return None
+
+    if isinstance(value, int):
+        return value
+
+    if isinstance(value, str) and value.isdigit():
+        return int(value)
+
+    return None
 
 
 def normalize_sentry_named_object(value):

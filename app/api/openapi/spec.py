@@ -10,6 +10,7 @@ from app.api.openapi.endpoints import (
     integrations,
     notification_center,
     notification_rules,
+    notification_policies,
     oncall_health,
     profile,
     rotations,
@@ -21,6 +22,7 @@ from app.api.openapi.endpoints import (
     users,
     version,
     maintenance_windows,
+    matchers,
 )
 from app.version import get_service_version
 
@@ -35,7 +37,9 @@ ENDPOINT_MODULES = [
     calendar,
     channels,
     routes,
+    matchers,
     escalation_policies,
+    notification_policies,
     alerts,
     incidents,
     silences,

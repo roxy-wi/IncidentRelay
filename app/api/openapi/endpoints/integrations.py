@@ -297,7 +297,7 @@ SENTRY_WEBHOOK_BODY_SCHEMA = {
                 "environment": "production",
                 "message": "division by zero",
             },
-            "project": {"slug": "backend-api", "name": "Backend API"},
+            "project": {"id": 42, "slug": "backend-api", "name": "Backend API"},
             "organization": {"slug": "acme", "name": "Acme"},
         },
     },

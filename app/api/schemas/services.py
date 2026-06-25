@@ -120,6 +120,8 @@ class ServiceBaseSchema(ApiModel):
 
     default_rotation_id: int | None = Field(default=None, ge=1)
     default_escalation_policy_id: int | None = Field(default=None, ge=1)
+    notification_policy_id: int | None = Field(default=None, ge=1)
+    priority_policy_id: int | None = Field(default=None, ge=1)
 
     labels: Dict[str, Any] = Field(default_factory=dict)
     tags: List[str] = Field(default_factory=list)
@@ -163,15 +165,16 @@ class ServiceMatchRuleBaseSchema(ApiModel):
         default=None,
         max_length=DESCRIPTION_MAX_LENGTH,
     )
+    matcher_preset_id: int | None = Field(default=None, ge=1)
     matchers: Dict[str, Any] = Field(default_factory=dict)
 
     enabled: bool = True
 
     @model_validator(mode="after")
     def validate_matchers(self):
-        """Require at least one matcher."""
-        if not self.matchers:
-            raise ValueError("Service match rule must have at least one matcher")
+        """Require a preset, local matchers or both."""
+        if not self.matcher_preset_id and not self.matchers:
+            raise ValueError("Service match rule must have a matcher preset or local matchers")
         return self
 
 

@@ -4,6 +4,7 @@ import re
 from pydantic import Field, model_validator
 
 from app.api.schemas.base import ApiModel
+from app.services.notifications.policies.constants import NOTIFICATION_CHANNEL_MODE_PATTERN, ROUTE_ONLY
 
 
 ROUTE_ESCALATION_MODE_PATTERN = r"^(rotation|policy)$"
@@ -22,10 +23,10 @@ class RouteBaseSchema(ApiModel):
     source: str = Field(pattern=r"^(alertmanager|aws_sns|grafana|zabbix|webhook|sentry|librenms|rmon)$")
     rotation_id: int | None = Field(default=None, ge=1)
     channel_ids: List[int] = Field(default_factory=list)
+    notification_channel_mode: str = Field(default=ROUTE_ONLY, pattern=NOTIFICATION_CHANNEL_MODE_PATTERN)
+    matcher_preset_id: int | None = Field(default=None, ge=1)
     matchers: Dict[str, Any] = Field(default_factory=dict)
-    group_by: List[str] = Field(
-        default_factory=lambda: ["alertname", "severity"]
-    )
+    group_by: List[str] = Field(default_factory=lambda: ["alertname", "severity"])
     integration_config: Dict[str, Any] = Field(default_factory=dict)
     enabled: bool = True
 

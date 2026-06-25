@@ -261,6 +261,20 @@
               <label for="route-channels">Channels</label>
               <select id="route-channels" class="input" multiple></select>
 
+                <label for="route-notification-channel-mode">
+                  Notification channel source
+                </label>
+
+                <select id="route-notification-channel-mode" class="input">
+                  <option value="route_only">Route channels only</option>
+                  <option value="service_policy">Service notification policy</option>
+                  <option value="service_policy_plus_route">
+                    Service policy + route channels
+                  </option>
+                </select>
+
+                <div id="route-notification-channel-mode-help" class="help-text"></div>
+
               <label class="md-checkbox">
                 <input id="route-enabled" type="checkbox" checked>
                 <span>Enabled</span>
@@ -283,19 +297,21 @@
             </div>
 
             <div class="form-body">
-              <label for="route-matchers">Alert filters JSON</label>
+                <label for="route-matcher-preset">Matcher preset</label>
+                <select id="route-matcher-preset" class="input">
+                  <option value="">No preset</option>
+                </select>
+
+                <div id="route-matcher-preset-hint" class="help-text">
+                  No preset selected. Only the additional matchers below will be evaluated.
+                </div>
+
+                <label for="route-matchers">Additional matchers JSON</label>
 
               <div class="json-editor">
                 <div class="json-editor-header">
                   <span>Matchers</span>
 
-                  <button
-                    id="format-route-matchers"
-                    type="button"
-                    class="btn btn-small"
-                  >
-                    Format
-                  </button>
                 </div>
 
                 <textarea
@@ -493,20 +509,19 @@
             </select>
 
             <label for="service-rule-position">Position</label>
-            <input
-              id="service-rule-position"
-              class="input"
-              type="number"
-              min="0"
-              value="0"
-            >
+            <input id="service-rule-position" class="input" type="number" min="0" value="0">
+              <label for="service-rule-matcher-preset">Matcher preset</label>
+              <select id="service-rule-matcher-preset" class="input">
+                  <option value="">No preset</option>
+              </select>
+
+                <div id="service-rule-matcher-preset-hint" class="help-text">
+                  No preset selected. Only the additional matchers below will be evaluated.
+                </div>
 
             <div class="json-editor">
               <div class="json-editor-header">
-                  <span>Matchers</span>
-                  <button id="format-route-matchers" type="button" class="btn btn-small">
-                    Format
-                  </button>
+                  <span>Additional matchers</span>
               </div>
 
               <textarea

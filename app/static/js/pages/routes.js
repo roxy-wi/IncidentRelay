@@ -45,6 +45,67 @@ function getRouteEscalationLabel(route) {
 
     return "-";
 }
+let routeMatcherPresetsCache = [];
+let routeServiceRuleMatcherPresetsCache = [];
+
+function updateRouteMatcherPresetHint() {
+    const preset = findMatcherPresetById(routeMatcherPresetsCache, $("#route-matcher-preset").val());
+    $("#route-matcher-preset-hint").text(matcherPresetAndLocalHint(preset));
+}
+
+
+function updateServiceRuleMatcherPresetHint() {
+    const preset = findMatcherPresetById(routeServiceRuleMatcherPresetsCache, $("#service-rule-matcher-preset").val());
+    $("#service-rule-matcher-preset-hint").text(matcherPresetAndLocalHint(preset));
+}
+
+function getRouteNotificationModeLabel(route) {
+    const mode = route.notification_channel_mode || "route_only";
+
+    if (mode === "service_policy") {
+        return "Service notification policy";
+    }
+
+    if (mode === "service_policy_plus_route") {
+        return "Service policy + route channels";
+    }
+
+    return "Route channels only";
+}
+
+function updateRouteNotificationChannelModeUi() {
+    const mode = (
+        $("#route-notification-channel-mode").val()
+        || "route_only"
+    );
+    const routeChannelsDisabled = mode === "service_policy";
+
+    $("#route-channels")
+        .prop("disabled", routeChannelsDisabled)
+        .closest(".form-group")
+        .toggleClass("is-muted", routeChannelsDisabled);
+
+    let helpText;
+
+    if (mode === "service_policy") {
+        helpText = (
+            "Only channels selected by the matched service notification "
+            + "policy will receive shared notifications."
+        );
+    } else if (mode === "service_policy_plus_route") {
+        helpText = (
+            "Channels selected by the service policy are combined with "
+            + "the channels configured on this route."
+        );
+    } else {
+        helpText = (
+            "Only channels configured directly on this route are used."
+        );
+    }
+
+    $("#route-notification-channel-mode-help").text(helpText);
+}
+
 function getRouteTeamEscalationLabel(route) {
     if (route.escalation_policy_name) {
         return "Ignored for policy mode";
@@ -56,19 +117,51 @@ function getRouteTeamEscalationLabel(route) {
 
     return "Disabled";
 }
+function initializeRouteMatcherEditors() {
+    enhanceMatcherEditor("#route-matchers", {
+        label: "Additional matchers JSON",
+        header: "Additional matchers",
+        context: function () {
+            return {
+                scope: "route",
+                teamId: Number($("#route-team").val()) || null,
+                routeId: Number($("#route-id").val()) || null,
+                matcherPresetId: Number($("#route-matcher-preset").val()) || null,
+            };
+        },
+    });
+
+    enhanceMatcherEditor("#service-rule-matchers", {
+        label: "Additional matchers",
+        context: function () {
+            const route = getSelectedRouteForServiceRules();
+
+            return {
+                scope: "service_rule",
+                teamId: route ? route.team_id : null,
+                routeId: route ? route.id : null,
+                serviceId: Number($("#service-rule-service").val()) || null,
+                matcherPresetId: Number($("#service-rule-matcher-preset").val()) || null,
+            };
+        },
+    });
+}
+
 function loadRoutes() {
+    initializeRouteMatcherEditors();
     fillTeamSelect("#route-team", false, loadRouteDependencies);
     initRoutesTableSorting();
     refreshRoutes();
 }
 
-function loadRouteDependencies(callback) {
+function loadRouteDependencies(callback, selectedMatcherPresetId) {
     const teamId = $("#route-team").val();
 
     const rotationSelect = $("#route-rotation");
     const channelSelect = $("#route-channels");
     const policySelect = $("#route-escalation-policy");
     const serviceSelect = $("#route-service");
+    const matcherPresetSelect = $("#route-matcher-preset");
 
     rotationSelect.empty().append($("<option>").val("").text("No rotation"));
     channelSelect.empty();
@@ -88,13 +181,18 @@ function loadRouteDependencies(callback) {
         return;
     }
 
+    routeMatcherPresetsCache = [];
+    fillMatcherPresetSelect(matcherPresetSelect, [], selectedMatcherPresetId);
+    updateRouteMatcherPresetHint();
+
     let rotationsLoaded = false;
     let channelsLoaded = false;
     let policiesLoaded = !policySelect.length;
     let servicesLoaded = !serviceSelect.length;
+    let matcherPresetsLoaded = !matcherPresetSelect.length;
 
     function finishWhenReady() {
-        if (!rotationsLoaded || !channelsLoaded || !policiesLoaded || !servicesLoaded) {
+        if (!rotationsLoaded || !channelsLoaded || !policiesLoaded || !servicesLoaded || !matcherPresetsLoaded) {
             return;
         }
 
@@ -182,6 +280,15 @@ function loadRouteDependencies(callback) {
             finishWhenReady();
         });
     }
+    if (matcherPresetSelect.length) {
+        loadMatcherPresetsForTeam(teamId, function (presets) {
+            routeMatcherPresetsCache = presets;
+            fillMatcherPresetSelect(matcherPresetSelect, presets, selectedMatcherPresetId);
+            updateRouteMatcherPresetHint();
+            matcherPresetsLoaded = true;
+            finishWhenReady();
+        });
+    }
 }
 
 function refreshRoutes() {
@@ -260,6 +367,9 @@ function getRouteSearchText(route) {
         channels,
         route.service_name,
         route.service_slug,
+        route.notification_channel_mode,
+        route.matcher_preset ? route.matcher_preset.name : "",
+        getRouteNotificationModeLabel(route),
     ].join(" ").toLowerCase();
 }
 
@@ -292,7 +402,6 @@ function renderRoutesTable() {
 
 function renderRouteRow(route) {
     const row = $("<tr>");
-    const channels = asArray(route.channels);
 
     row.append(
         $("<td>")
@@ -310,7 +419,7 @@ function renderRouteRow(route) {
     row.append($("<td>").append($("<span>").addClass("route-pill").text(getRouteTeamLabel(route))));
     row.append($("<td>").text(route.source || "-"));
     row.append($("<td>").text(getRouteEscalationLabel(route)));
-    row.append($("<td>").append(renderRouteChannels(channels)));
+    row.append($("<td>").append(renderRouteChannels(route)));
     row.append($("<td>").append($("<span>").addClass("token-pill").text(route.intake_token_prefix || "-")));
     row.append(
         window.AppMaintenanceBadges.statusCell(
@@ -322,15 +431,39 @@ function renderRouteRow(route) {
     return row;
 }
 
-function renderRouteChannels(channels) {
+function renderRouteChannels(route) {
     const wrapper = $("<div>").addClass("route-channels-list");
-    channels = asArray(channels);
-    if (!channels.length) {
-        return wrapper.append($("<span>").text("-"));
+    const mode = route.notification_channel_mode || "route_only";
+    const channels = asArray(route.channels);
+
+    if (mode === "service_policy") {
+        return wrapper.append(
+            $("<span>")
+                .addClass("route-channel-chip")
+                .text("Service policy")
+        );
     }
+
+    if (mode === "service_policy_plus_route") {
+        wrapper.append(
+            $("<span>")
+                .addClass("route-channel-chip")
+                .text("Service policy")
+        );
+    }
+
     channels.forEach(function (channel) {
-        wrapper.append($("<span>").addClass("route-channel-chip").text(channel.name || channel.id));
+        wrapper.append(
+            $("<span>")
+                .addClass("route-channel-chip")
+                .text(channel.name || channel.id)
+        );
     });
+
+    if (!wrapper.children().length) {
+        wrapper.append($("<span>").text("-"));
+    }
+
     return wrapper;
 }
 
@@ -433,8 +566,10 @@ function openRouteServiceRules(routeId) {
     resetServiceRuleForm();
 
     loadServiceRuleServices(route.team_id, function () {
-        refreshRouteServiceRules();
-        openAppModal("#route-service-rules-modal");
+        loadServiceRuleMatcherPresets(route.team_id, null, function () {
+            refreshRouteServiceRules();
+            openAppModal("#route-service-rules-modal");
+        });
     });
 }
 
@@ -466,6 +601,22 @@ function loadServiceRuleServices(teamId, callback) {
                     .text(service.name + " (" + service.slug + ")")
             );
         });
+
+        if (typeof callback === "function") {
+            callback();
+        }
+    });
+}
+
+function loadServiceRuleMatcherPresets(teamId, selectedPresetId, callback) {
+    routeServiceRuleMatcherPresetsCache = [];
+    fillMatcherPresetSelect("#service-rule-matcher-preset", [], null);
+    updateServiceRuleMatcherPresetHint();
+
+    loadMatcherPresetsForTeam(teamId, function (presets) {
+        routeServiceRuleMatcherPresetsCache = presets;
+        fillMatcherPresetSelect("#service-rule-matcher-preset", presets, selectedPresetId);
+        updateServiceRuleMatcherPresetHint();
 
         if (typeof callback === "function") {
             callback();
@@ -532,13 +683,24 @@ function renderRouteServiceRuleRow(rule) {
             .text(rule.service_name || rule.service_slug || "-")
     );
 
-    row.append(
-        $("<td>").append(
-            $("<code>")
-                .addClass("inline-code")
-                .text(JSON.stringify(rule.matchers || {}))
-        )
+    const matchersCell = $("<td>");
+    const matcherPreset = rule.matcher_preset;
+
+    if (matcherPreset) {
+        matchersCell.append(
+            $("<div>")
+                .addClass("row-subtitle")
+                .text("Preset: " + formatMatcherPresetOption(matcherPreset))
+        );
+    }
+
+    matchersCell.append(
+        $("<code>")
+            .addClass("inline-code")
+            .text(JSON.stringify(rule.matchers || {}))
     );
+
+    row.append(matchersCell);
 
     row.append(
         $("<td>").append(
@@ -579,46 +741,43 @@ function renderRouteServiceRuleRow(rule) {
 }
 
 function resetServiceRuleForm() {
-    const route = getSelectedRouteForServiceRules();
-
-    $("#service-rule-form-title").text("Create rule");
     $("#service-rule-id").val("");
-    $("#service-rule-team").val(route ? route.team_id : "");
-    $("#service-rule-route").val(route ? route.id : "");
     $("#service-rule-name").val("");
     $("#service-rule-service").val("");
     $("#service-rule-position").val("0");
-    $("#service-rule-matchers").val(JSON.stringify({
-        labels: {
-            cluster: "cloud-postgresql"
-        }
-    }, null, 2));
     $("#service-rule-enabled").prop("checked", true);
+
+    fillMatcherPresetSelect("#service-rule-matcher-preset", routeServiceRuleMatcherPresetsCache, null);
+    updateServiceRuleMatcherPresetHint();
+
+    setMatcherEditorValue("#service-rule-matchers", {});
 }
 
 function editRouteServiceRule(rule) {
-    $("#service-rule-form-title").text("Edit rule #" + rule.id);
     $("#service-rule-id").val(rule.id);
-    $("#service-rule-team").val(rule.team_id);
-    $("#service-rule-route").val(rule.route_id || "");
     $("#service-rule-name").val(rule.name || "");
     $("#service-rule-service").val(rule.service_id || "");
     $("#service-rule-position").val(rule.position || 0);
-    $("#service-rule-matchers").val(JSON.stringify(rule.matchers || {}, null, 2));
-    $("#service-rule-enabled").prop("checked", !!rule.enabled);
+    $("#service-rule-enabled").prop("checked", rule.enabled !== false);
+
+    const matcherPresetId = rule.matcher_preset_id || (rule.matcher_preset ? rule.matcher_preset.id : null);
+
+    fillMatcherPresetSelect("#service-rule-matcher-preset", routeServiceRuleMatcherPresetsCache, matcherPresetId);
+    updateServiceRuleMatcherPresetHint();
+
+    setMatcherEditorValue("#service-rule-matchers", rule.matchers || {});
 }
 
 function collectRouteServiceRulePayload() {
     return {
         team_id: Number($("#service-rule-team").val()),
-        route_id: $("#service-rule-route").val()
-            ? Number($("#service-rule-route").val())
-            : null,
+        route_id: $("#service-rule-route").val() ? Number($("#service-rule-route").val()) : null,
         service_id: Number($("#service-rule-service").val()),
         position: Number($("#service-rule-position").val() || 0),
         name: $("#service-rule-name").val(),
         description: null,
-        matchers: parseJsonInput("#service-rule-matchers", {}),
+        matcher_preset_id: $("#service-rule-matcher-preset").val() ? Number($("#service-rule-matcher-preset").val()) : null,
+        matchers: getMatcherEditorValue("#service-rule-matchers", {}),
         enabled: $("#service-rule-enabled").is(":checked"),
     };
 }
@@ -629,6 +788,11 @@ function saveRouteServiceRule() {
 
     if (!payload.service_id) {
         showAppError("Service is required.");
+        return;
+    }
+
+    if (!payload.matcher_preset_id && !Object.keys(payload.matchers || {}).length) {
+        showAppError("Select a matcher preset or define additional matchers.");
         return;
     }
 
@@ -715,6 +879,7 @@ function renderRouteDetails(route) {
             .append(routeDetailsItem("Maintenance", window.AppMaintenanceBadges.text(route, "-")))
             .append(routeDetailsItem("Escalation", getRouteEscalationLabel(route)))
             .append(routeDetailsItem("Team escalation", getRouteTeamEscalationLabel(route)))
+            .append(routeDetailsItem("Notification channel source", getRouteNotificationModeLabel(route)))
             .append(routeDetailsItem("Channels", asArray(route.channels).map(function (channel) {
                 return channel.name;
             }).join(", ") || "-"))
@@ -727,7 +892,13 @@ function renderRouteDetails(route) {
                     : $()
             )
             .append(routeDetailsItem("Status", route.enabled ? "Enabled" : "Disabled"))
-            .append(routeDetailsCode("Matchers", route.matchers || {}))
+            .append(
+                routeDetailsItem(
+                    "Matcher preset",
+                    route.matcher_preset ? formatMatcherPresetOption(route.matcher_preset) : "No preset"
+                )
+            )
+            .append(routeDetailsCode("Additional matchers", route.matchers || {}))
             .append(routeDetailsCode("Group by", route.group_by || []))
             .append(routeDetailsItem("Service", route.service_name || route.service_slug || "-"))
     );
@@ -947,7 +1118,7 @@ function collectRoutePayload() {
         team_id: Number($("#route-team").val()),
         name: $("#route-name").val(),
         source: $("#route-source").val(),
-
+        escalation_mode: mode,
         rotation_id: (
             !usePolicy && $("#route-rotation").val()
                 ? Number($("#route-rotation").val())
@@ -959,16 +1130,11 @@ function collectRoutePayload() {
                 ? Number($("#route-escalation-policy").val())
                 : null
         ),
-
-        channel_ids: (
-            $("#route-channels").val() || []
-        ).map(Number),
-
-        matchers: parseJsonInput(
-            "#route-matchers",
-            {}
-        ),
-
+        channel_ids: ($("#route-channels").val() || []).map(Number),
+        notification_channel_mode: ($("#route-notification-channel-mode").val() || "route_only"),
+        service_id: $("#route-service").val() ? Number($("#route-service").val()) : null,
+        matcher_preset_id: $("#route-matcher-preset").val() ? Number($("#route-matcher-preset").val()) : null,
+        matchers: getMatcherEditorValue("#route-matchers", {}),
         group_by: parseJsonInput(
             "#route-group-by",
             []
@@ -1064,7 +1230,7 @@ function editRoute(id) {
             .addClass("is-hidden");
     }
 
-    $("#route-matchers").val(JSON.stringify(route.matchers || {}, null, 2));
+    setMatcherEditorValue("#route-matchers", route.matchers || {});
     $("#route-group-by").val(JSON.stringify(route.group_by || [], null, 2));
     $("#route-enabled").prop("checked", !!route.enabled);
     $("#route-sentry-webhook-secret").val("");
@@ -1083,10 +1249,12 @@ function editRoute(id) {
         }));
 
         $("#route-service").val(route.service_id || "");
+        $("#route-notification-channel-mode").val(route.notification_channel_mode || "route_only");
 
+        updateRouteNotificationChannelModeUi();
         updateRouteEscalationModeUi();
         updateRouteSourceUi();
-    });
+    }, route.matcher_preset_id || (route.matcher_preset ? route.matcher_preset.id : null));
 
     openAppModal("#route-form-modal");
 }
@@ -1149,7 +1317,7 @@ function resetRouteForm() {
     $("#route-id").val("");
     $("#route-name").val("");
     $("#route-source").val("alertmanager");
-    $("#route-matchers").val("{}");
+    setMatcherEditorValue("#route-matchers", {});
     $("#route-group-by").val('["alertname","instance"]');
     $("#route-enabled").prop("checked", true);
     $("#route-rotation").val("");
@@ -1157,11 +1325,15 @@ function resetRouteForm() {
     $("#route-escalation-mode").val("rotation");
     $("#route-escalation-policy").val("");
     $("#route-service").val("");
+    fillMatcherPresetSelect("#route-matcher-preset", routeMatcherPresetsCache, null);
+    updateRouteMatcherPresetHint();
     $("#route-aws-sns-topic-arn").val("");
     $("#route-aws-sns-webhook-url").val("");
     $("#route-aws-sns-webhook-group").addClass("is-hidden");
     updateRouteEscalationModeUi();
     $("#route-sentry-webhook-secret").val("");
+    $("#route-notification-channel-mode").val("route_only");
+    updateRouteNotificationChannelModeUi();
     updateSentrySecretHelp(null);
     updateRouteSourceUi();
 }
@@ -1388,9 +1560,6 @@ $(document).on("keydown", function (event) {
         closeAppModal("#route-form-modal");
     }
 });
-$(document).on("click", "#format-route-matchers", function () {
-    formatJsonTextarea("#route-matchers", {}, "Alert filters JSON");
-});
 $(document).on("change", "#route-rotation", function () {
     if ($(this).val()) {
         $("#route-escalation-mode").val("rotation");
@@ -1425,14 +1594,6 @@ $(document).on("click", "#save-service-rule", saveRouteServiceRule);
 
 $(document).on("click", "#reset-service-rule-form", resetServiceRuleForm);
 
-$(document).on("click", "#format-service-rule-matchers", function () {
-    try {
-        const value = JSON.parse($("#service-rule-matchers").val() || "{}");
-        $("#service-rule-matchers").val(JSON.stringify(value, null, 2));
-    } catch (error) {
-        showAppError("Invalid JSON: " + error.message);
-    }
-});
 
 $(document).on("click", "#close-route-service-rules-modal", function () {
     closeAppModal("#route-service-rules-modal");
@@ -1445,3 +1606,6 @@ $(document).on("click", "#route-service-rules-modal", function (event) {
 });
 $(document).on("click", "#copy-route-intake-url", copyRouteIntakeUrl);
 $(document).on("click", "#copy-route-intake-curl", copyRouteIntakeCurl);
+$(document).on("change", "#route-notification-channel-mode", updateRouteNotificationChannelModeUi);
+$(document).on("change", "#route-matcher-preset", updateRouteMatcherPresetHint);
+$(document).on("change", "#service-rule-matcher-preset", updateServiceRuleMatcherPresetHint);

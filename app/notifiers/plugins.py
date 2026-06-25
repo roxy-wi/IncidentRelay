@@ -3,7 +3,7 @@ import logging
 import requests
 
 from app.notifiers.base import BaseNotifier
-from app.services.links import build_alert_web_url
+from app.services.links import build_alert_web_url, build_source_event_url
 from app.services.routing.service_context import (
     get_alert_service_links,
     get_alert_service_runbooks,
@@ -65,6 +65,7 @@ class IncomingWebhookNotifier(BaseNotifier):
                 "text": text,
                 "alert_id": alert.id,
                 "alert_url": build_alert_web_url(alert),
+                "source_event_url": build_source_event_url(alert) or None,
                 "team": alert.team.slug if alert.team else None,
                 "status": alert.status,
                 "source": alert.source,

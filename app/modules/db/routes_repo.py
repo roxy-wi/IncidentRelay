@@ -128,6 +128,7 @@ def create_route(
     source,
     rotation_id=None,
     escalation_policy_id=None,
+    matcher_preset_id=None,
     matchers=None,
     group_by=None,
     enabled=True,
@@ -135,11 +136,9 @@ def create_route(
     intake_token_hash=None,
     service_id=None,
     integration_config=None,
+    notification_channel_mode="route_only",
 ):
-    """
-    Create an alert route.
-    """
-
+    """Create an alert route."""
     return AlertRoute.create(
         team=team_id,
         name=name,
@@ -147,12 +146,14 @@ def create_route(
         rotation=rotation_id,
         escalation_policy=escalation_policy_id,
         service=service_id,
+        matcher_preset=matcher_preset_id,
         matchers=matchers or {},
         group_by=group_by or [],
         enabled=enabled,
         intake_token_prefix=intake_token_prefix,
         intake_token_hash=intake_token_hash,
         integration_config=integration_config or {},
+        notification_channel_mode=notification_channel_mode,
     )
 
 
@@ -164,6 +165,7 @@ def restore_route(
     source,
     rotation_id=None,
     escalation_policy_id=None,
+    matcher_preset_id=None,
     matchers=None,
     group_by=None,
     enabled=True,
@@ -171,6 +173,7 @@ def restore_route(
     intake_token_hash=None,
     service_id=None,
     integration_config=None,
+    notification_channel_mode="route_only",
 ):
     """Restore and completely reconfigure a deleted route."""
     route = get_route(
@@ -183,6 +186,7 @@ def restore_route(
     route.source = source
     route.rotation = rotation_id
     route.escalation_policy = escalation_policy_id
+    route.matcher_preset = matcher_preset_id
     route.matchers = matchers or {}
     route.group_by = group_by or []
     route.enabled = enabled
@@ -190,6 +194,7 @@ def restore_route(
     route.intake_token_hash = intake_token_hash
     route.service = service_id
     route.integration_config = integration_config or {}
+    route.notification_channel_mode = notification_channel_mode
     route.deleted = False
     route.deleted_at = None
 
@@ -236,6 +241,7 @@ def update_route(route_id, data):
         "source",
         "rotation",
         "escalation_policy",
+        "matcher_preset",
         "matchers",
         "group_by",
         "enabled",
@@ -243,6 +249,7 @@ def update_route(route_id, data):
         "intake_token_hash",
         "service",
         "integration_config",
+        "notification_channel_mode",
     ]:
         if field in data:
             setattr(route, field, data[field])

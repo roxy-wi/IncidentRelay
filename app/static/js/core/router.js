@@ -56,10 +56,25 @@ function navigate(path, pushState) {
     $("#page-subtitle").text(selectedRoute.subtitle);
 
     $(".menu-link").removeClass("active");
-    $('.menu-link[href="' + normalizedPath.routePath + '"]').addClass("active");
+    $(".menu-group").removeClass("is-active");
+
+    const activeMenuLink = $(
+        '.menu-link[href="' + normalizedPath.routePath + '"]'
+    );
+
+    activeMenuLink.addClass("active");
+
+    const activeMenuGroup = activeMenuLink.closest(".menu-group");
+
+    if (activeMenuGroup.length) {
+        activeMenuGroup.addClass("is-active is-expanded");
+        activeMenuGroup
+            .children(".menu-group-toggle")
+            .attr("aria-expanded", "true");
+    }
 
     if (pushState) {
-        history.pushState({ path: normalizedPath.fullPath }, "", normalizedPath.fullPath);
+        history.pushState({path: normalizedPath.fullPath}, "", normalizedPath.fullPath);
     }
 
     safePageLoad(selectedRoute.load);
