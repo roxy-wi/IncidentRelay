@@ -114,6 +114,7 @@ CLEANUP_MODELS = [
     MaintenanceWindowService,
     MaintenanceWindow,
     AlertRoute,
+    ServiceRunbook,
     MatcherPreset,
     Service,
     NotificationPolicy,

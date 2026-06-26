@@ -69,6 +69,28 @@ class ServiceDetailsImpactQuery:
     max_depth = 5
 
 
+def _validate_runbook_matcher_preset(service, preset_id):
+    try:
+        preset = matcher_preset_service.validate_preset_assignment(
+            preset_id,
+            team_id=service.team_id,
+        )
+    except matcher_preset_service.MatcherPresetNotFoundError as exc:
+        return None, make_error_response(
+            "matcher_preset_not_found",
+            str(exc),
+            400,
+        )
+    except matcher_preset_service.MatcherPresetError as exc:
+        return None, make_error_response(
+            "matcher_preset_invalid",
+            str(exc),
+            400,
+        )
+
+    return preset, None
+
+
 def _service_details_days_from_request():
     days = request.args.get("days", default=SERVICE_DETAILS_DEFAULT_DAYS, type=int)
     return max(1, min(days or SERVICE_DETAILS_DEFAULT_DAYS, SERVICE_DETAILS_MAX_DAYS))
@@ -1364,10 +1386,15 @@ def create_service_runbook(service_id):
     if error:
         return error
 
-    runbook = services_repo.create_service_runbook(
-        service_id,
-        payload.model_dump(),
-    )
+    preset, preset_error = _validate_runbook_matcher_preset(service, payload.matcher_preset_id)
+    if preset_error:
+        return preset_error
+
+    data = payload.model_dump()
+    data.pop("matcher_preset_id", None)
+    data["matcher_preset"] = preset.id if preset else None
+
+    runbook = services_repo.create_service_runbook(service_id, data)
 
     write_audit(
         "service_runbook.create",
@@ -1394,10 +1421,15 @@ def update_service_runbook(runbook_id):
     if error:
         return error
 
-    runbook = services_repo.update_service_runbook(
-        runbook_id,
-        payload.model_dump(),
-    )
+    preset, preset_error = _validate_runbook_matcher_preset(runbook_before.service, payload.matcher_preset_id)
+    if preset_error:
+        return preset_error
+
+    data = payload.model_dump()
+    data.pop("matcher_preset_id", None)
+    data["matcher_preset"] = preset.id if preset else None
+
+    runbook = services_repo.update_service_runbook(runbook_id, data)
 
     write_audit(
         "service_runbook.update",

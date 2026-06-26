@@ -3,7 +3,7 @@ from typing import Any
 from types import SimpleNamespace
 
 from app.modules.db import services_repo
-from app.services.routing.matcher.matchers import match_alert
+from app.services.routing.matcher.match_context import alert_rule_matches
 
 
 MAX_SERVICE_CONTEXT_ITEMS = 5
@@ -104,14 +104,21 @@ def get_alert_service_links(alert: Any, limit: int = MAX_SERVICE_CONTEXT_ITEMS) 
 
 
 def _runbook_matches_alert(runbook: Any, alert: Any) -> bool:
-    matchers = getattr(runbook, "matchers", None) or {}
+    runbook_severity = _clean(getattr(runbook, "severity", None)).lower()
+    alert_severity = _clean(getattr(alert, "severity", None)).lower()
 
-    # Empty matchers mean generic service runbook.
-    if not matchers:
-        return True
+    if runbook_severity and runbook_severity != alert_severity:
+        return False
 
     try:
-        return bool(match_alert(_alert_match_data(alert), matchers))
+        return alert_rule_matches(
+            alert,
+            runbook,
+            team=getattr(alert, "team", None),
+            route=getattr(alert, "route", None),
+            service=getattr(alert, "service", None),
+            priority=getattr(alert, "priority_slug", None),
+        )
     except Exception:
         return False
 

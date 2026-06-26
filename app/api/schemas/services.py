@@ -214,16 +214,11 @@ class ServiceLinkUpdateSchema(ServiceLinkBaseSchema):
 class ServiceRunbookBaseSchema(ApiModel):
     """Validate service runbook input."""
 
-    title: str = Field(
-        min_length=NAME_MIN_LENGTH,
-        max_length=NAME_MAX_LENGTH,
-    )
-    description: str | None = Field(
-        default=None,
-        max_length=DESCRIPTION_MAX_LENGTH,
-    )
+    title: str = Field(min_length=NAME_MIN_LENGTH, max_length=NAME_MAX_LENGTH)
+    description: str | None = Field(default=None, max_length=DESCRIPTION_MAX_LENGTH)
     url: str = Field(min_length=3, max_length=2048)
     severity: str | None = Field(default=None, max_length=NAME_MAX_LENGTH)
+    matcher_preset_id: int | None = Field(default=None, ge=1)
     matchers: Dict[str, Any] = Field(default_factory=dict)
     priority: int = Field(default=100, ge=0)
     enabled: bool = True

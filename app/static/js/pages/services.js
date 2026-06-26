@@ -10,13 +10,14 @@ let serviceDetailsCache = {};
 let serviceImpactPayload = null;
 let serviceAnalyticsPayload = null;
 let serviceAnalyticsCharts = {};
+let serviceRunbookMatcherPresetsCache = [];
 
 
 function initializeServiceMatcherEditors() {
     enhanceMatcherEditor("#service-runbook-matchers", {
-        label: "Matchers JSON",
-        header: "Matchers",
-        helpText: "Use {} when the runbook should be available for every alert in the service.",
+        label: "Additional matchers JSON",
+        header: "Additional matchers",
+        helpText: "Use {} when the preset alone should determine whether the runbook matches.",
         context: function () {
             const serviceId = Number($("#service-runbook-service").val()) || null;
             const service = serviceId ? getServiceById(serviceId) : null;
@@ -25,6 +26,7 @@ function initializeServiceMatcherEditors() {
                 scope: "service_runbook",
                 teamId: service ? service.team_id : null,
                 serviceId: serviceId,
+                matcherPresetId: Number($("#service-runbook-matcher-preset").val()) || null,
             };
         },
     });
@@ -1208,6 +1210,7 @@ function getFilteredServiceRunbooks() {
             runbook.service_slug,
             runbook.team_name,
             runbook.team_slug,
+            runbook.matcher_preset ? runbook.matcher_preset.name : "",
         ].join(" ").toLowerCase().indexOf(query) !== -1;
     });
 }
@@ -1517,16 +1520,31 @@ function resetServiceRunbookForm() {
     $("#service-runbook-description").val("");
     setMatcherEditorValue("#service-runbook-matchers", {});
     $("#service-runbook-enabled").prop("checked", true);
+    fillMatcherPresetSelect(
+        "#service-runbook-matcher-preset",
+        [],
+        null
+    );
+    updateServiceRunbookMatcherPresetHint();
 }
 
 
 function openCreateServiceRunbookModal() {
     resetServiceRunbookForm();
-    openAppModal("#service-runbook-modal");
+
+    loadServiceRunbookMatcherPresets(
+        Number($("#service-runbook-service").val()) || null,
+        null,
+        function () {
+            openAppModal("#service-runbook-modal");
+        }
+    );
 }
 
 
 function editServiceRunbook(runbook) {
+    const matcherPresetId = runbook.matcher_preset_id || (runbook.matcher_preset ? runbook.matcher_preset.id : null);
+
     $("#service-runbook-form-title").text("Edit runbook");
     $("#service-runbook-id").val(runbook.id);
     fillServiceSelect("#service-runbook-service", runbook.service_id);
@@ -1535,12 +1553,14 @@ function editServiceRunbook(runbook) {
     $("#service-runbook-title").val(runbook.title || "");
     $("#service-runbook-url").val(runbook.url || "");
     $("#service-runbook-severity").val(runbook.severity || "");
-    $("#service-runbook-priority").val(runbook.priority || 100);
+    $("#service-runbook-priority").val(runbook.priority ?? 100);
     $("#service-runbook-description").val(runbook.description || "");
     setMatcherEditorValue("#service-runbook-matchers", runbook.matchers || {});
-    $("#service-runbook-enabled").prop("checked", !!runbook.enabled);
+    $("#service-runbook-enabled").prop("checked", runbook.enabled !== false);
 
-    openAppModal("#service-runbook-modal");
+    loadServiceRunbookMatcherPresets(runbook.service_id, matcherPresetId, function () {
+        openAppModal("#service-runbook-modal");
+    });
 }
 
 
@@ -1551,6 +1571,9 @@ function collectServiceRunbookPayload() {
         severity: $("#service-runbook-severity").val() || null,
         priority: Number($("#service-runbook-priority").val() || 100),
         description: $("#service-runbook-description").val() || null,
+        matcher_preset_id: $("#service-runbook-matcher-preset").val()
+            ? Number($("#service-runbook-matcher-preset").val())
+            : null,
         matchers: getMatcherEditorValue("#service-runbook-matchers", {}),
         enabled: $("#service-runbook-enabled").is(":checked"),
     };
@@ -2831,6 +2854,15 @@ function renderServiceDetailsRunbooks(payload) {
                         .addClass("compact-list-meta")
                         .text((runbook.severity || "any severity") + " / priority " + (runbook.priority || 0))
                 )
+                .text(
+                    [
+                        runbook.severity || "any severity",
+                        "priority " + (runbook.priority || 0),
+                        runbook.matcher_preset
+                            ? "preset: " + runbook.matcher_preset.name
+                            : null,
+                    ].filter(Boolean).join(" / ")
+                )
         );
     });
 
@@ -3530,3 +3562,60 @@ $(document).on("click", "#reset-service-owner-form", resetServiceOwnerForm);
 $(document).on("click", "#close-service-owner-modal", function () {
     closeAppModal("#service-owner-modal");
 });
+function updateServiceRunbookMatcherPresetHint() {
+    const preset = findMatcherPresetById(
+        serviceRunbookMatcherPresetsCache,
+        $("#service-runbook-matcher-preset").val()
+    );
+
+    $("#service-runbook-matcher-preset-hint").text(
+        matcherPresetAndLocalHint(preset)
+    );
+}
+
+
+function loadServiceRunbookMatcherPresets(serviceId, selectedPresetId, callback) {
+    const service = getServiceById(serviceId);
+    serviceRunbookMatcherPresetsCache = [];
+
+    fillMatcherPresetSelect(
+        "#service-runbook-matcher-preset",
+        [],
+        null
+    );
+    updateServiceRunbookMatcherPresetHint();
+
+    if (!service) {
+        if (typeof callback === "function") {
+            callback([]);
+        }
+        return;
+    }
+
+    loadMatcherPresetsForTeam(service.team_id, function (presets) {
+        serviceRunbookMatcherPresetsCache = presets;
+
+        fillMatcherPresetSelect(
+            "#service-runbook-matcher-preset",
+            presets,
+            selectedPresetId
+        );
+        updateServiceRunbookMatcherPresetHint();
+
+        if (typeof callback === "function") {
+            callback(presets);
+        }
+    });
+}
+$(document).on("change", "#service-runbook-service", function () {
+    loadServiceRunbookMatcherPresets(
+        Number($(this).val()) || null,
+        null
+    );
+});
+
+$(document).on(
+    "change",
+    "#service-runbook-matcher-preset",
+    updateServiceRunbookMatcherPresetHint
+);

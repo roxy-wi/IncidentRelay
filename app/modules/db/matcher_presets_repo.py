@@ -9,7 +9,20 @@ from app.modules.db.models import (
     PriorityPolicyRule,
     ServiceMatchRule,
     Silence,
+    ServiceRunbook,
 )
+
+
+def count_service_runbook_usages(preset_id):
+    """Return number of active service runbooks using a preset."""
+    return (
+        ServiceRunbook.select(ServiceRunbook.id)
+        .where(
+            ServiceRunbook.matcher_preset == preset_id,
+            ServiceRunbook.deleted == False,
+        )
+        .count()
+    )
 
 
 def count_silence_usages(preset_id):
@@ -227,11 +240,18 @@ def count_matcher_preset_usages(preset_id):
             + count_route_usages(preset_id)
             + count_service_match_rule_usages(preset_id)
             + count_silence_usages(preset_id)
+            + count_service_runbook_usages(preset_id)
     )
 
 
 def list_matcher_preset_usages(preset_id):
     """Return active rules using a preset."""
+    service_runbooks = list(
+        ServiceRunbook.select().where(
+            ServiceRunbook.matcher_preset == preset_id,
+            ServiceRunbook.deleted == False,
+        )
+    )
     silences = list(
         Silence.select().where(
             Silence.matcher_preset == preset_id,
@@ -273,6 +293,7 @@ def list_matcher_preset_usages(preset_id):
         "routes": routes,
         "service_match_rules": service_match_rules,
         "silences": silences,
+        "service_runbooks": service_runbooks,
     }
 
 

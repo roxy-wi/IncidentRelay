@@ -169,6 +169,7 @@ def serialize_preset(preset, current_user=None, *, include_usages=False):
     route_count = matcher_presets_repo.count_route_usages(preset.id)
     service_match_rule_count = matcher_presets_repo.count_service_match_rule_usages(preset.id)
     silence_count = matcher_presets_repo.count_silence_usages(preset.id)
+    service_runbook_count = matcher_presets_repo.count_service_runbook_usages(preset.id)
 
     data = {
         "id": preset.id,
@@ -186,12 +187,14 @@ def serialize_preset(preset, current_user=None, *, include_usages=False):
             + route_count
             + service_match_rule_count
             + silence_count
+            + service_runbook_count
         ),
         "silences_count": silence_count,
         "notification_policy_rules_count": notification_count,
         "priority_policy_rules_count": priority_count,
         "routes_count": route_count,
         "service_match_rules_count": service_match_rule_count,
+        "service_runbooks_count": service_runbook_count,
         "created_at": preset.created_at.isoformat() if preset.created_at else None,
         "updated_at": preset.updated_at.isoformat() if preset.updated_at else None,
 
@@ -248,6 +251,17 @@ def serialize_preset(preset, current_user=None, *, include_usages=False):
                     "enabled": silence.enabled,
                 }
                 for silence in usages["silences"]
+            ],
+            "service_runbooks": [
+                {
+                    "id": runbook.id,
+                    "title": runbook.title,
+                    "service_id": runbook.service_id,
+                    "service_name": runbook.service.name,
+                    "team_id": runbook.service.team_id,
+                    "team_name": runbook.service.team.name,
+                }
+                for runbook in usages["service_runbooks"]
             ],
         }
 

@@ -1699,8 +1699,24 @@ function renderAlertServiceRunbooks(alert, runbooks) {
 
 
 function alertMatchesRunbook(alert, runbook) {
-    if (runbook.severity && normalizeAlertValue(runbook.severity) !== normalizeAlertValue(alert.severity)) {
+    if (
+        runbook.severity &&
+        normalizeAlertValue(runbook.severity) !==
+        normalizeAlertValue(alert.severity)
+    ) {
         return false;
+    }
+
+    const preset = runbook.matcher_preset;
+
+    if (preset) {
+        if (!preset.enabled) {
+            return false;
+        }
+
+        if (!alertMatchesSimpleMatchers(alert, preset.matchers || {})) {
+            return false;
+        }
     }
 
     return alertMatchesSimpleMatchers(alert, runbook.matchers || {});

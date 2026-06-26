@@ -966,6 +966,11 @@ def serialize_service_runbook(runbook, current_user=None):
     """Serialize a service runbook."""
     service = runbook.service
     team = service.team if service else None
+    matcher_preset = (
+        runbook.matcher_preset
+        if getattr(runbook, "matcher_preset_id", None)
+        else None
+    )
 
     data = {
         "id": runbook.id,
@@ -982,6 +987,14 @@ def serialize_service_runbook(runbook, current_user=None):
         "description": runbook.description,
         "url": runbook.url,
         "severity": runbook.severity,
+        "matcher_preset_id": matcher_preset.id if matcher_preset else None,
+        "matcher_preset": {
+            "id": matcher_preset.id,
+            "name": matcher_preset.name,
+            "version": matcher_preset.version,
+            "enabled": matcher_preset.enabled,
+            "matchers": matcher_preset.matchers or {},
+        } if matcher_preset else None,
         "matchers": runbook.matchers or {},
         "priority": runbook.priority,
         "enabled": runbook.enabled,

@@ -557,6 +557,12 @@ class ServiceRunbook(SoftDeleteModel):
     url = TextField()
 
     severity = CharField(null=True)
+    matcher_preset = ForeignKeyField(
+        MatcherPreset,
+        null=True,
+        backref="service_runbooks",
+        on_delete="RESTRICT",
+    )
     matchers = JSONTextField(null=True)
     priority = IntegerField(default=100)
 

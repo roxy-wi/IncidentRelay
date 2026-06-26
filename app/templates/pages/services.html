@@ -670,10 +670,22 @@
             <label for="service-runbook-description">Description</label>
             <textarea id="service-runbook-description" class="input" rows="3"></textarea>
 
-            <label for="service-runbook-matchers">Matchers JSON</label>
+              <label for="service-runbook-matcher-preset">Matcher preset</label>
+            <select id="service-runbook-matcher-preset" class="input">
+              <option value="">No preset</option>
+            </select>
+
+            <div id="service-runbook-matcher-preset-hint" class="help-text">
+              No preset selected. Only the additional matchers below will be evaluated.
+            </div>
+
+            <label for="service-runbook-matchers">Additional matchers JSON</label>
+
             <textarea id="service-runbook-matchers" class="input code-textarea json-editor-textarea" rows="8" spellcheck="false">{}</textarea>
 
-            <div class="help-text">Use {} when the runbook should be available for every alert in the service.</div>
+            <div class="help-text">
+              The preset and additional matchers are combined using AND. Empty {} means no additional conditions.
+            </div>
 
             <div class="form-actions">
               <button id="reset-service-runbook-form" type="button" class="btn">Reset</button>
