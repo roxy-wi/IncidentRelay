@@ -1,6 +1,6 @@
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Literal
 
-from pydantic import Field, field_validator, model_validator
+from pydantic import Field, model_validator
 
 from app.api.schemas.base import ApiModel
 from app.api.schemas.limits import (
@@ -87,6 +87,73 @@ class ServiceOwnerUpdateSchema(ServiceOwnerBaseSchema):
     """Validate service owner update."""
 
 
+SERVICE_STANDARD_CHECK_TYPE_PATTERN = (
+    r"^(field_present|field_equals|owner_exists|active_rotation_exists|"
+    r"escalation_policy_exists|notification_policy_exists|"
+    r"service_channel_exists|route_exists|match_rule_exists|runbook_exists|"
+    r"link_type_exists|dependency_exists|dependency_cycle_absent|metadata_value)$"
+)
+
+SERVICE_STANDARD_CHECK_SEVERITY_PATTERN = r"^(info|warning|critical)$"
+
+
+class ServiceStandardBaseSchema(ApiModel):
+    """Validate service standard input."""
+
+    slug: str = Field(
+        min_length=SLUG_MIN_LENGTH,
+        max_length=SLUG_MAX_LENGTH,
+        pattern=r"^[a-z0-9][a-z0-9-]*$",
+    )
+    name: str = Field(min_length=NAME_MIN_LENGTH, max_length=NAME_MAX_LENGTH)
+    description: str | None = Field(default=None, max_length=DESCRIPTION_MAX_LENGTH)
+    applies_to: Dict[str, Any] = Field(default_factory=dict)
+    enabled: bool = True
+
+
+class ServiceStandardCreateSchema(ServiceStandardBaseSchema):
+    """Validate service standard creation."""
+
+    group_id: int = Field(ge=1)
+
+
+class ServiceStandardUpdateSchema(ServiceStandardBaseSchema):
+    """Validate service standard update."""
+
+
+class ServiceStandardCheckBaseSchema(ApiModel):
+    """Validate service standard check input."""
+
+    slug: str = Field(
+        min_length=SLUG_MIN_LENGTH,
+        max_length=SLUG_MAX_LENGTH,
+        pattern=r"^[a-z0-9][a-z0-9-]*$",
+    )
+    name: str = Field(min_length=NAME_MIN_LENGTH, max_length=NAME_MAX_LENGTH)
+    description: str | None = Field(default=None, max_length=DESCRIPTION_MAX_LENGTH)
+    check_type: str = Field(pattern=SERVICE_STANDARD_CHECK_TYPE_PATTERN)
+    configuration: Dict[str, Any] = Field(default_factory=dict)
+    weight: int = Field(default=1, ge=1, le=100)
+    severity: str = Field(default="warning", pattern=SERVICE_STANDARD_CHECK_SEVERITY_PATTERN)
+    required: bool = True
+    enabled: bool = True
+    position: int = Field(default=0, ge=0)
+
+
+class ServiceStandardCheckCreateSchema(ServiceStandardCheckBaseSchema):
+    """Validate service standard check creation."""
+
+
+class ServiceStandardCheckUpdateSchema(ServiceStandardCheckBaseSchema):
+    """Validate service standard check update."""
+
+
+class ServiceStandardPresetApplySchema(ApiModel):
+    """Validate service standard preset application."""
+
+    group_id: int = Field(ge=1)
+
+
 class ServiceBaseSchema(ApiModel):
     """Validate service input."""
 
@@ -139,6 +206,8 @@ class ServiceBaseSchema(ApiModel):
         max_length=DESCRIPTION_MAX_LENGTH,
     )
     public_order: int = Field(default=100, ge=0)
+    kind: Literal["technical"] = "technical"
+    lifecycle: Literal["experimental", "development", "production", "deprecated", "retired"] = "production"
 
 
 class ServiceCreateSchema(ServiceBaseSchema):
@@ -230,6 +299,43 @@ class ServiceRunbookCreateSchema(ServiceRunbookBaseSchema):
 
 class ServiceRunbookUpdateSchema(ServiceRunbookBaseSchema):
     """Validate service runbook update."""
+
+
+
+
+SERVICE_SLO_SEVERITY_PATTERN = r"^(critical|high|warning|info)$"
+
+
+class ServiceSloBaseSchema(ApiModel):
+    """Validate service objective / SLO input."""
+
+    name: str = Field(min_length=NAME_MIN_LENGTH, max_length=NAME_MAX_LENGTH)
+    description: str | None = Field(default=None, max_length=DESCRIPTION_MAX_LENGTH)
+    severity: str | None = Field(default=None, pattern=SERVICE_SLO_SEVERITY_PATTERN)
+    ack_target_seconds: int | None = Field(default=None, ge=1, le=30 * 24 * 3600)
+    resolve_target_seconds: int | None = Field(default=None, ge=1, le=90 * 24 * 3600)
+    availability_target_basis_points: int | None = Field(default=None, ge=0, le=10000)
+    enabled: bool = True
+
+    @model_validator(mode="after")
+    def validate_has_at_least_one_target(self):
+        """Require at least one objective target."""
+        if (
+            self.ack_target_seconds is None
+            and self.resolve_target_seconds is None
+            and self.availability_target_basis_points is None
+        ):
+            raise ValueError("Service objective must define at least one target")
+
+        return self
+
+
+class ServiceSloCreateSchema(ServiceSloBaseSchema):
+    """Validate service objective creation."""
+
+
+class ServiceSloUpdateSchema(ServiceSloBaseSchema):
+    """Validate service objective update."""
 
 
 class ServiceDependencyBaseSchema(ApiModel):

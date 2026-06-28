@@ -23,6 +23,7 @@ from app.api.openapi.endpoints import (
     version,
     maintenance_windows,
     matchers,
+    service_catalog,
 )
 from app.version import get_service_version
 
@@ -51,6 +52,7 @@ ENDPOINT_MODULES = [
     groups,
     sso,
     services,
+    service_catalog,
     maintenance_windows,
 ]
 

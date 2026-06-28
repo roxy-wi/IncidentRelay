@@ -9,6 +9,7 @@ from app.modules.db.models import (
     ServiceStatusHistory,
     Team,
     ServiceOwner,
+    ServiceSlo,
     User,
 )
 
@@ -640,3 +641,78 @@ def deactivate_service_owner(owner_id):
     owner.save()
 
     return owner
+
+
+def list_service_slos(service_id=None, service_ids=None, include_disabled=True):
+    """Return service objectives / SLO targets."""
+    query = (
+        ServiceSlo
+        .select(ServiceSlo, Service, Team)
+        .join(Service)
+        .switch(Service)
+        .join(Team)
+        .where(ServiceSlo.deleted == False)  # noqa: E712
+    )
+
+    if service_id is not None:
+        query = query.where(ServiceSlo.service == service_id)
+
+    if service_ids is not None:
+        service_ids = list(service_ids)
+
+        if not service_ids:
+            return []
+
+        query = query.where(ServiceSlo.service.in_(service_ids))
+
+    if not include_disabled:
+        query = query.where(ServiceSlo.enabled == True)  # noqa: E712
+
+    return list(query.order_by(ServiceSlo.enabled.desc(), ServiceSlo.name.asc(), ServiceSlo.id.asc()))
+
+
+def get_service_slo(slo_id):
+    """Return one service objective / SLO target."""
+    return (
+        ServiceSlo
+        .select(ServiceSlo, Service)
+        .join(Service)
+        .where(
+            (ServiceSlo.id == slo_id)
+            & (ServiceSlo.deleted == False)  # noqa: E712
+        )
+        .get()
+    )
+
+
+def create_service_slo(service_id, data):
+    """Create a service objective / SLO target."""
+    data = dict(data)
+    data["service"] = service_id
+    data["updated_at"] = datetime.utcnow()
+    return ServiceSlo.create(**data)
+
+
+def update_service_slo(slo_id, data):
+    """Update a service objective / SLO target."""
+    slo = get_service_slo(slo_id)
+
+    for field, value in data.items():
+        setattr(slo, field, value)
+
+    slo.updated_at = datetime.utcnow()
+    slo.save()
+
+    return slo
+
+
+def soft_delete_service_slo(slo_id):
+    """Soft-delete a service objective / SLO target."""
+    slo = get_service_slo(slo_id)
+    slo.enabled = False
+    slo.deleted = True
+    slo.deleted_at = datetime.utcnow()
+    slo.updated_at = datetime.utcnow()
+    slo.save()
+
+    return slo

@@ -21,6 +21,7 @@ from app.services.rbac import (
 from app.services.serializers import serialize_route
 from app.services.validation import make_error_response, validate_body
 from app.services.routing.matcher import service as matcher_preset_service
+from app.services.service_catalog.reconciliation import reconcile_route_services
 
 
 routes_bp = Blueprint("routes_api", __name__)
@@ -419,6 +420,14 @@ def create_route():
         data=audit_data,
     )
 
+    trigger = "route_restored" if audit_action == "route.restore" else "route_created"
+
+    reconcile_route_services(
+        route.id,
+        trigger=trigger,
+        actor_user=current_user(),
+    )
+
     response = serialize_route(route, current_user=current_user())
     response["intake_token"] = raw_token
 
@@ -437,6 +446,7 @@ def update_route(route_id):
 
     current_route = routes_repo.get_route(route_id)
     error = require_team_write(current_route.team_id)
+    old_service_id = current_route.service_id
 
     if error:
         return error
@@ -517,6 +527,13 @@ def update_route(route_id):
         data=audit_data,
     )
 
+    reconcile_route_services(
+        route.id,
+        trigger="route_updated",
+        actor_user=current_user(),
+        extra_service_ids=[old_service_id],
+    )
+
     return jsonify(serialize_route(route, current_user=current_user()))
 
 
@@ -544,6 +561,12 @@ def disable_route(route_id):
         },
     )
 
+    reconcile_route_services(
+        route.id,
+        trigger="route_enabled",
+        actor_user=current_user(),
+    )
+
     return jsonify(serialize_route(route, current_user=current_user()))
 
 
@@ -569,6 +592,12 @@ def enable_route(route_id):
             "name": route.name,
             "enabled": True,
         },
+    )
+
+    reconcile_route_services(
+        route.id,
+        trigger="route_enabled",
+        actor_user=current_user(),
     )
 
     return jsonify(serialize_route(route, current_user=current_user()))
@@ -599,6 +628,12 @@ def delete_route(route_id):
             "source": route.source,
             "deleted": True,
         },
+    )
+
+    reconcile_route_services(
+        route.id,
+        trigger="route_enabled",
+        actor_user=current_user(),
     )
 
     return jsonify({

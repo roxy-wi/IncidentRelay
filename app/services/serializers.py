@@ -318,7 +318,99 @@ def serialize_service_short(service):
     }
 
 
-def serialize_service(service, current_user=None):
+def serialize_service_readiness_state(state):
+    """Serialize the current aggregated service readiness state."""
+
+    if state is None:
+        return None
+
+    return {
+        "status": state.status,
+        "score": state.score,
+        "standards_count": state.standards_count,
+        "checks_count": state.checks_count,
+        "failed_count": state.failed_count,
+        "failed_required_count": state.failed_required_count,
+        "failed_critical_count": state.failed_critical_count,
+        "batch_uid": str(state.batch_uid),
+        "evaluated_at": serialize_utc_datetime(state.evaluated_at),
+    }
+
+
+def serialize_service_readiness_check_result(result):
+    """Serialize one readiness check result snapshot."""
+
+    return {
+        "id": result.id,
+        "check_id": result.check_id,
+        "check_uid": str(result.check_uid) if result.check_uid else None,
+        "check_slug": result.check_slug,
+        "check_name": result.check_name,
+        "check_type": result.check_type,
+        "status": result.status,
+        "weight": result.weight,
+        "severity": result.severity,
+        "required": result.required,
+        "message": result.message,
+        "details": result.details or {},
+        "evaluated_at": serialize_utc_datetime(result.evaluated_at),
+    }
+
+
+def serialize_service_readiness_evaluation(evaluation, results=None):
+    """Serialize one standard evaluation."""
+
+    standard = evaluation.standard if evaluation.standard_id else None
+    actor_user = evaluation.actor_user if evaluation.actor_user_id else None
+
+    return {
+        "id": evaluation.id,
+        "uid": str(evaluation.uid),
+        "batch_uid": str(evaluation.batch_uid),
+        "service_id": evaluation.service_id,
+        "standard": {
+            "id": standard.id,
+            "uid": str(standard.uid),
+            "slug": standard.slug,
+            "name": standard.name,
+            "enabled": standard.enabled,
+        } if standard else None,
+        "status": evaluation.status,
+        "score": evaluation.score,
+        "passed_weight": evaluation.passed_weight,
+        "total_weight": evaluation.total_weight,
+        "checks_count": evaluation.checks_count,
+        "failed_count": evaluation.failed_count,
+        "failed_required_count": evaluation.failed_required_count,
+        "failed_critical_count": evaluation.failed_critical_count,
+        "trigger": evaluation.trigger,
+        "actor_user_id": actor_user.id if actor_user else None,
+        "evaluated_at": serialize_utc_datetime(evaluation.evaluated_at),
+        "results": [
+            serialize_service_readiness_check_result(result)
+            for result in results or []
+        ],
+    }
+
+
+def serialize_service_readiness(state, evaluations=None, results_by_evaluation=None):
+    """Serialize the current readiness batch for a service."""
+
+    results_by_evaluation = results_by_evaluation or {}
+
+    return {
+        "state": serialize_service_readiness_state(state),
+        "evaluations": [
+            serialize_service_readiness_evaluation(
+                evaluation,
+                results=results_by_evaluation.get(evaluation.id, []),
+            )
+            for evaluation in evaluations or []
+        ],
+    }
+
+
+def serialize_service(service, current_user=None, readiness_state=None):
     """Serialize a service."""
     team = service.team if service.team_id else None
     group = service.group if service.group_id else None
@@ -336,6 +428,7 @@ def serialize_service(service, current_user=None):
 
     data = {
         "id": service.id,
+        "uid": str(service.uid),
         "group_id": group.id if group else None,
         "group_slug": group.slug if group else None,
         "group_name": group.name if group else None,
@@ -346,6 +439,8 @@ def serialize_service(service, current_user=None):
         "slug": service.slug,
         "name": service.name,
         "description": service.description,
+        "kind": service.kind,
+        "lifecycle": service.lifecycle,
 
         "service_type": service.service_type,
         "environment": service.environment,
@@ -403,6 +498,7 @@ def serialize_service(service, current_user=None):
 
         "created_at": serialize_utc_datetime(service.created_at),
         "updated_at": serialize_utc_datetime(service.updated_at),
+        "readiness": serialize_service_readiness_state(readiness_state),
         "active_maintenance": serialize_active_maintenance_for_scope(
             group_id=service.team.group_id if service.team_id and service.team else None,
             team_id=service.team_id,
@@ -418,6 +514,57 @@ def serialize_service(service, current_user=None):
     }
 
     return attach_team_permissions(data, service.team_id, current_user)
+
+
+def serialize_service_standard_check(check):
+    """Serialize a service readiness standard check."""
+
+    return {
+        "id": check.id,
+        "uid": str(check.uid),
+        "standard_id": check.standard_id,
+        "slug": check.slug,
+        "name": check.name,
+        "description": check.description,
+        "check_type": check.check_type,
+        "configuration": check.configuration or {},
+        "weight": check.weight,
+        "severity": check.severity,
+        "required": check.required,
+        "enabled": check.enabled,
+        "position": check.position,
+        "created_at": serialize_utc_datetime(check.created_at),
+        "updated_at": serialize_utc_datetime(check.updated_at),
+    }
+
+
+def serialize_service_standard(standard, current_user=None, checks=None):
+    """Serialize a service readiness standard."""
+
+    group = standard.group if standard.group_id else None
+    created_by = standard.created_by if standard.created_by_id else None
+
+    data = {
+        "id": standard.id,
+        "uid": str(standard.uid),
+        "group_id": group.id if group else None,
+        "group_slug": group.slug if group else None,
+        "group_name": group.name if group else None,
+        "slug": standard.slug,
+        "name": standard.name,
+        "description": standard.description,
+        "applies_to": standard.applies_to or {},
+        "enabled": standard.enabled,
+        "created_by": serialize_user_short(created_by),
+        "created_at": serialize_utc_datetime(standard.created_at),
+        "updated_at": serialize_utc_datetime(standard.updated_at),
+    }
+
+    if checks is not None:
+        data["checks"] = [serialize_service_standard_check(check) for check in checks]
+        data["checks_count"] = len(checks)
+
+    return attach_group_permissions(data, standard.group_id, current_user)
 
 
 def serialize_service_match_rule(rule, current_user=None):
@@ -575,16 +722,18 @@ def serialize_alert_event(event):
 
 
 def serialize_alert_notification(notification):
-    """
-    Serialize an alert notification delivery record.
-    """
+    """Serialize an alert notification delivery record."""
+    channel = notification.channel
+    config = channel.config or {}
 
     return {
         "id": notification.id,
-        "channel": serialize_channel_short(notification.channel),
+        "channel": serialize_channel_short(channel),
         "provider": notification.provider,
+        "configured_channel_id": config.get("channel_id") if channel.channel_type == "mattermost" else None,
         "external_message_id": notification.external_message_id,
         "external_channel_id": notification.external_channel_id,
+        "provider_payload": notification.provider_payload or {},
         "last_event_type": notification.last_event_type,
         "last_error": notification.last_error,
         "created_at": notification.created_at.isoformat(),
@@ -1008,6 +1157,40 @@ def serialize_service_runbook(runbook, current_user=None):
         current_user,
     )
 
+
+
+def serialize_service_slo(slo, current_user=None, evaluation=None):
+    """Serialize a service objective / SLO target."""
+    service = slo.service if getattr(slo, "service_id", None) else None
+    team = service.team if service and getattr(service, "team_id", None) else None
+
+    data = {
+        "id": slo.id,
+        "service_id": service.id if service else slo.service_id,
+        "service_name": service.name if service else None,
+        "service_slug": service.slug if service else None,
+        "team_id": team.id if team else None,
+        "team_name": team.name if team else None,
+        "team_slug": team.slug if team else None,
+        "name": slo.name,
+        "description": slo.description,
+        "severity": slo.severity,
+        "ack_target_seconds": slo.ack_target_seconds,
+        "resolve_target_seconds": slo.resolve_target_seconds,
+        "availability_target_basis_points": slo.availability_target_basis_points,
+        "enabled": slo.enabled,
+        "created_at": serialize_utc_datetime(slo.created_at),
+        "updated_at": serialize_utc_datetime(slo.updated_at),
+    }
+
+    if evaluation is not None:
+        data["evaluation"] = evaluation
+
+    return attach_team_permissions(
+        data,
+        team.id if team else None,
+        current_user,
+    )
 
 def serialize_service_dependency(dependency, current_user=None):
     """Serialize a service dependency."""

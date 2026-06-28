@@ -12,6 +12,97 @@ let serviceAnalyticsPayload = null;
 let serviceAnalyticsCharts = {};
 let serviceRunbookMatcherPresetsCache = [];
 
+const SERVICE_TYPE_OPTIONS = [
+    ["api", "API"],
+    ["web", "Web"],
+    ["database", "Database"],
+    ["queue", "Queue"],
+    ["cache", "Cache"],
+    ["worker", "Worker"],
+    ["cron", "Cron"],
+    ["network", "Network"],
+    ["storage", "Storage"],
+    ["infrastructure", "Infrastructure"],
+    ["external", "External"],
+    ["other", "Other"],
+];
+
+const SERVICE_ENVIRONMENT_OPTIONS = [
+    ["production", "Production"],
+    ["staging", "Staging"],
+    ["development", "Development"],
+    ["testing", "Testing"],
+    ["shared", "Shared"],
+];
+
+const SERVICE_CRITICALITY_OPTIONS = [
+    ["critical", "Critical"],
+    ["high", "High"],
+    ["medium", "Medium"],
+    ["low", "Low"],
+];
+
+const SERVICE_TIER_OPTIONS = [
+    ["tier_1", "Tier 1"],
+    ["tier_2", "Tier 2"],
+    ["tier_3", "Tier 3"],
+    ["tier_4", "Tier 4"],
+];
+
+const SERVICE_KIND_OPTIONS = [
+    ["technical", "Technical"],
+    ["business", "Business"],
+];
+
+const SERVICE_LIFECYCLE_OPTIONS = [
+    ["experimental", "Experimental"],
+    ["development", "Development"],
+    ["production", "Production"],
+    ["deprecated", "Deprecated"],
+    ["retired", "Retired"],
+];
+
+window.ServiceCatalogOptions = {
+    serviceTypes: SERVICE_TYPE_OPTIONS,
+    environments: SERVICE_ENVIRONMENT_OPTIONS,
+    criticalities: SERVICE_CRITICALITY_OPTIONS,
+    tiers: SERVICE_TIER_OPTIONS,
+    kinds: SERVICE_KIND_OPTIONS,
+    lifecycles: SERVICE_LIFECYCLE_OPTIONS,
+};
+
+
+
+function fillOptionSelect(selector, options, selectedValue) {
+    const select = $(selector);
+
+    if (!select.length) {
+        return;
+    }
+
+    select.empty();
+
+    options.forEach(function (option) {
+        select.append(
+            $("<option>")
+                .val(option[0])
+                .text(option[1])
+        );
+    });
+
+    if (selectedValue !== undefined && selectedValue !== null) {
+        select.val(String(selectedValue));
+    }
+}
+
+
+function initializeServiceClassificationSelects() {
+    fillOptionSelect("#service-type", SERVICE_TYPE_OPTIONS, "other");
+    fillOptionSelect("#service-environment", SERVICE_ENVIRONMENT_OPTIONS, "production");
+    fillOptionSelect("#service-criticality", SERVICE_CRITICALITY_OPTIONS, "medium");
+    fillOptionSelect("#service-tier", SERVICE_TIER_OPTIONS, "tier_3");
+}
+
 
 function initializeServiceMatcherEditors() {
     enhanceMatcherEditor("#service-runbook-matchers", {
@@ -33,7 +124,13 @@ function initializeServiceMatcherEditors() {
 }
 
 function loadServices() {
+    initializeServiceClassificationSelects();
     initializeServiceMatcherEditors();
+    if (window.AppSlug) {
+        window.AppSlug.bind("#service-name", "#service-slug", {
+            manualWhenHasValue: true,
+        });
+    }
     fillTeamSelect("#service-team", false, function () {
         resetServiceForm();
     });
@@ -47,10 +144,15 @@ function refreshServices() {
     serviceDetailsCache = {};
     apiGet("/api/services" + selectedTeamQuery(), function (services) {
         servicesCache = asArray(services);
+        window.servicesCache = servicesCache;
 
         renderServicesSummary();
         renderServicesTable();
-        restoreServiceDetails();
+
+        if (typeof window.loadServiceStandards === "function") {
+            window.loadServiceStandards();
+        }
+
         refreshAllServiceContext();
         refreshServiceImpact({ refreshDetails: false });
         refreshServiceAnalytics();
@@ -111,6 +213,7 @@ function renderServiceSummaryTiles(summary) {
 
 
 function getServiceSearchText(service) {
+    const readiness = service.readiness || {};
     return [
         service.id,
         service.name,
@@ -123,6 +226,10 @@ function getServiceSearchText(service) {
         service.criticality,
         service.tier,
         service.status,
+        service.kind,
+        service.lifecycle,
+        readiness.status,
+        readiness.score,
         service.default_rotation_name,
         service.default_escalation_policy_name,
         service.notification_policy_name,
@@ -136,6 +243,7 @@ function getFilteredServices() {
     const query = String($("#services-search").val() || "").trim().toLowerCase();
     const status = String($("#services-status-filter").val() || "");
     const criticality = String($("#services-criticality-filter").val() || "");
+    const readinessStatus = String($("#services-readiness-filter").val() || "");
 
     return servicesCache.filter(function (service) {
         if (status && service.status !== status) {
@@ -143,6 +251,10 @@ function getFilteredServices() {
         }
 
         if (criticality && service.criticality !== criticality) {
+            return false;
+        }
+
+        if (readinessStatus && getServiceReadinessStatus(service) !== readinessStatus) {
             return false;
         }
 
@@ -168,7 +280,7 @@ function renderServicesTable() {
         tbody.append(
             $("<tr>").append(
                 $("<td>")
-                    .attr("colspan", "7")
+                    .attr("colspan", "8")
                     .addClass("empty-cell")
                     .text("No services")
             )
@@ -195,7 +307,7 @@ function renderServiceRow(service) {
                     .addClass("name-button")
                     .text(service.name || service.slug || "-")
                     .on("click", function () {
-                        renderServiceDetails(service);
+                        openServiceDetailsModal(service.id);
                     })
             )
             .append(
@@ -217,6 +329,9 @@ function renderServiceRow(service) {
             renderServiceStatusBadge(service),
             service
         )
+    );
+    row.append(
+        $("<td>").append(renderServiceReadinessBadge(service))
     );
     row.append($("<td>").text(service.criticality || "-"));
     row.append($("<td>").text(service.environment || "-"));
@@ -260,6 +375,50 @@ function renderServiceStatusBadge(service) {
     return $("<span>").addClass("status-pill status-neutral").text(label);
 }
 
+function getServiceReadinessStatus(service) {
+    if (!service.readiness) {
+        return "not_evaluated";
+    }
+
+    return service.readiness.status || "not_evaluated";
+}
+
+function formatServiceReadinessStatus(status) {
+    const labels = {
+        ready: "Ready",
+        warning: "Warning",
+        not_ready: "Not ready",
+        not_applicable: "Not applicable",
+        not_evaluated: "Not evaluated",
+    };
+
+    return labels[status] || String(status || "Not evaluated").replace(/_/g, " ");
+}
+
+function renderServiceReadinessBadge(service) {
+    const readiness = service.readiness || null;
+    const status = getServiceReadinessStatus(service);
+    const score = readiness && readiness.score !== undefined ? readiness.score : null;
+    let label = formatServiceReadinessStatus(status);
+
+    if (readiness && status !== "not_applicable" && readiness.score !== undefined) {
+        label = readiness.score + "/100";
+    }
+
+    if (status === "ready") {
+        return $("<span>").addClass("status-pill status-active").attr("title", "Ready").text(label);
+    }
+
+    if (status === "warning") {
+        return $("<span>").addClass("status-pill status-scheduled").attr("title", "Warning").text(label);
+    }
+
+    if (status === "not_ready") {
+        return $("<span>").addClass("status-pill status-inactive").attr("title", "Not ready").text(label);
+    }
+
+    return $("<span>").addClass("status-pill status-neutral").attr("title", formatServiceReadinessStatus(status)).text(label);
+}
 
 function getServiceDefaultsLabel(service) {
     const defaults = [];
@@ -291,6 +450,13 @@ function renderServiceActions(service) {
     return makeActionMenu({
         object: service,
         items: [
+            {
+                label: "Details",
+                icon: "fas fa-info-circle",
+                onClick: function () {
+                    openServiceDetailsModal(service.id);
+                }
+            },
             {
                 label: "Edit",
                 icon: "fas fa-edit",
@@ -333,14 +499,40 @@ function serviceDetailsItem(label, value) {
 }
 
 
-function renderServiceDetails(service) {
-    selectedServiceDetailsId = service.id;
+function isServiceDetailsModalOpen() {
+    return $("#service-details-modal").is(":visible");
+}
 
-    $("#service-details-subtitle").text(
-        (service.team_name || service.team_slug || "-") +
-        " / " +
-        (service.status || "unknown")
-    );
+
+function openServiceDetailsModal(serviceId) {
+    const service = getServiceById(serviceId);
+
+    if (!service) {
+        return;
+    }
+
+    selectedServiceDetailsId = service.id;
+    window.selectedServiceId = selectedServiceDetailsId;
+
+    openAppModal("#service-details-modal");
+    loadServiceDetails(service.id);
+}
+
+
+function closeServiceDetailsModal() {
+    closeAppModal("#service-details-modal");
+}
+
+
+function loadServiceDetails(serviceId) {
+    const service = getServiceById(serviceId);
+
+    if (!service) {
+        return;
+    }
+
+    selectedServiceDetailsId = service.id;
+    window.selectedServiceId = selectedServiceDetailsId;
 
     renderServiceDetailsLoading(service);
 
@@ -362,8 +554,21 @@ function renderServiceDetails(service) {
     );
 }
 
+
+function renderServiceDetails(service) {
+    openServiceDetailsModal(service.id);
+}
+
+
 function renderServiceDetailsLoading(service) {
-    const body = $("#service-details-body");
+    const body = $("#service-details-modal-body");
+
+    $("#service-details-modal-title").text(service.name || service.slug || "Service details");
+    $("#service-details-modal-subtitle").text(
+        (service.team_name || service.team_slug || "-") +
+        " / " +
+        (service.status || "unknown")
+    );
 
     body.empty();
     body.append(
@@ -372,6 +577,7 @@ function renderServiceDetailsLoading(service) {
             .text("Loading service details for " + (service.name || service.slug || "service") + "...")
     );
 }
+
 
 
 function serviceDetailsMetric(label, value, hint) {
@@ -407,9 +613,10 @@ function renderServiceDetailsPayload(payload) {
     const summary = payload.summary || {};
     const alerts = summary.alerts || {};
     const analytics = payload.analytics || {};
-    const body = $("#service-details-body");
+    const body = $("#service-details-modal-body");
 
-    $("#service-details-subtitle").text(
+    $("#service-details-modal-title").text(service.name || service.slug || "Service details");
+    $("#service-details-modal-subtitle").text(
         (service.team_name || service.team_slug || "-") +
         " / " +
         (service.status || "unknown")
@@ -419,114 +626,965 @@ function renderServiceDetailsPayload(payload) {
 
     body.append(renderServiceDetailsHero(payload));
 
-    body.append(
-        $("<div>")
-            .addClass("metric-grid service-detail-metrics")
-            .append(serviceDetailsMetric("Open alerts", alerts.open || 0, "firing + acknowledged"))
-            .append(serviceDetailsMetric("Critical open", alerts.critical_open || 0, "critical severity"))
-            .append(serviceDetailsMetric("Maintenance", summary.maintenance_windows || 0, "active or upcoming"))
-            .append(serviceDetailsMetric(
-                "Dependencies",
-                (summary.upstream_dependencies || 0) + " / " + (summary.downstream_dependencies || 0),
-                "upstream / downstream"
-            ))
-    );
-
+    body.append(renderServiceDetailsMetrics(payload));
     body.append(renderServiceDetailsQuickActions(payload));
     body.append(renderServiceDetailsOwners(payload));
+    body.append(renderServiceDetailsReadiness(payload));
+    body.append(renderServiceDetailsObjectives(payload));
     body.append(renderServiceDetailsImpact(payload));
     body.append(renderServiceDetailsMaintenance(payload));
     body.append(renderServiceDetailsRunbooks(payload));
     body.append(renderServiceDetailsLinks(payload));
     body.append(renderServiceDetailsDependencies(payload));
     body.append(renderServiceDetailsAnalytics(analytics));
-    body.append(renderServiceDetailsStatusHistory(payload));
+    body.append(renderServiceDetailsTimeline(payload));
+}
+
+function renderServiceDetailsMetrics(payload) {
+    const summary = payload.summary || {};
+    const alerts = summary.alerts || {};
+    const section = serviceDetailsSection("Metrics", null);
+
+    const table = $("<table>").addClass("data-table");
+    const tbody = $("<tbody>");
+
+    tbody.append(
+        $("<tr>")
+            .append($("<th>").text("Open alerts"))
+            .append($("<td>").text(Number(alerts.open || 0)))
+            .append($("<th>").text("Critical open"))
+            .append($("<td>").text(Number(alerts.critical_open || 0)))
+    );
+
+    tbody.append(
+        $("<tr>")
+            .append($("<th>").text("Maintenance"))
+            .append($("<td>").text(Number(summary.maintenance_windows || 0)))
+            .append($("<th>").text("Dependencies"))
+            .append(
+                $("<td>").text(
+                    Number(summary.upstream_dependencies || 0) +
+                    " / " +
+                    Number(summary.downstream_dependencies || 0) +
+                    " upstream / downstream"
+                )
+            )
+    );
+
+    table.append(tbody);
+
+    section.append(
+        $("<div>")
+            .addClass("table-wrapper")
+            .append(table)
+    );
+
+    return section;
 }
 
 
-function renderServiceDetailsImpact(payload) {
-    const impact = payload.impact || {};
+function renderServiceDetailsObjectives(payload) {
+    const service = payload.service || {};
+    const objectives = asArray(payload.objectives);
     const section = serviceDetailsSection(
-        "Impact",
-        "Effective status, primary reason, root cause and downstream blast radius."
+        "Objectives",
+        "Ack, resolution and availability targets for this service."
     );
-    section.append(
-        $("<div>")
-            .addClass("metric-grid service-detail-metrics")
-            .append(serviceDetailsMetric(
-                "Effective status",
-                formatImpactStatusText(impact.effective_status || "unknown"),
-                formatImpactReasonText(impact.primary_reason || "unknown")
-            ))
-            .append(serviceDetailsMetric(
-                "Alert impact",
-                formatImpactStatusText(impact.alert_impact_status || "operational"),
-                "open " + Number(impact.open_alert_groups || 0) +
-                " / critical " + Number(impact.critical_open_alert_groups || 0)
-            ))
-            .append(serviceDetailsMetric(
-                "Dependency impact",
-                formatImpactStatusText(impact.dependency_impact_status || "operational"),
-                "upstream issues " + Number(impact.upstream_issues_count || 0)
-            ))
-            .append(serviceDetailsMetric(
-                "Blast radius",
-                Number((impact.blast_radius || {}).transitive_downstream || 0),
-                "total downstream"
-            ))
+    const actions = $("<div>").addClass("details-actions");
+
+    appendIconActionIfAllowed(actions, service, {
+        required: "write",
+        icon: "fas fa-plus",
+        label: "Add objective",
+        onClick: function () {
+            openServiceObjectiveModal(service, null);
+        },
+    });
+
+    section.append(actions);
+
+    if (!objectives.length) {
+        section.append(
+            $("<div>")
+                .addClass("empty-state compact")
+                .text("No service objectives configured.")
+        );
+
+        return section;
+    }
+
+    const table = $("<table>").addClass("data-table");
+    const tbody = $("<tbody>");
+
+    table.append(
+        $("<thead>").append(
+            $("<tr>")
+                .append($("<th>").text("Objective"))
+                .append($("<th>").text("Scope"))
+                .append($("<th>").text("Targets"))
+                .append($("<th>").text("Health"))
+                .append($("<th>").text("Status"))
+                .append($("<th>").addClass("actions-th").text("Actions"))
+        )
     );
 
-    section.append(renderImpactExplanationPanel(impact, { compact: false }));
-    section.append(renderImpactBlastRadiusPanel(impact, { compact: false }));
+    objectives.forEach(function (objective) {
+        tbody.append(renderServiceObjectiveRow(service, objective));
+    });
+
+    table.append(tbody);
+    section.append($("<div>").addClass("table-wrapper").append(table));
 
     return section;
+}
+
+
+function renderServiceObjectiveRow(service, objective) {
+    const evaluation = objective.evaluation || {};
+
+    return $("<tr>").toggleClass("row-disabled", !objective.enabled)
+        .append(
+            $("<td>")
+                .addClass("table-cell-truncate")
+                .append($("<strong>").text(objective.name || ("Objective #" + objective.id)))
+                .append($("<div>").addClass("row-subtitle").text(objective.description || "-"))
+        )
+        .append($("<td>").text(formatServiceObjectiveScope(objective)))
+        .append($("<td>").append(renderServiceObjectiveTargets(objective)))
+        .append($("<td>").append(renderServiceObjectiveHealth(evaluation)))
+        .append($("<td>").append(renderServiceObjectiveStatusBadge(evaluation.status, objective.enabled)))
+        .append(
+            $("<td>")
+                .addClass("actions-cell")
+                .append(renderServiceObjectiveActions(service, objective))
+        );
+}
+
+
+function renderServiceObjectiveActions(service, objective) {
+    if (typeof window.makeActionMenu === "function") {
+        return window.makeActionMenu({
+            object: service,
+            items: [
+                {
+                    label: "Edit",
+                    icon: "fas fa-edit",
+                    required: "write",
+                    onClick: function () {
+                        openServiceObjectiveModal(service, objective);
+                    },
+                },
+                {
+                    label: "Delete",
+                    icon: "fas fa-trash",
+                    required: "write",
+                    danger: true,
+                    onClick: function () {
+                        deleteServiceObjective(service, objective);
+                    },
+                },
+            ],
+        });
+    }
+
+    const wrapper = $("<div>").addClass("action-buttons");
+
+    appendIconActionIfAllowed(wrapper, service, {
+        required: "write",
+        icon: "fas fa-edit",
+        label: "Edit",
+        onClick: function () {
+            openServiceObjectiveModal(service, objective);
+        },
+    });
+
+    appendIconActionIfAllowed(wrapper, service, {
+        required: "write",
+        icon: "fas fa-trash",
+        label: "Delete",
+        danger: true,
+        onClick: function () {
+            deleteServiceObjective(service, objective);
+        },
+    });
+
+    return wrapper;
+}
+
+
+function renderServiceObjectiveTargets(objective) {
+    const wrapper = $("<div>").addClass("compact-list");
+
+    if (objective.ack_target_seconds) {
+        wrapper.append(
+            $("<div>")
+                .addClass("compact-list-item")
+                .text("Ack ≤ " + formatDurationSeconds(objective.ack_target_seconds))
+        );
+    }
+
+    if (objective.resolve_target_seconds) {
+        wrapper.append(
+            $("<div>")
+                .addClass("compact-list-item")
+                .text("Resolve ≤ " + formatDurationSeconds(objective.resolve_target_seconds))
+        );
+    }
+
+    if (objective.availability_target_basis_points !== null && objective.availability_target_basis_points !== undefined) {
+        wrapper.append(
+            $("<div>")
+                .addClass("compact-list-item")
+                .text("Availability ≥ " + formatBasisPoints(objective.availability_target_basis_points))
+        );
+    }
+
+    if (!wrapper.children().length) {
+        wrapper.text("-");
+    }
+
+    return wrapper;
+}
+
+
+function renderServiceObjectiveHealth(evaluation) {
+    const wrapper = $("<div>").addClass("compact-list");
+
+    appendServiceObjectiveHealthLine(wrapper, "Ack", evaluation.ack);
+    appendServiceObjectiveHealthLine(wrapper, "Resolve", evaluation.resolve);
+
+    if (evaluation.availability) {
+        wrapper.append(
+            $("<div>")
+                .addClass("compact-list-item")
+                .append($("<strong>").text("Availability: "))
+                .append($("<span>").text(evaluation.availability.message || "not measured"))
+        );
+    }
+
+    if (!wrapper.children().length) {
+        wrapper.text("No measured data");
+    }
+
+    return wrapper;
+}
+
+
+function appendServiceObjectiveHealthLine(wrapper, label, result) {
+    if (!result) {
+        return;
+    }
+
+    const parts = [
+        result.met + "/" + result.measured + " met",
+    ];
+
+    if (result.breached) {
+        parts.push(result.breached + " breached");
+    }
+
+    if (result.pending) {
+        parts.push(result.pending + " pending");
+    }
+
+    if (result.p95_seconds !== null && result.p95_seconds !== undefined) {
+        parts.push("p95 " + formatDurationSeconds(result.p95_seconds));
+    }
+
+    wrapper.append(
+        $("<div>")
+            .addClass("compact-list-item")
+            .append($("<strong>").text(label + ": "))
+            .append($("<span>").text(parts.join(" / ")))
+    );
+}
+
+
+function renderServiceObjectiveStatusBadge(status, enabled) {
+    if (!enabled) {
+        return $("<span>").addClass("status-pill status-neutral").text("Disabled");
+    }
+
+    if (status === "met") {
+        return $("<span>").addClass("status-pill status-active").text("Met");
+    }
+
+    if (status === "at_risk") {
+        return $("<span>").addClass("status-pill status-scheduled").text("At risk");
+    }
+
+    if (status === "breached") {
+        return $("<span>").addClass("status-pill status-inactive").text("Breached");
+    }
+
+    return $("<span>").addClass("status-pill status-neutral").text("Unknown");
+}
+
+
+function formatServiceObjectiveScope(objective) {
+    return objective.severity ? ("severity: " + objective.severity) : "all severities";
+}
+
+
+function formatDurationSeconds(seconds) {
+    seconds = Number(seconds || 0);
+
+    if (!seconds) {
+        return "-";
+    }
+
+    if (seconds % 86400 === 0) {
+        return (seconds / 86400) + "d";
+    }
+
+    if (seconds % 3600 === 0) {
+        return (seconds / 3600) + "h";
+    }
+
+    if (seconds % 60 === 0) {
+        return (seconds / 60) + "m";
+    }
+
+    return seconds + "s";
+}
+
+
+function formatBasisPoints(value) {
+    if (value === null || value === undefined || value === "") {
+        return "-";
+    }
+
+    return (Number(value) / 100).toFixed(2).replace(/\.00$/, "") + "%";
+}
+
+
+function secondsToMinutes(value) {
+    return value ? Math.round(Number(value) / 60) : "";
+}
+
+
+function minutesToSeconds(value) {
+    const minutes = Number(value || 0);
+    return minutes > 0 ? minutes * 60 : null;
+}
+
+
+function basisPointsToPercent(value) {
+    return value !== null && value !== undefined ? Number(value) / 100 : "";
+}
+
+
+function percentToBasisPoints(value) {
+    if (value === null || value === undefined || value === "") {
+        return null;
+    }
+
+    return Math.round(Number(value) * 100);
+}
+
+
+function openServiceObjectiveModal(service, objective) {
+    $("#service-objective-modal").remove();
+    $("body").append(renderServiceObjectiveModal(service, objective));
+    openAppModal("#service-objective-modal");
+}
+
+
+function renderServiceObjectiveModal(service, objective) {
+    objective = objective || {
+        name: "",
+        description: "",
+        severity: "",
+        ack_target_seconds: null,
+        resolve_target_seconds: null,
+        availability_target_basis_points: null,
+        enabled: true,
+    };
+
+    return $("<div>")
+        .attr("id", "service-objective-modal")
+        .addClass("app-modal")
+        .hide()
+        .append(
+            $("<div>")
+                .addClass("app-modal-dialog app-modal-dialog-wide")
+                .append(
+                    $("<div>")
+                        .addClass("app-modal-header")
+                        .append(
+                            $("<div>")
+                                .append($("<h2>").text(objective.id ? "Edit service objective" : "New service objective"))
+                                .append($("<div>").addClass("card-subtitle").text(service.name || service.slug || "Service"))
+                        )
+                        .append(
+                            $("<button>")
+                                .attr("type", "button")
+                                .addClass("app-modal-close")
+                                .attr("aria-label", "Close")
+                                .text("×")
+                                .on("click", function () {
+                                    closeAppModal("#service-objective-modal");
+                                })
+                        )
+                )
+                .append(
+                    $("<div>")
+                        .addClass("app-modal-body")
+                        .append(renderServiceObjectiveForm(service, objective))
+                )
+        );
+}
+
+
+function renderServiceObjectiveForm(service, objective) {
+    const body = $("<div>").addClass("form-body");
+
+    body.append($("<input>").attr("type", "hidden").attr("id", "service-objective-service-id").val(service.id));
+    body.append($("<input>").attr("type", "hidden").attr("id", "service-objective-id").val(objective.id || ""));
+
+    body.append($("<label>").attr("for", "service-objective-name").text("Name"));
+    body.append(
+        $("<input>")
+            .attr("id", "service-objective-name")
+            .attr("type", "text")
+            .addClass("input")
+            .attr("placeholder", "Critical alerts response")
+            .val(objective.name || "")
+    );
+
+    body.append($("<label>").attr("for", "service-objective-description").text("Description"));
+    body.append(
+        $("<textarea>")
+            .attr("id", "service-objective-description")
+            .attr("rows", 3)
+            .addClass("input")
+            .val(objective.description || "")
+    );
+
+    body.append($("<label>").attr("for", "service-objective-severity").text("Severity scope"));
+    body.append(
+        $("<select>")
+            .attr("id", "service-objective-severity")
+            .addClass("input")
+            .append($("<option>").val("").text("All severities"))
+            .append($("<option>").val("critical").text("Critical"))
+            .append($("<option>").val("high").text("High"))
+            .append($("<option>").val("warning").text("Warning"))
+            .append($("<option>").val("info").text("Info"))
+            .val(objective.severity || "")
+    );
+
+    body.append(
+        $("<div>")
+            .addClass("form-grid-3")
+            .append(renderServiceObjectiveNumberField("service-objective-ack-minutes", "Ack target, minutes", secondsToMinutes(objective.ack_target_seconds), "15"))
+            .append(renderServiceObjectiveNumberField("service-objective-resolve-minutes", "Resolve target, minutes", secondsToMinutes(objective.resolve_target_seconds), "240"))
+            .append(renderServiceObjectiveNumberField("service-objective-availability", "Availability target, %", basisPointsToPercent(objective.availability_target_basis_points), "99.9", "0.01"))
+    );
+
+    body.append(
+        $("<label>")
+            .addClass("md-checkbox")
+            .append($("<input>").attr("id", "service-objective-enabled").attr("type", "checkbox").prop("checked", objective.enabled !== false))
+            .append($("<span>").text("Enabled"))
+    );
+
+    body.append(
+        $("<div>")
+            .addClass("form-actions")
+            .append(
+                $("<button>")
+                    .attr("type", "button")
+                    .addClass("btn")
+                    .text("Cancel")
+                    .on("click", function () {
+                        closeAppModal("#service-objective-modal");
+                    })
+            )
+            .append(
+                $("<button>")
+                    .attr("type", "button")
+                    .addClass("btn btn-primary")
+                    .text("Save objective")
+                    .on("click", saveServiceObjective)
+            )
+    );
+
+    return body;
+}
+
+
+function renderServiceObjectiveNumberField(id, label, value, placeholder, step) {
+    return $("<div>")
+        .append($("<label>").attr("for", id).text(label))
+        .append(
+            $("<input>")
+                .attr("id", id)
+                .attr("type", "number")
+                .attr("min", 0)
+                .attr("step", step || "1")
+                .addClass("input")
+                .attr("placeholder", placeholder || "")
+                .val(value)
+        );
+}
+
+
+function collectServiceObjectivePayload() {
+    return {
+        name: $("#service-objective-name").val().trim(),
+        description: $("#service-objective-description").val().trim() || null,
+        severity: $("#service-objective-severity").val() || null,
+        ack_target_seconds: minutesToSeconds($("#service-objective-ack-minutes").val()),
+        resolve_target_seconds: minutesToSeconds($("#service-objective-resolve-minutes").val()),
+        availability_target_basis_points: percentToBasisPoints($("#service-objective-availability").val()),
+        enabled: $("#service-objective-enabled").is(":checked"),
+    };
+}
+
+
+function saveServiceObjective() {
+    const serviceId = Number($("#service-objective-service-id").val());
+    const objectiveId = $("#service-objective-id").val();
+    const payload = collectServiceObjectivePayload();
+
+    if (!serviceId) {
+        showAppError("Service is required.");
+        return;
+    }
+
+    if (!payload.name) {
+        showAppError("Name is required.");
+        return;
+    }
+
+    if (!payload.ack_target_seconds && !payload.resolve_target_seconds && payload.availability_target_basis_points === null) {
+        showAppError("Set at least one target.");
+        return;
+    }
+
+    if (objectiveId) {
+        apiPut("/api/services/objectives/" + encodeURIComponent(objectiveId), payload, function () {
+            closeAppModal("#service-objective-modal");
+            refreshServiceContextAfterDetailsChange();
+        });
+        return;
+    }
+
+    apiPost("/api/services/" + encodeURIComponent(serviceId) + "/objectives", payload, function () {
+        closeAppModal("#service-objective-modal");
+        refreshServiceContextAfterDetailsChange();
+    });
+}
+
+
+function deleteServiceObjective(service, objective) {
+    showAppConfirm({
+        title: "Delete this service objective?",
+        message: "Delete objective \"" + (objective.name || objective.id) + "\"?",
+        confirmText: "Delete",
+        confirmClass: "btn-danger",
+    }).done(function () {
+        apiDelete("/api/services/objectives/" + encodeURIComponent(objective.id), function () {
+            refreshServiceContextAfterDetailsChange();
+        });
+    });
+}
+
+function renderServiceDetailsImpact(payload) {
+    const impact = payload.impact || {};
+    const blastRadius = impact.blast_radius || {};
+    const section = serviceDetailsSection(
+        "Impact",
+        "Effective status, root cause and downstream blast radius."
+    );
+
+    section.append(
+        $("<div>")
+            .addClass("grid-two")
+            .append(
+                serviceDetailsCompactCard("Status", [
+                    ["Effective status", formatImpactStatusText(impact.effective_status || "unknown")],
+                    ["Primary reason", formatImpactReasonText(impact.primary_reason || "unknown")],
+                    ["Alert impact", formatImpactStatusText(impact.alert_impact_status || "operational")],
+                    ["Open alert groups", Number(impact.open_alert_groups || 0)],
+                    ["Critical open", Number(impact.critical_open_alert_groups || 0)],
+                    ["Dependency impact", formatImpactStatusText(impact.dependency_impact_status || "operational")],
+                    ["Upstream issues", Number(impact.upstream_issues_count || 0)],
+                ])
+            )
+            .append(
+                serviceDetailsCompactCard("Blast radius", [
+                    ["Direct downstream", Number(blastRadius.direct_downstream || 0)],
+                    ["Total downstream", Number(blastRadius.transitive_downstream || 0)],
+                    ["Critical downstream", Number(blastRadius.critical_downstream || 0)],
+                    ["Tier 1 downstream", Number(blastRadius.tier_1_downstream || 0)],
+                    ["Cycle detected", blastRadius.cycle_detected ? "Yes" : "No"],
+                    ["Depth limited", blastRadius.depth_limited ? "Yes" : "No"],
+                ])
+            )
+    );
+
+    section.append(renderImpactExplanationPanel(impact, { compact: true }));
+
+    return section;
+}
+
+function renderServiceDetailsReadiness(payload) {
+    const service = payload.service || {};
+    const readiness = payload.readiness || {};
+    const state = readiness.state || null;
+    const evaluations = asArray(readiness.evaluations);
+    const section = serviceDetailsSection("Readiness", null);
+
+    const headerActions = $("<div>").addClass("details-actions");
+
+    appendIconActionIfAllowed(headerActions, service, {
+        required: "write",
+        icon: "fas fa-sync",
+        label: "Evaluate",
+        onClick: function () {
+            evaluateServiceReadiness(service);
+        },
+    });
+
+    section.append(headerActions);
+
+    if (!state) {
+        section.append(
+            $("<div>")
+                .addClass("empty-state compact")
+                .text("Readiness has not been evaluated.")
+        );
+
+        return section;
+    }
+
+    const scoreLabel = state.status !== "not_applicable" ? state.score + "/100" : "—";
+
+    section.append(renderReadinessSummaryTable(state, scoreLabel));
+
+    if (!evaluations.length) {
+        section.append(
+            $("<div>")
+                .addClass("empty-state compact")
+                .text("No standards apply to this service.")
+        );
+
+        return section;
+    }
+
+    section.append(renderReadinessStandardsTable(evaluations));
+
+    return section;
+}
+
+function renderReadinessSummaryTable(state, scoreLabel) {
+    const table = $("<table>").addClass("data-table");
+    const tbody = $("<tbody>");
+
+    tbody.append(
+        $("<tr>")
+            .append($("<th>").text("Score"))
+            .append($("<td>").text(scoreLabel + " · " + formatServiceReadinessStatus(state.status)))
+            .append($("<th>").text("Standards"))
+            .append($("<td>").text(Number(state.standards_count || 0)))
+    );
+
+    tbody.append(
+        $("<tr>")
+            .append($("<th>").text("Checks"))
+            .append($("<td>").text(Number(state.checks_count || 0)))
+            .append($("<th>").text("Failed"))
+            .append(
+                $("<td>").text(
+                    Number(state.failed_count || 0) +
+                    " total / " +
+                    Number(state.failed_required_count || 0) +
+                    " required / " +
+                    Number(state.failed_critical_count || 0) +
+                    " critical"
+                )
+            )
+    );
+
+    table.append(tbody);
+
+    return $("<div>").addClass("table-wrapper").append(table);
+}
+
+
+function renderReadinessStandardsTable(evaluations) {
+    const table = $("<table>").addClass("data-table");
+    const tbody = $("<tbody>");
+
+    table.append(
+        $("<thead>").append(
+            $("<tr>")
+                .append($("<th>").text("Standard"))
+                .append($("<th>").text("Score"))
+                .append($("<th>").text("Status"))
+                .append($("<th>").text("Failed checks"))
+        )
+    );
+
+    evaluations.forEach(function (evaluation) {
+        const standard = evaluation.standard || {};
+        const results = asArray(evaluation.results);
+        const failed = results.filter(function (result) {
+            return result.status !== "passed";
+        });
+
+        tbody.append(
+            $("<tr>")
+                .append(
+                    $("<td>")
+                        .addClass("table-cell-truncate-wide")
+                        .append($("<strong>").text(standard.name || standard.slug || "Standard"))
+                        .append($("<div>").addClass("row-subtitle").text(standard.slug || "-"))
+                )
+                .append($("<td>").text(evaluation.score + "/100"))
+                .append($("<td>").append($("<span>").addClass(getReadinessStatusClass(evaluation.status)).text(formatServiceReadinessStatus(evaluation.status))))
+                .append($("<td>").append(renderReadinessFailedChecks(failed)))
+        );
+    });
+
+    table.append(tbody);
+
+    return $("<div>").addClass("table-wrapper").append(table);
+}
+
+
+function renderReadinessFailedChecks(failed) {
+    const wrapper = $("<div>").addClass("compact-list");
+
+    if (!failed.length) {
+        return $("<span>").text("-");
+    }
+
+    failed.slice(0, 4).forEach(function (result) {
+        wrapper.append(
+            $("<div>")
+                .addClass("compact-list-item")
+                .append(
+                    $("<div>")
+                        .addClass("compact-list-title")
+                        .text(result.check_name || result.check_slug || result.check_type || "Check")
+                )
+                .append(
+                    $("<div>")
+                        .addClass("compact-list-meta")
+                        .text((result.message || result.status || "failed") + " / " + Number(result.weight || 0) + " pt")
+                )
+        );
+    });
+
+    if (failed.length > 4) {
+        wrapper.append(
+            $("<div>")
+                .addClass("compact-list-meta")
+                .text("+" + (failed.length - 4) + " more")
+        );
+    }
+
+    return wrapper;
+}
+
+function getReadinessStatusClass(status) {
+    if (status === "ready") {
+        return "status-pill status-active";
+    }
+
+    if (status === "warning") {
+        return "status-pill status-scheduled";
+    }
+
+    if (status === "not_ready") {
+        return "status-pill status-inactive";
+    }
+
+    return "status-pill status-neutral";
+}
+
+function evaluateServiceReadiness(service) {
+    apiPost(
+        "/api/services/" + encodeURIComponent(service.id) + "/readiness/evaluate",
+        {},
+        function () {
+            serviceDetailsCache = {};
+            refreshServices();
+
+            if ($("#service-details-modal").is(":visible")) {
+                loadServiceDetails(service.id);
+            }
+        }
+    );
+}
+
+
+function serviceDetailsCompactRow(label, value) {
+    return $("<tr>")
+        .append(
+            $("<td>")
+                .addClass("table-cell-truncate")
+                .append($("<strong>").text(label))
+        )
+        .append(
+            $("<td>")
+                .addClass("table-cell-truncate-wide")
+                .attr("title", value || "-")
+                .text(value || "-")
+        );
+}
+
+
+function serviceDetailsCompactCard(title, rows) {
+    const card = $("<section>").addClass("card");
+    const tbody = $("<tbody>");
+
+    rows.forEach(function (row) {
+        tbody.append(serviceDetailsCompactRow(row[0], row[1]));
+    });
+
+    card.append(
+        $("<div>")
+            .addClass("card-header")
+            .append($("<div>").append($("<h2>").text(title)))
+    );
+
+    card.append(
+        $("<div>")
+            .addClass("table-wrapper")
+            .append(
+                $("<table>")
+                    .addClass("data-table")
+                    .append(tbody)
+            )
+    );
+
+    return card;
+}
+
+
+
+
+function serviceDetailsTableCell(value, wide) {
+    const cell = $("<td>");
+
+    if (wide) {
+        cell.addClass("table-cell-truncate-wide");
+    } else {
+        cell.addClass("table-cell-truncate");
+    }
+
+    if (value && value.jquery) {
+        cell.append(value);
+        return cell;
+    }
+
+    cell.attr("title", value === undefined || value === null || value === "" ? "-" : String(value));
+    cell.text(value === undefined || value === null || value === "" ? "-" : value);
+
+    return cell;
+}
+
+
+function serviceDetailsTableCard(title, headers, rows, emptyMessage) {
+    const card = $("<section>").addClass("card");
+    const table = $("<table>").addClass("data-table");
+    const tbody = $("<tbody>");
+
+    card.append(
+        $("<div>")
+            .addClass("card-header")
+            .append($("<div>").append($("<h2>").text(title)))
+    );
+
+    if (headers && headers.length) {
+        table.append(
+            $("<thead>").append(
+                $("<tr>").append(headers.map(function (header) {
+                    return $("<th>").text(header);
+                }))
+            )
+        );
+    }
+
+    if (!rows.length) {
+        tbody.append(
+            $("<tr>").append(
+                $("<td>")
+                    .attr("colspan", headers && headers.length ? headers.length : 1)
+                    .addClass("empty-cell")
+                    .text(emptyMessage || "No data")
+            )
+        );
+    } else {
+        rows.forEach(function (row) {
+            const tr = $("<tr>");
+
+            row.forEach(function (value, index) {
+                tr.append(serviceDetailsTableCell(value, index === row.length - 1));
+            });
+
+            tbody.append(tr);
+        });
+    }
+
+    table.append(tbody);
+    card.append($("<div>").addClass("table-wrapper").append(table));
+
+    return card;
 }
 
 
 function renderServiceDetailsHero(payload) {
     const service = payload.service || {};
-    const section = $("<section>").addClass("service-detail-hero");
-
-    const title = $("<div>")
-        .addClass("service-detail-hero-title")
-        .append($("<h3>").text(service.name || service.slug || ("Service #" + service.id)))
-        .append($("<p>").text(service.description || service.slug || "No description"));
+    const section = serviceDetailsSection(
+        "Overview",
+        service.description || service.slug || "No description"
+    );
 
     const badges = $("<div>").addClass("service-detail-badges");
 
     badges.append(renderServiceStatusBadge(service));
+    badges.append(renderServiceReadinessBadge(service));
     badges.append($("<span>").addClass("status-pill status-neutral").text(service.criticality || "unknown"));
     badges.append($("<span>").addClass("status-pill status-neutral").text(service.environment || "unknown"));
     badges.append($("<span>").addClass("status-pill status-neutral").text(service.tier || "unknown"));
 
-    section.append(title);
     section.append(badges);
 
     section.append(
         $("<div>")
-            .addClass("details-list")
-            .append(serviceDetailsItem("Team", service.team_name || service.team_slug))
-            .append(serviceDetailsItem("Type", service.service_type))
-            .append(serviceDetailsItem("Status message", service.status_message))
-            .append(serviceDetailsItem("Maintenance", window.AppMaintenanceBadges.text(service, "-")))
-            .append(serviceDetailsItem("Default rotation", service.default_rotation_name))
-            .append(serviceDetailsItem("Default policy", service.default_escalation_policy_name))
-            .append(serviceDetailsItem("Notification policy", service.notification_policy_name))
-            .append(serviceDetailsItem("Priority policy", service.priority_policy_name || "Team default"))
-            .append(serviceDetailsItem("Enabled", service.enabled ? "Yes" : "No"))
+            .addClass("grid-two")
+            .append(
+                serviceDetailsCompactCard("Identity", [
+                    ["Team", service.team_name || service.team_slug],
+                    ["Type", service.service_type],
+                    ["Kind", service.kind],
+                    ["Lifecycle", service.lifecycle],
+                    ["Enabled", service.enabled ? "Yes" : "No"],
+                    ["Status message", service.status_message],
+                ])
+            )
+            .append(
+                serviceDetailsCompactCard("Defaults", [
+                    ["Default rotation", service.default_rotation_name],
+                    ["Escalation policy", service.default_escalation_policy_name],
+                    ["Notification policy", service.notification_policy_name],
+                    ["Priority policy", service.priority_policy_name || "Team default"],
+                    ["Maintenance", window.AppMaintenanceBadges.text(service, "-")],
+                ])
+            )
     );
 
     return section;
 }
 
-
 function renderServiceDetailsQuickActions(payload) {
     const service = payload.service || {};
-    const section = serviceDetailsSection(
-        "Quick actions",
-        "Common actions for this affected system."
-    );
-
+    const section = serviceDetailsSection("Quick actions", null);
     const actions = $("<div>").addClass("details-actions");
 
     appendIconActionIfAllowed(actions, service, {
@@ -541,7 +1599,7 @@ function renderServiceDetailsQuickActions(payload) {
     appendIconActionIfAllowed(actions, service, {
         required: "write",
         icon: "fas fa-tools",
-        label: "Create maintenance window",
+        label: "Maintenance",
         onClick: function () {
             openServiceMaintenanceWindow(service);
         },
@@ -550,7 +1608,7 @@ function renderServiceDetailsQuickActions(payload) {
     appendIconActionIfAllowed(actions, service, {
         required: "write",
         icon: "fas fa-book",
-        label: "Add runbook",
+        label: "Runbook",
         onClick: function () {
             resetServiceRunbookForm();
             fillServiceSelect("#service-runbook-service", service.id);
@@ -562,7 +1620,7 @@ function renderServiceDetailsQuickActions(payload) {
     appendIconActionIfAllowed(actions, service, {
         required: "write",
         icon: "fas fa-link",
-        label: "Add link",
+        label: "Link",
         onClick: function () {
             resetServiceLinkForm();
             fillServiceSelect("#service-link-service", service.id);
@@ -573,8 +1631,17 @@ function renderServiceDetailsQuickActions(payload) {
 
     appendIconActionIfAllowed(actions, service, {
         required: "write",
+        icon: "fas fa-bullseye",
+        label: "Objective",
+        onClick: function () {
+            openServiceObjectiveModal(service, null);
+        },
+    });
+
+    appendIconActionIfAllowed(actions, service, {
+        required: "write",
         icon: "fas fa-users",
-        label: "Add stakeholder",
+        label: "Stakeholder",
         onClick: function () {
             openCreateServiceOwnerModal(service);
         },
@@ -583,7 +1650,7 @@ function renderServiceDetailsQuickActions(payload) {
     appendIconActionIfAllowed(actions, service, {
         required: "write",
         icon: "fas fa-project-diagram",
-        label: "Add dependency",
+        label: "Dependency",
         onClick: function () {
             resetServiceDependencyForm();
             fillServiceSelect("#service-dependency-source", service.id);
@@ -598,11 +1665,9 @@ function renderServiceDetailsQuickActions(payload) {
         $("<button>")
             .attr("type", "button")
             .addClass("btn")
-            .text("Open alerts")
+            .text("Alerts")
             .on("click", function () {
-                openServiceAlerts(service, {
-                    onlyOpen: true,
-                });
+                openServiceAlerts(service, { onlyOpen: true });
             })
     );
 
@@ -610,7 +1675,7 @@ function renderServiceDetailsQuickActions(payload) {
         $("<button>")
             .attr("type", "button")
             .addClass("btn")
-            .text("Open impact")
+            .text("Impact")
             .on("click", function () {
                 switchServicesPageTab("impact");
                 $("#service-impact-search").val(service.slug || service.name || "");
@@ -630,30 +1695,33 @@ function openServiceMaintenanceWindow(service) {
 
 function renderServiceDetailsEmpty() {
     selectedServiceDetailsId = null;
-    $("#service-details-subtitle").text("Select a service");
-    $("#service-details-body").html("<p>Click a service name to inspect ownership, defaults and status.</p>");
+    window.selectedServiceId = null;
+    $("#service-details-modal-title").text("Service details");
+    $("#service-details-modal-subtitle").text("");
+    $("#service-details-modal-body").html(
+        $("<div>").addClass("empty-state").text("Select a service to view details.")
+    );
 }
+
 
 
 function restoreServiceDetails() {
-    if (!servicesCache.length) {
-        renderServiceDetailsEmpty();
+    if (!isServiceDetailsModalOpen() || !selectedServiceDetailsId) {
         return;
     }
 
-    if (selectedServiceDetailsId) {
-        const selected = servicesCache.find(function (service) {
-            return Number(service.id) === Number(selectedServiceDetailsId);
-        });
+    const selected = servicesCache.find(function (service) {
+        return Number(service.id) === Number(selectedServiceDetailsId);
+    });
 
-        if (selected) {
-            renderServiceDetails(selected);
-            return;
-        }
+    if (selected) {
+        loadServiceDetails(selected.id);
+        return;
     }
 
-    renderServiceDetails(servicesCache[0]);
+    renderServiceDetailsEmpty();
 }
+
 
 
 function getServiceById(serviceId) {
@@ -716,10 +1784,7 @@ function switchServicesPageTab(tab) {
     $(".services-tab-panel").hide();
     $("#services-tab-" + servicesPageTab).show();
 
-    const isServicesTab = servicesPageTab === "services";
-
-    $("#service-details-card").toggle(isServicesTab);
-    $("#services-page-layout").toggleClass("is-full-width", !isServicesTab);
+    $("#services-page-layout").addClass("is-full-width");
 
     if (servicesPageTab === "links") {
         renderAllServiceLinksTable();
@@ -732,6 +1797,10 @@ function switchServicesPageTab(tab) {
             refreshServiceImpact();
         } else {
             renderServiceImpactTable();
+        }
+    } else if (servicesPageTab === "standards") {
+        if (typeof window.loadServiceStandards === "function") {
+            window.loadServiceStandards();
         }
     } else if (servicesPageTab === "analytics") {
         if (!serviceAnalyticsCache.length) {
@@ -934,6 +2003,9 @@ function resetServiceForm() {
 
     $("#service-name").val("");
     $("#service-slug").val("");
+    if (window.AppSlug) {
+        window.AppSlug.reset("#service-slug", {manual: false});
+    }
     $("#service-description").val("");
     $("#service-type").val("other");
     $("#service-environment").val("production");
@@ -1034,6 +2106,9 @@ function editService(id) {
     loadServiceDefaults(function () {
         $("#service-name").val(service.name || "");
         $("#service-slug").val(service.slug || "");
+        if (window.AppSlug) {
+            window.AppSlug.reset("#service-slug", {manual: true});
+        }
         $("#service-description").val(service.description || "");
         $("#service-type").val(service.service_type || "other");
         $("#service-environment").val(service.environment || "production");
@@ -1112,6 +2187,7 @@ function deleteService(service) {
     }).done(function () {
         apiDelete("/api/services/" + service.id, function () {
             if (Number(selectedServiceDetailsId) === Number(service.id)) {
+                closeServiceDetailsModal();
                 renderServiceDetailsEmpty();
             }
 
@@ -1757,6 +2833,7 @@ $(document).on("click", "#services-page-tabs .page-tab", function () {
 $(document).on("input", "#services-search", renderServicesTable);
 $(document).on("change", "#services-status-filter", renderServicesTable);
 $(document).on("change", "#services-criticality-filter", renderServicesTable);
+$(document).on("change", "#services-readiness-filter", renderServicesTable);
 $(document).on("click", "#reload-services", refreshServices);
 $(document).on("click", "#open-service-create-modal", openCreateServiceModal);
 $(document).on("click", "#save-service", saveService);
@@ -1799,11 +2876,20 @@ $(document).on("click", "#close-service-dependency-modal", function () {
     closeAppModal("#service-dependency-modal");
 });
 
+$(document).on("click", "#close-service-details-modal", function () {
+    closeServiceDetailsModal();
+});
+
 $(document).on(
     "click",
-    "#service-form-modal, #service-link-modal, #service-runbook-modal, #service-dependency-modal, #service-owner-modal",
+    "#service-details-modal, #service-form-modal, #service-link-modal, #service-runbook-modal, #service-dependency-modal, #service-owner-modal",
     function (event) {
         if (event.target !== this) {
+            return;
+        }
+
+        if (this.id === "service-details-modal") {
+            closeServiceDetailsModal();
             return;
         }
 
@@ -1941,13 +3027,7 @@ function renderServiceAnalyticsRow(row) {
                         .addClass("name-button")
                         .text(row.service_name || row.service_slug || "-")
                         .on("click", function () {
-                            const service = getServiceById(row.service_id);
-
-                            if (service) {
-                                selectedServiceDetailsId = service.id;
-                                switchServicesPageTab("services");
-                                renderServiceDetails(service);
-                            }
+                            openServiceDetailsModal(row.service_id);
                         })
                 )
                 .append(
@@ -2725,16 +3805,9 @@ function openServiceFromImpact(serviceId) {
         return;
     }
 
-    const service = getServiceById(serviceId);
-
-    if (!service) {
-        return;
-    }
-
-    selectedServiceDetailsId = service.id;
-    switchServicesPageTab("services");
-    renderServiceDetails(service);
+    openServiceDetailsModal(serviceId);
 }
+
 
 
 function renderImpactServiceNode(node) {
@@ -2783,45 +3856,27 @@ function renderServiceDetailsMaintenance(payload) {
         "Maintenance windows",
         "Active and upcoming maintenance that can affect this service."
     );
-
-    if (!windows.length) {
-        section.append($("<div>").addClass("empty-state compact").text("No active or upcoming maintenance windows."));
-        return section;
-    }
-
-    const list = $("<div>").addClass("compact-list");
-
-    windows.slice(0, 5).forEach(function (item) {
-        list.append(
-            $("<div>")
-                .addClass("compact-list-item")
-                .append(
-                    $("<div>")
-                        .addClass("compact-list-title")
-                        .text(item.name || ("Window #" + item.id))
-                )
-                .append(
-                    $("<div>")
-                        .addClass("compact-list-meta")
-                        .text(
-                            (item.status || "scheduled") +
-                            " / " +
-                            (item.behavior || "-") +
-                            " / " +
-                            (item.starts_at || "-") +
-                            " → " +
-                            (item.ends_at || "-") +
-                            " " +
-                            (item.timezone || "UTC")
-                        )
-                )
-        );
+    const rows = windows.slice(0, 8).map(function (item) {
+        return [
+            item.name || ("Window #" + item.id),
+            item.status || "scheduled",
+            item.behavior || "-",
+            (item.starts_at || "-") + " → " + (item.ends_at || "-"),
+            item.timezone || "UTC",
+        ];
     });
 
-    section.append(list);
+    section.append(
+        serviceDetailsTableCard(
+            "Windows",
+            ["Window", "Status", "Behavior", "Time", "TZ"],
+            rows,
+            "No active or upcoming maintenance windows."
+        )
+    );
+
     return section;
 }
-
 
 function renderServiceDetailsRunbooks(payload) {
     const runbooks = asArray(payload.runbooks);
@@ -2829,47 +3884,31 @@ function renderServiceDetailsRunbooks(payload) {
         "Runbooks",
         "Response instructions for this service."
     );
-
-    if (!runbooks.length) {
-        section.append($("<div>").addClass("empty-state compact").text("No runbooks."));
-        return section;
-    }
-
-    const list = $("<div>").addClass("compact-list");
-
-    runbooks.slice(0, 5).forEach(function (runbook) {
-        list.append(
-            $("<div>")
-                .addClass("compact-list-item")
-                .append(
-                    $("<a>")
-                        .addClass("compact-list-title")
-                        .attr("href", runbook.url)
-                        .attr("target", "_blank")
-                        .attr("rel", "noopener noreferrer")
-                        .text(runbook.title || runbook.url)
-                )
-                .append(
-                    $("<div>")
-                        .addClass("compact-list-meta")
-                        .text((runbook.severity || "any severity") + " / priority " + (runbook.priority || 0))
-                )
-                .text(
-                    [
-                        runbook.severity || "any severity",
-                        "priority " + (runbook.priority || 0),
-                        runbook.matcher_preset
-                            ? "preset: " + runbook.matcher_preset.name
-                            : null,
-                    ].filter(Boolean).join(" / ")
-                )
-        );
+    const rows = runbooks.slice(0, 8).map(function (runbook) {
+        return [
+            $("<a>")
+                .attr("href", runbook.url)
+                .attr("target", "_blank")
+                .attr("rel", "noopener noreferrer")
+                .text(runbook.title || runbook.url || ("Runbook #" + runbook.id)),
+            runbook.severity || "any",
+            runbook.priority || 0,
+            runbook.matcher_preset ? runbook.matcher_preset.name : "-",
+            renderStatusBadge(runbook.enabled !== false, "Enabled", "Disabled"),
+        ];
     });
 
-    section.append(list);
+    section.append(
+        serviceDetailsTableCard(
+            "Runbooks",
+            ["Runbook", "Severity", "Priority", "Matcher preset", "Status"],
+            rows,
+            "No runbooks."
+        )
+    );
+
     return section;
 }
-
 
 function renderServiceDetailsLinks(payload) {
     const links = asArray(payload.links);
@@ -2877,77 +3916,54 @@ function renderServiceDetailsLinks(payload) {
         "Links",
         "Dashboards, logs, traces, repositories and documentation."
     );
-
-    if (!links.length) {
-        section.append($("<div>").addClass("empty-state compact").text("No links."));
-        return section;
-    }
-
-    const list = $("<div>").addClass("compact-list");
-
-    links.slice(0, 6).forEach(function (link) {
-        list.append(
-            $("<div>")
-                .addClass("compact-list-item")
-                .append(
-                    $("<a>")
-                        .addClass("compact-list-title")
-                        .attr("href", link.url)
-                        .attr("target", "_blank")
-                        .attr("rel", "noopener noreferrer")
-                        .text(link.label || link.url)
-                )
-                .append(
-                    $("<div>")
-                        .addClass("compact-list-meta")
-                        .text((link.link_type || "other") + " / priority " + (link.priority || 0))
-                )
-        );
+    const rows = links.slice(0, 10).map(function (link) {
+        return [
+            $("<a>")
+                .attr("href", link.url)
+                .attr("target", "_blank")
+                .attr("rel", "noopener noreferrer")
+                .text(link.label || link.url || ("Link #" + link.id)),
+            link.link_type || "other",
+            link.priority || 0,
+            link.description || "-",
+        ];
     });
 
-    section.append(list);
+    section.append(
+        serviceDetailsTableCard(
+            "Links",
+            ["Link", "Type", "Priority", "Description"],
+            rows,
+            "No links."
+        )
+    );
+
     return section;
 }
-
 
 function renderServiceDetailsDependencies(payload) {
     const dependencies = payload.dependencies || {};
     const upstream = asArray(dependencies.upstream);
     const downstream = asArray(dependencies.downstream);
-
     const section = serviceDetailsSection(
         "Dependencies",
         "Upstream services this service needs and downstream services that depend on it."
     );
 
-    if (!upstream.length && !downstream.length) {
-        section.append($("<div>").addClass("empty-state compact").text("No dependencies."));
-        return section;
-    }
+    section.append(
+        $("<div>")
+            .addClass("grid-two")
+            .append(renderServiceDependencyList("Depends on", upstream, true))
+            .append(renderServiceDependencyList("Used by", downstream, false))
+    );
 
-    const wrapper = $("<div>").addClass("dependency-split");
-
-    wrapper.append(renderServiceDependencyList("Depends on", upstream, true));
-    wrapper.append(renderServiceDependencyList("Used by", downstream, false));
-
-    section.append(wrapper);
     return section;
 }
 
 
+
 function renderServiceDependencyList(title, rows, upstream) {
-    const box = $("<div>").addClass("dependency-box");
-
-    box.append($("<h4>").text(title));
-
-    if (!rows.length) {
-        box.append($("<div>").addClass("empty-state compact").text("None"));
-        return box;
-    }
-
-    const list = $("<div>").addClass("compact-list");
-
-    rows.slice(0, 6).forEach(function (dependency) {
+    const tableRows = rows.slice(0, 10).map(function (dependency) {
         const name = upstream
             ? (dependency.depends_on_service_name || dependency.depends_on_service_slug || "-")
             : (dependency.service_name || dependency.service_slug || "-");
@@ -2956,86 +3972,295 @@ function renderServiceDependencyList(title, rows, upstream) {
             ? dependency.depends_on_service_status
             : dependency.service_status;
 
-        list.append(
-            $("<div>")
-                .addClass("compact-list-item")
-                .append($("<div>").addClass("compact-list-title").text(name))
-                .append(
-                    $("<div>")
-                        .addClass("compact-list-meta")
-                        .text(
-                            (dependency.dependency_type || "dependency") +
-                            " / " +
-                            (dependency.criticality || "important") +
-                            " / " +
-                            (status || "unknown")
-                        )
-                )
-        );
+        return [
+            name,
+            dependency.dependency_type || "dependency",
+            dependency.criticality || "important",
+            status || "unknown",
+            dependency.description || "-",
+        ];
     });
 
-    box.append(list);
-    return box;
+    return serviceDetailsTableCard(
+        title,
+        ["Service", "Type", "Criticality", "Status", "Description"],
+        tableRows,
+        "None"
+    );
 }
+
 
 
 function renderServiceDetailsAnalytics(analytics) {
     const section = serviceDetailsSection(
         "Analytics",
-        "Versioned analytics block prepared for charts and future widgets."
+        "Service-level counters for the selected analytics window."
     );
-
     const widgets = analytics.widgets || {};
     const alertVolume = widgets.alert_volume || {};
     const status = widgets.status || {};
 
     section.append(
-        $("<div>")
-            .addClass("metric-grid service-detail-metrics")
-            .append(serviceDetailsMetric("Recent alerts", alertVolume.recent || 0, "selected window"))
-            .append(serviceDetailsMetric("Total alerts", alertVolume.total || 0, "all time"))
-            .append(serviceDetailsMetric("Status changes", status.changes || 0, "recent history"))
-            .append(serviceDetailsMetric("Analytics version", analytics.version || 1, "payload contract"))
+        serviceDetailsCompactCard("Counters", [
+            ["Recent alerts", alertVolume.recent || 0],
+            ["Total alerts", alertVolume.total || 0],
+            ["Status changes", status.changes || 0],
+            ["Analytics version", analytics.version || 1],
+        ])
     );
 
     return section;
 }
 
 
-function renderServiceDetailsStatusHistory(payload) {
-    const history = asArray(payload.status_history);
+
+function renderServiceDetailsTimeline(payload) {
+    const service = payload.service || {};
+    const events = asArray(payload.timeline);
+    const pageSize = 20;
     const section = serviceDetailsSection(
-        "Status history",
-        "Recent manual, alert-driven or maintenance-driven status changes."
+        "Timeline",
+        "Recent service, readiness and configuration events."
+    );
+    const table = $("<table>").addClass("data-table");
+    const tbody = $("<tbody>").attr("id", "service-details-timeline-body");
+    const visibleEvents = events.slice(0, pageSize);
+
+    table.append(
+        $("<thead>").append(
+            $("<tr>")
+                .append($("<th>").text("Time"))
+                .append($("<th>").text("Event"))
+                .append($("<th>").text("Category"))
+                .append($("<th>").text("Actor"))
+        )
     );
 
-    if (!history.length) {
-        section.append($("<div>").addClass("empty-state compact").text("No status history."));
-        return section;
+    if (!visibleEvents.length) {
+        tbody.append(
+            $("<tr>").append(
+                $("<td>")
+                    .attr("colspan", 4)
+                    .addClass("empty-cell")
+                    .text("No timeline events.")
+            )
+        );
+    } else {
+        visibleEvents.forEach(function (event) {
+            tbody.append(renderServiceTimelineRow(event));
+        });
     }
 
-    const list = $("<div>").addClass("compact-list");
+    table.append(tbody);
 
-    history.slice(0, 8).forEach(function (item) {
-        list.append(
-            $("<div>")
-                .addClass("compact-list-item")
-                .append(
-                    $("<div>")
-                        .addClass("compact-list-title")
-                        .text((item.old_status || "-") + " → " + (item.new_status || "-"))
-                )
-                .append(
-                    $("<div>")
-                        .addClass("compact-list-meta")
-                        .text((item.source || "manual") + " / " + (formatDateTime(item.created_at) || "-"))
-                )
-        );
-    });
+    section.append(
+        $("<div>")
+            .addClass("table-wrapper")
+            .append(table)
+    );
 
-    section.append(list);
+    if (service.id && visibleEvents.length === pageSize) {
+        section.append(renderServiceTimelineLoadMoreButton(service.id, visibleEvents[visibleEvents.length - 1]));
+    }
+
     return section;
 }
+
+function renderServiceTimelineRow(event) {
+    const actor = event.actor || {};
+
+    return $("<tr>")
+        .append(serviceDetailsTableCell(formatServiceTimelineTime(event.occurred_at), false))
+        .append(serviceDetailsTableCell(renderServiceTimelineEventCell(event), true))
+        .append(serviceDetailsTableCell(renderServiceTimelineCategoryBadge(event.category), false))
+        .append(serviceDetailsTableCell(formatServiceTimelineActor(actor), false));
+}
+
+function renderServiceTimelineEventCell(event) {
+    const wrapper = $("<div>");
+    const title = $("<div>").append(
+        $("<strong>").text(event.title || event.event_type || "Event")
+    );
+
+    if (event.status) {
+        title.append(" ").append(renderServiceTimelineStatusBadge(event.status));
+    }
+
+    wrapper.append(title);
+
+    wrapper.append(
+        $("<div>")
+            .addClass("row-subtitle")
+            .text(event.event_type || "-")
+    );
+
+    if (event.summary && event.summary !== event.event_type) {
+        wrapper.append(
+            $("<div>")
+                .addClass("row-subtitle")
+                .text(event.summary)
+        );
+    }
+
+    return wrapper;
+}
+
+function renderServiceTimelineCategoryBadge(category) {
+    return $("<span>")
+        .addClass("status-pill status-neutral")
+        .text(formatServiceTimelineCategory(category));
+}
+
+function renderServiceTimelineStatusBadge(status) {
+    return $("<span>")
+        .addClass(getServiceTimelineStatusClass(status))
+        .text(formatServiceTimelineCategory(status));
+}
+
+function getServiceTimelineStatusClass(status) {
+    if (status === "ready" || status === "operational" || status === "passed") {
+        return "status-pill status-active";
+    }
+
+    if (status === "warning" || status === "degraded" || status === "maintenance") {
+        return "status-pill status-scheduled";
+    }
+
+    if (status === "not_ready" || status === "failed" || status === "critical" || status === "down") {
+        return "status-pill status-inactive";
+    }
+
+    return "status-pill status-neutral";
+}
+
+function formatServiceTimelineTime(value) {
+    if (!value) {
+        return "-";
+    }
+
+    const date = new Date(value);
+
+    if (Number.isNaN(date.getTime())) {
+        return value;
+    }
+
+    const options = {
+        month: "short",
+        day: "2-digit",
+        hour: "2-digit",
+        minute: "2-digit",
+    };
+
+    if (date.getFullYear() !== new Date().getFullYear()) {
+        options.year = "numeric";
+    }
+
+    return date.toLocaleString(undefined, options);
+}
+
+function formatServiceTimelineCategory(value) {
+    return String(value || "-").replace(/_/g, " ");
+}
+
+function formatServiceTimelineActor(actor) {
+    if (!actor) {
+        return "-";
+    }
+
+    if (actor.display_name) {
+        return actor.display_name;
+    }
+
+    if (actor.label) {
+        return actor.label;
+    }
+
+    if (actor.email) {
+        return actor.email;
+    }
+
+    if (actor.user_id) {
+        return "User #" + actor.user_id;
+    }
+
+    return actor.type || "-";
+}
+
+function renderServiceTimelineLoadMoreButton(serviceId, lastEvent) {
+    const cursor = serviceTimelineCursorFromEvent(lastEvent);
+    const actions = $("<div>").addClass("form-actions");
+    const button = $("<button>")
+        .attr("type", "button")
+        .addClass("btn")
+        .text("Load more")
+        .on("click", function () {
+            loadMoreServiceTimelineEvents(serviceId, $(this));
+        });
+
+    if (cursor) {
+        button.data("before", cursor.before);
+        button.data("before-id", cursor.before_id);
+    }
+
+    actions.append(button);
+
+    return actions;
+}
+
+function serviceTimelineCursorFromEvent(event) {
+    if (!event || !event.occurred_at) {
+        return null;
+    }
+
+    return {
+        before: event.occurred_at,
+        before_id: event.id || "",
+    };
+}
+
+function loadMoreServiceTimelineEvents(serviceId, button) {
+    const before = button.data("before");
+    const beforeId = button.data("before-id");
+
+    if (!before) {
+        button.closest(".form-actions").remove();
+        return;
+    }
+
+    button.prop("disabled", true).text("Loading...");
+
+    let url = "/api/services/" + encodeURIComponent(serviceId) + "/timeline?limit=20&before=" + encodeURIComponent(before);
+
+    if (beforeId) {
+        url += "&before_id=" + encodeURIComponent(beforeId);
+    }
+
+    apiGet(url, function (payload) {
+        const items = asArray(payload.items);
+        const tbody = $("#service-details-timeline-body");
+
+        if (!items.length) {
+            button.closest(".form-actions").remove();
+            return;
+        }
+
+        items.forEach(function (event) {
+            tbody.append(renderServiceTimelineRow(event));
+        });
+
+        if (payload.next_cursor) {
+            button
+                .data("before", payload.next_cursor.before)
+                .data("before-id", payload.next_cursor.before_id)
+                .prop("disabled", false)
+                .text("Load more");
+            return;
+        }
+
+        button.closest(".form-actions").remove();
+    });
+}
+
 function openServiceAlerts(service, options) {
     options = options || {};
 
@@ -3063,18 +4288,13 @@ function invalidateServiceDetailsCache() {
 
 
 function refreshSelectedServiceDetails() {
-    if (!selectedServiceDetailsId) {
+    if (!selectedServiceDetailsId || !isServiceDetailsModalOpen()) {
         return;
     }
 
-    const service = getServiceById(selectedServiceDetailsId);
-
-    if (!service) {
-        return;
-    }
-
-    renderServiceDetails(service);
+    loadServiceDetails(selectedServiceDetailsId);
 }
+
 
 
 function refreshServiceContextAfterDetailsChange() {
@@ -3297,12 +4517,7 @@ function serviceOwnerNotificationText(owner) {
 function renderServiceDetailsOwners(payload) {
     const service = payload.service || {};
     const owners = asArray(service.owners || payload.owners);
-
-    const section = serviceDetailsSection(
-        "Default stakeholders",
-        "Service owners copied to new incidents as incident stakeholders."
-    );
-
+    const section = serviceDetailsSection("Default stakeholders", null);
     const actions = $("<div>").addClass("details-actions");
 
     appendIconActionIfAllowed(actions, service, {
@@ -3319,7 +4534,7 @@ function renderServiceDetailsOwners(payload) {
     if (!owners.length) {
         section.append(
             $("<div>")
-                .addClass("empty-state")
+                .addClass("empty-state compact")
                 .text("No default stakeholders.")
         );
 
@@ -3334,15 +4549,15 @@ function renderServiceDetailsOwners(payload) {
                 .append($("<th>").text("User"))
                 .append($("<th>").text("Role"))
                 .append($("<th>").text("Notifications"))
-                .append($("<th>").text("Active"))
-                .append($("<th>").text("Actions"))
+                .append($("<th>").text("Status"))
+                .append($("<th>").addClass("actions-th").text("Actions"))
         )
     );
 
     const tbody = $("<tbody>");
 
     owners.forEach(function (owner) {
-        tbody.append(renderServiceOwnerRow(service, owner));
+        tbody.append(renderServiceOwnerCompactRow(service, owner));
     });
 
     table.append(tbody);
@@ -3356,43 +4571,29 @@ function renderServiceDetailsOwners(payload) {
     return section;
 }
 
-function renderServiceOwnerRow(service, owner) {
-    const row = $("<tr>");
-
-    row.append(
-        $("<td>")
-            .addClass("table-cell-truncate")
-            .attr("title", serviceOwnerDisplayName(owner))
-            .text(serviceOwnerDisplayName(owner))
-    );
-
-    row.append(
-        $("<td>").text(owner.role || "owner")
-    );
-
-    row.append(
-        $("<td>").text(serviceOwnerNotificationText(owner))
-    );
-
-    row.append(
-        $("<td>").append(
-            renderStatusBadge(
-                !!owner.active,
-                "Active",
-                "Inactive"
+function renderServiceOwnerCompactRow(service, owner) {
+    return $("<tr>")
+        .toggleClass("row-disabled", !owner.active)
+        .append(
+            $("<td>")
+                .addClass("table-cell-truncate")
+                .attr("title", serviceOwnerDisplayName(owner))
+                .append($("<strong>").text(serviceOwnerDisplayName(owner)))
+                .append($("<div>").addClass("row-subtitle").text(owner.user_email || owner.username || ""))
+        )
+        .append($("<td>").text(owner.role || "owner"))
+        .append($("<td>").text(serviceOwnerNotificationText(owner)))
+        .append(
+            $("<td>").append(
+                renderStatusBadge(!!owner.active, "Active", "Inactive")
             )
         )
-    );
-
-    row.append(
-        $("<td>")
-            .addClass("actions-cell")
-            .append(renderServiceOwnerActions(service, owner))
-    );
-
-    return row;
+        .append(
+            $("<td>")
+                .addClass("actions-cell")
+                .append(renderServiceOwnerActions(service, owner))
+        );
 }
-
 
 function renderServiceOwnerActions(service, owner) {
     return makeActionMenu({
@@ -3619,3 +4820,10 @@ $(document).on(
     "#service-runbook-matcher-preset",
     updateServiceRunbookMatcherPresetHint
 );
+
+window.refreshServices = refreshServices;
+window.loadServiceDetails = loadServiceDetails;
+window.openServiceDetailsModal = openServiceDetailsModal;
+window.getServiceById = getServiceById;
+window.servicesCache = servicesCache;
+window.selectedServiceId = selectedServiceDetailsId;

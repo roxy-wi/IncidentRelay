@@ -54,12 +54,16 @@
           Impact
           <span id="services-impact-count" class="page-tab-count">0</span>
         </button>
+        <button class="page-tab" type="button" data-services-tab="standards">
+          Standards
+          <span id="services-standards-count" class="page-tab-count">0</span>
+        </button>
         <button class="page-tab" type="button" data-services-tab="analytics">
           Analytics
         </button>
     </div>
 
-    <div id="services-page-layout" class="page-layout-grid">
+    <div id="services-page-layout" class="page-layout-grid is-full-width">
       <section class="card page-layout-main">
         <div id="services-tab-services" class="services-tab-panel">
           <div class="card-header">
@@ -101,6 +105,15 @@
               <option value="medium">Medium</option>
               <option value="low">Low</option>
             </select>
+
+              <select id="services-readiness-filter" class="input page-toolbar-filter">
+                  <option value="">All readiness</option>
+                  <option value="ready">Ready</option>
+                  <option value="warning">Warning</option>
+                  <option value="not_ready">Not ready</option>
+                  <option value="not_applicable">Not applicable</option>
+                  <option value="not_evaluated">Not evaluated</option>
+                </select>
           </div>
 
           <div class="table-wrapper">
@@ -110,6 +123,7 @@
                   <th>Service</th>
                   <th>Team</th>
                   <th>Status</th>
+                  <th>Readiness</th>
                   <th>Criticality</th>
                   <th>Environment</th>
                   <th>Defaults</th>
@@ -117,7 +131,7 @@
                 </tr>
               </thead>
               <tbody id="services-table">
-                <tr><td colspan="7" class="empty-cell">No services loaded</td></tr>
+                <tr><td colspan="8" class="empty-cell">No services loaded</td></tr>
               </tbody>
             </table>
           </div>
@@ -402,21 +416,111 @@
                 </table>
               </div>
             </div>
-      </section>
+          <div id="services-tab-standards" class="services-tab-panel" style="display: none;">
+          <div class="card-header">
+            <div>
+              <h2>Service Standards</h2>
+              <div class="card-subtitle">
+                Readiness requirements applied to services in the selected group.
+              </div>
+            </div>
+            <div class="card-header-actions">
+              <button id="restore-basic-standard-btn" type="button" class="btn">
+                Restore default standard
+              </button>
+              <button id="new-service-standard-btn" type="button" class="btn btn-primary">
+                New standard
+              </button>
+            </div>
+          </div>
 
-      <aside id="service-details-card" class="card page-details-card">
-        <div class="card-header">
-          <div>
-            <h2>Service details</h2>
-            <div id="service-details-subtitle" class="card-subtitle">Select a service</div>
+          <div class="grid-two">
+            <section class="card">
+              <div class="card-header">
+                <div>
+                  <h2>Standards</h2>
+                  <div class="card-subtitle">Policies that decide readiness score.</div>
+                </div>
+              </div>
+
+              <div class="table-wrapper">
+                <table class="data-table sortable-table">
+                  <thead>
+                    <tr>
+                      <th>Standard</th>
+                      <th>Applies to</th>
+                      <th>Checks</th>
+                      <th>Status</th>
+                      <th class="actions-th">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="service-standards-list">
+                    <tr>
+                      <td colspan="5" class="empty-cell">No service standards loaded</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
+
+            <section class="card">
+              <div class="card-header">
+                <div>
+                  <h2>Checks</h2>
+                  <div id="service-standard-checks-subtitle" class="card-subtitle">
+                    Select a standard to manage checks.
+                  </div>
+                </div>
+                <div class="card-header-actions">
+                  <button id="new-service-standard-check-btn" type="button" class="btn btn-primary" disabled>
+                    New check
+                  </button>
+                </div>
+              </div>
+
+              <div class="table-wrapper">
+                <table class="data-table sortable-table">
+                  <thead>
+                    <tr>
+                      <th>Check</th>
+                      <th>Type</th>
+                      <th>Weight</th>
+                      <th>Severity</th>
+                      <th>Status</th>
+                      <th class="actions-th">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="service-standard-checks-list">
+                    <tr>
+                      <td colspan="6" class="empty-cell">Select a standard to manage checks</td>
+                    </tr>
+                  </tbody>
+                </table>
+              </div>
+            </section>
           </div>
         </div>
-        <div id="service-details-body" class="details-body">
-          <p>Click a service name to inspect ownership, defaults and status.</p>
-        </div>
-      </aside>
+
+      </section>
+
     </div>
   </div>
+
+<div id="service-details-modal" class="app-modal" style="display: none;">
+  <div class="app-modal-dialog app-modal-dialog-wide">
+    <div class="app-modal-header">
+      <div>
+        <h2 id="service-details-modal-title">Service details</h2>
+        <div id="service-details-modal-subtitle" class="card-subtitle"></div>
+      </div>
+      <button id="close-service-details-modal" type="button" class="app-modal-close" aria-label="Close">×</button>
+    </div>
+
+    <div id="service-details-modal-body" class="app-modal-body">
+      <div class="empty-state">Select a service to view details.</div>
+    </div>
+  </div>
+</div>
 
 <div id="service-form-modal" class="app-modal" style="display: none;">
   <div class="app-modal-dialog app-modal-dialog-wide">
@@ -455,47 +559,22 @@
 
             <label for="service-type">Type</label>
             <select id="service-type" class="input">
-              <option value="api">API</option>
-              <option value="web">Web</option>
-              <option value="database">Database</option>
-              <option value="queue">Queue</option>
-              <option value="cache">Cache</option>
-              <option value="worker">Worker</option>
-              <option value="cron">Cron</option>
-              <option value="network">Network</option>
-              <option value="storage">Storage</option>
-              <option value="infrastructure">Infrastructure</option>
-              <option value="external">External</option>
-              <option value="other">Other</option>
-            </select>
+                </select>
 
             <div class="form-grid-3">
               <div>
                 <label for="service-environment">Environment</label>
                 <select id="service-environment" class="input">
-                  <option value="production">Production</option>
-                  <option value="staging">Staging</option>
-                  <option value="development">Development</option>
-                  <option value="testing">Testing</option>
-                  <option value="shared">Shared</option>
                 </select>
               </div>
               <div>
                 <label for="service-criticality">Criticality</label>
                 <select id="service-criticality" class="input">
-                  <option value="critical">Critical</option>
-                  <option value="high">High</option>
-                  <option value="medium">Medium</option>
-                  <option value="low">Low</option>
                 </select>
               </div>
               <div>
                 <label for="service-tier">Tier</label>
                 <select id="service-tier" class="input">
-                  <option value="tier_1">Tier 1</option>
-                  <option value="tier_2">Tier 2</option>
-                  <option value="tier_3">Tier 3</option>
-                  <option value="tier_4">Tier 4</option>
                 </select>
               </div>
             </div>

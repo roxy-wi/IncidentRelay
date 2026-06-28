@@ -16,6 +16,7 @@ from app.services.validation import (
     safe_exception_response,
     validate_body,
 )
+from app.services.service_catalog.reconciliation import reconcile_escalation_policy_services
 
 escalation_policies_bp = Blueprint("escalation_policies_api", __name__)
 
@@ -160,6 +161,12 @@ def update_escalation_policy(policy_id):
         data=payload.model_dump(exclude_unset=True),
     )
 
+    reconcile_escalation_policy_services(
+        policy.id,
+        trigger="escalation_policy_updated",
+        actor_user=current_user(),
+    )
+
     return jsonify(escalation_policy_service.serialize_policy(policy, include_rules=True, request_user=current_user()))
 
 
@@ -180,6 +187,12 @@ def delete_escalation_policy(policy_id):
         object_id=policy.id,
         team_id=policy.team.id,
         data={"deleted": True},
+    )
+
+    reconcile_escalation_policy_services(
+        policy.id,
+        trigger="escalation_policy_deleted",
+        actor_user=current_user(),
     )
 
     return jsonify({"deleted": True, "id": policy.id, "name": policy.name})
@@ -235,6 +248,12 @@ def create_escalation_policy_rule(policy_id):
         data=payload.model_dump(),
     )
 
+    reconcile_escalation_policy_services(
+        policy.id,
+        trigger="escalation_policy_rule_created",
+        actor_user=current_user(),
+    )
+
     return jsonify(escalation_policy_service.serialize_rule(rule)), 201
 
 
@@ -277,6 +296,12 @@ def update_escalation_policy_rule(rule_id):
         data=payload.model_dump(exclude_unset=True),
     )
 
+    reconcile_escalation_policy_services(
+        policy.id,
+        trigger="escalation_policy_rule_created",
+        actor_user=current_user(),
+    )
+
     return jsonify(escalation_policy_service.serialize_rule(rule))
 
 
@@ -298,6 +323,12 @@ def delete_escalation_policy_rule(rule_id):
         object_id=rule_id,
         team_id=policy.team.id,
         data={"deleted": True},
+    )
+
+    reconcile_escalation_policy_services(
+        policy.id,
+        trigger="escalation_policy_rule_created",
+        actor_user=current_user(),
     )
 
     return jsonify({"deleted": True, "id": rule_id})

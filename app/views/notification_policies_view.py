@@ -16,7 +16,7 @@ from app.services.rbac import (
     require_team_write,
 )
 from app.services.validation import validate_body
-
+from app.services.service_catalog.reconciliation import reconcile_notification_policy_services
 
 notification_policies_bp = Blueprint("notification_policies_api", __name__)
 
@@ -173,6 +173,12 @@ def update_notification_policy(policy_id):
         data=payload.model_dump(exclude_unset=True),
     )
 
+    reconcile_notification_policy_services(
+        policy.id,
+        trigger="notification_policy_updated",
+        actor_user=current_user(),
+    )
+
     return jsonify(policy_service.serialize_policy(policy, current_user())), 201
 
 
@@ -193,6 +199,12 @@ def delete_notification_policy(policy_id):
         group_id=policy.team.group_id,
         team_id=policy.team_id,
         data={"deleted": True},
+    )
+
+    reconcile_notification_policy_services(
+        policy.id,
+        trigger="notification_policy_deleted",
+        actor_user=current_user(),
     )
 
     return jsonify({
@@ -225,6 +237,12 @@ def create_notification_policy_rule(policy_id):
         data=payload.model_dump(),
     )
 
+    reconcile_notification_policy_services(
+        policy.id,
+        trigger="notification_policy_rule_created",
+        actor_user=current_user(),
+    )
+
     return jsonify(policy_service.serialize_rule(rule)), 201
 
 
@@ -252,6 +270,12 @@ def update_notification_policy_rule(policy_id, rule_id):
         data=payload.model_dump(exclude_unset=True),
     )
 
+    reconcile_notification_policy_services(
+        policy.id,
+        trigger="notification_policy_rule_created",
+        actor_user=current_user(),
+    )
+
     return jsonify(policy_service.serialize_rule(rule))
 
 
@@ -272,6 +296,12 @@ def delete_notification_policy_rule(policy_id, rule_id):
         group_id=policy.team.group_id,
         team_id=policy.team_id,
         data={"deleted": True},
+    )
+
+    reconcile_notification_policy_services(
+        policy.id,
+        trigger="notification_policy_rule_created",
+        actor_user=current_user(),
     )
 
     return jsonify({

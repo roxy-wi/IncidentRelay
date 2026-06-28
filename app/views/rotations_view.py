@@ -32,6 +32,7 @@ from app.services.validation import (
     safe_exception_response,
     validate_body,
 )
+from app.services.service_catalog.reconciliation import reconcile_rotation_services
 
 rotations_bp = Blueprint("rotations_api", __name__)
 
@@ -402,6 +403,12 @@ def update_rotation(rotation_id):
         data=payload.model_dump(mode="json"),
     )
 
+    reconcile_rotation_services(
+        rotation.id,
+        trigger="rotation_updated",
+        actor_user=request.current_user,
+    )
+
     return jsonify(serialize_rotation(
         rotation,
         get_current_oncall_user(rotation),
@@ -430,6 +437,14 @@ def set_rotation_enabled(rotation_id):
         data={"enabled": payload.enabled},
     )
 
+    trigger = "rotation_enabled" if payload.enabled else "rotation_disabled"
+
+    reconcile_rotation_services(
+        rotation.id,
+        trigger=trigger,
+        actor_user=request.current_user,
+    )
+
     return jsonify(serialize_rotation(
         rotation,
         get_current_oncall_user(rotation),
@@ -451,6 +466,12 @@ def delete_rotation(rotation_id):
         object_type="rotation",
         object_id=rotation.id,
         team_id=rotation.team.id,
+    )
+
+    reconcile_rotation_services(
+        rotation.id,
+        trigger="rotation_deleted",
+        actor_user=request.current_user,
     )
 
     return jsonify(serialize_rotation(

@@ -83,7 +83,18 @@ def create_group():
             )
 
         return integrity_conflict("Group could not be saved because it conflicts with existing data")
-    write_audit("group.create", object_type="group", object_id=group.id, group_id=group.id, data=payload.model_dump())
+
+    from app.services.service_catalog.presets import ensure_basic_operational_standard
+
+    ensure_basic_operational_standard(group, actor_user=request.current_user)
+    write_audit(
+        "group.create",
+        object_type="group",
+        object_id=group.id,
+        group_id=group.id,
+        data=payload.model_dump()
+    )
+
     return jsonify(serialize_group(group, request.current_user)), 201
 
 

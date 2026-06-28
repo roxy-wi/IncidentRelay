@@ -1,4 +1,5 @@
 import json
+import uuid
 from datetime import datetime
 
 from peewee import (
@@ -11,6 +12,7 @@ from peewee import (
     Model,
     TextField,
     DeferredForeignKey,
+    UUIDField,
 )
 
 from app.db import database_proxy
@@ -429,6 +431,10 @@ class Service(SoftDeleteModel):
     """Technical service or system affected by alerts."""
 
     id = AutoField()
+    uid = UUIDField(default=uuid.uuid4, unique=True, index=True)
+
+    kind = CharField(default="technical")
+    lifecycle = CharField(default="production")
     group = ForeignKeyField(Group, null=True, backref="services", on_delete="CASCADE")
     team = ForeignKeyField(Team, backref="services", on_delete="CASCADE")
 
@@ -521,20 +527,17 @@ class ServiceChannel(BaseModel):
 
 
 class ServiceDependency(SoftDeleteModel):
-    """Dependency between two technical services."""
+    """Dependency between two services."""
 
     id = AutoField()
     service = ForeignKeyField(Service, backref="dependencies", on_delete="CASCADE")
-    depends_on_service = ForeignKeyField(
-        Service,
-        backref="dependent_services",
-        on_delete="CASCADE",
-    )
-
+    depends_on_service = ForeignKeyField(Service, backref="dependent_services", on_delete="CASCADE")
     dependency_type = CharField(default="hard")
     criticality = CharField(default="important")
+    correlation_enabled = BooleanField(default=True)
+    propagation_delay_seconds = IntegerField(default=300)
     description = TextField(null=True)
-
+    metadata = JSONTextField(default=dict)
     enabled = BooleanField(default=True)
     created_at = DateTimeField(default=datetime.utcnow)
     updated_at = DateTimeField(default=datetime.utcnow)
@@ -543,6 +546,178 @@ class ServiceDependency(SoftDeleteModel):
         table_name = "service_dependency"
         indexes = (
             (("service", "depends_on_service"), True),
+            (("service", "correlation_enabled", "enabled"), False),
+        )
+
+
+class ServiceEvent(BaseModel):
+    """Immutable event displayed in a service timeline."""
+
+    id = AutoField()
+    uid = UUIDField(default=uuid.uuid4, unique=True, index=True)
+    service = ForeignKeyField(Service, backref="events", on_delete="CASCADE")
+    group = ForeignKeyField(Group, null=True, backref="service_events", on_delete="SET NULL")
+    team = ForeignKeyField(Team, null=True, backref="service_events", on_delete="SET NULL")
+    category = CharField(max_length=64, index=True)
+    event_type = CharField(max_length=128, index=True)
+    title = CharField()
+    summary = TextField(null=True)
+    source = CharField(max_length=64, default="incidentrelay", index=True)
+    source_ref = CharField(max_length=191, null=True)
+    dedup_key = CharField(max_length=191, null=True)
+    external_url = TextField(null=True)
+    actor_type = CharField(max_length=32, default="system")
+    actor_user = ForeignKeyField(User, null=True, backref="service_events", on_delete="SET NULL")
+    actor_label = CharField(null=True)
+    severity = CharField(max_length=32, null=True)
+    status = CharField(max_length=32, null=True)
+    occurred_at = DateTimeField(default=datetime.utcnow, index=True)
+    recorded_at = DateTimeField(default=datetime.utcnow)
+    schema_version = IntegerField(default=1)
+    payload = JSONTextField(default=dict)
+
+    class Meta:
+        table_name = "service_event"
+        indexes = (
+            (("service", "occurred_at"), False),
+            (("group", "occurred_at"), False),
+            (("team", "occurred_at"), False),
+            (("service", "category", "occurred_at"), False),
+            (("service", "event_type", "occurred_at"), False),
+            (("source", "source_ref"), False),
+            (("service", "source", "dedup_key"), True),
+        )
+
+
+class ServiceStandard(SoftDeleteModel):
+    """Readiness standard applied to services within a group."""
+
+    id = AutoField()
+    uid = UUIDField(default=uuid.uuid4, unique=True, index=True)
+    group = ForeignKeyField(Group, backref="service_standards", on_delete="CASCADE")
+    slug = CharField()
+    name = CharField()
+    description = TextField(null=True)
+    applies_to = JSONTextField(default=dict)
+    enabled = BooleanField(default=True)
+    created_by = ForeignKeyField(User, null=True, backref="created_service_standards", on_delete="SET NULL")
+    created_at = DateTimeField(default=datetime.utcnow)
+    updated_at = DateTimeField(default=datetime.utcnow)
+
+    class Meta:
+        table_name = "service_standard"
+        indexes = (
+            (("group", "slug"), True),
+            (("group", "enabled"), False),
+        )
+
+
+class ServiceStandardCheck(SoftDeleteModel):
+    """One readiness check belonging to a service standard."""
+
+    id = AutoField()
+    uid = UUIDField(default=uuid.uuid4, unique=True, index=True)
+    standard = ForeignKeyField(ServiceStandard, backref="checks", on_delete="CASCADE")
+    slug = CharField()
+    name = CharField()
+    description = TextField(null=True)
+    check_type = CharField(index=True)
+    configuration = JSONTextField(default=dict)
+    weight = IntegerField(default=1)
+    severity = CharField(default="warning")
+    required = BooleanField(default=True)
+    enabled = BooleanField(default=True)
+    position = IntegerField(default=0)
+    created_at = DateTimeField(default=datetime.utcnow)
+    updated_at = DateTimeField(default=datetime.utcnow)
+
+    class Meta:
+        table_name = "service_standard_check"
+        indexes = (
+            (("standard", "slug"), True),
+            (("standard", "position"), False),
+            (("check_type", "enabled"), False),
+        )
+
+
+class ServiceReadinessEvaluation(BaseModel):
+    """Immutable evaluation of one standard against one service."""
+
+    id = AutoField()
+    uid = UUIDField(default=uuid.uuid4, unique=True, index=True)
+    batch_uid = UUIDField(index=True)
+    service = ForeignKeyField(Service, backref="readiness_evaluations", on_delete="CASCADE")
+    standard = ForeignKeyField(ServiceStandard, backref="evaluations", on_delete="CASCADE")
+    status = CharField(index=True)
+    score = IntegerField(default=0)
+    passed_weight = IntegerField(default=0)
+    total_weight = IntegerField(default=0)
+    checks_count = IntegerField(default=0)
+    failed_count = IntegerField(default=0)
+    failed_required_count = IntegerField(default=0)
+    failed_critical_count = IntegerField(default=0)
+    trigger = CharField(default="system")
+    actor_user = ForeignKeyField(User, null=True, backref="service_readiness_evaluations", on_delete="SET NULL")
+    content_hash = CharField(null=True, index=True)
+    evaluated_at = DateTimeField(default=datetime.utcnow, index=True)
+
+    class Meta:
+        table_name = "service_readiness_evaluation"
+        indexes = (
+            (("service", "evaluated_at"), False),
+            (("standard", "evaluated_at"), False),
+            (("service", "standard", "evaluated_at"), False),
+            (("batch_uid", "service"), False),
+        )
+
+
+class ServiceReadinessCheckResult(BaseModel):
+    """Immutable result of one readiness check."""
+
+    id = AutoField()
+    evaluation = ForeignKeyField(ServiceReadinessEvaluation, backref="results", on_delete="CASCADE")
+    check = ForeignKeyField(ServiceStandardCheck, null=True, backref="evaluation_results", on_delete="SET NULL")
+    check_uid = UUIDField(null=True)
+    check_slug = CharField()
+    check_name = CharField()
+    check_type = CharField()
+    status = CharField(index=True)
+    weight = IntegerField(default=1)
+    severity = CharField(default="warning")
+    required = BooleanField(default=True)
+    message = TextField(null=True)
+    details = JSONTextField(default=dict)
+    evaluated_at = DateTimeField(default=datetime.utcnow)
+
+    class Meta:
+        table_name = "service_readiness_check_result"
+        indexes = (
+            (("evaluation", "status"), False),
+            (("check_slug", "status"), False),
+        )
+
+
+class ServiceReadinessState(BaseModel):
+    """Current aggregated readiness state for a service."""
+
+    id = AutoField()
+    service = ForeignKeyField(Service, unique=True, backref="readiness_state", on_delete="CASCADE")
+    batch_uid = UUIDField(index=True)
+    status = CharField(index=True)
+    score = IntegerField(default=0, index=True)
+    standards_count = IntegerField(default=0)
+    checks_count = IntegerField(default=0)
+    failed_count = IntegerField(default=0)
+    failed_required_count = IntegerField(default=0)
+    failed_critical_count = IntegerField(default=0)
+    content_hash = CharField(null=True, index=True)
+    evaluated_at = DateTimeField(default=datetime.utcnow, index=True)
+
+    class Meta:
+        table_name = "service_readiness_state"
+        indexes = (
+            (("status", "score"), False),
+            (("evaluated_at", "status"), False),
         )
 
 

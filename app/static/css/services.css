@@ -376,3 +376,74 @@ button.impact-path-node {
         grid-template-columns: 1fr;
     }
 }
+.service-readiness-standards {
+  display: grid;
+  gap: 12px;
+  margin-top: 16px;
+}
+
+.service-readiness-standard {
+  border: 1px solid var(--border-color);
+  border-radius: 10px;
+  overflow: hidden;
+}
+
+.service-readiness-standard-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px 14px;
+  background: var(--surface-muted);
+}
+
+.service-readiness-results {
+  display: grid;
+}
+
+.service-readiness-result {
+  display: grid;
+  grid-template-columns: 24px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  border-top: 1px solid var(--border-color);
+}
+
+.service-readiness-result-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  font-weight: 700;
+}
+
+.service-readiness-result.is-passed .service-readiness-result-icon {
+  background: var(--success-soft);
+  color: var(--success-color);
+}
+
+.service-readiness-result.is-failed .service-readiness-result-icon {
+  background: var(--danger-soft);
+  color: var(--danger-color);
+}
+
+.service-readiness-result-body {
+  min-width: 0;
+}
+.service-name-link {
+  padding: 0;
+  border: 0;
+  background: transparent;
+  color: var(--primary-color, #2563eb);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+  text-align: left;
+}
+
+.service-name-link:hover {
+  text-decoration: underline;
+}

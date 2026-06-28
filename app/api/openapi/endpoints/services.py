@@ -1,3 +1,8 @@
+from app.api.openapi.endpoints.service_catalog import (
+    READINESS_STATE_SCHEMA,
+    SERVICE_READINESS_RESPONSE_SCHEMA,
+    SERVICE_TIMELINE_EVENT_SCHEMA,
+)
 from app.api.schemas.limits import (
     DESCRIPTION_MAX_LENGTH,
     NAME_MAX_LENGTH,
@@ -734,7 +739,8 @@ SERVICE_DETAILS_RESPONSE_SCHEMA = {
                 "runbooks": {"type": "integer", "minimum": 0},
                 "upstream_dependencies": {"type": "integer", "minimum": 0},
                 "downstream_dependencies": {"type": "integer", "minimum": 0},
-                "status_history": {"type": "integer", "minimum": 0},
+                "timeline_events": {"type": "integer", "minimum": 0},
+                "readiness": READINESS_STATE_SCHEMA,
             },
         },
         "maintenance_windows": {
@@ -750,12 +756,10 @@ SERVICE_DETAILS_RESPONSE_SCHEMA = {
                 "downstream": {"type": "array", "items": SERVICE_DEPENDENCY_SCHEMA},
             },
         },
-        "status_history": {
-            "type": "array",
-            "items": SERVICE_STATUS_HISTORY_ITEM_SCHEMA,
-        },
+        "timeline": {"type": "array", "items": SERVICE_TIMELINE_EVENT_SCHEMA},
         "impact": SERVICE_IMPACT_ITEM_SCHEMA,
         "analytics": SERVICE_DETAILS_ANALYTICS_SCHEMA,
+        "readiness": SERVICE_READINESS_RESPONSE_SCHEMA,
     },
 }
 
@@ -1147,8 +1151,8 @@ def paths():
                 "description": (
                     "Returns the Service details v2 payload used by the UI details panel. "
                     "It contains service metadata, alert summary, maintenance windows, links, "
-                    "runbooks, dependencies, status history, current Impact v2 item and a "
-                    "small analytics widget block."
+                    "runbooks, dependencies, service timeline events, readiness, current "
+                    "Impact v2 item and a small analytics widget block."
                 ),
                 "operationId": "getServiceDetails",
                 "parameters": [

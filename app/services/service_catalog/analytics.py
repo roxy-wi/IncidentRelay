@@ -3,11 +3,10 @@ from __future__ import annotations
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta
 from statistics import mean
-from typing import Any
 
 from app.modules.db.models import Alert, AlertGroup, Service
 from app.services.serializers import serialize_utc_datetime
-from app.services.service_impact import build_single_service_impact_v2
+from app.services.service_catalog.impact import build_single_service_impact_v2
 
 
 OPEN_ALERT_GROUP_STATUSES = {"firing", "acknowledged"}

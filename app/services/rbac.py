@@ -387,6 +387,20 @@ def require_admin_user():
     return None
 
 
+def require_group_read(group_id):
+    """Return an error response when current principal cannot read a group."""
+
+    allowed_group_ids = get_allowed_group_ids(use_active_group=False)
+
+    if group_id not in allowed_group_ids:
+        return jsonify({
+            "error": "group_access_denied",
+            "message": "Access to this group is denied",
+        }), 403
+
+    return None
+
+
 def require_group_write(group_id):
     """Return an error response when current user cannot write group resources."""
     if is_admin_user():

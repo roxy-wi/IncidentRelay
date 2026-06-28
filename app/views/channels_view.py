@@ -16,6 +16,7 @@ from app.services.rbac import (
 )
 from app.services.serializers import serialize_channel
 from app.services.validation import make_error_response, validate_body
+from app.services.service_catalog.reconciliation import reconcile_channel_services
 
 channels_bp = Blueprint("channels_api", __name__)
 
@@ -138,6 +139,12 @@ def create_channel():
             data=payload.model_dump(),
         )
 
+        reconcile_channel_services(
+            channel.id,
+            trigger="channel_restored",
+            actor_user=current_user(),
+        )
+
         return jsonify(
             serialize_channel(
                 channel,
@@ -171,6 +178,12 @@ def create_channel():
         object_id=channel.id,
         team_id=channel.team.id if channel.team else None,
         data=payload.model_dump(),
+    )
+
+    reconcile_channel_services(
+        channel.id,
+        trigger="channel_restored",
+        actor_user=current_user(),
     )
 
     return jsonify(serialize_channel(channel, current_user=current_user())), 201
@@ -248,6 +261,12 @@ def update_channel(channel_id):
         data=payload.model_dump(),
     )
 
+    reconcile_channel_services(
+        channel.id,
+        trigger="channel_updated",
+        actor_user=current_user(),
+    )
+
     return jsonify(serialize_channel(channel, current_user=current_user()))
 
 
@@ -274,6 +293,12 @@ def disable_channel(channel_id):
         data={"name": channel.name, "enabled": False},
     )
 
+    reconcile_channel_services(
+        channel.id,
+        trigger="channel_enabled",
+        actor_user=current_user(),
+    )
+
     return jsonify(serialize_channel(channel, current_user=current_user()))
 
 
@@ -298,6 +323,12 @@ def enable_channel(channel_id):
         object_id=channel.id,
         team_id=channel.team.id if channel.team else None,
         data={"name": channel.name, "enabled": True},
+    )
+
+    reconcile_channel_services(
+        channel.id,
+        trigger="channel_enabled",
+        actor_user=current_user(),
     )
 
     return jsonify(serialize_channel(channel, current_user=current_user()))
@@ -331,6 +362,12 @@ def delete_channel(channel_id):
             "channel_type": channel.channel_type,
             "deleted": True,
         },
+    )
+
+    reconcile_channel_services(
+        channel.id,
+        trigger="channel_enabled",
+        actor_user=current_user(),
     )
 
     return jsonify({"deleted": True, "id": channel.id, "name": channel.name})

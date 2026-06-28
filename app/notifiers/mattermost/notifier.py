@@ -54,6 +54,12 @@ class MattermostNotifier(IncomingWebhookNotifier):
             "provider": self.name,
             "external_message_id": result.get("id") or post_id,
             "external_channel_id": result.get("channel_id") or channel_id,
+            "provider_payload": {
+                "requested_channel_id": channel_id,
+                "response_channel_id": result.get("channel_id"),
+                "channel_mismatch": bool(
+                    channel_id and result.get("channel_id") and channel_id != result.get("channel_id")),
+            },
         }
 
     def _should_include_actions_after_update(self, alert, event_type):
@@ -67,15 +73,25 @@ class MattermostNotifier(IncomingWebhookNotifier):
     def _send_bot_post(self, channel, alert, text, event_type):
         """Send a post through the Mattermost Bot API."""
         config = channel.config or {}
+
         if not self._bot_api_ready(config):
             raise RuntimeError("Mattermost Bot API requires api_url, bot_token and channel_id")
 
+        requested_channel_id = config.get("channel_id")
         payload = self._build_post_payload(channel, alert, text, event_type, include_actions=True)
         result = self._request(config, "POST", "/api/v4/posts", payload)
+        external_channel_id = result.get("channel_id") or requested_channel_id
+
         return {
             "provider": self.name,
             "external_message_id": result.get("id"),
-            "external_channel_id": result.get("channel_id") or config.get("channel_id"),
+            "external_channel_id": external_channel_id,
+            "provider_payload": {
+                "requested_channel_id": requested_channel_id,
+                "response_channel_id": result.get("channel_id"),
+                "channel_mismatch": bool(
+                    requested_channel_id and external_channel_id and requested_channel_id != external_channel_id),
+            },
         }
 
     def _should_use_bot_api(self, config):

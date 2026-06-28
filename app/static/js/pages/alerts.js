@@ -1872,6 +1872,7 @@ function renderEvents(events, modal) {
 function renderNotifications(notifications, modal) {
     const target = modal.find("#alert-details-notifications");
     target.empty();
+
     if (!notifications.length) {
         target.append($("<div>").addClass("help-text").text("No delivery records."));
         return;
@@ -1880,11 +1881,16 @@ function renderNotifications(notifications, modal) {
     notifications.forEach(function (item) {
         const channel = item.channel ? item.channel.name + " (" + item.channel.channel_type + ")" : "-";
         const status = item.last_error ? "failed: " + item.last_error : (item.last_event_type || "sent");
+        const requestedChannelId = item.provider_payload && item.provider_payload.requested_channel_id ? item.provider_payload.requested_channel_id : item.configured_channel_id;
+
         target.append(
             $("<div>")
                 .addClass("event-item")
                 .append($("<strong>").text("#" + item.id + " " + channel))
                 .append($("<div>").text((item.provider || "-") + " / " + status))
+                .append($("<div>").text("configured_channel_id: " + (item.configured_channel_id || "-")))
+                .append($("<div>").text("requested_channel_id: " + (requestedChannelId || "-")))
+                .append($("<div>").text("external_channel_id: " + (item.external_channel_id || "-")))
                 .append($("<div>").text("message_id: " + (item.external_message_id || "-")))
         );
     });

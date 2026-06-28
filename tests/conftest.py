@@ -80,6 +80,12 @@ from app.modules.db.models import (  # noqa: E402
     PriorityPolicy,
     PriorityPolicyRule,
     MatcherPreset,
+    ServiceEvent,
+    ServiceReadinessCheckResult,
+    ServiceReadinessEvaluation,
+    ServiceReadinessState,
+    ServiceStandard,
+    ServiceStandardCheck,
 )
 
 
@@ -103,6 +109,13 @@ CLEANUP_MODELS = [
     NotificationPolicyRule,
     PriorityPolicyRule,
     PriorityPolicy,
+    ServiceReadinessCheckResult,
+    ServiceReadinessEvaluation,
+    ServiceReadinessState,
+    ServiceStandardCheck,
+    ServiceStandard,
+    ServiceEvent,
+    ServiceEvent,
     ServiceMatchRule,
     ServiceChannel,
     ServiceDependency,
