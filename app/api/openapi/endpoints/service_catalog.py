@@ -71,6 +71,7 @@ TIMELINE_CATEGORIES = [
     "readiness",
     "status",
     "alerting",
+    "sli_slo",
 ]
 
 
@@ -444,6 +445,340 @@ TIMELINE_QUERY_PARAMS = [
 ]
 
 
+# ---------------------------------------------------------------------------
+# SLI / SLO schemas
+# ---------------------------------------------------------------------------
+
+SERVICE_SLI_TYPES = [
+    "alert_ack_latency",
+    "alert_resolve_latency",
+    "incident_availability",
+    "incident_count",
+]
+
+SERVICE_SLI_SOURCES = [
+    "incidentrelay_alert_groups",
+    "incidentrelay_service_status",
+]
+
+SERVICE_SLO_COMPARISONS = [
+    "percent_good_gte",
+    "value_gte",
+    "value_lte",
+]
+
+SERVICE_SLO_STATUSES = [
+    "met",
+    "at_risk",
+    "breached",
+    "no_data",
+]
+
+SERVICE_SLI_INPUT_SCHEMA = {
+    "type": "object",
+    "required": ["slug", "name", "sli_type"],
+    "additionalProperties": False,
+    "properties": {
+        "slug": {
+            "type": "string",
+            "minLength": SLUG_MIN_LENGTH,
+            "maxLength": SLUG_MAX_LENGTH,
+            "pattern": "^[a-z0-9][a-z0-9-]*$",
+            "example": "critical-ack-latency",
+        },
+        "name": {
+            "type": "string",
+            "minLength": NAME_MIN_LENGTH,
+            "maxLength": NAME_MAX_LENGTH,
+            "example": "Critical alert acknowledgement latency",
+        },
+        "description": {
+            "type": "string",
+            "nullable": True,
+            "maxLength": DESCRIPTION_MAX_LENGTH,
+        },
+        "sli_type": {
+            "type": "string",
+            "enum": SERVICE_SLI_TYPES,
+            "description": "What is measured for this service.",
+            "example": "alert_ack_latency",
+        },
+        "source": {
+            "type": "string",
+            "enum": SERVICE_SLI_SOURCES,
+            "default": "incidentrelay_alert_groups",
+            "description": "Data source used by the SLI evaluator.",
+        },
+        "configuration": {
+            "type": "object",
+            "additionalProperties": True,
+            "default": {},
+            "description": "Reserved for source-specific filters and future external providers.",
+        },
+        "severity": {
+            "type": "string",
+            "nullable": True,
+            "enum": ["critical", "high", "warning", "info"],
+            "description": "Optional alert severity filter for IncidentRelay alert-group based SLIs.",
+            "example": "critical",
+        },
+        "priority": {
+            "type": "string",
+            "nullable": True,
+            "description": "Optional priority filter placeholder for future priority-aware SLIs.",
+            "example": "p1",
+        },
+        "enabled": {"type": "boolean", "default": True},
+    },
+}
+
+SERVICE_SLI_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "id": {"type": "integer", "readOnly": True},
+        "service_id": {"type": "integer"},
+        "service_name": {"type": "string", "nullable": True},
+        "service_slug": {"type": "string", "nullable": True},
+        "team_id": {"type": "integer", "nullable": True},
+        "team_name": {"type": "string", "nullable": True},
+        "team_slug": {"type": "string", "nullable": True},
+        **SERVICE_SLI_INPUT_SCHEMA["properties"],
+        "created_at": {"type": "string", "format": "date-time", "nullable": True},
+        "updated_at": {"type": "string", "format": "date-time", "nullable": True},
+        "permissions": PERMISSIONS_SCHEMA,
+    },
+}
+
+SERVICE_SLO_INPUT_SCHEMA = {
+    "type": "object",
+    "required": ["sli_id", "name", "comparison"],
+    "additionalProperties": False,
+    "properties": {
+        "sli_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Service SLI that this SLO targets. It must belong to the same service.",
+        },
+        "name": {
+            "type": "string",
+            "minLength": NAME_MIN_LENGTH,
+            "maxLength": NAME_MAX_LENGTH,
+            "example": "95% critical alerts acknowledged within 15 minutes",
+        },
+        "description": {
+            "type": "string",
+            "nullable": True,
+            "maxLength": DESCRIPTION_MAX_LENGTH,
+        },
+        "comparison": {
+            "type": "string",
+            "enum": SERVICE_SLO_COMPARISONS,
+            "default": "percent_good_gte",
+            "description": (
+                "percent_good_gte for latency/availability, value_lte for incident count, "
+                "value_gte reserved for future gauges."
+            ),
+        },
+        "target_percent_basis_points": {
+            "type": "integer",
+            "nullable": True,
+            "minimum": 0,
+            "maximum": 10000,
+            "description": "Target percent in basis points: 9500 = 95%, 9990 = 99.9%.",
+            "example": 9500,
+        },
+        "threshold_seconds": {
+            "type": "integer",
+            "nullable": True,
+            "minimum": 1,
+            "description": "Latency threshold in seconds for alert_ack_latency and alert_resolve_latency.",
+            "example": 900,
+        },
+        "threshold_count": {
+            "type": "integer",
+            "nullable": True,
+            "minimum": 0,
+            "description": "Maximum allowed incident count for incident_count SLOs.",
+            "example": 3,
+        },
+        "window_days": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 365,
+            "default": 30,
+            "description": "Rolling evaluation window in days.",
+        },
+        "exclude_maintenance": {
+            "type": "boolean",
+            "default": True,
+            "description": "Exclude maintenance windows from incident availability downtime accounting.",
+        },
+        "include_open_alerts": {
+            "type": "boolean",
+            "default": True,
+            "description": "Treat open alerts within threshold as pending for latency SLIs.",
+        },
+        "enabled": {"type": "boolean", "default": True},
+    },
+    "examples": {
+        "ack_latency": {
+            "summary": "95% critical alerts acknowledged within 15 minutes",
+            "value": {
+                "sli_id": 10,
+                "name": "95% critical alerts acknowledged within 15 minutes",
+                "comparison": "percent_good_gte",
+                "target_percent_basis_points": 9500,
+                "threshold_seconds": 900,
+                "window_days": 30,
+            },
+        },
+        "incident_count": {
+            "summary": "No more than 3 critical incidents in 30 days",
+            "value": {
+                "sli_id": 11,
+                "name": "No more than 3 critical incidents in 30 days",
+                "comparison": "value_lte",
+                "threshold_count": 3,
+                "window_days": 30,
+            },
+        },
+    },
+}
+
+SERVICE_SLO_EVALUATION_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "slo_id": {"type": "integer"},
+        "sli_id": {"type": "integer"},
+        "sli_type": {"type": "string", "enum": SERVICE_SLI_TYPES},
+        "status": {"type": "string", "enum": SERVICE_SLO_STATUSES},
+        "window": {
+            "type": "object",
+            "properties": {
+                "days": {"type": "integer"},
+                "since": {"type": "string", "format": "date-time"},
+                "until": {"type": "string", "format": "date-time"},
+            },
+        },
+        "comparison": {"type": "string", "enum": SERVICE_SLO_COMPARISONS},
+        "target_percent_basis_points": {"type": "integer", "nullable": True},
+        "target_percent": {"type": "number", "nullable": True},
+        "threshold_seconds": {"type": "integer", "nullable": True},
+        "threshold_count": {"type": "integer", "nullable": True},
+        "value_basis_points": {"type": "integer", "nullable": True},
+        "value_percent": {"type": "number", "nullable": True},
+        "value_count": {"type": "integer", "nullable": True},
+        "good_count": {"type": "integer"},
+        "total_count": {"type": "integer"},
+        "bad_count": {"type": "integer"},
+        "pending_count": {"type": "integer"},
+        "downtime_seconds": {"type": "integer", "nullable": True},
+        "budget_seconds": {"type": "integer", "nullable": True},
+        "budget_consumed_seconds": {"type": "integer", "nullable": True},
+        "budget_remaining_seconds": {"type": "integer", "nullable": True},
+        "message": {"type": "string", "nullable": True},
+        "details": {"type": "object", "additionalProperties": True},
+        "measurement_id": {"type": "integer", "nullable": True},
+    },
+}
+
+SERVICE_SLO_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "id": {"type": "integer", "readOnly": True},
+        "service_id": {"type": "integer"},
+        "service_name": {"type": "string", "nullable": True},
+        "service_slug": {"type": "string", "nullable": True},
+        "team_id": {"type": "integer", "nullable": True},
+        "team_name": {"type": "string", "nullable": True},
+        "team_slug": {"type": "string", "nullable": True},
+        "sli_name": {"type": "string", "nullable": True},
+        "sli_slug": {"type": "string", "nullable": True},
+        "sli_type": {"type": "string", "nullable": True, "enum": SERVICE_SLI_TYPES},
+        **SERVICE_SLO_INPUT_SCHEMA["properties"],
+        "created_at": {"type": "string", "format": "date-time", "nullable": True},
+        "updated_at": {"type": "string", "format": "date-time", "nullable": True},
+        "evaluation": SERVICE_SLO_EVALUATION_SCHEMA,
+        "permissions": PERMISSIONS_SCHEMA,
+    },
+}
+
+SERVICE_SLI_SLO_RESPONSE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "slis": {"type": "array", "items": SERVICE_SLI_SCHEMA},
+        "slos": {"type": "array", "items": SERVICE_SLO_SCHEMA},
+    },
+}
+
+SERVICE_SLI_SLO_ANALYTICS_ITEM_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "service_id": {"type": "integer"},
+        "service_name": {"type": "string"},
+        "service_slug": {"type": "string"},
+        "service_status": {"type": "string"},
+        "service_criticality": {"type": "string"},
+        "team_id": {"type": "integer", "nullable": True},
+        "team_name": {"type": "string", "nullable": True},
+        "team_slug": {"type": "string", "nullable": True},
+        "sli_id": {"type": "integer"},
+        "sli_name": {"type": "string"},
+        "sli_slug": {"type": "string"},
+        "sli_type": {"type": "string", "enum": SERVICE_SLI_TYPES},
+        "sli_source": {"type": "string", "enum": SERVICE_SLI_SOURCES},
+        "sli_severity": {"type": "string", "nullable": True},
+        "sli_priority": {"type": "string", "nullable": True},
+        "slo_id": {"type": "integer"},
+        "slo_name": {"type": "string"},
+        "slo_description": {"type": "string", "nullable": True},
+        "comparison": {"type": "string", "enum": SERVICE_SLO_COMPARISONS},
+        "target_percent_basis_points": {"type": "integer", "nullable": True},
+        "threshold_seconds": {"type": "integer", "nullable": True},
+        "threshold_count": {"type": "integer", "nullable": True},
+        "window_days": {"type": "integer"},
+        "exclude_maintenance": {"type": "boolean"},
+        "include_open_alerts": {"type": "boolean"},
+        "enabled": {"type": "boolean"},
+        "status": {"type": "string", "enum": SERVICE_SLO_STATUSES},
+        "evaluation": SERVICE_SLO_EVALUATION_SCHEMA,
+    },
+}
+
+SERVICE_SLI_SLO_ANALYTICS_RESPONSE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "window": {
+            "type": "object",
+            "properties": {"days": {"type": "integer"}},
+        },
+        "summary": {
+            "type": "object",
+            "properties": {
+                "total": {"type": "integer"},
+                "met": {"type": "integer"},
+                "at_risk": {"type": "integer"},
+                "breached": {"type": "integer"},
+                "no_data": {"type": "integer"},
+                "disabled": {"type": "integer"},
+                "services": {"type": "integer"},
+            },
+        },
+        "items": {"type": "array", "items": SERVICE_SLI_SLO_ANALYTICS_ITEM_SCHEMA},
+    },
+}
+
+SLI_SLO_SCOPE_QUERY_PARAMS = [
+    query_param("team_id", "Filter by team id.", {"type": "integer", "minimum": 1}),
+    query_param("service_id", "Filter by service id.", {"type": "integer", "minimum": 1}),
+    query_param(
+        "include_disabled",
+        "Include disabled SLI/SLO records. Accepts 1 for true.",
+        {"type": "string", "enum": ["0", "1"], "default": "0"},
+    ),
+]
+
+
 def tags():
     """Do not duplicate the existing services tag from services.py."""
     return []
@@ -614,6 +949,157 @@ def paths():
                     "200": response("Standard check deleted.", DELETE_RESPONSE_SCHEMA),
                     "403": response("Access denied.", ERROR_SCHEMA),
                     "404": response("Standard check not found.", ERROR_SCHEMA),
+                },
+            },
+        },
+
+        "/api/services/{service_id}/slis": {
+            "get": {
+                "tags": ["services"],
+                "summary": "List service SLIs",
+                "description": "Returns Service Level Indicators configured for one service.",
+                "operationId": "listServiceSlis",
+                "parameters": [
+                    path_param("service_id", "Service id."),
+                    query_param("include_disabled", "Include disabled SLIs. Accepts 1 for true.", {"type": "string", "enum": ["0", "1"], "default": "1"}),
+                ],
+                "responses": {
+                    "200": response("List of service SLIs.", {"type": "array", "items": SERVICE_SLI_SCHEMA}),
+                    "403": response("Access denied.", ERROR_SCHEMA),
+                    "404": response("Service not found.", ERROR_SCHEMA),
+                },
+            },
+            "post": {
+                "tags": ["services"],
+                "summary": "Create service SLI",
+                "description": "Creates a Service Level Indicator for a service.",
+                "operationId": "createServiceSli",
+                "parameters": [path_param("service_id", "Service id.")],
+                "requestBody": json_body("Service SLI properties.", SERVICE_SLI_INPUT_SCHEMA),
+                "responses": {
+                    "201": response("Service SLI created.", SERVICE_SLI_SCHEMA),
+                    "400": response("Validation error.", ERROR_SCHEMA),
+                    "403": response("Access denied.", ERROR_SCHEMA),
+                    "404": response("Service not found.", ERROR_SCHEMA),
+                },
+            },
+        },
+        "/api/services/slis/{sli_id}": {
+            "put": {
+                "tags": ["services"],
+                "summary": "Update service SLI",
+                "description": "Updates a Service Level Indicator.",
+                "operationId": "updateServiceSli",
+                "parameters": [path_param("sli_id", "Service SLI id.")],
+                "requestBody": json_body("Updated Service SLI properties.", SERVICE_SLI_INPUT_SCHEMA),
+                "responses": {
+                    "200": response("Service SLI updated.", SERVICE_SLI_SCHEMA),
+                    "400": response("Validation error.", ERROR_SCHEMA),
+                    "403": response("Access denied.", ERROR_SCHEMA),
+                    "404": response("Service SLI not found.", ERROR_SCHEMA),
+                },
+            },
+            "delete": {
+                "tags": ["services"],
+                "summary": "Delete service SLI",
+                "description": "Soft-deletes a Service Level Indicator and all active SLOs attached to it are ignored by default list calls.",
+                "operationId": "deleteServiceSli",
+                "parameters": [path_param("sli_id", "Service SLI id.")],
+                "responses": {
+                    "200": response("Service SLI deleted.", SERVICE_SLI_SCHEMA),
+                    "403": response("Access denied.", ERROR_SCHEMA),
+                    "404": response("Service SLI not found.", ERROR_SCHEMA),
+                },
+            },
+        },
+        "/api/services/{service_id}/slos": {
+            "get": {
+                "tags": ["services"],
+                "summary": "List service SLOs",
+                "description": "Returns Service Level Objectives for one service. Each SLO includes its current evaluation.",
+                "operationId": "listServiceSlos",
+                "parameters": [
+                    path_param("service_id", "Service id."),
+                    query_param("include_disabled", "Include disabled SLOs. Accepts 1 for true.", {"type": "string", "enum": ["0", "1"], "default": "1"}),
+                    query_param("days", "Compatibility parameter. Each SLO uses its own window_days value.", {"type": "integer", "minimum": 1, "maximum": 365}),
+                ],
+                "responses": {
+                    "200": response("List of service SLOs.", {"type": "array", "items": SERVICE_SLO_SCHEMA}),
+                    "400": response("Validation error.", ERROR_SCHEMA),
+                    "403": response("Access denied.", ERROR_SCHEMA),
+                    "404": response("Service not found.", ERROR_SCHEMA),
+                },
+            },
+            "post": {
+                "tags": ["services"],
+                "summary": "Create service SLO",
+                "description": "Creates a Service Level Objective for an SLI on the same service and returns the first evaluation.",
+                "operationId": "createServiceSlo",
+                "parameters": [path_param("service_id", "Service id.")],
+                "requestBody": json_body("Service SLO properties.", SERVICE_SLO_INPUT_SCHEMA),
+                "responses": {
+                    "201": response("Service SLO created.", SERVICE_SLO_SCHEMA),
+                    "400": response("Validation error or SLI/SLO shape mismatch.", ERROR_SCHEMA),
+                    "403": response("Access denied.", ERROR_SCHEMA),
+                    "404": response("Service or SLI not found.", ERROR_SCHEMA),
+                },
+            },
+        },
+        "/api/services/slos/{slo_id}": {
+            "put": {
+                "tags": ["services"],
+                "summary": "Update service SLO",
+                "description": "Updates a Service Level Objective and returns the refreshed evaluation.",
+                "operationId": "updateServiceSlo",
+                "parameters": [path_param("slo_id", "Service SLO id.")],
+                "requestBody": json_body("Updated Service SLO properties.", SERVICE_SLO_INPUT_SCHEMA),
+                "responses": {
+                    "200": response("Service SLO updated.", SERVICE_SLO_SCHEMA),
+                    "400": response("Validation error or SLI/SLO shape mismatch.", ERROR_SCHEMA),
+                    "403": response("Access denied.", ERROR_SCHEMA),
+                    "404": response("Service SLO not found.", ERROR_SCHEMA),
+                },
+            },
+            "delete": {
+                "tags": ["services"],
+                "summary": "Delete service SLO",
+                "description": "Soft-deletes a Service Level Objective.",
+                "operationId": "deleteServiceSlo",
+                "parameters": [path_param("slo_id", "Service SLO id.")],
+                "responses": {
+                    "200": response("Service SLO deleted.", SERVICE_SLO_SCHEMA),
+                    "403": response("Access denied.", ERROR_SCHEMA),
+                    "404": response("Service SLO not found.", ERROR_SCHEMA),
+                },
+            },
+        },
+        "/api/services/sli-slo": {
+            "get": {
+                "tags": ["services"],
+                "summary": "List SLI/SLO for readable services",
+                "description": "Returns all SLIs and SLOs for services readable in the current scope. Use team_id or service_id to narrow the result.",
+                "operationId": "listServiceSliSlo",
+                "parameters": SLI_SLO_SCOPE_QUERY_PARAMS,
+                "responses": {
+                    "200": response("SLI/SLO payload.", SERVICE_SLI_SLO_RESPONSE_SCHEMA),
+                    "403": response("Access denied.", ERROR_SCHEMA),
+                },
+            },
+        },
+        "/api/services/sli-slo/analytics": {
+            "get": {
+                "tags": ["services"],
+                "summary": "Get SLI/SLO analytics",
+                "description": "Returns latest SLO health summary and evaluation rows for services readable in the current scope.",
+                "operationId": "getServiceSliSloAnalytics",
+                "parameters": [
+                    *SLI_SLO_SCOPE_QUERY_PARAMS,
+                    query_param("days", "Analytics display window. Each SLO evaluation still uses its own window_days value.", {"type": "integer", "minimum": 1, "maximum": 365, "default": 30}),
+                ],
+                "responses": {
+                    "200": response("SLI/SLO analytics payload.", SERVICE_SLI_SLO_ANALYTICS_RESPONSE_SCHEMA),
+                    "400": response("Validation error.", ERROR_SCHEMA),
+                    "403": response("Access denied.", ERROR_SCHEMA),
                 },
             },
         },

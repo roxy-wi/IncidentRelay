@@ -140,16 +140,37 @@ def service_standard_check_snapshot(check):
     }
 
 
+def service_sli_snapshot(sli):
+    return {
+        "id": sli.id,
+        "service_id": sli.service_id,
+        "slug": sli.slug,
+        "name": sli.name,
+        "description": sli.description,
+        "sli_type": sli.sli_type,
+        "source": sli.source,
+        "configuration": sli.configuration or {},
+        "severity": sli.severity,
+        "priority": sli.priority,
+        "enabled": sli.enabled,
+        "deleted": sli.deleted,
+    }
+
+
 def service_slo_snapshot(slo):
     return {
         "id": slo.id,
         "service_id": slo.service_id,
+        "sli_id": slo.sli_id,
         "name": slo.name,
         "description": slo.description,
-        "severity": slo.severity,
-        "ack_target_seconds": slo.ack_target_seconds,
-        "resolve_target_seconds": slo.resolve_target_seconds,
-        "availability_target_basis_points": slo.availability_target_basis_points,
+        "comparison": slo.comparison,
+        "target_percent_basis_points": slo.target_percent_basis_points,
+        "threshold_seconds": slo.threshold_seconds,
+        "threshold_count": slo.threshold_count,
+        "window_days": slo.window_days,
+        "exclude_maintenance": slo.exclude_maintenance,
+        "include_open_alerts": slo.include_open_alerts,
         "enabled": slo.enabled,
         "deleted": slo.deleted,
     }

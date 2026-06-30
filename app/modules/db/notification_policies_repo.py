@@ -188,7 +188,7 @@ def update_notification_policy(policy_id, data):
 
 
 def soft_delete_notification_policy(policy_id):
-    """Soft-delete policy and disable its active rules."""
+    """Soft-delete policy and its active rules."""
     policy = get_notification_policy(policy_id)
     now = datetime.utcnow()
 
@@ -197,6 +197,7 @@ def soft_delete_notification_policy(policy_id):
             NotificationPolicyRule
             .update(
                 enabled=False,
+                deleted=True,
                 updated_at=now,
             )
             .where(

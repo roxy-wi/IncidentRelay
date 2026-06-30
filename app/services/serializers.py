@@ -1159,10 +1159,40 @@ def serialize_service_runbook(runbook, current_user=None):
 
 
 
+def serialize_service_sli(sli, current_user=None):
+    """Serialize a Service Level Indicator."""
+    service = sli.service if getattr(sli, "service_id", None) else None
+    team = service.team if service and getattr(service, "team_id", None) else None
+
+    data = {
+        "id": sli.id,
+        "service_id": service.id if service else sli.service_id,
+        "service_name": service.name if service else None,
+        "service_slug": service.slug if service else None,
+        "team_id": team.id if team else None,
+        "team_name": team.name if team else None,
+        "team_slug": team.slug if team else None,
+        "slug": sli.slug,
+        "name": sli.name,
+        "description": sli.description,
+        "sli_type": sli.sli_type,
+        "source": sli.source,
+        "configuration": sli.configuration or {},
+        "severity": sli.severity,
+        "priority": sli.priority,
+        "enabled": sli.enabled,
+        "created_at": serialize_utc_datetime(sli.created_at),
+        "updated_at": serialize_utc_datetime(sli.updated_at),
+    }
+
+    return attach_team_permissions(data, team.id if team else None, current_user)
+
+
 def serialize_service_slo(slo, current_user=None, evaluation=None):
-    """Serialize a service objective / SLO target."""
+    """Serialize a Service Level Objective."""
     service = slo.service if getattr(slo, "service_id", None) else None
     team = service.team if service and getattr(service, "team_id", None) else None
+    sli = slo.sli if getattr(slo, "sli_id", None) else None
 
     data = {
         "id": slo.id,
@@ -1172,12 +1202,19 @@ def serialize_service_slo(slo, current_user=None, evaluation=None):
         "team_id": team.id if team else None,
         "team_name": team.name if team else None,
         "team_slug": team.slug if team else None,
+        "sli_id": sli.id if sli else slo.sli_id,
+        "sli_name": sli.name if sli else None,
+        "sli_slug": sli.slug if sli else None,
+        "sli_type": sli.sli_type if sli else None,
         "name": slo.name,
         "description": slo.description,
-        "severity": slo.severity,
-        "ack_target_seconds": slo.ack_target_seconds,
-        "resolve_target_seconds": slo.resolve_target_seconds,
-        "availability_target_basis_points": slo.availability_target_basis_points,
+        "comparison": slo.comparison,
+        "target_percent_basis_points": slo.target_percent_basis_points,
+        "threshold_seconds": slo.threshold_seconds,
+        "threshold_count": slo.threshold_count,
+        "window_days": slo.window_days,
+        "exclude_maintenance": slo.exclude_maintenance,
+        "include_open_alerts": slo.include_open_alerts,
         "enabled": slo.enabled,
         "created_at": serialize_utc_datetime(slo.created_at),
         "updated_at": serialize_utc_datetime(slo.updated_at),
@@ -1186,11 +1223,8 @@ def serialize_service_slo(slo, current_user=None, evaluation=None):
     if evaluation is not None:
         data["evaluation"] = evaluation
 
-    return attach_team_permissions(
-        data,
-        team.id if team else None,
-        current_user,
-    )
+    return attach_team_permissions(data, team.id if team else None, current_user)
+
 
 def serialize_service_dependency(dependency, current_user=None):
     """Serialize a service dependency."""

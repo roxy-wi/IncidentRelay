@@ -1602,7 +1602,7 @@ body.md-theme .app-modal-dialog-medium {
 }
 
 body.md-theme .app-modal-dialog-wide {
-  width: min(1360px, calc(100vw - 48px));
+  width: min(1760px, calc(100vw - 48px));
 }
 
 body.md-theme .app-modal-header,

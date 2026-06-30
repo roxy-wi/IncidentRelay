@@ -1,3 +1,47 @@
+const GLOBAL_TEAM_FILTER_STORAGE_KEY = "incidentrelay.global_team_filter";
+
+function readStoredGlobalTeamId() {
+    try {
+        return localStorage.getItem(GLOBAL_TEAM_FILTER_STORAGE_KEY) || "";
+    } catch (error) {
+        return "";
+    }
+}
+
+function writeStoredGlobalTeamId(teamId) {
+    try {
+        if (teamId) {
+            localStorage.setItem(GLOBAL_TEAM_FILTER_STORAGE_KEY, String(teamId));
+        } else {
+            localStorage.removeItem(GLOBAL_TEAM_FILTER_STORAGE_KEY);
+        }
+    } catch (error) {
+        // Ignore storage errors, the filter still works for the current page.
+    }
+}
+
+function restoreGlobalTeamFilterValue() {
+    const select = $("#global-team-filter");
+    const storedTeamId = readStoredGlobalTeamId();
+
+    if (!select.length) {
+        return;
+    }
+
+    if (
+        storedTeamId &&
+        select.find("option").filter(function () {
+            return String($(this).val()) === String(storedTeamId);
+        }).length
+    ) {
+        select.val(storedTeamId);
+        return;
+    }
+
+    select.val("");
+    writeStoredGlobalTeamId("");
+}
+
 function selectedTeamId() { return $("#global-team-filter").val(); }
 function selectedTeamQuery() { const teamId = selectedTeamId(); return teamId ? "?team_id=" + encodeURIComponent(teamId) : ""; }
 function selectedTeamNumber() {
@@ -7,12 +51,14 @@ function selectedTeamNumber() {
 
 function setSelectedTeamId(teamId, triggerChange) {
     const select = $("#global-team-filter");
+    const value = teamId ? String(teamId) : "";
 
     if (!select.length) {
         return;
     }
 
-    select.val(teamId ? String(teamId) : "");
+    select.val(value);
+    writeStoredGlobalTeamId(value);
 
     if (triggerChange) {
         select.trigger("change");
@@ -32,11 +78,31 @@ function fillGroupSelect(selector, includeAll, callback) {
 function fillTeamSelect(selector, includeAll, callback) {
     /* Fill a select element with teams ordered by id. */
     apiGet("/api/teams", function (teams) {
-        const select = $(selector); select.empty();
-        if (includeAll) { select.append($("<option>").val("").text("All teams")); }
+        const select = $(selector);
+
+        select.empty();
+
+        if (includeAll) {
+            select.append($("<option>").val("").text("All teams"));
+        }
+
         teams = asArray(teams);
-        teams.forEach(function (team) { select.append($("<option>").val(team.id).text("#" + team.id + " " + team.name + " (" + team.slug + ")")); });
-        if (typeof callback === "function") { callback(teams); }
+
+        teams.forEach(function (team) {
+            select.append(
+                $("<option>")
+                    .val(team.id)
+                    .text("#" + team.id + " " + team.name + " (" + team.slug + ")")
+            );
+        });
+
+        if (select.attr("id") === "global-team-filter") {
+            restoreGlobalTeamFilterValue();
+        }
+
+        if (typeof callback === "function") {
+            callback(teams);
+        }
     });
 }
 

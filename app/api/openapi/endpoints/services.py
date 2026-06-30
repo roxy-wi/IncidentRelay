@@ -2,6 +2,8 @@ from app.api.openapi.endpoints.service_catalog import (
     READINESS_STATE_SCHEMA,
     SERVICE_READINESS_RESPONSE_SCHEMA,
     SERVICE_TIMELINE_EVENT_SCHEMA,
+    SERVICE_SLI_SCHEMA,
+    SERVICE_SLO_SCHEMA,
 )
 from app.api.schemas.limits import (
     DESCRIPTION_MAX_LENGTH,
@@ -740,6 +742,8 @@ SERVICE_DETAILS_RESPONSE_SCHEMA = {
                 "upstream_dependencies": {"type": "integer", "minimum": 0},
                 "downstream_dependencies": {"type": "integer", "minimum": 0},
                 "timeline_events": {"type": "integer", "minimum": 0},
+                "slis": {"type": "integer", "minimum": 0},
+                "slos": {"type": "integer", "minimum": 0},
                 "readiness": READINESS_STATE_SCHEMA,
             },
         },
@@ -757,6 +761,13 @@ SERVICE_DETAILS_RESPONSE_SCHEMA = {
             },
         },
         "timeline": {"type": "array", "items": SERVICE_TIMELINE_EVENT_SCHEMA},
+        "sli_slo": {
+            "type": "object",
+            "properties": {
+                "slis": {"type": "array", "items": SERVICE_SLI_SCHEMA},
+                "slos": {"type": "array", "items": SERVICE_SLO_SCHEMA},
+            },
+        },
         "impact": SERVICE_IMPACT_ITEM_SCHEMA,
         "analytics": SERVICE_DETAILS_ANALYTICS_SCHEMA,
         "readiness": SERVICE_READINESS_RESPONSE_SCHEMA,

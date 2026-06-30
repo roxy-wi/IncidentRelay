@@ -6,10 +6,11 @@ from app.modules.db.models import (
     ServiceLink,
     ServiceMatchRule,
     ServiceRunbook,
-    ServiceStatusHistory,
     Team,
     ServiceOwner,
+    ServiceSli,
     ServiceSlo,
+    ServiceSloMeasurement,
     User,
 )
 
@@ -158,13 +159,34 @@ def update_service(service_id, data):
 
 
 def soft_delete_service(service_id):
-    """Soft-delete a service."""
+    """Soft-delete a service and service-owned routing helpers."""
     service = get_service(service_id)
+    now = datetime.utcnow()
+
     service.enabled = False
     service.deleted = True
-    service.deleted_at = datetime.utcnow()
-    service.updated_at = datetime.utcnow()
+    service.deleted_at = now
+    service.updated_at = now
     service.save()
+
+    ServiceMatchRule.update(
+        deleted=True,
+        enabled=False,
+        updated_at=now,
+    ).where(
+        (ServiceMatchRule.service == service.id)
+        & (ServiceMatchRule.deleted == False)
+    ).execute()
+
+    ServiceRunbook.update(
+        deleted=True,
+        enabled=False,
+        updated_at=now,
+    ).where(
+        (ServiceRunbook.service == service.id)
+        & (ServiceRunbook.deleted == False)
+    ).execute()
+
     return service
 
 
@@ -518,17 +540,6 @@ def list_downstream_service_dependencies(service_id=None, service_ids=None):
     )
 
 
-def list_service_status_history(service_id, *, limit=20):
-    """Return recent service status changes."""
-    return list(
-        ServiceStatusHistory
-        .select()
-        .where(ServiceStatusHistory.service == service_id)
-        .order_by(ServiceStatusHistory.created_at.desc(), ServiceStatusHistory.id.desc())
-        .limit(limit)
-    )
-
-
 def list_service_owners(service_id, active_only=True):
     """Return service owners for a service."""
     query = (
@@ -643,16 +654,77 @@ def deactivate_service_owner(owner_id):
     return owner
 
 
-def list_service_slos(service_id=None, service_ids=None, include_disabled=True):
-    """Return service objectives / SLO targets."""
-    query = (
-        ServiceSlo
-        .select(ServiceSlo, Service, Team)
+def list_service_slis(service_id=None, service_ids=None, include_disabled=True):
+    """Return Service Level Indicators."""
+    query = ServiceSli.select().where(ServiceSli.deleted == False)  # noqa: E712
+
+    if service_id is not None:
+        query = query.where(ServiceSli.service == service_id)
+
+    if service_ids is not None:
+        service_ids = list(service_ids)
+
+        if not service_ids:
+            return []
+
+        query = query.where(ServiceSli.service.in_(service_ids))
+
+    if not include_disabled:
+        query = query.where(ServiceSli.enabled == True)  # noqa: E712
+
+    return list(query.order_by(ServiceSli.enabled.desc(), ServiceSli.name.asc(), ServiceSli.id.asc()))
+
+
+def get_service_sli(sli_id):
+    """Return one Service Level Indicator."""
+    return (
+        ServiceSli
+        .select(ServiceSli, Service)
         .join(Service)
-        .switch(Service)
-        .join(Team)
-        .where(ServiceSlo.deleted == False)  # noqa: E712
+        .where(
+            (ServiceSli.id == sli_id)
+            & (ServiceSli.deleted == False)  # noqa: E712
+        )
+        .get()
     )
+
+
+def create_service_sli(service_id, data):
+    """Create a Service Level Indicator."""
+    data = dict(data)
+    data["service"] = service_id
+    data["updated_at"] = datetime.utcnow()
+    return ServiceSli.create(**data)
+
+
+def update_service_sli(sli_id, data):
+    """Update a Service Level Indicator."""
+    sli = get_service_sli(sli_id)
+
+    for field, value in data.items():
+        setattr(sli, field, value)
+
+    sli.updated_at = datetime.utcnow()
+    sli.save()
+
+    return sli
+
+
+def soft_delete_service_sli(sli_id):
+    """Soft-delete a Service Level Indicator."""
+    sli = get_service_sli(sli_id)
+    sli.enabled = False
+    sli.deleted = True
+    sli.deleted_at = datetime.utcnow()
+    sli.updated_at = datetime.utcnow()
+    sli.save()
+
+    return sli
+
+
+def list_service_slos(service_id=None, service_ids=None, sli_id=None, include_disabled=True):
+    """Return Service Level Objectives."""
+    query = ServiceSlo.select().where(ServiceSlo.deleted == False)  # noqa: E712
 
     if service_id is not None:
         query = query.where(ServiceSlo.service == service_id)
@@ -665,6 +737,9 @@ def list_service_slos(service_id=None, service_ids=None, include_disabled=True):
 
         query = query.where(ServiceSlo.service.in_(service_ids))
 
+    if sli_id is not None:
+        query = query.where(ServiceSlo.sli == sli_id)
+
     if not include_disabled:
         query = query.where(ServiceSlo.enabled == True)  # noqa: E712
 
@@ -672,11 +747,13 @@ def list_service_slos(service_id=None, service_ids=None, include_disabled=True):
 
 
 def get_service_slo(slo_id):
-    """Return one service objective / SLO target."""
+    """Return one Service Level Objective."""
     return (
         ServiceSlo
-        .select(ServiceSlo, Service)
+        .select(ServiceSlo, Service, ServiceSli)
         .join(Service)
+        .switch(ServiceSlo)
+        .join(ServiceSli)
         .where(
             (ServiceSlo.id == slo_id)
             & (ServiceSlo.deleted == False)  # noqa: E712
@@ -686,7 +763,7 @@ def get_service_slo(slo_id):
 
 
 def create_service_slo(service_id, data):
-    """Create a service objective / SLO target."""
+    """Create a Service Level Objective."""
     data = dict(data)
     data["service"] = service_id
     data["updated_at"] = datetime.utcnow()
@@ -694,7 +771,7 @@ def create_service_slo(service_id, data):
 
 
 def update_service_slo(slo_id, data):
-    """Update a service objective / SLO target."""
+    """Update a Service Level Objective."""
     slo = get_service_slo(slo_id)
 
     for field, value in data.items():
@@ -707,7 +784,7 @@ def update_service_slo(slo_id, data):
 
 
 def soft_delete_service_slo(slo_id):
-    """Soft-delete a service objective / SLO target."""
+    """Soft-delete a Service Level Objective."""
     slo = get_service_slo(slo_id)
     slo.enabled = False
     slo.deleted = True
@@ -716,3 +793,8 @@ def soft_delete_service_slo(slo_id):
     slo.save()
 
     return slo
+
+
+def create_service_slo_measurement(data):
+    """Create a Service Level Objective measurement row."""
+    return ServiceSloMeasurement.create(**data)

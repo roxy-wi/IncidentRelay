@@ -12,7 +12,8 @@ Use this section for service ownership and impact modeling:
 - [Service model](../concepts/services.md)
 - [Service notification policies](notification-policies.md)
 - [Service default stakeholders](default-stakeholders.md)
-- [Service standarts and events](service-standards-and-events.md)
+- [Service standards and events](service-standards-and-events.md)
+- [SLI/SLO](service-sli-slo.md)
 - [Services API](../api/services.md)
 
 ## Why services matter

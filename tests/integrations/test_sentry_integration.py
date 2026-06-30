@@ -41,6 +41,12 @@ def sentry_issue_alert_payload(action="triggered"):
                 "project": 42,
                 "environment": "production",
                 "message": "division by zero",
+                "tags": [
+                    ["team", "backend"],
+                    ["service", "cloud-api-previews"],
+                    {"key": "runtime.name", "value": "python"},
+                    {"key": "empty_tag", "value": ""},
+                ],
             },
             "project": {
                 "slug": "backend-api",
@@ -122,6 +128,7 @@ def test_normalize_sentry_event_alert_triggered():
     assert alert["labels"]["issue_short_id"] == "BACKEND-1"
     assert alert["labels"]["environment"] == "production"
     assert alert["labels"]["sentry_url"] == "https://sentry.example.com/issues/12345/"
+    assert alert["labels"]["environment"] == "production"
 
 
 def test_normalize_sentry_issue_resolved_resolves_same_dedup_key():
@@ -342,3 +349,23 @@ def test_normalize_sentry_uses_event_project_id_when_data_project_has_no_id():
 
     assert alert["labels"]["project_id"] == 42
     assert alert["labels"]["project_slug"] == "backend-api"
+
+
+def test_normalize_sentry_accepts_dict_style_tags():
+    payload = sentry_issue_alert_payload()
+    payload["data"]["event"].pop("tags")
+    payload["data"]["tags"] = {
+        "team": "payments",
+        "component": "checkout",
+        "release": "2026.06.30",
+    }
+
+    alert = normalize_sentry(
+        payload,
+        headers={"Sentry-Hook-Resource": "event_alert"},
+    )[0]
+
+    assert alert["team_slug"] == "payments"
+    assert alert["labels"]["team"] == "payments"
+    assert alert["labels"]["component"] == "checkout"
+    assert alert["labels"]["release"] == "2026.06.30"

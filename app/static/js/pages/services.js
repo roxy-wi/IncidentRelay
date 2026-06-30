@@ -9,6 +9,8 @@ let serviceImpactCache = [];
 let serviceDetailsCache = {};
 let serviceImpactPayload = null;
 let serviceAnalyticsPayload = null;
+let serviceSloAnalyticsPayload = null;
+let serviceSloAnalyticsCache = [];
 let serviceAnalyticsCharts = {};
 let serviceRunbookMatcherPresetsCache = [];
 
@@ -630,7 +632,7 @@ function renderServiceDetailsPayload(payload) {
     body.append(renderServiceDetailsQuickActions(payload));
     body.append(renderServiceDetailsOwners(payload));
     body.append(renderServiceDetailsReadiness(payload));
-    body.append(renderServiceDetailsObjectives(payload));
+    body.append(renderServiceDetailsSliSlo(payload));
     body.append(renderServiceDetailsImpact(payload));
     body.append(renderServiceDetailsMaintenance(payload));
     body.append(renderServiceDetailsRunbooks(payload));
@@ -683,34 +685,57 @@ function renderServiceDetailsMetrics(payload) {
 }
 
 
-function renderServiceDetailsObjectives(payload) {
+function renderServiceDetailsSliSlo(payload) {
     const service = payload.service || {};
-    const objectives = asArray(payload.objectives);
+    const sliSlo = payload.sli_slo || {};
+    const slis = asArray(sliSlo.slis);
+    const slos = asArray(sliSlo.slos);
     const section = serviceDetailsSection(
-        "Objectives",
-        "Ack, resolution and availability targets for this service."
+        "SLI / SLO",
+        "Indicators describe what is measured. Objectives define the target for those indicators."
     );
     const actions = $("<div>").addClass("details-actions");
 
     appendIconActionIfAllowed(actions, service, {
         required: "write",
-        icon: "fas fa-plus",
-        label: "Add objective",
+        icon: "fas fa-chart-line",
+        label: "Add SLI",
         onClick: function () {
-            openServiceObjectiveModal(service, null);
+            openServiceSliModal(service, null);
+        },
+    });
+
+    appendIconActionIfAllowed(actions, service, {
+        required: "write",
+        icon: "fas fa-bullseye",
+        label: "Add SLO",
+        onClick: function () {
+            openServiceSloModal(service, null, slis);
         },
     });
 
     section.append(actions);
 
-    if (!objectives.length) {
+    if (!slis.length && !slos.length) {
         section.append(
             $("<div>")
                 .addClass("empty-state compact")
-                .text("No service objectives configured.")
+                .text("No SLI/SLO configured for this service.")
         );
 
         return section;
+    }
+
+    section.append(renderServiceSlisTable(service, slis));
+    section.append(renderServiceSlosTable(service, slos, slis));
+
+    return section;
+}
+
+
+function renderServiceSlisTable(service, slis) {
+    if (!slis.length) {
+        return serviceDetailsTableCard("SLIs", ["Name", "Type", "Source", "Scope"], [], "No SLIs configured.");
     }
 
     const table = $("<table>").addClass("data-table");
@@ -719,49 +744,85 @@ function renderServiceDetailsObjectives(payload) {
     table.append(
         $("<thead>").append(
             $("<tr>")
-                .append($("<th>").text("Objective"))
+                .append($("<th>").text("SLI"))
+                .append($("<th>").text("Type"))
+                .append($("<th>").text("Source"))
                 .append($("<th>").text("Scope"))
-                .append($("<th>").text("Targets"))
-                .append($("<th>").text("Health"))
+                .append($("<th>").addClass("actions-th").text("Actions"))
+        )
+    );
+
+    slis.forEach(function (sli) {
+        tbody.append(
+            $("<tr>").toggleClass("row-disabled", !sli.enabled)
+                .append(
+                    $("<td>")
+                        .addClass("table-cell-truncate")
+                        .append($("<strong>").text(sli.name || ("SLI #" + sli.id)))
+                        .append($("<div>").addClass("row-subtitle").text(sli.slug || sli.description || "-"))
+                )
+                .append($("<td>").text(formatServiceSliType(sli.sli_type)))
+                .append($("<td>").text(formatServiceSliSource(sli.source)))
+                .append($("<td>").text(formatServiceSliScope(sli)))
+                .append($("<td>").addClass("actions-cell").append(renderServiceSliActions(service, sli)))
+        );
+    });
+
+    table.append(tbody);
+
+    return $("<div>").addClass("table-wrapper").append(table);
+}
+
+
+function renderServiceSlosTable(service, slos, slis) {
+    if (!slos.length) {
+        return serviceDetailsTableCard("SLOs", ["Name", "SLI", "Target", "Current", "Status"], [], "No SLOs configured.");
+    }
+
+    const table = $("<table>").addClass("data-table");
+    const tbody = $("<tbody>");
+
+    table.append(
+        $("<thead>").append(
+            $("<tr>")
+                .append($("<th>").text("SLO"))
+                .append($("<th>").text("SLI"))
+                .append($("<th>").text("Target"))
+                .append($("<th>").text("Current"))
                 .append($("<th>").text("Status"))
                 .append($("<th>").addClass("actions-th").text("Actions"))
         )
     );
 
-    objectives.forEach(function (objective) {
-        tbody.append(renderServiceObjectiveRow(service, objective));
+    slos.forEach(function (slo) {
+        tbody.append(renderServiceSloRow(service, slo, slis));
     });
 
     table.append(tbody);
-    section.append($("<div>").addClass("table-wrapper").append(table));
 
-    return section;
+    return $("<div>").addClass("table-wrapper").append(table);
 }
 
 
-function renderServiceObjectiveRow(service, objective) {
-    const evaluation = objective.evaluation || {};
+function renderServiceSloRow(service, slo, slis) {
+    const evaluation = slo.evaluation || {};
 
-    return $("<tr>").toggleClass("row-disabled", !objective.enabled)
+    return $("<tr>").toggleClass("row-disabled", !slo.enabled)
         .append(
             $("<td>")
                 .addClass("table-cell-truncate")
-                .append($("<strong>").text(objective.name || ("Objective #" + objective.id)))
-                .append($("<div>").addClass("row-subtitle").text(objective.description || "-"))
+                .append($("<strong>").text(slo.name || ("SLO #" + slo.id)))
+                .append($("<div>").addClass("row-subtitle").text((slo.window_days || 30) + " day window"))
         )
-        .append($("<td>").text(formatServiceObjectiveScope(objective)))
-        .append($("<td>").append(renderServiceObjectiveTargets(objective)))
-        .append($("<td>").append(renderServiceObjectiveHealth(evaluation)))
-        .append($("<td>").append(renderServiceObjectiveStatusBadge(evaluation.status, objective.enabled)))
-        .append(
-            $("<td>")
-                .addClass("actions-cell")
-                .append(renderServiceObjectiveActions(service, objective))
-        );
+        .append($("<td>").text(slo.sli_name || formatServiceSliType(slo.sli_type)))
+        .append($("<td>").append(renderServiceSloTarget(slo)))
+        .append($("<td>").append(renderServiceSloCurrent(evaluation, slo.sli_type)))
+        .append($("<td>").append(renderServiceSloStatusBadge(evaluation.status, slo.enabled)))
+        .append($("<td>").addClass("actions-cell").append(renderServiceSloActions(service, slo, slis)));
 }
 
 
-function renderServiceObjectiveActions(service, objective) {
+function renderServiceSliActions(service, sli) {
     if (typeof window.makeActionMenu === "function") {
         return window.makeActionMenu({
             object: service,
@@ -770,73 +831,72 @@ function renderServiceObjectiveActions(service, objective) {
                     label: "Edit",
                     icon: "fas fa-edit",
                     required: "write",
-                    onClick: function () {
-                        openServiceObjectiveModal(service, objective);
-                    },
+                    onClick: function () { openServiceSliModal(service, sli); },
                 },
                 {
                     label: "Delete",
                     icon: "fas fa-trash",
                     required: "write",
                     danger: true,
-                    onClick: function () {
-                        deleteServiceObjective(service, objective);
-                    },
+                    onClick: function () { deleteServiceSli(service, sli); },
                 },
             ],
         });
     }
 
     const wrapper = $("<div>").addClass("action-buttons");
-
-    appendIconActionIfAllowed(wrapper, service, {
-        required: "write",
-        icon: "fas fa-edit",
-        label: "Edit",
-        onClick: function () {
-            openServiceObjectiveModal(service, objective);
-        },
-    });
-
-    appendIconActionIfAllowed(wrapper, service, {
-        required: "write",
-        icon: "fas fa-trash",
-        label: "Delete",
-        danger: true,
-        onClick: function () {
-            deleteServiceObjective(service, objective);
-        },
-    });
-
+    appendIconActionIfAllowed(wrapper, service, {required: "write", icon: "fas fa-edit", label: "Edit", onClick: function () { openServiceSliModal(service, sli); }});
+    appendIconActionIfAllowed(wrapper, service, {required: "write", icon: "fas fa-trash", label: "Delete", danger: true, onClick: function () { deleteServiceSli(service, sli); }});
     return wrapper;
 }
 
 
-function renderServiceObjectiveTargets(objective) {
+function renderServiceSloActions(service, slo, slis) {
+    if (typeof window.makeActionMenu === "function") {
+        return window.makeActionMenu({
+            object: service,
+            items: [
+                {
+                    label: "Edit",
+                    icon: "fas fa-edit",
+                    required: "write",
+                    onClick: function () { openServiceSloModal(service, slo, slis); },
+                },
+                {
+                    label: "Delete",
+                    icon: "fas fa-trash",
+                    required: "write",
+                    danger: true,
+                    onClick: function () { deleteServiceSlo(service, slo); },
+                },
+            ],
+        });
+    }
+
+    const wrapper = $("<div>").addClass("action-buttons");
+    appendIconActionIfAllowed(wrapper, service, {required: "write", icon: "fas fa-edit", label: "Edit", onClick: function () { openServiceSloModal(service, slo, slis); }});
+    appendIconActionIfAllowed(wrapper, service, {required: "write", icon: "fas fa-trash", label: "Delete", danger: true, onClick: function () { deleteServiceSlo(service, slo); }});
+    return wrapper;
+}
+
+
+function renderServiceSloTarget(slo) {
     const wrapper = $("<div>").addClass("compact-list");
 
-    if (objective.ack_target_seconds) {
-        wrapper.append(
-            $("<div>")
-                .addClass("compact-list-item")
-                .text("Ack ≤ " + formatDurationSeconds(objective.ack_target_seconds))
-        );
+    if (slo.target_percent_basis_points !== null && slo.target_percent_basis_points !== undefined) {
+        wrapper.append($("<div>").addClass("compact-list-item").text("Target ≥ " + formatBasisPoints(slo.target_percent_basis_points)));
     }
 
-    if (objective.resolve_target_seconds) {
-        wrapper.append(
-            $("<div>")
-                .addClass("compact-list-item")
-                .text("Resolve ≤ " + formatDurationSeconds(objective.resolve_target_seconds))
-        );
+    if (slo.threshold_seconds) {
+        wrapper.append($("<div>").addClass("compact-list-item").text("Threshold ≤ " + formatDurationSeconds(slo.threshold_seconds)));
     }
 
-    if (objective.availability_target_basis_points !== null && objective.availability_target_basis_points !== undefined) {
-        wrapper.append(
-            $("<div>")
-                .addClass("compact-list-item")
-                .text("Availability ≥ " + formatBasisPoints(objective.availability_target_basis_points))
-        );
+    if (slo.threshold_count !== null && slo.threshold_count !== undefined) {
+        wrapper.append($("<div>").addClass("compact-list-item").text("Max incidents ≤ " + slo.threshold_count));
+    }
+
+    if (slo.exclude_maintenance) {
+        wrapper.append($("<div>").addClass("compact-list-item").text("Maintenance excluded"));
     }
 
     if (!wrapper.children().length) {
@@ -847,60 +907,109 @@ function renderServiceObjectiveTargets(objective) {
 }
 
 
-function renderServiceObjectiveHealth(evaluation) {
+function renderServiceSloCurrent(evaluation, sliType) {
     const wrapper = $("<div>").addClass("compact-list");
 
-    appendServiceObjectiveHealthLine(wrapper, "Ack", evaluation.ack);
-    appendServiceObjectiveHealthLine(wrapper, "Resolve", evaluation.resolve);
+    if (sliType === "incident_availability") {
+        return renderServiceSloAvailabilityCurrent(evaluation);
+    }
 
-    if (evaluation.availability) {
-        wrapper.append(
-            $("<div>")
-                .addClass("compact-list-item")
-                .append($("<strong>").text("Availability: "))
-                .append($("<span>").text(evaluation.availability.message || "not measured"))
-        );
+    if (sliType === "incident_count") {
+        return renderServiceSloIncidentCountCurrent(evaluation);
+    }
+
+    if (evaluation.value_percent !== null && evaluation.value_percent !== undefined) {
+        wrapper.append(serviceSloMetricLine("Current compliance", evaluation.value_percent + "%"));
+    }
+
+    if (evaluation.good_count !== undefined && evaluation.total_count !== undefined && Number(evaluation.total_count || 0) > 0) {
+        wrapper.append(serviceSloMetricLine("Good alert groups", Number(evaluation.good_count || 0)));
+        wrapper.append(serviceSloMetricLine("Total alert groups", Number(evaluation.total_count || 0)));
+    }
+
+    if (evaluation.bad_count !== undefined && Number(evaluation.bad_count || 0) > 0) {
+        wrapper.append(serviceSloMetricLine("Breached alert groups", Number(evaluation.bad_count || 0)));
+    }
+
+    if (evaluation.pending_count !== undefined && Number(evaluation.pending_count || 0) > 0) {
+        wrapper.append(serviceSloMetricLine("Pending alert groups", Number(evaluation.pending_count || 0)));
+    }
+
+    if (evaluation.message) {
+        wrapper.append($("<div>").addClass("compact-list-meta").text(evaluation.message));
     }
 
     if (!wrapper.children().length) {
-        wrapper.text("No measured data");
+        wrapper.text("No data");
     }
 
     return wrapper;
 }
 
 
-function appendServiceObjectiveHealthLine(wrapper, label, result) {
-    if (!result) {
-        return;
+function renderServiceSloAvailabilityCurrent(evaluation) {
+    const wrapper = $("<div>").addClass("compact-list");
+    const goodSeconds = Number(evaluation.good_count || 0);
+    const totalSeconds = Number(evaluation.total_count || 0);
+    const downtimeSeconds = Number(evaluation.downtime_seconds || evaluation.bad_count || 0);
+
+    if (evaluation.value_percent !== null && evaluation.value_percent !== undefined) {
+        wrapper.append(serviceSloMetricLine("Current availability", evaluation.value_percent + "%"));
     }
 
-    const parts = [
-        result.met + "/" + result.measured + " met",
-    ];
-
-    if (result.breached) {
-        parts.push(result.breached + " breached");
+    if (totalSeconds > 0) {
+        wrapper.append(serviceSloMetricLine("Good time", formatDurationSeconds(goodSeconds, {maxParts: 3})));
+        wrapper.append(serviceSloMetricLine("Total window", formatDurationSeconds(totalSeconds, {maxParts: 3})));
     }
 
-    if (result.pending) {
-        parts.push(result.pending + " pending");
+    wrapper.append(serviceSloMetricLine("Downtime", formatDurationSeconds(downtimeSeconds, {maxParts: 3})));
+
+    if (evaluation.message) {
+        wrapper.append($("<div>").addClass("compact-list-meta").text(evaluation.message));
     }
 
-    if (result.p95_seconds !== null && result.p95_seconds !== undefined) {
-        parts.push("p95 " + formatDurationSeconds(result.p95_seconds));
+    if (!wrapper.children().length) {
+        wrapper.text("No data");
     }
 
-    wrapper.append(
-        $("<div>")
-            .addClass("compact-list-item")
-            .append($("<strong>").text(label + ": "))
-            .append($("<span>").text(parts.join(" / ")))
-    );
+    return wrapper;
 }
 
 
-function renderServiceObjectiveStatusBadge(status, enabled) {
+function renderServiceSloIncidentCountCurrent(evaluation) {
+    const wrapper = $("<div>").addClass("compact-list");
+
+    if (evaluation.value_count !== null && evaluation.value_count !== undefined) {
+        wrapper.append(serviceSloMetricLine("Impact incidents", Number(evaluation.value_count || 0)));
+    } else if (evaluation.bad_count !== undefined) {
+        wrapper.append(serviceSloMetricLine("Impact incidents", Number(evaluation.bad_count || 0)));
+    }
+
+    if (evaluation.total_count !== undefined && Number(evaluation.total_count || 0) > 0) {
+        wrapper.append(serviceSloMetricLine("Total matching alert groups", Number(evaluation.total_count || 0)));
+    }
+
+    if (evaluation.message) {
+        wrapper.append($("<div>").addClass("compact-list-meta").text(evaluation.message));
+    }
+
+    if (!wrapper.children().length) {
+        wrapper.text("No data");
+    }
+
+    return wrapper;
+}
+
+
+function serviceSloMetricLine(label, value) {
+    return $("<div>")
+        .addClass("compact-list-item")
+        .append($("<strong>").text(label + ": "))
+        .append(document.createTextNode(value));
+}
+
+
+function renderServiceSloStatusBadge(status, enabled) {
     if (!enabled) {
         return $("<span>").addClass("status-pill status-neutral").text("Disabled");
     }
@@ -917,44 +1026,132 @@ function renderServiceObjectiveStatusBadge(status, enabled) {
         return $("<span>").addClass("status-pill status-inactive").text("Breached");
     }
 
-    return $("<span>").addClass("status-pill status-neutral").text("Unknown");
+    return $("<span>").addClass("status-pill status-neutral").text("No data");
 }
 
 
-function formatServiceObjectiveScope(objective) {
-    return objective.severity ? ("severity: " + objective.severity) : "all severities";
+const SERVICE_SLI_IMPACT_TYPES = ["incident_availability", "incident_count"];
+const SERVICE_SLI_PRIORITY_OPTIONS = [
+    ["p1", "P1"],
+    ["p2", "P2"],
+    ["p3", "P3"],
+    ["p4", "P4"],
+];
+
+
+function isImpactServiceSliType(type) {
+    return SERVICE_SLI_IMPACT_TYPES.indexOf(type) !== -1;
 }
 
 
-function formatDurationSeconds(seconds) {
-    seconds = Number(seconds || 0);
+function serviceSliPriorityScope(sli) {
+    const configuration = sli && sli.configuration ? sli.configuration : {};
+    let scope = configuration.priority_scope || null;
 
-    if (!seconds) {
-        return "-";
+    if (!scope && sli && sli.priority) {
+        scope = [sli.priority];
     }
 
-    if (seconds % 86400 === 0) {
-        return (seconds / 86400) + "d";
+    if (!scope && sli && isImpactServiceSliType(sli.sli_type)) {
+        scope = ["p1", "p2"];
     }
 
-    if (seconds % 3600 === 0) {
-        return (seconds / 3600) + "h";
+    if (typeof scope === "string") {
+        scope = [scope];
     }
 
-    if (seconds % 60 === 0) {
-        return (seconds / 60) + "m";
+    if (!Array.isArray(scope)) {
+        return [];
     }
 
-    return seconds + "s";
+    return scope.map(function (value) {
+        return String(value || "").toLowerCase();
+    }).filter(function (value, index, values) {
+        return ["p1", "p2", "p3", "p4"].indexOf(value) !== -1 && values.indexOf(value) === index;
+    });
+}
+
+
+function formatServiceSliType(type) {
+    const labels = {
+        alert_ack_latency: "Ack latency",
+        alert_resolve_latency: "Resolve latency",
+        incident_availability: "Incident availability",
+        incident_count: "Incident count",
+    };
+
+    return labels[type] || type || "-";
+}
+
+
+function formatServiceSliSource(source) {
+    const labels = {
+        incidentrelay_alert_groups: "Alert groups",
+        incidentrelay_service_status: "Service status",
+    };
+
+    return labels[source] || source || "-";
+}
+
+
+function formatServiceSliScope(sli) {
+    const parts = [];
+    const priorityScope = serviceSliPriorityScope(sli);
+
+    if (priorityScope.length) {
+        parts.push("priority: " + priorityScope.map(function (value) {
+            return value.toUpperCase();
+        }).join(", "));
+    }
+
+    if (sli.severity) {
+        parts.push("severity: " + sli.severity);
+    }
+
+    return parts.length ? parts.join(" / ") : "all matching alert groups";
 }
 
 
 function formatBasisPoints(value) {
-    if (value === null || value === undefined || value === "") {
+    if (value === null || value === undefined) {
         return "-";
     }
 
-    return (Number(value) / 100).toFixed(2).replace(/\.00$/, "") + "%";
+    return (Number(value) / 100).toFixed(Number(value) % 100 === 0 ? 0 : 2) + "%";
+}
+
+
+function formatDurationSeconds(value, options) {
+    options = options || {};
+
+    const numericValue = Number(value || 0);
+    let seconds = Math.floor(Math.abs(numericValue));
+    const maxParts = options.maxParts || 2;
+    const parts = [];
+    const units = [
+        ["d", 86400],
+        ["h", 3600],
+        ["m", 60],
+        ["s", 1],
+    ];
+
+    if (!seconds) {
+        return "0s";
+    }
+
+    units.forEach(function (unit) {
+        const label = unit[0];
+        const unitSeconds = unit[1];
+        const amount = Math.floor(seconds / unitSeconds);
+
+        if (amount > 0 && parts.length < maxParts) {
+            parts.push(amount + label);
+        }
+
+        seconds %= unitSeconds;
+    });
+
+    return parts.join(" ");
 }
 
 
@@ -983,26 +1180,46 @@ function percentToBasisPoints(value) {
 }
 
 
-function openServiceObjectiveModal(service, objective) {
-    $("#service-objective-modal").remove();
-    $("body").append(renderServiceObjectiveModal(service, objective));
-    openAppModal("#service-objective-modal");
+function simpleSlug(value) {
+    if (window.AppSlug && typeof window.AppSlug.slugify === "function") {
+        return window.AppSlug.slugify(value);
+    }
+
+    return String(value || "")
+        .toLowerCase()
+        .trim()
+        .replace(/['"`]/g, "")
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "")
+        .replace(/-{2,}/g, "-");
 }
 
 
-function renderServiceObjectiveModal(service, objective) {
-    objective = objective || {
+function openServiceSliModal(service, sli) {
+    $("#service-sli-modal").remove();
+    $("body").append(renderServiceSliModal(service, sli));
+    openAppModal("#service-sli-modal");
+
+    if (!sli && window.AppSlug) {
+        window.AppSlug.bind("#service-sli-name", "#service-sli-slug", {manualWhenHasValue: true});
+    }
+}
+
+
+function renderServiceSliModal(service, sli) {
+    sli = sli || {
+        slug: "",
         name: "",
         description: "",
-        severity: "",
-        ack_target_seconds: null,
-        resolve_target_seconds: null,
-        availability_target_basis_points: null,
+        sli_type: "alert_ack_latency",
+        source: "incidentrelay_alert_groups",
+        severity: "critical",
+        priority: "",
         enabled: true,
     };
 
     return $("<div>")
-        .attr("id", "service-objective-modal")
+        .attr("id", "service-sli-modal")
         .addClass("app-modal")
         .hide()
         .append(
@@ -1013,179 +1230,392 @@ function renderServiceObjectiveModal(service, objective) {
                         .addClass("app-modal-header")
                         .append(
                             $("<div>")
-                                .append($("<h2>").text(objective.id ? "Edit service objective" : "New service objective"))
+                                .append($("<h2>").text(sli.id ? "Edit SLI" : "New SLI"))
                                 .append($("<div>").addClass("card-subtitle").text(service.name || service.slug || "Service"))
                         )
-                        .append(
-                            $("<button>")
-                                .attr("type", "button")
-                                .addClass("app-modal-close")
-                                .attr("aria-label", "Close")
-                                .text("×")
-                                .on("click", function () {
-                                    closeAppModal("#service-objective-modal");
-                                })
-                        )
+                        .append($("<button>").attr("type", "button").addClass("app-modal-close").attr("aria-label", "Close").text("×").on("click", function () { closeAppModal("#service-sli-modal"); }))
                 )
-                .append(
-                    $("<div>")
-                        .addClass("app-modal-body")
-                        .append(renderServiceObjectiveForm(service, objective))
-                )
+                .append($("<div>").addClass("app-modal-body").append(renderServiceSliForm(service, sli)))
         );
 }
 
 
-function renderServiceObjectiveForm(service, objective) {
+function renderServiceSliForm(service, sli) {
     const body = $("<div>").addClass("form-body");
 
-    body.append($("<input>").attr("type", "hidden").attr("id", "service-objective-service-id").val(service.id));
-    body.append($("<input>").attr("type", "hidden").attr("id", "service-objective-id").val(objective.id || ""));
+    body.append($("<input>").attr("type", "hidden").attr("id", "service-sli-service-id").val(service.id));
+    body.append($("<input>").attr("type", "hidden").attr("id", "service-sli-id").val(sli.id || ""));
 
-    body.append($("<label>").attr("for", "service-objective-name").text("Name"));
-    body.append(
-        $("<input>")
-            .attr("id", "service-objective-name")
-            .attr("type", "text")
-            .addClass("input")
-            .attr("placeholder", "Critical alerts response")
-            .val(objective.name || "")
-    );
+    body.append($("<label>").attr("for", "service-sli-name").text("SLI name"));
+    body.append($("<input>").attr("id", "service-sli-name").attr("type", "text").addClass("input").attr("placeholder", "Critical alert acknowledgement latency").val(sli.name || "").on("input", function () {
+        if (!$("#service-sli-slug").data("slug-manual")) {
+            $("#service-sli-slug").val(simpleSlug($(this).val()));
+        }
+    }));
 
-    body.append($("<label>").attr("for", "service-objective-description").text("Description"));
-    body.append(
-        $("<textarea>")
-            .attr("id", "service-objective-description")
-            .attr("rows", 3)
-            .addClass("input")
-            .val(objective.description || "")
-    );
+    body.append($("<label>").attr("for", "service-sli-slug").text("Slug"));
+    body.append($("<input>").attr("id", "service-sli-slug").attr("type", "text").addClass("input").val(sli.slug || "").on("input", function () { $(this).data("slug-manual", true); }));
 
-    body.append($("<label>").attr("for", "service-objective-severity").text("Severity scope"));
+    body.append($("<label>").attr("for", "service-sli-description").text("Description"));
+    body.append($("<textarea>").attr("id", "service-sli-description").attr("rows", 3).addClass("input").val(sli.description || ""));
+
+    body.append($("<label>").attr("for", "service-sli-type").text("SLI type"));
     body.append(
-        $("<select>")
-            .attr("id", "service-objective-severity")
-            .addClass("input")
-            .append($("<option>").val("").text("All severities"))
-            .append($("<option>").val("critical").text("Critical"))
-            .append($("<option>").val("high").text("High"))
-            .append($("<option>").val("warning").text("Warning"))
-            .append($("<option>").val("info").text("Info"))
-            .val(objective.severity || "")
+        $("<select>").attr("id", "service-sli-type").addClass("input")
+            .append($("<option>").val("alert_ack_latency").text("Alert acknowledgement latency"))
+            .append($("<option>").val("alert_resolve_latency").text("Alert resolution latency"))
+            .append($("<option>").val("incident_availability").text("Incident-based availability"))
+            .append($("<option>").val("incident_count").text("Impact incident count"))
+            .val(sli.sli_type || "alert_ack_latency")
+            .on("change", updateServiceSliScopeVisibility)
     );
 
     body.append(
         $("<div>")
-            .addClass("form-grid-3")
-            .append(renderServiceObjectiveNumberField("service-objective-ack-minutes", "Ack target, minutes", secondsToMinutes(objective.ack_target_seconds), "15"))
-            .append(renderServiceObjectiveNumberField("service-objective-resolve-minutes", "Resolve target, minutes", secondsToMinutes(objective.resolve_target_seconds), "240"))
-            .append(renderServiceObjectiveNumberField("service-objective-availability", "Availability target, %", basisPointsToPercent(objective.availability_target_basis_points), "99.9", "0.01"))
+            .attr("id", "service-sli-severity-field")
+            .append($("<label>").attr("for", "service-sli-severity").text("Severity scope"))
+            .append(
+                $("<select>").attr("id", "service-sli-severity").addClass("input")
+                    .append($("<option>").val("").text("All severities"))
+                    .append($("<option>").val("critical").text("Critical"))
+                    .append($("<option>").val("high").text("High"))
+                    .append($("<option>").val("warning").text("Warning"))
+                    .append($("<option>").val("info").text("Info"))
+                    .val(sli.severity || "")
+            )
     );
 
-    body.append(
-        $("<label>")
-            .addClass("md-checkbox")
-            .append($("<input>").attr("id", "service-objective-enabled").attr("type", "checkbox").prop("checked", objective.enabled !== false))
-            .append($("<span>").text("Enabled"))
-    );
+    body.append(renderServiceSliPriorityScopeField(sli));
+
+    body.append($("<label>").addClass("md-checkbox").append($("<input>").attr("id", "service-sli-enabled").attr("type", "checkbox").prop("checked", sli.enabled !== false)).append($("<span>").text("Enabled")));
+
+    updateServiceSliScopeVisibility(body);
 
     body.append(
-        $("<div>")
-            .addClass("form-actions")
-            .append(
-                $("<button>")
-                    .attr("type", "button")
-                    .addClass("btn")
-                    .text("Cancel")
-                    .on("click", function () {
-                        closeAppModal("#service-objective-modal");
-                    })
-            )
-            .append(
-                $("<button>")
-                    .attr("type", "button")
-                    .addClass("btn btn-primary")
-                    .text("Save objective")
-                    .on("click", saveServiceObjective)
-            )
+        $("<div>").addClass("form-actions")
+            .append($("<button>").attr("type", "button").addClass("btn").text("Cancel").on("click", function () { closeAppModal("#service-sli-modal"); }))
+            .append($("<button>").attr("type", "button").addClass("btn btn-primary").text("Save SLI").on("click", saveServiceSli))
     );
 
     return body;
 }
 
 
-function renderServiceObjectiveNumberField(id, label, value, placeholder, step) {
-    return $("<div>")
-        .append($("<label>").attr("for", id).text(label))
-        .append(
-            $("<input>")
-                .attr("id", id)
-                .attr("type", "number")
-                .attr("min", 0)
-                .attr("step", step || "1")
-                .addClass("input")
-                .attr("placeholder", placeholder || "")
-                .val(value)
-        );
+function renderServiceSliPriorityScopeField(sli) {
+    const wrapper = $("<div>").attr("id", "service-sli-priority-field");
+    const selected = serviceSliPriorityScope(sli);
+
+    wrapper.append($("<label>").text("Priority scope"));
+    wrapper.append(
+        $("<div>").addClass("form-grid-3").append(
+            SERVICE_SLI_PRIORITY_OPTIONS.map(function (option) {
+                return $("<label>")
+                    .addClass("md-checkbox")
+                    .append(
+                        $("<input>")
+                            .attr("type", "checkbox")
+                            .attr("name", "service-sli-priority-scope")
+                            .val(option[0])
+                            .prop("checked", selected.indexOf(option[0]) !== -1)
+                    )
+                    .append($("<span>").text(option[1]));
+            })
+        )
+    );
+
+    wrapper.append(
+        $("<div>")
+            .addClass("row-subtitle")
+            .text("Incident availability and incident count are calculated from impact priorities. Default: P1/P2.")
+    );
+
+    return wrapper;
 }
 
 
-function collectServiceObjectivePayload() {
+function checkedInputValues(name) {
+    return $("input[name='" + name + "']:checked").map(function () {
+        return $(this).val();
+    }).get();
+}
+
+
+function updateServiceSliScopeVisibility() {
+    const type = $("#service-sli-type").val();
+    const impact = isImpactServiceSliType(type);
+
+    $("#service-sli-severity-field").toggle(!impact);
+    $("#service-sli-priority-field").show();
+
+    if (impact && !checkedInputValues("service-sli-priority-scope").length) {
+        $("input[name='service-sli-priority-scope'][value='p1']").prop("checked", true);
+        $("input[name='service-sli-priority-scope'][value='p2']").prop("checked", true);
+    }
+}
+
+
+function collectServiceSliPayload() {
+    const type = $("#service-sli-type").val();
+    const priorityScope = checkedInputValues("service-sli-priority-scope");
+    const impact = isImpactServiceSliType(type);
+    const configuration = {};
+
+    if (priorityScope.length) {
+        configuration.priority_scope = priorityScope;
+    } else if (impact) {
+        configuration.priority_scope = ["p1", "p2"];
+    }
+
     return {
-        name: $("#service-objective-name").val().trim(),
-        description: $("#service-objective-description").val().trim() || null,
-        severity: $("#service-objective-severity").val() || null,
-        ack_target_seconds: minutesToSeconds($("#service-objective-ack-minutes").val()),
-        resolve_target_seconds: minutesToSeconds($("#service-objective-resolve-minutes").val()),
-        availability_target_basis_points: percentToBasisPoints($("#service-objective-availability").val()),
-        enabled: $("#service-objective-enabled").is(":checked"),
+        slug: $("#service-sli-slug").val().trim() || simpleSlug($("#service-sli-name").val()),
+        name: $("#service-sli-name").val().trim(),
+        description: $("#service-sli-description").val().trim() || null,
+        sli_type: type,
+        source: "incidentrelay_alert_groups",
+        configuration: configuration,
+        severity: impact ? null : ($("#service-sli-severity").val() || null),
+        priority: configuration.priority_scope && configuration.priority_scope.length === 1
+            ? configuration.priority_scope[0]
+            : null,
+        enabled: $("#service-sli-enabled").is(":checked"),
     };
 }
 
 
-function saveServiceObjective() {
-    const serviceId = Number($("#service-objective-service-id").val());
-    const objectiveId = $("#service-objective-id").val();
-    const payload = collectServiceObjectivePayload();
+function saveServiceSli() {
+    const serviceId = Number($("#service-sli-service-id").val());
+    const sliId = $("#service-sli-id").val();
+    const payload = collectServiceSliPayload();
 
-    if (!serviceId) {
-        showAppError("Service is required.");
+    if (!serviceId || !payload.name || !payload.slug) {
+        showAppError("SLI name and slug are required.");
         return;
     }
 
-    if (!payload.name) {
-        showAppError("Name is required.");
-        return;
-    }
-
-    if (!payload.ack_target_seconds && !payload.resolve_target_seconds && payload.availability_target_basis_points === null) {
-        showAppError("Set at least one target.");
-        return;
-    }
-
-    if (objectiveId) {
-        apiPut("/api/services/objectives/" + encodeURIComponent(objectiveId), payload, function () {
-            closeAppModal("#service-objective-modal");
+    if (sliId) {
+        apiPut("/api/services/slis/" + encodeURIComponent(sliId), payload, function () {
+            closeAppModal("#service-sli-modal");
             refreshServiceContextAfterDetailsChange();
         });
         return;
     }
 
-    apiPost("/api/services/" + encodeURIComponent(serviceId) + "/objectives", payload, function () {
-        closeAppModal("#service-objective-modal");
+    apiPost("/api/services/" + encodeURIComponent(serviceId) + "/slis", payload, function () {
+        closeAppModal("#service-sli-modal");
         refreshServiceContextAfterDetailsChange();
     });
 }
 
 
-function deleteServiceObjective(service, objective) {
+function deleteServiceSli(service, sli) {
     showAppConfirm({
-        title: "Delete this service objective?",
-        message: "Delete objective \"" + (objective.name || objective.id) + "\"?",
+        title: "Delete this SLI?",
+        message: "Delete SLI \"" + (sli.name || sli.id) + "\"? SLOs attached to it will be deleted by the database.",
         confirmText: "Delete",
         confirmClass: "btn-danger",
     }).done(function () {
-        apiDelete("/api/services/objectives/" + encodeURIComponent(objective.id), function () {
+        apiDelete("/api/services/slis/" + encodeURIComponent(sli.id), function () {
+            refreshServiceContextAfterDetailsChange();
+        });
+    });
+}
+
+
+function openServiceSloModal(service, slo, slis) {
+    slis = asArray(slis);
+
+    if (!slis.length) {
+        showAppError("Create an SLI first, then add an SLO for it.");
+        return;
+    }
+
+    $("#service-slo-modal").remove();
+    $("body").append(renderServiceSloModal(service, slo, slis));
+    openAppModal("#service-slo-modal");
+    updateServiceSloFormForSli();
+}
+
+
+function renderServiceSloModal(service, slo, slis) {
+    slo = slo || {
+        sli_id: slis[0].id,
+        name: "",
+        description: "",
+        comparison: "percent_good_gte",
+        target_percent_basis_points: 9500,
+        threshold_seconds: 15 * 60,
+        threshold_count: null,
+        window_days: 30,
+        exclude_maintenance: true,
+        include_open_alerts: true,
+        enabled: true,
+    };
+
+    return $("<div>")
+        .attr("id", "service-slo-modal")
+        .addClass("app-modal")
+        .hide()
+        .append(
+            $("<div>")
+                .addClass("app-modal-dialog app-modal-dialog-wide")
+                .append(
+                    $("<div>")
+                        .addClass("app-modal-header")
+                        .append(
+                            $("<div>")
+                                .append($("<h2>").text(slo.id ? "Edit SLO" : "New SLO"))
+                                .append($("<div>").addClass("card-subtitle").text(service.name || service.slug || "Service"))
+                        )
+                        .append($("<button>").attr("type", "button").addClass("app-modal-close").attr("aria-label", "Close").text("×").on("click", function () { closeAppModal("#service-slo-modal"); }))
+                )
+                .append($("<div>").addClass("app-modal-body").append(renderServiceSloForm(service, slo, slis)))
+        );
+}
+
+
+function renderServiceSloForm(service, slo, slis) {
+    const body = $("<div>").addClass("form-body");
+
+    body.append($("<input>").attr("type", "hidden").attr("id", "service-slo-service-id").val(service.id));
+    body.append($("<input>").attr("type", "hidden").attr("id", "service-slo-id").val(slo.id || ""));
+
+    body.append($("<label>").attr("for", "service-slo-sli").text("SLI"));
+    const sliSelect = $("<select>").attr("id", "service-slo-sli").addClass("input").on("change", updateServiceSloFormForSli);
+    slis.forEach(function (sli) {
+        sliSelect.append($("<option>").val(sli.id).attr("data-sli-type", sli.sli_type).text((sli.name || sli.slug) + " · " + formatServiceSliType(sli.sli_type)));
+    });
+    sliSelect.val(slo.sli_id || (slis[0] && slis[0].id));
+    body.append(sliSelect);
+
+    body.append($("<label>").attr("for", "service-slo-name").text("SLO name"));
+    body.append($("<input>").attr("id", "service-slo-name").attr("type", "text").addClass("input").attr("placeholder", "95% critical alerts acknowledged within 15 minutes").val(slo.name || ""));
+
+    body.append($("<label>").attr("for", "service-slo-description").text("Description"));
+    body.append($("<textarea>").attr("id", "service-slo-description").attr("rows", 3).addClass("input").val(slo.description || ""));
+
+    body.append($("<div>").addClass("card-subtitle").text("Targets and evaluation window"));
+
+    body.append($("<div>").addClass("form-grid-3")
+        .append(renderServiceSloNumberField("service-slo-window-days", "Window, days", slo.window_days || 30, "30"))
+        .append(renderServiceSloNumberField("service-slo-target-percent", "Target, %", basisPointsToPercent(slo.target_percent_basis_points), "95", "0.01"))
+        .append(renderServiceSloNumberField("service-slo-threshold-minutes", "Threshold, minutes", secondsToMinutes(slo.threshold_seconds), "15"))
+    );
+
+    body.append($("<div>").addClass("form-grid-3")
+        .append(renderServiceSloNumberField("service-slo-threshold-count", "Max incidents", slo.threshold_count, "3"))
+        .append($("<div>").addClass("form-field").append($("<label>").text("Comparison")).append($("<input>").attr("id", "service-slo-comparison-label").addClass("input").prop("disabled", true)))
+    );
+
+    body.append($("<label>").addClass("md-checkbox").append($("<input>").attr("id", "service-slo-exclude-maintenance").attr("type", "checkbox").prop("checked", slo.exclude_maintenance !== false)).append($("<span>").text("Exclude maintenance from availability calculations")));
+    body.append($("<label>").addClass("md-checkbox").append($("<input>").attr("id", "service-slo-include-open-alerts").attr("type", "checkbox").prop("checked", slo.include_open_alerts !== false)).append($("<span>").text("Track open alerts as pending/breached")));
+    body.append($("<label>").addClass("md-checkbox").append($("<input>").attr("id", "service-slo-enabled").attr("type", "checkbox").prop("checked", slo.enabled !== false)).append($("<span>").text("Enabled")));
+
+    body.append(
+        $("<div>").addClass("form-actions")
+            .append($("<button>").attr("type", "button").addClass("btn").text("Cancel").on("click", function () { closeAppModal("#service-slo-modal"); }))
+            .append($("<button>").attr("type", "button").addClass("btn btn-primary").text("Save SLO").on("click", saveServiceSlo))
+    );
+
+    return body;
+}
+
+
+function renderServiceSloNumberField(id, label, value, placeholder, step) {
+    return $("<div>")
+        .addClass("form-field")
+        .append($("<label>").attr("for", id).text(label))
+        .append($("<input>").attr("id", id).attr("type", "number").attr("min", 0).attr("step", step || "1").addClass("input").attr("placeholder", placeholder || "").val(value === null || value === undefined ? "" : value));
+}
+
+
+function selectedServiceSloSliType() {
+    return $("#service-slo-sli option:selected").attr("data-sli-type") || "alert_ack_latency";
+}
+
+
+function updateServiceSloFormForSli() {
+    const type = selectedServiceSloSliType();
+    const latency = type === "alert_ack_latency" || type === "alert_resolve_latency";
+    const availability = type === "incident_availability";
+    const count = type === "incident_count";
+
+    $("#service-slo-target-percent").closest(".form-field").toggle(latency || availability);
+    $("#service-slo-threshold-minutes").closest(".form-field").toggle(latency);
+    $("#service-slo-threshold-count").closest(".form-field").toggle(count);
+    $("#service-slo-exclude-maintenance").closest("label").toggle(availability);
+    $("#service-slo-comparison-label").val(count ? "value_lte" : "percent_good_gte");
+}
+
+
+function collectServiceSloPayload() {
+    const type = selectedServiceSloSliType();
+    const count = type === "incident_count";
+
+    return {
+        sli_id: Number($("#service-slo-sli").val()),
+        name: $("#service-slo-name").val().trim(),
+        description: $("#service-slo-description").val().trim() || null,
+        comparison: count ? "value_lte" : "percent_good_gte",
+        target_percent_basis_points: count ? null : percentToBasisPoints($("#service-slo-target-percent").val()),
+        threshold_seconds: (type === "alert_ack_latency" || type === "alert_resolve_latency") ? minutesToSeconds($("#service-slo-threshold-minutes").val()) : null,
+        threshold_count: count ? Number($("#service-slo-threshold-count").val() || 0) : null,
+        window_days: Number($("#service-slo-window-days").val() || 30),
+        exclude_maintenance: $("#service-slo-exclude-maintenance").is(":checked"),
+        include_open_alerts: $("#service-slo-include-open-alerts").is(":checked"),
+        enabled: $("#service-slo-enabled").is(":checked"),
+    };
+}
+
+
+function saveServiceSlo() {
+    const serviceId = Number($("#service-slo-service-id").val());
+    const sloId = $("#service-slo-id").val();
+    const payload = collectServiceSloPayload();
+    const type = selectedServiceSloSliType();
+
+    if (!serviceId || !payload.name || !payload.sli_id) {
+        showAppError("SLO name and SLI are required.");
+        return;
+    }
+
+    if (type === "incident_count" && payload.threshold_count === null) {
+        showAppError("Incident count SLO requires Max incidents.");
+        return;
+    }
+
+    if (type !== "incident_count" && payload.target_percent_basis_points === null) {
+        showAppError("SLO target percent is required.");
+        return;
+    }
+
+    if ((type === "alert_ack_latency" || type === "alert_resolve_latency") && !payload.threshold_seconds) {
+        showAppError("Latency SLO requires threshold minutes.");
+        return;
+    }
+
+    if (sloId) {
+        apiPut("/api/services/slos/" + encodeURIComponent(sloId), payload, function () {
+            closeAppModal("#service-slo-modal");
+            refreshServiceContextAfterDetailsChange();
+        });
+        return;
+    }
+
+    apiPost("/api/services/" + encodeURIComponent(serviceId) + "/slos", payload, function () {
+        closeAppModal("#service-slo-modal");
+        refreshServiceContextAfterDetailsChange();
+    });
+}
+
+
+function deleteServiceSlo(service, slo) {
+    showAppConfirm({
+        title: "Delete this SLO?",
+        message: "Delete SLO \"" + (slo.name || slo.id) + "\"?",
+        confirmText: "Delete",
+        confirmClass: "btn-danger",
+    }).done(function () {
+        apiDelete("/api/services/slos/" + encodeURIComponent(slo.id), function () {
             refreshServiceContextAfterDetailsChange();
         });
     });
@@ -1632,9 +2062,9 @@ function renderServiceDetailsQuickActions(payload) {
     appendIconActionIfAllowed(actions, service, {
         required: "write",
         icon: "fas fa-bullseye",
-        label: "Objective",
+        label: "SLI",
         onClick: function () {
-            openServiceObjectiveModal(service, null);
+            openServiceSliModal(service, null);
         },
     });
 
@@ -1809,6 +2239,12 @@ function switchServicesPageTab(tab) {
             renderServiceAnalyticsSummary();
             renderServiceAnalyticsCharts();
             renderServiceAnalyticsTable();
+        }
+    } else if (servicesPageTab === "reliability") {
+        if (serviceSloAnalyticsPayload) {
+            renderServiceSloAnalytics();
+        } else {
+            refreshServiceSloAnalytics();
         }
     }
     if (servicesPageTab === "services") {
@@ -3052,6 +3488,346 @@ function renderServiceAnalyticsRow(row) {
                 .text(getAnalyticsMaintenanceAndBlastLabel(maintenance, blastRadius))
         );
 }
+
+function refreshServiceSloAnalytics() {
+    ensureServiceSloAnalyticsPanel();
+    renderServiceSloAnalyticsLoading();
+
+    const separator = selectedTeamQuery() ? "&" : "?";
+    const url = "/api/services/sli-slo/analytics" + selectedTeamQuery()
+        + separator
+        + "include_disabled=0";
+
+    apiGet(url, function (payload) {
+        serviceSloAnalyticsPayload = payload || {};
+        serviceSloAnalyticsCache = asArray(serviceSloAnalyticsPayload.items);
+        renderServiceSloAnalytics();
+    });
+}
+
+
+function ensureServiceSloAnalyticsPanel() {
+    if ($("#service-slo-analytics-panel").length) {
+        return;
+    }
+
+    const reliabilityContent = $("#service-reliability-content");
+
+    if (!reliabilityContent.length) {
+        return;
+    }
+
+    reliabilityContent.append(
+        $("<div>")
+            .attr("id", "service-slo-analytics-panel")
+            .append(
+                $("<div>")
+                    .addClass("card-header")
+                    .append(
+                        $("<div>")
+                            .append($("<h2>").text("SLI / SLO health"))
+                            .append(
+                                $("<div>")
+                                    .addClass("card-subtitle")
+                                    .text("Latest SLO measurements for services in the selected scope.")
+                            )
+                    )
+            )
+            .append(
+                $("<div>")
+                    .addClass("table-wrapper")
+                    .append(
+                        $("<table>")
+                            .addClass("data-table")
+                            .append(
+                                $("<thead>").append(
+                                    $("<tr>")
+                                        .append($("<th>").text("Total SLOs"))
+                                        .append($("<th>").text("Met"))
+                                        .append($("<th>").text("At risk"))
+                                        .append($("<th>").text("Breached"))
+                                        .append($("<th>").text("No data"))
+                                        .append($("<th>").text("Services"))
+                                )
+                            )
+                            .append($("<tbody>").attr("id", "service-slo-analytics-summary"))
+                    )
+            )
+            .append(
+                $("<div>")
+                    .addClass("table-wrapper")
+                    .append(
+                        $("<table>")
+                            .addClass("data-table sortable-table")
+                            .append(
+                                $("<thead>").append(
+                                    $("<tr>")
+                                        .append($("<th>").text("Service"))
+                                        .append($("<th>").text("SLI"))
+                                        .append($("<th>").text("SLO"))
+                                        .append($("<th>").text("Current"))
+                                        .append($("<th>").text("Target"))
+                                        .append($("<th>").text("Status"))
+                                        .append($("<th>").text("Window"))
+                                        .append($("<th>").text("Budget"))
+                                )
+                            )
+                            .append($("<tbody>").attr("id", "service-slo-analytics-table"))
+                    )
+            )
+    );
+}
+
+
+function renderServiceSloAnalyticsLoading() {
+    ensureServiceSloAnalyticsPanel();
+
+    $("#service-slo-analytics-summary").html(
+        $("<tr>").append(
+            $("<td>")
+                .attr("colspan", 6)
+                .addClass("empty-cell")
+                .text("Loading SLO health...")
+        )
+    );
+    $("#service-slo-analytics-table").html(
+        $("<tr>").append(
+            $("<td>")
+                .attr("colspan", 8)
+                .addClass("empty-cell")
+                .text("Loading SLO measurements...")
+        )
+    );
+}
+
+
+function renderServiceSloAnalytics() {
+    ensureServiceSloAnalyticsPanel();
+    renderServiceSloAnalyticsSummary();
+    renderServiceSloAnalyticsTable();
+}
+
+
+function renderServiceSloAnalyticsSummary() {
+    const summary = serviceSloAnalyticsPayload ? (serviceSloAnalyticsPayload.summary || {}) : {};
+    const tbody = $("#service-slo-analytics-summary");
+
+    if (!tbody.length) {
+        return;
+    }
+
+    tbody.empty();
+    tbody.append(
+        $("<tr>")
+            .append($("<td>").text(Number(summary.total || 0)))
+            .append($("<td>").append(renderServiceSloStatusBadge("met", true)).append(" ").append(String(Number(summary.met || 0))))
+            .append($("<td>").append(renderServiceSloStatusBadge("at_risk", true)).append(" ").append(String(Number(summary.at_risk || 0))))
+            .append($("<td>").append(renderServiceSloStatusBadge("breached", true)).append(" ").append(String(Number(summary.breached || 0))))
+            .append($("<td>").append(renderServiceSloStatusBadge("no_data", true)).append(" ").append(String(Number(summary.no_data || 0))))
+            .append($("<td>").text(Number(summary.services || 0)))
+    );
+}
+
+
+function getFilteredServiceSloAnalytics() {
+    const query = String($("#service-reliability-search").val() || "").trim().toLowerCase();
+
+    if (!query) {
+        return serviceSloAnalyticsCache;
+    }
+
+    return serviceSloAnalyticsCache.filter(function (row) {
+        const evaluation = row.evaluation || {};
+
+        return [
+            row.service_name,
+            row.service_slug,
+            row.team_name,
+            row.team_slug,
+            row.sli_name,
+            row.sli_slug,
+            row.sli_type,
+            row.sli_source,
+            row.sli_severity,
+            row.sli_priority,
+            row.slo_name,
+            row.status,
+            evaluation.message,
+        ].join(" ").toLowerCase().indexOf(query) !== -1;
+    });
+}
+
+
+function renderServiceSloAnalyticsTable() {
+    const tbody = $("#service-slo-analytics-table");
+    const rows = getFilteredServiceSloAnalytics();
+
+    if (!tbody.length) {
+        return;
+    }
+
+    tbody.empty();
+
+    if (!rows.length) {
+        tbody.append(
+            $("<tr>").append(
+                $("<td>")
+                    .attr("colspan", 8)
+                    .addClass("empty-cell")
+                    .text("No SLO measurements")
+            )
+        );
+        return;
+    }
+
+    rows.forEach(function (row) {
+        tbody.append(renderServiceSloAnalyticsRow(row));
+    });
+}
+
+
+function renderServiceSloAnalyticsRow(row) {
+    const evaluation = row.evaluation || {};
+
+    return $("<tr>")
+        .toggleClass("row-disabled", !row.enabled)
+        .append(
+            $("<td>")
+                .addClass("table-cell-truncate")
+                .attr("title", row.service_name || row.service_slug || "-")
+                .append(
+                    $("<button>")
+                        .attr("type", "button")
+                        .addClass("name-button")
+                        .text(row.service_name || row.service_slug || "-")
+                        .on("click", function () {
+                            openServiceDetailsModal(row.service_id);
+                        })
+                )
+                .append(
+                    $("<div>")
+                        .addClass("row-subtitle")
+                        .text(row.team_slug || row.team_name || "-")
+                )
+        )
+        .append(
+            $("<td>")
+                .addClass("table-cell-truncate")
+                .append($("<strong>").text(row.sli_name || row.sli_slug || "-"))
+                .append(
+                    $("<div>")
+                        .addClass("row-subtitle")
+                        .text(formatServiceSliType(row.sli_type) + " / " + formatServiceSliSource(row.sli_source))
+                )
+        )
+        .append(
+            $("<td>")
+                .addClass("table-cell-truncate-wide")
+                .append($("<strong>").text(row.slo_name || "-"))
+                .append(
+                    $("<div>")
+                        .addClass("row-subtitle")
+                        .text(formatServiceSliAnalyticsScope(row))
+                )
+        )
+        .append($("<td>").append(renderServiceSloAnalyticsCurrent(evaluation, row.sli_type)))
+        .append($("<td>").append(renderServiceSloAnalyticsTarget(row)))
+        .append($("<td>").append(renderServiceSloStatusBadge(row.status, row.enabled)))
+        .append($("<td>").text(Number(row.window_days || 0) + "d"))
+        .append($("<td>").append(renderServiceSloAnalyticsBudget(evaluation)));
+}
+
+
+function renderServiceSloAnalyticsCurrent(evaluation, sliType) {
+    if (sliType === "incident_availability") {
+        return renderServiceSloAvailabilityCurrent(evaluation);
+    }
+
+    if (sliType === "incident_count") {
+        return renderServiceSloIncidentCountCurrent(evaluation);
+    }
+
+    return renderServiceSloCurrent(evaluation, sliType);
+}
+
+
+function renderServiceSloAnalyticsTarget(row) {
+    const wrapper = $("<div>").addClass("compact-list");
+
+    if (row.target_percent_basis_points !== null && row.target_percent_basis_points !== undefined) {
+        wrapper.append($("<div>").addClass("compact-list-item").text("≥ " + formatBasisPoints(row.target_percent_basis_points)));
+    }
+
+    if (row.threshold_seconds) {
+        wrapper.append($("<div>").addClass("compact-list-item").text("≤ " + formatDurationSeconds(row.threshold_seconds)));
+    }
+
+    if (row.threshold_count !== null && row.threshold_count !== undefined) {
+        wrapper.append($("<div>").addClass("compact-list-item").text("≤ " + row.threshold_count + " incidents"));
+    }
+
+    if (!wrapper.children().length) {
+        wrapper.text("-");
+    }
+
+    return wrapper;
+}
+
+
+function renderServiceSloAnalyticsBudget(evaluation) {
+    const wrapper = $("<div>").addClass("compact-list");
+
+    if (evaluation.budget_seconds === null || evaluation.budget_seconds === undefined) {
+        return $("<span>").text("-");
+    }
+
+    wrapper.append(
+        $("<div>")
+            .addClass("compact-list-item")
+            .text(
+                "Budget used: " +
+                formatDurationSeconds(evaluation.budget_consumed_seconds || 0, {maxParts: 3}) +
+                " of " +
+                formatDurationSeconds(evaluation.budget_seconds || 0, {maxParts: 3})
+            )
+    );
+
+    if (evaluation.budget_remaining_seconds !== null && evaluation.budget_remaining_seconds !== undefined) {
+        const remaining = Number(evaluation.budget_remaining_seconds || 0);
+        const remainingText = remaining >= 0
+            ? "remaining " + formatDurationSeconds(remaining)
+            : "over budget by " + formatDurationSeconds(Math.abs(remaining));
+
+        wrapper.append(
+            $("<div>")
+                .addClass("compact-list-meta")
+                .text(remainingText)
+        );
+    }
+
+    return wrapper;
+}
+
+
+function formatServiceSliAnalyticsScope(row) {
+    const parts = [];
+
+    if (row.sli_severity) {
+        parts.push("severity: " + row.sli_severity);
+    }
+
+    if (row.sli_priority) {
+        parts.push("priority: " + row.sli_priority);
+    }
+
+    if (row.exclude_maintenance) {
+        parts.push("maintenance excluded");
+    }
+
+    return parts.length ? parts.join(" / ") : "all matching alert groups";
+}
+
+
 function formatAnalyticsRatio(value) {
     const number = Number(value || 0);
 
@@ -3092,13 +3868,19 @@ function getAnalyticsMaintenanceAndBlastLabel(maintenance, blastRadius) {
         "blast " + Number(blastRadius.transitive_downstream || 0),
     ].join(" / ");
 }
-$(document).on("input", "#service-analytics-search", renderServiceAnalyticsTable);
+$(document).on("input", "#service-analytics-search", function () {
+    renderServiceAnalyticsTable();
+});
+
+$(document).on("input", "#service-reliability-search", function () {
+    renderServiceSloAnalyticsTable();
+});
 $(document).on("change", "#service-analytics-days", function () {
     invalidateServiceDetailsCache();
     refreshServiceAnalytics();
     refreshSelectedServiceDetails();
 });
-$(document).on("click", "#reload-service-analytics", refreshServiceAnalytics);
+$(document).on("click", "#reload-service-reliability", refreshServiceSloAnalytics);
 function buildServiceImpactQuery() {
     const existingQuery = selectedTeamQuery();
     const params = new URLSearchParams(

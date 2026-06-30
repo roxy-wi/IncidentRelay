@@ -1007,6 +1007,30 @@ function updateLayerCadenceVisibility(layerId) {
     card.find(".layer-custom-options").toggle(type === "custom");
 }
 
+function nextRotationLayerDefaultName() {
+    const used = {};
+
+    asArray(rotationLayersCache).forEach(function (layer) {
+        const name = String((layer && layer.name) || "").trim().toLowerCase();
+
+        if (name) {
+            used[name] = true;
+        }
+    });
+
+    if (!used["new layer"]) {
+        return "New layer";
+    }
+
+    let index = 2;
+
+    while (used[("new layer " + index).toLowerCase()]) {
+        index += 1;
+    }
+
+    return "New layer " + index;
+}
+
 function addLayerCard() {
     if (!selectedRotationForLayers) {
         showAppError("Select a rotation first.");
@@ -1021,7 +1045,7 @@ function addLayerCard() {
         : 10;
 
     const payload = {
-        name: "New layer",
+        name: nextRotationLayerDefaultName(rotation),
         description: null,
         priority: nextPriority,
         start_at: rotation ? rotation.start_at : null,

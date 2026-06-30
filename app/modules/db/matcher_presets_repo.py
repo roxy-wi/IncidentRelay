@@ -7,6 +7,7 @@ from app.modules.db.models import (
     MatcherPreset,
     NotificationPolicyRule,
     PriorityPolicyRule,
+    Service,
     ServiceMatchRule,
     Silence,
     ServiceRunbook,
@@ -14,12 +15,15 @@ from app.modules.db.models import (
 
 
 def count_service_runbook_usages(preset_id):
-    """Return number of active service runbooks using a preset."""
+    """Return number of active service runbooks on active services using a preset."""
     return (
-        ServiceRunbook.select(ServiceRunbook.id)
+        ServiceRunbook
+        .select(ServiceRunbook.id)
+        .join(Service)
         .where(
             ServiceRunbook.matcher_preset == preset_id,
             ServiceRunbook.deleted == False,
+            Service.deleted == False,
         )
         .count()
     )
@@ -50,12 +54,15 @@ def count_route_usages(preset_id):
 
 
 def count_service_match_rule_usages(preset_id):
-    """Return number of active service match rules using a preset."""
+    """Return number of active service match rules on active services using a preset."""
     return (
-        ServiceMatchRule.select(ServiceMatchRule.id)
+        ServiceMatchRule
+        .select(ServiceMatchRule.id)
+        .join(Service)
         .where(
             ServiceMatchRule.matcher_preset == preset_id,
             ServiceMatchRule.deleted == False,
+            Service.deleted == False,
         )
         .count()
     )
@@ -247,9 +254,13 @@ def count_matcher_preset_usages(preset_id):
 def list_matcher_preset_usages(preset_id):
     """Return active rules using a preset."""
     service_runbooks = list(
-        ServiceRunbook.select().where(
+        ServiceRunbook
+        .select(ServiceRunbook, Service)
+        .join(Service)
+        .where(
             ServiceRunbook.matcher_preset == preset_id,
             ServiceRunbook.deleted == False,
+            Service.deleted == False,
         )
     )
     silences = list(
@@ -281,9 +292,13 @@ def list_matcher_preset_usages(preset_id):
     )
 
     service_match_rules = list(
-        ServiceMatchRule.select().where(
+        ServiceMatchRule
+        .select(ServiceMatchRule, Service)
+        .join(Service)
+        .where(
             ServiceMatchRule.matcher_preset == preset_id,
             ServiceMatchRule.deleted == False,
+            Service.deleted == False,
         )
     )
 

@@ -906,21 +906,56 @@ class ServiceOwner(BaseModel):
         )
 
 
+class ServiceSli(SoftDeleteModel):
+    """Service Level Indicator definition for a service."""
+
+    id = AutoField()
+    service = ForeignKeyField(Service, backref="slis", on_delete="CASCADE")
+
+    slug = CharField()
+    name = CharField()
+    description = TextField(null=True)
+
+    sli_type = CharField(index=True)
+    source = CharField(default="incidentrelay_alert_groups", index=True)
+    configuration = JSONTextField(default=dict)
+
+    severity = CharField(null=True, index=True)
+    priority = CharField(null=True, index=True)
+
+    enabled = BooleanField(default=True, index=True)
+    created_at = DateTimeField(default=datetime.utcnow)
+    updated_at = DateTimeField(default=datetime.utcnow)
+
+    class Meta:
+        table_name = "service_sli"
+        indexes = (
+            (("service", "slug"), True),
+            (("service", "enabled"), False),
+            (("sli_type", "source"), False),
+        )
+
+
 class ServiceSlo(SoftDeleteModel):
-    """Service-level targets for acknowledgement and resolution."""
+    """Service Level Objective attached to one SLI."""
 
     id = AutoField()
     service = ForeignKeyField(Service, backref="slos", on_delete="CASCADE")
+    sli = ForeignKeyField(ServiceSli, backref="slos", on_delete="CASCADE")
 
     name = CharField()
     description = TextField(null=True)
-    severity = CharField(null=True)
 
-    ack_target_seconds = IntegerField(null=True)
-    resolve_target_seconds = IntegerField(null=True)
-    availability_target_basis_points = IntegerField(null=True)
+    comparison = CharField(default="percent_good_gte")
+    target_percent_basis_points = IntegerField(null=True)
+    threshold_seconds = IntegerField(null=True)
+    threshold_count = IntegerField(null=True)
+    window_days = IntegerField(default=30)
 
-    enabled = BooleanField(default=True)
+    exclude_maintenance = BooleanField(default=True)
+    include_open_alerts = BooleanField(default=True)
+
+    enabled = BooleanField(default=True, index=True)
     created_at = DateTimeField(default=datetime.utcnow)
     updated_at = DateTimeField(default=datetime.utcnow)
 
@@ -929,6 +964,47 @@ class ServiceSlo(SoftDeleteModel):
         indexes = (
             (("service", "name"), True),
             (("service", "enabled"), False),
+            (("sli", "enabled"), False),
+        )
+
+
+class ServiceSloMeasurement(BaseModel):
+    """Point-in-time SLO calculation result."""
+
+    id = AutoField()
+    service = ForeignKeyField(Service, backref="slo_measurements", on_delete="CASCADE")
+    sli = ForeignKeyField(ServiceSli, backref="measurements", on_delete="CASCADE")
+    slo = ForeignKeyField(ServiceSlo, backref="measurements", on_delete="CASCADE")
+
+    window_start = DateTimeField(index=True)
+    window_end = DateTimeField(index=True)
+    status = CharField(index=True)
+
+    value_basis_points = IntegerField(null=True)
+    value_count = IntegerField(null=True)
+    target_basis_points = IntegerField(null=True)
+    threshold_seconds = IntegerField(null=True)
+    threshold_count = IntegerField(null=True)
+
+    good_count = IntegerField(default=0)
+    total_count = IntegerField(default=0)
+    bad_count = IntegerField(default=0)
+    pending_count = IntegerField(default=0)
+
+    downtime_seconds = IntegerField(null=True)
+    budget_seconds = IntegerField(null=True)
+    budget_consumed_seconds = IntegerField(null=True)
+    budget_remaining_seconds = IntegerField(null=True)
+
+    calculated_at = DateTimeField(default=datetime.utcnow, index=True)
+    details = JSONTextField(default=dict)
+
+    class Meta:
+        table_name = "service_slo_measurement"
+        indexes = (
+            (("slo", "calculated_at"), False),
+            (("service", "calculated_at"), False),
+            (("status", "calculated_at"), False),
         )
 
 
@@ -1552,41 +1628,6 @@ class IncidentStakeholder(BaseModel):
             (("group", "email"), False),
             (("group", "role"), False),
             (("group", "active"), False),
-        )
-
-
-class ServiceStatusHistory(BaseModel):
-    """Product history of service status changes."""
-
-    id = AutoField()
-    service = ForeignKeyField(Service, backref="status_history", on_delete="CASCADE")
-
-    old_status = CharField(null=True)
-    new_status = CharField()
-    source = CharField(default="manual")
-    message = TextField(null=True)
-
-    alert = ForeignKeyField(Alert, null=True, backref="service_status_changes", on_delete="SET NULL")
-    maintenance_window = ForeignKeyField(
-        MaintenanceWindow,
-        null=True,
-        backref="service_status_changes",
-        on_delete="SET NULL",
-    )
-    changed_by = ForeignKeyField(
-        User,
-        null=True,
-        backref="service_status_changes",
-        on_delete="SET NULL",
-    )
-
-    created_at = DateTimeField(default=datetime.utcnow)
-
-    class Meta:
-        table_name = "service_status_history"
-        indexes = (
-            (("service", "created_at"), False),
-            (("new_status", "created_at"), False),
         )
 
 

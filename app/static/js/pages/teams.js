@@ -8,10 +8,7 @@ function loadTeams() {
      * Load teams page.
      */
     RbacRoles.fillTeamSelect(TEAM_VIEWER_ROLE);
-    loadTeamGroups(function () {
-        refreshTeams();
-        fillUserSelect("#team-member-user", null, "/api/users?all=1");
-    });
+    loadTeamGroups(refreshTeams);
 }
 
 function loadTeamGroups(callback) {
@@ -389,6 +386,67 @@ function getSelectedTeamForMembers() {
     });
 }
 
+function fillTeamMemberUserSelect(team, callback) {
+    /*
+     * Fill team member user select with active users from this team's group.
+     */
+    const selectElement = getSelectElement("#team-member-user");
+
+    if (!selectElement) {
+        if (typeof callback === "function") {
+            callback([]);
+        }
+        return;
+    }
+
+    const wasDisabled = $(selectElement).prop("disabled");
+
+    destroyTomSelectIfExists(selectElement);
+
+    const select = $(selectElement);
+    select.empty();
+
+    if (!team || !team.group_id) {
+        initUserTomSelectIfNeeded(selectElement);
+        setEnhancedSelectDisabled(selectElement, wasDisabled);
+
+        if (typeof callback === "function") {
+            callback([]);
+        }
+        return;
+    }
+
+    apiGet(
+        "/api/groups/" + encodeURIComponent(team.group_id) + "/users",
+        function (memberships) {
+            memberships = asArray(memberships).filter(function (membership) {
+                return !!membership.active;
+            });
+
+            memberships.forEach(function (membership) {
+                const userId = getUserIdValue(membership);
+
+                if (!userId) {
+                    return;
+                }
+
+                select.append(
+                    $("<option>")
+                        .val(String(userId))
+                        .text(getUserOptionText(membership))
+                );
+            });
+
+            initUserTomSelectIfNeeded(selectElement);
+            setEnhancedSelectDisabled(selectElement, wasDisabled);
+
+            if (typeof callback === "function") {
+                callback(memberships);
+            }
+        }
+    );
+}
+
 function openTeamMembers(teamId, teamName) {
     /*
      * Open team members modal and load members.
@@ -396,15 +454,21 @@ function openTeamMembers(teamId, teamName) {
     const team = teamsCache.find(function (item) {
         return Number(item.id) === Number(teamId);
     });
-    if (team && !canManageUsersObject(team)) {
+
+    if (!team) {
+        showAppError("Team was not found.");
+        return;
+    }
+
+    if (!canManageUsersObject(team)) {
         showAppError("You do not have permission to manage this team's members.");
         return;
     }
 
     RbacRoles.fillTeamSelect(TEAM_VIEWER_ROLE);
-    fillUserSelect("#team-member-user", function () {
+    fillTeamMemberUserSelect(team, function () {
         resetTeamMemberForm();
-    }, "/api/users?all=1");
+    });
     loadTeamMembers(teamId, teamName);
     openTeamMembersModal();
 }
@@ -549,9 +613,14 @@ function saveTeamUser() {
     const teamName = $("#team-member-team-name").val();
     const membershipId = $("#team-member-id").val();
     const selectedTeam = getSelectedTeamForMembers();
+    const selectedUserId = Number($("#team-member-user").val());
 
     if (!teamId) {
         showAppError("Select a team first.");
+        return;
+    }
+    if (!membershipId && !selectedUserId) {
+        showAppError("User is required.");
         return;
     }
     if (selectedTeam && !canManageUsersObject(selectedTeam)) {
@@ -578,7 +647,7 @@ function saveTeamUser() {
     apiPost(
         "/api/teams/" + teamId + "/users",
         {
-            user_id: Number($("#team-member-user").val()),
+            user_id: selectedUserId,
             role: $("#team-member-role").val(),
             active: $("#team-member-active").is(":checked"),
         },

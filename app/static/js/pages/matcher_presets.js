@@ -217,7 +217,7 @@ function matcherPresetUsageList(title, usages) {
         list.append(
             matcherPresetDetailsItem(
                 matcherPresetUsageContext(usage),
-                usage.name || "Resource #" + usage.id
+                usage.name || usage.title || "Resource #" + usage.id
             )
         );
     });
@@ -260,6 +260,7 @@ function renderMatcherPresetDetails(preset, options) {
     body.append(matcherPresetUsageList("Priority policy rules", asArray(usages.priority_policy_rules)));
     body.append(matcherPresetUsageList("Routes", asArray(usages.routes)));
     body.append(matcherPresetUsageList("Service match rules", asArray(usages.service_match_rules)));
+    body.append(matcherPresetUsageList("Service runbooks", asArray(usages.service_runbooks)));
     body.append(matcherPresetUsageList("Silences", asArray(usages.silences)));
 
     const actions = $("<div>").addClass("details-actions");

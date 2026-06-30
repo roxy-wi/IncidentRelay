@@ -5,6 +5,7 @@ import logging
 
 logger = logging.getLogger("oncall.alerts")
 
+
 def normalize_sentry(payload, headers=None):
     """Normalize Sentry Integration Platform webhooks."""
     headers = headers or {}
@@ -181,6 +182,19 @@ def normalize_sentry(payload, headers=None):
         if value not in (None, "")
     }
 
+    sentry_tags = normalize_sentry_tags(
+        payload.get("tags"),
+        data.get("tags"),
+        issue.get("tags"),
+        event.get("tags"),
+        metric_alert.get("tags"),
+        event_alert.get("tags"),
+        alert_obj.get("tags"),
+    )
+
+    for key, value in sentry_tags.items():
+        labels.setdefault(key, value)
+
     add_event_link_label(labels, sentry_url)
 
     external_id = first_non_empty(
@@ -243,6 +257,83 @@ def normalize_sentry_named_object(value):
     name = first_non_empty(value.get("name"), slug)
 
     return slug, name
+
+
+def normalize_sentry_tags(*tag_sources):
+    """Normalize Sentry tag formats into alert labels."""
+    labels = {}
+
+    for tags in tag_sources:
+        if not tags:
+            continue
+
+        if isinstance(tags, dict):
+            tag_items = tags.items()
+        elif isinstance(tags, list):
+            tag_items = iter_sentry_tag_list(tags)
+        else:
+            continue
+
+        for key, value in tag_items:
+            key = normalize_sentry_tag_key(key)
+            value = normalize_sentry_tag_value(value)
+
+            if key and value not in (None, ""):
+                labels[key] = value
+
+    return labels
+
+
+def iter_sentry_tag_list(tags):
+    """Yield key/value pairs from Sentry list-style tags."""
+    for item in tags:
+        if isinstance(item, dict):
+            key = first_non_empty(
+                item.get("key"),
+                item.get("name"),
+                item.get("tag"),
+            )
+            value = first_non_empty(
+                item.get("value"),
+                item.get("val"),
+            )
+            yield key, value
+            continue
+
+        if isinstance(item, (list, tuple)) and len(item) >= 2:
+            yield item[0], item[1]
+
+
+def normalize_sentry_tag_key(value):
+    """Return a usable label key for a Sentry tag."""
+    if value is None:
+        return None
+
+    value = str(value).strip()
+
+    if not value:
+        return None
+
+    return value
+
+
+def normalize_sentry_tag_value(value):
+    """Return a usable label value for a Sentry tag."""
+    if value is None:
+        return None
+
+    if isinstance(value, str):
+        value = value.strip()
+
+        if not value:
+            return None
+
+        return value
+
+    if isinstance(value, (int, float, bool)):
+        return value
+
+    return str(value)
 
 
 def normalize_sentry_alertname(resource, metric_alert=None):

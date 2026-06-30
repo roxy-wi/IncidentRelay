@@ -301,41 +301,118 @@ class ServiceRunbookUpdateSchema(ServiceRunbookBaseSchema):
     """Validate service runbook update."""
 
 
+SERVICE_SLI_TYPE_PATTERN = (
+    r"^(alert_ack_latency|alert_resolve_latency|incident_availability|incident_count)$"
+)
+
+SERVICE_SLI_SOURCE_PATTERN = r"^(incidentrelay_alert_groups|incidentrelay_service_status)$"
+
+SERVICE_SLI_SEVERITY_PATTERN = r"^(critical|high|warning|info)$"
+
+SERVICE_SLI_PRIORITY_PATTERN = r"^(p1|p2|p3|p4)$"
+SERVICE_IMPACT_SLI_TYPES = {"incident_availability", "incident_count"}
+SERVICE_SLI_PRIORITY_VALUES = ["p1", "p2", "p3", "p4"]
+DEFAULT_IMPACT_PRIORITY_SCOPE = ["p1", "p2"]
+
+SERVICE_SLO_COMPARISON_PATTERN = r"^(percent_good_gte|value_gte|value_lte)$"
+SERVICE_SLO_NAME_MAX_LENGTH = 160
 
 
-SERVICE_SLO_SEVERITY_PATTERN = r"^(critical|high|warning|info)$"
+class ServiceSliBaseSchema(ApiModel):
+    """Validate Service Level Indicator input."""
 
-
-class ServiceSloBaseSchema(ApiModel):
-    """Validate service objective / SLO input."""
-
+    slug: str = Field(
+        min_length=SLUG_MIN_LENGTH,
+        max_length=SLUG_MAX_LENGTH,
+        pattern=r"^[a-z0-9][a-z0-9-]*$",
+    )
     name: str = Field(min_length=NAME_MIN_LENGTH, max_length=NAME_MAX_LENGTH)
     description: str | None = Field(default=None, max_length=DESCRIPTION_MAX_LENGTH)
-    severity: str | None = Field(default=None, pattern=SERVICE_SLO_SEVERITY_PATTERN)
-    ack_target_seconds: int | None = Field(default=None, ge=1, le=30 * 24 * 3600)
-    resolve_target_seconds: int | None = Field(default=None, ge=1, le=90 * 24 * 3600)
-    availability_target_basis_points: int | None = Field(default=None, ge=0, le=10000)
+    sli_type: str = Field(pattern=SERVICE_SLI_TYPE_PATTERN)
+    source: str = Field(default="incidentrelay_alert_groups", pattern=SERVICE_SLI_SOURCE_PATTERN)
+    configuration: Dict[str, Any] = Field(default_factory=dict)
+    severity: str | None = Field(default=None, pattern=SERVICE_SLI_SEVERITY_PATTERN)
+    priority: str | None = Field(default=None, pattern=SERVICE_SLI_PRIORITY_PATTERN)
     enabled: bool = True
 
     @model_validator(mode="after")
-    def validate_has_at_least_one_target(self):
-        """Require at least one objective target."""
-        if (
-            self.ack_target_seconds is None
-            and self.resolve_target_seconds is None
-            and self.availability_target_basis_points is None
-        ):
-            raise ValueError("Service objective must define at least one target")
+    def validate_scope_shape(self):
+        """Validate and normalize SLI scope fields."""
+        configuration = dict(self.configuration or {})
+        priority_scope = configuration.get("priority_scope")
+
+        if priority_scope is None and self.priority:
+            priority_scope = [self.priority]
+
+        if priority_scope is None and self.sli_type in SERVICE_IMPACT_SLI_TYPES:
+            priority_scope = list(DEFAULT_IMPACT_PRIORITY_SCOPE)
+
+        if isinstance(priority_scope, str):
+            priority_scope = [priority_scope]
+
+        normalized = []
+
+        if priority_scope is not None:
+            if not isinstance(priority_scope, list):
+                raise ValueError("priority_scope must be a list")
+
+            for value in priority_scope:
+                value = str(value or "").strip().lower()
+
+                if value not in SERVICE_SLI_PRIORITY_VALUES:
+                    raise ValueError("priority_scope values must be one of p1, p2, p3, p4")
+
+                if value not in normalized:
+                    normalized.append(value)
+
+        if self.sli_type in SERVICE_IMPACT_SLI_TYPES and not normalized:
+            raise ValueError("Impact SLI requires priority_scope")
+
+        if normalized:
+            configuration["priority_scope"] = normalized
+            self.priority = normalized[0] if len(normalized) == 1 else None
+        else:
+            configuration.pop("priority_scope", None)
+            self.priority = None
+
+        if self.sli_type in SERVICE_IMPACT_SLI_TYPES:
+            self.severity = None
+
+        self.configuration = configuration
 
         return self
 
 
+class ServiceSliCreateSchema(ServiceSliBaseSchema):
+    """Validate Service Level Indicator creation."""
+
+
+class ServiceSliUpdateSchema(ServiceSliBaseSchema):
+    """Validate Service Level Indicator update."""
+
+
+class ServiceSloBaseSchema(ApiModel):
+    """Validate Service Level Objective input."""
+
+    sli_id: int = Field(ge=1)
+    name: str = Field(min_length=NAME_MIN_LENGTH, max_length=SERVICE_SLO_NAME_MAX_LENGTH)
+    description: str | None = Field(default=None, max_length=DESCRIPTION_MAX_LENGTH)
+    comparison: str | None = Field(default=None, pattern=SERVICE_SLO_COMPARISON_PATTERN)
+    target_percent_basis_points: int | None = Field(default=None, ge=0, le=10000)
+    threshold_seconds: int | None = Field(default=None, ge=1, le=90 * 24 * 3600)
+    threshold_count: int | None = Field(default=None, ge=0, le=100000)
+    window_days: int = Field(default=30, ge=1, le=365)
+    exclude_maintenance: bool = True
+    include_open_alerts: bool = True
+    enabled: bool = True
+
+
 class ServiceSloCreateSchema(ServiceSloBaseSchema):
-    """Validate service objective creation."""
+    """Validate Service Level Objective creation."""
 
 
 class ServiceSloUpdateSchema(ServiceSloBaseSchema):
-    """Validate service objective update."""
+    """Validate Service Level Objective update."""
 
 
 class ServiceDependencyBaseSchema(ApiModel):

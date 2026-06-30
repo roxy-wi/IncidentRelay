@@ -9,10 +9,10 @@ from app.modules.db.models import AlertGroup
 from app.services.rbac import require_team_read, current_user
 from app.services.serializers import serialize_utc_datetime, serialize_maintenance_window, serialize_service, \
     serialize_service_readiness_state, serialize_service_link, serialize_service_runbook, serialize_service_dependency, \
-    serialize_service_readiness, serialize_service_slo
+    serialize_service_readiness, serialize_service_sli, serialize_service_slo
 from app.services.service_catalog import readiness as service_readiness
 from app.services.service_catalog.impact import build_single_service_impact_v2
-from app.services.service_catalog.objectives import evaluate_service_objectives
+from app.services.service_catalog.sli_slo import evaluate_service_slos
 from app.services.service_catalog.timeline import list_service_events, serialize_service_event, build_next_cursor
 from app.services.validation import make_error_response
 
@@ -214,11 +214,15 @@ def _service_details_payload(service, *, days):
 
     links = services_repo.list_service_links(service_id=service.id)
     runbooks = services_repo.list_service_runbooks(service_id=service.id)
-    objectives = services_repo.list_service_slos(
+    slis = services_repo.list_service_slis(
         service_id=service.id,
         include_disabled=True,
     )
-    objective_evaluations = evaluate_service_objectives(objectives, days=days)
+    slos = services_repo.list_service_slos(
+        service_id=service.id,
+        include_disabled=True,
+    )
+    slo_evaluations = evaluate_service_slos(slos)
 
     impact = build_single_service_impact_v2(
         service.id,
@@ -240,7 +244,8 @@ def _service_details_payload(service, *, days):
             "upstream_dependencies": len(upstream_dependencies),
             "downstream_dependencies": len(downstream_dependencies),
             "timeline_events": len(timeline),
-            "objectives": len(objectives),
+            "slis": len(slis),
+            "slos": len(slos),
             "readiness": serialize_service_readiness_state(readiness_state),
         },
         "maintenance_windows": _service_maintenance_windows(service),
@@ -252,14 +257,20 @@ def _service_details_payload(service, *, days):
             serialize_service_runbook(runbook, current_user())
             for runbook in runbooks
         ],
-        "objectives": [
-            serialize_service_slo(
-                objective,
-                current_user(),
-                evaluation=objective_evaluations.get(objective.id),
-            )
-            for objective in objectives
-        ],
+        "sli_slo": {
+            "slis": [
+                serialize_service_sli(sli, current_user())
+                for sli in slis
+            ],
+            "slos": [
+                serialize_service_slo(
+                    slo,
+                    current_user(),
+                    evaluation=slo_evaluations.get(slo.id),
+                )
+                for slo in slos
+            ],
+        },
         "dependencies": {
             "upstream": [
                 serialize_service_dependency(dependency, current_user())

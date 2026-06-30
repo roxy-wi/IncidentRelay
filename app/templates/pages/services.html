@@ -61,6 +61,9 @@
         <button class="page-tab" type="button" data-services-tab="analytics">
           Analytics
         </button>
+        <button class="page-tab" type="button" data-services-tab="reliability">
+          Reliability
+        </button>
     </div>
 
     <div id="services-page-layout" class="page-layout-grid is-full-width">
@@ -416,6 +419,30 @@
                 </table>
               </div>
             </div>
+          <div id="services-tab-reliability" class="services-tab-panel" style="display: none;">
+          <div class="card-header">
+            <div>
+              <h2>Reliability</h2>
+              <div class="card-subtitle">
+                SLI/SLO health, latest measurements and error budget state.
+              </div>
+            </div>
+            <div class="card-header-actions">
+              <button id="reload-service-reliability" type="button" class="btn">
+                Reload
+              </button>
+            </div>
+          </div>
+
+          <div class="page-toolbar is-flush-top">
+            <div class="page-toolbar-search">
+              <span class="page-toolbar-search-icon">⌕</span>
+              <input id="service-reliability-search" class="input" type="search" placeholder="Search services, SLI or SLO..." autocomplete="off">
+            </div>
+          </div>
+
+          <div id="service-reliability-content"></div>
+        </div>
           <div id="services-tab-standards" class="services-tab-panel" style="display: none;">
           <div class="card-header">
             <div>

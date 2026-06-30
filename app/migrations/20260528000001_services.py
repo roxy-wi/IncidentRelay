@@ -12,11 +12,12 @@ from app.modules.db.models import (
     ServiceRunbook,
     ServiceLink,
     ServiceMatchRule,
-    ServiceStatusHistory,
     MaintenanceWindow,
     MaintenanceWindowService,
     ServiceOwner,
+    ServiceSli,
     ServiceSlo,
+    ServiceSloMeasurement,
 )
 
 db = init_database()
@@ -42,7 +43,9 @@ def upgrade():
             MaintenanceWindow,
             MaintenanceWindowService,
             ServiceOwner,
+            ServiceSli,
             ServiceSlo,
+            ServiceSloMeasurement,
         ],
         safe=True,
     )
@@ -73,7 +76,6 @@ def upgrade():
     db.create_tables(
         [
             ServiceMatchRule,
-            ServiceStatusHistory,
         ],
         safe=True,
     )
@@ -95,7 +97,6 @@ def downgrade():
 
     db.drop_tables(
         [
-            ServiceStatusHistory,
             ServiceMatchRule,
         ],
         safe=True,
@@ -114,7 +115,9 @@ def downgrade():
 
     db.drop_tables(
         [
+            ServiceSloMeasurement,
             ServiceSlo,
+            ServiceSli,
             ServiceOwner,
             MaintenanceWindowService,
             MaintenanceWindow,

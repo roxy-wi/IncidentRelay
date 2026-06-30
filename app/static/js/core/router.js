@@ -184,6 +184,7 @@ $(document).ready(function () {
     }
 
     $("#global-team-filter").on("change", function () {
+        writeStoredGlobalTeamId($(this).val());
         navigate(currentAppUrlWithoutTeamScope(), true);
         applyRbacUiState();
     });
