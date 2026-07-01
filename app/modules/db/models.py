@@ -589,6 +589,114 @@ class ServiceEvent(BaseModel):
         )
 
 
+class ServiceImpactSnapshot(BaseModel):
+    """Point-in-time Service Impact v2 computation snapshot."""
+
+    id = AutoField()
+    uid = UUIDField(default=uuid.uuid4, unique=True, index=True)
+
+    group = ForeignKeyField(Group, null=True, backref="service_impact_snapshots", on_delete="SET NULL")
+    team = ForeignKeyField(Team, null=True, backref="service_impact_snapshots", on_delete="SET NULL")
+    service = ForeignKeyField(Service, null=True, backref="impact_snapshots", on_delete="SET NULL")
+
+    source = CharField(default="manual", index=True)
+    scope = CharField(default="all", index=True)
+    captured_at = DateTimeField(default=datetime.utcnow, index=True)
+
+    max_depth = IntegerField(default=5)
+    include_disabled = BooleanField(default=False)
+    include_operational = BooleanField(default=True)
+
+    services_count = IntegerField(default=0)
+    affected_services = IntegerField(default=0)
+    critical_services = IntegerField(default=0)
+    major_outage_services = IntegerField(default=0)
+    partial_outage_services = IntegerField(default=0)
+    degraded_services = IntegerField(default=0)
+    maintenance_services = IntegerField(default=0)
+    unknown_services = IntegerField(default=0)
+
+    alert_group_impacted_services = IntegerField(default=0)
+    dependency_impacted_services = IntegerField(default=0)
+    own_status_impacted_services = IntegerField(default=0)
+
+    open_alert_groups_total = IntegerField(default=0)
+    critical_open_alert_groups_total = IntegerField(default=0)
+    upstream_issues_total = IntegerField(default=0)
+    cycle_detected_count = IntegerField(default=0)
+    depth_limited_count = IntegerField(default=0)
+
+    summary = JSONTextField(default=dict)
+    filters = JSONTextField(default=dict)
+    payload = JSONTextField(default=dict)
+
+    created_at = DateTimeField(default=datetime.utcnow)
+
+    class Meta:
+        table_name = "service_impact_snapshot"
+        indexes = (
+            (("captured_at",), False),
+            (("team", "captured_at"), False),
+            (("service", "captured_at"), False),
+            (("source", "captured_at"), False),
+        )
+
+
+class ServiceImpactSnapshotItem(BaseModel):
+    """One service row inside a Service Impact snapshot."""
+
+    id = AutoField()
+    snapshot = ForeignKeyField(ServiceImpactSnapshot, backref="items", on_delete="CASCADE")
+
+    group = ForeignKeyField(Group, null=True, backref="service_impact_snapshot_items", on_delete="SET NULL")
+    team = ForeignKeyField(Team, null=True, backref="service_impact_snapshot_items", on_delete="SET NULL")
+    service = ForeignKeyField(Service, null=True, backref="impact_snapshot_items", on_delete="SET NULL")
+
+    captured_at = DateTimeField(index=True)
+
+    service_slug = CharField(null=True)
+    service_name = CharField(null=True)
+    team_slug = CharField(null=True)
+    team_name = CharField(null=True)
+    criticality = CharField(null=True)
+    tier = CharField(null=True)
+
+    own_status = CharField(default="operational", index=True)
+    alert_impact_status = CharField(default="operational", index=True)
+    dependency_impact_status = CharField(default="operational", index=True)
+    effective_status = CharField(default="operational", index=True)
+    primary_reason = CharField(default="none", index=True)
+
+    open_alert_groups = IntegerField(default=0)
+    critical_open_alert_groups = IntegerField(default=0)
+    upstream_issues_count = IntegerField(default=0)
+
+    blast_radius_direct = IntegerField(default=0)
+    blast_radius_total = IntegerField(default=0)
+    blast_radius_critical = IntegerField(default=0)
+    blast_radius_tier_1 = IntegerField(default=0)
+
+    cycle_detected = BooleanField(default=False, index=True)
+    depth_limited = BooleanField(default=False, index=True)
+
+    root_causes = JSONTextField(default=list)
+    explanation = JSONTextField(null=True)
+    blast_radius = JSONTextField(null=True)
+    payload = JSONTextField(default=dict)
+
+    created_at = DateTimeField(default=datetime.utcnow)
+
+    class Meta:
+        table_name = "service_impact_snapshot_item"
+        indexes = (
+            (("snapshot", "service"), True),
+            (("captured_at", "effective_status"), False),
+            (("team", "captured_at"), False),
+            (("service", "captured_at"), False),
+            (("primary_reason", "captured_at"), False),
+        )
+
+
 class ServiceStandard(SoftDeleteModel):
     """Readiness standard applied to services within a group."""
 

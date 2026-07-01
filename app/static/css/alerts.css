@@ -372,3 +372,15 @@ body.md-theme .alert-comment-edit-body {
   min-height: 88px;
   resize: vertical;
 }
+.alert-child-time-row {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+    margin-top: 6px;
+    color: var(--muted-text, #64748b);
+    font-size: 12px;
+}
+
+.alert-child-time-item {
+    white-space: nowrap;
+}

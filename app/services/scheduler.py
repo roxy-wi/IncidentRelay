@@ -15,6 +15,7 @@ from app.services.notifications.shift_notifications import (
 from app.services.notifications.rules import process_due_user_notifications
 from app.services.incidents.responders import expire_due_incident_responders
 from app.services.alerts.explain_cleanup import cleanup_alert_explain_traces
+from app.services.service_catalog.impact_snapshots import capture_scheduled_service_impact_snapshot
 
 logger = logging.getLogger("oncall.scheduler")
 _scheduler = None
@@ -327,6 +328,58 @@ def alert_explain_trace_cleanup_job():
             db.close()
 
 
+def service_impact_snapshot_job():
+    """Capture Service Impact snapshots under a database lock."""
+    if db.is_closed():
+        db.connect(reuse_if_open=True)
+
+    owner = None
+
+    try:
+        owner = acquire_db_lock("service_impact_snapshot_job")
+
+        if not owner:
+            logger.debug("service impact snapshot job skipped because lock is busy")
+            return {
+                "items": 0,
+                "deleted_old_snapshots": 0,
+            }
+
+        logger.info("service impact snapshot job started")
+
+        result = capture_scheduled_service_impact_snapshot(
+            retention_days=int(getattr(Config, "SERVICE_IMPACT_SNAPSHOT_RETENTION_DAYS", 365))
+        )
+
+        logger.info(
+            "service impact snapshot job finished",
+            extra={
+                "extra": {
+                    "event_type": "scheduler",
+                    "snapshot_items": result.get("items", 0),
+                    "deleted_old_snapshots": result.get("deleted_old_snapshots", 0),
+                }
+            },
+        )
+
+        return result
+
+    except Exception:
+        logger.exception("service impact snapshot job failed")
+        return {
+            "items": 0,
+            "deleted_old_snapshots": 0,
+            "failed": 1,
+        }
+
+    finally:
+        if owner:
+            release_db_lock("service_impact_snapshot_job", owner)
+
+        if not db.is_closed():
+            db.close()
+
+
 def start_scheduler():
     """
     Start the background scheduler.
@@ -430,6 +483,18 @@ def start_scheduler():
         id="alert_explain_trace_cleanup_job",
         replace_existing=True,
     )
+
+    if bool(getattr(Config, "SERVICE_IMPACT_SNAPSHOT_ENABLED", True)):
+        _scheduler.add_job(
+            service_impact_snapshot_job,
+            "interval",
+            seconds=int(getattr(Config, "SERVICE_IMPACT_SNAPSHOT_INTERVAL_SECONDS", 300)),
+            max_instances=1,
+            coalesce=True,
+            next_run_time=datetime.utcnow(),
+            id="service_impact_snapshot_job",
+            replace_existing=True,
+        )
 
     try:
         _scheduler.start()

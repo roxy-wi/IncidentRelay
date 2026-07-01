@@ -30,6 +30,7 @@
     <script src="/static/js/vendor/select2.min.js"></script>
     <script src="{{ url_for('static', filename='js/vendor/tom-select.complete.min.js') }}"></script>
     <script src="{{ url_for('static', filename='js/vendor/chart.min.js') }}"></script>
+    <script src="{{ url_for('static', filename='/js/vendor/cytoscape.min.js') }}"></script>
 </head>
 <body class="md-theme">
 <section class="layout">
@@ -307,13 +308,19 @@
 <script src="{{ url_for('static', filename='js/components/alerts/alert_incident_management.js') }}"></script>
 <script src="{{ url_for('static', filename='js/components/maintenance_badges.js') }}"></script>
 <script src="{{ url_for('static', filename='js/components/notification_center.js') }}"></script>
+<script src="{{ url_for('static', filename='js/components/dependency_graph.js') }}"></script>
 <script src="{{ url_for('static', filename='js/common/slug.js') }}"></script>
 <script src="{{ url_for('static', filename='js/pages/alerts.js') }}"></script>
 <script src="/static/js/pages/rotations.js"></script>
 <script src="{{ url_for('static', filename='js/pages/oncall_health.js') }}"></script>
 <script src="/static/js/pages/calendar.js"></script>
 <script src="/static/js/pages/routes.js"></script>
-<script src="{{ url_for('static', filename='js/pages/services.js') }}"></script>
+<script src="{{ url_for('static', filename='js/pages/services/core.js') }}"></script>
+<script src="{{ url_for('static', filename='js/pages/services/details.js') }}"></script>
+<script src="{{ url_for('static', filename='js/pages/services/context.js') }}"></script>
+<script src="{{ url_for('static', filename='js/pages/services/analytics.js') }}"></script>
+<script src="{{ url_for('static', filename='js/pages/services/impact.js') }}"></script>
+<script src="{{ url_for('static', filename='js/pages/services/extras.js') }}"></script>
 <script src="{{ url_for('static', filename='js/pages/maintenance_windows.js') }}"></script>
 <script src="{{ url_for('static', filename='js/pages/escalation_policies.js') }}"></script>
 <script src="{{ url_for('static', filename='js/pages/notification_policies.js') }}"></script>

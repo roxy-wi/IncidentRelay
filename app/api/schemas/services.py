@@ -520,6 +520,45 @@ class ServiceImpactAnalyticsQuerySchema(ApiModel):
     )
 
 
+class ServiceImpactSnapshotQuerySchema(ApiModel):
+    """Validate manual Service Impact snapshot creation query/body."""
+
+    team_id: int | None = Field(default=None, ge=1)
+    service_id: int | None = Field(default=None, ge=1)
+
+    include_disabled: bool = False
+    include_operational: bool = True
+    include_explanation: bool = True
+    include_root_causes: bool = True
+    include_blast_radius: bool = True
+    include_paths: bool = True
+
+    max_depth: int = Field(
+        default=SERVICE_IMPACT_MAX_DEPTH_DEFAULT,
+        ge=1,
+        le=SERVICE_IMPACT_MAX_DEPTH_LIMIT,
+    )
+
+
+class ServiceImpactSnapshotListQuerySchema(ApiModel):
+    """Validate Service Impact snapshot list query."""
+
+    team_id: int | None = Field(default=None, ge=1)
+    service_id: int | None = Field(default=None, ge=1)
+    days: int = Field(default=7, ge=1, le=365)
+    limit: int = Field(default=50, ge=1, le=500)
+
+
+class ServiceImpactHistoryQuerySchema(ApiModel):
+    """Validate historical Service Impact analytics query."""
+
+    team_id: int | None = Field(default=None, ge=1)
+    service_id: int | None = Field(default=None, ge=1)
+    days: int = Field(default=30, ge=1, le=365)
+    bucket: str = Field(default="day", pattern=r"^(hour|day)$")
+    limit: int = Field(default=25, ge=1, le=200)
+
+
 class ServiceImpactPathNodeSchema(ApiModel):
     """Service node inside an impact path."""
 

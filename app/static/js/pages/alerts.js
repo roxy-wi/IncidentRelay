@@ -1810,15 +1810,22 @@ function renderAlertGroupChildren(alerts, modal) {
     section.prop("hidden", false);
 
     if (!alerts.length) {
-        target.append($("<div>").addClass("help-text").text("No child alerts in this group."));
+        target.append(
+            $("<div>").addClass("help-text").text("No child alerts in this group.")
+        );
         return;
     }
 
     alerts.forEach(function (alert) {
         const labels = alert.labels || {};
+        const createdAt = alert.first_seen_at || alert.created_at || null;
+        const lastSeenAt = alert.last_seen_at || alert.updated_at || null;
+
         const subtitle = [
             alert.status || null,
             alert.severity || null,
+            createdAt ? "created=" + formatDateTimeMinutes(createdAt) : null,
+            lastSeenAt ? "last_seen=" + formatDateTimeMinutes(lastSeenAt) : null,
             labels.instance ? "instance=" + labels.instance : null,
             alert.dedup_key ? "dedup=" + alert.dedup_key : null,
         ].filter(Boolean).join(" · ");
@@ -1830,7 +1837,7 @@ function renderAlertGroupChildren(alerts, modal) {
                     $("<div>")
                         .addClass("alert-child-header")
                         .append(
-                            $("<strong>").text("#" + alert.id + " " + (alert.title || "Alert"))
+                            $("<span>").text("#" + alert.id + " " + (alert.title || "Alert"))
                         )
                         .append(
                             $("<span>")
@@ -1842,6 +1849,20 @@ function renderAlertGroupChildren(alerts, modal) {
                     $("<div>")
                         .addClass("table-subtitle")
                         .text(subtitle || "-")
+                )
+                .append(
+                    $("<div>")
+                        .addClass("alert-child-time-row")
+                        .append(
+                            $("<span>")
+                                .addClass("alert-child-time-item")
+                                .text("Created: " + (formatDateTimeMinutes(createdAt) || "-"))
+                        )
+                        .append(
+                            $("<span>")
+                                .addClass("alert-child-time-item")
+                                .text("Last seen: " + (formatDateTimeMinutes(lastSeenAt) || "-"))
+                        )
                 )
                 .append(
                     $("<pre>")

@@ -219,3 +219,15 @@ button.impact-root-cause-chip:hover {
         grid-template-columns: 1fr;
     }
 }
+
+.impact-history-panel {
+    margin: 16px 0;
+}
+
+.impact-history-chart-grid {
+    margin-bottom: 16px;
+}
+
+.impact-history-table-wrapper {
+    margin-top: 12px;
+}

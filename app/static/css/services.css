@@ -447,3 +447,115 @@ button.impact-path-node {
 .service-name-link:hover {
   text-decoration: underline;
 }
+.service-dependency-graph-card {
+    border: 1px solid var(--border-color, #d9dee8);
+    border-radius: 16px;
+    background: var(--card-bg, #fff);
+    padding: 14px;
+    margin-bottom: 16px;
+}
+
+.service-dependency-graph-toolbar {
+    display: flex;
+    gap: 10px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-bottom: 12px;
+}
+
+.service-dependency-graph-search {
+    min-width: 260px;
+    flex: 1 1 280px;
+}
+
+.service-dependency-graph {
+    position: relative;
+    min-height: 480px;
+    height: min(70vh, 720px);
+    border: 1px solid var(--border-color, #d9dee8);
+    border-radius: 14px;
+    background:
+        radial-gradient(circle at 1px 1px, rgba(148, 163, 184, 0.18) 1px, transparent 0),
+        var(--surface-bg, #f8fafc);
+    background-size: 20px 20px;
+    overflow: hidden;
+}
+
+.service-dependency-graph .empty-state {
+    position: absolute;
+    inset: 0;
+    display: grid;
+    place-items: center;
+    color: var(--muted-text, #64748b);
+}
+
+.service-dependency-graph-legend {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-top: 10px;
+    color: var(--muted-text, #64748b);
+    font-size: 12px;
+}
+
+.graph-legend-dot {
+    display: inline-block;
+    width: 10px;
+    height: 10px;
+    border-radius: 999px;
+    margin-right: 6px;
+    vertical-align: -1px;
+}
+
+.graph-legend-line {
+    display: inline-block;
+    width: 22px;
+    height: 0;
+    border-top: 3px solid currentColor;
+    margin-right: 6px;
+    vertical-align: 3px;
+}
+
+.graph-legend-operational {
+    background: #16a34a;
+}
+
+.graph-legend-degraded {
+    background: #f59e0b;
+}
+
+.graph-legend-outage {
+    background: #dc2626;
+}
+
+.graph-legend-required {
+    color: #dc2626;
+}
+
+.graph-legend-optional {
+    color: #94a3b8;
+}
+
+.graph-legend-disabled {
+    color: #94a3b8;
+    border-top-style: dashed;
+}
+.service-dependencies-view-tabs,
+.service-impact-view-tabs {
+    margin-top: 12px;
+    margin-bottom: 12px;
+}
+
+.service-dependencies-view-panel {
+    margin-top: 12px;
+}
+
+
+.service-impact-view-panel {
+    margin-top: 12px;
+}
+
+.impact-history-toolbar {
+    justify-content: flex-end;
+}

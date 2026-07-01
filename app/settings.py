@@ -232,6 +232,24 @@ class Config:
         86400,
     )
 
+    SERVICE_IMPACT_SNAPSHOT_ENABLED = settings.get_bool(
+        "services",
+        "impact_snapshot_enabled",
+        True,
+    )
+
+    SERVICE_IMPACT_SNAPSHOT_INTERVAL_SECONDS = settings.get_int(
+        "services",
+        "impact_snapshot_interval_seconds",
+        600,
+    )
+
+    SERVICE_IMPACT_SNAPSHOT_RETENTION_DAYS = settings.get_int(
+        "services",
+        "impact_snapshot_retention_days",
+        65,
+    )
+
     INCIDENT_RESPONDER_EXPIRE_CHECK_INTERVAL_SECONDS = settings.get_int(
         "incidents",
         "responder_expire_check_interval_seconds",

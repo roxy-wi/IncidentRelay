@@ -235,6 +235,24 @@
                     </div>
                   </div>
 
+              <div class="page-tabs service-impact-view-tabs" role="group" aria-label="Service impact view">
+                <button
+                  type="button"
+                  class="page-tab service-impact-view-tab is-active"
+                  data-service-impact-view="current"
+                >
+                  Current
+                </button>
+                <button
+                  type="button"
+                  class="page-tab service-impact-view-tab"
+                  data-service-impact-view="history"
+                >
+                  History
+                </button>
+              </div>
+
+              <div id="service-impact-current-view" class="service-impact-view-panel">
                   <div class="page-toolbar is-flush-top">
                     <div class="page-toolbar-search">
                       <span class="page-toolbar-search-icon">⌕</span>
@@ -295,6 +313,62 @@
                   </tbody>
                 </table>
               </div>
+              </div>
+
+              <div id="service-impact-history-view" class="service-impact-view-panel" style="display: none;">
+                <div class="page-toolbar is-flush-top impact-history-toolbar">
+                  <select id="service-impact-history-days" class="input page-toolbar-filter">
+                    <option value="7">Last 7 days</option>
+                    <option value="30" selected>Last 30 days</option>
+                    <option value="90">Last 90 days</option>
+                    <option value="365">Last 365 days</option>
+                  </select>
+                  <button id="capture-service-impact-snapshot" type="button" class="btn">
+                    Capture snapshot
+                  </button>
+                </div>
+
+                <div id="service-impact-history-panel" class="impact-history-panel">
+                  <div class="analytics-chart-grid impact-history-chart-grid">
+                    <section class="analytics-chart-card">
+                      <div class="analytics-chart-header">
+                        <h3>Historical affected services</h3>
+                        <p>Average and maximum affected services from persisted impact snapshots.</p>
+                      </div>
+                      <canvas id="service-impact-history-affected-chart"></canvas>
+                    </section>
+
+                    <section class="analytics-chart-card">
+                      <div class="analytics-chart-header">
+                        <h3>Historical impact reasons</h3>
+                        <p>Snapshot item counts by primary reason.</p>
+                      </div>
+                      <canvas id="service-impact-history-reasons-chart"></canvas>
+                    </section>
+                  </div>
+
+                  <div class="table-wrapper impact-history-table-wrapper">
+                    <table class="data-table sortable-table">
+                      <thead>
+                        <tr>
+                          <th>Historically affected service</th>
+                          <th>Team</th>
+                          <th>Affected samples</th>
+                          <th>Affected %</th>
+                          <th>Worst status</th>
+                          <th>Last status</th>
+                          <th>Max alerts</th>
+                          <th>Max upstream</th>
+                          <th>Last affected</th>
+                        </tr>
+                      </thead>
+                      <tbody id="service-impact-history-table">
+                        <tr><td colspan="9" class="empty-cell">No historical impact snapshots</td></tr>
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              </div>
             </div>
 
         <div id="services-tab-dependencies" class="services-tab-panel" style="display: none;">
@@ -309,31 +383,103 @@
             </div>
           </div>
 
-          <div class="page-toolbar is-flush-top">
-            <div class="page-toolbar-search">
-              <span class="page-toolbar-search-icon">⌕</span>
-              <input id="service-dependencies-search" class="input" type="search" placeholder="Search dependencies..." autocomplete="off">
-            </div>
+          <div class="page-tabs service-dependencies-view-tabs" role="group" aria-label="Dependencies view">
+            <button
+              id="service-dependencies-view-table"
+              type="button"
+              class="page-tab service-dependencies-view-tab is-active"
+              data-service-dependencies-view="table"
+            >
+              Table
+            </button>
+            <button
+              id="service-dependencies-view-graph"
+              type="button"
+              class="page-tab service-dependencies-view-tab"
+              data-service-dependencies-view="graph"
+            >
+              Graph
+            </button>
           </div>
 
-          <div class="table-wrapper">
-            <table class="data-table sortable-table">
-              <thead>
-                <tr>
-                  <th>Service</th>
-                  <th>Depends on</th>
-                  <th>Type</th>
-                  <th>Criticality</th>
-                  <th>Target status</th>
-                  <th>Description</th>
-                  <th class="actions-th">Actions</th>
-                </tr>
-              </thead>
-              <tbody id="service-dependencies-table">
-                <tr><td colspan="7" class="empty-cell">No dependencies</td></tr>
-              </tbody>
-            </table>
-          </div>
+            <div id="service-dependencies-graph-view" class="service-dependencies-view-panel" style="display: none;">
+                <div class="service-dependency-graph-card">
+                    <div class="service-dependency-graph-toolbar">
+                        <div class="page-toolbar-search service-dependency-graph-search">
+                            <span class="page-toolbar-search-icon">⌕</span>
+                            <input
+                                id="service-dependency-graph-search"
+                                class="input"
+                                type="search"
+                                placeholder="Search graph..."
+                                autocomplete="off"
+                            >
+                        </div>
+
+                        <select id="service-dependency-graph-focus" class="input page-toolbar-filter">
+                            <option value="">All services</option>
+                        </select>
+
+                        <select id="service-dependency-graph-direction" class="input page-toolbar-filter">
+                            <option value="connected">Connected to selected</option>
+                            <option value="outgoing">Dependencies of selected</option>
+                            <option value="incoming">Dependents of selected</option>
+                            <option value="all">All</option>
+                        </select>
+
+                        <select id="service-dependency-graph-layout" class="input page-toolbar-filter">
+                            <option value="breadthfirst" selected>Hierarchy</option>
+                            <option value="cose">Force-directed</option>
+                            <option value="circle">Circle</option>
+                            <option value="grid">Grid</option>
+                        </select>
+
+                        <button id="service-dependency-graph-fit" type="button" class="btn">
+                            Fit
+                        </button>
+                    </div>
+
+                    <div id="service-dependency-graph" class="service-dependency-graph">
+                        <div class="empty-state">No dependency graph loaded</div>
+                    </div>
+
+                    <div class="service-dependency-graph-legend">
+                        <span><i class="graph-legend-dot graph-legend-operational"></i>Operational</span>
+                        <span><i class="graph-legend-dot graph-legend-degraded"></i>Degraded</span>
+                        <span><i class="graph-legend-dot graph-legend-outage"></i>Outage</span>
+                        <span><i class="graph-legend-line graph-legend-required"></i>Required</span>
+                        <span><i class="graph-legend-line graph-legend-optional"></i>Optional</span>
+                        <span><i class="graph-legend-line graph-legend-disabled"></i>Disabled</span>
+                    </div>
+                </div>
+            </div>
+
+            <div id="service-dependencies-table-view" class="service-dependencies-view-panel">
+              <div class="page-toolbar is-flush-top service-dependencies-table-toolbar">
+                <div class="page-toolbar-search service-dependencies-table-search">
+                  <span class="page-toolbar-search-icon">⌕</span>
+                  <input id="service-dependencies-search" class="input" type="search" placeholder="Search dependencies..." autocomplete="off">
+                </div>
+              </div>
+              <div class="table-wrapper">
+                <table class="data-table sortable-table">
+                  <thead>
+                    <tr>
+                      <th>Service</th>
+                      <th>Depends on</th>
+                      <th>Type</th>
+                      <th>Criticality</th>
+                      <th>Target status</th>
+                      <th>Description</th>
+                      <th class="actions-th">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody id="service-dependencies-table">
+                    <tr><td colspan="7" class="empty-cell">No dependencies</td></tr>
+                  </tbody>
+                </table>
+              </div>
+            </div>
         </div>
           <div id="services-tab-analytics" class="services-tab-panel" style="display: none;">
               <div class="card-header">
