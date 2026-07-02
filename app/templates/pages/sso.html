@@ -433,6 +433,21 @@
           </label>
 
           <label>
+            <span>IncidentRelay team</span>
+            <select id="sso-mapping-team"></select>
+            <small>Optional. When selected, matching users are also added to this team.</small>
+          </label>
+
+          <label>
+            <span>Team role</span>
+            <select id="sso-mapping-team-role" disabled>
+                <option value="viewer">Team Viewer</option>
+                <option value="responder">Team Responder</option>
+                <option value="manager">Team Manager</option>
+            </select>
+          </label>
+
+          <label>
             <span>Priority</span>
             <input id="sso-mapping-priority" type="number" value="100" min="0">
           </label>

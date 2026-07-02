@@ -49,10 +49,7 @@ def list_teams():
             for team in teams_repo.list_teams(active_only=active_only)
             if team.id in team_ids
         ]
-    return jsonify([
-        serialize_team(team, user)
-        for team in teams
-    ])
+    return jsonify([serialize_team(team, current_user=user) for team in teams])
 
 
 @teams_bp.route("/<int:team_id>", methods=["GET"])
@@ -63,7 +60,7 @@ def get_team(team_id):
         return error
     return jsonify(serialize_team(
         teams_repo.get_team(team_id),
-        request.current_user,
+        current_user=request.current_user,
     ))
 
 
@@ -112,7 +109,7 @@ def create_team():
         team_id=team.id,
         data=payload.model_dump(),
     )
-    return jsonify(serialize_team(team, request.current_user)), 201
+    return jsonify(serialize_team(team, current_user=request.current_user)), 201
 
 
 @teams_bp.route("/<int:team_id>", methods=["PUT"])
@@ -167,7 +164,7 @@ def update_team(team_id):
         team_id=team.id,
         data=payload.model_dump(),
     )
-    return jsonify(serialize_team(team, request.current_user)), 201
+    return jsonify(serialize_team(team, current_user=request.current_user))
 
 
 @teams_bp.route("/<int:team_id>", methods=["DELETE"])

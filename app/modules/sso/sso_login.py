@@ -7,7 +7,7 @@ from peewee import IntegrityError
 
 from app.db import database_proxy as db
 from app.login import create_access_token
-from app.modules.db import groups_repo, users_repo
+from app.modules.db import groups_repo, teams_repo, users_repo
 from app.modules.db.models import SsoGroupMapping, SsoIdentity, User, UserGroup
 from app.settings import Config
 from app.api.schemas.limits import normalize_phone
@@ -344,6 +344,20 @@ def _effective_group_role(mapping_role: str) -> str:
     return mapping_role
 
 
+def _sync_team_membership_from_mapping(user, mapping):
+    """Sync optional IncidentRelay team membership from a matched SSO mapping."""
+    team_id = getattr(mapping, "incidentrelay_team_id", None)
+
+    if not team_id:
+        return
+
+    teams_repo.add_user_to_team(
+        team_id=team_id,
+        user_id=user.id,
+        role=mapping.team_role or "viewer",
+    )
+
+
 def _sync_group_memberships(user, provider, claims):
     """Sync IncidentRelay group memberships from SSO group mappings."""
     if not provider.sync_group_memberships:
@@ -399,6 +413,8 @@ def _sync_group_memberships(user, provider, claims):
             group_id=group_id,
             role=_effective_group_role(mapping.group_role),
         )
+
+        _sync_team_membership_from_mapping(user, mapping)
 
         matched_group_ids.append(group_id)
 

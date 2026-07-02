@@ -526,17 +526,9 @@ def get_team_permissions(user, team_id):
     }
 
 
-def is_global_admin_user(user=None):
-    """Return true when user is a global administrator."""
-    if user is None:
-        user = current_user()
-
-    return bool(user and user.is_admin)
-
-
 def can_assign_group_role(role, user=None):
     """Return true when user can assign selected group role."""
-    if is_global_admin_user(user):
+    if is_admin_user(user):
         return True
 
     return role != GROUP_USER_ADMIN_ROLE

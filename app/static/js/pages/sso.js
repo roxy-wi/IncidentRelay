@@ -1,6 +1,7 @@
 let ssoProvidersCache = [];
 let ssoMappingsCache = [];
 let ssoGroupsCache = [];
+let ssoTeamsCache = [];
 let selectedSsoProvider = null;
 let ssoProviderExtraConfigCache = {};
 
@@ -35,7 +36,9 @@ function collectSamlSecurityPayload() {
 
 function loadSsoAdmin() {
   loadSsoGroups(function () {
-    loadSsoProviders();
+    loadSsoTeams(function () {
+      loadSsoProviders();
+    });
   });
 }
 
@@ -68,6 +71,60 @@ function fillSsoGroupSelect(selectedValue) {
   if (selectedValue) {
     select.val(String(selectedValue));
   }
+}
+
+function loadSsoTeams(done) {
+  apiGet("/api/teams?include_inactive=true", function (teams) {
+    ssoTeamsCache = asArray(teams).filter(function (team) {
+      return team.active !== false;
+    });
+
+    fillSsoTeamSelect();
+
+    if (typeof done === "function") {
+      done();
+    }
+  });
+}
+
+function getSsoTeamsForSelectedGroup() {
+  const groupId = Number($("#sso-mapping-group").val());
+
+  if (!groupId) {
+    return [];
+  }
+
+  return ssoTeamsCache.filter(function (team) {
+    return Number(team.group_id) === groupId;
+  });
+}
+
+function fillSsoTeamSelect(selectedValue) {
+  const select = $("#sso-mapping-team");
+  const teams = getSsoTeamsForSelectedGroup();
+
+  select.empty();
+  select.append(
+    $("<option>")
+      .val("")
+      .text("No team mapping")
+  );
+
+  teams.forEach(function (team) {
+    select.append(
+      $("<option>")
+        .val(String(team.id))
+        .text((team.name || team.slug || ("Team #" + team.id)) + " (" + team.slug + ")")
+    );
+  });
+
+  if (selectedValue && select.find('option[value="' + selectedValue + '"]').length) {
+    select.val(String(selectedValue));
+  } else {
+    select.val("");
+  }
+
+  $("#sso-mapping-team-role").prop("disabled", !select.val());
 }
 
 function loadSsoProviders() {
@@ -361,7 +418,10 @@ function renderSsoMappingCard(mapping) {
                           .text(
                               (mapping.group_name || mapping.group_slug || "Group") +
                               " · " +
-                              (mapping.group_role || "viewer")
+                              (mapping.group_role || "viewer") +
+                              (mapping.team_id
+                                ? " · " + (mapping.team_name || mapping.team_slug || "Team") + " / " + (mapping.team_role || "viewer")
+                                : "")
                           )
                   )
           )
@@ -376,7 +436,9 @@ function renderSsoMappingCard(mapping) {
       $("<div>")
           .addClass("summary-mini-grid")
           .append(renderSsoMiniItem("IncidentRelay group", mapping.group_name || mapping.group_slug))
-          .append(renderSsoMiniItem("Role", mapping.group_role || "viewer"))
+          .append(renderSsoMiniItem("Group role", mapping.group_role || "viewer"))
+          .append(renderSsoMiniItem("IncidentRelay team", mapping.team_name || mapping.team_slug || "—"))
+          .append(renderSsoMiniItem("Team role", mapping.team_role || "—"))
           .append(renderSsoMiniItem("Priority", mapping.priority))
           .append(renderSsoMiniItem("Status", mapping.active ? "Enabled" : "Disabled"))
   );
@@ -695,7 +757,10 @@ function openExistingSsoMappingModal(mapping) {
   $("#sso-mapping-id").val(mapping.id);
   $("#sso-mapping-external-group").val(mapping.external_group || "");
   fillSsoGroupSelect(mapping.group_id);
+  fillSsoTeamSelect(mapping.team_id);
   $("#sso-mapping-role").val(mapping.group_role || "viewer");
+  $("#sso-mapping-team-role").val(mapping.team_role || "viewer");
+  $("#sso-mapping-team-role").prop("disabled", !mapping.team_id);
   $("#sso-mapping-priority").val(mapping.priority || 100);
   $("#sso-mapping-active").prop("checked", !!mapping.active);
 
@@ -708,7 +773,10 @@ function resetSsoMappingForm() {
   $("#sso-mapping-id").val("");
   $("#sso-mapping-external-group").val("");
   fillSsoGroupSelect();
+  fillSsoTeamSelect();
   $("#sso-mapping-role").val("viewer");
+  $("#sso-mapping-team-role").val("viewer");
+  $("#sso-mapping-team-role").prop("disabled", true);
   $("#sso-mapping-priority").val(100);
   $("#sso-mapping-active").prop("checked", true);
 }
@@ -718,6 +786,8 @@ function collectSsoMappingPayload() {
     external_group: $("#sso-mapping-external-group").val().trim(),
     group_id: Number($("#sso-mapping-group").val()),
     group_role: $("#sso-mapping-role").val() || "viewer",
+    team_id: $("#sso-mapping-team").val() ? Number($("#sso-mapping-team").val()) : null,
+    team_role: $("#sso-mapping-team").val() ? ($("#sso-mapping-team-role").val() || "viewer") : null,
     active: $("#sso-mapping-active").is(":checked"),
     priority: Number($("#sso-mapping-priority").val() || 100),
   };
@@ -788,6 +858,12 @@ $(document).on("click", "#reload-sso-mappings", function () {
 
 $(document).on("click", "#save-sso-mapping", saveSsoMapping);
 $(document).on("click", "#reset-sso-mapping-form", resetSsoMappingForm);
+$(document).on("change", "#sso-mapping-group", function () {
+  fillSsoTeamSelect();
+});
+$(document).on("change", "#sso-mapping-team", function () {
+  $("#sso-mapping-team-role").prop("disabled", !$(this).val());
+});
 $(document).on("click", "#close-sso-mapping-modal", closeAppModal);
 $(document).on("click", "#close-sso-mappings-modal", closeAppModal);
 

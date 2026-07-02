@@ -165,6 +165,8 @@ def create_group_mapping(provider_id):
 
     try:
         mapping = sso_repo.create_group_mapping(provider_id, data)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
     except IntegrityError:
         return integrity_conflict("SSO group mapping could not be saved because it conflicts with existing data")
 
@@ -197,6 +199,8 @@ def update_group_mapping(mapping_id):
 
     try:
         mapping = sso_repo.update_group_mapping(mapping_id, data)
+    except ValueError as exc:
+        return jsonify({"error": str(exc)}), 400
     except IntegrityError:
         return integrity_conflict("SSO group mapping could not be saved because it conflicts with existing data")
 

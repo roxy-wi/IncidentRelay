@@ -1145,6 +1145,18 @@ body.has-app-sticky-x-scroll {
     gap: 9px;
 }
 
+.form-grid-4 {
+    display: grid;
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+    gap: 10px;
+}
+
+.form-grid-4 > div {
+    display: flex;
+    flex-direction: column;
+    gap: 9px;
+}
+
 .table-cell-truncate,
 .table-cell-truncate-wide {
     max-width: 240px;

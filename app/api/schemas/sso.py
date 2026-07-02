@@ -1,7 +1,14 @@
 from pydantic import Field, field_validator, model_validator
 
 from app.api.schemas.base import ApiModel
-from app.api.schemas.roles import GROUP_VIEWER_ROLE, GROUP_EDITOR_ROLE, GROUP_USER_ADMIN_ROLE, SSO_GLOBAL_ADMIN_ROLE
+from app.api.schemas.roles import (
+    GROUP_VIEWER_ROLE,
+    GROUP_EDITOR_ROLE,
+    GROUP_USER_ADMIN_ROLE,
+    SSO_GLOBAL_ADMIN_ROLE,
+    TEAM_ROLE_VALUES,
+    TEAM_VIEWER_ROLE,
+)
 from app.modules.sso.saml_security import SsoExtraConfig
 
 SSO_MAPPING_ROLES = {
@@ -166,6 +173,8 @@ class SsoGroupMappingCreateSchema(ApiModel):
     external_group: str = Field(min_length=1, max_length=100)
     group_id: int = Field(ge=1)
     group_role: str = Field(default=GROUP_VIEWER_ROLE, max_length=32)
+    team_id: int | None = Field(default=None, ge=1)
+    team_role: str | None = Field(default=TEAM_VIEWER_ROLE, max_length=32)
     active: bool = True
     priority: int = Field(default=100, ge=0, le=10000)
 
@@ -179,6 +188,14 @@ class SsoGroupMappingCreateSchema(ApiModel):
 
         if not self.group_id:
             raise ValueError("incidentrelay_group_id is required")
+
+        if self.team_id and (self.team_role or TEAM_VIEWER_ROLE) not in TEAM_ROLE_VALUES:
+            raise ValueError("team_role must be viewer, responder or manager")
+
+        if not self.team_id:
+            self.team_role = None
+        elif not self.team_role:
+            self.team_role = TEAM_VIEWER_ROLE
 
         return self
 

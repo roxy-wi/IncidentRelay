@@ -244,6 +244,7 @@ def update_user(user_id, data):
         "mattermost_user_id",
         "notify_oncall_shift_start_email",
         "notify_oncall_shift_end_email",
+        "notify_oncall_shift_start_mattermost",
         "active",
         "is_admin",
         "password_hash",

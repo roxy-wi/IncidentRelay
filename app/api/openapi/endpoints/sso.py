@@ -1,4 +1,4 @@
-from app.api.schemas.roles import GROUP_ROLE_VALUES, GROUP_VIEWER_ROLE
+from app.api.schemas.roles import GROUP_ROLE_VALUES, GROUP_VIEWER_ROLE, TEAM_ROLE_VALUES, TEAM_VIEWER_ROLE
 
 
 def path_param(name, description):
@@ -167,6 +167,16 @@ SSO_GROUP_MAPPING_SCHEMA = {
             "enum": list(GROUP_ROLE_VALUES),
             "default": GROUP_VIEWER_ROLE,
             "example": "viewer",
+        },
+        "team_id": {"type": "integer", "nullable": True, "minimum": 1, "example": 10},
+        "team_slug": {"type": "string", "nullable": True, "readOnly": True, "example": "cloud-api"},
+        "team_name": {"type": "string", "nullable": True, "readOnly": True, "example": "Cloud API"},
+        "team_role": {
+            "type": "string",
+            "nullable": True,
+            "enum": list(TEAM_ROLE_VALUES),
+            "default": TEAM_VIEWER_ROLE,
+            "example": "responder",
         },
         "active": {"type": "boolean", "default": True},
         "priority": {"type": "integer", "default": 100, "minimum": 0, "maximum": 100000},

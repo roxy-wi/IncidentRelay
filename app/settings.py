@@ -138,6 +138,9 @@ class Config:
     )
 
     MATTERMOST_ACTION_SECRET = settings.get("mattermost", "action_secret", SECRET_KEY)
+    MATTERMOST_API_URL = settings.get("mattermost", "api_url", "")
+    MATTERMOST_BOT_TOKEN = settings.get("mattermost", "bot_token", "")
+    MATTERMOST_BOT_USER_ID = settings.get("mattermost", "bot_user_id", "")
 
     SMTP_HOST = settings.get("smtp", "host", "")
     SMTP_PORT = settings.get_int("smtp", "port", 587)
@@ -165,6 +168,18 @@ class Config:
     ONCALL_SHIFT_EMAIL_LOOKBACK_SECONDS = settings.get_int(
         "oncall",
         "shift_email_lookback_seconds", 300)
+
+    ONCALL_SHIFT_MATTERMOST_ENABLED = settings.get_bool(
+        "oncall",
+        "shift_mattermost_enabled", True)
+
+    ONCALL_SHIFT_MATTERMOST_CHECK_INTERVAL_SECONDS = settings.get_int(
+        "oncall",
+        "shift_mattermost_check_interval_seconds", 60)
+
+    ONCALL_SHIFT_MATTERMOST_LOOKBACK_SECONDS = settings.get_int(
+        "oncall",
+        "shift_mattermost_lookback_seconds", 300)
 
     BROWSER_PUSH_ENABLED = settings.get_bool(
         "browser_push",
@@ -241,13 +256,13 @@ class Config:
     SERVICE_IMPACT_SNAPSHOT_INTERVAL_SECONDS = settings.get_int(
         "services",
         "impact_snapshot_interval_seconds",
-        600,
+        300,
     )
 
     SERVICE_IMPACT_SNAPSHOT_RETENTION_DAYS = settings.get_int(
         "services",
         "impact_snapshot_retention_days",
-        65,
+        365,
     )
 
     INCIDENT_RESPONDER_EXPIRE_CHECK_INTERVAL_SECONDS = settings.get_int(

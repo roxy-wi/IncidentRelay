@@ -62,9 +62,19 @@ def attach_group_permissions(data, group_id, current_user=None):
 def attach_team_permissions(data, team_id, current_user=None):
     """Attach team permissions to serialized data."""
     if current_user and team_id:
-        from app.services.rbac import get_team_permissions
+        from app.services.rbac import (
+            get_team_permissions,
+            can_access_team_or_group_resource,
+        )
 
-        data["permissions"] = get_team_permissions(current_user, team_id)
+        permissions = get_team_permissions(current_user, team_id)
+        permissions["can_write_resources"] = can_access_team_or_group_resource(
+            current_user,
+            team_id,
+            write_required=True,
+        )
+
+        data["permissions"] = permissions
 
     return data
 
@@ -145,6 +155,9 @@ def serialize_user(user, groups=None):
         ),
         "notify_oncall_shift_end_email": bool(
             getattr(user, "notify_oncall_shift_end_email", True)
+        ),
+        "notify_oncall_shift_start_mattermost": bool(
+            getattr(user, "notify_oncall_shift_start_mattermost", True)
         ),
     }
 
@@ -1033,6 +1046,7 @@ def serialize_sso_provider(provider):
 def serialize_sso_group_mapping(mapping):
     """Serialize SSO group mapping."""
     group = mapping.incidentrelay_group
+    team = mapping.incidentrelay_team if mapping.incidentrelay_team_id else None
 
     return {
         "id": mapping.id,
@@ -1042,6 +1056,10 @@ def serialize_sso_group_mapping(mapping):
         "group_slug": group.slug,
         "group_name": group.name,
         "group_role": mapping.group_role,
+        "team_id": team.id if team else None,
+        "team_slug": team.slug if team else None,
+        "team_name": team.name if team else None,
+        "team_role": mapping.team_role if team else None,
         "active": mapping.active,
         "priority": mapping.priority,
         "created_at": mapping.created_at.isoformat() if mapping.created_at else None,

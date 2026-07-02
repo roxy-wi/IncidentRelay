@@ -94,6 +94,121 @@ class MattermostNotifier(IncomingWebhookNotifier):
             },
         }
 
+    def send_direct_shift_notification(self, user, event, event_type, rotation):
+        """Send a personal on-call shift notification to a Mattermost user."""
+        config = self._global_bot_config()
+
+        if not self._direct_bot_ready(config):
+            raise RuntimeError(
+                "Mattermost personal shift notifications require "
+                "[mattermost] api_url and bot_token"
+            )
+
+        mattermost_user_id = str(getattr(user, "mattermost_user_id", "") or "").strip()
+        if not mattermost_user_id:
+            raise RuntimeError("Mattermost user id is missing in user profile")
+
+        channel_id = self._direct_channel_id(config, mattermost_user_id)
+        payload = self._build_shift_direct_post_payload(
+            user=user,
+            event=event,
+            event_type=event_type,
+            rotation=rotation,
+            channel_id=channel_id,
+        )
+
+        result = self._request(config, "POST", "/api/v4/posts", payload)
+
+        return {
+            "provider": self.name,
+            "external_message_id": result.get("id"),
+            "external_channel_id": result.get("channel_id") or channel_id,
+        }
+
+    def _global_bot_config(self):
+        """Return global Mattermost Bot API config used for personal messages."""
+        return {
+            "api_url": getattr(Config, "MATTERMOST_API_URL", ""),
+            "bot_token": getattr(Config, "MATTERMOST_BOT_TOKEN", ""),
+            "bot_user_id": getattr(Config, "MATTERMOST_BOT_USER_ID", ""),
+        }
+
+    def _direct_bot_ready(self, config):
+        """Check that Mattermost Bot API config can create direct messages."""
+        return bool(config.get("api_url") and config.get("bot_token"))
+
+    def _direct_channel_id(self, config, mattermost_user_id):
+        """Return or create a direct channel between bot and target Mattermost user."""
+        bot_user_id = str(config.get("bot_user_id") or "").strip()
+
+        if not bot_user_id:
+            bot = self._request(config, "GET", "/api/v4/users/me")
+            bot_user_id = str(bot.get("id") or "").strip()
+
+        if not bot_user_id:
+            raise RuntimeError("Mattermost bot user id could not be resolved")
+
+        channel = self._request(
+            config,
+            "POST",
+            "/api/v4/channels/direct",
+            [bot_user_id, mattermost_user_id],
+        )
+
+        channel_id = str(channel.get("id") or "").strip()
+        if not channel_id:
+            raise RuntimeError("Mattermost direct channel id was not returned")
+
+        return channel_id
+
+    def _build_shift_direct_post_payload(self, user, event, event_type, rotation, channel_id):
+        """Build Mattermost post payload for personal on-call shift notifications."""
+        user_name = getattr(user, "display_name", None) or getattr(user, "username", None) or f"user #{user.id}"
+        rotation_name = event.get("rotation_name") or getattr(rotation, "name", None) or f"Rotation #{rotation.id}"
+
+        team = getattr(rotation, "team", None)
+        team_name = (
+            event.get("team_name")
+            or event.get("team_slug")
+            or (team.name if team else None)
+            or (team.slug if team else None)
+            or "-"
+        )
+
+        layer_name = event.get("layer_name") or ("Override" if event.get("type") == "override" else "-")
+        starts_at = str(event.get("start") or "-")
+        ends_at = str(event.get("end") or "-")
+
+        if event_type == "shift_start":
+            title = f"On-call shift started: {rotation_name}"
+            message = "Your on-call shift has started."
+            color = "#2e7d32"
+        else:
+            title = f"On-call shift update: {rotation_name}"
+            message = "Your on-call shift status changed."
+            color = "#4a90e2"
+
+        attachment = {
+            "fallback": title,
+            "color": color,
+            "title": title,
+            "text": message,
+            "fields": [
+                {"short": True, "title": "User", "value": user_name},
+                {"short": True, "title": "Team", "value": team_name},
+                {"short": True, "title": "Rotation", "value": rotation_name},
+                {"short": True, "title": "Layer", "value": layer_name},
+                {"short": False, "title": "Starts at", "value": starts_at},
+                {"short": False, "title": "Ends at", "value": ends_at},
+            ],
+        }
+
+        return {
+            "channel_id": channel_id,
+            "message": "",
+            "props": {"attachments": [attachment]},
+        }
+
     def _should_use_bot_api(self, config):
         """Decide whether this channel should use Bot API mode."""
         return config.get("mode") == "bot_api" or self._bot_api_ready(config)
@@ -102,7 +217,7 @@ class MattermostNotifier(IncomingWebhookNotifier):
         """Check that Mattermost Bot API config is complete."""
         return bool(config.get("api_url") and config.get("bot_token") and config.get("channel_id"))
 
-    def _request(self, config, method, path, payload):
+    def _request(self, config, method, path, payload=None):
         """Send a Mattermost REST API request."""
         api_url = config.get("api_url", "").rstrip("/")
         url = urljoin(api_url + "/", path.lstrip("/"))
@@ -168,7 +283,7 @@ class MattermostNotifier(IncomingWebhookNotifier):
             return f"This alert is still not acknowledged.\n\n{alert.message or ''}"
         if event_type == "escalation":
             return f"The alert was escalated.\n\n{alert.message or ''}"
-        return alert.message or text
+        return alert.message or ""
 
     def _fields(self, alert):
         """Return Mattermost attachment fields."""

@@ -140,6 +140,7 @@ class User(SoftDeleteModel):
     mattermost_user_id = CharField(null=True)
     notify_oncall_shift_start_email = BooleanField(default=True)
     notify_oncall_shift_end_email = BooleanField(default=True)
+    notify_oncall_shift_start_mattermost = BooleanField(default=True)
     password_hash = CharField(null=True)
     active = BooleanField(default=True)
     is_admin = BooleanField(default=False)
@@ -1908,6 +1909,41 @@ class OnCallShiftEmailNotification(BaseModel):
         )
 
 
+class OnCallShiftMattermostNotification(BaseModel):
+    """Deduplication log for personal Mattermost on-call shift notifications."""
+
+    id = AutoField()
+
+    user = ForeignKeyField(User, backref="oncall_shift_mattermost_notifications", on_delete="CASCADE")
+    rotation = ForeignKeyField(Rotation, backref="oncall_shift_mattermost_notifications", on_delete="CASCADE")
+
+    event_type = CharField(index=True)  # shift_start
+
+    slot_start_at = DateTimeField(index=True)
+    slot_end_at = DateTimeField(index=True)
+
+    layer_id = IntegerField(null=True)
+    override_id = IntegerField(null=True)
+
+    mattermost_user_id = CharField(index=True)
+    fingerprint = CharField(unique=True, index=True)
+
+    status = CharField(default="pending", index=True)  # pending | sent | failed | skipped
+    last_error = TextField(null=True)
+
+    created_at = DateTimeField(default=datetime.utcnow)
+    sent_at = DateTimeField(null=True)
+    updated_at = DateTimeField(default=datetime.utcnow)
+
+    class Meta:
+        table_name = "oncall_shift_mattermost_notification"
+        indexes = (
+            (("user", "event_type", "slot_start_at", "slot_end_at"), False),
+            (("rotation", "event_type", "slot_start_at"), False),
+            (("mattermost_user_id", "event_type", "slot_start_at"), False),
+        )
+
+
 class Silence(SoftDeleteModel):
     """Alert silence rule for a team."""
 
@@ -2033,7 +2069,7 @@ class SsoIdentity(BaseModel):
 
 
 class SsoGroupMapping(BaseModel):
-    """Map external SSO group value to IncidentRelay group role."""
+    """Map external SSO group value to IncidentRelay group and optional team role."""
 
     id = AutoField()
     provider = ForeignKeyField(SsoProvider, backref="group_mappings", on_delete="CASCADE")
@@ -2046,6 +2082,13 @@ class SsoGroupMapping(BaseModel):
     )
 
     group_role = CharField(default="viewer")
+    incidentrelay_team = ForeignKeyField(
+        Team,
+        null=True,
+        backref="sso_group_mappings",
+        on_delete="CASCADE",
+    )
+    team_role = CharField(null=True)
     active = BooleanField(default=True)
     priority = IntegerField(default=100)
 
@@ -2055,7 +2098,7 @@ class SsoGroupMapping(BaseModel):
     class Meta:
         table_name = "sso_group_mapping"
         indexes = (
-            (("provider", "external_group", "incidentrelay_group"), True),
+            (("provider", "external_group", "incidentrelay_group", "incidentrelay_team"), True),
         )
 
 

@@ -226,9 +226,9 @@
             <aside class="card page-details-card">
                 <div class="card-header">
                     <div>
-                        <h2>On-call email notifications</h2>
+                        <h2>On-call shift notifications</h2>
                         <div class="card-subtitle">
-                            Choose which shift notifications should be sent to your email.
+                            Choose which shift notifications should be sent to your email or Mattermost.
                         </div>
                     </div>
                 </div>
@@ -251,6 +251,19 @@
                             <small>Send an email when my primary on-call shift is over.</small>
                         </span>
                     </label>
+
+                    <div class="form-divider"></div>
+
+                    <label class="md-switch" for="profile-notify-shift-start-mattermost">
+                        <input id="profile-notify-shift-start-mattermost" type="checkbox">
+                        <span class="md-switch-ui"></span>
+                        <span>
+                            <strong>Send me a Mattermost direct message when my on-call shift starts</strong>
+                            <small>Requires a Mattermost user ID in your profile and a configured Mattermost bot.</small>
+                        </span>
+                    </label>
+
+                    <div id="profile-shift-notification-status" class="inline-status"></div>
 
                     <div class="details-list">
                         <div class="details-item">

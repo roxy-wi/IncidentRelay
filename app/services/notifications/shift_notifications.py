@@ -7,9 +7,12 @@ from email.message import EmailMessage
 from app import Config
 from app.modules.db.models import (
     OnCallShiftEmailNotification,
+    OnCallShiftMattermostNotification,
     Rotation,
     User,
 )
+from app.notifiers.registry import get_notifier
+from app.notifiers.types import MATTERMOST_CHANNEL
 from app.services.calendar_service import build_rotation_calendar
 
 logger = logging.getLogger("oncall.shift_notifications")
@@ -59,6 +62,17 @@ def _notification_fingerprint(event, event_type):
             str(event.get("rotation_id")),
             str(event.get("user_id")),
             str(transition_at),
+        ]
+    )
+
+
+def _mattermost_notification_fingerprint(event, event_type, mattermost_user_id):
+    """Deduplicate personal Mattermost shift notifications."""
+    return ":".join(
+        [
+            "mattermost",
+            str(mattermost_user_id),
+            _notification_fingerprint(event, event_type),
         ]
     )
 
@@ -211,6 +225,101 @@ def _mark_log(log, status, error=None):
     log.save()
 
 
+def _get_or_create_mattermost_log(user, rotation, event, event_type):
+    mattermost_user_id = str(user.mattermost_user_id or "").strip()
+    fingerprint = _mattermost_notification_fingerprint(
+        event,
+        event_type,
+        mattermost_user_id,
+    )
+
+    log, created = OnCallShiftMattermostNotification.get_or_create(
+        fingerprint=fingerprint,
+        defaults={
+            "user": user,
+            "rotation": rotation,
+            "event_type": event_type,
+            "slot_start_at": _event_dt(event["start"]),
+            "slot_end_at": _event_dt(event["end"]),
+            "layer_id": event.get("layer_id"),
+            "override_id": event.get("override_id"),
+            "mattermost_user_id": mattermost_user_id,
+            "status": "pending",
+            "created_at": datetime.utcnow(),
+            "updated_at": datetime.utcnow(),
+        },
+    )
+
+    return log, created
+
+
+def _send_shift_event_to_mattermost(event, event_type):
+    if event_type != SHIFT_START:
+        return False
+
+    if not getattr(Config, "ONCALL_SHIFT_MATTERMOST_ENABLED", True):
+        return False
+
+    if not getattr(Config, "MATTERMOST_API_URL", "") or not getattr(Config, "MATTERMOST_BOT_TOKEN", ""):
+        return False
+
+    user_id = event.get("user_id")
+    rotation_id = event.get("rotation_id")
+
+    if not user_id or not rotation_id:
+        return False
+
+    try:
+        user = User.get_by_id(user_id)
+        rotation = Rotation.get_by_id(rotation_id)
+    except Exception:
+        return False
+
+    if not user.active or user.deleted:
+        return False
+
+    if not str(user.mattermost_user_id or "").strip():
+        return False
+
+    if getattr(user, "notify_oncall_shift_start_mattermost", True) is False:
+        return False
+
+    log, _created = _get_or_create_mattermost_log(
+        user,
+        rotation,
+        event,
+        event_type,
+    )
+
+    if log.status == "sent":
+        return False
+
+    try:
+        notifier = get_notifier(MATTERMOST_CHANNEL)
+        notifier.send_direct_shift_notification(
+            user=user,
+            event=event,
+            event_type=event_type,
+            rotation=rotation,
+        )
+        _mark_log(log, "sent")
+        return True
+    except Exception as exc:
+        logger.exception(
+            "on-call shift Mattermost direct notification failed",
+            extra={
+                "extra": {
+                    "event_type": "shift_mattermost",
+                    "shift_event_type": event_type,
+                    "user_id": user.id,
+                    "rotation_id": rotation.id,
+                }
+            },
+        )
+        _mark_log(log, "failed", str(exc))
+        return False
+
+
 def _send_shift_event(event, event_type):
     user_id = event.get("user_id")
     rotation_id = event.get("rotation_id")
@@ -314,6 +423,50 @@ def send_due_oncall_shift_email_notifications(now=None, lookback_seconds=None):
 
             if _event_due(event, SHIFT_END, window_start, now):
                 if _send_shift_event(event, SHIFT_END):
+                    sent += 1
+
+    return sent
+
+
+def send_due_oncall_shift_mattermost_notifications(now=None, lookback_seconds=None):
+    """
+    Send personal Mattermost notifications for shifts that started recently.
+
+    The notification is sent to the user's Mattermost DM when
+    User.mattermost_user_id is set. End-of-shift messages are intentionally
+    not sent to avoid noisy direct messages.
+    """
+    now = now or datetime.utcnow()
+
+    if lookback_seconds is None:
+        lookback_seconds = int(
+            getattr(
+                Config,
+                "ONCALL_SHIFT_MATTERMOST_LOOKBACK_SECONDS",
+                max(int(getattr(Config, "REMINDER_INTERVAL_SECONDS", 300)) * 2, 300),
+            )
+        )
+
+    window_start = now - timedelta(seconds=lookback_seconds)
+    window_end = now + timedelta(seconds=1)
+
+    sent = 0
+
+    rotations = (
+        Rotation
+        .select()
+        .where(
+            Rotation.enabled == True,
+            Rotation.deleted == False,
+        )
+    )
+
+    for rotation in rotations:
+        events = build_rotation_calendar(rotation, window_start, window_end)
+
+        for event in events:
+            if _event_due(event, SHIFT_START, window_start, now):
+                if _send_shift_event_to_mattermost(event, SHIFT_START):
                     sent += 1
 
     return sent

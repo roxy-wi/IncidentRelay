@@ -843,7 +843,7 @@ function renderEscalationRuleSummary(rule) {
 function renderEscalationRuleEditor(rule) {
     const editor = $("<div>").addClass("rotation-layer-editor escalation-rule-editor");
     const section = $("<section>").addClass("layer-editor-section");
-    const grid = $("<div>").addClass("app-form-grid");
+    const grid = $("<div>").addClass("form-grid-4");
 
     section.append($("<h4>").text("Rule settings"));
     section.append(

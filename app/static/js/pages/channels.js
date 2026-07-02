@@ -275,6 +275,14 @@ function getSelectedChannelTeam() {
     });
 }
 
+function canWriteChannelResourceForTeam(team) {
+    const permissions = (team && team.permissions) || {};
+    return Boolean(
+        permissions.can_write_resources ||
+        permissions.can_write
+    );
+}
+
 function collectChannelPayload() {
     const teamId = Number($("#channel-team").val());
     if (!teamId) {
@@ -414,8 +422,8 @@ function saveChannel() {
         showAppError("You do not have permission to edit this channel.");
         return;
     }
-    if (!existing && selectedTeam && !canWriteObject(selectedTeam)) {
-        showAppError("You do not have permission to create channels in this team.");
+    if (!existing && selectedTeam && !canWriteChannelResourceForTeam(selectedTeam)) {
+        showAppError("Team manager or group editor role is required to create channels in this team.");
         return;
     }
 
@@ -878,8 +886,8 @@ function openCreateChannelModal() {
     resetChannelForm();
     $("#channel-form-title").text("Create channel");
     const team = getSelectedChannelTeam();
-    if (team && !canWriteObject(team)) {
-        showAppError("You do not have permission to create channels in this team.");
+    if (team && !canWriteChannelResourceForTeam(team)) {
+        showAppError("Team manager or group editor role is required to create channels in this team.");
         return;
     }
     openAppModal("#channel-form-modal");

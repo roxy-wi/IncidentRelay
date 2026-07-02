@@ -1,6 +1,6 @@
 from datetime import datetime
 
-from app.modules.db.models import Group, SsoGroupMapping, SsoIdentity, SsoProvider
+from app.modules.db.models import Group, SsoGroupMapping, SsoIdentity, SsoProvider, Team
 from app.modules.sso.crypto import encrypt_secret
 from app.modules.sso.saml_security import normalize_sso_extra_config
 
@@ -197,13 +197,32 @@ def get_group_mapping(mapping_id):
     return SsoGroupMapping.get_by_id(mapping_id)
 
 
+def _validate_group_mapping_team(data):
+    """Validate that optional SSO team mapping belongs to the selected group."""
+    team_id = data.get("team_id")
+
+    if not team_id:
+        return None
+
+    team = Team.get_by_id(team_id)
+
+    if int(team.group_id) != int(data["group_id"]):
+        raise ValueError("team_id must belong to the selected IncidentRelay group")
+
+    return team
+
+
 def create_group_mapping(provider_id, data):
     """Create SSO group mapping."""
+    team = _validate_group_mapping_team(data)
+
     return SsoGroupMapping.create(
         provider=provider_id,
         external_group=data["external_group"],
         incidentrelay_group=data["group_id"],
         group_role=data["group_role"],
+        incidentrelay_team=team.id if team else None,
+        team_role=data.get("team_role") if team else None,
         active=data.get("active", True),
         priority=data.get("priority", 100),
     )
@@ -212,10 +231,13 @@ def create_group_mapping(provider_id, data):
 def update_group_mapping(mapping_id, data):
     """Update SSO group mapping."""
     mapping = get_group_mapping(mapping_id)
+    team = _validate_group_mapping_team(data)
 
     mapping.external_group = data["external_group"]
     mapping.incidentrelay_group = data["group_id"]
     mapping.group_role = data["group_role"]
+    mapping.incidentrelay_team = team.id if team else None
+    mapping.team_role = data.get("team_role") if team else None
     mapping.active = data.get("active", True)
     mapping.priority = data.get("priority", 100)
     mapping.updated_at = datetime.utcnow()

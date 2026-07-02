@@ -138,6 +138,11 @@ function loadProfile() {
             profile.notify_oncall_shift_end_email !== false
         );
 
+        $("#profile-notify-shift-start-mattermost").prop(
+            "checked",
+            profile.notify_oncall_shift_start_mattermost !== false
+        );
+
         if (window.AppTimezones) {
             AppTimezones.initOptionalSelect("#profile-timezone", profile.timezone);
             AppTimezones.setOptionalSelectValue("#profile-timezone", profile.timezone);
@@ -170,12 +175,41 @@ function saveProfile() {
             slack_user_id: $("#profile-slack").val() || null,
             mattermost_user_id: $("#profile-mattermost").val() || null,
             notify_oncall_shift_start_email: $("#profile-notify-shift-start-email").is(":checked"),
-            notify_oncall_shift_end_email: $("#profile-notify-shift-end-email").is(":checked")
+            notify_oncall_shift_end_email: $("#profile-notify-shift-end-email").is(":checked"),
+            notify_oncall_shift_start_mattermost: $("#profile-notify-shift-start-mattermost").is(":checked")
         },
         function (profile) {
             setProfileStatus("#profile-save-status", "Saved", false);
             renderProfileHeader(profile);
             loadProfile();
+        }
+    );
+}
+
+function saveProfileShiftNotificationPreferences() {
+    /*
+     * Save shift notification preferences immediately when a switch changes.
+     */
+    setProfileInlineStatus("#profile-shift-notification-status", "Saving...", false);
+
+    apiPut(
+        "/api/profile",
+        {
+            notify_oncall_shift_start_email: $("#profile-notify-shift-start-email").is(":checked"),
+            notify_oncall_shift_end_email: $("#profile-notify-shift-end-email").is(":checked"),
+            notify_oncall_shift_start_mattermost: $("#profile-notify-shift-start-mattermost").is(":checked")
+        },
+        function (profile) {
+            currentProfileData = profile;
+            setProfileInlineStatus("#profile-shift-notification-status", "Saved", false);
+            renderProfileHeader(profile);
+        },
+        function (xhr) {
+            setProfileInlineStatus(
+                "#profile-shift-notification-status",
+                getApiErrorMessage(xhr, "Failed to save notification preferences."),
+                true
+            );
         }
     );
 }
@@ -416,6 +450,11 @@ $(document).on("click", "#change-profile-password", changeProfilePassword);
 $(document).on("click", "#save-profile", saveProfile);
 $(document).on("click", "#save-profile-top", saveProfile);
 $(document).on("click", "#save-active-group", saveActiveGroup);
+$(document).on(
+    "change",
+    "#profile-notify-shift-start-email, #profile-notify-shift-end-email, #profile-notify-shift-start-mattermost",
+    saveProfileShiftNotificationPreferences
+);
 
 loadProfileTokens();
 function profileOncallDisplayName(name, slug, fallback) {

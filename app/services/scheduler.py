@@ -11,6 +11,7 @@ from app.services.alerts.lifecycle import logger as send_unacked_reminders
 from app.services.db_lock import acquire_db_lock, release_db_lock
 from app.services.notifications.shift_notifications import (
     send_due_oncall_shift_email_notifications,
+    send_due_oncall_shift_mattermost_notifications,
 )
 from app.services.notifications.rules import process_due_user_notifications
 from app.services.incidents.responders import expire_due_incident_responders
@@ -106,6 +107,50 @@ def oncall_shift_email_job():
     finally:
         if owner:
             release_db_lock("oncall_shift_email_job", owner)
+
+        if not db.is_closed():
+            db.close()
+
+
+def oncall_shift_mattermost_job():
+    """
+    Send personal Mattermost on-call shift start notifications under a database lock.
+    """
+    if db.is_closed():
+        db.connect(reuse_if_open=True)
+
+    owner = None
+
+    try:
+        owner = acquire_db_lock("oncall_shift_mattermost_job")
+
+        if not owner:
+            logger.debug("on-call shift Mattermost job skipped because lock is busy")
+            return 0
+
+        logger.info("on-call shift Mattermost job started")
+
+        count = send_due_oncall_shift_mattermost_notifications()
+
+        logger.info(
+            "on-call shift Mattermost job finished",
+            extra={
+                "extra": {
+                    "event_type": "scheduler",
+                    "oncall_shift_mattermost_sent": count,
+                }
+            },
+        )
+
+        return count
+
+    except Exception:
+        logger.exception("on-call shift Mattermost job failed")
+        return 0
+
+    finally:
+        if owner:
+            release_db_lock("oncall_shift_mattermost_job", owner)
 
         if not db.is_closed():
             db.close()
@@ -421,6 +466,24 @@ def start_scheduler():
         id="oncall_shift_email_job",
         replace_existing=True,
     )
+
+    if bool(getattr(Config, "ONCALL_SHIFT_MATTERMOST_ENABLED", True)):
+        _scheduler.add_job(
+            oncall_shift_mattermost_job,
+            "interval",
+            seconds=int(
+                getattr(
+                    Config,
+                    "ONCALL_SHIFT_MATTERMOST_CHECK_INTERVAL_SECONDS",
+                    Config.REMINDER_INTERVAL_SECONDS,
+                )
+            ),
+            max_instances=1,
+            coalesce=True,
+            next_run_time=datetime.utcnow(),
+            id="oncall_shift_mattermost_job",
+            replace_existing=True,
+        )
 
     _scheduler.add_job(
         user_notification_rules_job,
