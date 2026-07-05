@@ -551,6 +551,82 @@ class ServiceDependency(SoftDeleteModel):
         )
 
 
+class AlertGroupCorrelation(BaseModel):
+    """Persisted dependency-aware correlation between alert groups."""
+
+    id = AutoField()
+
+    root_group = DeferredForeignKey(
+        "AlertGroup",
+        backref="root_correlations",
+        on_delete="CASCADE",
+    )
+
+    related_group = DeferredForeignKey(
+        "AlertGroup",
+        backref="related_correlations",
+        on_delete="CASCADE",
+    )
+
+    team = ForeignKeyField(
+        Team,
+        null=True,
+        backref="alert_group_correlations",
+        on_delete="SET NULL",
+    )
+
+    root_service = ForeignKeyField(
+        Service,
+        null=True,
+        backref="root_alert_correlations",
+        on_delete="SET NULL",
+    )
+
+    related_service = ForeignKeyField(
+        Service,
+        null=True,
+        backref="related_alert_correlations",
+        on_delete="SET NULL",
+    )
+
+    dependency = ForeignKeyField(
+        ServiceDependency,
+        null=True,
+        backref="alert_group_correlations",
+        on_delete="SET NULL",
+    )
+
+    relation_type = CharField(max_length=64, index=True)
+    direction = CharField(max_length=32, index=True)
+
+    score = IntegerField(default=0, index=True)
+    depth = IntegerField(default=1)
+
+    dependency_type = CharField(max_length=32, null=True)
+    criticality = CharField(max_length=32, null=True)
+
+    reason = TextField(null=True)
+    active = BooleanField(default=True, index=True)
+
+    first_seen_at = DateTimeField(default=datetime.utcnow, index=True)
+    last_seen_at = DateTimeField(default=datetime.utcnow, index=True)
+    updated_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=datetime.utcnow)
+
+    context = JSONTextField(default=dict)
+
+    class Meta:
+        table_name = "alert_group_correlation"
+        indexes = (
+            (("root_group", "related_group", "relation_type"), True),
+            (("root_group", "active"), False),
+            (("related_group", "active"), False),
+            (("team", "active"), False),
+            (("relation_type", "active"), False),
+            (("last_seen_at", "active"), False),
+        )
+
+
 class ServiceEvent(BaseModel):
     """Immutable event displayed in a service timeline."""
 

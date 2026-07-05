@@ -3,10 +3,8 @@ from app.services.incidents.responders import (
     can_user_act_as_responder_target,
 )
 from app.services.links import build_alert_web_url
-from app.services.serializers import (
-    serialize_incident,
-    serialize_incident_responder,
-)
+from app.services.serializers.incidents import serialize_incident
+from app.services.serializers.alerts import serialize_incident_responder
 from app.services.incidents.responder_display import user_display_name
 
 

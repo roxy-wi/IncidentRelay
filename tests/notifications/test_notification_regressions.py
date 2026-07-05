@@ -7,9 +7,14 @@ import app.services.alerts.notification_queue as notification_queue
 import app.services.alerts.reminders as alert_reminders
 from app.services.notifications import delivery as notification_service
 from app.services.notifications import rules as notification_rules
+from app.services.notifications.policies.resolver import resolve_notification_channels
 from tests.factories import (
+    create_channel,
     create_group,
+    create_notification_policy,
+    create_notification_policy_rule,
     create_route,
+    create_service,
     create_team,
     create_user,
 )
@@ -334,3 +339,138 @@ def _get_column(table_name, column_name):
             return column
 
     return None
+
+
+def test_route_less_group_uses_service_notification_policy(db):
+    group = create_group()
+    team = create_team(group)
+
+    channel = create_channel(group, team=team)
+    policy = create_notification_policy(team)
+    create_notification_policy_rule(
+        policy,
+        event_types=["notification"],
+        channels=[channel],
+    )
+
+    service = create_service(team)
+    service.notification_policy = policy
+    service.save()
+
+    alert_group = AlertGroup.create(
+        team=team,
+        route=None,
+        service=service,
+        source="manual",
+        group_key="manual-route-less-policy",
+        group_key_hash="manual-route-less-policy",
+        title="Manual incident",
+        message="Created by user",
+        severity="critical",
+        status="firing",
+        alert_count=1,
+        firing_count=1,
+    )
+
+    resolution = resolve_notification_channels(
+        alert_group,
+        event_type="notification",
+    )
+
+    assert resolution.mode == "service_policy"
+    assert channel in resolution.channels
+    assert resolution.service_id == service.id
+    assert resolution.policy_id == policy.id
+    assert "route_missing" in resolution.notes
+    assert "service_policy_without_route" in resolution.notes
+
+
+def test_due_route_less_group_notification_uses_service_policy(db, monkeypatch):
+    group = create_group()
+    team = create_team(group)
+
+    channel = create_channel(group, team=team)
+    policy = create_notification_policy(team)
+    create_notification_policy_rule(
+        policy,
+        event_types=["notification"],
+        channels=[channel],
+    )
+
+    service = create_service(team)
+    service.notification_policy = policy
+    service.save()
+
+    alert_group = AlertGroup.create(
+        team=team,
+        route=None,
+        service=service,
+        source="manual",
+        group_key="manual-route-less-due",
+        group_key_hash="manual-route-less-due",
+        title="Manual incident",
+        message="Created by user",
+        severity="critical",
+        status="firing",
+        alert_count=1,
+        firing_count=1,
+        notification_pending=True,
+        notification_due_at=datetime.utcnow() - timedelta(seconds=1),
+        notification_reason="notification",
+        last_notification_at=None,
+    )
+
+    monkeypatch.setattr(
+        notification_queue.alerts_repo,
+        "list_due_alert_group_notifications",
+        lambda now=None, limit=100: [AlertGroup.get_by_id(alert_group.id)],
+    )
+
+    sent_calls = []
+
+    class DummyNotifier:
+        def send(self, channel_arg, group_arg, text, event_type="notification"):
+            sent_calls.append({
+                "channel_id": channel_arg.id,
+                "group_id": group_arg.id,
+                "text": text,
+                "event_type": event_type,
+            })
+            return {
+                "provider": channel_arg.channel_type,
+                "external_message_id": "manual-message-1",
+                "external_channel_id": "manual-channel-1",
+                "provider_status": "sent",
+                "provider_payload": {},
+            }
+
+        def can_update(self, channel_arg, delivery):
+            return False
+
+    monkeypatch.setattr(
+        notification_service,
+        "get_notifier",
+        lambda channel_type: DummyNotifier(),
+    )
+
+    result = notification_queue.process_due_alert_group_notifications()
+
+    assert result["processed"] == 1
+    assert result["sent"] == 1
+    assert result["skipped"] == 0
+    assert sent_calls == [
+        {
+            "channel_id": channel.id,
+            "group_id": alert_group.id,
+            "text": sent_calls[0]["text"],
+            "event_type": "notification",
+        }
+    ]
+    assert "NOTIFICATION:" in sent_calls[0]["text"]
+    assert "Manual incident" in sent_calls[0]["text"]
+    assert "Service:" in sent_calls[0]["text"]
+    assert "Source: manual" in sent_calls[0]["text"]
+
+    alert_group = AlertGroup.get_by_id(alert_group.id)
+    assert alert_group.notification_pending is False
+    assert alert_group.last_notification_at is not None

@@ -637,16 +637,20 @@ function getFilteredServiceDependencies() {
 
     return allServiceDependenciesCache.filter(function (dependency) {
         return [
-            dependency.service_name,
-            dependency.service_slug,
-            dependency.team_name,
-            dependency.team_slug,
-            dependency.depends_on_service_name,
-            dependency.depends_on_service_slug,
-            dependency.dependency_type,
-            dependency.criticality,
-            dependency.depends_on_service_status,
-            dependency.description,
+            [
+                dependency.service_name,
+                dependency.service_slug,
+                dependency.team_name,
+                dependency.team_slug,
+                dependency.depends_on_service_name,
+                dependency.depends_on_service_slug,
+                dependency.dependency_type,
+                dependency.criticality,
+                dependency.depends_on_service_status,
+                dependency.correlation_enabled === false ? "correlation off" : "correlation on",
+                dependency.propagation_delay_seconds,
+                dependency.description,
+            ]
         ].join(" ").toLowerCase().indexOf(query) !== -1;
     });
 }
@@ -669,6 +673,9 @@ function renderAllServiceDependenciesTable() {
 
     dependencies.forEach(function (dependency) {
         const service = dependency._service || getServiceById(dependency.service_id);
+        const correlationLabel = dependency.correlation_enabled === false
+            ? "Correlation off"
+            : "Correlation " + (dependency.propagation_delay_seconds || 300) + "s";
 
         tbody.append(
             $("<tr>")
@@ -700,7 +707,12 @@ function renderAllServiceDependenciesTable() {
                 .append($("<td>").text(dependency.dependency_type || "-"))
                 .append($("<td>").text(dependency.criticality || "-"))
                 .append($("<td>").text(dependency.depends_on_service_status || "-"))
-                .append($("<td>").addClass("table-cell-truncate-wide").text(dependency.description || "-"))
+                .append(
+                    $("<td>")
+                        .addClass("table-cell-truncate-wide")
+                        .append($("<div>").text(dependency.description || "-"))
+                        .append($("<div>").addClass("row-subtitle").text(correlationLabel))
+                )
                 .append($("<td>").addClass("actions-cell").append(renderServiceDependencyActions(service, dependency)))
         );
     });
@@ -993,10 +1005,11 @@ function resetServiceDependencyForm() {
     $("#service-dependency-id").val("");
     $("#service-dependency-source").prop("disabled", false);
     fillServiceSelect("#service-dependency-source", getDefaultServiceIdForCreate());
-
     $("#service-dependency-target").val("");
     $("#service-dependency-type").val("hard");
     $("#service-dependency-criticality").val("important");
+    $("#service-dependency-correlation-enabled").prop("checked", true);
+    $("#service-dependency-propagation-delay-seconds").val("300");
     $("#service-dependency-description").val("");
     $("#service-dependency-enabled").prop("checked", true);
 }
@@ -1013,7 +1026,6 @@ function openCreateServiceDependencyModal() {
 function editServiceDependency(dependency) {
     $("#service-dependency-form-title").text("Edit dependency");
     $("#service-dependency-id").val(dependency.id);
-
     fillServiceSelect("#service-dependency-source", dependency.service_id);
     $("#service-dependency-source").prop("disabled", true);
 
@@ -1021,6 +1033,8 @@ function editServiceDependency(dependency) {
         $("#service-dependency-target").val(dependency.depends_on_service_id || "");
         $("#service-dependency-type").val(dependency.dependency_type || "hard");
         $("#service-dependency-criticality").val(dependency.criticality || "important");
+        $("#service-dependency-correlation-enabled").prop("checked", dependency.correlation_enabled !== false);
+        $("#service-dependency-propagation-delay-seconds").val(dependency.propagation_delay_seconds || 300);
         $("#service-dependency-description").val(dependency.description || "");
         $("#service-dependency-enabled").prop("checked", !!dependency.enabled);
         openAppModal("#service-dependency-modal");
@@ -1067,6 +1081,8 @@ function collectServiceDependencyPayload() {
         depends_on_service_id: Number($("#service-dependency-target").val()),
         dependency_type: $("#service-dependency-type").val() || "hard",
         criticality: $("#service-dependency-criticality").val() || "important",
+        correlation_enabled: $("#service-dependency-correlation-enabled").is(":checked"),
+        propagation_delay_seconds: Number($("#service-dependency-propagation-delay-seconds").val() || 300),
         description: $("#service-dependency-description").val() || null,
         enabled: $("#service-dependency-enabled").is(":checked"),
     };

@@ -2,7 +2,7 @@ from flask import Blueprint, jsonify, request
 
 from app.modules.db import users_repo
 from app.services.rbac import get_allowed_group_ids
-from app.services.serializers import serialize_user
+from app.services.serializers.users import serialize_user
 
 
 users_bp = Blueprint("users_api", __name__)

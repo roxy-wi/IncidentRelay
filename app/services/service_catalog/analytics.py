@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from statistics import mean
 
 from app.modules.db.models import Alert, AlertGroup, Service
-from app.services.serializers import serialize_utc_datetime
+from app.services.serializers.services import serialize_utc_datetime
 from app.services.service_catalog.impact import build_single_service_impact_v2
 
 

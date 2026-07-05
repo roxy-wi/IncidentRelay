@@ -131,12 +131,19 @@ function renderServiceDependencyList(title, rows, upstream) {
         ];
     });
 
-    return serviceDetailsTableCard(
-        title,
-        ["Service", "Type", "Criticality", "Status", "Description"],
-        tableRows,
-        "None"
-    );
+    const correlationLabel = dependency.correlation_enabled === false
+        ? "Correlation off"
+        : "Correlation " + (dependency.propagation_delay_seconds || 300) + "s";
+
+    return [
+        name,
+        dependency.dependency_type || "dependency",
+        dependency.criticality || "important",
+        status || "unknown",
+        $("<div>")
+            .append($("<div>").text(dependency.description || "-"))
+            .append($("<div>").addClass("row-subtitle").text(correlationLabel)),
+    ];
 }
 
 

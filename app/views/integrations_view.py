@@ -14,7 +14,7 @@ from app.api.schemas.integrations import (
     SentryWebhookSchema,
     ZabbixWebhookSchema,
 )
-from app.services.serializers import serialize_alert_processing_result
+from app.services.serializers.alerts import serialize_alert_processing_result
 from app.settings import Config
 from app.modules.db import channels_repo, users_repo, alerts_repo, routes_repo
 from app.services.alerts.actions import acknowledge_alert, resolve_alert
@@ -308,6 +308,7 @@ def sentry_webhook(route_id):
         normalize_sentry(
             payload.model_dump(),
             headers=dict(request.headers),
+            route_config=route.integration_config or {},
         )
     )
 

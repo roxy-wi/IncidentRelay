@@ -9,19 +9,24 @@ class ExampleBody(BaseModel):
 
 
 def test_make_json_safe_converts_non_serializable_values():
-    value = make_json_safe(
-        {
-            "ok": True,
-            "items": (1, 2),
-            "error": ValueError("bad"),
-        }
-    )
+    value = make_json_safe({
+        "ok": True,
+        "items": (1, 2),
+        "error": ValueError("bad"),
+    })
 
     assert value == {
         "ok": True,
         "items": [1, 2],
-        "error": "bad",
+        "error": "Invalid value",
     }
+
+
+def test_make_json_safe_does_not_expose_exception_messages():
+    value = make_json_safe(ValueError("secret database detail"))
+
+    assert value == "Invalid value"
+    assert "secret" not in value
 
 
 def test_normalize_validation_error_returns_compact_details():

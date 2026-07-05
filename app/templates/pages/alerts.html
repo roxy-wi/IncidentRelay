@@ -27,6 +27,10 @@
                     <span>Auto refresh</span>
                 </label>
                 <button id="reload-alerts" type="button" class="btn btn-primary">Reload</button>
+
+                <button type="button" class="btn btn-primary is-hidden" id="open-manual-incident-modal">
+                    Create incident
+                </button>
                 <button id="open-alert-explain-trace" type="button" class="btn btn-secondary">
                     Explain trace
                 </button>
@@ -111,8 +115,6 @@
               <th data-sort="created">Created</th>
               <th data-sort="last_seen">Last seen</th>
               <th>Escalations</th>
-{#              <th data-sort="reminders">Reminders</th>#}
-              <th class="alerts-actions-th">Actions</th>
           </tr>
         </thead>
 

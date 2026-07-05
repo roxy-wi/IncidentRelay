@@ -11,30 +11,47 @@ from app.services.incidents.stakeholders import (
 from app.services.incidents.priorities import reset_incident_priority, set_incident_priority
 from app.services.incidents.responders import create_incident_responder, set_incident_responder_status
 from app.services.rbac import (
+    can_access_team_or_group_resource,
+    can_respond_team,
     get_allowed_team_ids,
+    is_admin_user,
     require_team_read,
     require_team_respond,
 )
-from app.services.serializers import (
+from app.services.serializers.alerts import (
     serialize_alert_event,
-    serialize_incident,
-    serialize_incident_alert,
     serialize_incident_priority,
     serialize_incident_responder,
-    serialize_incident_stakeholder,
 )
+from app.services.serializers.incidents import serialize_incident, serialize_incident_stakeholder, serialize_incident_alert
 from app.services.validation import (
     make_error_response,
     safe_exception_response,
     validate_body,
 )
-from app.api.schemas.incidents import (
-    IncidentResponderCreateSchema,
-    IncidentResponderUpdateSchema,
-)
+from app.api.schemas.incidents import IncidentResponderCreateSchema, IncidentResponderUpdateSchema, IncidentCreateSchema
+from app.services.incidents.manual import create_manual_incident
 
 
 incidents_bp = Blueprint("incidents_api", __name__)
+
+
+def _can_create_manual_incident(user, team_id):
+    """Return True when user may create a manual incident for a team."""
+    if not user:
+        return False
+
+    if is_admin_user(user):
+        return True
+
+    return (
+        can_respond_team(user, team_id)
+        or can_access_team_or_group_resource(
+            user,
+            team_id,
+            write_required=True,
+        )
+    )
 
 
 def _request_user():
@@ -133,6 +150,62 @@ def list_incidents():
         "summary": page["summary"],
         "sort": page["sort"],
     })
+
+
+@incidents_bp.route("", methods=["POST"])
+def create_incident():
+    payload, error = validate_body(IncidentCreateSchema)
+    if error:
+        return error
+
+    if not _can_create_manual_incident(_request_user(), payload.team_id):
+        return jsonify({
+            "error": "manual_incident_create_denied",
+            "message": (
+                "Team responder, team manager or group editor role "
+                "is required to create an incident for this team"
+            ),
+        }), 403
+
+    try:
+        group = create_manual_incident(payload.model_dump(), user_id=_request_user_id())
+    except LookupError as exc:
+        return safe_exception_response(
+            exc,
+            error="not_found",
+            message="Manual incident target not found.",
+            status_code=404,
+        )
+    except ValueError as exc:
+        return safe_exception_response(
+            exc,
+            error="validation_error",
+            message="Invalid manual incident request.",
+            status_code=400,
+        )
+
+    write_audit(
+        "incident.manual.create",
+        object_type="incident",
+        object_id=group.id,
+        team_id=group.team_id,
+        user_id=_request_user_id(),
+        data={
+            "team_id": group.team_id,
+            "service_id": group.service_id,
+            "title": group.title,
+            "severity": group.severity,
+            "priority": group.priority_slug,
+        },
+    )
+
+    return jsonify(
+        serialize_incident(
+            group,
+            current_user=_request_user(),
+            include_details=True,
+        )
+    ), 201
 
 
 @incidents_bp.route("/<int:incident_id>", methods=["GET"])

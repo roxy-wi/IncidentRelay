@@ -1,7 +1,7 @@
 from peewee import DoesNotExist
 
 from app.modules.db import matcher_presets_repo, teams_repo
-from app.services.serializers import attach_team_permissions
+from app.services.serializers.common import attach_team_permissions
 
 
 class MatcherPresetError(ValueError):

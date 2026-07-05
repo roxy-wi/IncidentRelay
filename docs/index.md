@@ -174,8 +174,9 @@ ICS calendar feeds use secret subscription URLs and do not require login.
 
 ## Services
 
-- [Services](concepts/services.md)
-- [Service default stakeholders](services/default-stakeholders.md)
+  * [Services](concepts/services.md)
+  * [Dependency-aware Alert Correlation](concepts/alert-correlation.md)
+  * [Service default stakeholders](services/default-stakeholders.md)
 
 ## Scheduling
 

@@ -4,7 +4,7 @@ from app.api.schemas.auth import ChangePasswordSchema, LoginSchema
 from app.login import create_access_token, hash_password, verify_password
 from app.middleware import jwt_required
 from app.modules.db import users_repo, groups_repo
-from app.services.serializers import serialize_user
+from app.services.serializers.users import serialize_user
 from app.services.validation import validate_body
 from app.settings import Config
 

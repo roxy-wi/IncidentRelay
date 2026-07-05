@@ -10,7 +10,7 @@ from app.api.schemas.services import (
 from app.modules.db import services_repo
 from app.services.audit import write_audit
 from app.services.rbac import current_user, require_team_read, require_team_write
-from app.services.serializers import serialize_service_sli, serialize_service_slo
+from app.services.serializers.services import serialize_service_sli, serialize_service_slo
 from app.services.service_catalog.events import emit_service_catalog_event
 from app.services.service_catalog.sli_slo import (
     default_slo_comparison_for_sli_type,

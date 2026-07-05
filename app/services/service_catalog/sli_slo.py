@@ -2,7 +2,7 @@ from datetime import datetime, timedelta
 
 from app.modules.db import maintenance_repo, services_repo
 from app.modules.db.models import AlertGroup
-from app.services.serializers import serialize_utc_datetime
+from app.services.serializers.services import serialize_utc_datetime
 
 
 SLI_TYPE_ACK_LATENCY = "alert_ack_latency"

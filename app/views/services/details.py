@@ -7,7 +7,7 @@ from app.views.services.blueprint import services_bp
 from app.modules.db import maintenance_repo, services_repo
 from app.modules.db.models import AlertGroup
 from app.services.rbac import require_team_read, current_user
-from app.services.serializers import serialize_utc_datetime, serialize_maintenance_window, serialize_service, \
+from app.services.serializers.services import serialize_utc_datetime, serialize_maintenance_window, serialize_service, \
     serialize_service_readiness_state, serialize_service_link, serialize_service_runbook, serialize_service_dependency, \
     serialize_service_readiness, serialize_service_sli, serialize_service_slo
 from app.services.service_catalog import readiness as service_readiness

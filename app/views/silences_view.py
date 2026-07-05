@@ -8,7 +8,7 @@ from app.services.rbac import (
     get_allowed_team_or_group_resource_ids,
     require_team_or_group_resource_access,
 )
-from app.services.serializers import attach_team_permissions
+from app.services.serializers.common import attach_team_permissions
 from app.services.routing.matcher import service as matcher_preset_service
 from app.services.validation import make_error_response, validate_body
 

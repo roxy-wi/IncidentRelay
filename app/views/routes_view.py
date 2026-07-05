@@ -16,15 +16,23 @@ from app.services.rbac import (
     current_user,
     get_allowed_team_ids,
     require_team_read,
-    require_team_write,
+    require_team_or_group_resource_access,
 )
-from app.services.serializers import serialize_route
+from app.services.serializers.routes import serialize_route
 from app.services.validation import make_error_response, validate_body
 from app.services.routing.matcher import service as matcher_preset_service
 from app.services.service_catalog.reconciliation import reconcile_route_services
 
 
 routes_bp = Blueprint("routes_api", __name__)
+
+
+def require_route_resource_write(team_id):
+    """Require write access to team-owned route resources."""
+    return require_team_or_group_resource_access(
+        team_id,
+        write_required=True,
+    )
 
 
 def validate_route_matcher_preset(team_id, preset_id):
@@ -78,6 +86,29 @@ def mask_route_integration_config(config):
     return config
 
 
+def clean_route_config_string(value):
+    """Normalize optional route integration config string values."""
+    if value is None:
+        return None
+
+    value = str(value).strip()
+
+    if not value:
+        return None
+
+    return value
+
+
+def clean_sentry_base_url(value):
+    """Normalize optional Sentry base URL."""
+    value = clean_route_config_string(value)
+
+    if not value:
+        return None
+
+    return value.rstrip("/")
+
+
 def build_route_integration_config(payload, current_route=None):
     """Build provider-specific route integration config."""
     incoming = payload.integration_config or {}
@@ -89,8 +120,7 @@ def build_route_integration_config(payload, current_route=None):
 
         current_config = (
             current_route.integration_config or {}
-            if current_route
-            else {}
+            if current_route else {}
         )
         current_sentry = dict(
             current_config.get("sentry") or {}
@@ -105,10 +135,24 @@ def build_route_integration_config(payload, current_route=None):
 
         secret = new_secret or current_secret
 
+        base_url = clean_sentry_base_url(
+            incoming_sentry.get("base_url")
+        )
+
+        organization_slug = clean_route_config_string(
+            incoming_sentry.get("organization_slug")
+        )
+
         sentry_config = {}
 
         if secret:
             sentry_config["webhook_secret"] = secret
+
+        if base_url:
+            sentry_config["base_url"] = base_url
+
+        if organization_slug:
+            sentry_config["organization_slug"] = organization_slug
 
         return {
             "sentry": sentry_config,
@@ -169,7 +213,7 @@ def validate_route_service(team_id, service_id):
             "service_id": service_id,
         }), 400
 
-    error = require_team_write(service.team_id)
+    error = require_route_resource_write(service.team_id)
     if error:
         return error
 
@@ -213,7 +257,7 @@ def validate_route_escalation_policy(team_id, escalation_policy_id):
             "escalation_policy_id": escalation_policy_id,
         }), 400
 
-    error = require_team_write(policy.team_id)
+    error = require_route_resource_write(policy.team_id)
     if error:
         return error
 
@@ -241,7 +285,7 @@ def validate_route_channels(team_id, channel_ids):
                 "team_id": team_id,
             }), 400
 
-        error = require_team_write(channel.team_id)
+        error = require_route_resource_write(channel.team_id)
         if error:
             return error
 
@@ -271,7 +315,7 @@ def validate_route_rotation(team_id, rotation_id):
             "team_id": team_id,
         }), 400
 
-    error = require_team_write(rotation.team_id)
+    error = require_route_resource_write(rotation.team_id)
     if error:
         return error
 
@@ -322,7 +366,7 @@ def create_route():
     if error:
         return error
 
-    error = require_team_write(payload.team_id)
+    error = require_route_resource_write(payload.team_id)
     if error:
         return error
 
@@ -445,14 +489,14 @@ def update_route(route_id):
         return error
 
     current_route = routes_repo.get_route(route_id)
-    error = require_team_write(current_route.team_id)
+    error = require_route_resource_write(current_route.team_id)
     old_service_id = current_route.service_id
 
     if error:
         return error
 
     if payload.team_id != current_route.team_id:
-        error = require_team_write(payload.team_id)
+        error = require_route_resource_write(payload.team_id)
         if error:
             return error
 
@@ -544,7 +588,7 @@ def disable_route(route_id):
     """
     route_before = routes_repo.get_route(route_id)
 
-    error = require_team_write(route_before.team_id)
+    error = require_route_resource_write(route_before.team_id)
     if error:
         return error
 
@@ -577,7 +621,7 @@ def enable_route(route_id):
     """
     route_before = routes_repo.get_route(route_id)
 
-    error = require_team_write(route_before.team_id)
+    error = require_route_resource_write(route_before.team_id)
     if error:
         return error
 
@@ -612,7 +656,7 @@ def delete_route(route_id):
     """
     route_before = routes_repo.get_route(route_id)
 
-    error = require_team_write(route_before.team_id)
+    error = require_route_resource_write(route_before.team_id)
     if error:
         return error
 
@@ -650,7 +694,7 @@ def regenerate_route_intake_token(route_id):
     """
 
     route = routes_repo.get_route(route_id)
-    error = require_team_write(route.team_id)
+    error = require_route_resource_write(route.team_id)
 
     if error:
         return error
@@ -682,7 +726,7 @@ def replace_route_channels(route_id):
         return error
 
     route_before = routes_repo.get_route(route_id)
-    error = require_team_write(route_before.team_id)
+    error = require_route_resource_write(route_before.team_id)
 
     if error:
         return error
@@ -712,7 +756,7 @@ def add_route_channel(route_id, channel_id):
     """
 
     route_before = routes_repo.get_route(route_id)
-    error = require_team_write(route_before.team_id)
+    error = require_route_resource_write(route_before.team_id)
 
     if error:
         return error
@@ -741,7 +785,7 @@ def delete_route_channel(route_id, channel_id):
     """
 
     route_before = routes_repo.get_route(route_id)
-    error = require_team_write(route_before.team_id)
+    error = require_route_resource_write(route_before.team_id)
 
     if error:
         return error

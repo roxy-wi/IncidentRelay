@@ -47,14 +47,45 @@ DELETE /api/services/match-rules/{rule_id}
 
 ## Service links and runbooks
 
-```text
-GET /api/services/links
-GET /api/services/{service_id}/links
-POST /api/services/{service_id}/links
-GET /api/services/runbooks
-GET /api/services/{service_id}/runbooks
-POST /api/services/{service_id}/runbooks
-```
+    GET /api/services/links
+    GET /api/services/{service_id}/links
+    POST /api/services/{service_id}/links
+    GET /api/services/runbooks
+    GET /api/services/{service_id}/runbooks
+    POST /api/services/{service_id}/runbooks
+
+## Service dependencies
+
+    GET /api/services/dependencies
+    GET /api/services/{service_id}/dependencies
+    POST /api/services/{service_id}/dependencies
+    PUT /api/services/dependencies/{dependency_id}
+    DELETE /api/services/dependencies/{dependency_id}
+
+Dependency payload:
+
+    {
+      "depends_on_service_id": 2,
+      "dependency_type": "hard",
+      "criticality": "required",
+      "correlation_enabled": true,
+      "propagation_delay_seconds": 300,
+      "description": "Primary PostgreSQL dependency",
+      "enabled": true
+    }
+
+Fields:
+
+Name Type Default Description
+`depends_on_service_id` integer required Upstream service id.
+`dependency_type` string `hard` One of `hard`, `soft`, `external`, `informational`.
+`criticality` string `important` One of `required`, `important`, `optional`.
+`correlation_enabled` boolean `true` Whether this dependency can be used for dependency-aware alert correlation.
+`propagation_delay_seconds` integer `300` Maximum expected delay between related alert groups.
+`description` string or null `null` Optional human-readable dependency note.
+`enabled` boolean `true` Whether the dependency is active.
+
+`propagation_delay_seconds` is clamped by API validation. Use short windows for synchronous dependencies and longer windows only for delayed batch or queue-based propagation.
 
 ## Analytics and impact
 

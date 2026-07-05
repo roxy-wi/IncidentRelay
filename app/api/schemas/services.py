@@ -432,6 +432,8 @@ class ServiceDependencyBaseSchema(ApiModel):
         max_length=DESCRIPTION_MAX_LENGTH,
     )
     enabled: bool = True
+    correlation_enabled: bool = True
+    propagation_delay_seconds: int = Field(default=300, ge=0, le=86400)
 
 
 class ServiceDependencyCreateSchema(ServiceDependencyBaseSchema):

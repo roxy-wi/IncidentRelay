@@ -3,7 +3,7 @@ from pydantic import ValidationError
 
 from app.api.schemas.routes import RouteCreateSchema
 from app.modules.db import routes_repo
-from app.services.serializers import serialize_route
+from app.services.serializers.routes import serialize_route
 from tests.factories import create_group, create_route, create_team
 
 

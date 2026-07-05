@@ -17,7 +17,7 @@ from app.services.rbac import (
     require_group_read,
     require_group_write,
 )
-from app.services.serializers import (
+from app.services.serializers.services import (
     serialize_service_standard,
     serialize_service_standard_check,
 )

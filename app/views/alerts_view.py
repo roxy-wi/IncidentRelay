@@ -6,14 +6,14 @@ from app.modules.db import alerts_repo, notifications_repo
 from app.services.alerts.actions import acknowledge_alert, resolve_alert
 from app.services.audit import write_audit
 from app.services.rbac import get_allowed_team_ids, require_team_read, require_team_respond
-from app.services.serializers import (
+from app.services.serializers.alerts import (
     serialize_alert_event,
     serialize_alert_comment,
     serialize_alert_group,
     serialize_incident_responder,
-    serialize_incident_stakeholder,
     serialize_alert_explain_trace,
 )
+from app.services.serializers.incidents import serialize_incident_stakeholder
 from app.services.alerts.alert_comments import (
     create_group_comment,
     create_child_alert_comment,

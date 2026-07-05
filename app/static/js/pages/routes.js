@@ -485,7 +485,7 @@ function renderRouteActions(route) {
             label: "Regenerate token",
             icon: "fas fa-sync-alt",
             required: "write",
-            denyMessage: "Team manager role is required to regenerate route tokens.",
+            denyMessage: "Team manager or group editor/admin role is required to regenerate route tokens.",
             onClick: function () {
                 regenerateRouteToken(route.id);
             }
@@ -497,7 +497,7 @@ function renderRouteActions(route) {
             label: "Service rules",
             icon: "fas fa-project-diagram",
             required: "write",
-            denyMessage: "Team manager role is required to manage service rules.",
+            denyMessage: "Team manager or group editor/admin role is required to manage service rules.",
             onClick: function () {
                 openRouteServiceRules(route.id);
             }
@@ -507,7 +507,7 @@ function renderRouteActions(route) {
             icon: route.enabled ? "fas fa-pause" : "fas fa-play",
             required: "write",
             danger: route.enabled,
-            denyMessage: "Team manager role is required to enable or disable this route.",
+            denyMessage: "Team manager or group editor/admin role is required to enable or disable this route.",
             onClick: function () {
                 if (route.enabled) {
                     disableRoute(route);
@@ -869,6 +869,22 @@ function renderRouteDetails(route) {
                     : $()
             )
             .append(
+                route.source === "sentry"
+                    ? routeDetailsItem(
+                        "Sentry base URL",
+                        getRouteSentryConfig(route).base_url || "-"
+                    )
+                    : $()
+            )
+            .append(
+                route.source === "sentry"
+                    ? routeDetailsItem(
+                        "Sentry organization",
+                        getRouteSentryConfig(route).organization_slug || "-"
+                    )
+                    : $()
+            )
+            .append(
                 routeDetailsItem(
                     route.source === "aws_sns"
                         ? "SNS webhook URL"
@@ -1074,12 +1090,30 @@ function collectRouteIntegrationConfig() {
     }
 
     if (source === "sentry") {
+        const secret = String(
+            $("#route-sentry-webhook-secret").val() || ""
+        ).trim();
 
-        const secret = String($("#route-sentry-webhook-secret").val() || "").trim();
+        const baseUrl = String(
+            $("#route-sentry-base-url").val() || ""
+        ).trim();
+
+        const organizationSlug = String(
+            $("#route-sentry-organization-slug").val() || ""
+        ).trim();
+
         const sentry = {};
 
         if (secret) {
             sentry.webhook_secret = secret;
+        }
+
+        if (baseUrl) {
+            sentry.base_url = baseUrl;
+        }
+
+        if (organizationSlug) {
+            sentry.organization_slug = organizationSlug;
         }
 
         return {
@@ -1152,7 +1186,7 @@ function saveRoute() {
         return Number(item.id) === Number(id);
     }) : null;
     if (existing && !canWriteObject(existing)) {
-        showAppError("You do not have permission to edit this route.");
+        showAppError("Team manager or group editor/admin role is required to edit this route.");
         return;
     }
 
@@ -1208,6 +1242,10 @@ function editRoute(id) {
         integrationConfig.aws_sns || {}
     );
 
+    const sentryConfig = (
+        integrationConfig.sentry || {}
+    );
+
     $("#route-aws-sns-topic-arn").val(
         awsSnsConfig.topic_arn || ""
     );
@@ -1234,6 +1272,9 @@ function editRoute(id) {
     $("#route-group-by").val(JSON.stringify(route.group_by || [], null, 2));
     $("#route-enabled").prop("checked", !!route.enabled);
     $("#route-sentry-webhook-secret").val("");
+    $("#route-sentry-base-url").val(sentryConfig.base_url || "");
+    $("#route-sentry-organization-slug").val(sentryConfig.organization_slug || "");
+
     updateSentrySecretHelp(route);
     updateRouteSourceUi();
 
@@ -1332,6 +1373,8 @@ function resetRouteForm() {
     $("#route-aws-sns-webhook-group").addClass("is-hidden");
     updateRouteEscalationModeUi();
     $("#route-sentry-webhook-secret").val("");
+    $("#route-sentry-base-url").val("");
+    $("#route-sentry-organization-slug").val("");
     $("#route-notification-channel-mode").val("route_only");
     updateRouteNotificationChannelModeUi();
     updateSentrySecretHelp(null);

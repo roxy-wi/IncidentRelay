@@ -9,7 +9,8 @@ from app.modules.db import groups_repo, tokens_repo, users_repo
 from app.services.integrations.auth import create_raw_token, hash_token
 from app.services.audit import write_audit
 from app.services.rbac import can_read_group
-from app.services.serializers import serialize_user, serialize_api_token
+from app.services.serializers.users import serialize_user
+from app.services.serializers.tokens import serialize_api_token
 from app.services.validation import validate_body
 from app.services.user_oncall_status import get_user_oncall_status
 

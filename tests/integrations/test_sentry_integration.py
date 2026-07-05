@@ -369,3 +369,73 @@ def test_normalize_sentry_accepts_dict_style_tags():
     assert alert["labels"]["team"] == "payments"
     assert alert["labels"]["component"] == "checkout"
     assert alert["labels"]["release"] == "2026.06.30"
+
+
+def test_normalize_sentry_builds_event_link_from_route_config_when_payload_has_no_url():
+    payload = {
+        "action": "created",
+        "data": {
+            "issue": {
+                "id": "119598",
+                "title": "Storage API failed",
+                "project": {
+                    "slug": "auth-fe",
+                },
+            },
+            "event": {
+                "event_id": "abc123",
+                "level": "error",
+            },
+        },
+    }
+
+    result = normalize_sentry(
+        payload,
+        route_config={
+            "sentry": {
+                "base_url": "https://sentry.example.com/",
+                "organization_slug": "platform",
+            }
+        },
+    )
+
+    alert = result[0]
+
+    assert alert["labels"]["sentry_url"] == (
+        "https://sentry.example.com/organizations/platform/issues/119598/"
+    )
+    assert alert["labels"]["event_link"] == (
+        "https://sentry.example.com/organizations/platform/issues/119598/"
+    )
+
+
+def test_normalize_sentry_prefers_payload_url_over_route_config():
+    payload = {
+        "action": "created",
+        "data": {
+            "issue": {
+                "id": "119598",
+                "title": "Storage API failed",
+                "permalink": "https://payload-sentry/issues/119598/",
+            },
+        },
+    }
+
+    result = normalize_sentry(
+        payload,
+        route_config={
+            "sentry": {
+                "base_url": "https://route-sentry.example.com",
+                "organization_slug": "platform",
+            }
+        },
+    )
+
+    alert = result[0]
+
+    assert alert["labels"]["sentry_url"] == (
+        "https://payload-sentry/issues/119598/"
+    )
+    assert alert["labels"]["event_link"] == (
+        "https://payload-sentry/issues/119598/"
+    )

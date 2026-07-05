@@ -23,7 +23,8 @@ from app.services.rbac import (
     require_group_write,
     require_assign_group_role,
 )
-from app.services.serializers import serialize_group, serialize_user, serialize_user_group
+from app.services.serializers.users import serialize_user, serialize_user_group
+from app.services.serializers.teams import serialize_group
 from app.services.validation import validate_body
 
 

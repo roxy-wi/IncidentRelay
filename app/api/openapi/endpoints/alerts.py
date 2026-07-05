@@ -340,6 +340,105 @@ def alert_explain_trace_schema(include_steps=False):
     }
 
 
+def alert_correlation_summary_schema():
+    """Build compact alert correlation summary schema."""
+    return {
+        "type": "object",
+        "properties": {
+            "total": {"type": "integer", "minimum": 0},
+            "root_candidates": {"type": "integer", "minimum": 0},
+            "downstream_impacts": {"type": "integer", "minimum": 0},
+            "best_score": {"type": "integer", "minimum": 0, "maximum": 100},
+            "roles": {
+                "type": "array",
+                "items": {
+                    "type": "string",
+                    "enum": ["possible_symptom", "possible_root_cause"],
+                },
+            },
+            "has_correlation": {"type": "boolean"},
+        },
+        "additionalProperties": True,
+    }
+
+
+def alert_correlation_group_ref_schema():
+    """Build compact alert group reference schema for correlations."""
+    return {
+        "type": "object",
+        "nullable": True,
+        "properties": {
+            "id": {"type": "integer"},
+            "title": {"type": "string"},
+            "status": {"type": "string"},
+            "severity": {"type": "string", "nullable": True},
+            "priority": {"type": "string", "nullable": True},
+            "service_id": {"type": "integer", "nullable": True},
+            "service_slug": {"type": "string", "nullable": True},
+            "service_name": {"type": "string", "nullable": True},
+            "source": {"type": "string", "nullable": True},
+            "last_seen_at": date_time_property("Last seen timestamp in UTC.", nullable=True),
+        },
+        "additionalProperties": True,
+    }
+
+
+def alert_group_correlation_schema():
+    """Build saved alert group correlation schema."""
+    group_ref = alert_correlation_group_ref_schema()
+
+    return {
+        "type": "object",
+        "properties": {
+            "id": {"type": "integer"},
+            "role": {
+                "type": "string",
+                "enum": ["possible_symptom", "possible_root_cause", "related"],
+            },
+            "relation_type": {
+                "type": "string",
+                "enum": [
+                    "possible_root_cause",
+                    "possible_downstream_impact",
+                    "same_dependency_chain",
+                ],
+            },
+            "direction": {"type": "string", "enum": ["upstream", "downstream"]},
+            "score": {"type": "integer", "minimum": 0, "maximum": 100},
+            "depth": {"type": "integer", "minimum": 1},
+            "dependency_type": {"type": "string", "nullable": True},
+            "criticality": {"type": "string", "nullable": True},
+            "reason": {"type": "string", "nullable": True},
+            "active": {"type": "boolean"},
+            "first_seen_at": date_time_property("First correlation timestamp in UTC."),
+            "last_seen_at": date_time_property("Last correlation timestamp in UTC."),
+            "root_group": group_ref,
+            "related_group": group_ref,
+            "peer_group": group_ref,
+        },
+        "additionalProperties": True,
+    }
+
+
+def alert_group_correlations_schema():
+    """Build alert group details correlation block schema."""
+    return {
+        "type": "object",
+        "properties": {
+            "root_candidates": {
+                "type": "array",
+                "items": alert_group_correlation_schema(),
+            },
+            "downstream_impacts": {
+                "type": "array",
+                "items": alert_group_correlation_schema(),
+            },
+            "total": {"type": "integer", "minimum": 0},
+        },
+        "additionalProperties": True,
+    }
+
+
 def alert_group_schema(include_details=False):
     """Build an alert group response schema.
 
@@ -431,6 +530,7 @@ def alert_group_schema(include_details=False):
         "notification_reason": {"type": "string", "nullable": True},
         "reminder_count": {"type": "integer"},
         "escalation_level": {"type": "integer"},
+        "correlation_summary": alert_correlation_summary_schema(),
         "merged_into_id": {"type": "integer", "nullable": True},
         "merged_at": date_time_property(
             "Timestamp when this group was merged into another group.",
@@ -454,6 +554,7 @@ def alert_group_schema(include_details=False):
             "type": "array",
             "items": alert_notification_schema(),
         }
+        properties["correlations"] = alert_group_correlations_schema()
 
     return {
         "type": "object",

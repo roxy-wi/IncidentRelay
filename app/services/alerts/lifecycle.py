@@ -29,6 +29,7 @@ from app.services.routing.service_resolution import (
     resolve_alert_service,
 )
 from app.services.silences import find_active_silence
+from app.services.alerts.correlation import refresh_alert_group_correlations, refresh_alert_group_correlations_safely
 
 logger = logging.getLogger("oncall.alerts")
 
@@ -370,6 +371,8 @@ def _handle_existing_alert(
         previous_priority_order=previous_priority_order,
         created_group=created_group,
     )
+
+    refresh_alert_group_correlations_safely(group, reason="existing_alert_update")
 
     if maintenance_decision.suppress_notifications:
         alerts_repo.clear_alert_group_notification(group)
@@ -761,6 +764,49 @@ def _upsert_alert(alert_data, trace):
         previous_priority_order=None if created_group else previous_priority_order,
         created_group=created_group,
     )
+
+    refresh_alert_group_correlations_safely(group, reason="new_alert")
+
+    if alert_data["source"] == "sentry":
+        labels = alert_data.get("labels") or {}
+
+        logger.info(
+            "sentry source event link debug",
+            extra={
+                "extra": {
+                    "event_type": "sentry_source_event_link_debug",
+                    "title": alert_data.get("title"),
+                    "external_id": alert_data.get("external_id"),
+                    "dedup_key": alert_data.get("dedup_key"),
+                    "group_key": group_key,
+                    "route_id": route.id if route else None,
+                    "team_name": team.name if team else None,
+                    "team_id": team.id if team else None,
+                    "service_id": service.id if service else None,
+                    "event_link": labels.get("event_link") or "",
+                    "sentry_url": labels.get("sentry_url") or "",
+                    "issue_id": labels.get("issue_id") or "",
+                    "event_id": labels.get("event_id") or "",
+                    "sentry_alert_id": labels.get("sentry_alert_id") or "",
+                    "project_slug": labels.get("project_slug") or "",
+                    "organization_slug": labels.get("organization_slug") or "",
+                    "label_keys": sorted(labels.keys()),
+                }
+            },
+        )
+
+    try:
+        refresh_alert_group_correlations(group)
+    except Exception:
+        logger.exception(
+            "alert group correlation refresh failed",
+            extra={
+                "extra": {
+                    "alert_group_id": getattr(group, "id", None),
+                    "service_id": getattr(group, "service_id", None),
+                }
+            },
+        )
 
     logger.info(
         "alert added to incident",

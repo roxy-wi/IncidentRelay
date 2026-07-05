@@ -8,7 +8,17 @@ function loadTeams() {
      * Load teams page.
      */
     RbacRoles.fillTeamSelect(TEAM_VIEWER_ROLE);
-    loadTeamGroups(refreshTeams);
+
+    if (window.AppSlug) {
+        window.AppSlug.bind("#team-name", "#team-slug", {
+            manualWhenHasValue: true,
+        });
+    }
+
+    loadTeamGroups(function () {
+        refreshTeams();
+        fillUserSelect("#team-member-user", null, "/api/users?all=1");
+    });
 }
 
 function loadTeamGroups(callback) {
@@ -705,11 +715,15 @@ function collectTeamPayload() {
         throw new Error("group_id is required");
     }
 
+    const rawSlug = String($("#team-slug").val() || "");
+
     return {
         group_id: groupId,
-        slug: $("#team-slug").val(),
-        name: $("#team-name").val(),
-        description: $("#team-description").val(),
+        slug: window.AppSlug
+            ? window.AppSlug.slugify(rawSlug)
+            : rawSlug.trim(),
+        name: String($("#team-name").val() || "").trim(),
+        description: String($("#team-description").val() || "").trim(),
         escalation_enabled: $("#team-escalation-enabled").is(":checked"),
         escalation_after_reminders: Number($("#team-escalation-after").val()),
         active: $("#team-active").is(":checked"),
@@ -769,6 +783,13 @@ function editTeam(id) {
     $("#team-escalation-enabled").prop("checked", !!team.escalation_enabled);
     $("#team-escalation-after").val(team.escalation_after_reminders || 0);
     $("#team-active").prop("checked", !!team.active);
+
+    if (window.AppSlug) {
+        window.AppSlug.reset("#team-slug", {
+            manual: true,
+        });
+    }
+
     openTeamFormModal();
 }
 
@@ -788,6 +809,11 @@ function resetTeamForm() {
     $("#team-escalation-enabled").prop("checked", true);
     $("#team-escalation-after").val(2);
     $("#team-active").prop("checked", true);
+    if (window.AppSlug) {
+        window.AppSlug.reset("#team-slug", {
+            manual: false,
+        });
+    }
 }
 
 function openTeamFormModal() {

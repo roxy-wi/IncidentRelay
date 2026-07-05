@@ -7,7 +7,7 @@ from app.modules.db import routes_repo, services_repo
 from app.services.audit import write_audit
 from app.services.rbac import require_team_read, current_user, require_team_write
 from app.services.routing.matcher import service as matcher_preset_service
-from app.services.serializers import serialize_service_match_rule
+from app.services.serializers.services import serialize_service_match_rule
 from app.services.service_catalog.events import (
     READINESS_SCOPE_NONE,
     READINESS_SCOPE_SERVICE,

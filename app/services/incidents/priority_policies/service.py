@@ -4,7 +4,7 @@ from app.db import database_proxy
 from app.modules.db import priority_policies_repo, teams_repo
 from app.services.incidents.priority_policies.constants import FALLBACK_FIXED_PRIORITY, FALLBACK_SEVERITY_MAPPING
 from app.services.routing.matcher import service as matcher_preset_service
-from app.services.serializers import attach_team_permissions
+from app.services.serializers.common import attach_team_permissions
 
 
 class PriorityPolicyError(ValueError):

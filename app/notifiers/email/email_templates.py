@@ -1,4 +1,3 @@
-from __future__ import annotations
 from html import escape
 from string import Formatter
 
@@ -9,6 +8,7 @@ from app.services.routing.service_context import (
     service_display_name,
 )
 from app.services.alerts.priority import alert_priority_label
+from app.services.alerts.correlation import format_correlation_plain
 
 EMAIL_HTML_TEMPLATE_MAX_LENGTH = 20000
 
@@ -29,6 +29,7 @@ EMAIL_TEMPLATE_PLACEHOLDERS = (
     "service_runbooks",
     "source_event_url",
     "source_event_link",
+    "{correlation}",
 )
 
 DEFAULT_EMAIL_HTML_TEMPLATE = """<!doctype html>
@@ -75,6 +76,10 @@ DEFAULT_EMAIL_HTML_TEMPLATE = """<!doctype html>
                 <td>{service_runbooks}</td>
             </tr>
             <tr>
+                <td>Correlation</td>
+                <td>{correlation}</td>
+            </tr>
+            <tr>
               <td style="padding:16px 26px;background:#f8fafc;color:#64748b;font-size:12px;">
                 Sent by IncidentRelay. You can customize this email template in the channel settings.
               </td>
@@ -106,6 +111,21 @@ def _stringify(value, default="-"):
 
 def _escape_value(value, default="-"):
     return escape(_stringify(value, default), quote=True)
+
+
+def format_correlation_html(alert):
+    """Return escaped HTML correlation block for email templates."""
+    lines = format_correlation_plain(alert)
+
+    if not lines:
+        return "-"
+
+    escaped_lines = [
+        escape(str(line), quote=True)
+        for line in lines
+    ]
+
+    return "<br>".join(escaped_lines)
 
 
 def build_email_template_context(alert, text, event_type="notification"):
@@ -145,6 +165,7 @@ def build_email_template_context(alert, text, event_type="notification"):
         service=_escape_value(service_display_name(alert)),
         service_links=format_service_links_html(alert),
         service_runbooks=format_service_runbooks_html(alert),
+        correlation=format_correlation_html(alert),
     )
 
 

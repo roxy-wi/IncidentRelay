@@ -1,9 +1,6 @@
-from __future__ import annotations
-
 from collections import Counter, defaultdict
 from datetime import datetime, timedelta
 from types import SimpleNamespace
-from typing import Any
 
 from app.db import database_proxy
 from app.modules.db.models import (
@@ -11,7 +8,7 @@ from app.modules.db.models import (
     ServiceImpactSnapshot,
     ServiceImpactSnapshotItem,
 )
-from app.services.serializers import serialize_utc_datetime
+from app.services.serializers.services import serialize_utc_datetime
 from app.services.service_catalog.impact import build_service_impact_v2
 
 IMPACTFUL_STATUSES = {"degraded", "partial_outage", "major_outage", "maintenance", "unknown"}

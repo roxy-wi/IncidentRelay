@@ -21,7 +21,7 @@ from app.modules.db import rotations_repo, teams_repo
 from app.services.audit import write_audit
 from app.services.rbac import get_allowed_team_ids, require_team_read, require_team_write
 from app.services.oncall import get_current_oncall_user
-from app.services.serializers import (
+from app.services.serializers.rotations import (
     serialize_rotation,
     serialize_rotation_layer,
     serialize_rotation_layer_member,

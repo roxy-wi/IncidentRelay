@@ -194,6 +194,36 @@
                     <div id="route-sentry-secret-help" class="help-text">
                         Create the route first to get the Sentry webhook URL. Then create a Sentry Internal Integration and paste its Client Secret here.
                     </div>
+                    <div class="form-group">
+                        <label for="route-sentry-base-url">Sentry base URL</label>
+                        <input
+                            id="route-sentry-base-url"
+                            class="input"
+                            type="url"
+                            placeholder="https://sentry.io"
+                            autocomplete="off"
+                            spellcheck="false"
+                        >
+                        <div class="help-text">
+                            Used as fallback when webhook payload does not include an event URL.
+                            For self-hosted Sentry, use your Sentry root URL.
+                        </div>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="route-sentry-organization-slug">Sentry organization slug</label>
+                        <input
+                            id="route-sentry-organization-slug"
+                            class="input"
+                            type="text"
+                            placeholder="my-org"
+                            autocomplete="off"
+                            spellcheck="false"
+                        >
+                        <div class="help-text">
+                            Used together with issue_id to build a fallback Sentry issue link.
+                        </div>
+                    </div>
                 </div>
                 <div id="route-aws-sns-settings" class="is-hidden">
                     <div class="form-group">

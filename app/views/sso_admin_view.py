@@ -11,7 +11,7 @@ from app.modules.db.common import integrity_conflict, unique_field_conflict
 from app.modules.db import sso_repo
 from app.services.audit import write_audit
 from app.services.rbac import require_admin_user
-from app.services.serializers import serialize_sso_group_mapping, serialize_sso_provider
+from app.services.serializers.sso import serialize_sso_group_mapping, serialize_sso_provider
 from app.services.validation import validate_body
 from app.api.schemas.sso import SsoSamlMetadataParseRequest
 from app.modules.sso.saml_metadata import SamlMetadataError, parse_saml_idp_metadata
@@ -165,8 +165,11 @@ def create_group_mapping(provider_id):
 
     try:
         mapping = sso_repo.create_group_mapping(provider_id, data)
-    except ValueError as exc:
-        return jsonify({"error": str(exc)}), 400
+    except ValueError:
+        return jsonify({
+            "error": "validation_error",
+            "message": "Invalid SSO group mapping request",
+        }), 400
     except IntegrityError:
         return integrity_conflict("SSO group mapping could not be saved because it conflicts with existing data")
 
@@ -199,8 +202,11 @@ def update_group_mapping(mapping_id):
 
     try:
         mapping = sso_repo.update_group_mapping(mapping_id, data)
-    except ValueError as exc:
-        return jsonify({"error": str(exc)}), 400
+    except ValueError:
+        return jsonify({
+            "error": "validation_error",
+            "message": "Invalid SSO group mapping request",
+        }), 400
     except IntegrityError:
         return integrity_conflict("SSO group mapping could not be saved because it conflicts with existing data")
 

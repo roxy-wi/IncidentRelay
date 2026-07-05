@@ -5,6 +5,23 @@ from pydantic import Field, model_validator
 from app.api.schemas.base import ApiModel
 
 
+IncidentSeverity = Literal[
+    "critical",
+    "high",
+    "medium",
+    "low",
+    "warning",
+    "info",
+]
+
+IncidentPrioritySlug = Literal[
+    "p1",
+    "p2",
+    "p3",
+    "p4",
+    "p5",
+]
+
 IncidentResponderTargetType = Literal[
     "user",
     "team",
@@ -18,6 +35,27 @@ IncidentResponderUpdateStatus = Literal[
     "expired",
     "resolved",
 ]
+
+
+class IncidentCreateSchema(ApiModel):
+    """Validate manual incident creation payload."""
+
+    team_id: int = Field(ge=1)
+    service_id: int | None = Field(default=None, ge=1)
+    title: str = Field(min_length=1, max_length=500)
+    message: str | None = Field(default=None, max_length=5000)
+    severity: IncidentSeverity = "critical"
+    priority: IncidentPrioritySlug | None = None
+    notify: bool = True
+
+    @model_validator(mode="after")
+    def normalize_text(self):
+        self.title = self.title.strip()
+
+        if self.message is not None:
+            self.message = self.message.strip()
+
+        return self
 
 
 class IncidentResponderCreateSchema(ApiModel):

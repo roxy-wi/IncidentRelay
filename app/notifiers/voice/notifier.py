@@ -4,6 +4,7 @@ from app.notifiers.base import BaseNotifier
 from app.notifiers.plugins import logger
 from app.notifiers.voice.base import VoiceCallRequest
 from app.notifiers.voice.loader import create_voice_provider
+from app.services.alerts.correlation import format_correlation_plain
 
 
 class VoiceCallNotifier(BaseNotifier):
@@ -91,6 +92,7 @@ class VoiceCallNotifier(BaseNotifier):
             team=alert.team.slug if getattr(alert, "team", None) else "-",
             assignee=self._assignee_name(alert) or "-",
             source=getattr(alert, "source", None) or "-",
+            correlation=self._correlation_text(alert),
         )
         return template.format_map(values)
 
@@ -148,3 +150,24 @@ class VoiceCallNotifier(BaseNotifier):
             "skipped": True,
             "skip_reason": reason,
         }
+
+    def _correlation_text(self, alert):
+        """Return short voice-friendly correlation text."""
+        lines = format_correlation_plain(alert)
+
+        if not lines:
+            return ""
+
+        useful_lines = [
+            line
+            for line in lines
+            if line.startswith("Role:")
+               or line.startswith("Possible root cause:")
+               or line.startswith("Possible downstream impact:")
+               or line.startswith("- ")
+        ]
+
+        if not useful_lines:
+            return ""
+
+        return " ".join(useful_lines[:4])

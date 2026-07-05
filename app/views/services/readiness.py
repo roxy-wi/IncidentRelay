@@ -5,7 +5,7 @@ from app.views.services.blueprint import services_bp
 from app.modules.db import services_repo
 from app.services.audit import write_audit
 from app.services.rbac import require_team_read, require_team_write, current_user
-from app.services.serializers import serialize_service_readiness
+from app.services.serializers.services import serialize_service_readiness
 from app.services.service_catalog import readiness as service_readiness
 from app.services.service_catalog.events import reconcile_service_catalog_readiness
 from app.services.validation import make_error_response

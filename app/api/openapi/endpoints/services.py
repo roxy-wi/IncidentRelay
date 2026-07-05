@@ -521,6 +521,18 @@ SERVICE_DEPENDENCY_SCHEMA = {
             "enum": SERVICE_DEPENDENCY_CRITICALITIES,
             "default": "important",
         },
+        "correlation_enabled": {
+            "type": "boolean",
+            "default": True,
+            "description": "Whether this dependency can be used for dependency-aware alert correlation.",
+        },
+        "propagation_delay_seconds": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 86400,
+            "default": 300,
+            "description": "Maximum expected propagation delay between related alerts.",
+        },
         "description": {
             "type": "string",
             "nullable": True,

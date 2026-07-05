@@ -13,6 +13,7 @@ from app.services.alerts.priority import (
     alert_priority_label,
     format_alert_title_with_priority,
 )
+from app.services.alerts.correlation import format_correlation_markdown
 
 
 class MattermostNotifier(IncomingWebhookNotifier):
@@ -327,6 +328,15 @@ class MattermostNotifier(IncomingWebhookNotifier):
                     "short": False,
                     "title": "Runbooks",
                     "value": service_runbooks,
+                }
+            )
+        correlation_context = format_correlation_markdown(alert)
+        if correlation_context:
+            fields.append(
+                {
+                    "short": False,
+                    "title": "Correlation",
+                    "value": correlation_context,
                 }
             )
         if alert_url:

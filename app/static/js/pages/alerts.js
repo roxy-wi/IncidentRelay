@@ -14,6 +14,10 @@ let alertsServiceFilterLoaded = false;
 let alertsServiceFilterTeamKey = null;
 const ALERTS_QUERY_STORAGE_KEY = "incidentrelay.alerts.query";
 let selectedAlertGroupIds = new Set();
+let manualIncidentTeams = [];
+let manualIncidentPermissionsLoaded = false;
+let manualIncidentPriorities = [];
+let manualIncidentServices = [];
 let alertsPagination = {
     page: 1,
     page_size: 25,
@@ -119,6 +123,34 @@ function alertGroupTargetIdFromSelection() {
 
     return selected.length ? Number(selected[0].id) : null;
 }
+
+function selectedAlertGroups() {
+    return alertsCache.filter(function (item) {
+        return selectedAlertGroupIds.has(Number(item.id));
+    });
+}
+
+
+function selectedAlertGroupsForBulkAction(action) {
+    return selectedAlertGroups().filter(function (alert) {
+        const status = normalizeAlertValue(alert.status);
+
+        if (!canRespondObject(alert) || !isAlertGroup(alert)) {
+            return false;
+        }
+
+        if (action === "ack") {
+            return status === "firing";
+        }
+
+        if (action === "resolve") {
+            return status !== "resolved" && status !== "merged";
+        }
+
+        return false;
+    });
+}
+
 function ensureAlertsBulkActionsBar() {
     let bar = $("#alerts-bulk-actions");
 
@@ -135,6 +167,20 @@ function ensureAlertsBulkActionsBar() {
                 .attr("id", "alerts-bulk-selected-count")
                 .addClass("alerts-bulk-selected-count")
                 .text("0 selected")
+        )
+        .append(
+            $("<button>")
+                .attr("type", "button")
+                .attr("id", "alerts-ack-selected")
+                .addClass("btn btn-warning btn-small")
+                .text("Ack selected")
+        )
+        .append(
+            $("<button>")
+                .attr("type", "button")
+                .attr("id", "alerts-resolve-selected")
+                .addClass("btn btn-resolve btn-small")
+                .text("Resolve selected")
         )
         .append(
             $("<button>")
@@ -159,9 +205,17 @@ function ensureAlertsBulkActionsBar() {
 function renderAlertsBulkActions() {
     const bar = ensureAlertsBulkActionsBar();
     const count = selectedAlertGroupIds.size;
+    const ackCount = selectedAlertGroupsForBulkAction("ack").length;
+    const resolveCount = selectedAlertGroupsForBulkAction("resolve").length;
 
     bar.toggle(count > 0);
     bar.find("#alerts-bulk-selected-count").text(count + " selected");
+    bar.find("#alerts-ack-selected")
+        .prop("disabled", ackCount < 1)
+        .text(ackCount > 0 ? "Ack selected (" + ackCount + ")" : "Ack selected");
+    bar.find("#alerts-resolve-selected")
+        .prop("disabled", resolveCount < 1)
+        .text(resolveCount > 0 ? "Resolve selected (" + resolveCount + ")" : "Resolve selected");
     bar.find("#alerts-merge-selected").prop("disabled", count < 2);
 }
 
@@ -600,6 +654,65 @@ function makeAlertBadge(text, cssClass) {
     return makeUiPill(text, cssClass);
 }
 
+function alertCorrelationSummary(alert) {
+    return alert && alert.correlation_summary
+        ? alert.correlation_summary
+        : {
+            total: 0,
+            root_candidates: 0,
+            downstream_impacts: 0,
+            best_score: 0,
+            roles: [],
+            has_correlation: false
+        };
+}
+
+
+function renderAlertCorrelationBadges(alert) {
+    const summary = alertCorrelationSummary(alert);
+    const wrapper = $("<div>").addClass("alert-correlation-badges");
+
+    if (!summary.has_correlation) {
+        return wrapper;
+    }
+
+    if (Number(summary.root_candidates || 0) > 0) {
+        wrapper.append(
+            makeAlertBadge(
+                "Symptom",
+                "ui-pill-medium"
+            ).attr(
+                "title",
+                "This alert has possible upstream root cause alerts"
+            )
+        );
+    }
+
+    if (Number(summary.downstream_impacts || 0) > 0) {
+        wrapper.append(
+            makeAlertBadge(
+                "Root cause",
+                "ui-pill-critical"
+            ).attr(
+                "title",
+                "This alert may impact downstream alerts"
+            )
+        );
+    }
+
+    wrapper.append(
+        makeAlertBadge(
+            "Correlated " + Number(summary.total || 0),
+            "ui-pill-info"
+        ).attr(
+            "title",
+            "Best correlation score: " + Number(summary.best_score || 0)
+        )
+    );
+
+    return wrapper;
+}
+
 function loadAlerts() {
     applyAlertsQueryParams();
     initAlertsTableSorting();
@@ -636,6 +749,7 @@ function renderAlertsPage() {
 
     syncAlertDetailsFromUrl();
     renderAlertsBulkActions();
+    renderManualIncidentCreateButton();
 }
 
 function renderAlertsPagination(pagination) {
@@ -759,7 +873,7 @@ function renderAlertsTable(alerts) {
     if (!alerts.length) {
         tbody.append(
             $("<tr>").append(
-                $("<td>").attr("colspan", "11").addClass("empty-table-cell").text("No alerts found")
+                $("<td>").attr("colspan", "10").addClass("empty-table-cell").text("No alerts found")
             )
         );
         return;
@@ -834,13 +948,16 @@ function renderAlertPageRow(alert) {
         $("<td>")
             .addClass("alert-title-cell")
             .append($("<div>").addClass("table-title").text(alert.title || "-"))
-            .append($("<div>").addClass("table-subtitle").text(buildAlertSubtitle(alert)))
+            .append(
+                $("<div>").addClass("table-subtitle").text(buildAlertSubtitle(alert))
+            )
             .append(
                 $("<div>")
                     .addClass("table-subtitle")
                     .text(alertGroupCountLabel(alert))
                     .toggle(isAlertGroup(alert))
             )
+            .append(renderAlertCorrelationBadges(alert))
             .append($("<div>").addClass("table-age").text("Age: " + alertDuration(alert)))
     );
 
@@ -871,37 +988,6 @@ function renderAlertPageRow(alert) {
     row.append($("<td>").text(formatDateTimeMinutes(alertCreatedValue(alert))));
     row.append($("<td>").text(formatDateTimeMinutes(alert.last_seen_at)));
     row.append($("<td>").append(renderEscalationCell(alert)));
-    // row.append($("<td>").append(renderReminderCount(alert)));
-
-    const actionsCell = $("<td>").addClass("actions-cell");
-    const actions = $("<div>").addClass("table-actions");
-
-    if (canRespond && normalizeAlertValue(alert.status) === "firing") {
-        actions.append(
-            $("<button>")
-                .attr("type", "button")
-                .addClass("btn btn-warning btn-small")
-                .text("Ack")
-                .on("click", function () {
-                    apiPost("/api/alerts/" + alert.id + "/ack", {}, loadAlerts);
-                })
-        );
-    }
-
-    if (canRespond && normalizeAlertValue(alert.status) !== "resolved") {
-        actions.append(
-            $("<button>")
-                .attr("type", "button")
-                .addClass("btn btn-resolve btn-small")
-                .text("Resolve")
-                .on("click", function () {
-                    apiPost("/api/alerts/" + alert.id + "/resolve", {}, loadAlerts);
-                })
-        );
-    }
-
-    actionsCell.append(actions);
-    row.append(actionsCell);
 
     return row;
 }
@@ -1295,6 +1381,7 @@ function showAlertDetails(alertId) {
 
         renderAlertPrimaryDetails(alert, modal);
         renderAlertServiceContext(alert, modal);
+        renderAlertCorrelation(alert, modal);
         renderAlertDetailsSummary(alert, modal);
 
         modal.find("#alert-details-labels").text(
@@ -1755,6 +1842,207 @@ function alertMatchesSimpleMatchers(alert, matchers) {
 
     return true;
 }
+
+function ensureAlertCorrelationContext(modal) {
+    let target = modal.find("#alert-correlation-context");
+
+    if (target.length) {
+        return target;
+    }
+
+    target = $("<section>")
+        .attr("id", "alert-correlation-context")
+        .addClass("card alert-correlation-context");
+
+    const serviceContext = modal.find("#alert-service-context");
+    const overview = modal.find("#alert-details-overview");
+
+    if (serviceContext.length) {
+        serviceContext.after(target);
+    } else if (overview.length) {
+        overview.append(target);
+    } else {
+        modal.find("#alert-details-summary").before(target);
+    }
+
+    return target;
+}
+
+
+function alertCorrelationRoleLabel(role) {
+    const labels = {
+        possible_symptom: "Possible symptom",
+        possible_root_cause: "Possible root cause",
+        related: "Related alert"
+    };
+
+    return labels[role] || role || "Related alert";
+}
+
+
+function alertCorrelationRelationLabel(relationType) {
+    const labels = {
+        possible_root_cause: "Possible root cause",
+        possible_downstream_impact: "Possible downstream impact",
+        same_dependency_chain: "Same dependency chain"
+    };
+
+    return labels[relationType] || relationType || "-";
+}
+
+
+function alertCorrelationGroupLabel(group) {
+    if (!group) {
+        return "-";
+    }
+
+    return [
+        "#" + group.id,
+        group.service_name || group.service_slug || null,
+        group.title || null
+    ].filter(Boolean).join(" · ");
+}
+
+
+function alertCorrelationGroupMeta(group) {
+    if (!group) {
+        return "-";
+    }
+
+    return [
+        group.status || null,
+        group.severity || null,
+        group.priority || null,
+        group.source || null,
+        formatDateTimeMinutes(group.last_seen_at) || null
+    ].filter(Boolean).join(" / ");
+}
+
+
+function buildAlertCorrelationItem(item) {
+    const peer = item.peer_group || null;
+
+    const row = $("<div>")
+        .addClass("event-item alert-correlation-item");
+
+    const title = $("<div>")
+        .addClass("alert-correlation-title")
+        .append(
+            $("<strong>").text(alertCorrelationRoleLabel(item.role))
+        )
+        .append(
+            $("<span>")
+                .addClass("pill badge-muted")
+                .text("score " + (item.score || 0))
+        );
+
+    row.append(title);
+
+    const groupLink = $("<button>")
+        .attr("type", "button")
+        .addClass("btn-link")
+        .text(alertCorrelationGroupLabel(peer));
+
+    if (peer && peer.id) {
+        groupLink.on("click", function () {
+            showAlertDetails(peer.id);
+        });
+    } else {
+        groupLink.prop("disabled", true);
+    }
+
+    row.append(
+        $("<div>")
+            .addClass("table-subtitle")
+            .text(alertCorrelationGroupMeta(peer))
+    );
+
+    row.append(
+        $("<div>")
+            .addClass("alert-correlation-peer")
+            .append(groupLink)
+    );
+
+    row.append(
+        $("<div>")
+            .addClass("table-subtitle")
+            .text(
+                [
+                    alertCorrelationRelationLabel(item.relation_type),
+                    item.dependency_type || null,
+                    item.criticality || null,
+                    item.depth ? "depth " + item.depth : null
+                ].filter(Boolean).join(" / ")
+            )
+    );
+
+    if (item.reason) {
+        row.append(
+            $("<div>")
+                .addClass("help-text")
+                .text(item.reason)
+        );
+    }
+
+    return row;
+}
+
+
+function renderAlertCorrelation(alert, modal) {
+    const target = ensureAlertCorrelationContext(modal);
+    const correlations = alert.correlations || {};
+    const rootCandidates = asArray(correlations.root_candidates);
+    const downstreamImpacts = asArray(correlations.downstream_impacts);
+    const total = rootCandidates.length + downstreamImpacts.length;
+
+    target.empty();
+
+    if (!total) {
+        target.addClass("is-hidden");
+        return;
+    }
+
+    target.removeClass("is-hidden");
+
+    target.append(
+        $("<div>")
+            .addClass("card-header")
+            .append(
+                $("<div>")
+                    .append($("<h2>").text("Correlation"))
+                    .append(
+                        $("<div>")
+                            .addClass("card-subtitle")
+                            .text("Dependency-aware related alert groups.")
+                    )
+            )
+    );
+
+    const body = $("<div>").addClass("form-body");
+
+    if (rootCandidates.length) {
+        body.append(
+            $("<h3>").text("Possible root cause")
+        );
+
+        rootCandidates.forEach(function (item) {
+            body.append(buildAlertCorrelationItem(item));
+        });
+    }
+
+    if (downstreamImpacts.length) {
+        body.append(
+            $("<h3>").text("Possible downstream impact")
+        );
+
+        downstreamImpacts.forEach(function (item) {
+            body.append(buildAlertCorrelationItem(item));
+        });
+    }
+
+    target.append(body);
+}
+
 function renderAlertDetailsSummary(alert, modal) {
     const summary = modal.find("#alert-details-summary");
 
@@ -1872,11 +2160,79 @@ function renderAlertGroupChildren(alerts, modal) {
         );
     });
 }
+function alertEventTypeLabel(eventType) {
+    const labels = {
+        manual_created: "Manual incident created",
+        created: "Created",
+        acknowledged: "Acknowledged",
+        resolved: "Resolved",
+        escalated: "Escalated",
+        notification_sent: "Notification sent",
+        notification_failed: "Notification failed",
+        notification_skipped: "Notification skipped",
+        priority_updated: "Priority updated",
+        priority_reset: "Priority reset",
+        responder_added: "Responder added",
+        responder_updated: "Responder updated",
+        stakeholder_added: "Stakeholder added",
+        stakeholder_removed: "Stakeholder removed"
+    };
+
+    if (labels[eventType]) {
+        return labels[eventType];
+    }
+
+    return String(eventType || "event")
+        .replace(/_/g, " ")
+        .replace(/\b\w/g, function (letter) {
+            return letter.toUpperCase();
+        });
+}
+
+function alertEventUserLabel(event) {
+    const user = event && event.user ? event.user : null;
+
+    if (!user) {
+        return null;
+    }
+
+    return (
+        user.display_name ||
+        user.username ||
+        user.email ||
+        null
+    );
+}
+
+function alertEventTypeLabel(eventType) {
+    const labels = {
+        correlation_detected: "Correlation detected",
+        correlation_deactivated: "Correlation deactivated",
+        merged: "Merged",
+        merge_target_updated: "Merge target updated",
+        acknowledged: "Acknowledged",
+        resolved: "Resolved",
+        notification: "Notification",
+        reminder: "Reminder",
+        escalation: "Escalation"
+    };
+
+    return labels[eventType] || eventType || "-";
+}
+
 function renderEvents(events, modal) {
     const target = modal.find("#alert-details-events");
+
     target.empty();
+
+    events = asArray(events);
+
     if (!events.length) {
-        target.append($("<div>").addClass("help-text").text("No events."));
+        target.append(
+            $("<div>")
+                .addClass("help-text")
+                .text("No events.")
+        );
         return;
     }
 
@@ -1884,8 +2240,23 @@ function renderEvents(events, modal) {
         target.append(
             $("<div>")
                 .addClass("event-item")
-                .append($("<strong>").text("#" + event.id + " " + event.event_type))
-                .append($("<div>").text(formatDateTimeMinutes(event.created_at) + " " + (event.message || "")))
+                .append(
+                    $("<div>")
+                        .addClass("event-title")
+                        .text(
+                            "#" + event.id + " "
+                            + alertEventTypeLabel(event.event_type)
+                        )
+                )
+                .append(
+                    $("<div>")
+                        .addClass("table-subtitle")
+                        .text(
+                            formatDateTimeMinutes(event.created_at)
+                            + " "
+                            + (event.message || "")
+                        )
+                )
         );
     });
 }
@@ -2323,6 +2694,7 @@ window.addEventListener("popstate", function () {
     loadAlerts();
 });
 initTableMultiSelects(document);
+loadManualIncidentPermissions();
 
 const initialExplainTraceId =
     getAlertsQueryParam("trace_id") ||
@@ -2341,6 +2713,75 @@ $(document).on("click", "#alerts-clear-selection", function () {
 $(document).on("click", "#alerts-merge-selected", function () {
     mergeSelectedAlertGroups();
 });
+$(document).on("click", "#alerts-clear-selection", function () {
+    clearAlertGroupSelection();
+});
+
+$(document).on("click", "#alerts-ack-selected", function () {
+    bulkUpdateSelectedAlertGroups("ack");
+});
+
+$(document).on("click", "#alerts-resolve-selected", function () {
+    bulkUpdateSelectedAlertGroups("resolve");
+});
+
+$(document).on("click", "#alerts-merge-selected", function () {
+    mergeSelectedAlertGroups();
+});
+
+function runAlertGroupBulkAction(action, ids, onDone) {
+    const queue = ids.slice();
+
+    function next() {
+        const id = queue.shift();
+
+        if (!id) {
+            if (typeof onDone === "function") {
+                onDone();
+            }
+            return;
+        }
+
+        apiPost("/api/alerts/" + id + "/" + action, {}, next);
+    }
+
+    next();
+}
+
+
+function bulkUpdateSelectedAlertGroups(action) {
+    const candidates = selectedAlertGroupsForBulkAction(action);
+    const ids = candidates.map(function (alert) {
+        return Number(alert.id);
+    }).filter(Boolean);
+
+    if (!ids.length) {
+        showAppError(
+            action === "ack"
+                ? "Select at least one firing alert group to acknowledge."
+                : "Select at least one unresolved alert group to resolve."
+        );
+        return;
+    }
+
+    const label = action === "ack" ? "acknowledge" : "resolve";
+    const title = action === "ack" ? "Acknowledge selected alert groups?" : "Resolve selected alert groups?";
+    const confirmText = action === "ack" ? "Acknowledge groups" : "Resolve groups";
+    const message = "This will " + label + " " + ids.length + " selected alert group(s).";
+
+    showAppConfirm({
+        title: title,
+        message: message,
+        confirmText: confirmText,
+        confirmClass: action === "ack" ? "btn-warning" : "btn-resolve"
+    }).done(function () {
+        runAlertGroupBulkAction(action, ids, function () {
+            selectedAlertGroupIds.clear();
+            loadAlerts();
+        });
+    });
+}
+
 function mergeSelectedAlertGroups() {
     const ids = Array.from(selectedAlertGroupIds).map(Number).filter(Boolean);
 
@@ -2482,4 +2923,337 @@ function getAlertsQueryParam(name) {
     const params = new URLSearchParams(window.location.search);
 
     return params.get(name);
+}
+
+function showManualIncidentError(message) {
+    $("#manual-incident-error")
+        .removeClass("is-hidden")
+        .text(message || "Failed to create incident.");
+}
+
+function clearManualIncidentError() {
+    $("#manual-incident-error")
+        .addClass("is-hidden")
+        .text("");
+}
+
+function selectedManualIncidentTeamId() {
+    const value = $("#manual-incident-team").val();
+
+    if (!value) {
+        return null;
+    }
+
+    return Number(value) || null;
+}
+
+function renderManualIncidentTeamOptions() {
+    const select = $("#manual-incident-team");
+
+    select.empty();
+
+    const allowedTeams = manualIncidentTeams.filter(canCreateManualIncidentForTeam);
+
+    if (!allowedTeams.length) {
+        select.append(
+            $("<option>")
+                .attr("value", "")
+                .text("No teams available")
+        );
+        select.prop("disabled", true);
+        return;
+    }
+
+    select.prop("disabled", false);
+
+    select.append(
+        $("<option>")
+            .attr("value", "")
+            .text("Select team")
+    );
+
+    allowedTeams.forEach(function (team) {
+        select.append(
+            $("<option>")
+                .attr("value", team.id)
+                .text(team.name || team.slug || ("Team #" + team.id))
+        );
+    });
+
+    const activeTeamId = (
+        typeof selectedTeamId === "function"
+        && selectedTeamId()
+    )
+        ? Number(selectedTeamId())
+        : null;
+
+    if (
+        activeTeamId
+        && allowedTeams.some(function (team) {
+            return Number(team.id) === Number(activeTeamId);
+        })
+    ) {
+        select.val(String(activeTeamId));
+    } else if (allowedTeams.length === 1) {
+        select.val(String(allowedTeams[0].id));
+    }
+}
+
+function renderManualIncidentPriorityOptions() {
+    const select = $("#manual-incident-priority");
+
+    select.empty();
+
+    select.append(
+        $("<option>")
+            .attr("value", "")
+            .text("Automatic")
+    );
+
+    manualIncidentPriorities
+        .filter(function (priority) {
+            return priority.enabled !== false;
+        })
+        .forEach(function (priority) {
+            const slug = priority.slug || "";
+            const label = [
+                slug ? String(slug).toUpperCase() : null,
+                priority.name || null
+            ].filter(Boolean).join(" ");
+
+            select.append(
+                $("<option>")
+                    .attr("value", slug)
+                    .text(label || slug || "Priority")
+            );
+        });
+}
+
+function renderManualIncidentServiceOptions() {
+    const select = $("#manual-incident-service");
+
+    select.empty();
+
+    select.append(
+        $("<option>")
+            .attr("value", "")
+            .text("No service")
+    );
+
+    manualIncidentServices
+        .filter(function (service) {
+            return service.enabled !== false;
+        })
+        .forEach(function (service) {
+            select.append(
+                $("<option>")
+                    .attr("value", service.id)
+                    .text(service.name || service.slug || ("Service #" + service.id))
+            );
+        });
+}
+
+function loadManualIncidentTeams(callback) {
+    apiGet("/api/teams", function (response) {
+        manualIncidentTeams = asArray(response && response.items ? response.items : response);
+        renderManualIncidentTeamOptions();
+
+        if (typeof callback === "function") {
+            callback();
+        }
+    });
+}
+
+function loadManualIncidentPriorities(callback) {
+    apiGet("/api/incidents/priorities", function (response) {
+        manualIncidentPriorities = asArray(response);
+        renderManualIncidentPriorityOptions();
+
+        if (typeof callback === "function") {
+            callback();
+        }
+    });
+}
+
+function loadManualIncidentServices(teamId, callback) {
+    manualIncidentServices = [];
+    renderManualIncidentServiceOptions();
+
+    if (!teamId) {
+        if (typeof callback === "function") {
+            callback();
+        }
+        return;
+    }
+
+    apiGet("/api/services?team_id=" + encodeURIComponent(teamId), function (response) {
+        manualIncidentServices = asArray(response && response.items ? response.items : response);
+        renderManualIncidentServiceOptions();
+
+        if (typeof callback === "function") {
+            callback();
+        }
+    });
+}
+
+function resetManualIncidentForm() {
+    clearManualIncidentError();
+
+    $("#manual-incident-title").val("");
+    $("#manual-incident-message").val("");
+    $("#manual-incident-severity").val("critical");
+    $("#manual-incident-priority").val("");
+    $("#manual-incident-notify").prop("checked", true);
+    $("#manual-incident-service").empty().append(
+        $("<option>")
+            .attr("value", "")
+            .text("No service")
+    );
+}
+
+function openManualIncidentModal() {
+    resetManualIncidentForm();
+
+    loadManualIncidentTeams(function () {
+        loadManualIncidentPriorities(function () {
+            loadManualIncidentServices(selectedManualIncidentTeamId(), function () {
+                openAppModal("#manual-incident-modal");
+                $("#manual-incident-title").trigger("focus");
+            });
+        });
+    });
+}
+
+function validateManualIncidentPayload(payload) {
+    if (!payload.team_id) {
+        return "Select a team.";
+    }
+
+    if (!payload.title) {
+        return "Incident title is required.";
+    }
+
+    const team = manualIncidentTeams.find(function (item) {
+        return Number(item.id) === Number(payload.team_id);
+    });
+
+    if (!canCreateManualIncidentForTeam(team)) {
+        return "You do not have permission to create incidents for this team.";
+    }
+
+    return null;
+}
+
+function collectManualIncidentPayload() {
+    const serviceValue = $("#manual-incident-service").val();
+    const priorityValue = $("#manual-incident-priority").val();
+
+    return {
+        team_id: selectedManualIncidentTeamId(),
+        service_id: serviceValue ? Number(serviceValue) : null,
+        title: $.trim($("#manual-incident-title").val()),
+        message: $.trim($("#manual-incident-message").val()),
+        severity: $("#manual-incident-severity").val() || "critical",
+        priority: priorityValue || null,
+        notify: $("#manual-incident-notify").is(":checked")
+    };
+}
+
+function saveManualIncident() {
+    clearManualIncidentError();
+
+    const payload = collectManualIncidentPayload();
+    const validationError = validateManualIncidentPayload(payload);
+
+    if (validationError) {
+        showManualIncidentError(validationError);
+        return;
+    }
+
+    apiPost("/api/incidents", payload, function (incident) {
+        closeAppModal("#manual-incident-modal");
+
+        if (incident && incident.id) {
+            openAlertDetailsPage(incident.id);
+            loadAlerts();
+            return;
+        }
+
+        loadAlerts();
+    });
+}
+$(document).on("click", "#open-manual-incident-modal", function () {
+    openManualIncidentModal();
+});
+
+$(document).on("click", "#close-manual-incident-modal", function () {
+    closeAppModal("#manual-incident-modal");
+});
+
+$(document).on("click", "#manual-incident-modal", function (event) {
+    if (event.target === this) {
+        closeAppModal("#manual-incident-modal");
+    }
+});
+
+$(document).on("keydown", function (event) {
+    if (
+        event.key === "Escape"
+        && $("#manual-incident-modal").hasClass("is-open")
+    ) {
+        closeAppModal("#manual-incident-modal");
+    }
+});
+
+$(document).on("click", "#reset-manual-incident-form", function () {
+    resetManualIncidentForm();
+});
+
+$(document).on("click", "#save-manual-incident", function () {
+    saveManualIncident();
+});
+
+$(document).on("keydown", "#manual-incident-title, #manual-incident-message", function (event) {
+    if (event.key === "Enter" && (event.ctrlKey || event.metaKey)) {
+        event.preventDefault();
+        saveManualIncident();
+    }
+});
+
+function canCreateManualIncidentForTeam(team) {
+    const permissions = (team && team.permissions) || {};
+
+    return Boolean(permissions.can_create_manual_incident);
+}
+
+function loadManualIncidentPermissions(callback) {
+    apiGet("/api/teams", function (response) {
+        manualIncidentTeams = asArray(
+            response && response.items ? response.items : response
+        );
+
+        manualIncidentPermissionsLoaded = true;
+        renderManualIncidentCreateButton();
+
+        if (typeof callback === "function") {
+            callback();
+        }
+    });
+}
+
+function userCanCreateManualIncident() {
+    return manualIncidentTeams.some(canCreateManualIncidentForTeam);
+}
+
+function renderManualIncidentCreateButton() {
+    const button = $("#open-manual-incident-modal");
+
+    if (!button.length) {
+        return;
+    }
+
+    button.toggleClass(
+        "is-hidden",
+        !manualIncidentPermissionsLoaded || !userCanCreateManualIncident()
+    );
 }

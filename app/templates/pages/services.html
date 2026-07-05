@@ -985,6 +985,21 @@
           <option value="optional">Optional</option>
         </select>
 
+          <label>
+            <span>Propagation delay, seconds</span>
+            <input id="service-dependency-propagation-delay-seconds" type="number" min="0" max="86400" value="300">
+        </label>
+
+        <label class="checkbox-row">
+            <input id="service-dependency-correlation-enabled" type="checkbox" checked>
+            <span>Use this dependency for alert correlation</span>
+        </label>
+
+        <p class="help-text">
+            Correlation uses this dependency to connect related active alert groups.
+            Propagation delay controls how far apart alerts may be and still match.
+        </p>
+
         <label for="service-dependency-description">Description</label>
         <textarea id="service-dependency-description" class="input" rows="3"></textarea>
 

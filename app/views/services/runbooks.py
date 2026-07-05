@@ -6,7 +6,7 @@ from app.modules.db import services_repo
 from app.services.audit import write_audit
 from app.services.rbac import require_team_read, current_user, require_team_write
 from app.services.routing.matcher import service as matcher_preset_service
-from app.services.serializers import serialize_service_runbook
+from app.services.serializers.services import serialize_service_runbook
 from app.services.service_catalog.events import emit_service_catalog_event
 from app.services.service_catalog.snapshots import service_runbook_snapshot
 from app.services.validation import make_error_response, validate_body

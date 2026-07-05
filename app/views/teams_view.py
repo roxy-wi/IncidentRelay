@@ -18,7 +18,7 @@ from app.services.rbac import (
     require_team_write,
     require_team_read,
 )
-from app.services.serializers import serialize_team
+from app.services.serializers.teams import serialize_team
 from app.services.validation import validate_body
 
 teams_bp = Blueprint("teams_api", __name__)

@@ -14,6 +14,7 @@ from app.services.alerts.priority import (
     alert_priority_label,
     alert_priority_short_label,
 )
+from app.services.alerts.correlation import get_saved_alert_group_correlation_summary
 
 logger = logging.getLogger("oncall.alerts")
 
@@ -45,6 +46,40 @@ def alert_service_label(alert):
         return f"Service #{service_id}"
 
     return "-"
+
+
+def serialize_alert_correlation(alert):
+    """Return saved alert correlation records for webhook payloads."""
+    summary = get_saved_alert_group_correlation_summary(alert)
+
+    def serialize_record(record, group_attr):
+        group = getattr(record, group_attr)
+        service = getattr(group, "service", None)
+
+        return {
+            "correlation_id": record.id,
+            "alert_group_id": group.id,
+            "title": group.title,
+            "status": group.status,
+            "severity": group.severity,
+            "service_id": getattr(service, "id", None),
+            "service_name": getattr(service, "name", None),
+            "service_slug": getattr(service, "slug", None),
+            "relation_type": record.relation_type,
+            "score": record.score,
+            "reason": record.reason,
+        }
+
+    return {
+        "possible_root_causes": [
+            serialize_record(record, "root_group")
+            for record in summary["root_candidates"]
+        ],
+        "possible_downstream_impacts": [
+            serialize_record(record, "related_group")
+            for record in summary["downstream_impacts"]
+        ],
+    }
 
 
 class IncomingWebhookNotifier(BaseNotifier):
@@ -105,6 +140,7 @@ class IncomingWebhookNotifier(BaseNotifier):
                     }
                     for runbook in get_alert_service_runbooks(alert)
                 ],
+                "correlation": serialize_alert_correlation(alert),
             },
             timeout=10,
         )

@@ -12,7 +12,7 @@ from app.services.rbac import (
     require_admin_user,
     require_user_management_access,
 )
-from app.services.serializers import serialize_user
+from app.services.serializers.users import serialize_user
 from app.services.validation import (
     make_error_response,
     safe_exception_response,

@@ -1,12 +1,9 @@
 from app.modules.redaction import REDACTED, redact_secrets, redact_string
-from app.services.serializers import (
-    serialize_alert,
-    serialize_channel,
-    serialize_group,
-    serialize_route,
-    serialize_team,
-    serialize_user,
-)
+from app.services.serializers.alerts import serialize_alert
+from app.services.serializers.channels import serialize_channel
+from app.services.serializers.routes import serialize_route
+from app.services.serializers.teams import serialize_team, serialize_group
+from app.services.serializers.users import serialize_user
 from tests.factories import (
     attach_channel,
     create_alert,

@@ -305,6 +305,77 @@ INCIDENT_PRIORITY_UPDATE_SCHEMA = {
     },
 }
 
+MANUAL_INCIDENT_CREATE_SCHEMA = {
+    "type": "object",
+    "required": ["team_id", "title"],
+    "additionalProperties": False,
+    "properties": {
+        "team_id": {
+            "type": "integer",
+            "minimum": 1,
+            "description": "Team that owns the manual incident.",
+            "example": 7,
+        },
+        "service_id": {
+            "type": "integer",
+            "minimum": 1,
+            "nullable": True,
+            "description": (
+                "Optional affected service. When selected, service ownership, "
+                "default rotation, escalation policy and notification policy "
+                "can be used."
+            ),
+            "example": 3,
+        },
+        "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 500,
+            "description": "Manual incident title.",
+            "example": "Storage API is unavailable",
+        },
+        "message": {
+            "type": "string",
+            "nullable": True,
+            "maxLength": 5000,
+            "description": "Incident description, impact, links or first observations.",
+            "example": "Customers are receiving 5xx from storage-api.",
+        },
+        "severity": {
+            "type": "string",
+            "enum": [
+                "critical",
+                "high",
+                "warning",
+                "medium",
+                "low",
+                "info",
+            ],
+            "default": "critical",
+            "description": "Initial incident severity.",
+            "example": "critical",
+        },
+        "priority": {
+            "type": "string",
+            "nullable": True,
+            "enum": ["p1", "p2", "p3", "p4", "p5"],
+            "description": (
+                "Optional manual priority slug. Omit or pass null to use "
+                "automatic priority resolution."
+            ),
+            "example": "p1",
+        },
+        "notify": {
+            "type": "boolean",
+            "default": True,
+            "description": (
+                "When true, schedule normal alert group notification after creation."
+            ),
+            "example": True,
+        },
+    },
+}
+
 INCIDENT_STAKEHOLDER_SCHEMA = {
     "type": "object",
     "properties": {
@@ -541,6 +612,30 @@ def paths():
                     "200": response("Incidents returned.", INCIDENT_LIST_SCHEMA),
                     "401": response("Valid JWT token is required.", ERROR_SCHEMA),
                     "403": response("Access denied.", ERROR_SCHEMA),
+                },
+            },
+            "post": {
+                "tags": ["incidents"],
+                "summary": "Create manual incident",
+                "description": (
+                    "Creates a manual incident as a normal alert group with one child "
+                    "alert. The incident starts in firing status and can be "
+                    "acknowledged, resolved, assigned responders, updated with "
+                    "stakeholders, prioritized and notified through the normal alert "
+                    "group workflow."
+                ),
+                "operationId": "createManualIncident",
+                "security": [{"bearerAuth": []}],
+                "requestBody": json_body(
+                    "Manual incident creation payload.",
+                    MANUAL_INCIDENT_CREATE_SCHEMA,
+                ),
+                "responses": {
+                    "201": response("Manual incident created.", INCIDENT_DETAILS_SCHEMA),
+                    "400": response("Validation error.", ERROR_SCHEMA),
+                    "401": response("Valid JWT token is required.", ERROR_SCHEMA),
+                    "403": response("Access denied.", ERROR_SCHEMA),
+                    "404": response("Team or service not found.", ERROR_SCHEMA),
                 },
             },
         },

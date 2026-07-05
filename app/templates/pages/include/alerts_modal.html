@@ -462,3 +462,123 @@
     </div>
   </div>
 </div>
+<div id="manual-incident-modal" class="app-modal is-hidden">
+    <div class="app-modal-dialog app-modal-dialog-wide">
+        <div class="app-modal-header">
+            <div>
+                <h2 id="manual-incident-modal-title">Create incident</h2>
+                <div class="card-subtitle">
+                    Create a manual incident for a team or service.
+                </div>
+            </div>
+
+            <button
+                id="close-manual-incident-modal"
+                type="button"
+                class="app-modal-close"
+                aria-label="Close"
+            >
+                ×
+            </button>
+        </div>
+
+        <div class="app-modal-body">
+            <div class="grid-two">
+                <section class="card">
+                    <div class="card-header">
+                        <div>
+                            <h2>Incident</h2>
+                            <div class="card-subtitle">
+                                Title, description and severity.
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-body">
+                        <div id="manual-incident-error" class="alert alert-danger is-hidden"></div>
+
+                        <label for="manual-incident-title">Title</label>
+                        <input
+                            id="manual-incident-title"
+                            class="input"
+                            type="text"
+                            maxlength="500"
+                            placeholder="Storage API is unavailable"
+                            autocomplete="off"
+                        >
+
+                        <label for="manual-incident-message">Description</label>
+                        <textarea
+                            id="manual-incident-message"
+                            class="input"
+                            rows="6"
+                            maxlength="5000"
+                            placeholder="Impact, links, first observations..."
+                        ></textarea>
+
+                        <label for="manual-incident-severity">Severity</label>
+                        <select id="manual-incident-severity" class="input">
+                            <option value="critical">Critical</option>
+                            <option value="high">High</option>
+                            <option value="warning">Warning</option>
+                            <option value="medium">Medium</option>
+                            <option value="low">Low</option>
+                            <option value="info">Info</option>
+                        </select>
+
+                        <label for="manual-incident-priority">Priority</label>
+                        <select id="manual-incident-priority" class="input">
+                            <option value="">Automatic</option>
+                        </select>
+
+                        <div class="help-text">
+                            Leave automatic to let priority rules/defaults decide.
+                        </div>
+                    </div>
+                </section>
+
+                <section class="card">
+                    <div class="card-header">
+                        <div>
+                            <h2>Scope</h2>
+                            <div class="card-subtitle">
+                                Team, optional service and notification behavior.
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="form-body">
+                        <label for="manual-incident-team">Team</label>
+                        <select id="manual-incident-team" class="input"></select>
+
+                        <label for="manual-incident-service">Service</label>
+                        <select id="manual-incident-service" class="input"></select>
+
+                        <div class="help-text">
+                            If a service is selected, the incident will use service ownership and escalation defaults.
+                        </div>
+
+                        <label class="md-checkbox">
+                            <input id="manual-incident-notify" type="checkbox" checked>
+                            <span>Notify team</span>
+                        </label>
+
+                        <div class="help-text">
+                            When enabled, IncidentRelay will schedule notification through the normal alert notification flow.
+                        </div>
+                    </div>
+                </section>
+            </div>
+        </div>
+
+        <div class="app-modal-footer">
+            <button id="reset-manual-incident-form" type="button" class="btn">
+                Reset
+            </button>
+
+            <button id="save-manual-incident" type="button" class="btn btn-primary">
+                Create incident
+            </button>
+        </div>
+    </div>
+</div>

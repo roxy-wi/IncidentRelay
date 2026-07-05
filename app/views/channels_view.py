@@ -14,7 +14,7 @@ from app.services.rbac import (
     get_allowed_team_or_group_resource_ids,
     require_team_or_group_resource_access,
 )
-from app.services.serializers import serialize_channel
+from app.services.serializers.channels import serialize_channel
 from app.services.validation import make_error_response, validate_body
 from app.services.service_catalog.reconciliation import reconcile_channel_services
 

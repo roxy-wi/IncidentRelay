@@ -141,12 +141,20 @@ def _add_service_policy_channels(result, group, event_type):
 def resolve_notification_channels(group, event_type="notification"):
     """Resolve effective channels for one alert group event."""
     route = getattr(group, "route", None)
+    policy_event_type = NOTIFICATION_POLICY_EVENT_ALIASES.get(event_type, event_type)
 
     if not route:
-        return NotificationChannelResolution(
-            mode=ROUTE_ONLY,
-            notes=["route_missing"],
+        result = NotificationChannelResolution(
+            mode=SERVICE_POLICY,
+            notes=["route_missing", "service_policy_without_route"],
         )
+
+        _add_service_policy_channels(result, group, policy_event_type)
+
+        if not result.channels:
+            result.notes.append("no_channels_without_route")
+
+        return result
 
     configured_mode = (
         getattr(route, "notification_channel_mode", None)
@@ -159,8 +167,6 @@ def resolve_notification_channels(group, event_type="notification"):
         mode = ROUTE_ONLY
 
     result = NotificationChannelResolution(mode=mode)
-
-    policy_event_type = NOTIFICATION_POLICY_EVENT_ALIASES.get(event_type, event_type)
 
     if configured_mode != mode:
         result.notes.append("unknown_channel_mode_fallback_to_route_only")

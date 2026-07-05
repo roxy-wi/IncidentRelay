@@ -6,7 +6,7 @@ from app.api.schemas.services import ServiceDependencyCreateSchema, ServiceDepen
 from app.modules.db import services_repo
 from app.services.audit import write_audit
 from app.services.rbac import require_team_read, current_user, require_team_write
-from app.services.serializers import serialize_service_dependency
+from app.services.serializers.services import serialize_service_dependency
 from app.services.service_catalog.events import (
     READINESS_SCOPE_DEPENDENCY_COMPONENT,
     READINESS_SCOPE_NONE,
@@ -112,6 +112,8 @@ def create_service_dependency(service_id):
             "depends_on_service": payload.depends_on_service_id,
             "dependency_type": payload.dependency_type,
             "criticality": payload.criticality,
+            "correlation_enabled": payload.correlation_enabled,
+            "propagation_delay_seconds": payload.propagation_delay_seconds,
             "description": payload.description,
             "enabled": payload.enabled,
         },
@@ -187,6 +189,8 @@ def update_service_dependency(dependency_id):
             "depends_on_service": payload.depends_on_service_id,
             "dependency_type": payload.dependency_type,
             "criticality": payload.criticality,
+            "correlation_enabled": payload.correlation_enabled,
+            "propagation_delay_seconds": payload.propagation_delay_seconds,
             "description": payload.description,
             "enabled": payload.enabled,
         },

@@ -9,7 +9,7 @@ from app.services.audit import write_audit
 from app.services.incidents.priority_policies import service as priority_policy_service
 from app.services.notifications.policies import service as notification_policy_service
 from app.services.rbac import require_team_read, get_allowed_team_ids, current_user, require_team_write
-from app.services.serializers import serialize_service
+from app.services.serializers.services import serialize_service
 from app.services.service_catalog import readiness as service_readiness
 from app.services.service_catalog.events import (
     READINESS_SCOPE_NONE,

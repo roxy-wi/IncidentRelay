@@ -6,65 +6,57 @@ import logging
 logger = logging.getLogger("oncall.alerts")
 
 
-def sentry_link_candidates(*objects):
-    """Yield URL-like values from nested Sentry payload objects."""
-    url_keys = (
-        "permalink",
-        "web_url",
-        "url",
-        "issue_url",
-        "event_url",
-        "alert_url",
-        "source_url",
-        "link",
-        "href",
-    )
-
-    for obj in objects:
-        if not isinstance(obj, dict):
-            continue
-
-        for key in url_keys:
-            yield obj.get(key)
-
-        links = obj.get("links")
-        if isinstance(links, dict):
-            for key in url_keys:
-                yield links.get(key)
-            for value in links.values():
-                if isinstance(value, str):
-                    yield value
-                elif isinstance(value, dict):
-                    for key in url_keys:
-                        yield value.get(key)
-
-        if isinstance(links, list):
-            for item in links:
-                if isinstance(item, str):
-                    yield item
-                elif isinstance(item, dict):
-                    for key in url_keys:
-                        yield item.get(key)
-
-        metadata = obj.get("metadata")
-        if isinstance(metadata, dict):
-            for key in url_keys:
-                yield metadata.get(key)
-
-        contexts = obj.get("contexts")
-        if isinstance(contexts, dict):
-            for context in contexts.values():
-                if isinstance(context, dict):
-                    for key in url_keys:
-                        yield context.get(key)
-
-
-def build_sentry_issue_url(organization_slug, issue_id):
-    """Build a Sentry issue URL when webhook did not provide an explicit link."""
-    if not organization_slug or not issue_id:
+def normalize_sentry_base_url(value):
+    """Return a clean Sentry base URL without trailing slash."""
+    if value is None:
         return None
 
-    return f"https://sentry.io/organizations/{organization_slug}/issues/{issue_id}/"
+    value = str(value).strip()
+
+    if not value:
+        return None
+
+    return value.rstrip("/")
+
+
+def route_sentry_config(route_config):
+    """Return Sentry route config from route integration_config."""
+    if not isinstance(route_config, dict):
+        return {}
+
+    sentry = route_config.get("sentry") or {}
+
+    if not isinstance(sentry, dict):
+        return {}
+
+    return sentry
+
+
+def build_sentry_issue_url(base_url, organization_slug, issue_id):
+    """Build a Sentry issue URL from explicit route config."""
+    base_url = normalize_sentry_base_url(base_url)
+
+    if not base_url or not organization_slug or not issue_id:
+        return None
+
+    return f"{base_url}/organizations/{organization_slug}/issues/{issue_id}/"
+
+
+def sentry_url_from_route_config(route_config, organization_slug, issue_id):
+    """Build a Sentry URL from route integration_config fallback."""
+    sentry = route_sentry_config(route_config)
+
+    base_url = sentry.get("base_url")
+    configured_organization_slug = first_non_empty(
+        sentry.get("organization_slug"),
+        sentry.get("org_slug"),
+    )
+
+    return build_sentry_issue_url(
+        base_url,
+        first_non_empty(organization_slug, configured_organization_slug),
+        issue_id,
+    )
 
 
 def sentry_url_from_payload(
@@ -75,25 +67,8 @@ def sentry_url_from_payload(
     metric_alert,
     event_alert,
     alert_obj,
-    organization_slug,
-    issue_id,
 ):
-    """Return the best available Sentry URL from known webhook payload shapes."""
-    nested_url = first_event_link(
-        *sentry_link_candidates(
-            issue,
-            event,
-            metric_alert,
-            event_alert,
-            alert_obj,
-            data,
-            payload,
-        )
-    )
-
-    if nested_url:
-        return nested_url
-
+    """Return an explicit Sentry URL from known webhook payload fields."""
     return first_event_link(
         # Issue payloads.
         issue.get("permalink"),
@@ -136,17 +111,16 @@ def sentry_url_from_payload(
         payload.get("issue_url"),
         payload.get("event_url"),
         payload.get("alert_url"),
-
-        # Last-resort deterministic Sentry issue URL.
-        build_sentry_issue_url(organization_slug, issue_id),
     )
 
 
-def normalize_sentry(payload, headers=None):
+def normalize_sentry(payload, headers=None, route_config=None):
     """Normalize Sentry Integration Platform webhooks."""
     headers = headers or {}
     data = payload.get("data") or {}
     action = str(payload.get("action") or "").lower()
+    route_config = route_config or {}
+    sentry_route_config = route_sentry_config(route_config)
 
     resource = (
         headers.get("Sentry-Hook-Resource")
@@ -194,18 +168,18 @@ def normalize_sentry(payload, headers=None):
     )
     organization_slug, organization_name = normalize_sentry_named_object(organization)
 
+    route_organization_slug = first_non_empty(
+        sentry_route_config.get("organization_slug"),
+        sentry_route_config.get("org_slug"),
+    )
+
     organization_slug = first_non_empty(
         organization_slug,
-        data.get("organization_slug"),
-        payload.get("organization_slug"),
-        data.get("org_slug"),
-        payload.get("org_slug"),
+        route_organization_slug,
     )
 
     organization_name = first_non_empty(
         organization_name,
-        data.get("organization_name"),
-        payload.get("organization_name"),
         organization_slug,
     )
 
@@ -294,30 +268,49 @@ def normalize_sentry(payload, headers=None):
         metric_alert=metric_alert,
         event_alert=event_alert,
         alert_obj=alert_obj,
-        organization_slug=organization_slug,
-        issue_id=issue_id,
     )
 
+    sentry_url_source = "payload" if sentry_url else None
+
     if not sentry_url:
-        logger.warning(
-            "sentry webhook did not contain source event url",
-            extra={
-                "extra": {
-                    "resource": resource,
-                    "action": action,
-                    "organization_slug": organization_slug,
-                    "issue_id": issue_id,
-                    "event_id": event_id,
-                    "alert_id": alert_id,
-                    "top_level_keys": sorted(payload.keys()),
-                    "data_keys": sorted(data.keys()),
-                    "issue_keys": sorted(issue.keys()),
-                    "event_keys": sorted(event.keys()),
-                    "metric_alert_keys": sorted(metric_alert.keys()),
-                    "event_alert_keys": sorted(event_alert.keys()),
-                }
-            },
+        sentry_url = sentry_url_from_route_config(
+            route_config,
+            organization_slug,
+            issue_id,
         )
+        if sentry_url:
+            sentry_url_source = "route_config"
+
+    logger.info(
+        "sentry source event url resolved",
+        extra={
+            "extra": {
+                "event_type": "sentry_source_event_url_resolved",
+                "has_sentry_url": bool(sentry_url),
+                "sentry_url_source": sentry_url_source or "missing",
+                "sentry_url": sentry_url or "",
+                "resource": resource,
+                "action": action,
+                "organization_slug": organization_slug or "",
+                "route_sentry_base_url_configured": bool(
+                    sentry_route_config.get("base_url")
+                ),
+                "route_sentry_organization_configured": bool(
+                    sentry_route_config.get("organization_slug")
+                    or sentry_route_config.get("org_slug")
+                ),
+                "issue_id": str(issue_id) if issue_id else "",
+                "event_id": str(event_id) if event_id else "",
+                "alert_id": str(alert_id) if alert_id else "",
+                "top_level_keys": sorted(payload.keys()),
+                "data_keys": sorted(data.keys()),
+                "issue_keys": sorted(issue.keys()),
+                "event_keys": sorted(event.keys()),
+                "metric_alert_keys": sorted(metric_alert.keys()),
+                "event_alert_keys": sorted(event_alert.keys()),
+            }
+        },
+    )
 
     labels = {
         "alertname": normalize_sentry_alertname(resource, metric_alert),

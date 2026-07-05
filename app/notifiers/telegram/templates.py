@@ -13,6 +13,7 @@ from app.services.alerts.priority import (
     format_alert_title_with_priority,
 )
 from app.services.links import build_source_event_url
+from app.services.alerts.correlation import format_correlation_plain
 
 MAX_TELEGRAM_MESSAGE_LENGTH = 4096
 MAX_ALERT_MESSAGE_LENGTH = 1600
@@ -47,6 +48,26 @@ def _service_context_lines(alert: Any) -> list[str]:
                 lines.append(f"• {label}")
 
     return lines
+
+
+def _correlation_context_lines(alert: Any) -> list[str]:
+    """Return Telegram HTML lines with saved correlation context."""
+    lines = format_correlation_plain(alert)
+
+    if not lines:
+        return []
+
+    result = ["", "<b>Correlation:</b>"]
+
+    for line in lines[1:]:
+        if line.endswith(":"):
+            result.append(f"<b>{_html(line)}</b>")
+        elif line.startswith("- "):
+            result.append("• " + _html(line[2:]))
+        else:
+            result.append(_html(line))
+
+    return result
 
 
 def _raw(value: Any, default: str = "-") -> str:
@@ -314,6 +335,8 @@ def format_telegram_alert_message(
                     f"🔗 <a href=\"{_attr(ack_url)}\">ACK URL</a>",
                 ]
             )
+
+    lines.extend(_correlation_context_lines(alert))
 
     text = "\n".join(lines)
 

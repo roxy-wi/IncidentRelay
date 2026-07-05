@@ -165,6 +165,55 @@ alert_group_notification_check_interval_seconds = 10
 alert_group_notification_batch_size = 100
 ```
 
+## Manual incidents
+
+Manual incidents allow responders and editors to create an incident directly from the UI or API when the problem is known before an external monitoring system sends an alert.
+
+A manual incident is stored as a normal alert group with one child alert:
+
+- alert group `source` is `manual`;
+- child alert `source` is `manual`;
+- status starts as `firing`;
+- acknowledge, resolve, responders, stakeholders, comments, priority and timeline work the same way as for integration-created alert groups.
+
+Manual incidents do not require an intake route. The creator selects the team directly, and may optionally select a service.
+
+If a service is selected, IncidentRelay can use the service ownership, default rotation, escalation policy and notification policy. Route channels are not used for route-less manual incidents.
+
+### Permissions
+
+A user may create a manual incident for a team when they are one of:
+
+- global admin;
+- group editor or group admin for the team group;
+- team manager;
+- team responder.
+
+Viewers cannot create manual incidents.
+
+### API example
+
+```bash
+curl -X POST https://incidentrelay.example.com/api/incidents \
+  -H "Authorization: Bearer TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "team_id": 12,
+    "service_id": 34,
+    "title": "Storage API is unavailable",
+    "message": "Customers are receiving 5xx from storage-api.",
+    "severity": "critical",
+    "priority": "p1",
+    "notify": true
+  }'
+```
+
+Notification behavior
+
+When notifying is true, IncidentRelay schedules the normal alert group notification. For route-less manual incidents, delivery is resolved through the selected service notification policy.
+
+If no service is selected, or the selected service has no matching notification policy rule, the incident is still created but no notification target may be found.
+
 ## Manual merge
 
 Manual merge is useful when two groups were created separately but actually describe one incident.

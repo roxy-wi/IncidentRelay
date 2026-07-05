@@ -68,27 +68,17 @@ Dependencies describe relationships between services.
 
 A dependency has:
 
-- source service;
-- target service the source depends on;
-- dependency type;
-- dependency criticality;
-- enabled flag;
-- optional description.
+  * `depends_on_service_id`
+  * `dependency_type` — `hard`, `soft`, `external`, `informational`
+  * `criticality` — `required`, `important`, `optional`
+  * `correlation_enabled` — whether this dependency can be used for alert correlation.
+  * `propagation_delay_seconds` — expected delay window for related alerts.
 
-Supported dependency types:
+Dependencies are used by service impact views to show whether a service may be affected by upstream incidents.
 
-- `hard`;
-- `soft`;
-- `external`;
-- `informational`.
+Dependencies can also be used for dependency-aware alert correlation. Correlation stores relationships between active alert groups, adds possible root cause / downstream impact context to notifications and writes correlation lifecycle events to alert timelines.
 
-Supported criticalities:
-
-- `required`;
-- `important`;
-- `optional`.
-
-Dependencies are used by impact calculations to propagate upstream failures to downstream services.
+Read more: [Dependency-aware Alert Correlation](alert-correlation.md).
 
 ## Service Impact v2
 

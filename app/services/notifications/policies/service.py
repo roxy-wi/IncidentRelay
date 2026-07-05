@@ -6,7 +6,7 @@ from app.modules.db import (
     notification_policies_repo,
     teams_repo,
 )
-from app.services.serializers import attach_team_permissions
+from app.services.serializers.common import attach_team_permissions
 from app.services.routing.matcher import service as matcher_preset_service
 
 

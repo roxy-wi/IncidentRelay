@@ -14,6 +14,7 @@ from app.services.routing.service_context import (
     link_display_label,
     runbook_display_label,
 )
+from app.services.alerts.correlation import format_correlation_markdown
 
 
 class SlackNotifier(IncomingWebhookNotifier):
@@ -147,9 +148,11 @@ class SlackNotifier(IncomingWebhookNotifier):
         response = requests.post(
             webhook_url,
             json=self._build_message_payload(
+                channel,
                 alert,
                 text,
                 event_type,
+                include_actions=False,
             ),
             timeout=10,
         )
@@ -328,6 +331,21 @@ class SlackNotifier(IncomingWebhookNotifier):
                 }
             )
 
+        correlation = self._correlation_context(alert)
+        if correlation:
+            blocks.append(
+                {
+                    "type": "section",
+                    "text": {
+                        "type": "mrkdwn",
+                        "text": self._truncate(
+                            f"*Correlation*\n{correlation}",
+                            3000,
+                        ),
+                    },
+                }
+            )
+
         alert_url = build_alert_web_url(alert)
         source_event_url = build_source_event_url(alert)
         link_elements = []
@@ -498,6 +516,15 @@ class SlackNotifier(IncomingWebhookNotifier):
             result.append(f"• <{runbook.url}|{label}>")
 
         return "\n".join(result)
+
+    def _correlation_context(self, alert):
+        """Format saved alert correlations using Slack mrkdwn."""
+        correlation = format_correlation_markdown(alert)
+
+        if not correlation:
+            return ""
+
+        return self._truncate(correlation, 3000)
 
     @staticmethod
     def _escape_text(value):

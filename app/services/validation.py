@@ -10,7 +10,7 @@ from werkzeug.datastructures import MultiDict
 def make_json_safe(value):
     """Convert values from Pydantic errors to JSON-serializable values."""
     if isinstance(value, BaseException):
-        return str(value)
+        return "Invalid value"
     if isinstance(value, dict):
         return {str(key): make_json_safe(item) for key, item in value.items()}
     if isinstance(value, (list, tuple)):
@@ -38,7 +38,14 @@ def normalize_validation_error(error):
     if "input" in error:
         result["input"] = make_json_safe(error["input"])
     if "ctx" in error:
-        result["ctx"] = make_json_safe(error["ctx"])
+        ctx = {
+            key: value
+            for key, value in error["ctx"].items()
+            if not isinstance(value, BaseException)
+        }
+
+        if ctx:
+            result["ctx"] = make_json_safe(ctx)
 
     return result
 

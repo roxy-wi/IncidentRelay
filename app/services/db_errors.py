@@ -82,8 +82,6 @@ def handle_integrity_error(exc: IntegrityError):
             "details": [
                 {
                     "type": "unique_constraint",
-                    "fields": fields,
-                    "constraint": constraint,
                 }
             ],
         }), 409

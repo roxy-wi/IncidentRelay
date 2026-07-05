@@ -9,6 +9,7 @@ from app.services.routing.service_context import format_service_context_plain, s
 from app.services.notifications import rules
 from app.services.alerts.priority import alert_priority_label, format_alert_title_with_priority
 from app.services.notifications.policies.resolver import resolve_notification_channels
+from app.services.alerts.correlation import format_correlation_plain
 
 EDITABLE_EVENTS = {"acknowledged", "resolved"}
 
@@ -72,6 +73,11 @@ def format_alert_message(alert, event_type="notification"):
     if service_context:
         lines.append("")
         lines.extend(service_context)
+
+    correlation_context = format_correlation_plain(alert)
+    if correlation_context:
+        lines.append("")
+        lines.extend(correlation_context)
 
     return "\n".join(lines)
 
