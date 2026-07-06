@@ -713,6 +713,90 @@ function renderAlertCorrelationBadges(alert) {
     return wrapper;
 }
 
+
+function alertBusinessImpactSummary(alert) {
+    return alert && alert.business_impact_summary
+        ? alert.business_impact_summary
+        : {
+            has_business_impact: false,
+            total: 0,
+            highest_status: null,
+            highest_score: 0,
+            services: []
+        };
+}
+
+
+function businessImpactBadgeLabel(status) {
+    const labels = {
+        unknown: "Unknown",
+        operational: "Operational",
+        degraded: "Degraded",
+        partial_outage: "Partial outage",
+        major_outage: "Major outage",
+        maintenance: "Maintenance"
+    };
+
+    return labels[status] || status || "Business impact";
+}
+
+
+function businessImpactBadgeClass(status) {
+    const value = normalizeAlertValue(status);
+
+    if (value === "major_outage") {
+        return "ui-pill-critical";
+    }
+
+    if (value === "partial_outage") {
+        return "ui-pill-high";
+    }
+
+    if (value === "degraded" || value === "maintenance") {
+        return "ui-pill-medium";
+    }
+
+    return "ui-pill-info";
+}
+
+
+function renderAlertBusinessImpactBadges(alert) {
+    const summary = alertBusinessImpactSummary(alert);
+    const wrapper = $("<div>").addClass("alert-correlation-badges alert-business-impact-badges");
+
+    if (!summary.has_business_impact) {
+        return wrapper;
+    }
+
+    const services = asArray(summary.services);
+    const first = services.length ? services[0] : null;
+    const title = services.map(function (item) {
+        return (item.public_name || item.business_service_name || item.business_service_slug || "-")
+            + " / "
+            + businessImpactBadgeLabel(item.impact_status)
+            + " / score "
+            + Number(item.impact_score || 0);
+    }).join("\n");
+
+    wrapper.append(
+        makeAlertBadge(
+            first
+                ? "Business: " + (first.public_name || first.business_service_name || first.business_service_slug)
+                : "Business impact",
+            businessImpactBadgeClass(summary.highest_status)
+        ).attr("title", title || "Business impact")
+    );
+
+    if (Number(summary.total || 0) > 1) {
+        wrapper.append(
+            makeAlertBadge("Impacted " + Number(summary.total || 0), "ui-pill-info")
+                .attr("title", title || "Business impact")
+        );
+    }
+
+    return wrapper;
+}
+
 function loadAlerts() {
     applyAlertsQueryParams();
     initAlertsTableSorting();
@@ -958,6 +1042,7 @@ function renderAlertPageRow(alert) {
                     .toggle(isAlertGroup(alert))
             )
             .append(renderAlertCorrelationBadges(alert))
+            .append(renderAlertBusinessImpactBadges(alert))
             .append($("<div>").addClass("table-age").text("Age: " + alertDuration(alert)))
     );
 
@@ -1382,6 +1467,7 @@ function showAlertDetails(alertId) {
         renderAlertPrimaryDetails(alert, modal);
         renderAlertServiceContext(alert, modal);
         renderAlertCorrelation(alert, modal);
+        renderAlertBusinessImpact(alert, modal);
         renderAlertDetailsSummary(alert, modal);
 
         modal.find("#alert-details-labels").text(
@@ -1414,6 +1500,206 @@ function showAlertDetails(alertId) {
         openAlertDetailsModal();
     });
 }
+
+function ensureAlertBusinessImpact(modal) {
+    let target = modal.find("#alert-business-impact");
+
+    if (target.length) {
+        return target;
+    }
+
+    target = $("<div>")
+        .attr("id", "alert-business-impact")
+        .addClass("alert-service-context alert-business-impact");
+
+    const correlation = modal.find("#alert-correlation-context");
+    const serviceContext = modal.find("#alert-service-context");
+    const primary = modal.find("#alert-primary-details");
+    const overview = modal.find("#alert-details-overview");
+
+    if (correlation.length) {
+        correlation.after(target);
+    } else if (serviceContext.length) {
+        serviceContext.after(target);
+    } else if (primary.length) {
+        primary.after(target);
+    } else if (overview.length) {
+        overview.append(target);
+    } else {
+        modal.find("#alert-details-summary").before(target);
+    }
+
+    return target;
+}
+
+
+function businessImpactStatusLabel(status) {
+    const labels = {
+        unknown: "Unknown",
+        operational: "Operational",
+        degraded: "Degraded",
+        partial_outage: "Partial outage",
+        major_outage: "Major outage",
+        maintenance: "Maintenance"
+    };
+
+    return labels[status] || status || "-";
+}
+
+
+function businessImpactStatusBadgeClass(status) {
+    const value = normalizeAlertValue(status);
+
+    if (value === "major_outage") {
+        return "ui-pill-critical";
+    }
+
+    if (value === "partial_outage") {
+        return "ui-pill-high";
+    }
+
+    if (value === "degraded" || value === "maintenance") {
+        return "ui-pill-medium";
+    }
+
+    if (value === "operational") {
+        return "ui-pill-low";
+    }
+
+    return "ui-pill-muted";
+}
+
+
+function businessImpactTitle(impact) {
+    return (
+        impact.public_name
+        || impact.business_service_name
+        || impact.business_service_slug
+        || ("Business service #" + impact.business_service_id)
+    );
+}
+
+
+function businessImpactMeta(impact) {
+    return [
+        impact.impact_status ? "status: " + businessImpactStatusLabel(impact.impact_status) : null,
+        Number.isFinite(Number(impact.impact_score)) ? "score: " + Number(impact.impact_score) : null,
+        impact.service_name ? "via: " + impact.service_name : null,
+        impact.relation || null,
+    ].filter(Boolean).join(" / ");
+}
+
+
+function renderBusinessImpactComponentSnapshot(impact) {
+    const snapshot = asArray(impact.component_snapshot);
+    const affected = snapshot.filter(function (item) {
+        return item.impact_score > 0 || normalizeAlertValue(item.service_status) !== "operational";
+    });
+
+    const list = $("<div>").addClass("alert-service-context-list");
+
+    if (!affected.length) {
+        return list.append($("<div>").addClass("help-text").text("No affected components in snapshot."));
+    }
+
+    affected.slice(0, 5).forEach(function (item) {
+        list.append(
+            $("<div>")
+                .addClass("alert-service-context-link")
+                .append(
+                    $("<div>")
+                        .addClass("alert-service-context-title")
+                        .text(item.service_name || item.service_slug || ("Service #" + item.service_id))
+                )
+                .append(
+                    $("<div>")
+                        .addClass("alert-service-context-meta")
+                        .text([
+                            item.service_status ? "status: " + item.service_status : null,
+                            item.criticality ? "criticality: " + item.criticality : null,
+                            Number.isFinite(Number(item.impact_score)) ? "score: " + Number(item.impact_score) : null,
+                            Number.isFinite(Number(item.impact_weight)) ? "weight: " + Number(item.impact_weight) : null,
+                        ].filter(Boolean).join(" / "))
+                )
+        );
+    });
+
+    if (affected.length > 5) {
+        list.append(
+            $("<div>")
+                .addClass("help-text")
+                .text("+" + (affected.length - 5) + " more affected component(s)")
+        );
+    }
+
+    return list;
+}
+
+
+function renderAlertBusinessImpact(alert, modal) {
+    const target = ensureAlertBusinessImpact(modal);
+    const impacts = asArray(alert.business_impacts);
+
+    target.empty();
+
+    if (!impacts.length) {
+        target.hide();
+        return;
+    }
+
+    target.show();
+
+    target.append(
+        $("<div>")
+            .addClass("alert-service-context-header")
+            .append($("<h3>").text("Business impact"))
+            .append(
+                $("<div>")
+                    .addClass("card-subtitle")
+                    .text("Customer-facing services affected by this incident.")
+            )
+    );
+
+    const grid = $("<div>").addClass("alert-service-context-grid");
+
+    impacts.forEach(function (impact) {
+        const section = $("<div>")
+            .addClass("alert-service-context-section")
+            .append(
+                $("<div>")
+                    .addClass("alert-correlation-title")
+                    .append(
+                        makeAlertBadge(
+                            businessImpactStatusLabel(impact.impact_status),
+                            businessImpactStatusBadgeClass(impact.impact_status)
+                        )
+                    )
+                    .append(
+                        $("<strong>")
+                            .text(businessImpactTitle(impact))
+                    )
+            )
+            .append(
+                $("<div>")
+                    .addClass("alert-service-context-meta")
+                    .text(businessImpactMeta(impact))
+            );
+
+        if (impact.reason) {
+            section.append(
+                $("<div>")
+                    .addClass("table-subtitle")
+                    .text(impact.reason)
+            );
+        }
+
+        section.append(renderBusinessImpactComponentSnapshot(impact));
+        grid.append(section);
+    });
+
+    target.append(grid);
+}
+
 function buildAlertDetailsSubtitle(alert) {
     return [
         alert.source || null,
@@ -2160,54 +2446,14 @@ function renderAlertGroupChildren(alerts, modal) {
         );
     });
 }
-function alertEventTypeLabel(eventType) {
-    const labels = {
-        manual_created: "Manual incident created",
-        created: "Created",
-        acknowledged: "Acknowledged",
-        resolved: "Resolved",
-        escalated: "Escalated",
-        notification_sent: "Notification sent",
-        notification_failed: "Notification failed",
-        notification_skipped: "Notification skipped",
-        priority_updated: "Priority updated",
-        priority_reset: "Priority reset",
-        responder_added: "Responder added",
-        responder_updated: "Responder updated",
-        stakeholder_added: "Stakeholder added",
-        stakeholder_removed: "Stakeholder removed"
-    };
-
-    if (labels[eventType]) {
-        return labels[eventType];
-    }
-
-    return String(eventType || "event")
-        .replace(/_/g, " ")
-        .replace(/\b\w/g, function (letter) {
-            return letter.toUpperCase();
-        });
-}
-
-function alertEventUserLabel(event) {
-    const user = event && event.user ? event.user : null;
-
-    if (!user) {
-        return null;
-    }
-
-    return (
-        user.display_name ||
-        user.username ||
-        user.email ||
-        null
-    );
-}
 
 function alertEventTypeLabel(eventType) {
     const labels = {
         correlation_detected: "Correlation detected",
         correlation_deactivated: "Correlation deactivated",
+        business_impact_detected: "Business impact detected",
+        business_impact_updated: "Business impact updated",
+        business_impact_deactivated: "Business impact deactivated",
         merged: "Merged",
         merge_target_updated: "Merge target updated",
         acknowledged: "Acknowledged",

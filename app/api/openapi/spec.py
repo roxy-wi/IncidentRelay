@@ -2,6 +2,7 @@ from app.api.openapi.endpoints import (
     alerts,
     auth,
     browser_push,
+    business_services,
     calendar,
     channels,
     escalation_policies,
@@ -52,6 +53,7 @@ ENDPOINT_MODULES = [
     groups,
     sso,
     services,
+    business_services,
     service_catalog,
     maintenance_windows,
 ]

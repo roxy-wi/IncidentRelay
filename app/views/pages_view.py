@@ -52,6 +52,8 @@ def pwa_service_worker():
 @pages_bp.route("/routes/")
 @pages_bp.route("/services")
 @pages_bp.route("/services/")
+@pages_bp.route("/business-services")
+@pages_bp.route("/business-services/")
 @pages_bp.route("/maintenance-windows")
 @pages_bp.route("/maintenance-windows/")
 @pages_bp.route("/escalation-policies")

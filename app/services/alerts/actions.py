@@ -2,6 +2,8 @@ from app.modules.db import alerts_repo, users_repo
 from app.services.alerts.correlation import refresh_alert_group_correlations_safely
 from app.services.incidents.stakeholders import notify_stakeholders
 from app.services.notifications.delivery import update_alert_messages
+from app.services.business_services.impact import refresh_business_impacts_safely_for_group
+from app.services.business_services.status import refresh_business_services_safely_for_technical_service
 
 
 def acknowledge_alert(alert_id, user_id=None):
@@ -19,6 +21,12 @@ def acknowledge_alert(alert_id, user_id=None):
     )
 
     refresh_alert_group_correlations_safely(group, reason="manual_acknowledge")
+
+    if getattr(group, "service_id", None):
+        refresh_business_services_safely_for_technical_service(group.service_id, reason="manual_acknowledge")
+
+    refresh_business_impacts_safely_for_group(group, reason="manual_acknowledge")
+
     update_alert_messages(group, event_type="acknowledged")
 
     if old_status != group.status:
@@ -42,6 +50,12 @@ def resolve_alert(alert_id, user_id=None):
     )
 
     refresh_alert_group_correlations_safely(group, reason="manual_resolve")
+
+    if getattr(group, "service_id", None):
+        refresh_business_services_safely_for_technical_service(group.service_id, reason="manual_resolve")
+
+    refresh_business_impacts_safely_for_group(group, reason="manual_resolve")
+
     update_alert_messages(group, event_type="resolved")
 
     if old_status != group.status:

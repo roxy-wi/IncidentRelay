@@ -1,3 +1,6 @@
+from app.api.openapi.endpoints.business_services import BUSINESS_SERVICE_IMPACT_SCHEMA
+
+
 def path_param(name, description):
     """Build an integer path parameter."""
 
@@ -439,6 +442,44 @@ def alert_group_correlations_schema():
     }
 
 
+def alert_group_business_impact_summary_schema():
+    return {
+        "type": "object",
+        "properties": {
+            "has_business_impact": {"type": "boolean"},
+            "total": {"type": "integer"},
+            "highest_status": {
+                "type": "string",
+                "nullable": True,
+                "enum": [
+                    "unknown",
+                    "operational",
+                    "degraded",
+                    "partial_outage",
+                    "major_outage",
+                    "maintenance",
+                    None,
+                ],
+            },
+            "highest_score": {"type": "integer"},
+            "services": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "business_service_id": {"type": "integer"},
+                        "business_service_slug": {"type": "string"},
+                        "business_service_name": {"type": "string"},
+                        "public_name": {"type": "string"},
+                        "impact_status": {"type": "string"},
+                        "impact_score": {"type": "integer"},
+                    },
+                },
+            },
+        },
+    }
+
+
 def alert_group_schema(include_details=False):
     """Build an alert group response schema.
 
@@ -531,6 +572,7 @@ def alert_group_schema(include_details=False):
         "reminder_count": {"type": "integer"},
         "escalation_level": {"type": "integer"},
         "correlation_summary": alert_correlation_summary_schema(),
+        "business_impact_summary": alert_group_business_impact_summary_schema(),
         "merged_into_id": {"type": "integer", "nullable": True},
         "merged_at": date_time_property(
             "Timestamp when this group was merged into another group.",
@@ -555,6 +597,10 @@ def alert_group_schema(include_details=False):
             "items": alert_notification_schema(),
         }
         properties["correlations"] = alert_group_correlations_schema()
+        properties["business_impacts"] = {
+            "type": "array",
+            "items": BUSINESS_SERVICE_IMPACT_SCHEMA,
+        }
 
     return {
         "type": "object",

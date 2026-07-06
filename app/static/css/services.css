@@ -529,6 +529,11 @@ button.impact-path-node {
     background: #dc2626;
 }
 
+.graph-legend-business {
+    background: #64748b;
+    border-radius: 3px;
+}
+
 .graph-legend-required {
     color: #dc2626;
 }

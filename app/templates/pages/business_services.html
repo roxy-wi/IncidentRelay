@@ -1,0 +1,440 @@
+<link rel="stylesheet" href="/static/css/services.css">
+
+<div id="view-business-services" class="view first-div-page-layout services-page page-stack">
+    <div class="summary-grid">
+        <div class="summary-card summary-primary">
+            <div class="summary-icon">◆</div>
+            <div>
+                <div class="summary-title">Total</div>
+                <div class="summary-value" id="business-services-total">0</div>
+                <div class="summary-hint">Business services in scope</div>
+            </div>
+        </div>
+
+        <div class="summary-card summary-success">
+            <div class="summary-icon">✓</div>
+            <div>
+                <div class="summary-title">Operational</div>
+                <div class="summary-value" id="business-services-operational">0</div>
+                <div class="summary-hint">Customer-facing healthy</div>
+            </div>
+        </div>
+
+        <div class="summary-card summary-muted">
+            <div class="summary-icon">!</div>
+            <div>
+                <div class="summary-title">Affected</div>
+                <div class="summary-value" id="business-services-affected">0</div>
+                <div class="summary-hint">Not operational</div>
+            </div>
+        </div>
+
+        <div class="summary-card summary-info">
+            <div class="summary-icon">★</div>
+            <div>
+                <div class="summary-title">Public</div>
+                <div class="summary-value" id="business-services-public">0</div>
+                <div class="summary-hint">Visible on status page</div>
+            </div>
+        </div>
+    </div>
+
+    <div id="business-services-page-layout" class="page-layout-grid is-full-width">
+        <section class="card page-layout-main">
+            <div class="card-header">
+                <div>
+                    <h2>Business Services</h2>
+                    <div class="card-subtitle">
+                        Showing <span id="business-services-filtered-count">0</span>
+                        of <span id="business-services-total-count">0</span> business services
+                    </div>
+                </div>
+
+                <div class="card-header-actions">
+                    <button id="open-business-service-create-modal" type="button" class="btn btn-primary">New business service</button>
+                    <button id="reload-business-services" type="button" class="btn">Reload</button>
+                </div>
+            </div>
+
+            <div class="page-toolbar is-flush-top">
+                <div class="page-toolbar-search">
+                    <span class="page-toolbar-search-icon">⌕</span>
+                    <input id="business-services-search" class="input" type="search" placeholder="Search business services..." autocomplete="off">
+                </div>
+
+                <select id="business-services-status-filter" class="input page-toolbar-filter">
+                    <option value="">All statuses</option>
+                    <option value="operational">Operational</option>
+                    <option value="degraded">Degraded</option>
+                    <option value="partial_outage">Partial outage</option>
+                    <option value="major_outage">Major outage</option>
+                    <option value="maintenance">Maintenance</option>
+                    <option value="unknown">Unknown</option>
+                </select>
+
+                <select id="business-services-public-filter" class="input page-toolbar-filter">
+                    <option value="">All visibility</option>
+                    <option value="public">Public</option>
+                    <option value="private">Private</option>
+                </select>
+            </div>
+
+            <div class="table-wrapper">
+                <table id="business-services-table-view" class="data-table sortable-table">
+                    <thead>
+                        <tr>
+                            <th>Name</th>
+                            <th>Group</th>
+                            <th>Owner team</th>
+                            <th>Status</th>
+                            <th>Criticality</th>
+                            <th>Tier</th>
+                            <th>Components</th>
+                            <th>Visibility</th>
+                            <th class="actions-th">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody id="business-services-table">
+                        <tr>
+                            <td colspan="9" class="empty-cell">No business services loaded</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
+        </section>
+    </div>
+
+    <div id="business-service-details-modal" class="app-modal" style="display: none;">
+        <div class="app-modal-dialog app-modal-dialog-wide">
+            <div class="app-modal-header">
+                <div>
+                    <h2 id="business-service-details-title">Business service details</h2>
+                    <div id="business-service-details-subtitle" class="card-subtitle">
+                        Select a business service to view components and status history.
+                    </div>
+                </div>
+                <button id="close-business-service-details-modal" type="button" class="app-modal-close" aria-label="Close">×</button>
+            </div>
+
+            <div class="app-modal-body">
+                <div class="card-header">
+                    <div>
+                        <h2>Business impact</h2>
+                        <div class="card-subtitle">Customer-facing status calculated from technical services.</div>
+                    </div>
+                    <div class="card-header-actions">
+                        <button id="business-service-recalculate" class="btn" type="button" disabled>Recalculate</button>
+                        <button id="open-business-service-component-modal" class="btn btn-primary" type="button" disabled>Add component</button>
+                    </div>
+                </div>
+
+                <div id="business-service-details-body" class="details-grid">
+                    <div class="empty-state">No business service selected.</div>
+                </div>
+
+                <section class="card">
+                    <div class="card-header">
+                        <div>
+                            <h2>Components</h2>
+                            <div class="card-subtitle">Technical services used to calculate business impact.</div>
+                        </div>
+                    </div>
+
+                    <div class="table-wrapper">
+                        <table class="data-table sortable-table">
+                            <thead>
+                                <tr>
+                                    <th>Technical service</th>
+                                    <th>Team</th>
+                                    <th>Status</th>
+                                    <th>Criticality</th>
+                                    <th>Weight</th>
+                                    <th>Description</th>
+                                    <th class="actions-th">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody id="business-service-components-table">
+                                <tr>
+                                    <td colspan="7" class="empty-cell">Select a business service</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <section class="card">
+                        <div class="card-header">
+                            <div>
+                                <h3>Manual status override</h3>
+                                <div class="card-subtitle">
+                                    Override calculated business status during an incident or customer-facing degradation.
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-body">
+                            <div class="grid-two">
+                                <div>
+                                    <label>Status source</label>
+                                    <div id="business-service-details-status-source" class="text-muted">-</div>
+                                </div>
+
+                                <div>
+                                    <label>Manual override</label>
+                                    <div id="business-service-details-manual-status" class="text-muted">-</div>
+                                </div>
+                            </div>
+
+                            <div class="grid-two">
+                                <div>
+                                    <label>Manual message</label>
+                                    <div id="business-service-details-manual-message" class="text-muted">-</div>
+                                </div>
+
+                                <div>
+                                    <label>Manual until</label>
+                                    <div id="business-service-details-manual-until" class="text-muted">-</div>
+                                </div>
+                            </div>
+
+                            <label for="business-service-manual-status">Set status</label>
+                            <select id="business-service-manual-status" class="input">
+                                <option value="operational">Operational</option>
+                                <option value="degraded">Degraded</option>
+                                <option value="partial_outage">Partial outage</option>
+                                <option value="major_outage">Major outage</option>
+                                <option value="maintenance">Maintenance</option>
+                            </select>
+                            <div class="help-text">
+                                Manual status has priority over calculated status until it expires or is cleared.
+                            </div>
+
+                            <label for="business-service-manual-status-message">Message</label>
+                            <textarea id="business-service-manual-status-message" class="input" rows="3"></textarea>
+                            <div class="help-text">
+                                Optional operator note explaining why the business status is overridden.
+                            </div>
+
+                            <label for="business-service-manual-status-until">Until</label>
+                            <input id="business-service-manual-status-until" class="input" type="datetime-local">
+                            <div class="help-text">
+                                Optional local expiration time. Leave empty to keep the override active until it is cleared manually.
+                            </div>
+
+                            <div id="business-service-manual-status-error" class="form-error" style="display: none;"></div>
+
+                            <div class="form-actions">
+                                <button id="clear-business-service-manual-status" class="btn" type="button">
+                                    Clear override
+                                </button>
+                                <button id="set-business-service-manual-status" class="btn btn-primary" type="button">
+                                    Set manual status
+                                </button>
+                            </div>
+                        </div>
+                    </section>
+
+                <section class="card">
+                    <div class="card-header">
+                        <div>
+                            <h2>Status history</h2>
+                            <div class="card-subtitle">Recent calculated business status changes.</div>
+                        </div>
+                    </div>
+
+                    <div class="table-wrapper">
+                        <table class="data-table sortable-table">
+                            <thead>
+                                <tr>
+                                    <th>Time</th>
+                                    <th>Old status</th>
+                                    <th>New status</th>
+                                    <th>Score</th>
+                                    <th>Message</th>
+                                </tr>
+                            </thead>
+                            <tbody id="business-service-history-table">
+                                <tr>
+                                    <td colspan="5" class="empty-cell">Select a business service</td>
+                                </tr>
+                            </tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+        </div>
+    </div>
+
+    <div id="business-service-modal" class="app-modal" style="display: none;">
+        <div class="app-modal-dialog app-modal-dialog-wide">
+            <div class="app-modal-header">
+                <div>
+                    <h2 id="business-service-form-title">Create business service</h2>
+                    <div class="card-subtitle">Business-facing capability shown in impact views and status pages.</div>
+                </div>
+                <button id="close-business-service-modal" type="button" class="app-modal-close" aria-label="Close">×</button>
+            </div>
+
+            <div class="app-modal-body">
+                <div class="grid-two">
+                    <section class="card">
+                        <div class="card-header">
+                            <div>
+                                <h2>Business service</h2>
+                                <div class="card-subtitle">Identity, ownership and classification.</div>
+                            </div>
+                        </div>
+
+                        <div class="form-body">
+                            <input id="business-service-id" type="hidden">
+
+                            <label for="business-service-group">Group</label>
+                            <select id="business-service-group" class="input"></select>
+
+                            <label for="business-service-owner-team">Owner team</label>
+                            <select id="business-service-owner-team" class="input"></select>
+
+                            <label for="business-service-name">Name</label>
+                            <input id="business-service-name" class="input" type="text" maxlength="255">
+
+                            <label for="business-service-slug">Slug</label>
+                            <input id="business-service-slug" class="input" type="text" maxlength="64">
+
+                            <label for="business-service-description">Description</label>
+                            <textarea id="business-service-description" class="input" rows="3"></textarea>
+
+                            <div class="form-grid-3">
+                                <div>
+                                    <label for="business-service-criticality">Criticality</label>
+                                    <select id="business-service-criticality" class="input">
+                                        <option value="critical">Critical</option>
+                                        <option value="important">Important</option>
+                                        <option value="optional">Optional</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label for="business-service-tier">Tier</label>
+                                    <select id="business-service-tier" class="input">
+                                        <option value="tier_1">Tier 1</option>
+                                        <option value="tier_2">Tier 2</option>
+                                        <option value="tier_3">Tier 3</option>
+                                        <option value="tier_4">Tier 4</option>
+                                    </select>
+                                </div>
+
+                                <div>
+                                    <label for="business-service-public-order">Public order</label>
+                                    <input id="business-service-public-order" class="input" type="number" min="0" value="100">
+                                </div>
+                            </div>
+                        </div>
+                    </section>
+
+                    <section class="card">
+                        <div class="card-header">
+                            <div>
+                                <h2>Status page</h2>
+                                <div class="card-subtitle">Customer-facing labels and visibility.</div>
+                            </div>
+                        </div>
+
+                        <div class="form-body">
+                            <label for="business-service-public-name">Public name</label>
+                            <input id="business-service-public-name" class="input" type="text" maxlength="255">
+
+                            <label for="business-service-public-description">Public description</label>
+                            <textarea id="business-service-public-description" class="input" rows="3"></textarea>
+
+                            <label class="md-checkbox">
+                                <input id="business-service-public" type="checkbox" checked>
+                                <span>Show on status page</span>
+                            </label>
+
+                            <label class="md-checkbox">
+                                <input id="business-service-enabled" type="checkbox" checked>
+                                <span>Enabled</span>
+                            </label>
+
+                            <div class="form-actions">
+                                <button id="reset-business-service-form" class="btn" type="button">Reset</button>
+                                <button id="save-business-service" class="btn btn-primary" type="button">Save business service</button>
+                            </div>
+                        </div>
+                    </section>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <div id="business-service-component-modal" class="app-modal" style="display: none;">
+        <div class="app-modal-dialog">
+            <div class="app-modal-header">
+                <div>
+                    <h2 id="business-service-component-form-title">Add component</h2>
+                    <div class="card-subtitle">Attach a technical service to the selected business service.</div>
+                </div>
+                <button id="close-business-service-component-modal" type="button" class="app-modal-close" aria-label="Close">×</button>
+            </div>
+
+            <div class="app-modal-body">
+                <div class="form-body">
+                    <input id="business-service-component-id" type="hidden">
+
+                    <label for="business-service-component-service">Technical service</label>
+                    <select id="business-service-component-service" class="input"></select>
+                    <div class="help-text">
+                        Technical service that participates in this business service status calculation.
+                    </div>
+
+                    <label for="business-service-component-criticality">Criticality</label>
+                    <select id="business-service-component-criticality" class="input">
+                        <option value="required">Required</option>
+                        <option value="critical">Critical</option>
+                        <option value="important">Important</option>
+                        <option value="optional">Optional</option>
+                        <option value="informational">Informational</option>
+                    </select>
+                    <div class="help-text">
+                        Required and critical components have the strongest impact on business status.
+                        Optional and informational components have lower impact.
+                    </div>
+
+                    <div class="form-grid-3">
+                        <div>
+                            <label for="business-service-component-weight">Impact weight</label>
+                            <input id="business-service-component-weight" class="input" type="number" min="0" max="100" value="100">
+                            <div class="help-text">
+                                Weight from 0 to 100. Higher weight means this component contributes more to the business impact score.
+                            </div>
+                        </div>
+
+                        <div>
+                            <label for="business-service-component-position">Position</label>
+                            <input id="business-service-component-position" class="input" type="number" min="0" value="0">
+                            <div class="help-text">
+                                Sort order inside the business service. Lower values are shown first.
+                            </div>
+                        </div>
+                    </div>
+
+                    <label for="business-service-component-description">Description</label>
+                    <textarea id="business-service-component-description" class="input" rows="3"></textarea>
+
+                    <label for="business-service-component-description">Description</label>
+                    <textarea id="business-service-component-description" class="input" rows="3"></textarea>
+
+                    <label class="md-checkbox">
+                        <input id="business-service-component-enabled" type="checkbox" checked>
+                        <span>Enabled</span>
+                    </label>
+
+                    <div class="form-actions">
+                        <button id="reset-business-service-component-form" class="btn" type="button">Reset</button>
+                        <button id="save-business-service-component" class="btn btn-primary" type="button">Save component</button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>

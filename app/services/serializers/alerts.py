@@ -1,5 +1,7 @@
-from app.modules.db import incidents_repo, maintenance_repo
+from app.modules.db import incidents_repo, maintenance_repo, business_services_repo
 from app.services.incidents.responder_display import responder_target_label
+from app.services.serializers.business_services import serialize_business_service_incident_impact, \
+    serialize_alert_group_business_impact_summary
 from app.services.serializers.channels import serialize_channel_short
 from app.services.serializers.common import serialize_utc_datetime, attach_team_permissions
 from app.services.serializers.rotations import serialize_rotation_short, serialize_escalation_policy_short
@@ -585,6 +587,7 @@ def serialize_alert_group(
         "maintenance_window_id": group.maintenance_window_id,
         "maintenance_suppressed": group.maintenance_suppressed,
         "correlation_summary": serialize_alert_group_correlation_summary(group),
+        "business_impact_summary": serialize_alert_group_business_impact_summary(group),
     }
 
     data.update(serialize_priority_ref(group))
@@ -613,6 +616,10 @@ def serialize_alert_group(
             for item in responders
         ]
         data["correlations"] = serialize_alert_group_correlations(group)
+        data["business_impacts"] = [
+            serialize_business_service_incident_impact(impact)
+            for impact in business_services_repo.list_active_incident_impacts(group.id)
+        ]
 
     data["active_maintenance"] = serialize_attached_maintenance_ref(group)
 

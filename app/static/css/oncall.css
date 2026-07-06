@@ -1203,63 +1203,27 @@ body.has-app-sticky-x-scroll {
         grid-template-columns: 1fr;
     }
 }
+#business-services-page-layout.is-full-width,
 #services-page-layout.is-full-width {
     grid-template-columns: minmax(0, 1fr);
 }
 
+#business-services-page-layout.is-full-width .page-layout-main,
 #services-page-layout.is-full-width .page-layout-main {
     grid-column: 1 / -1;
     width: 100%;
     max-width: none;
 }
 
+#business-services-page-layout.is-full-width #service-details-card,
 #services-page-layout.is-full-width #service-details-card {
     display: none !important;
 }
 
+#business-services-page-layout.is-full-width .services-tab-panel,
 #services-page-layout.is-full-width .services-tab-panel {
     width: 100%;
     max-width: none;
-}
-.impact-status-pill {
-    border: 1px solid transparent;
-    text-transform: none;
-}
-
-.impact-status-major {
-    background: #fee4e2;
-    border-color: #fecdca;
-    color: #b42318;
-}
-
-.impact-status-partial {
-    background: #fffaeb;
-    border-color: #fedf89;
-    color: #b54708;
-}
-
-.impact-status-degraded {
-    background: #fff7cc;
-    border-color: #fde68a;
-    color: #92400e;
-}
-
-.impact-status-maintenance {
-    background: #f4f3ff;
-    border-color: #d9d6fe;
-    color: #5925dc;
-}
-
-.impact-status-operational {
-    background: #ecfdf3;
-    border-color: #abefc6;
-    color: #067647;
-}
-
-.impact-status-neutral {
-    background: #f2f4f7;
-    border-color: #e4e7ec;
-    color: #475467;
 }
 .impact-row-major-outage {
     border-left: 4px solid #d92d20;

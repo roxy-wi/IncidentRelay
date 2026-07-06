@@ -4,8 +4,7 @@ from collections import Counter, defaultdict
 from dataclasses import dataclass, field
 from typing import Any
 
-from app.modules.db.models import AlertGroup, Service, ServiceDependency
-
+from app.modules.db.models import AlertGroup, Service, ServiceDependency, Team
 
 OPEN_ALERT_GROUP_STATUSES = {"firing", "acknowledged"}
 
@@ -258,6 +257,109 @@ def build_single_service_impact_v2(service_id, query, *, team_ids=None):
         include_blast_radius=include_blast_radius,
         include_paths=include_paths,
     )
+
+
+def build_service_effective_impact_map(service_ids, *, max_depth=5):
+    """Return Service Impact v2 items keyed by service id.
+
+    This helper is intended for other backend features such as Business Services.
+    It uses the same effective status logic as the Service Impact v2 API.
+    """
+    service_ids = {
+        int(service_id)
+        for service_id in (service_ids or [])
+        if service_id
+    }
+
+    if not service_ids:
+        return {}
+
+    services = _load_services_for_effective_impact(service_ids)
+
+    if not services:
+        return {}
+
+    dependencies = _load_dependencies(services.keys())
+    alert_stats = _load_alert_stats(services.keys())
+
+    upstream_by_service, downstream_by_service = _build_dependency_maps(
+        services,
+        dependencies,
+    )
+
+    context = {
+        "services": services,
+        "alert_stats": alert_stats,
+        "upstream_by_service": upstream_by_service,
+        "downstream_by_service": downstream_by_service,
+        "max_depth": int(max_depth or 5),
+        "include_paths": True,
+        "computed": {},
+    }
+
+    result = {}
+
+    for service_id in service_ids:
+        if service_id not in services:
+            continue
+
+        computation = _compute_service_impact(
+            service_id,
+            context,
+            path=[],
+            depth=int(max_depth or 5),
+        )
+
+        result[service_id] = _impact_item_from_computation(
+            computation,
+            context,
+            include_explanation=True,
+            include_root_causes=True,
+            include_blast_radius=False,
+            include_paths=True,
+        )
+
+    return result
+
+
+def _load_services_for_effective_impact(service_ids):
+    """Load enough services to calculate dependencies for requested services.
+
+    Business Services are group-scoped, so we calculate impact against all
+    services in the same groups as the requested component services.
+    """
+    requested_services = list(
+        Service
+        .select()
+        .where(
+            (Service.id.in_(service_ids))
+            & (Service.deleted == False)  # noqa: E712
+        )
+    )
+
+    if not requested_services:
+        return {}
+
+    group_ids = {
+        service.team.group_id
+        for service in requested_services
+        if service.team_id and service.team and service.team.group_id
+    }
+
+    if not group_ids:
+        return {service.id: service for service in requested_services}
+
+    query = (
+        Service
+        .select()
+        .join(Team)
+        .where(
+            (Service.deleted == False)  # noqa: E712
+            & (Team.group.in_(group_ids))
+        )
+    )
+
+    return {service.id: service for service in query}
 
 
 def _empty_payload(query):

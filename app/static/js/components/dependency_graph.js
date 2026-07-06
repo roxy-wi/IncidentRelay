@@ -225,6 +225,270 @@ function serviceDependencyGraphAlertStatus(service, impactMap) {
     return null;
 }
 
+
+const SERVICE_DEPENDENCY_GRAPH_STATUS_RANK = {
+    disabled: -1,
+    operational: 0,
+    unknown: 0,
+    maintenance: 1,
+    degraded: 2,
+    partial_outage: 3,
+    major_outage: 4
+};
+
+const SERVICE_DEPENDENCY_GRAPH_TYPE_RANK = {
+    informational: 0,
+    external: 1,
+    soft: 2,
+    hard: 3
+};
+
+const SERVICE_DEPENDENCY_GRAPH_CRITICALITY_RANK = {
+    optional: 1,
+    important: 2,
+    required: 3
+};
+
+function serviceDependencyGraphNormalizeStatus(status) {
+    const value = serviceDependencyGraphValue(status || "unknown")
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9_]+/g, "_");
+
+    return Object.prototype.hasOwnProperty.call(SERVICE_DEPENDENCY_GRAPH_STATUS_RANK, value)
+        ? value
+        : "unknown";
+}
+
+function serviceDependencyGraphStatusRank(status) {
+    const key = serviceDependencyGraphNormalizeStatus(status);
+    return Object.prototype.hasOwnProperty.call(SERVICE_DEPENDENCY_GRAPH_STATUS_RANK, key)
+        ? SERVICE_DEPENDENCY_GRAPH_STATUS_RANK[key]
+        : 0;
+}
+
+function serviceDependencyGraphMaxStatus() {
+    const statuses = Array.prototype.slice.call(arguments).map(serviceDependencyGraphNormalizeStatus);
+    return statuses.reduce(function (best, status) {
+        return serviceDependencyGraphStatusRank(status) > serviceDependencyGraphStatusRank(best)
+            ? status
+            : best;
+    }, "operational");
+}
+
+function serviceDependencyGraphNormalizeDependencyType(value) {
+    return serviceDependencyGraphValue(value || "hard")
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9_]+/g, "_");
+}
+
+function serviceDependencyGraphNormalizeDependencyCriticality(value) {
+    return serviceDependencyGraphValue(value || "important")
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9_]+/g, "_");
+}
+
+function serviceDependencyGraphPropagateDependencyStatus(dependency, upstreamStatus) {
+    upstreamStatus = serviceDependencyGraphNormalizeStatus(upstreamStatus);
+
+    if (["operational", "maintenance", "disabled"].includes(upstreamStatus)) {
+        return "operational";
+    }
+
+    if (upstreamStatus === "unknown") {
+        return "unknown";
+    }
+
+    const dependencyType = serviceDependencyGraphNormalizeDependencyType(dependency.dependency_type || dependency.type || dependency.kind);
+    const criticality = serviceDependencyGraphNormalizeDependencyCriticality(dependency.criticality || dependency.dependency_criticality);
+    const typeRank = Object.prototype.hasOwnProperty.call(SERVICE_DEPENDENCY_GRAPH_TYPE_RANK, dependencyType)
+        ? SERVICE_DEPENDENCY_GRAPH_TYPE_RANK[dependencyType]
+        : SERVICE_DEPENDENCY_GRAPH_TYPE_RANK.soft;
+    const criticalityRank = Object.prototype.hasOwnProperty.call(SERVICE_DEPENDENCY_GRAPH_CRITICALITY_RANK, criticality)
+        ? SERVICE_DEPENDENCY_GRAPH_CRITICALITY_RANK[criticality]
+        : SERVICE_DEPENDENCY_GRAPH_CRITICALITY_RANK.important;
+
+    if (typeRank <= SERVICE_DEPENDENCY_GRAPH_TYPE_RANK.informational) {
+        return "operational";
+    }
+
+    if (upstreamStatus === "major_outage") {
+        if (dependencyType === "hard" || criticality === "required") {
+            return "major_outage";
+        }
+        if (dependencyType === "soft" || criticality === "important") {
+            return "partial_outage";
+        }
+        return "degraded";
+    }
+
+    if (upstreamStatus === "partial_outage") {
+        if (dependencyType === "hard" || criticalityRank >= SERVICE_DEPENDENCY_GRAPH_CRITICALITY_RANK.important) {
+            return "partial_outage";
+        }
+        return "degraded";
+    }
+
+    if (upstreamStatus === "degraded") {
+        if (criticalityRank >= SERVICE_DEPENDENCY_GRAPH_CRITICALITY_RANK.important) {
+            return "degraded";
+        }
+        return "operational";
+    }
+
+    return "operational";
+}
+
+function serviceDependencyGraphNodeBaseStatus(service, impactMap) {
+    if (!service || service.enabled === false) {
+        return "disabled";
+    }
+
+    const id = serviceDependencyGraphId(service.id);
+    const impact = id ? (impactMap[id] || {}) : {};
+    const alertStatus = serviceDependencyGraphAlertStatus(service, impactMap) || impact.alert_impact_status || "operational";
+
+    return serviceDependencyGraphMaxStatus(
+        impact.own_status || service.status || "unknown",
+        alertStatus
+    );
+}
+
+function serviceDependencyGraphBusinessServiceNodeId(businessServiceId) {
+    return "business-service-" + serviceDependencyGraphId(businessServiceId);
+}
+
+function serviceDependencyGraphServicesForImpact(serviceMap, impactMap) {
+    const servicesById = Object.assign({}, serviceMap);
+
+    Object.keys(impactMap || {}).forEach(function (id) {
+        if (servicesById[id]) {
+            return;
+        }
+
+        const impact = impactMap[id] || {};
+        servicesById[id] = {
+            id: id,
+            name: impact.service_name || ("Service #" + id),
+            slug: impact.service_slug || "",
+            status: impact.own_status || impact.effective_status || "unknown",
+            enabled: impact.effective_status !== "disabled",
+            team_name: impact.team_name || impact.team_slug || ""
+        };
+    });
+
+    asArray(allServiceDependenciesCache).forEach(function (dependency) {
+        if (!dependency) {
+            return;
+        }
+
+        const sourceId = serviceDependencyGraphSourceId(dependency);
+        const targetId = serviceDependencyGraphTargetId(dependency);
+
+        if (sourceId && !servicesById[sourceId]) {
+            servicesById[sourceId] = serviceDependencyGraphServiceFromDependency(dependency, "source", sourceId, serviceMap);
+        }
+
+        if (targetId && !servicesById[targetId]) {
+            servicesById[targetId] = serviceDependencyGraphServiceFromDependency(dependency, "target", targetId, serviceMap);
+        }
+    });
+
+    return servicesById;
+}
+
+function serviceDependencyGraphEffectiveStatusMap(serviceMap, impactMap) {
+    const servicesById = serviceDependencyGraphServicesForImpact(serviceMap, impactMap);
+    const upstreamByService = {};
+
+    asArray(allServiceDependenciesCache).forEach(function (dependency) {
+        if (!dependency || dependency.enabled === false) {
+            return;
+        }
+
+        const sourceId = serviceDependencyGraphSourceId(dependency);
+        const targetId = serviceDependencyGraphTargetId(dependency);
+
+        if (!sourceId || !targetId || sourceId === targetId) {
+            return;
+        }
+
+        if (!upstreamByService[sourceId]) {
+            upstreamByService[sourceId] = [];
+        }
+
+        upstreamByService[sourceId].push(dependency);
+    });
+
+    const cache = {};
+    const maxDepth = 5;
+
+    function compute(serviceId, stack, depth) {
+        serviceId = serviceDependencyGraphId(serviceId);
+
+        if (!serviceId) {
+            return "unknown";
+        }
+
+        if (cache[serviceId]) {
+            return cache[serviceId];
+        }
+
+        const service = servicesById[serviceId];
+        const impact = impactMap[serviceId] || {};
+        let status = serviceDependencyGraphNodeBaseStatus(service, impactMap);
+
+        if (impact.effective_status) {
+            status = serviceDependencyGraphMaxStatus(status, impact.effective_status);
+        }
+
+        if (stack[serviceId]) {
+            return serviceDependencyGraphMaxStatus(status, "unknown");
+        }
+
+        if (depth <= 0) {
+            return status;
+        }
+
+        const nextStack = Object.assign({}, stack);
+        nextStack[serviceId] = true;
+
+        asArray(upstreamByService[serviceId]).forEach(function (dependency) {
+            const upstreamId = serviceDependencyGraphTargetId(dependency);
+            const upstreamStatus = compute(upstreamId, nextStack, depth - 1);
+            const propagatedStatus = serviceDependencyGraphPropagateDependencyStatus(dependency, upstreamStatus);
+            status = serviceDependencyGraphMaxStatus(status, propagatedStatus);
+        });
+
+        cache[serviceId] = status;
+        return status;
+    }
+
+    Object.keys(servicesById).forEach(function (serviceId) {
+        compute(serviceId, {}, maxDepth);
+    });
+
+    return cache;
+}
+
+function serviceDependencyGraphBusinessComponentSearchText(component) {
+    return [
+        component.business_service_name,
+        component.business_service_slug,
+        component.business_service_status,
+        component.service_name,
+        component.service_slug,
+        component.criticality,
+        component.component_type,
+        component.description
+    ]
+        .map(serviceDependencyGraphValue)
+        .join(" ")
+        .toLowerCase();
+}
+
 function serviceDependencyGraphNodeDisplayStatus(service, impactMap) {
     const alertStatus = serviceDependencyGraphAlertStatus(service, impactMap);
 
@@ -478,6 +742,7 @@ function serviceDependencyGraphLayoutOptions() {
 function serviceDependencyGraphElements() {
     const serviceMap = serviceDependencyGraphServiceMap();
     const impactMap = serviceDependencyGraphImpactMap();
+    const effectiveStatusMap = serviceDependencyGraphEffectiveStatusMap(serviceMap, impactMap);
     const focusId = serviceDependencyGraphId($("#service-dependency-graph-focus").val());
     const direction = $("#service-dependency-graph-direction").val() || "connected";
     const query = serviceDependencyGraphValue($("#service-dependency-graph-search").val()).trim().toLowerCase();
@@ -486,57 +751,70 @@ function serviceDependencyGraphElements() {
     const edges = [];
 
     function addNode(service, extraClasses) {
-    if (!service || service.id === null || service.id === undefined) {
-        return;
+        if (!service || service.id === null || service.id === undefined) {
+            return;
+        }
+
+        const id = serviceDependencyGraphId(service.id);
+        if (!id) {
+            return;
+        }
+
+        const impact = impactMap[id] || {};
+        const baseLabel = serviceDependencyGraphNodeLabel(service);
+        const openAlertGroups = Number(impact.open_alert_groups || 0);
+        const criticalOpenAlertGroups = Number(impact.critical_open_alert_groups || 0);
+        const baseStatus = serviceDependencyGraphNodeBaseStatus(service, impactMap);
+        const displayStatus = effectiveStatusMap[id] || serviceDependencyGraphNodeDisplayStatus(service, impactMap);
+        const alertStatus = serviceDependencyGraphAlertStatus(service, impactMap);
+        const hasDependencyImpact = (
+            impact.primary_reason === "upstream_dependency"
+            || serviceDependencyGraphStatusRank(displayStatus) > serviceDependencyGraphStatusRank(baseStatus)
+        );
+
+        const classes = [
+            `status-${displayStatus}`
+        ];
+
+        if (alertStatus) {
+            classes.push("has-own-alerts");
+        }
+
+        if (hasDependencyImpact) {
+            classes.push("has-dependency-impact");
+        }
+
+        if (focusId && id === focusId) {
+            classes.push("focused");
+        }
+
+        if (extraClasses) {
+            classes.push(extraClasses);
+        }
+
+        nodesById[id] = {
+            data: {
+                id: id,
+                nodeType: "technical_service",
+                serviceId: id,
+                label: baseLabel,
+                displayLabel: openAlertGroups > 0
+                    ? baseLabel + "\n⚠ " + openAlertGroups
+                    : hasDependencyImpact
+                        ? baseLabel + "\n↥ dependency"
+                        : baseLabel,
+                status: service.status || "unknown",
+                displayStatus: displayStatus,
+                alertStatus: alertStatus || "operational",
+                dependencyImpactStatus: hasDependencyImpact ? displayStatus : "operational",
+                openAlertGroups: openAlertGroups,
+                criticalOpenAlertGroups: criticalOpenAlertGroups,
+                team: service.team_name || service.team || "",
+                enabled: service.enabled !== false
+            },
+            classes: classes.join(" ")
+        };
     }
-
-    const id = serviceDependencyGraphId(service.id);
-    if (!id) {
-        return;
-    }
-
-    const impact = impactMap[id] || {};
-    const baseLabel = serviceDependencyGraphNodeLabel(service);
-    const openAlertGroups = Number(impact.open_alert_groups || 0);
-    const criticalOpenAlertGroups = Number(impact.critical_open_alert_groups || 0);
-    const displayStatus = serviceDependencyGraphNodeDisplayStatus(service, impactMap);
-    const alertStatus = serviceDependencyGraphAlertStatus(service, impactMap);
-
-    const classes = [
-        `status-${displayStatus}`
-    ];
-
-    if (alertStatus) {
-        classes.push("has-own-alerts");
-    }
-
-    if (focusId && id === focusId) {
-        classes.push("focused");
-    }
-
-    if (extraClasses) {
-        classes.push(extraClasses);
-    }
-
-    nodesById[id] = {
-        data: {
-            id: id,
-            serviceId: id,
-            label: baseLabel,
-            displayLabel: openAlertGroups > 0
-                ? baseLabel + "\n⚠ " + openAlertGroups
-                : baseLabel,
-            status: service.status || "unknown",
-            displayStatus: displayStatus,
-            alertStatus: alertStatus || "operational",
-            openAlertGroups: openAlertGroups,
-            criticalOpenAlertGroups: criticalOpenAlertGroups,
-            team: service.team_name || service.team || "",
-            enabled: service.enabled !== false
-        },
-        classes: classes.join(" ")
-    };
-}
 
     asArray(allServiceDependenciesCache).forEach((dependency) => {
         if (!dependency) {
@@ -577,23 +855,19 @@ function serviceDependencyGraphElements() {
         addNode(sourceService);
         addNode(targetService);
 
-        const criticality = serviceDependencyGraphValue(
+        const criticality = serviceDependencyGraphNormalizeDependencyCriticality(
             dependency.criticality ||
             dependency.dependency_criticality ||
             dependency.impact ||
             "important"
-        )
-            .toLowerCase()
-            .replace(/[^a-z0-9_]+/g, "_");
+        );
 
-        const dependencyType = serviceDependencyGraphValue(
+        const dependencyType = serviceDependencyGraphNormalizeDependencyType(
             dependency.dependency_type ||
             dependency.type ||
             dependency.kind ||
             "dependency"
-        )
-            .toLowerCase()
-            .replace(/[^a-z0-9_]+/g, "_");
+        );
 
         const classes = [
             `criticality-${criticality}`,
@@ -610,10 +884,78 @@ function serviceDependencyGraphElements() {
                 source: sourceId,
                 target: targetId,
                 label: dependency.dependency_type || dependency.type || dependency.kind || "",
+                displayLabel: dependency.dependency_type || dependency.type || dependency.kind || "",
                 criticality: dependency.criticality || "",
                 description: dependency.description || ""
             },
             classes: classes.join(" ")
+        });
+    });
+
+    asArray(businessServiceComponentsCache).forEach(function (component) {
+        if (!component || component.enabled === false) {
+            return;
+        }
+
+        const serviceId = serviceDependencyGraphId(component.service_id);
+        const businessServiceId = serviceDependencyGraphId(component.business_service_id);
+
+        if (!serviceId || !businessServiceId) {
+            return;
+        }
+
+        const componentMatchesQuery = query
+            && serviceDependencyGraphBusinessComponentSearchText(component).includes(query);
+
+        if (!nodesById[serviceId]) {
+            if (!componentMatchesQuery || !serviceMap[serviceId]) {
+                return;
+            }
+
+            addNode(serviceMap[serviceId]);
+        }
+
+        const businessNodeId = serviceDependencyGraphBusinessServiceNodeId(businessServiceId);
+        const businessStatus = serviceDependencyGraphNormalizeStatus(component.business_service_status || "unknown");
+        const businessLabel = serviceDependencyGraphValue(
+            component.business_service_name || component.business_service_slug || ("Business service #" + businessServiceId)
+        );
+        const componentCriticality = serviceDependencyGraphNormalizeDependencyCriticality(component.criticality || "required");
+
+        if (!nodesById[businessNodeId]) {
+            nodesById[businessNodeId] = {
+                data: {
+                    id: businessNodeId,
+                    nodeType: "business_service",
+                    businessServiceId: businessServiceId,
+                    label: businessLabel,
+                    displayLabel: businessLabel + "\nBusiness",
+                    status: component.business_service_status || "unknown",
+                    displayStatus: businessStatus,
+                    team: component.owner_team_name || component.team_name || "",
+                    enabled: true
+                },
+                classes: [
+                    "business-service",
+                    `status-${businessStatus}`
+                ].join(" ")
+            };
+        }
+
+        edges.push({
+            data: {
+                id: `business-component-${component.id || `${businessServiceId}-${serviceId}`}`,
+                source: businessNodeId,
+                target: serviceId,
+                label: component.criticality || "component",
+                displayLabel: component.criticality || "component",
+                criticality: component.criticality || "",
+                description: component.description || ""
+            },
+            classes: [
+                "business-component",
+                `criticality-${componentCriticality}`
+            ].join(" ")
         });
     });
 
@@ -687,6 +1029,33 @@ function serviceDependencyGraphStyle() {
             }
         },
         {
+            selector: "node.has-dependency-impact",
+            style: {
+                "border-width": 4,
+                "border-color": "#f59e0b"
+            }
+        },
+        {
+            selector: "node.has-own-alerts.has-dependency-impact",
+            style: {
+                "border-color": "#991b1b"
+            }
+        },
+        {
+            selector: "node.business-service",
+            style: {
+                "shape": "round-rectangle",
+                "width": 92,
+                "height": 44,
+                "font-size": 11,
+                "text-valign": "center",
+                "text-halign": "center",
+                "text-margin-y": 0,
+                "border-width": 3,
+                "border-color": "#0f172a"
+            }
+        },
+        {
             selector: "node.status-maintenance",
             style: {
                 "background-color": "#2563eb"
@@ -755,6 +1124,15 @@ function serviceDependencyGraphStyle() {
             style: {
                 "line-style": "dashed",
                 "opacity": 0.45
+            }
+        },
+        {
+            selector: "edge.business-component",
+            style: {
+                "line-style": "dotted",
+                "line-color": "#0f172a",
+                "target-arrow-color": "#0f172a",
+                "width": 2
             }
         },
         {
@@ -846,6 +1224,18 @@ function renderServiceDependencyGraph() {
     });
 
     serviceDependencyGraphCy.on("tap", "node", function (event) {
+        const nodeType = event.target.data("nodeType");
+
+        if (nodeType === "business_service") {
+            const businessServiceId = event.target.data("businessServiceId");
+
+            if (typeof openBusinessServiceDetailsModal === "function") {
+                openBusinessServiceDetailsModal(businessServiceId);
+            }
+
+            return;
+        }
+
         const serviceId = event.target.data("serviceId");
 
         if (typeof openServiceDetailsModal === "function") {

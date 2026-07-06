@@ -14,7 +14,8 @@ IncidentRelay resources are organized around groups, teams, services, rotations,
 | Team              | Operational unit inside a group                                                |
 | Rotation          | On-call schedule for a team                                                    |
 | Route             | Incoming alert routing rule with its own intake token                          |
-| Service | Logical affected system such as API, database, queue, website or infrastructure component |
+| Service           | Logical affected system such as API, database, queue, website or infrastructure component |
+| Business service  | Business Services describe customer-facing or business-facing capabilities that depend on one or more technical services. |
 | Escalation policy | Escalation policy                                                               |
 | Channel           | Outgoing notification destination                                              |
 | Alert             | Alert created or updated by an incoming integration                            |
@@ -28,6 +29,7 @@ Recommended reading order:
 3. [Channels](channels.md)
 4. [Reminders and Escalations](reminders-and-escalations.md)
 5. [Escalation Policies](escalation-policies.md)
+6. [Business services](business-services.md)
 
 For domain-specific workflows, continue with:
 

@@ -31,14 +31,45 @@ function loadVersion() {
     });
 }
 
+function uiStatusBadge(label, variant) {
+    return $("<span>")
+        .addClass("ui-status-badge")
+        .addClass("ui-status-badge-" + (variant || "muted"))
+        .text(label || "-");
+}
+
+
+function uiStatusBadgeVariantForStatus(status) {
+    const normalized = status || "unknown";
+
+    if (normalized === "operational" || normalized === "enabled" || normalized === "active") {
+        return "success";
+    }
+
+    if (normalized === "major_outage" || normalized === "critical" || normalized === "failed") {
+        return "danger";
+    }
+
+    if (normalized === "partial_outage" || normalized === "degraded" || normalized === "warning") {
+        return "warning";
+    }
+
+    if (normalized === "maintenance" || normalized === "info") {
+        return "info";
+    }
+
+    return "muted";
+}
+
+
 function renderStatusBadge(isActive, activeText = "Enabled", inactiveText = "Disabled") {
     /*
-     * Render a reusable status badge.
+     * Render a reusable enabled/disabled badge.
      */
-    return $("<span>")
-        .addClass("status-pill")
-        .addClass(isActive ? "status-enabled" : "status-disabled")
-        .text(isActive ? activeText : inactiveText);
+    return uiStatusBadge(
+        isActive ? activeText : inactiveText,
+        isActive ? "success" : "muted"
+    );
 }
 
 function upperCaseFirst(value) {

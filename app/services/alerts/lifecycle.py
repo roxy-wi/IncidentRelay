@@ -30,6 +30,8 @@ from app.services.routing.service_resolution import (
 )
 from app.services.silences import find_active_silence
 from app.services.alerts.correlation import refresh_alert_group_correlations, refresh_alert_group_correlations_safely
+from app.services.business_services.impact import refresh_business_impacts_safely_for_group
+from app.services.business_services.status import refresh_business_services_safely_for_technical_service
 
 logger = logging.getLogger("oncall.alerts")
 
@@ -373,6 +375,11 @@ def _handle_existing_alert(
     )
 
     refresh_alert_group_correlations_safely(group, reason="existing_alert_update")
+
+    if getattr(group, "service_id", None):
+        refresh_business_services_safely_for_technical_service(group.service_id, reason="existing_alert_update")
+
+    refresh_business_impacts_safely_for_group(group, reason="existing_alert_update")
 
     if maintenance_decision.suppress_notifications:
         alerts_repo.clear_alert_group_notification(group)
@@ -766,6 +773,11 @@ def _upsert_alert(alert_data, trace):
     )
 
     refresh_alert_group_correlations_safely(group, reason="new_alert")
+
+    if getattr(group, "service_id", None):
+        refresh_business_services_safely_for_technical_service(group.service_id, reason="new_alert")
+
+    refresh_business_impacts_safely_for_group(group, reason="new_alert")
 
     if alert_data["source"] == "sentry":
         labels = alert_data.get("labels") or {}

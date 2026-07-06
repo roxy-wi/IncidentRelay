@@ -85,6 +85,10 @@ from app.modules.db.models import (  # noqa: E402
     ServiceReadinessState,
     ServiceStandard,
     ServiceStandardCheck,
+    BusinessService,
+    BusinessServiceComponent,
+    BusinessServiceIncidentImpact,
+    BusinessServiceStatusHistory,
 )
 
 
@@ -121,6 +125,10 @@ CLEANUP_MODELS = [
     ServiceLink,
     ServiceRunbook,
     ServiceSlo,
+    BusinessService,
+    BusinessServiceComponent,
+    BusinessServiceIncidentImpact,
+    BusinessServiceStatusHistory,
     MaintenanceWindowScope,
     MaintenanceWindowService,
     MaintenanceWindow,

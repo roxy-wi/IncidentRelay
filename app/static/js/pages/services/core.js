@@ -6,6 +6,7 @@ let servicesPageTab = "services";
 let allServiceLinksCache = [];
 let allServiceRunbooksCache = [];
 let allServiceDependenciesCache = [];
+let businessServiceComponentsCache = [];
 let serviceAnalyticsCache = [];
 let serviceImpactCache = [];
 let serviceDetailsCache = {};

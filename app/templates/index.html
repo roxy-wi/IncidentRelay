@@ -91,6 +91,10 @@
 
               <span class="menu-text">Service Catalog</span>
             </a>
+              <a class="menu-link menu-sub-link" href="/business-services" data-page="business-services">
+                <span class="menu-icon">◆</span>
+                <span class="menu-text">Business Services</span>
+            </a>
 
             <a href="/maintenance-windows" data-page="maintenance-windows" class="menu-link menu-sub-link" title="Maintenance">
               <svg class="menu-icon">
@@ -227,6 +231,7 @@
             <div id="view-calendar" class="view">{% include "pages/calendar.html" %}</div>
             <div id="view-routes" class="view">{% include "pages/routes.html" %}</div>
             <div id="view-services" class="view">{% include "pages/services.html" %}</div>
+            {% include "pages/business_services.html" %}
             <div id="view-maintenance-windows" class="view">{% include "pages/maintenance_windows.html" %}</div>
             <div id="view-escalation-policies" class="view">{% include "pages/escalation_policies.html" %}</div>
             <div id="view-notification-policies" class="view">{% include "pages/notification_policies.html" %}</div>
@@ -321,6 +326,7 @@
 <script src="{{ url_for('static', filename='js/pages/services/analytics.js') }}"></script>
 <script src="{{ url_for('static', filename='js/pages/services/impact.js') }}"></script>
 <script src="{{ url_for('static', filename='js/pages/services/extras.js') }}"></script>
+<script src="{{ url_for('static', filename='js/pages/business_services.js') }}"></script>
 <script src="{{ url_for('static', filename='js/pages/maintenance_windows.js') }}"></script>
 <script src="{{ url_for('static', filename='js/pages/escalation_policies.js') }}"></script>
 <script src="{{ url_for('static', filename='js/pages/notification_policies.js') }}"></script>

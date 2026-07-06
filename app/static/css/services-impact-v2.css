@@ -39,7 +39,6 @@
 }
 
 .impact-reason-cell,
-.impact-status-stack,
 .impact-explanation-card,
 .impact-blast-radius-cell {
     display: flex;
@@ -104,7 +103,6 @@
     text-decoration: underline;
 }
 
-.impact-status-hint,
 .impact-explanation-message,
 .impact-path-title {
     color: var(--muted, #667085);

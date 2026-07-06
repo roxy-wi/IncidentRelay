@@ -551,6 +551,134 @@ class ServiceDependency(SoftDeleteModel):
         )
 
 
+class BusinessService(SoftDeleteModel):
+    """Business-facing service shown in impact views and status pages."""
+
+    id = AutoField()
+    group = ForeignKeyField(Group, backref="business_services", on_delete="CASCADE")
+    owner_team = ForeignKeyField(Team, null=True, backref="owned_business_services", on_delete="SET NULL")
+
+    slug = CharField()
+    name = CharField()
+    description = TextField(null=True)
+
+    status = CharField(default="unknown", index=True)
+    status_source = CharField(default="calculated")
+    status_message = TextField(null=True)
+    status_updated_at = DateTimeField(null=True)
+
+    manual_status = CharField(max_length=32, null=True, index=True)
+    manual_status_message = TextField(null=True)
+    manual_status_until = DateTimeField(null=True, index=True)
+    manual_status_set_by = ForeignKeyField(User, null=True, backref="business_service_status_overrides", on_delete="SET NULL")
+    manual_status_set_at = DateTimeField(null=True)
+
+    criticality = CharField(default="important", index=True)
+    tier = CharField(default="tier_2", index=True)
+
+    public = BooleanField(default=True, index=True)
+    public_name = CharField(null=True)
+    public_description = TextField(null=True)
+    public_order = IntegerField(default=100)
+
+    labels = JSONTextField(default=dict)
+    metadata = JSONTextField(default=dict)
+
+    enabled = BooleanField(default=True, index=True)
+    created_at = DateTimeField(default=datetime.utcnow)
+    updated_at = DateTimeField(default=datetime.utcnow)
+
+    class Meta:
+        table_name = "business_service"
+        indexes = (
+            (("group", "slug"), True),
+            (("group", "enabled"), False),
+            (("group", "public"), False),
+            (("status", "enabled"), False),
+            (("criticality", "enabled"), False),
+        )
+
+
+class BusinessServiceComponent(SoftDeleteModel):
+    """Technical service component of a business service."""
+
+    id = AutoField()
+    business_service = ForeignKeyField(BusinessService, backref="components", on_delete="CASCADE")
+    service = ForeignKeyField(Service, backref="business_components", on_delete="CASCADE")
+
+    component_type = CharField(default="technical_service", index=True)
+    criticality = CharField(default="required", index=True)
+    impact_weight = IntegerField(default=100)
+    position = IntegerField(default=0)
+
+    status_rule = CharField(default="inherit")
+    description = TextField(null=True)
+
+    enabled = BooleanField(default=True, index=True)
+    created_at = DateTimeField(default=datetime.utcnow)
+    updated_at = DateTimeField(default=datetime.utcnow)
+
+    class Meta:
+        table_name = "business_service_component"
+        indexes = (
+            (("business_service", "service"), True),
+            (("business_service", "enabled"), False),
+            (("service", "enabled"), False),
+            (("criticality", "enabled"), False),
+        )
+
+
+class BusinessServiceStatusHistory(BaseModel):
+    """Historical calculated or manual status changes for a business service."""
+
+    id = AutoField()
+    business_service = ForeignKeyField(BusinessService, backref="status_history", on_delete="CASCADE")
+    old_status = CharField(null=True)
+    new_status = CharField(index=True)
+    status_source = CharField(default="calculated", index=True)
+    message = TextField(null=True)
+    impact_score = IntegerField(default=0)
+    component_snapshot = JSONTextField(default=list)
+    created_at = DateTimeField(default=datetime.utcnow, index=True)
+
+    class Meta:
+        table_name = "business_service_status_history"
+        indexes = (
+            (("business_service", "created_at"), False),
+            (("business_service", "new_status"), False),
+        )
+
+
+class BusinessServiceIncidentImpact(BaseModel):
+    """Persisted business impact snapshot for an alert group."""
+
+    id = AutoField()
+    business_service = ForeignKeyField(BusinessService, backref="incident_impacts", on_delete="CASCADE")
+    group = DeferredForeignKey("AlertGroup", backref="business_impacts", on_delete="CASCADE")
+    service = ForeignKeyField(Service, null=True, backref="business_incident_impacts", on_delete="SET NULL")
+
+    impact_status = CharField(index=True)
+    impact_score = IntegerField(default=0, index=True)
+    relation = CharField(default="component_alert", index=True)
+    reason = TextField(null=True)
+    active = BooleanField(default=True, index=True)
+
+    component_snapshot = JSONTextField(default=list)
+
+    first_seen_at = DateTimeField(default=datetime.utcnow, index=True)
+    last_seen_at = DateTimeField(default=datetime.utcnow, index=True)
+    updated_at = DateTimeField(default=datetime.utcnow)
+
+    class Meta:
+        table_name = "business_service_incident_impact"
+        indexes = (
+            (("business_service", "group", "relation"), True),
+            (("business_service", "active"), False),
+            (("group", "active"), False),
+            (("impact_status", "active"), False),
+        )
+
+
 class AlertGroupCorrelation(BaseModel):
     """Persisted dependency-aware correlation between alert groups."""
 

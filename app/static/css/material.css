@@ -3147,3 +3147,48 @@ body.md-theme .incident-priority-reset {
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
     white-space: pre;
 }
+body.md-theme .ui-status-badge {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    width: fit-content;
+    min-height: 22px;
+    padding: 3px 9px;
+    border: 1px solid transparent;
+    border-radius: 999px;
+    font-size: 12px;
+    font-weight: 800;
+    line-height: 1.2;
+    white-space: nowrap;
+    vertical-align: middle;
+}
+
+body.md-theme .ui-status-badge-success {
+    background: var(--md-success-soft);
+    color: var(--md-success);
+    border-color: rgba(22, 163, 74, 0.22);
+}
+
+body.md-theme .ui-status-badge-warning {
+    background: var(--md-warning-soft);
+    color: var(--md-warning);
+    border-color: rgba(217, 119, 6, 0.22);
+}
+
+body.md-theme .ui-status-badge-danger {
+    background: var(--md-danger-soft);
+    color: var(--md-danger);
+    border-color: rgba(220, 38, 38, 0.22);
+}
+
+body.md-theme .ui-status-badge-info {
+    background: var(--md-info-soft);
+    color: var(--md-info);
+    border-color: rgba(2, 132, 199, 0.22);
+}
+
+body.md-theme .ui-status-badge-muted {
+    background: var(--md-surface-soft);
+    color: var(--md-muted);
+    border-color: var(--md-border);
+}

@@ -108,13 +108,14 @@ function refreshAllServiceContext() {
     allServiceLinksCache = [];
     allServiceRunbooksCache = [];
     allServiceDependenciesCache = [];
+    businessServiceComponentsCache = [];
 
     $("#services-links-count").text("0");
     $("#services-runbooks-count").text("0");
     $("#services-dependencies-count").text("0");
 
     const query = selectedTeamQuery();
-    let pending = 3;
+    let pending = 4;
 
     function done() {
         pending -= 1;
@@ -158,6 +159,14 @@ function refreshAllServiceContext() {
             dependency._service = getServiceById(dependency.service_id);
             return dependency;
         });
+        done();
+    });
+
+    apiGet("/api/business-services/components" + query, function (components) {
+        businessServiceComponentsCache = asArray(components);
+        done();
+    }, function () {
+        businessServiceComponentsCache = [];
         done();
     });
 }

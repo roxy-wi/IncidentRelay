@@ -925,20 +925,28 @@ function getFallbackImpactExplanationTitle(row) {
 }
 
 
+function impactStatusBadgeLabel(status) {
+    const normalized = status || "unknown";
+
+    if (normalized === "operational") {
+        return "Operational";
+    }
+
+    if (normalized === "maintenance") {
+        return "Maintenance";
+    }
+
+    return formatImpactStatusText(normalized);
+}
+
+
 function renderImpactStatusBadge(status) {
     const normalized = status || "unknown";
-    const label = formatImpactStatusText(normalized);
 
-    return $("<span>")
-        .addClass("status-pill impact-status-pill")
-        .addClass(impactStatusCssClass(normalized))
-        .text(
-            normalized === "operational"
-                ? "Operational"
-                : normalized === "maintenance"
-                    ? "Maintenance"
-                    : label
-        );
+    return uiStatusBadge(
+        impactStatusBadgeLabel(normalized),
+        uiStatusBadgeVariantForStatus(normalized)
+    ).addClass("impact-status-pill");
 }
 
 
@@ -1034,19 +1042,4 @@ function renderImpactServiceNode(node) {
         .text(label);
 
     return element;
-}
-
-
-function impactStatusCssClass(status) {
-    const normalized = status || "unknown";
-
-    return {
-        major_outage: "impact-status-major",
-        partial_outage: "impact-status-partial",
-        degraded: "impact-status-degraded",
-        maintenance: "impact-status-maintenance",
-        operational: "impact-status-operational",
-        disabled: "impact-status-neutral",
-        unknown: "impact-status-neutral"
-    }[normalized] || "impact-status-neutral";
 }
