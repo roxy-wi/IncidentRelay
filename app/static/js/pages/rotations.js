@@ -1633,14 +1633,6 @@ function setRotationEnabled(id, enabled) {
     });
 }
 
-function enableRotation(id) {
-    setRotationEnabled(id, true);
-}
-
-function disableRotation(id) {
-    setRotationEnabled(id, false);
-}
-
 function deleteRotation(id) {
     showAppConfirm({
         title: "Delete this rotation?",

@@ -173,7 +173,7 @@ def test_alert_group_details_include_child_alerts(client, admin_headers, db):
     assert child_instances == {"host1", "host2"}
 
 
-def test_default_grouping_uses_alertname_and_severity(db):
+def test_empty_group_by_uses_dedup_key_instead_of_default_labels(db):
     route = _route(group_by=[])
 
     result = upsert_alert(_alert(route, "DiskFull", "host1"))
@@ -186,13 +186,39 @@ def test_default_grouping_uses_alertname_and_severity(db):
 
 
     assert created1 is True
-    assert created2 is False
-    assert group1.id == group2.id
+    assert created2 is True
+    assert group1.id != group2.id
 
-    group = alerts_repo.get_alert_group(group1.id)
+    group1 = alerts_repo.get_alert_group(group1.id)
+    group2 = alerts_repo.get_alert_group(group2.id)
 
-    assert group.alert_count == 2
-    assert group.firing_count == 2
+    assert group1.alert_count == 1
+    assert group2.alert_count == 1
+
+
+def test_missing_group_by_values_do_not_merge_unrelated_alerts(db):
+    route = _route(group_by=["alertname", "severity"])
+
+    alert1 = {
+        **_alert(route, "DiskFull", "host1"),
+        "labels": {"severity": "critical"},
+    }
+    alert2 = {
+        **_alert(route, "CpuHigh", "host2"),
+        "labels": {"severity": "critical"},
+    }
+
+    result = upsert_alert(alert1)
+    group1 = result.group
+    created1 = result.created_group
+
+    result = upsert_alert(alert2)
+    group2 = result.group
+    created2 = result.created_group
+
+    assert created1 is True
+    assert created2 is True
+    assert group1.id != group2.id
 
 
 def test_grouping_respects_route_scope(db):

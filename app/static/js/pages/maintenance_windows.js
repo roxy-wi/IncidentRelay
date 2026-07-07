@@ -1017,18 +1017,6 @@ function getMaintenanceDisplayTimezone(item) {
     return item.timezone;
 }
 
-function formatMaintenanceOccurrence(item) {
-    const occurrence = getMaintenanceOccurrence(item);
-
-    if (!occurrence) {
-        return "-";
-    }
-
-    return [
-        window.AppTimezones.formatPlainDatetime(occurrence.starts_at, occurrence.timezone),
-        window.AppTimezones.formatPlainDatetime(occurrence.ends_at, occurrence.timezone),
-    ].join(" — ");
-}
 function parseMaintenanceInputDate(value) {
     const text = String(value || "").trim();
 

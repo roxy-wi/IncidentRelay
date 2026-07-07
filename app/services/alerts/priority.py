@@ -204,24 +204,6 @@ def _is_priority_model(value):
     )
 
 
-def _recalculate_fallback_priority(resolution):
-    """Return the configured fallback priority for recalculate mode."""
-    policy = getattr(resolution, "policy", None)
-
-    candidates = (
-        getattr(resolution, "fallback_priority", None),
-        getattr(resolution, "default_priority", None),
-        getattr(policy, "default_priority", None) if policy else None,
-        getattr(resolution, "priority", None),
-    )
-
-    for candidate in candidates:
-        if _is_priority_model(candidate):
-            return candidate
-
-    return None
-
-
 def recalculate_auto_priority_from_active_alerts(
     group,
     *,

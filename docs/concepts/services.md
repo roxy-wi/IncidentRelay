@@ -86,9 +86,9 @@ Service Impact v2 calculates the current effective status for every readable ser
 
 Impact combines:
 
-- the service own status;
-- open grouped alerts;
-- upstream dependency impact;
+- the service own status and own status score;
+- open grouped alerts scored by incident priority, with severity as fallback;
+- upstream dependency impact propagated through dependency multipliers;
 - disabled state;
 - cycle and depth-limit detection.
 
@@ -96,10 +96,10 @@ Impact is intentionally based on `AlertGroup`, not raw alert events. A grouped a
 
 Each impact item contains:
 
-- `own_status` — the service status itself;
-- `alert_impact_status` — impact caused by open grouped alerts;
-- `dependency_impact_status` — impact propagated from upstream services;
-- `effective_status` — the final computed status;
+- `own_status` and `own_impact_score` — the service status itself;
+- `alert_impact_status` and `alert_impact_score` — impact caused by open grouped alerts;
+- `dependency_impact_status` and `dependency_impact_score` — impact propagated from upstream services;
+- `effective_status` and `effective_impact_score` — the final computed status and score;
 - `primary_reason` — why the final status was selected;
 - `root_causes` — services where the problem originated;
 - `explanation` — human-readable explanation and dependency paths;
@@ -130,7 +130,46 @@ Frontend Web -> Billing API -> PostgreSQL Prod
 
 If `PostgreSQL Prod` has a critical firing alert group and `Billing API` depends on it as `hard / required`, `Billing API` can become `major_outage`.
 
-If `Frontend Web` depends on `Billing API` as `soft / important`, the propagated impact can be reduced to `partial_outage`.
+If `Frontend Web` depends on `Billing API` as `soft / important`, the propagated score is reduced by the dependency multiplier and can become `partial_outage` instead of `major_outage`.
+
+### Alert impact scoring
+
+Open grouped alerts are scored in this order:
+
+```text
+explicit incident priority -> impact score
+else alert severity -> impact score
+```
+
+Default `p3` fields without a resolved priority record or manual priority flag are treated as unset, so old/raw alerts can still fall back to severity. Once priority is explicitly resolved or manually set, priority becomes the authoritative signal.
+
+Default scores:
+
+| Signal | Score | Typical status |
+|---|---:|---|
+| P1 | 100 | major_outage |
+| P2 | 75 | partial_outage |
+| P3 | 45 | degraded |
+| P4 | 20 | operational with low impact score |
+| P5 | 5 | operational with informational impact |
+| severity=critical | 80 | major_outage |
+| severity=high/error | 65 | partial_outage |
+| severity=warning | 40 | degraded |
+
+### Dependency impact scoring
+
+Dependency propagation multiplies the upstream effective score. Examples:
+
+| Dependency | Multiplier |
+|---|---:|
+| hard / required | 1.00 |
+| hard / important | 0.85 |
+| soft / required | 0.75 |
+| soft / important | 0.55 |
+| external / optional | 0.20 |
+| informational | 0.00 |
+
+A hard required dependency on an upstream `major_outage` keeps score 100. A soft important dependency on score 100 becomes score 55 and maps to `partial_outage`.
 
 ### Blast radius
 

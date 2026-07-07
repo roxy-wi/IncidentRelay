@@ -656,15 +656,6 @@ function dashboardHasAlertImpact(row) {
 }
 
 
-function dashboardHasDependencyImpact(row) {
-    return !!(
-        row &&
-        row.dependency_impact_status &&
-        row.dependency_impact_status !== "operational"
-    );
-}
-
-
 function dashboardImpactIssues(row) {
     const rootCauses = dashboardAsArray(row.root_causes);
     const paths = row.explanation ? dashboardAsArray(row.explanation.paths) : [];

@@ -179,22 +179,6 @@ function formatShortDate(value) {
 }
 
 
-function formatTime(value) {
-    /*
-     * Format time using browser locale.
-     */
-    return formatBrowserDate(value, "time");
-}
-
-
-function formatTimeMinutes(value) {
-    /*
-     * Format time without seconds using browser locale.
-     */
-    return formatBrowserDate(value, "timeMinutes");
-}
-
-
 function formatDateTime(value) {
     /*
      * Format datetime using browser locale.

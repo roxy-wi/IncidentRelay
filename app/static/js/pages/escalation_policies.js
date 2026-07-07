@@ -471,12 +471,6 @@ function rememberEscalationPolicyInCache(policy) {
     escalationPoliciesCache.push(policy);
 }
 
-function getEscalationPolicyRuleById(policy, ruleId) {
-    return asArray(policy && policy.rules).find(function (rule) {
-        return Number(rule.id) === Number(ruleId);
-    }) || null;
-}
-
 function collectEscalationPolicyPayload() {
     return {
         team_id: Number($("#escalation-policy-team").val()),

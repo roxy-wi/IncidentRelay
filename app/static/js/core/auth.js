@@ -4,12 +4,6 @@ function getStoredToken() {
   return localStorage.getItem(INCIDENTRELAY_TOKEN_KEY);
 }
 
-function setStoredToken(token) {
-  if (token) {
-    localStorage.setItem(INCIDENTRELAY_TOKEN_KEY, token);
-  }
-}
-
 function clearStoredToken() {
   localStorage.removeItem(INCIDENTRELAY_TOKEN_KEY);
 }

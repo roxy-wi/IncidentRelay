@@ -62,13 +62,3 @@ def resolve_alert(alert_id, user_id=None):
         notify_stakeholders(group, "resolved", old_value=old_status)
 
     return group
-
-
-def attach_action_user(alert, user_id):
-    """Attach the action user to the alert object for notification formatting."""
-    if not user_id:
-        alert._action_user = None
-        return alert
-
-    alert._action_user = users_repo.get_user_or_none(user_id)
-    return alert

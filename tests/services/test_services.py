@@ -915,8 +915,11 @@ def test_service_impact_v2_propagates_direct_upstream_critical_alert(
     assert database_item["primary_reason"] == "alert_group"
     assert database_item["open_alert_groups"] == 1
     assert database_item["critical_open_alert_groups"] == 1
+    assert database_item["alert_impact_score"] == 80
+    assert database_item["effective_impact_score"] == 80
 
     assert billing_item["effective_status"] == "major_outage"
+    assert billing_item["dependency_impact_score"] == 100
     assert billing_item["dependency_impact_status"] == "major_outage"
     assert billing_item["primary_reason"] == "upstream_dependency"
     assert billing_item["upstream_issues_count"] == 1
@@ -1253,8 +1256,9 @@ def test_service_impact_v2_optional_dependency_downgrades_major_to_degraded(
     billing_item = find_impact_item(payload, billing)
 
     assert billing_item["primary_reason"] == "upstream_dependency"
-    assert billing_item["dependency_impact_status"] == "degraded"
-    assert billing_item["effective_status"] == "degraded"
+    assert billing_item["dependency_impact_score"] == 20
+    assert billing_item["dependency_impact_status"] == "operational"
+    assert billing_item["effective_status"] == "operational"
     assert billing_item["root_causes"][0]["effective_status"] == "major_outage"
 
 
@@ -1304,6 +1308,7 @@ def test_service_impact_v2_soft_dependency_reduces_major_outage(
 
     assert billing_item["primary_reason"] == "upstream_dependency"
     assert billing_item["dependency_impact_status"] == "partial_outage"
+    assert billing_item["dependency_impact_score"] == 55
     assert billing_item["effective_status"] == "partial_outage"
     assert billing_item["root_causes"][0]["effective_status"] == "major_outage"
 
@@ -1547,6 +1552,83 @@ def test_service_details_includes_impact_v2_block(client, admin_headers):
     assert data["analytics"]["widgets"]["impact"]["effective_status"] == "major_outage"
     assert data["analytics"]["widgets"]["impact"]["primary_reason"] == "upstream_dependency"
 
+
+
+def test_service_impact_v2_explicit_priority_overrides_severity(
+    client,
+    admin_headers,
+):
+    group = create_group()
+    team = create_team(group)
+
+    service = create_service(
+        team,
+        slug=unique("priority-api"),
+        name="Priority API",
+    )
+
+    create_impact_alert_group(
+        team=team,
+        service=service,
+        status="firing",
+        severity="critical",
+        priority_slug="p3",
+        priority_order=3,
+        priority_set_manually=True,
+        alertname="CriticalButP3",
+        summary="Critical severity but P3 priority",
+    )
+
+    response = client.get(
+        f"/api/services/impact?team_id={team.id}&include_operational=true",
+        headers=admin_headers,
+    )
+
+    assert response.status_code == 200, response.get_json()
+
+    item = find_impact_item(response.get_json(), service)
+
+    assert item["primary_reason"] == "alert_group"
+    assert item["alert_impact_score"] == 45
+    assert item["effective_impact_score"] == 45
+    assert item["effective_status"] == "degraded"
+
+
+def test_service_impact_v2_priority_can_raise_warning_alert_to_partial_outage(
+    client,
+    admin_headers,
+):
+    group = create_group()
+    team = create_team(group)
+
+    service = create_service(
+        team,
+        slug=unique("payment-provider"),
+        name="Payment Provider",
+    )
+
+    create_impact_alert_group(
+        team=team,
+        service=service,
+        status="firing",
+        severity="warning",
+        priority_slug="p2",
+        priority_order=2,
+        alertname="ProviderSlow",
+        summary="Warning severity but P2 business priority",
+    )
+
+    response = client.get(
+        f"/api/services/impact?team_id={team.id}&include_operational=true",
+        headers=admin_headers,
+    )
+
+    assert response.status_code == 200, response.get_json()
+
+    item = find_impact_item(response.get_json(), service)
+
+    assert item["alert_impact_score"] == 75
+    assert item["effective_status"] == "partial_outage"
 
 def test_create_service_restores_deleted_service(client, admin_headers):
     group = create_group()

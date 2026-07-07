@@ -534,10 +534,6 @@ function disableSilence(id) {
     });
 }
 
-function deleteSilence(id) {
-    disableSilence(id);
-}
-
 function resetSilenceForm() {
     $("#silence-form-title").text("Create silence");
     $("#silence-id").val("");
@@ -608,25 +604,6 @@ $(document).on("keydown", function (event) {
         closeAppModal("#silence-form-modal");
     }
 });
-function openCreateSilenceModal() {
-    resetSilenceForm();
-
-    const selectedTeam = selectedTeamNumber();
-
-    if (
-        selectedTeam &&
-        $("#silence-team option[value='" + selectedTeam + "']").length
-    ) {
-        $("#silence-team").val(String(selectedTeam));
-    }
-
-    const teamId = Number($("#silence-team").val()) || null;
-
-    loadSilenceMatcherPresets(teamId, null, function () {
-        $("#silence-form-title").text("Create silence");
-        openAppModal("#silence-form-modal");
-    });
-}
 $(document).on(
     "change",
     "#silence-matcher-preset",

@@ -5,6 +5,12 @@ from app.db import database_proxy
 from app.modules.db import business_services_repo
 from app.modules.db.models import ServiceDependency
 from app.services.service_catalog.impact import build_service_effective_impact_map
+from app.services.service_catalog.impact_scoring import (
+    COMPONENT_CRITICALITY_MULTIPLIER,
+    clamp_impact_score,
+    combined_impact_score,
+    status_from_impact_score,
+)
 
 logger = logging.getLogger("oncall.business_services")
 
@@ -32,13 +38,7 @@ TECHNICAL_STATUS_SCORE = {
     "firing": 100,
 }
 
-CRITICALITY_MULTIPLIER = {
-    "required": 1.0,
-    "critical": 1.0,
-    "important": 0.75,
-    "optional": 0.4,
-    "informational": 0.2,
-}
+CRITICALITY_MULTIPLIER = COMPONENT_CRITICALITY_MULTIPLIER
 
 
 def is_business_service_manual_status_active(business_service, now=None):
@@ -108,13 +108,29 @@ def technical_status_score(status):
     return TECHNICAL_STATUS_SCORE.get(normalize_technical_status(status), 20)
 
 
-def component_impact_score(component, impact_map=None):
-    status = component_service_effective_status(component, impact_map=impact_map)
-    base_score = technical_status_score(status)
-    multiplier = CRITICALITY_MULTIPLIER.get(component.criticality, 1.0)
-    weight = max(0, min(100, int(component.impact_weight or 0)))
+def component_service_effective_impact_score(component, impact_map=None):
+    impact_item = component_service_impact_item(component, impact_map=impact_map)
 
-    return int(round(base_score * multiplier * weight / 100))
+    if impact_item:
+        return clamp_impact_score(
+            impact_item.get("effective_impact_score")
+            or impact_item.get("impact_score")
+            or technical_status_score(impact_item.get("effective_status"))
+        )
+
+    return clamp_impact_score(technical_status_score(component_service_raw_status(component)))
+
+
+def component_criticality_multiplier(component):
+    return CRITICALITY_MULTIPLIER.get(component.criticality, 1.0)
+
+
+def component_impact_score(component, impact_map=None):
+    base_score = component_service_effective_impact_score(component, impact_map=impact_map)
+    multiplier = component_criticality_multiplier(component)
+    weight = clamp_impact_score(component.impact_weight or 0)
+
+    return clamp_impact_score(base_score * multiplier * weight / 100)
 
 
 def component_service_raw_status(component):
@@ -156,16 +172,10 @@ def component_service_effective_reason(component, impact_map=None):
 
 
 def status_from_score(score, has_required_major=False):
-    if has_required_major or score >= 80:
+    if has_required_major:
         return "major_outage"
 
-    if score >= 55:
-        return "partial_outage"
-
-    if score >= 25:
-        return "degraded"
-
-    return "operational"
+    return status_from_impact_score(score)
 
 
 def component_snapshot_row(component, impact_score, impact_map=None):
@@ -185,6 +195,13 @@ def component_snapshot_row(component, impact_score, impact_map=None):
         "effective_status_reason": component_service_effective_reason(component, impact_map=impact_map),
         "alert_impact_status": impact_item.get("alert_impact_status") if impact_item else "operational",
         "dependency_impact_status": impact_item.get("dependency_impact_status") if impact_item else "operational",
+        "own_impact_score": impact_item.get("own_impact_score") if impact_item else technical_status_score(component_service_raw_status(component)),
+        "alert_impact_score": impact_item.get("alert_impact_score") if impact_item else 0,
+        "dependency_impact_score": impact_item.get("dependency_impact_score") if impact_item else 0,
+        "effective_impact_score": component_service_effective_impact_score(component, impact_map=impact_map),
+        "service_impact_score": component_service_effective_impact_score(component, impact_map=impact_map),
+        "component_multiplier": component_criticality_multiplier(component),
+        "weighted_impact_score": impact_score,
         "open_alert_groups": impact_item.get("open_alert_groups") if impact_item else 0,
         "critical_open_alert_groups": impact_item.get("critical_open_alert_groups") if impact_item else 0,
         "upstream_issues_count": impact_item.get("upstream_issues_count") if impact_item else 0,
@@ -215,11 +232,11 @@ def calculate_business_service_status(business_service):
     )
 
     component_snapshot = []
-    impact_score = 0
+    component_scores = []
 
     for component in components:
         score = component_impact_score(component, impact_map=impact_map)
-        impact_score = max(impact_score, score)
+        component_scores.append(score)
 
         component_snapshot.append(
             component_snapshot_row(
@@ -229,11 +246,14 @@ def calculate_business_service_status(business_service):
             )
         )
 
+    impact_score = combined_impact_score(component_scores)
+    status = status_from_score(impact_score)
+
     return {
-        "status": status_from_score(impact_score),
+        "status": status,
         "status_source": "calculated",
         "status_message": calculated_business_service_status_message({
-            "status": status_from_score(impact_score),
+            "status": status,
             "impact_score": impact_score,
             "component_snapshot": component_snapshot,
         }),
@@ -400,17 +420,6 @@ def refresh_business_services_for_technical_service(service_id):
                 result = apply_business_service_status(business_service)
                 refreshed.append((business_service, result))
                 refreshed_business_service_ids.add(business_service.id)
-
-    return refreshed
-
-
-def refresh_all_business_services(group_id=None):
-    refreshed = []
-
-    with database_proxy.atomic():
-        for business_service in business_services_repo.list_business_services(group_id=group_id):
-            result = apply_business_service_status(business_service)
-            refreshed.append((business_service, result))
 
     return refreshed
 

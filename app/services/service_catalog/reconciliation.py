@@ -261,48 +261,6 @@ def reconcile_dependency_component(service_ids, *, trigger, actor_user=None):
     )
 
 
-def list_services_for_rotation(rotation_id):
-    if not rotation_id:
-        return []
-
-    return list(
-        Service.select()
-        .where(
-            Service.default_rotation == rotation_id,
-            Service.deleted == False,
-        )
-        .order_by(Service.id)
-    )
-
-
-def list_services_for_escalation_policy(policy_id):
-    if not policy_id:
-        return []
-
-    return list(
-        Service.select()
-        .where(
-            Service.default_escalation_policy == policy_id,
-            Service.deleted == False,
-        )
-        .order_by(Service.id)
-    )
-
-
-def list_services_for_notification_policy(policy_id):
-    if not policy_id:
-        return []
-
-    return list(
-        Service.select()
-        .where(
-            Service.notification_policy == policy_id,
-            Service.deleted == False,
-        )
-        .order_by(Service.id)
-    )
-
-
 def list_services_for_route(route_id):
     if not route_id:
         return []

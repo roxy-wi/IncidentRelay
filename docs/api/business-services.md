@@ -280,6 +280,22 @@ service_id
 
 After create, the Business Service should be recalculated and the response should include the serialized component with effective impact fields.
 
+Component impact fields include:
+
+```text
+effective_status
+effective_status_reason
+own_impact_score
+alert_impact_score
+dependency_impact_score
+effective_impact_score
+service_impact_score
+component_multiplier
+weighted_impact_score
+```
+
+`service_impact_score` comes from Service Impact v2. `weighted_impact_score` is the component score after criticality and impact weight are applied. Business Service status then uses combined weighted component scores.
+
 ## Update Component
 
 ```http

@@ -166,11 +166,6 @@ function getObjectPermissions(item) {
     return (item && item.permissions) || {};
 }
 
-function hasObjectPermissions(item) {
-    const permissions = getObjectPermissions(item);
-    return !!Object.keys(permissions).length;
-}
-
 function getObjectTeamRole(item) {
     return item && (item.current_user_role || item.user_role || item.role);
 }

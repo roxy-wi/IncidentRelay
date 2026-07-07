@@ -98,3 +98,88 @@ def test_business_service_uses_effective_component_status_from_dependency(db):
     assert result["component_snapshot"][0]["service_status"] == "operational"
     assert result["component_snapshot"][0]["effective_status"] == "major_outage"
     assert result["component_snapshot"][0]["effective_status_reason"] == "upstream_dependency"
+
+
+def test_business_service_combines_multiple_component_scores(db):
+    group = create_group()
+    team = create_team(group=group)
+
+    business_service = BusinessService.create(
+        group=group,
+        owner_team=team,
+        slug=unique("checkout"),
+        name="Checkout",
+        enabled=True,
+    )
+
+    components = []
+
+    for index in range(3):
+        service = create_service(team=team, slug=unique(f"component-{index}"), name=f"Component {index}")
+        components.append(service)
+
+        BusinessServiceComponent.create(
+            business_service=business_service,
+            service=service,
+            criticality="important",
+            impact_weight=100,
+            enabled=True,
+        )
+
+        create_impact_alert_group(
+            team=team,
+            service=service,
+            fingerprint=unique(f"component-{index}-warning"),
+            status="firing",
+            severity="warning",
+            alertname=f"Component{index}Warning",
+            summary=f"Component {index} warning",
+        )
+
+    result = apply_business_service_status(business_service)
+
+    assert result["status"] == "partial_outage"
+    assert result["impact_score"] == 66
+    assert [item["weighted_impact_score"] for item in result["component_snapshot"]] == [30, 30, 30]
+    assert all(item["service_impact_score"] == 40 for item in result["component_snapshot"])
+
+
+def test_business_service_uses_priority_based_component_impact(db):
+    group = create_group()
+    team = create_team(group=group)
+    service = create_service(team=team, slug=unique("payment"), name="Payment")
+
+    business_service = BusinessService.create(
+        group=group,
+        owner_team=team,
+        slug=unique("checkout"),
+        name="Checkout",
+        enabled=True,
+    )
+
+    BusinessServiceComponent.create(
+        business_service=business_service,
+        service=service,
+        criticality="required",
+        impact_weight=100,
+        enabled=True,
+    )
+
+    create_impact_alert_group(
+        team=team,
+        service=service,
+        fingerprint=unique("payment-warning-p2"),
+        status="firing",
+        severity="warning",
+        priority_slug="p2",
+        priority_order=2,
+        alertname="PaymentProviderSlow",
+        summary="Payment provider warning with P2 priority",
+    )
+
+    result = apply_business_service_status(business_service)
+
+    assert result["status"] == "partial_outage"
+    assert result["impact_score"] == 75
+    assert result["component_snapshot"][0]["alert_impact_score"] == 75
+    assert result["component_snapshot"][0]["weighted_impact_score"] == 75

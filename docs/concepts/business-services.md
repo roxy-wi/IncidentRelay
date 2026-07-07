@@ -80,10 +80,10 @@ service.status = operational
 Effective status is calculated by the Service Impact engine from:
 
 ```text
-raw service status
-+ open alert groups
-+ upstream/downstream dependency impact
-= effective service status
+raw service status score
++ alert impact score from priority/severity
++ propagated upstream dependency score
+= effective service impact score and status
 ```
 
 This means a component can show:
@@ -105,14 +105,18 @@ Business Service status is calculated from enabled components.
 Each component gets an impact score based on:
 
 ```text
-effective component status
+effective component impact score
 x component criticality multiplier
 x impact weight
 ```
 
-The highest component score becomes the Business Service impact score.
+Business Service impact uses combined component scores, not just the single highest component. This lets several degraded important components become a larger business impact:
 
-The impact score is then converted to Business Service status.
+```text
+business_score = 100 * (1 - product(1 - component_score / 100))
+```
+
+The combined score is then converted to Business Service status.
 
 Typical statuses:
 
@@ -278,9 +282,8 @@ The current implementation intentionally does not include:
 - notification templates for Business Services
 - analytics dashboards
 - automatic stakeholder assignment
-- fine-grained alert impact policy for warning/info alerts
 
-Warning alerts can still influence effective status according to the current Service Impact v2 logic. A more precise impact policy should be added later in the shared Service Impact layer, so Business Services automatically inherit it.
+Fine-grained alert impact policy lives in the shared Service Impact layer. Business Services inherit priority-based alert impact, severity fallback, dependency propagation multipliers and effective component scores from that layer.
 
 ## Recommended workflow
 

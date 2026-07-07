@@ -5,6 +5,20 @@ from dataclasses import dataclass, field
 from typing import Any
 
 from app.modules.db.models import AlertGroup, Service, ServiceDependency, Team
+from app.services.service_catalog.impact_scoring import (
+    alert_group_impact_score,
+    clamp_impact_score,
+    combined_impact_score,
+    max_severity,
+    max_status,
+    normalize_severity,
+    normalize_status,
+    priority_slug_for_alert_group,
+    propagate_dependency_impact,
+    status_from_impact_score,
+    status_impact_score,
+    status_rank,
+)
 
 OPEN_ALERT_GROUP_STATUSES = {"firing", "acknowledged"}
 
@@ -72,7 +86,13 @@ class AlertImpactStats:
     critical_open_alert_groups: int = 0
     high_open_alert_groups: int = 0
     warning_open_alert_groups: int = 0
+    priority_open_alert_groups: int = 0
+    severity_open_alert_groups: int = 0
     worst_severity: str | None = None
+    worst_priority_slug: str | None = None
+    worst_priority_order: int | None = None
+    impact_score: int = 0
+    impact_source: str | None = None
 
 
 @dataclass
@@ -82,6 +102,10 @@ class ImpactComputation:
     alert_impact_status: str = "operational"
     dependency_impact_status: str = "operational"
     effective_status: str = "operational"
+    own_impact_score: int = 0
+    alert_impact_score: int = 0
+    dependency_impact_score: int = 0
+    effective_impact_score: int = 0
     primary_reason: str = "none"
     open_alert_groups: int = 0
     critical_open_alert_groups: int = 0
@@ -448,21 +472,37 @@ def _load_alert_stats(service_ids):
             continue
 
         severity = _normalize_severity(group.severity)
+        score, source = alert_group_impact_score(group)
+        priority_slug = priority_slug_for_alert_group(group)
+        priority_order = getattr(group, "priority_order", None)
         item = stats[service_id]
 
         item.open_alert_groups += 1
 
-        if severity == "critical":
+        if source == "priority":
+            item.priority_open_alert_groups += 1
+        else:
+            item.severity_open_alert_groups += 1
+
+        if score >= 80:
             item.critical_open_alert_groups += 1
-        elif severity == "high":
+        elif score >= 55:
             item.high_open_alert_groups += 1
-        elif severity in {"warning", "warn"}:
+        elif score >= 25:
             item.warning_open_alert_groups += 1
 
         item.worst_severity = _max_severity(item.worst_severity, severity)
 
-    return stats
+        if score > item.impact_score:
+            item.impact_score = score
+            item.impact_source = source
+            item.worst_priority_slug = priority_slug
+            try:
+                item.worst_priority_order = int(priority_order) if priority_order is not None else None
+            except (TypeError, ValueError):
+                item.worst_priority_order = None
 
+    return stats
 
 def _build_dependency_maps(services, dependencies):
     upstream_by_service = defaultdict(list)
@@ -521,6 +561,8 @@ def _compute_service_impact(service_id, context, *, path, depth):
             service_id=service_id,
             own_status="unknown",
             effective_status="unknown",
+            own_impact_score=status_impact_score("unknown"),
+            effective_impact_score=status_impact_score("unknown"),
             primary_reason="unknown",
             cycle_detected=True,
             paths=[_path_for_ids(path + [service_id], context)],
@@ -543,11 +585,15 @@ def _compute_service_impact(service_id, context, *, path, depth):
             service_id=service_id,
             own_status="unknown",
             effective_status="unknown",
+            own_impact_score=status_impact_score("unknown"),
+            effective_impact_score=status_impact_score("unknown"),
             primary_reason="unknown",
         )
 
     own_status = _own_status(service)
+    own_score = _own_impact_score(own_status)
     alert_stats = context["alert_stats"][service_id]
+    alert_score = clamp_impact_score(alert_stats.impact_score)
     alert_status = _alert_impact_status(alert_stats)
 
     if not service.enabled:
@@ -557,6 +603,10 @@ def _compute_service_impact(service_id, context, *, path, depth):
             alert_impact_status="operational",
             dependency_impact_status="operational",
             effective_status="disabled",
+            own_impact_score=0,
+            alert_impact_score=0,
+            dependency_impact_score=0,
+            effective_impact_score=0,
             primary_reason="disabled",
             open_alert_groups=0,
             critical_open_alert_groups=0,
@@ -565,24 +615,45 @@ def _compute_service_impact(service_id, context, *, path, depth):
                     service,
                     reason="disabled",
                     status="disabled",
+                    impact_score=0,
                     alert_stats=AlertImpactStats(),
-                    path=[_path_node(service)],
+                    path=[_path_node(service, effective_status="disabled", impact_score=0)],
                 )
             ],
-            paths=[[_path_node(service)]],
+            paths=[[_path_node(service, effective_status="disabled", impact_score=0)]],
             rules=[f"{service.name} is disabled."],
         )
 
         computed[cache_key] = result
         return result
 
+    base_reason = _primary_base_reason(
+        service,
+        own_status,
+        own_score,
+        alert_status,
+        alert_score,
+    )
+    base_score = max(own_score, alert_score)
+    base_status = _status_for_reason(
+        base_reason,
+        own_status=own_status,
+        alert_status=alert_status,
+        dependency_status="operational",
+        score=base_score,
+    )
+
     result = ImpactComputation(
         service_id=service_id,
         own_status=own_status,
         alert_impact_status=alert_status,
         dependency_impact_status="operational",
-        effective_status=_max_status(own_status, alert_status),
-        primary_reason=_primary_base_reason(service, own_status, alert_status),
+        effective_status=base_status,
+        own_impact_score=own_score,
+        alert_impact_score=alert_score,
+        dependency_impact_score=0,
+        effective_impact_score=base_score,
+        primary_reason=base_reason,
         open_alert_groups=alert_stats.open_alert_groups,
         critical_open_alert_groups=alert_stats.critical_open_alert_groups,
     )
@@ -593,13 +664,16 @@ def _compute_service_impact(service_id, context, *, path, depth):
                 service,
                 reason=result.primary_reason,
                 status=result.effective_status,
+                impact_score=result.effective_impact_score,
                 alert_stats=alert_stats,
-                path=[_path_node(service)],
+                path=[_path_node(service, effective_status=result.effective_status, impact_score=result.effective_impact_score)],
             )
         )
 
-        result.paths.append([_path_node(service)])
-        result.rules.extend(_base_rules(service, result.primary_reason, alert_stats))
+        result.paths.append([
+            _path_node(service, effective_status=result.effective_status, impact_score=result.effective_impact_score)
+        ])
+        result.rules.extend(_base_rules(service, result.primary_reason, alert_stats, result.effective_impact_score))
 
     if depth <= 0:
         result.depth_limited = True
@@ -608,6 +682,7 @@ def _compute_service_impact(service_id, context, *, path, depth):
         return result
 
     dependency_status = "operational"
+    dependency_score = 0
     dependency_root_causes = []
     dependency_paths = []
     upstream_issues_count = 0
@@ -636,14 +711,18 @@ def _compute_service_impact(service_id, context, *, path, depth):
             depth=depth - 1,
         )
 
-        propagated_status = _propagate_dependency_status(
-            dependency,
-            upstream.effective_status,
-        )
+        propagated = _propagate_dependency_impact(dependency, upstream)
+        propagated_status = propagated["status"]
+        propagated_score = propagated["score"]
 
-        if _is_impactful_status(propagated_status):
+        if _is_impactful_status(propagated_status) or propagated_score > 0:
             upstream_issues_count += 1
-            dependency_status = _max_status(dependency_status, propagated_status)
+
+            if propagated_score > dependency_score:
+                dependency_score = propagated_score
+                dependency_status = propagated_status
+            elif propagated_score == dependency_score:
+                dependency_status = _max_status(dependency_status, propagated_status)
 
             if upstream.root_causes:
                 for cause in upstream.root_causes:
@@ -652,6 +731,7 @@ def _compute_service_impact(service_id, context, *, path, depth):
                             cause,
                             service,
                             dependency,
+                            propagated=propagated,
                         )
                     )
             else:
@@ -662,57 +742,84 @@ def _compute_service_impact(service_id, context, *, path, depth):
                             upstream_service,
                             reason=upstream.primary_reason,
                             status=upstream.effective_status,
+                            impact_score=upstream.effective_impact_score,
                             alert_stats=context["alert_stats"][upstream_id],
                             path=[
-                                _path_node(service),
-                                _path_node(upstream_service, dependency),
+                                _path_node(service, effective_status=result.effective_status, impact_score=result.effective_impact_score),
+                                _path_node(
+                                    upstream_service,
+                                    dependency,
+                                    effective_status=upstream.effective_status,
+                                    impact_score=upstream.effective_impact_score,
+                                    propagated_impact_score=propagated_score,
+                                    dependency_multiplier=propagated["multiplier"],
+                                ),
                             ],
                         )
                     )
 
             for upstream_path in upstream.paths:
                 dependency_paths.append(
-                    _prefix_path(service, dependency, upstream_path)
+                    _prefix_path(
+                        service,
+                        dependency,
+                        upstream_path,
+                        service_effective_status=result.effective_status,
+                        service_impact_score=result.effective_impact_score,
+                        dependency_multiplier=propagated["multiplier"],
+                        propagated_impact_score=propagated_score,
+                    )
                 )
 
             if not upstream.paths:
                 upstream_service = context["services"].get(upstream_id)
                 if upstream_service:
                     dependency_paths.append([
-                        _path_node(service),
-                        _path_node(upstream_service, dependency),
+                        _path_node(service, effective_status=result.effective_status, impact_score=result.effective_impact_score),
+                        _path_node(
+                            upstream_service,
+                            dependency,
+                            effective_status=upstream.effective_status,
+                            impact_score=upstream.effective_impact_score,
+                            propagated_impact_score=propagated_score,
+                            dependency_multiplier=propagated["multiplier"],
+                        ),
                     ])
 
         cycle_detected = cycle_detected or upstream.cycle_detected
         depth_limited = depth_limited or upstream.depth_limited
 
     result.dependency_impact_status = dependency_status
-    result.effective_status = _max_status(
-        result.own_status,
-        result.alert_impact_status,
-        result.dependency_impact_status,
+    result.dependency_impact_score = clamp_impact_score(dependency_score)
+    result.effective_impact_score = max(
+        result.own_impact_score,
+        result.alert_impact_score,
+        result.dependency_impact_score,
     )
     result.upstream_issues_count = upstream_issues_count
     result.cycle_detected = result.cycle_detected or cycle_detected
     result.depth_limited = result.depth_limited or depth_limited
-
-    if (
-        _status_rank(result.dependency_impact_status) >= _status_rank(result.own_status)
-        and _status_rank(result.dependency_impact_status) >= _status_rank(result.alert_impact_status)
-        and _is_impactful_status(result.dependency_impact_status)
-    ):
-        result.primary_reason = "upstream_dependency"
+    result.primary_reason = _primary_reason_from_scores(result)
+    result.effective_status = _status_for_reason(
+        result.primary_reason,
+        own_status=result.own_status,
+        alert_status=result.alert_impact_status,
+        dependency_status=result.dependency_impact_status,
+        score=result.effective_impact_score,
+    )
 
     if result.primary_reason == "upstream_dependency":
         result.root_causes = _deduplicate_root_causes(dependency_root_causes)
         result.paths = _deduplicate_paths(dependency_paths)
         result.rules.append(
-            f"{service.name} is impacted by {upstream_issues_count} upstream dependency issue(s)."
+            (
+                f"{service.name} is impacted by {upstream_issues_count} upstream dependency issue(s); "
+                f"dependency impact score={result.dependency_impact_score}."
+            )
         )
 
-    computed[service_id] = result
+    computed[cache_key] = result
     return result
-
 
 def _own_status(service):
     if not service.enabled:
@@ -726,96 +833,128 @@ def _own_status(service):
     return status
 
 
+def _own_impact_score(own_status):
+    return status_impact_score(own_status)
+
+
 def _alert_impact_status(stats):
-    if stats.critical_open_alert_groups > 0:
-        return "major_outage"
+    if not stats or clamp_impact_score(stats.impact_score) <= 0:
+        return "operational"
 
-    if stats.high_open_alert_groups > 0:
-        return "partial_outage"
-
-    if stats.warning_open_alert_groups > 0:
-        return "degraded"
-
-    if stats.open_alert_groups > 0:
-        return "degraded"
-
-    return "operational"
+    return status_from_impact_score(stats.impact_score)
 
 
-def _primary_base_reason(service, own_status, alert_status):
+def _primary_base_reason(service, own_status, own_score, alert_status, alert_score):
     if not service.enabled:
         return "disabled"
 
-    if own_status == "maintenance":
+    own_score = clamp_impact_score(own_score)
+    alert_score = clamp_impact_score(alert_score)
+
+    if own_status == "maintenance" and own_score >= alert_score:
         return "maintenance"
 
-    if _is_impactful_status(own_status) and _status_rank(own_status) >= _status_rank(alert_status):
+    if _is_impactful_status(own_status) and own_score >= alert_score:
         return "own_status"
 
-    if _is_impactful_status(alert_status):
+    if alert_score > 0 or _is_impactful_status(alert_status):
         return "alert_group"
+
+    if own_status == "unknown" and own_score > 0:
+        return "own_status"
 
     return "none"
 
 
-def _base_rules(service, reason, stats):
+def _primary_reason_from_scores(computation):
+    dependency_score = clamp_impact_score(computation.dependency_impact_score)
+    own_score = clamp_impact_score(computation.own_impact_score)
+    alert_score = clamp_impact_score(computation.alert_impact_score)
+
+    if dependency_score > 0 and dependency_score >= own_score and dependency_score >= alert_score:
+        return "upstream_dependency"
+
+    if computation.own_status == "maintenance" and own_score >= alert_score:
+        return "maintenance"
+
+    if _is_impactful_status(computation.own_status) and own_score >= alert_score:
+        return "own_status"
+
+    if alert_score > 0 or _is_impactful_status(computation.alert_impact_status):
+        return "alert_group"
+
+    if computation.own_status == "unknown" and own_score > 0:
+        return "own_status"
+
+    return "none"
+
+
+def _status_for_reason(reason, *, own_status, alert_status, dependency_status, score):
+    score = clamp_impact_score(score)
+
+    if reason == "disabled":
+        return "disabled"
+
+    if reason == "maintenance":
+        return "maintenance"
+
+    if reason == "own_status":
+        own_status = _normalize_status(own_status)
+        if own_status in {"unknown", "degraded", "partial_outage", "major_outage"}:
+            return own_status
+        return status_from_impact_score(score)
+
+    if reason == "upstream_dependency":
+        dependency_status = _normalize_status(dependency_status)
+        if dependency_status in {"unknown", "degraded", "partial_outage", "major_outage"}:
+            return dependency_status
+        return status_from_impact_score(score)
+
+    if reason == "alert_group":
+        alert_status = _normalize_status(alert_status)
+        if alert_status in {"degraded", "partial_outage", "major_outage"}:
+            return alert_status
+        return status_from_impact_score(score)
+
+    return "operational"
+
+
+def _base_rules(service, reason, stats, impact_score=0):
+    impact_score = clamp_impact_score(impact_score)
+
     if reason == "disabled":
         return [f"{service.name} is disabled."]
 
     if reason == "maintenance":
-        return [f"{service.name} is in maintenance status."]
+        return [f"{service.name} is in maintenance status; impact score={impact_score}."]
 
     if reason == "own_status":
-        return [f"{service.name} own status is {service.status}."]
+        return [f"{service.name} own status is {service.status}; impact score={impact_score}."]
 
     if reason == "alert_group":
+        source = stats.impact_source or "severity"
+        priority_part = (
+            f", worst priority={stats.worst_priority_slug.upper()}"
+            if stats.worst_priority_slug
+            else ""
+        )
         return [
             (
                 f"{service.name} has {stats.open_alert_groups} open alert group(s), "
-                f"{stats.critical_open_alert_groups} critical."
+                f"{stats.critical_open_alert_groups} critical-impact; "
+                f"alert impact score={impact_score} from {source}{priority_part}."
             )
         ]
 
     return []
 
 
-def _propagate_dependency_status(dependency, upstream_status):
-    upstream_status = _normalize_status(upstream_status)
-
-    if upstream_status in {"operational", "maintenance", "disabled"}:
-        return "operational"
-
-    if upstream_status == "unknown":
-        return "unknown"
-
-    dependency_type = dependency.dependency_type or "hard"
-    criticality = dependency.criticality or "important"
-
-    type_rank = DEPENDENCY_TYPE_RANK.get(dependency_type, 1)
-    criticality_rank = DEPENDENCY_CRITICALITY_RANK.get(criticality, 2)
-
-    if type_rank <= DEPENDENCY_TYPE_RANK["informational"]:
-        return "operational"
-
-    if upstream_status == "major_outage":
-        if dependency_type == "hard" or criticality == "required":
-            return "major_outage"
-        if dependency_type == "soft" or criticality == "important":
-            return "partial_outage"
-        return "degraded"
-
-    if upstream_status == "partial_outage":
-        if dependency_type == "hard" or criticality_rank >= DEPENDENCY_CRITICALITY_RANK["important"]:
-            return "partial_outage"
-        return "degraded"
-
-    if upstream_status == "degraded":
-        if criticality_rank >= DEPENDENCY_CRITICALITY_RANK["important"]:
-            return "degraded"
-        return "operational"
-
-    return "operational"
-
+def _propagate_dependency_impact(dependency, upstream):
+    return propagate_dependency_impact(
+        dependency,
+        upstream.effective_status,
+        upstream.effective_impact_score,
+    )
 
 def _impact_item_from_computation(
     computation,
@@ -841,6 +980,11 @@ def _impact_item_from_computation(
         "alert_impact_status": computation.alert_impact_status,
         "dependency_impact_status": computation.dependency_impact_status,
         "effective_status": computation.effective_status,
+        "own_impact_score": computation.own_impact_score,
+        "alert_impact_score": computation.alert_impact_score,
+        "dependency_impact_score": computation.dependency_impact_score,
+        "effective_impact_score": computation.effective_impact_score,
+        "impact_score": computation.effective_impact_score,
         "primary_reason": computation.primary_reason,
         "open_alert_groups": computation.open_alert_groups,
         "critical_open_alert_groups": computation.critical_open_alert_groups,
@@ -873,12 +1017,16 @@ def _explanation(service, computation, *, include_paths):
         title = f"{service.name} is impacted by open alert groups"
         message = (
             f"{service.name} has {computation.open_alert_groups} open alert group(s), "
-            f"{computation.critical_open_alert_groups} critical."
+            f"{computation.critical_open_alert_groups} critical-impact, "
+            f"alert impact score {computation.alert_impact_score}."
         )
     elif computation.primary_reason == "upstream_dependency":
         source_name = primary_root["service_name"] if primary_root else "an upstream dependency"
         title = f"{service.name} is impacted by {source_name}"
-        message = f"The effective status is {computation.effective_status} because an upstream dependency is unhealthy."
+        message = (
+            f"The effective status is {computation.effective_status} because an upstream dependency is unhealthy; "
+            f"dependency impact score {computation.dependency_impact_score}."
+        )
     elif computation.primary_reason == "maintenance":
         title = f"{service.name} is in maintenance"
         message = "The service own status is maintenance."
@@ -899,6 +1047,10 @@ def _explanation(service, computation, *, include_paths):
         "primary_source_service_name": primary_root["service_name"] if primary_root else None,
         "title": title,
         "message": message,
+        "own_impact_score": computation.own_impact_score,
+        "alert_impact_score": computation.alert_impact_score,
+        "dependency_impact_score": computation.dependency_impact_score,
+        "effective_impact_score": computation.effective_impact_score,
         "rules": computation.rules,
         "paths": computation.paths if include_paths else [],
     }
@@ -993,7 +1145,7 @@ def _blast_radius(service_id, context, *, include_paths):
     }
 
 
-def _root_cause(service, *, reason, status, alert_stats, path):
+def _root_cause(service, *, reason, status, impact_score, alert_stats, path):
     return {
         "service_id": service.id,
         "service_slug": service.slug,
@@ -1001,37 +1153,87 @@ def _root_cause(service, *, reason, status, alert_stats, path):
         "reason": reason or "unknown",
         "status": _normalize_status(service.status),
         "effective_status": _normalize_status(status),
+        "impact_score": clamp_impact_score(impact_score),
         "severity": alert_stats.worst_severity,
+        "priority_slug": alert_stats.worst_priority_slug,
+        "priority_order": alert_stats.worst_priority_order,
         "open_alert_groups": alert_stats.open_alert_groups,
         "critical_open_alert_groups": alert_stats.critical_open_alert_groups,
         "path": path,
     }
 
 
-def _root_cause_with_prefixed_path(cause, service, dependency):
+def _root_cause_with_prefixed_path(cause, service, dependency, propagated=None):
     prefixed = dict(cause)
-    prefixed["path"] = _prefix_path(service, dependency, cause.get("path") or [])
+    prefixed["path"] = _prefix_path(
+        service,
+        dependency,
+        cause.get("path") or [],
+        dependency_multiplier=(propagated or {}).get("multiplier"),
+        propagated_impact_score=(propagated or {}).get("score"),
+    )
     return prefixed
 
 
-def _path_node(service, dependency=None):
+def _path_node(
+    service,
+    dependency=None,
+    *,
+    effective_status=None,
+    impact_score=None,
+    propagated_impact_score=None,
+    dependency_multiplier=None,
+):
     return {
         "service_id": service.id,
         "service_slug": service.slug,
         "service_name": service.name,
         "status": _normalize_status(service.status),
-        "effective_status": _normalize_status(service.status),
+        "effective_status": _normalize_status(effective_status or service.status),
+        "impact_score": clamp_impact_score(
+            status_impact_score(effective_status or service.status)
+            if impact_score is None
+            else impact_score
+        ),
+        "propagated_impact_score": (
+            clamp_impact_score(propagated_impact_score)
+            if propagated_impact_score is not None
+            else None
+        ),
+        "dependency_multiplier": dependency_multiplier,
         "dependency_type": dependency.dependency_type if dependency else None,
         "dependency_criticality": dependency.criticality if dependency else None,
     }
 
 
-def _prefix_path(service, dependency, upstream_path):
-    path = [_path_node(service)]
+def _prefix_path(
+    service,
+    dependency,
+    upstream_path,
+    *,
+    service_effective_status=None,
+    service_impact_score=None,
+    dependency_multiplier=None,
+    propagated_impact_score=None,
+):
+    path = [
+        _path_node(
+            service,
+            effective_status=service_effective_status,
+            impact_score=service_impact_score,
+        )
+    ]
 
     if not upstream_path:
         depends_on = dependency.depends_on_service
-        return path + [_path_node(depends_on, dependency)]
+        return path + [
+            _path_node(
+                depends_on,
+                dependency,
+                dependency_multiplier=dependency_multiplier,
+                propagated_impact_score=propagated_impact_score,
+            )
+        ]
 
     for index, node in enumerate(upstream_path):
         node = dict(node)
@@ -1039,6 +1241,12 @@ def _prefix_path(service, dependency, upstream_path):
         if index == 0:
             node["dependency_type"] = dependency.dependency_type
             node["dependency_criticality"] = dependency.criticality
+            node["dependency_multiplier"] = dependency_multiplier
+            node["propagated_impact_score"] = (
+                clamp_impact_score(propagated_impact_score)
+                if propagated_impact_score is not None
+                else node.get("propagated_impact_score")
+            )
 
         path.append(node)
 
@@ -1074,7 +1282,6 @@ def _downstream_path(path_ids, downstream_id, dependency, context):
 
 def _downstream_cycle_path(path_ids, downstream_id, dependency, context):
     return _downstream_path(path_ids, downstream_id, dependency, context)
-
 
 def _deduplicate_root_causes(root_causes):
     seen = set()
@@ -1135,6 +1342,12 @@ def _summary(items):
             if item["effective_status"] == "major_outage"
         ),
         "by_effective_status": dict(by_status),
+        "max_impact_score": max((item.get("effective_impact_score") or 0) for item in items) if items else 0,
+        "average_impact_score": (
+            int(round(sum((item.get("effective_impact_score") or 0) for item in items) / len(items)))
+            if items
+            else 0
+        ),
         "cycle_detected": sum(1 for item in items if item.get("cycle_detected")),
         "depth_limited": sum(1 for item in items if item.get("depth_limited")),
     }
@@ -1157,8 +1370,11 @@ def _sort_value(item, sort):
     if sort == "status":
         return _status_rank(item.get("own_status"))
 
-    if sort == "effective_status":
-        return _status_rank(item.get("effective_status"))
+    if sort in {"effective_status", "impact_score"}:
+        return (
+            item.get("effective_impact_score") or item.get("impact_score") or 0,
+            _status_rank(item.get("effective_status")),
+        )
 
     if sort == "blast_radius":
         blast_radius = item.get("blast_radius") or {}
@@ -1170,47 +1386,30 @@ def _sort_value(item, sort):
     if sort == "tier":
         return TIER_RANK.get(item.get("tier"), 0)
 
-    return _status_rank(item.get("effective_status"))
+    return (
+        item.get("effective_impact_score") or item.get("impact_score") or 0,
+        _status_rank(item.get("effective_status")),
+    )
 
 
 def _normalize_status(status):
-    status = str(status or "unknown").strip()
-
-    if status not in IMPACT_STATUSES:
-        return "unknown"
-
-    return status
+    return normalize_status(status)
 
 
 def _normalize_severity(severity):
-    severity = str(severity or "").strip().lower()
-
-    if not severity:
-        return None
-
-    if severity == "warn":
-        return "warning"
-
-    return severity
+    return normalize_severity(severity)
 
 
 def _max_status(*statuses):
-    normalized = [_normalize_status(status) for status in statuses]
-    return max(normalized, key=_status_rank)
+    return max_status(*statuses)
 
 
 def _status_rank(status):
-    return STATUS_RANK.get(_normalize_status(status), 0)
+    return status_rank(status)
 
 
 def _max_severity(left, right):
-    left = _normalize_severity(left)
-    right = _normalize_severity(right)
-
-    if SEVERITY_RANK.get(right, 0) > SEVERITY_RANK.get(left, 0):
-        return right
-
-    return left
+    return max_severity(left, right)
 
 
 def _is_impactful_status(status):

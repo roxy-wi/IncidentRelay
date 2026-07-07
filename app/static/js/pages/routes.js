@@ -915,7 +915,7 @@ function renderRouteDetails(route) {
                 )
             )
             .append(routeDetailsCode("Additional matchers", route.matchers || {}))
-            .append(routeDetailsCode("Group by", route.group_by || []))
+            .append(routeDetailsCode("Group by", asArray(route.group_by)))
             .append(routeDetailsItem("Service", route.service_name || route.service_slug || "-"))
     );
 
@@ -1144,6 +1144,28 @@ function updateSentrySecretHelp(route) {
         "Create the route first to get the Sentry webhook URL. Then create a Sentry Internal Integration and paste its Client Secret here."
     );
 }
+
+function getRouteGroupByValue() {
+    const value = parseJsonInput(
+        "#route-group-by",
+        []
+    );
+
+    if (!Array.isArray(value)) {
+        const message = "Route group by must be a JSON array, for example [\"alertname\", \"instance\"]. Use [] to disable cross-alert grouping.";
+
+        if (typeof showAppError === "function") {
+            showAppError(message);
+        } else {
+            alert(message);
+        }
+
+        throw new Error(message);
+    }
+
+    return value;
+}
+
 function collectRoutePayload() {
     const mode = $("#route-escalation-mode").val() || "rotation";
     const usePolicy = mode === "policy";
@@ -1169,10 +1191,7 @@ function collectRoutePayload() {
         service_id: $("#route-service").val() ? Number($("#route-service").val()) : null,
         matcher_preset_id: $("#route-matcher-preset").val() ? Number($("#route-matcher-preset").val()) : null,
         matchers: getMatcherEditorValue("#route-matchers", {}),
-        group_by: parseJsonInput(
-            "#route-group-by",
-            []
-        ),
+        group_by: getRouteGroupByValue(),
 
         integration_config: collectRouteIntegrationConfig(),
 
@@ -1269,7 +1288,7 @@ function editRoute(id) {
     }
 
     setMatcherEditorValue("#route-matchers", route.matchers || {});
-    $("#route-group-by").val(JSON.stringify(route.group_by || [], null, 2));
+    $("#route-group-by").val(JSON.stringify(asArray(route.group_by), null, 2));
     $("#route-enabled").prop("checked", !!route.enabled);
     $("#route-sentry-webhook-secret").val("");
     $("#route-sentry-base-url").val(sentryConfig.base_url || "");

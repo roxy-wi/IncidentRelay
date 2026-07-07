@@ -16,6 +16,8 @@ from app.services.alerts.priority import (
     apply_priority_resolution_to_group,
     apply_priority_to_existing_alert,
     incident_priority_create_kwargs,
+    group_priority_state,
+    restore_group_priority_state,
 )
 from app.services.incidents.priority_policies.resolver import resolve_incident_priority
 from app.services.alerts.result import AlertProcessingResult
@@ -98,42 +100,6 @@ def _completed_result(*, trace, group, alert, created_group, outcome):
         processing_status="completed",
         trace=trace,
     )
-
-
-def _group_priority_state(group):
-    """Capture incident priority before generic group recalculation."""
-    return {
-        "priority_id": getattr(group, "priority_id", None),
-        "priority_slug": getattr(group, "priority_slug", None),
-        "priority_order": getattr(group, "priority_order", None),
-        "priority_set_manually": bool(
-            getattr(group, "priority_set_manually", False)
-        ),
-    }
-
-
-def _restore_group_priority_state(group, state):
-    """Restore priority changed by generic group recalculation."""
-    current_state = _group_priority_state(group)
-
-    if current_state == state:
-        return group
-
-    group.priority = state["priority_id"]
-    group.priority_slug = state["priority_slug"]
-    group.priority_order = state["priority_order"]
-    group.priority_set_manually = state["priority_set_manually"]
-
-    group.save(
-        only=[
-            group.__class__.priority,
-            group.__class__.priority_slug,
-            group.__class__.priority_order,
-            group.__class__.priority_set_manually,
-        ]
-    )
-
-    return group
 
 
 def _resolve_policy_assignment(route, service, rotation, maintenance_decision, trace):
@@ -287,7 +253,7 @@ def _handle_existing_alert(
         trace.group_reused(group)
 
     old_group_status = group.status
-    priority_state_before_recalculate = _group_priority_state(group)
+    priority_state_before_recalculate = group_priority_state(group)
     previous_priority_slug = (
         None
         if created_group
@@ -355,7 +321,7 @@ def _handle_existing_alert(
         )
 
     group = alerts_repo.recalculate_alert_group(group)
-    group = _restore_group_priority_state(
+    group = restore_group_priority_state(
         group,
         priority_state_before_recalculate,
     )
@@ -676,7 +642,7 @@ def _upsert_alert(alert_data, trace):
     else:
         trace.group_reused(group)
 
-    priority_state_before_recalculate = _group_priority_state(group)
+    priority_state_before_recalculate = group_priority_state(group)
 
     previous_priority_slug = (
         None
@@ -753,7 +719,7 @@ def _upsert_alert(alert_data, trace):
         )
 
     group = alerts_repo.recalculate_alert_group(group)
-    group = _restore_group_priority_state(
+    group = restore_group_priority_state(
         group,
         priority_state_before_recalculate,
     )

@@ -569,6 +569,9 @@ class ServiceImpactPathNodeSchema(ApiModel):
     service_name: str | None = None
     status: str = Field(pattern=SERVICE_IMPACT_STATUS_PATTERN)
     effective_status: str = Field(pattern=SERVICE_IMPACT_STATUS_PATTERN)
+    impact_score: int = Field(default=0, ge=0, le=100)
+    propagated_impact_score: int | None = Field(default=None, ge=0, le=100)
+    dependency_multiplier: float | None = None
     dependency_type: str | None = Field(default=None, pattern=SERVICE_DEPENDENCY_TYPE_PATTERN)
     dependency_criticality: str | None = Field(
         default=None,
@@ -585,7 +588,10 @@ class ServiceImpactRootCauseSchema(ApiModel):
     reason: str = Field(pattern=SERVICE_IMPACT_REASON_PATTERN)
     status: str = Field(pattern=SERVICE_IMPACT_STATUS_PATTERN)
     effective_status: str = Field(pattern=SERVICE_IMPACT_STATUS_PATTERN)
+    impact_score: int = Field(default=0, ge=0, le=100)
     severity: str | None = None
+    priority_slug: str | None = None
+    priority_order: int | None = None
     open_alert_groups: int = Field(default=0, ge=0)
     critical_open_alert_groups: int = Field(default=0, ge=0)
     path: list[ServiceImpactPathNodeSchema] = Field(default_factory=list)
@@ -601,6 +607,11 @@ class ServiceImpactExplanationSchema(ApiModel):
 
     title: str
     message: str
+
+    own_impact_score: int = Field(default=0, ge=0, le=100)
+    alert_impact_score: int = Field(default=0, ge=0, le=100)
+    dependency_impact_score: int = Field(default=0, ge=0, le=100)
+    effective_impact_score: int = Field(default=0, ge=0, le=100)
 
     rules: list[str] = Field(default_factory=list)
     paths: list[list[ServiceImpactPathNodeSchema]] = Field(default_factory=list)
@@ -634,6 +645,12 @@ class ServiceImpactV2ItemSchema(ApiModel):
     alert_impact_status: str = Field(pattern=SERVICE_IMPACT_STATUS_PATTERN)
     dependency_impact_status: str = Field(pattern=SERVICE_IMPACT_STATUS_PATTERN)
     effective_status: str = Field(pattern=SERVICE_IMPACT_STATUS_PATTERN)
+
+    own_impact_score: int = Field(default=0, ge=0, le=100)
+    alert_impact_score: int = Field(default=0, ge=0, le=100)
+    dependency_impact_score: int = Field(default=0, ge=0, le=100)
+    effective_impact_score: int = Field(default=0, ge=0, le=100)
+    impact_score: int = Field(default=0, ge=0, le=100)
 
     primary_reason: str = Field(pattern=SERVICE_IMPACT_REASON_PATTERN)
 

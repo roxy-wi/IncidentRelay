@@ -177,7 +177,12 @@ ROUTE_SCHEMA = {
         "group_by": {
             "type": "array",
             "items": {"type": "string"},
-            "description": "Label names used for alert grouping.",
+            "default": [],
+            "description": (
+                "Label names used for alert grouping. Leave empty to keep each dedup key "
+                "in its own group. If any configured grouping value is missing from an alert, "
+                "the alert dedup key is added to the group key to avoid merging unrelated alerts."
+            ),
             "example": ["alertname", "instance"],
         },
         "enabled": {"type": "boolean", "default": True},

@@ -66,14 +66,6 @@ function serviceDependencyGraphValue(value) {
     return String(value);
 }
 
-function serviceDependencyGraphId(value) {
-    const numberValue = Number(value);
-    if (Number.isFinite(numberValue) && numberValue > 0) {
-        return String(numberValue);
-    }
-    return "";
-}
-
 function serviceDependencyGraphPick(object, paths) {
     if (!object) {
         return null;
@@ -399,79 +391,6 @@ function serviceDependencyGraphServicesForImpact(serviceMap, impactMap) {
     return servicesById;
 }
 
-function serviceDependencyGraphEffectiveStatusMap(serviceMap, impactMap) {
-    const servicesById = serviceDependencyGraphServicesForImpact(serviceMap, impactMap);
-    const upstreamByService = {};
-
-    asArray(allServiceDependenciesCache).forEach(function (dependency) {
-        if (!dependency || dependency.enabled === false) {
-            return;
-        }
-
-        const sourceId = serviceDependencyGraphSourceId(dependency);
-        const targetId = serviceDependencyGraphTargetId(dependency);
-
-        if (!sourceId || !targetId || sourceId === targetId) {
-            return;
-        }
-
-        if (!upstreamByService[sourceId]) {
-            upstreamByService[sourceId] = [];
-        }
-
-        upstreamByService[sourceId].push(dependency);
-    });
-
-    const cache = {};
-    const maxDepth = 5;
-
-    function compute(serviceId, stack, depth) {
-        serviceId = serviceDependencyGraphId(serviceId);
-
-        if (!serviceId) {
-            return "unknown";
-        }
-
-        if (cache[serviceId]) {
-            return cache[serviceId];
-        }
-
-        const service = servicesById[serviceId];
-        const impact = impactMap[serviceId] || {};
-        let status = serviceDependencyGraphNodeBaseStatus(service, impactMap);
-
-        if (impact.effective_status) {
-            status = serviceDependencyGraphMaxStatus(status, impact.effective_status);
-        }
-
-        if (stack[serviceId]) {
-            return serviceDependencyGraphMaxStatus(status, "unknown");
-        }
-
-        if (depth <= 0) {
-            return status;
-        }
-
-        const nextStack = Object.assign({}, stack);
-        nextStack[serviceId] = true;
-
-        asArray(upstreamByService[serviceId]).forEach(function (dependency) {
-            const upstreamId = serviceDependencyGraphTargetId(dependency);
-            const upstreamStatus = compute(upstreamId, nextStack, depth - 1);
-            const propagatedStatus = serviceDependencyGraphPropagateDependencyStatus(dependency, upstreamStatus);
-            status = serviceDependencyGraphMaxStatus(status, propagatedStatus);
-        });
-
-        cache[serviceId] = status;
-        return status;
-    }
-
-    Object.keys(servicesById).forEach(function (serviceId) {
-        compute(serviceId, {}, maxDepth);
-    });
-
-    return cache;
-}
 
 function serviceDependencyGraphBusinessComponentSearchText(component) {
     return [
@@ -490,10 +409,11 @@ function serviceDependencyGraphBusinessComponentSearchText(component) {
 }
 
 function serviceDependencyGraphNodeDisplayStatus(service, impactMap) {
-    const alertStatus = serviceDependencyGraphAlertStatus(service, impactMap);
+    const serviceId = serviceDependencyGraphId(service && service.id);
+    const impact = serviceId ? impactMap[serviceId] : null;
 
-    if (alertStatus) {
-        return alertStatus;
+    if (impact && impact.effective_status) {
+        return serviceDependencyGraphNormalizeStatus(impact.effective_status);
     }
 
     return serviceDependencyGraphNodeStatus(service);
@@ -639,19 +559,6 @@ function serviceDependencyGraphNodeLabel(service) {
     return serviceDependencyGraphValue(service.name || service.slug || `Service #${service.id}`);
 }
 
-function serviceDependencyGraphNodeSearchText(service) {
-    return [
-        service.name,
-        service.slug,
-        service.status,
-        service.team_name,
-        service.team,
-        service.id
-    ]
-        .map(serviceDependencyGraphValue)
-        .join(" ")
-        .toLowerCase();
-}
 
 function serviceDependencyGraphDependencySearchText(dependency, sourceService, targetService) {
     return [
@@ -742,7 +649,6 @@ function serviceDependencyGraphLayoutOptions() {
 function serviceDependencyGraphElements() {
     const serviceMap = serviceDependencyGraphServiceMap();
     const impactMap = serviceDependencyGraphImpactMap();
-    const effectiveStatusMap = serviceDependencyGraphEffectiveStatusMap(serviceMap, impactMap);
     const focusId = serviceDependencyGraphId($("#service-dependency-graph-focus").val());
     const direction = $("#service-dependency-graph-direction").val() || "connected";
     const query = serviceDependencyGraphValue($("#service-dependency-graph-search").val()).trim().toLowerCase();
@@ -764,13 +670,11 @@ function serviceDependencyGraphElements() {
         const baseLabel = serviceDependencyGraphNodeLabel(service);
         const openAlertGroups = Number(impact.open_alert_groups || 0);
         const criticalOpenAlertGroups = Number(impact.critical_open_alert_groups || 0);
-        const baseStatus = serviceDependencyGraphNodeBaseStatus(service, impactMap);
-        const displayStatus = effectiveStatusMap[id] || serviceDependencyGraphNodeDisplayStatus(service, impactMap);
+        const displayStatus = serviceDependencyGraphNodeDisplayStatus(service, impactMap);
         const alertStatus = serviceDependencyGraphAlertStatus(service, impactMap);
-        const hasDependencyImpact = (
-            impact.primary_reason === "upstream_dependency"
-            || serviceDependencyGraphStatusRank(displayStatus) > serviceDependencyGraphStatusRank(baseStatus)
-        );
+        const effectiveImpactScore = Number(impact.effective_impact_score || impact.impact_score || 0);
+        const dependencyImpactScore = Number(impact.dependency_impact_score || 0);
+        const hasDependencyImpact = (impact.primary_reason === "upstream_dependency") || dependencyImpactScore > 0;
 
         const classes = [
             `status-${displayStatus}`
@@ -800,13 +704,16 @@ function serviceDependencyGraphElements() {
                 label: baseLabel,
                 displayLabel: openAlertGroups > 0
                     ? baseLabel + "\n⚠ " + openAlertGroups
-                    : hasDependencyImpact
-                        ? baseLabel + "\n↥ dependency"
+                    : effectiveImpactScore > 0
+                        ? baseLabel + "\nimpact " + effectiveImpactScore
                         : baseLabel,
                 status: service.status || "unknown",
                 displayStatus: displayStatus,
                 alertStatus: alertStatus || "operational",
                 dependencyImpactStatus: hasDependencyImpact ? displayStatus : "operational",
+                effectiveImpactScore: effectiveImpactScore,
+                dependencyImpactScore: dependencyImpactScore,
+                primaryReason: impact.primary_reason || "none",
                 openAlertGroups: openAlertGroups,
                 criticalOpenAlertGroups: criticalOpenAlertGroups,
                 team: service.team_name || service.team || "",
@@ -1023,16 +930,11 @@ function serviceDependencyGraphStyle() {
             }
         },
         {
-            selector: "node.has-own-alerts",
-            style: {
-                "label": "data(label)"
-            }
-        },
-        {
             selector: "node.has-dependency-impact",
             style: {
-                "border-width": 4,
-                "border-color": "#f59e0b"
+                "border-style": "double",
+                "border-width": 5,
+                "border-color": "#7c3aed"
             }
         },
         {

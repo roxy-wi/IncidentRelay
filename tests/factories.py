@@ -345,6 +345,9 @@ def create_impact_alert_group(
     severity="critical",
     alertname=None,
     summary=None,
+    priority_slug=None,
+    priority_order=None,
+    priority_set_manually=False,
 ):
     now = datetime.utcnow()
     alertname = alertname or (service.slug + "-alert")
@@ -382,6 +385,15 @@ def create_impact_alert_group(
         acknowledged_count=1 if status == "acknowledged" else 0,
         resolved_count=1 if status == "resolved" else 0,
         silenced_count=1 if status == "silenced" else 0,
+        **(
+            {
+                "priority_slug": priority_slug,
+                "priority_order": priority_order if priority_order is not None else 3,
+                "priority_set_manually": priority_set_manually,
+            }
+            if priority_slug is not None
+            else {}
+        ),
     )
 
 

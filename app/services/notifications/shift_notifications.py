@@ -101,28 +101,6 @@ def _same_user_event_at(rotation, user_id, at):
     return None
 
 
-def _user_was_already_oncall_before_event(rotation, event):
-    start_at = _event_dt(event["start"])
-    previous_at = start_at - timedelta(seconds=1)
-
-    return _same_user_event_at(
-        rotation,
-        event.get("user_id"),
-        previous_at,
-    ) is not None
-
-
-def _user_stays_oncall_after_event(rotation, event):
-    end_at = _event_dt(event["end"])
-    next_at = end_at + timedelta(seconds=1)
-
-    return _same_user_event_at(
-        rotation,
-        event.get("user_id"),
-        next_at,
-    ) is not None
-
-
 def _send_plain_email(to_email, subject, body):
     smtp_host = Config.SMTP_HOST
     smtp_port = int(Config.SMTP_PORT)

@@ -1,12 +1,4 @@
-def path_param(name, description):
-    """Build an integer path parameter."""
-    return {
-        "name": name,
-        "in": "path",
-        "required": True,
-        "description": description,
-        "schema": {"type": "integer", "minimum": 1},
-    }
+from app.api.openapi.common import response, path_param, json_body, query_param
 
 
 def string_path_param(name, description, pattern=None):
@@ -23,44 +15,6 @@ def string_path_param(name, description, pattern=None):
         "description": description,
         "schema": schema,
     }
-
-
-def query_param(name, description, schema=None, required=False):
-    """Build a query parameter."""
-    return {
-        "name": name,
-        "in": "query",
-        "required": required,
-        "description": description,
-        "schema": schema or {"type": "string"},
-    }
-
-
-def json_body(description, schema, required=True):
-    """Build a JSON request body."""
-    return {
-        "required": required,
-        "description": description,
-        "content": {
-            "application/json": {
-                "schema": schema,
-            },
-        },
-    }
-
-
-def response(description, schema=None):
-    """Build a JSON response object."""
-    item = {"description": description}
-
-    if schema:
-        item["content"] = {
-            "application/json": {
-                "schema": schema,
-            },
-        }
-
-    return item
 
 
 def content_response(description, content):

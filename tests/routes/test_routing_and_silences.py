@@ -85,6 +85,58 @@ def test_build_group_key_uses_route_group_by_labels(db):
     )
 
 
+def test_build_group_key_empty_group_by_uses_dedup_key(db):
+    group = create_group()
+    team = create_team(group)
+    route = create_route(
+        team,
+        group_by=[],
+    )
+
+    key = build_group_key(
+        route,
+        {
+            "source": "alertmanager",
+            "dedup_key": "dedup-1",
+            "labels": {
+                "severity": "critical",
+            },
+        },
+    )
+
+    assert key == (
+        f"source=alertmanager|team_id={route.team_id}|"
+        f"route_id={route.id}|service_id=|"
+        "dedup_key=dedup-1"
+    )
+
+
+def test_build_group_key_missing_configured_value_adds_dedup_fallback(db):
+    group = create_group()
+    team = create_team(group)
+    route = create_route(
+        team,
+        group_by=["alertname", "severity"],
+    )
+
+    key = build_group_key(
+        route,
+        {
+            "source": "alertmanager",
+            "dedup_key": "dedup-1",
+            "labels": {
+                "severity": "critical",
+            },
+        },
+    )
+
+    assert key == (
+        f"source=alertmanager|team_id={route.team_id}|"
+        f"route_id={route.id}|service_id=|"
+        "alertname=|severity=critical|fallback_dedup_key=dedup-1"
+    )
+
+
 def test_find_active_silence_returns_matching_active_silence(db):
     group = create_group(slug="infra")
     team = create_team(group, slug="sre")

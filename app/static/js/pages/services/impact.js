@@ -1003,11 +1003,6 @@ function getImpactServiceDisplayName(row) {
 }
 
 
-function getImpactTeamDisplayName(row) {
-    return displayName(row.team_name, row.team_slug);
-}
-
-
 function openServiceFromImpact(serviceId) {
     if (!serviceId) {
         return;

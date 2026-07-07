@@ -246,23 +246,9 @@ function renderTablePaginationControls(options) {
 }
 
 
-function createTableFilterChip(text) {
-    return $("<span>")
-        .addClass("table-filter-chip")
-        .text(text || "-");
-}
-
-
 function makeUiPill(text, cssClass) {
     return $("<span>")
         .addClass("ui-pill")
         .addClass(cssClass || "ui-pill-muted")
         .text(text || "-");
-}
-
-
-function makeStatusDot(status) {
-    return $("<span>")
-        .addClass("status-dot")
-        .addClass("status-dot-" + String(status || "muted").toLowerCase());
 }

@@ -26,7 +26,7 @@ class RouteBaseSchema(ApiModel):
     notification_channel_mode: str = Field(default=ROUTE_ONLY, pattern=NOTIFICATION_CHANNEL_MODE_PATTERN)
     matcher_preset_id: int | None = Field(default=None, ge=1)
     matchers: Dict[str, Any] = Field(default_factory=dict)
-    group_by: List[str] = Field(default_factory=lambda: ["alertname", "severity"])
+    group_by: List[str] = Field(default_factory=list)
     integration_config: Dict[str, Any] = Field(default_factory=dict)
     enabled: bool = True
 

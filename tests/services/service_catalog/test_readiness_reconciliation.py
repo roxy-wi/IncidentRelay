@@ -16,10 +16,8 @@ from app.services.service_catalog.reconciliation import (
     reconcile_service_readiness,
     list_dependency_component_services,
     reconcile_dependency_component,
-    list_services_for_escalation_policy,
-    list_services_for_notification_policy,
-    list_services_for_rotation,
-    list_services_for_route,
+    list_services_by_escalation_policy,
+    list_services_by_notification_policy,
     reconcile_escalation_policy_services,
     reconcile_notification_policy_services,
     reconcile_rotation_services,
@@ -286,7 +284,7 @@ def test_list_services_for_escalation_policy():
     service.default_escalation_policy = policy
     service.save(only=[service.__class__.default_escalation_policy])
 
-    services = list_services_for_escalation_policy(policy.id)
+    services = list_services_by_escalation_policy(policy.id)
 
     assert [item.id for item in services] == [service.id]
 
@@ -300,7 +298,7 @@ def test_list_services_for_notification_policy():
     service.notification_policy = policy
     service.save(only=[service.__class__.notification_policy])
 
-    services = list_services_for_notification_policy(policy.id)
+    services = list_services_by_notification_policy(policy.id)
 
     assert [item.id for item in services] == [service.id]
 

@@ -1,12 +1,5 @@
 // Service details, SLI/SLO forms, readiness, compact cards and helper renderers.
 
-function serviceDetailsItem(label, value) {
-    return $("<div>")
-        .addClass("details-item")
-        .append($("<div>").addClass("details-label").text(label))
-        .append($("<div>").addClass("details-value").text(value || "-"));
-}
-
 
 function isServiceDetailsModalOpen() {
     return $("#service-details-modal").is(":visible");
@@ -64,11 +57,6 @@ function loadServiceDetails(serviceId) {
 }
 
 
-function renderServiceDetails(service) {
-    openServiceDetailsModal(service.id);
-}
-
-
 function renderServiceDetailsLoading(service) {
     const body = $("#service-details-modal-body");
 
@@ -85,21 +73,6 @@ function renderServiceDetailsLoading(service) {
             .addClass("empty-state")
             .text("Loading service details for " + (service.name || service.slug || "service") + "...")
     );
-}
-
-
-
-function serviceDetailsMetric(label, value, hint) {
-    const item = $("<div>").addClass("metric-card service-detail-metric");
-
-    item.append($("<div>").addClass("metric-value").text(value === undefined || value === null ? "-" : value));
-    item.append($("<div>").addClass("metric-label").text(label));
-
-    if (hint) {
-        item.append($("<div>").addClass("metric-hint").text(hint));
-    }
-
-    return item;
 }
 
 
@@ -1639,25 +1612,3 @@ function renderServiceDetailsEmpty() {
         $("<div>").addClass("empty-state").text("Select a service to view details.")
     );
 }
-
-
-
-function restoreServiceDetails() {
-    if (!isServiceDetailsModalOpen() || !selectedServiceDetailsId) {
-        return;
-    }
-
-    const selected = servicesCache.find(function (service) {
-        return Number(service.id) === Number(selectedServiceDetailsId);
-    });
-
-    if (selected) {
-        loadServiceDetails(selected.id);
-        return;
-    }
-
-    renderServiceDetailsEmpty();
-}
-
-
-

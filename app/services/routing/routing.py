@@ -113,7 +113,42 @@ def find_route_for_alert(alert_data):
     return None
 
 
-DEFAULT_ALERT_GROUP_BY = ("alertname", "severity")
+DEFAULT_ALERT_GROUP_BY = ()
+
+
+def _normalize_group_by(value):
+    """Return a clean list of configured grouping fields.
+
+    Empty, null and legacy non-array values mean that explicit grouping is
+    disabled. This avoids accidentally merging unrelated alerts when the route
+    stores an empty object such as {}.
+    """
+
+    if not isinstance(value, list):
+        return []
+
+    result = []
+
+    for item in value:
+        name = str(item or "").strip()
+
+        if name:
+            result.append(name)
+
+    return result
+
+
+def _fallback_group_key_value(alert_data):
+    """Return a per-alert fallback value used when grouping is incomplete."""
+
+    return (
+        alert_data.get("dedup_key")
+        or alert_data.get("external_id")
+        or alert_data.get("fingerprint")
+        or alert_data.get("title")
+        or alert_data.get("message")
+        or ""
+    )
 
 
 def _normalize_group_key_value(value):
@@ -215,9 +250,14 @@ def get_alert_group_field_value(name, alert_data, route=None, service=None):
 
 
 def get_effective_group_by(route):
-    """Return configured group_by or safe default grouping."""
+    """Return explicitly configured grouping fields.
 
-    group_by = list(getattr(route, "group_by", None) or [])
+    An empty configuration intentionally disables cross-alert grouping. Repeated
+    occurrences of the same alert still share a group through dedup_key fallback
+    in build_group_key().
+    """
+
+    group_by = _normalize_group_by(getattr(route, "group_by", None))
 
     if group_by:
         return group_by
@@ -245,8 +285,10 @@ def build_group_key(route, alert_data, service=None):
     ]
 
     group_parts = []
+    group_by = get_effective_group_by(route)
+    has_missing_group_value = False
 
-    for name in get_effective_group_by(route):
+    for name in group_by:
         value = get_alert_group_field_value(
             name,
             alert_data,
@@ -254,7 +296,15 @@ def build_group_key(route, alert_data, service=None):
             service=service,
         )
 
+        if not _normalize_group_key_value(value):
+            has_missing_group_value = True
+
         group_parts.append((name, value))
+
+    if not group_by:
+        group_parts.append(("dedup_key", _fallback_group_key_value(alert_data)))
+    elif has_missing_group_value:
+        group_parts.append(("fallback_dedup_key", _fallback_group_key_value(alert_data)))
 
     parts = scope_parts + group_parts
 

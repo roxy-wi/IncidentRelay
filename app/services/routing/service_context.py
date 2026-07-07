@@ -62,33 +62,6 @@ def _alert_service_id(alert: Any) -> int | None:
     return getattr(service, "id", None) if service else None
 
 
-def _alert_match_data(alert: Any) -> dict:
-    payload = getattr(alert, "payload", None) or {}
-    labels = getattr(alert, "labels", None) or {}
-
-    if not isinstance(payload, dict):
-        payload = {}
-
-    annotations = payload.get("annotations") or {}
-    if not isinstance(annotations, dict):
-        annotations = {}
-
-    return {
-        "id": getattr(alert, "id", None),
-        "source": getattr(alert, "source", None),
-        "title": getattr(alert, "title", None),
-        "message": getattr(alert, "message", None),
-        "severity": getattr(alert, "severity", None),
-        "status": getattr(alert, "status", None),
-        "labels": labels,
-        "annotations": annotations,
-        "payload": payload,
-        "dedup_key": getattr(alert, "dedup_key", None),
-        "group_key": getattr(alert, "group_key", None),
-        "service_id": _alert_service_id(alert),
-    }
-
-
 def get_alert_service_links(alert: Any, limit: int = MAX_SERVICE_CONTEXT_ITEMS) -> list:
     """Return enabled service links for alert service."""
     service_id = _alert_service_id(alert)

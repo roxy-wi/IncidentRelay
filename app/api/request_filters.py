@@ -45,22 +45,3 @@ def get_multi_query_values(args, name, aliases=None):
         values.append(value)
 
     return values
-
-
-def get_multi_query_int_values(args, name, aliases=None):
-    """Return query-string values as positive integer filters."""
-    values = []
-
-    for value in get_multi_query_values(args, name, aliases=aliases):
-        try:
-            int_value = int(value)
-        except (TypeError, ValueError):
-            continue
-
-        if int_value <= 0:
-            continue
-
-        if int_value not in values:
-            values.append(int_value)
-
-    return values
