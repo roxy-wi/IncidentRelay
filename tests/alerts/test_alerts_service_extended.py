@@ -91,7 +91,7 @@ def test_upsert_alert_creates_routed_alert_with_current_oncall(monkeypatch, db):
     assert alert_group.group_key == (
         f"source=alertmanager|team_id={route.team_id}|"
         f"route_id={route.id}|service_id=|"
-        "alertname=DiskFull|severity=critical"
+        "dedup_key=dedup-1"
     )
     assert alert_group.status == "firing"
 
