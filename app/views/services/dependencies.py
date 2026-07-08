@@ -1,20 +1,118 @@
-from flask import jsonify
+from flask import jsonify, request
 from peewee import DoesNotExist
 
 from app.views.services.blueprint import services_bp
 from app.api.schemas.services import ServiceDependencyCreateSchema, ServiceDependencyUpdateSchema
-from app.modules.db import services_repo
+from app.modules.db import business_services_repo, services_repo, teams_repo
 from app.services.audit import write_audit
-from app.services.rbac import require_team_read, current_user, require_team_write
+from app.services.rbac import (
+    current_user,
+    get_allowed_group_ids,
+    require_team_read,
+    require_team_write,
+)
 from app.services.serializers.services import serialize_service_dependency
 from app.services.service_catalog.events import (
     READINESS_SCOPE_DEPENDENCY_COMPONENT,
     READINESS_SCOPE_NONE,
     emit_service_catalog_event,
 )
+from app.services.service_catalog.impact import build_service_effective_impact_map
 from app.services.service_catalog.snapshots import service_dependency_snapshot
 from app.services.validation import make_error_response, validate_body
 from app.views.services.links import _readable_services_from_request
+
+
+def _business_component_seed_service_ids(anchor_service_ids):
+    """Return business-service component services connected to current graph anchors.
+
+    We only expand through a business service when at least one of its components
+    is already in the current service scope. This prevents an empty team from
+    showing a graph built from neighboring teams in the same group.
+    """
+    anchor_service_ids = {
+        int(service_id)
+        for service_id in list(anchor_service_ids or [])
+        if service_id
+    }
+
+    if not anchor_service_ids:
+        return []
+
+    team_id = request.args.get("team_id", type=int)
+    group_id = request.args.get("group_id", type=int)
+
+    if team_id:
+        team = teams_repo.get_team(team_id)
+        group_ids = [team.group_id] if team.group_id else []
+    elif group_id:
+        group_ids = [group_id]
+    else:
+        group_ids = get_allowed_group_ids(user=current_user())
+
+    if not group_ids:
+        return []
+
+    components = list(
+        business_services_repo.list_business_service_components_for_groups(
+            group_ids=group_ids,
+            active_only=True,
+        )
+    )
+
+    service_ids_by_business_service = {}
+    matched_business_service_ids = set()
+
+    for component in components:
+        if not component.service_id or not component.business_service_id:
+            continue
+
+        service_id = int(component.service_id)
+        business_service_id = int(component.business_service_id)
+
+        service_ids_by_business_service.setdefault(
+            business_service_id,
+            set(),
+        ).add(service_id)
+
+        if service_id in anchor_service_ids:
+            matched_business_service_ids.add(business_service_id)
+
+    seed_service_ids = set()
+
+    for business_service_id in matched_business_service_ids:
+        seed_service_ids.update(
+            service_ids_by_business_service.get(business_service_id, set())
+        )
+
+    return sorted(seed_service_ids)
+
+
+def _graph_seed_service_ids(services):
+    service_ids = {
+        int(service.id)
+        for service in services
+        if service and service.id
+    }
+
+    if not service_ids:
+        return []
+
+    service_ids.update(_business_component_seed_service_ids(service_ids))
+
+    return sorted(service_ids)
+
+
+def _dependency_graph_service_ids(seed_service_ids, dependencies):
+    service_ids = {int(service_id) for service_id in seed_service_ids or [] if service_id}
+
+    for dependency in dependencies or []:
+        if dependency.service_id:
+            service_ids.add(dependency.service_id)
+        if dependency.depends_on_service_id:
+            service_ids.add(dependency.depends_on_service_id)
+
+    return sorted(service_ids)
 
 
 def _validate_dependency_service(service, depends_on_service_id):
@@ -332,4 +430,37 @@ def list_all_service_dependencies():
     return jsonify([
         serialize_service_dependency(dependency, current_user())
         for dependency in services_repo.list_service_dependencies(service_ids=service_ids)
+    ])
+
+
+@services_bp.route("/dependencies/graph", methods=["GET"])
+def list_service_dependency_graph():
+    """Return the connected dependency graph for the current service scope."""
+    services, error = _readable_services_from_request()
+    if error:
+        return error
+
+    max_depth = request.args.get("max_depth", default=5, type=int)
+    service_ids = _graph_seed_service_ids(services)
+
+    if not service_ids:
+        return jsonify([])
+
+    dependencies = services_repo.list_service_dependency_graph(
+        service_ids,
+        max_depth=max_depth,
+    )
+    graph_service_ids = _dependency_graph_service_ids(service_ids, dependencies)
+    impact_by_service = build_service_effective_impact_map(
+        graph_service_ids,
+        max_depth=max_depth,
+    )
+
+    return jsonify([
+        serialize_service_dependency(
+            dependency,
+            current_user(),
+            impact_by_service=impact_by_service,
+        )
+        for dependency in dependencies
     ])

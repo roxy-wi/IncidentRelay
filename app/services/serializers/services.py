@@ -489,10 +489,36 @@ def serialize_service_slo(slo, current_user=None, evaluation=None):
     return attach_team_permissions(data, team.id if team else None, current_user)
 
 
-def serialize_service_dependency(dependency, current_user=None):
+def _service_dependency_impact_fields(prefix, impact):
+    """Serialize effective impact fields for a dependency endpoint."""
+
+    if not impact:
+        return {}
+
+    def get(name, default=None):
+        return impact.get(name, default)
+
+    return {
+        f"{prefix}_own_status": get("own_status"),
+        f"{prefix}_alert_impact_status": get("alert_impact_status"),
+        f"{prefix}_dependency_impact_status": get("dependency_impact_status"),
+        f"{prefix}_effective_status": get("effective_status"),
+        f"{prefix}_primary_reason": get("primary_reason"),
+        f"{prefix}_own_impact_score": get("own_impact_score", 0),
+        f"{prefix}_alert_impact_score": get("alert_impact_score", 0),
+        f"{prefix}_dependency_impact_score": get("dependency_impact_score", 0),
+        f"{prefix}_effective_impact_score": get("effective_impact_score", get("impact_score", 0)),
+        f"{prefix}_impact_score": get("impact_score", get("effective_impact_score", 0)),
+        f"{prefix}_open_alert_groups": get("open_alert_groups", 0),
+        f"{prefix}_critical_open_alert_groups": get("critical_open_alert_groups", 0),
+    }
+
+
+def serialize_service_dependency(dependency, current_user=None, impact_by_service=None):
     """Serialize a service dependency."""
     service = dependency.service
     depends_on = dependency.depends_on_service
+    impact_by_service = impact_by_service or {}
 
     data = {
         "id": dependency.id,
@@ -522,6 +548,15 @@ def serialize_service_dependency(dependency, current_user=None):
         "created_at": serialize_utc_datetime(dependency.created_at),
         "updated_at": serialize_utc_datetime(dependency.updated_at),
     }
+
+    data.update(_service_dependency_impact_fields(
+        "service",
+        impact_by_service.get(service.id),
+    ))
+    data.update(_service_dependency_impact_fields(
+        "depends_on_service",
+        impact_by_service.get(depends_on.id),
+    ))
 
     return attach_team_permissions(data, service.team_id, current_user)
 

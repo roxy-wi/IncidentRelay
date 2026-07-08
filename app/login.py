@@ -1,4 +1,5 @@
 from datetime import datetime, timedelta
+from urllib.parse import urlsplit, urlunsplit
 
 import jwt
 from werkzeug.security import check_password_hash, generate_password_hash
@@ -7,6 +8,34 @@ from app.settings import Config
 
 
 JWT_ALGORITHM = "HS256"
+
+
+def normalize_auth_redirect_target(value, default="/"):
+    """Return a safe local UI redirect target for post-login navigation."""
+
+    if value is None:
+        return default
+
+    value = str(value).strip()
+    if not value:
+        return default
+
+    try:
+        parsed = urlsplit(value)
+    except ValueError:
+        return default
+
+    if parsed.scheme or parsed.netloc:
+        return default
+
+    path = parsed.path or "/"
+    if not path.startswith("/") or path.startswith("//"):
+        return default
+
+    if path == "/login" or path.startswith("/api/auth/"):
+        return default
+
+    return urlunsplit(("", "", path, parsed.query, parsed.fragment)) or default
 
 
 def hash_password(password):

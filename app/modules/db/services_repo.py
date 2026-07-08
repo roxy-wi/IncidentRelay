@@ -354,12 +354,33 @@ def list_service_runbooks(service_id=None, service_ids=None):
     )
 
 
+def _active_service_id_subquery():
+    """Return ids for services that should be visible in dependency views."""
+    return Service.select(Service.id).where(Service.deleted == False)  # noqa: E712
+
+
+def _visible_service_dependency_filter():
+    """Filter out dependency edges with deleted endpoints.
+
+    Service deletion is soft-delete based. Dependencies are intentionally kept
+    in the database for audit/restore scenarios, but active dependency views and
+    graphs must not resurrect deleted service nodes through those stale edges.
+    """
+    active_service_ids = _active_service_id_subquery()
+
+    return (
+        (ServiceDependency.deleted == False)  # noqa: E712
+        & (ServiceDependency.service.in_(active_service_ids))
+        & (ServiceDependency.depends_on_service.in_(active_service_ids))
+    )
+
+
 def list_service_dependencies(service_id=None, service_ids=None):
     """Return service dependencies."""
     query = (
         ServiceDependency
         .select()
-        .where(ServiceDependency.deleted == False)
+        .where(_visible_service_dependency_filter())
     )
 
     if service_id is not None:
@@ -377,6 +398,75 @@ def list_service_dependencies(service_id=None, service_ids=None):
             ServiceDependency.id.asc(),
         )
     )
+
+
+def list_service_dependencies_touching_services(service_ids):
+    """Return dependencies where any endpoint is one of the provided services."""
+    service_ids = list(service_ids or [])
+
+    if not service_ids:
+        return []
+
+    query = (
+        ServiceDependency
+        .select()
+        .where(
+            _visible_service_dependency_filter()
+            & (
+                (ServiceDependency.service.in_(service_ids))
+                | (ServiceDependency.depends_on_service.in_(service_ids))
+            )
+        )
+        .order_by(ServiceDependency.criticality.asc(), ServiceDependency.id.asc())
+    )
+
+    return list(query)
+
+
+def list_service_dependency_graph(service_ids, max_depth=5):
+    """Return the connected dependency graph around the provided service ids.
+
+    The graph traversal is intentionally bidirectional. A business service
+    component can have downstream consumers owned by another team, and those
+    consumers can have their own upstream dependencies. Starting from the
+    scoped services, walking both incoming and outgoing edges gives the graph
+    enough context to show the real cross-team blast radius without changing
+    the service table scope.
+    """
+    seen_service_ids = {int(service_id) for service_id in service_ids or [] if service_id}
+
+    if not seen_service_ids:
+        return []
+
+    try:
+        max_depth = int(max_depth)
+    except (TypeError, ValueError):
+        max_depth = 5
+
+    max_depth = max(1, min(max_depth, 10))
+    frontier = set(seen_service_ids)
+    seen_dependency_ids = set()
+    dependencies = []
+
+    for _depth in range(max_depth):
+        if not frontier:
+            break
+
+        next_frontier = set()
+
+        for dependency in list_service_dependencies_touching_services(frontier):
+            if dependency.id not in seen_dependency_ids:
+                seen_dependency_ids.add(dependency.id)
+                dependencies.append(dependency)
+
+            for related_service_id in (dependency.service_id, dependency.depends_on_service_id):
+                if related_service_id and related_service_id not in seen_service_ids:
+                    seen_service_ids.add(related_service_id)
+                    next_frontier.add(related_service_id)
+
+        frontier = next_frontier
+
+    return dependencies
 
 
 def get_service_link(link_id):
@@ -476,7 +566,7 @@ def get_service_dependency(dependency_id):
         .select()
         .where(
             (ServiceDependency.id == dependency_id)
-            & (ServiceDependency.deleted == False)
+            & _visible_service_dependency_filter()
         )
         .get()
     )
@@ -518,7 +608,7 @@ def list_downstream_service_dependencies(service_id=None, service_ids=None):
     query = (
         ServiceDependency
         .select()
-        .where(ServiceDependency.deleted == False)  # noqa: E712
+        .where(_visible_service_dependency_filter())
     )
 
     if service_id is not None:

@@ -7,6 +7,7 @@ from app.modules.db.models import (
     BusinessServiceComponent,
     BusinessServiceIncidentImpact,
     BusinessServiceStatusHistory,
+    Service,
 )
 
 
@@ -44,6 +45,11 @@ def clear_business_service_manual_status(business_service_id):
     ).where(BusinessService.id == business_service_id).execute()
 
     return get_business_service(business_service_id)
+
+
+def _active_component_service_ids():
+    """Return services that should be visible as business-service components."""
+    return Service.select(Service.id).where(Service.deleted == False)  # noqa: E712
 
 
 def get_business_service(business_service_id):
@@ -128,6 +134,7 @@ def list_business_service_components(business_service_id, active_only=True):
     query = BusinessServiceComponent.select().where(
         (BusinessServiceComponent.business_service == business_service_id)
         & (BusinessServiceComponent.deleted == False)  # noqa: E712
+        & (BusinessServiceComponent.service.in_(_active_component_service_ids()))
     )
 
     if active_only:
@@ -144,6 +151,7 @@ def list_business_service_components_for_groups(group_ids=None, active_only=True
         .where(
             (BusinessService.deleted == False)  # noqa: E712
             & (BusinessServiceComponent.deleted == False)  # noqa: E712
+            & (BusinessServiceComponent.service.in_(_active_component_service_ids()))
         )
     )
 
@@ -173,6 +181,7 @@ def list_components_for_service(service_id, active_only=True):
     query = BusinessServiceComponent.select().where(
         (BusinessServiceComponent.service == service_id)
         & (BusinessServiceComponent.deleted == False)  # noqa: E712
+        & (BusinessServiceComponent.service.in_(_active_component_service_ids()))
     )
 
     if active_only:
@@ -206,6 +215,7 @@ def count_business_service_components(business_service_id, active_only=True):
     query = BusinessServiceComponent.select().where(
         (BusinessServiceComponent.business_service == business_service_id)
         & (BusinessServiceComponent.deleted == False)  # noqa: E712
+        & (BusinessServiceComponent.service.in_(_active_component_service_ids()))
     )
 
     if active_only:

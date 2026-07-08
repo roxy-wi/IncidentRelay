@@ -27,6 +27,7 @@ from app.modules.db.models import (
     PriorityPolicy,
     PriorityPolicyRule,
     MatcherPreset,
+    Heartbeat,
 )
 
 _counter = 0
@@ -564,4 +565,40 @@ def create_matcher_preset(
         description=description,
         matchers=matchers or {},
         enabled=enabled,
+    )
+
+
+def create_heartbeat(
+    team: Team,
+    route: AlertRoute,
+    *,
+    service: Service | None = None,
+    name: str | None = None,
+    slug: str | None = None,
+    token_hash: str = "heartbeat-token-hash",
+    mode: str = "interval",
+    expected_interval_seconds: int | None = 60,
+    grace_period_seconds: int = 60,
+    status: str = "new",
+    last_seen_at: datetime | None = None,
+    next_expected_at: datetime | None = None,
+) -> Heartbeat:
+    return Heartbeat.create(
+        group=team.group,
+        team=team,
+        route=route,
+        service=service,
+        name=name or unique("Heartbeat"),
+        slug=slug or unique("heartbeat"),
+        token_prefix="test-token",
+        token_hash=token_hash,
+        mode=mode,
+        expected_interval_seconds=expected_interval_seconds,
+        grace_period_seconds=grace_period_seconds,
+        status=status,
+        last_seen_at=last_seen_at,
+        next_expected_at=next_expected_at,
+        enabled=True,
+        severity="critical",
+        priority_slug="p2",
     )

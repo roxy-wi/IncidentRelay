@@ -39,6 +39,7 @@ from app.views.matcher_presets_view import matcher_presets_bp
 from app.views.priority_policies_view import priority_policies_bp
 from app.views.matchers_view import matchers_bp
 from app.views.business_services.routes import business_services_bp
+from app.views.heartbeats_view import heartbeats_bp
 
 
 def create_app(log_role=None):
@@ -126,3 +127,4 @@ def register_blueprints(flask_app):
     flask_app.register_blueprint(matchers_bp, url_prefix="/api/matchers")
     flask_app.register_blueprint(priority_policies_bp, url_prefix="/api/priority-policies")
     flask_app.register_blueprint(business_services_bp)
+    flask_app.register_blueprint(heartbeats_bp, url_prefix="/api/heartbeats")

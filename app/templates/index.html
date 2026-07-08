@@ -73,6 +73,11 @@
             <span class="menu-text">Routes</span>
         </a>
 
+        <a href="/heartbeats" data-page="heartbeats" class="menu-link" title="Heartbeats">
+            <span class="menu-icon">♥</span>
+            <span class="menu-text">Heartbeats</span>
+        </a>
+
         <div class="menu-group" data-menu-group="services">
           <button id="services-menu-toggle" type="button" class="menu-group-toggle" title="Services" aria-expanded="false" aria-controls="services-menu-items">
             <svg class="menu-icon">
@@ -232,6 +237,7 @@
             <div id="view-routes" class="view">{% include "pages/routes.html" %}</div>
             <div id="view-services" class="view">{% include "pages/services.html" %}</div>
             {% include "pages/business_services.html" %}
+            {% include "pages/heartbeats.html" %}
             <div id="view-maintenance-windows" class="view">{% include "pages/maintenance_windows.html" %}</div>
             <div id="view-escalation-policies" class="view">{% include "pages/escalation_policies.html" %}</div>
             <div id="view-notification-policies" class="view">{% include "pages/notification_policies.html" %}</div>
@@ -327,6 +333,7 @@
 <script src="{{ url_for('static', filename='js/pages/services/impact.js') }}"></script>
 <script src="{{ url_for('static', filename='js/pages/services/extras.js') }}"></script>
 <script src="{{ url_for('static', filename='js/pages/business_services.js') }}"></script>
+<script src="{{ url_for('static', filename='js/pages/heartbeats.js') }}"></script>
 <script src="{{ url_for('static', filename='js/pages/maintenance_windows.js') }}"></script>
 <script src="{{ url_for('static', filename='js/pages/escalation_policies.js') }}"></script>
 <script src="{{ url_for('static', filename='js/pages/notification_policies.js') }}"></script>

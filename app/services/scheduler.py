@@ -17,6 +17,7 @@ from app.services.notifications.rules import process_due_user_notifications
 from app.services.incidents.responders import expire_due_incident_responders
 from app.services.alerts.explain_cleanup import cleanup_alert_explain_traces
 from app.services.service_catalog.impact_snapshots import capture_scheduled_service_impact_snapshot
+from app.services.heartbeats.service import process_overdue_heartbeats
 
 logger = logging.getLogger("oncall.scheduler")
 _scheduler = None
@@ -373,6 +374,53 @@ def alert_explain_trace_cleanup_job():
             db.close()
 
 
+def heartbeat_overdue_job():
+    """Open incidents for overdue heartbeat/dead-man checks under a database lock."""
+    if db.is_closed():
+        db.connect(reuse_if_open=True)
+
+    owner = None
+
+    try:
+        owner = acquire_db_lock("heartbeat_overdue_job")
+
+        if not owner:
+            logger.debug("heartbeat overdue job skipped because lock is busy")
+            return {"processed": 0, "overdue": 0, "unchanged": 0, "failed": 0}
+
+        logger.info("heartbeat overdue job started")
+
+        result = process_overdue_heartbeats(
+            limit=int(getattr(Config, "HEARTBEAT_CHECK_BATCH_SIZE", 100))
+        )
+
+        logger.info(
+            "heartbeat overdue job finished",
+            extra={
+                "extra": {
+                    "event_type": "scheduler",
+                    "processed": result.get("processed", 0),
+                    "overdue": result.get("overdue", 0),
+                    "unchanged": result.get("unchanged", 0),
+                    "failed": result.get("failed", 0),
+                }
+            },
+        )
+
+        return result
+
+    except Exception:
+        logger.exception("heartbeat overdue job failed")
+        return {"processed": 0, "overdue": 0, "unchanged": 0, "failed": 1}
+
+    finally:
+        if owner:
+            release_db_lock("heartbeat_overdue_job", owner)
+
+        if not db.is_closed():
+            db.close()
+
+
 def service_impact_snapshot_job():
     """Capture Service Impact snapshots under a database lock."""
     if db.is_closed():
@@ -546,6 +594,18 @@ def start_scheduler():
         id="alert_explain_trace_cleanup_job",
         replace_existing=True,
     )
+
+    if bool(getattr(Config, "HEARTBEATS_ENABLED", True)):
+        _scheduler.add_job(
+            heartbeat_overdue_job,
+            "interval",
+            seconds=int(getattr(Config, "HEARTBEAT_CHECK_INTERVAL_SECONDS", 30)),
+            max_instances=1,
+            coalesce=True,
+            next_run_time=datetime.utcnow(),
+            id="heartbeat_overdue_job",
+            replace_existing=True,
+        )
 
     if bool(getattr(Config, "SERVICE_IMPACT_SNAPSHOT_ENABLED", True)):
         _scheduler.add_job(

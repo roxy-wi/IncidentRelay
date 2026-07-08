@@ -416,6 +416,27 @@
                             >
                         </div>
 
+                        <select id="service-dependency-graph-mode" class="input page-toolbar-filter" title="Graph view mode">
+                            <option value="overview" selected>Overview</option>
+                            <option value="impact">Impact only</option>
+                            <option value="full">Full graph</option>
+                        </select>
+
+                        <select id="service-dependency-graph-collapse" class="input page-toolbar-filter" title="Collapse graph sections">
+                            <option value="healthy_leaves" selected>Hide healthy leaves</option>
+                            <option value="team">Collapse by team</option>
+                            <option value="prefix">Collapse by prefix</option>
+                            <option value="none">No collapse</option>
+                        </select>
+
+                        <select id="service-dependency-graph-depth" class="input page-toolbar-filter" title="Focus depth">
+                            <option value="1">Depth 1</option>
+                            <option value="2">Depth 2</option>
+                            <option value="3">Depth 3</option>
+                            <option value="5" selected>Depth 5</option>
+                            <option value="all">Depth all</option>
+                        </select>
+
                         <select id="service-dependency-graph-focus" class="input page-toolbar-filter">
                             <option value="">All services</option>
                         </select>
@@ -444,12 +465,26 @@
                     </div>
 
                     <div class="service-dependency-graph-legend">
+                        <span class="graph-legend-section">Nodes</span>
                         <span><i class="graph-legend-dot graph-legend-operational"></i>Operational</span>
                         <span><i class="graph-legend-dot graph-legend-degraded"></i>Degraded</span>
-                        <span><i class="graph-legend-dot graph-legend-outage"></i>Outage</span>
-                        <span><i class="graph-legend-dot graph-legend-business"></i>Business service</span>
+                        <span><i class="graph-legend-dot graph-legend-partial-outage"></i>Partial outage</span>
+                        <span><i class="graph-legend-dot graph-legend-outage"></i>Major outage</span>
+                        <span><i class="graph-legend-dot graph-legend-unknown"></i>Unknown</span>
+                        <span><i class="graph-legend-business"></i>Business service</span>
+
+                        <span class="graph-legend-section">Dependency impact</span>
+                        <span><i class="graph-legend-line graph-legend-edge-operational"></i>Operational path</span>
+                        <span><i class="graph-legend-line graph-legend-edge-degraded"></i>Degraded path</span>
+                        <span><i class="graph-legend-line graph-legend-edge-partial-outage"></i>Partial outage path</span>
+                        <span><i class="graph-legend-line graph-legend-edge-outage"></i>Major outage path</span>
+                        <span><i class="graph-legend-line graph-legend-edge-unknown"></i>Unknown path</span>
+
+                        <span class="graph-legend-section">Dependency strength</span>
                         <span><i class="graph-legend-line graph-legend-required"></i>Required</span>
+                        <span><i class="graph-legend-line graph-legend-important"></i>Important</span>
                         <span><i class="graph-legend-line graph-legend-optional"></i>Optional</span>
+                        <span><i class="graph-legend-line graph-legend-business-component"></i>Business component</span>
                         <span><i class="graph-legend-line graph-legend-disabled"></i>Disabled</span>
                     </div>
                 </div>
@@ -966,10 +1001,18 @@
         <input id="service-dependency-id" type="hidden">
 
         <label for="service-dependency-source">Service</label>
-        <select id="service-dependency-source" class="input"></select>
+        <select
+          id="service-dependency-source"
+          class="js-service-dependency-select"
+          data-placeholder="Search source service..."
+        ></select>
 
         <label for="service-dependency-target">Depends on service</label>
-        <select id="service-dependency-target" class="input"><option value="">Select service</option></select>
+        <select
+          id="service-dependency-target"
+          class="js-service-dependency-select"
+          data-placeholder="Search dependency service..."
+        ></select>
 
         <label for="service-dependency-type">Dependency type</label>
         <select id="service-dependency-type" class="input">

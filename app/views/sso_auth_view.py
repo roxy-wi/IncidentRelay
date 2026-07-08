@@ -20,6 +20,7 @@ from app.modules.sso.sso_login import (
     build_sso_login_response,
     complete_sso_login,
 )
+from app.login import normalize_auth_redirect_target
 from app.settings import Config
 from app.modules.sso.saml_security import get_saml_security, validate_saml_crypto_config
 from app.services.validation import safe_exception_response
@@ -310,6 +311,9 @@ def _oidc_login(provider):
 
     session[f"sso_oidc_state:{provider.slug}"] = state
     session[f"sso_oidc_nonce:{provider.slug}"] = nonce
+    session[f"sso_return_to:{provider.slug}"] = normalize_auth_redirect_target(
+        request.args.get("next")
+    )
 
     return redirect(authorization_url)
 
@@ -324,6 +328,7 @@ def _oidc_callback(provider):
 
     expected_state = session.pop(f"sso_oidc_state:{provider.slug}", None)
     expected_nonce = session.pop(f"sso_oidc_nonce:{provider.slug}", None)
+    redirect_to = session.pop(f"sso_return_to:{provider.slug}", "/")
 
     if not expected_state or request.args.get("state") != expected_state:
         return jsonify({
@@ -415,7 +420,7 @@ def _oidc_callback(provider):
         },
     )
 
-    return build_sso_login_response(user)
+    return build_sso_login_response(user, redirect_to=redirect_to)
 
 
 def _saml_request_data():
@@ -505,6 +510,10 @@ def _saml_login(provider):
         old_settings=settings,
     )
 
+    session[f"sso_return_to:{provider.slug}"] = normalize_auth_redirect_target(
+        request.args.get("next")
+    )
+
     return redirect(auth.login())
 
 
@@ -562,6 +571,8 @@ def _saml_callback(provider):
         auth.get_nameid(),
     )
 
+    redirect_to = session.pop(f"sso_return_to:{provider.slug}", "/")
+
     try:
         user = complete_sso_login(provider, claims)
     except SsoLoginError as exc:
@@ -582,7 +593,7 @@ def _saml_callback(provider):
         },
     )
 
-    return build_sso_login_response(user)
+    return build_sso_login_response(user, redirect_to=redirect_to)
 
 
 @sso_auth_bp.route("/<slug>/login", methods=["GET"])

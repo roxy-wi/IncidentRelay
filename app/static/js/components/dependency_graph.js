@@ -1,6 +1,7 @@
 let serviceDependencyGraphCy = null;
 let serviceDependencyGraphRenderTimer = null;
 let serviceDependencyGraphSearchTimer = null;
+let serviceDependencyGraphExpandedGroups = {};
 const SERVICE_DEPENDENCIES_VIEW_STORAGE_KEY = "incidentrelay.services.dependencies.view";
 let serviceDependenciesView = getStoredServiceDependenciesView();
 
@@ -175,8 +176,67 @@ function serviceDependencyGraphServiceMap() {
     return map;
 }
 
+function serviceDependencyGraphImpactFromDependency(dependency, prefix, serviceId) {
+    const effectiveStatus = serviceDependencyGraphPick(dependency, [prefix + "_effective_status"]);
+    const impactScore = serviceDependencyGraphPick(dependency, [
+        prefix + "_effective_impact_score",
+        prefix + "_impact_score"
+    ]);
+
+    if (!effectiveStatus && impactScore === null) {
+        return null;
+    }
+
+    return {
+        service_id: serviceId,
+        service_name: serviceDependencyGraphPick(dependency, [prefix + "_name"]),
+        service_slug: serviceDependencyGraphPick(dependency, [prefix + "_slug"]),
+        team_name: prefix === "depends_on_service"
+            ? serviceDependencyGraphPick(dependency, ["depends_on_team_name", prefix + "_team_name"])
+            : serviceDependencyGraphPick(dependency, ["team_name", prefix + "_team_name"]),
+        team_slug: prefix === "depends_on_service"
+            ? serviceDependencyGraphPick(dependency, ["depends_on_team_slug", prefix + "_team_slug"])
+            : serviceDependencyGraphPick(dependency, ["team_slug", prefix + "_team_slug"]),
+        own_status: serviceDependencyGraphPick(dependency, [prefix + "_own_status"]),
+        alert_impact_status: serviceDependencyGraphPick(dependency, [prefix + "_alert_impact_status"]),
+        dependency_impact_status: serviceDependencyGraphPick(dependency, [prefix + "_dependency_impact_status"]),
+        effective_status: effectiveStatus,
+        primary_reason: serviceDependencyGraphPick(dependency, [prefix + "_primary_reason"]),
+        own_impact_score: Number(serviceDependencyGraphPick(dependency, [prefix + "_own_impact_score"]) || 0),
+        alert_impact_score: Number(serviceDependencyGraphPick(dependency, [prefix + "_alert_impact_score"]) || 0),
+        dependency_impact_score: Number(serviceDependencyGraphPick(dependency, [prefix + "_dependency_impact_score"]) || 0),
+        effective_impact_score: Number(impactScore || 0),
+        impact_score: Number(impactScore || 0),
+        open_alert_groups: Number(serviceDependencyGraphPick(dependency, [prefix + "_open_alert_groups"]) || 0),
+        critical_open_alert_groups: Number(serviceDependencyGraphPick(dependency, [prefix + "_critical_open_alert_groups"]) || 0)
+    };
+}
+
 function serviceDependencyGraphImpactMap() {
     const map = {};
+
+    asArray(serviceDependencyGraphDependencies()).forEach(function (dependency) {
+        if (!dependency) {
+            return;
+        }
+
+        const sourceId = serviceDependencyGraphSourceId(dependency);
+        const targetId = serviceDependencyGraphTargetId(dependency);
+        const sourceImpact = sourceId
+            ? serviceDependencyGraphImpactFromDependency(dependency, "service", sourceId)
+            : null;
+        const targetImpact = targetId
+            ? serviceDependencyGraphImpactFromDependency(dependency, "depends_on_service", targetId)
+            : null;
+
+        if (sourceImpact) {
+            map[sourceId] = sourceImpact;
+        }
+
+        if (targetImpact) {
+            map[targetId] = targetImpact;
+        }
+    });
 
     if (typeof serviceImpactCache === "undefined") {
         return map;
@@ -192,6 +252,14 @@ function serviceDependencyGraphImpactMap() {
     });
 
     return map;
+}
+
+function serviceDependencyGraphDependencies() {
+    if (typeof allServiceGraphDependenciesCache !== "undefined") {
+        return asArray(allServiceGraphDependenciesCache);
+    }
+
+    return asArray(allServiceDependenciesCache);
 }
 
 function serviceDependencyGraphAlertStatus(service, impactMap) {
@@ -371,7 +439,7 @@ function serviceDependencyGraphServicesForImpact(serviceMap, impactMap) {
         };
     });
 
-    asArray(allServiceDependenciesCache).forEach(function (dependency) {
+    asArray(serviceDependencyGraphDependencies()).forEach(function (dependency) {
         if (!dependency) {
             return;
         }
@@ -418,6 +486,35 @@ function serviceDependencyGraphNodeDisplayStatus(service, impactMap) {
 
     return serviceDependencyGraphNodeStatus(service);
 }
+
+function serviceDependencyGraphEdgeImpactStatus(dependency, upstreamService, impactMap) {
+    const upstreamStatus = serviceDependencyGraphNodeDisplayStatus(upstreamService, impactMap);
+    return serviceDependencyGraphPropagateDependencyStatus(dependency || {}, upstreamStatus);
+}
+
+function serviceDependencyGraphEdgeImpactClasses(status) {
+    const normalizedStatus = serviceDependencyGraphNormalizeStatus(status || "operational");
+    const classes = [
+        `impact-status-${normalizedStatus}`
+    ];
+
+    if (serviceDependencyGraphStatusRank(normalizedStatus) > 0) {
+        classes.push("has-impact");
+    }
+
+    return classes;
+}
+
+function serviceDependencyGraphBusinessComponentImpactStatus(component, service, impactMap) {
+    const serviceStatus = serviceDependencyGraphNodeDisplayStatus(service, impactMap);
+
+    if (serviceDependencyGraphStatusRank(serviceStatus) > 0) {
+        return serviceStatus;
+    }
+
+    return serviceDependencyGraphNormalizeStatus(component && component.business_service_status || "operational");
+}
+
 
 function serviceDependencyGraphServiceFromDependency(dependency, side, id, serviceMap) {
     if (serviceMap[id]) {
@@ -471,6 +568,7 @@ function serviceDependencyGraphServiceFromDependency(dependency, side, id, servi
                 "consumer_service_slug"
             ]) || "",
             status: serviceDependencyGraphPick(dependency, [
+                "service_effective_status",
                 "service_status",
                 "source_service_status",
                 "source_status",
@@ -488,6 +586,7 @@ function serviceDependencyGraphServiceFromDependency(dependency, side, id, servi
             ]) !== false,
             team_name: serviceDependencyGraphPick(dependency, [
                 "service_team_name",
+                "team_name",
                 "source_team_name",
                 "from_service_team_name",
                 "dependent_service_team_name",
@@ -517,6 +616,7 @@ function serviceDependencyGraphServiceFromDependency(dependency, side, id, servi
             "upstream_service_slug"
         ]) || "",
         status: serviceDependencyGraphPick(dependency, [
+            "depends_on_service_effective_status",
             "depends_on_service_status",
             "dependency_service_status",
             "target_service_status",
@@ -536,6 +636,7 @@ function serviceDependencyGraphServiceFromDependency(dependency, side, id, servi
         ]) !== false,
         team_name: serviceDependencyGraphPick(dependency, [
             "depends_on_service_team_name",
+            "depends_on_team_name",
             "dependency_service_team_name",
             "target_team_name",
             "to_service_team_name",
@@ -646,12 +747,556 @@ function serviceDependencyGraphLayoutOptions() {
     };
 }
 
+function serviceDependencyGraphMode() {
+    return serviceDependencyGraphValue($("#service-dependency-graph-mode").val() || "overview") || "overview";
+}
+
+function serviceDependencyGraphCollapseMode() {
+    return serviceDependencyGraphValue($("#service-dependency-graph-collapse").val() || "healthy_leaves") || "healthy_leaves";
+}
+
+function serviceDependencyGraphMaxDepth() {
+    const rawValue = serviceDependencyGraphValue($("#service-dependency-graph-depth").val() || "5");
+    if (rawValue === "all") {
+        return 10;
+    }
+
+    const depth = Number(rawValue || 5);
+    return Math.max(1, Math.min(Number.isFinite(depth) ? depth : 5, 10));
+}
+
+function serviceDependencyGraphCollapsedGroupKey(value) {
+    return serviceDependencyGraphValue(value)
+        .toLowerCase()
+        .replace(/[^a-z0-9:_-]+/g, "-")
+        .replace(/-+/g, "-")
+        .replace(/^-|-$/g, "");
+}
+
+function serviceDependencyGraphIsCollapsedGroupExpanded(groupKey) {
+    return !!serviceDependencyGraphExpandedGroups[serviceDependencyGraphCollapsedGroupKey(groupKey)];
+}
+
+function serviceDependencyGraphToggleCollapsedGroup(groupKey) {
+    groupKey = serviceDependencyGraphCollapsedGroupKey(groupKey);
+    if (!groupKey) {
+        return;
+    }
+
+    if (serviceDependencyGraphExpandedGroups[groupKey]) {
+        delete serviceDependencyGraphExpandedGroups[groupKey];
+    } else {
+        serviceDependencyGraphExpandedGroups[groupKey] = true;
+    }
+}
+
+function serviceDependencyGraphNodeData(node) {
+    return node && node.data ? node.data : {};
+}
+
+function serviceDependencyGraphNodeStatus(node) {
+    const data = serviceDependencyGraphNodeData(node);
+    return serviceDependencyGraphNormalizeStatus(data.displayStatus || data.status || "unknown");
+}
+
+function serviceDependencyGraphNodeImpactScore(node) {
+    const data = serviceDependencyGraphNodeData(node);
+    return Number(data.effectiveImpactScore || data.impactScore || data.dependencyImpactScore || 0);
+}
+
+function serviceDependencyGraphNodeIsBusinessService(node) {
+    return serviceDependencyGraphNodeData(node).nodeType === "business_service";
+}
+
+function serviceDependencyGraphNodeIsTechnicalService(node) {
+    return serviceDependencyGraphNodeData(node).nodeType === "technical_service";
+}
+
+function serviceDependencyGraphNodeHasImpact(node) {
+    const data = serviceDependencyGraphNodeData(node);
+    const status = serviceDependencyGraphNodeStatus(node);
+
+    return serviceDependencyGraphNodeImpactScore(node) > 0
+        || Number(data.openAlertGroups || 0) > 0
+        || Number(data.criticalOpenAlertGroups || 0) > 0
+        || ["degraded", "partial_outage", "major_outage", "unknown"].includes(status);
+}
+
+function serviceDependencyGraphNodeIsHealthyTechnical(node) {
+    const data = serviceDependencyGraphNodeData(node);
+    return serviceDependencyGraphNodeIsTechnicalService(node)
+        && data.enabled !== false
+        && serviceDependencyGraphNodeStatus(node) === "operational"
+        && !serviceDependencyGraphNodeHasImpact(node);
+}
+
+function serviceDependencyGraphEdgeHasImpact(edge) {
+    const status = serviceDependencyGraphNormalizeStatus(edge && edge.data && edge.data.impactStatus);
+    return ["degraded", "partial_outage", "major_outage", "unknown"].includes(status);
+}
+
+function serviceDependencyGraphElementsByNodeId(nodes) {
+    const map = {};
+    asArray(nodes).forEach(function (node) {
+        const id = node && node.data && node.data.id;
+        if (id) {
+            map[id] = node;
+        }
+    });
+    return map;
+}
+
+function serviceDependencyGraphNodeDegreeMap(edges) {
+    const degree = {};
+    asArray(edges).forEach(function (edge) {
+        const source = edge && edge.data && edge.data.source;
+        const target = edge && edge.data && edge.data.target;
+        if (!source || !target || source === target) {
+            return;
+        }
+        degree[source] = (degree[source] || 0) + 1;
+        degree[target] = (degree[target] || 0) + 1;
+    });
+    return degree;
+}
+
+function serviceDependencyGraphImpactedEdgeNodeMap(edges) {
+    const map = {};
+    asArray(edges).forEach(function (edge) {
+        if (!serviceDependencyGraphEdgeHasImpact(edge)) {
+            return;
+        }
+        if (edge.data && edge.data.source) {
+            map[edge.data.source] = true;
+        }
+        if (edge.data && edge.data.target) {
+            map[edge.data.target] = true;
+        }
+    });
+    return map;
+}
+
+function serviceDependencyGraphCollapsedGroupNode(groupKey, label, hiddenCount, status, impactScore) {
+    groupKey = serviceDependencyGraphCollapsedGroupKey(groupKey);
+    status = serviceDependencyGraphNormalizeStatus(status || "operational");
+
+    return {
+        data: {
+            id: "collapsed-" + groupKey,
+            nodeType: "collapsed_group",
+            groupKey: groupKey,
+            label: label,
+            displayLabel: label + "\n+" + hiddenCount,
+            hiddenCount: hiddenCount,
+            status: status,
+            displayStatus: status,
+            effectiveImpactScore: Number(impactScore || 0),
+            enabled: true
+        },
+        classes: [
+            "collapsed-group",
+            "status-" + status
+        ].join(" ")
+    };
+}
+
+function serviceDependencyGraphCollapsedEdge(edgeId, sourceId, targetId, label, impactStatus) {
+    impactStatus = serviceDependencyGraphNormalizeStatus(impactStatus || "operational");
+    return {
+        data: {
+            id: "collapsed-edge-" + serviceDependencyGraphCollapsedGroupKey(edgeId),
+            source: sourceId,
+            target: targetId,
+            label: label || "collapsed",
+            displayLabel: label || "collapsed",
+            impactStatus: impactStatus,
+            description: "Collapsed graph section"
+        },
+        classes: [
+            "collapsed-edge"
+        ].concat(serviceDependencyGraphEdgeImpactClasses(impactStatus)).join(" ")
+    };
+}
+
+function serviceDependencyGraphCollapseHealthyLeaves(elements) {
+    const nodes = asArray(elements.nodes);
+    const edges = asArray(elements.edges);
+    const nodeMap = serviceDependencyGraphElementsByNodeId(nodes);
+    const degree = serviceDependencyGraphNodeDegreeMap(edges);
+    const hiddenById = {};
+    const groups = {};
+
+    nodes.forEach(function (node) {
+        const data = serviceDependencyGraphNodeData(node);
+        const id = data.id;
+        if (!id || data.nodeType === "collapsed_group") {
+            return;
+        }
+        if (!serviceDependencyGraphNodeIsHealthyTechnical(node) || Number(degree[id] || 0) !== 1) {
+            return;
+        }
+
+        const edge = edges.find(function (candidate) {
+            return candidate && candidate.data && (candidate.data.source === id || candidate.data.target === id);
+        });
+
+        if (!edge || !edge.data) {
+            return;
+        }
+
+        const isSource = edge.data.source === id;
+        const neighborId = isSource ? edge.data.target : edge.data.source;
+        if (!neighborId || !nodeMap[neighborId]) {
+            return;
+        }
+
+        const groupKey = serviceDependencyGraphCollapsedGroupKey(
+            "healthy-leaves:" + neighborId + ":" + (isSource ? "dependents" : "dependencies")
+        );
+
+        if (serviceDependencyGraphIsCollapsedGroupExpanded(groupKey)) {
+            return;
+        }
+
+        if (!groups[groupKey]) {
+            groups[groupKey] = {
+                key: groupKey,
+                neighborId: neighborId,
+                hiddenSource: isSource,
+                label: isSource ? "Healthy dependents" : "Healthy dependencies",
+                nodeIds: [],
+                impactStatus: "operational"
+            };
+        }
+
+        groups[groupKey].nodeIds.push(id);
+        hiddenById[id] = true;
+    });
+
+    const keptNodes = nodes.filter(function (node) {
+        const id = node && node.data && node.data.id;
+        return !hiddenById[id];
+    });
+
+    const keptEdges = edges.filter(function (edge) {
+        if (!edge || !edge.data) {
+            return false;
+        }
+        return !hiddenById[edge.data.source] && !hiddenById[edge.data.target];
+    });
+
+    Object.keys(groups).forEach(function (groupKey) {
+        const group = groups[groupKey];
+        if (!group.nodeIds.length) {
+            return;
+        }
+
+        const groupNode = serviceDependencyGraphCollapsedGroupNode(
+            groupKey,
+            group.label,
+            group.nodeIds.length,
+            group.impactStatus,
+            0
+        );
+        keptNodes.push(groupNode);
+
+        const groupNodeId = groupNode.data.id;
+        keptEdges.push(serviceDependencyGraphCollapsedEdge(
+            groupKey,
+            group.hiddenSource ? groupNodeId : group.neighborId,
+            group.hiddenSource ? group.neighborId : groupNodeId,
+            group.nodeIds.length + " hidden",
+            group.impactStatus
+        ));
+    });
+
+    return {
+        nodes: keptNodes,
+        edges: keptEdges
+    };
+}
+
+function serviceDependencyGraphPrefixGroupLabel(node) {
+    const data = serviceDependencyGraphNodeData(node);
+    const rawLabel = serviceDependencyGraphValue(data.label || data.serviceSlug || data.serviceId || "");
+    const normalized = rawLabel
+        .trim()
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-|-$/g, "");
+    const parts = normalized.split("-").filter(Boolean);
+
+    if (parts.length >= 3) {
+        return parts.slice(0, 2).join("-") + "-*";
+    }
+    if (parts.length >= 2) {
+        return parts[0] + "-*";
+    }
+    return "";
+}
+
+function serviceDependencyGraphCollapseByAttribute(elements, attribute) {
+    const nodes = asArray(elements.nodes);
+    const edges = asArray(elements.edges);
+    const impactedEdgeNodes = serviceDependencyGraphImpactedEdgeNodeMap(edges);
+    const groups = {};
+    const nodeGroup = {};
+
+    nodes.forEach(function (node) {
+        const data = serviceDependencyGraphNodeData(node);
+        const id = data.id;
+        if (!id || !serviceDependencyGraphNodeIsHealthyTechnical(node) || impactedEdgeNodes[id]) {
+            return;
+        }
+
+        let label = "";
+        if (attribute === "team") {
+            label = serviceDependencyGraphValue(data.team || "No team");
+        } else if (attribute === "prefix") {
+            label = serviceDependencyGraphPrefixGroupLabel(node);
+        }
+
+        if (!label) {
+            return;
+        }
+
+        const groupKey = serviceDependencyGraphCollapsedGroupKey(attribute + ":" + label);
+        if (serviceDependencyGraphIsCollapsedGroupExpanded(groupKey)) {
+            return;
+        }
+
+        if (!groups[groupKey]) {
+            groups[groupKey] = {
+                key: groupKey,
+                label: label,
+                nodeIds: [],
+                maxImpactScore: 0
+            };
+        }
+
+        groups[groupKey].nodeIds.push(id);
+        groups[groupKey].maxImpactScore = Math.max(groups[groupKey].maxImpactScore, serviceDependencyGraphNodeImpactScore(node));
+    });
+
+    Object.keys(groups).forEach(function (groupKey) {
+        if (groups[groupKey].nodeIds.length < 2) {
+            delete groups[groupKey];
+            return;
+        }
+        groups[groupKey].nodeIds.forEach(function (nodeId) {
+            nodeGroup[nodeId] = groupKey;
+        });
+    });
+
+    if (!Object.keys(groups).length) {
+        return elements;
+    }
+
+    const keptNodes = nodes.filter(function (node) {
+        const id = node && node.data && node.data.id;
+        return !nodeGroup[id];
+    });
+
+    Object.keys(groups).forEach(function (groupKey) {
+        const group = groups[groupKey];
+        keptNodes.push(serviceDependencyGraphCollapsedGroupNode(
+            groupKey,
+            group.label,
+            group.nodeIds.length,
+            "operational",
+            group.maxImpactScore
+        ));
+    });
+
+    const dedupedEdges = {};
+    asArray(edges).forEach(function (edge) {
+        if (!edge || !edge.data) {
+            return;
+        }
+
+        const sourceGroup = nodeGroup[edge.data.source];
+        const targetGroup = nodeGroup[edge.data.target];
+        const sourceId = sourceGroup ? "collapsed-" + sourceGroup : edge.data.source;
+        const targetId = targetGroup ? "collapsed-" + targetGroup : edge.data.target;
+
+        if (!sourceId || !targetId || sourceId === targetId) {
+            return;
+        }
+
+        const edgeKey = sourceId + "->" + targetId + ":" + serviceDependencyGraphValue(edge.data.displayLabel || edge.data.label);
+        if (!dedupedEdges[edgeKey]) {
+            dedupedEdges[edgeKey] = Object.assign({}, edge, {
+                data: Object.assign({}, edge.data, {
+                    id: "collapsed-rewire-" + serviceDependencyGraphCollapsedGroupKey(edgeKey),
+                    source: sourceId,
+                    target: targetId
+                }),
+                classes: serviceDependencyGraphValue(edge.classes || "") + " collapsed-rewired-edge"
+            });
+        }
+    });
+
+    return {
+        nodes: keptNodes,
+        edges: Object.values(dedupedEdges)
+    };
+}
+
+function serviceDependencyGraphApplyImpactOnly(elements) {
+    const nodes = asArray(elements.nodes);
+    const edges = asArray(elements.edges);
+    const nodeMap = serviceDependencyGraphElementsByNodeId(nodes);
+    const keep = {};
+
+    nodes.forEach(function (node) {
+        const data = serviceDependencyGraphNodeData(node);
+        if (!data.id) {
+            return;
+        }
+
+        if (serviceDependencyGraphNodeHasImpact(node)
+                || (serviceDependencyGraphNodeIsBusinessService(node) && serviceDependencyGraphNodeStatus(node) !== "operational")) {
+            keep[data.id] = true;
+        }
+    });
+
+    edges.forEach(function (edge) {
+        if (!edge || !edge.data) {
+            return;
+        }
+        if (serviceDependencyGraphEdgeHasImpact(edge) || keep[edge.data.source] || keep[edge.data.target]) {
+            keep[edge.data.source] = true;
+            keep[edge.data.target] = true;
+        }
+    });
+
+    const keptNodes = nodes.filter(function (node) {
+        return keep[node && node.data && node.data.id];
+    });
+    const keptEdges = edges.filter(function (edge) {
+        return edge && edge.data && keep[edge.data.source] && keep[edge.data.target];
+    });
+
+    return {
+        nodes: keptNodes,
+        edges: keptEdges
+    };
+}
+
+function serviceDependencyGraphApplyDisplayOptions(elements) {
+    const query = serviceDependencyGraphValue($("#service-dependency-graph-search").val()).trim();
+    if (query) {
+        return elements;
+    }
+
+    const mode = serviceDependencyGraphMode();
+    const collapseMode = serviceDependencyGraphCollapseMode();
+
+    if (mode === "full") {
+        return elements;
+    }
+
+    if (mode === "impact") {
+        return serviceDependencyGraphApplyImpactOnly(elements);
+    }
+
+    let result = elements;
+    if (collapseMode === "team" || collapseMode === "prefix") {
+        result = serviceDependencyGraphCollapseByAttribute(result, collapseMode);
+    } else if (collapseMode !== "none") {
+        result = serviceDependencyGraphCollapseHealthyLeaves(result);
+    }
+
+    return result;
+}
+
+function serviceDependencyGraphDependencyId(dependency, sourceId, targetId) {
+    return serviceDependencyGraphValue(
+        dependency && dependency.id !== null && dependency.id !== undefined
+            ? dependency.id
+            : `${sourceId || ""}-${targetId || ""}`
+    );
+}
+
+function serviceDependencyGraphReachableDependencyIds(dependencies, focusId, direction, maxDepth) {
+    focusId = serviceDependencyGraphId(focusId);
+
+    if (!focusId) {
+        return null;
+    }
+
+    maxDepth = Math.max(1, Math.min(Number(maxDepth || 5), 10));
+
+    const visible = {};
+    let frontier = {};
+    const visitedServices = {};
+    frontier[focusId] = true;
+    visitedServices[focusId] = true;
+
+    for (let depth = 0; depth < maxDepth; depth += 1) {
+        const nextFrontier = {};
+        let foundNext = false;
+
+        asArray(dependencies).forEach(function (dependency) {
+            const sourceId = serviceDependencyGraphSourceId(dependency);
+            const targetId = serviceDependencyGraphTargetId(dependency);
+
+            if (!sourceId || !targetId || sourceId === targetId) {
+                return;
+            }
+
+            let matches = false;
+            let nextServiceId = null;
+
+            if (direction === "outgoing") {
+                matches = !!frontier[sourceId];
+                nextServiceId = targetId;
+            } else if (direction === "incoming") {
+                matches = !!frontier[targetId];
+                nextServiceId = sourceId;
+            } else {
+                if (frontier[sourceId]) {
+                    matches = true;
+                    nextServiceId = targetId;
+                } else if (frontier[targetId]) {
+                    matches = true;
+                    nextServiceId = sourceId;
+                }
+            }
+
+            if (!matches) {
+                return;
+            }
+
+            visible[serviceDependencyGraphDependencyId(dependency, sourceId, targetId)] = true;
+
+            if (nextServiceId && !visitedServices[nextServiceId]) {
+                visitedServices[nextServiceId] = true;
+                nextFrontier[nextServiceId] = true;
+                foundNext = true;
+            }
+        });
+
+        if (!foundNext) {
+            break;
+        }
+
+        frontier = nextFrontier;
+    }
+
+    return visible;
+}
+
 function serviceDependencyGraphElements() {
     const serviceMap = serviceDependencyGraphServiceMap();
     const impactMap = serviceDependencyGraphImpactMap();
     const focusId = serviceDependencyGraphId($("#service-dependency-graph-focus").val());
     const direction = $("#service-dependency-graph-direction").val() || "connected";
     const query = serviceDependencyGraphValue($("#service-dependency-graph-search").val()).trim().toLowerCase();
+    const graphDependencies = serviceDependencyGraphDependencies();
+    const visibleDependencyIds = focusId
+        ? serviceDependencyGraphReachableDependencyIds(graphDependencies, focusId, direction, serviceDependencyGraphMaxDepth())
+        : null;
 
     const nodesById = {};
     const edges = [];
@@ -723,7 +1368,7 @@ function serviceDependencyGraphElements() {
         };
     }
 
-    asArray(allServiceDependenciesCache).forEach((dependency) => {
+    asArray(graphDependencies).forEach((dependency) => {
         if (!dependency) {
             return;
         }
@@ -738,18 +1383,10 @@ function serviceDependencyGraphElements() {
         const sourceService = serviceDependencyGraphServiceFromDependency(dependency, "source", sourceId, serviceMap);
         const targetService = serviceDependencyGraphServiceFromDependency(dependency, "target", targetId, serviceMap);
 
-        if (focusId) {
-            if (direction === "outgoing" && sourceId !== focusId) {
-                return;
-            }
+        const dependencyId = serviceDependencyGraphDependencyId(dependency, sourceId, targetId);
 
-            if (direction === "incoming" && targetId !== focusId) {
-                return;
-            }
-
-            if (direction === "connected" && sourceId !== focusId && targetId !== focusId) {
-                return;
-            }
+        if (visibleDependencyIds && !visibleDependencyIds[dependencyId]) {
+            return;
         }
 
         if (query) {
@@ -776,10 +1413,11 @@ function serviceDependencyGraphElements() {
             "dependency"
         );
 
+        const edgeImpactStatus = serviceDependencyGraphEdgeImpactStatus(dependency, targetService, impactMap);
         const classes = [
             `criticality-${criticality}`,
             `dependency-type-${dependencyType}`
-        ];
+        ].concat(serviceDependencyGraphEdgeImpactClasses(edgeImpactStatus));
 
         if (dependency.enabled === false) {
             classes.push("disabled");
@@ -787,12 +1425,13 @@ function serviceDependencyGraphElements() {
 
         edges.push({
             data: {
-                id: `dependency-${dependency.id || `${sourceId}-${targetId}`}`,
+                id: `dependency-${dependencyId}`,
                 source: sourceId,
                 target: targetId,
                 label: dependency.dependency_type || dependency.type || dependency.kind || "",
                 displayLabel: dependency.dependency_type || dependency.type || dependency.kind || "",
                 criticality: dependency.criticality || "",
+                impactStatus: edgeImpactStatus,
                 description: dependency.description || ""
             },
             classes: classes.join(" ")
@@ -828,6 +1467,12 @@ function serviceDependencyGraphElements() {
             component.business_service_name || component.business_service_slug || ("Business service #" + businessServiceId)
         );
         const componentCriticality = serviceDependencyGraphNormalizeDependencyCriticality(component.criticality || "required");
+        const componentService = serviceMap[serviceId] || nodesById[serviceId] && nodesById[serviceId].data || {
+            id: serviceId,
+            status: component.service_status || "unknown",
+            enabled: true
+        };
+        const componentImpactStatus = serviceDependencyGraphBusinessComponentImpactStatus(component, componentService, impactMap);
 
         if (!nodesById[businessNodeId]) {
             nodesById[businessNodeId] = {
@@ -857,12 +1502,13 @@ function serviceDependencyGraphElements() {
                 label: component.criticality || "component",
                 displayLabel: component.criticality || "component",
                 criticality: component.criticality || "",
+                impactStatus: componentImpactStatus,
                 description: component.description || ""
             },
             classes: [
                 "business-component",
                 `criticality-${componentCriticality}`
-            ].join(" ")
+            ].concat(serviceDependencyGraphEdgeImpactClasses(componentImpactStatus)).join(" ")
         });
     });
 
@@ -870,10 +1516,10 @@ function serviceDependencyGraphElements() {
         addNode(serviceMap[focusId], "focused");
     }
 
-    return {
+    return serviceDependencyGraphApplyDisplayOptions({
         nodes: Object.values(nodesById),
         edges: edges
-    };
+    });
 }
 
 function serviceDependencyGraphStyle() {
@@ -958,6 +1604,24 @@ function serviceDependencyGraphStyle() {
             }
         },
         {
+            selector: "node.collapsed-group",
+            style: {
+                "shape": "round-rectangle",
+                "width": 86,
+                "height": 42,
+                "font-size": 11,
+                "font-weight": 700,
+                "text-valign": "center",
+                "text-halign": "center",
+                "text-margin-y": 0,
+                "background-color": "#e2e8f0",
+                "border-width": 2,
+                "border-style": "dashed",
+                "border-color": "#64748b",
+                "color": "#334155"
+            }
+        },
+        {
             selector: "node.status-maintenance",
             style: {
                 "background-color": "#2563eb"
@@ -1000,25 +1664,67 @@ function serviceDependencyGraphStyle() {
         {
             selector: "edge.criticality-required",
             style: {
-                "line-color": "#dc2626",
-                "target-arrow-color": "#dc2626",
                 "width": 4
             }
         },
         {
             selector: "edge.criticality-important",
             style: {
-                "line-color": "#f59e0b",
-                "target-arrow-color": "#f59e0b",
                 "width": 3
             }
         },
         {
             selector: "edge.criticality-optional",
             style: {
-                "line-color": "#94a3b8",
-                "target-arrow-color": "#94a3b8",
                 "width": 2
+            }
+        },
+        {
+            selector: "edge.impact-status-operational",
+            style: {
+                "line-color": "#16a34a",
+                "target-arrow-color": "#16a34a"
+            }
+        },
+        {
+            selector: "edge.impact-status-degraded",
+            style: {
+                "line-color": "#f59e0b",
+                "target-arrow-color": "#f59e0b"
+            }
+        },
+        {
+            selector: "edge.impact-status-partial_outage",
+            style: {
+                "line-color": "#f97316",
+                "target-arrow-color": "#f97316"
+            }
+        },
+        {
+            selector: "edge.impact-status-major_outage",
+            style: {
+                "line-color": "#dc2626",
+                "target-arrow-color": "#dc2626"
+            }
+        },
+        {
+            selector: "edge.impact-status-maintenance",
+            style: {
+                "line-color": "#2563eb",
+                "target-arrow-color": "#2563eb"
+            }
+        },
+        {
+            selector: "edge.impact-status-unknown",
+            style: {
+                "line-color": "#64748b",
+                "target-arrow-color": "#64748b"
+            }
+        },
+        {
+            selector: "edge.has-impact",
+            style: {
+                "line-style": "solid"
             }
         },
         {
@@ -1032,9 +1738,14 @@ function serviceDependencyGraphStyle() {
             selector: "edge.business-component",
             style: {
                 "line-style": "dotted",
-                "line-color": "#0f172a",
-                "target-arrow-color": "#0f172a",
                 "width": 2
+            }
+        },
+        {
+            selector: "edge.collapsed-edge, edge.collapsed-rewired-edge",
+            style: {
+                "line-style": "dashed",
+                "opacity": 0.75
             }
         },
         {
@@ -1059,7 +1770,7 @@ function renderServiceDependencyGraph() {
         return;
     }
 
-    const dependenciesCount = asArray(allServiceDependenciesCache).length;
+    const dependenciesCount = asArray(serviceDependencyGraphDependencies()).length;
     const servicesCount = asArray(servicesCache).length;
 
     if (typeof cytoscape !== "function") {
@@ -1094,7 +1805,7 @@ function renderServiceDependencyGraph() {
             serviceDependencyGraphCy = null;
         }
 
-        const sample = JSON.stringify(allServiceDependenciesCache[0], null, 2);
+        const sample = JSON.stringify(serviceDependencyGraphDependencies()[0], null, 2);
 
         container.innerHTML =
             '<div class="empty-state">' +
@@ -1127,6 +1838,12 @@ function renderServiceDependencyGraph() {
 
     serviceDependencyGraphCy.on("tap", "node", function (event) {
         const nodeType = event.target.data("nodeType");
+
+        if (nodeType === "collapsed_group") {
+            serviceDependencyGraphToggleCollapsedGroup(event.target.data("groupKey"));
+            scheduleRenderServiceDependencyGraph(0);
+            return;
+        }
 
         if (nodeType === "business_service") {
             const businessServiceId = event.target.data("businessServiceId");
@@ -1175,9 +1892,10 @@ function initializeServiceDependencyGraph() {
 
     applyServiceDependenciesView(serviceDependenciesView, { persist: false });
 
-    $("#service-dependency-graph-focus, #service-dependency-graph-direction, #service-dependency-graph-layout")
+    $("#service-dependency-graph-focus, #service-dependency-graph-direction, #service-dependency-graph-layout, #service-dependency-graph-mode, #service-dependency-graph-collapse, #service-dependency-graph-depth")
         .off("change.dependencyGraph")
         .on("change.dependencyGraph", function () {
+            serviceDependencyGraphExpandedGroups = {};
             if (serviceDependenciesView === "graph") {
                 scheduleRenderServiceDependencyGraph(50);
             }

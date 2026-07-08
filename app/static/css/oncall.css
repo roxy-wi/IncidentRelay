@@ -510,7 +510,7 @@ summary {
 }
 
 .page-toolbar-filter {
-    min-width: 170px;
+    min-width: 90px;
 }
 .first-div-page-layout {
     display: flex;
@@ -1126,7 +1126,7 @@ body.has-app-sticky-x-scroll {
 }
 
 .page-layout-grid.is-full-width {
-    grid-template-columns: minmax(0, 1fr);
+    grid-template-columns: minmax(0, 1fr) !important;
 }
 
 .services-tab-panel {
@@ -1553,4 +1553,67 @@ body.has-app-sticky-x-scroll {
 .notification-center-open {
     display: inline-flex;
     font-size: 13px;
+}
+
+/* Heartbeats */
+body.md-theme .heartbeat-form-dialog {
+    width: min(980px, calc(100vw - 48px));
+}
+
+.form-grid-2 {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.form-grid-2 > .form-group,
+.form-grid > .form-group,
+.form-stack > .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    min-width: 0;
+}
+
+.form-grid-2 label,
+.form-stack label {
+    font-weight: 750;
+    color: var(--text);
+}
+
+.form-stack {
+    display: grid;
+    gap: 14px;
+    margin-top: 14px;
+}
+
+.form-row-inline {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 12px 18px;
+}
+
+.checkbox-label {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    color: var(--text);
+    font-weight: 650;
+}
+
+@media (max-width: 760px) {
+    .form-grid-2 {
+        grid-template-columns: 1fr;
+    }
+}
+
+#heartbeats-page-layout.is-full-width .page-layout-main {
+    grid-column: 1 / -1;
+    width: 100%;
+    max-width: none;
+}
+
+body.md-theme #heartbeats-page-layout .table-wrapper {
+    width: 100%;
 }

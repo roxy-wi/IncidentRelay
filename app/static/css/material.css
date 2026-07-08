@@ -673,7 +673,7 @@ body.md-theme input[type="tel"],
 body.md-theme input[type="url"],
 body.md-theme select,
 body.md-theme textarea {
-  min-height: 40px;
+  min-height: 20px;
   padding: 8px 12px;
   color: var(--md-text);
   background: var(--md-surface);

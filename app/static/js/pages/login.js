@@ -9,6 +9,20 @@ function setLoginStatus(message, type) {
         .text(message || "");
 }
 
+function getLoginReturnUrl() {
+    /*
+     * Return the safe page URL requested before authentication.
+     */
+    const params = new URLSearchParams(window.location.search);
+    const next = params.get("next");
+
+    if (typeof normalizeReturnPath === "function") {
+        return normalizeReturnPath(next, "/");
+    }
+
+    return next && next.indexOf("/") === 0 && next.indexOf("//") !== 0 ? next : "/";
+}
+
 function login(event) {
     /*
      * Request a JWT token and store it locally.
@@ -41,7 +55,7 @@ function login(event) {
                 "success"
             );
 
-            window.location.href = "/";
+            window.location.href = getLoginReturnUrl();
         },
         function (xhr) {
             const message = getApiErrorMessage(
@@ -102,7 +116,11 @@ function renderSsoProviders(providers) {
             $("<a>")
                 .addClass("login-sso-button")
                 .addClass(protocolClass)
-                .attr("href", "/api/auth/sso/" + encodeURIComponent(provider.slug) + "/login")
+                .attr(
+                    "href",
+                    "/api/auth/sso/" + encodeURIComponent(provider.slug) +
+                        "/login?next=" + encodeURIComponent(getLoginReturnUrl())
+                )
                 .append(
                     $("<span>")
                         .addClass("login-sso-icon")

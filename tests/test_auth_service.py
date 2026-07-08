@@ -1,6 +1,12 @@
 from types import SimpleNamespace
 
-from app.login import create_access_token, decode_access_token, hash_password, verify_password
+from app.login import (
+    create_access_token,
+    decode_access_token,
+    hash_password,
+    normalize_auth_redirect_target,
+    verify_password,
+)
 from app.services.integrations.auth import create_raw_token, get_bearer_token, hash_token, token_has_scope
 
 
@@ -57,3 +63,14 @@ def test_get_bearer_token_extracts_authorization_header(app):
 def test_get_bearer_token_rejects_non_bearer_header(app):
     with app.test_request_context("/", headers={"Authorization": "Basic abc"}):
         assert get_bearer_token() is None
+
+
+def test_normalize_auth_redirect_target_accepts_local_path_with_query_and_fragment():
+    assert normalize_auth_redirect_target("/services?tab=impact#graph") == "/services?tab=impact#graph"
+
+
+def test_normalize_auth_redirect_target_rejects_external_and_auth_urls():
+    assert normalize_auth_redirect_target("https://evil.example/services") == "/"
+    assert normalize_auth_redirect_target("//evil.example/services") == "/"
+    assert normalize_auth_redirect_target("/login") == "/"
+    assert normalize_auth_redirect_target("/api/auth/login") == "/"

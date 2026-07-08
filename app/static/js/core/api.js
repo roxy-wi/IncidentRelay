@@ -153,7 +153,12 @@ function showApiError(xhr, fallbackMessage) {
             } else {
                 localStorage.removeItem("incidentrelay_jwt");
             }
-            window.location.href = "/login";
+
+            if (typeof redirectToLogin === "function") {
+                redirectToLogin();
+            } else {
+                window.location.href = "/login";
+            }
         });
 
         return;

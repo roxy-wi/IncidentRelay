@@ -307,7 +307,7 @@ function renderServiceImpactHistoryRow(row) {
                         .text("samples " + Number(row.samples || 0))
                 )
         )
-        .append($("<td>").text(row.team_slug || row.team_name || "-"))
+        .append($("<td>").text(row.team_name || row.team_slug || "-"))
         .append($("<td>").text(Number(row.affected_samples || 0)))
         .append($("<td>").text(Number(row.affected_percent || 0).toFixed(1) + "%"))
         .append($("<td>").append(renderImpactStatusBadge(row.worst_effective_status || "unknown")))

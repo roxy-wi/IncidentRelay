@@ -327,6 +327,7 @@ function fillRouteSourceFilter(routes) {
         aws_sns: true,
         grafana: true,
         rmon: true,
+        heartbeat: true,
         zabbix: true,
         webhook: true,
         sentry: true,
@@ -1420,6 +1421,10 @@ function getRouteIntakePath(route) {
         return "/api/integrations/alertmanager";
     }
 
+    if (source === "heartbeat") {
+        return "/api/heartbeats/ping/<heartbeat-token>";
+    }
+
     if (source === "zabbix") {
         return "/api/integrations/zabbix";
     }
@@ -1449,6 +1454,14 @@ function buildRouteIntakeCurl(route, token) {
         ].join("\n");
     }
 
+    if (source === "heartbeat") {
+        return [
+            "curl -fsS -X POST '" + url + "' \\",
+            "  -H 'Content-Type: application/json' \\",
+            "  -d '{}'"
+        ].join("\n");
+    }
+
     return [
         "curl -X POST '" + url + "' \\",
         "  -H 'Content-Type: application/json' \\",
@@ -1461,29 +1474,36 @@ function showRouteIntakeDetails(route) {
     const source = String(route.source || "").toLowerCase();
     const token = route.intake_token || "";
     const isSentry = source === "sentry";
+    const isHeartbeat = source === "heartbeat";
     const url = getRouteIntakeUrl(route);
 
     $("#route-intake-title").text(
-        isSentry ? "Sentry webhook URL" : "Route intake details"
+        isSentry
+            ? "Sentry webhook URL"
+            : (isHeartbeat ? "Heartbeat ping URL pattern" : "Route intake details")
     );
 
     $("#route-intake-subtitle").text(
         isSentry
             ? "Copy this URL to Sentry Internal Integration. Then paste Sentry Client Secret into this route settings."
-            : "Copy this token now. It may not be shown again."
+            : (isHeartbeat
+                ? "Heartbeat pings use a per-heartbeat token in the URL. Create or open a heartbeat to copy its real ping URL."
+                : "Copy this token now. It may not be shown again.")
     );
 
     $("#route-intake-url").val(url);
     $("#route-intake-token").val(token);
     $("#route-intake-curl").val(buildRouteIntakeCurl(route, token));
 
-    $("#route-intake-token-group").toggleClass("is-hidden", isSentry);
-    $("#copy-route-intake-token").toggleClass("is-hidden", isSentry);
+    $("#route-intake-token-group").toggleClass("is-hidden", isSentry || isHeartbeat);
+    $("#copy-route-intake-token").toggleClass("is-hidden", isSentry || isHeartbeat);
 
     $("#route-intake-url-help").text(
         isSentry
             ? "Use this URL as Webhook URL in Sentry Internal Integration."
-            : "Send alerts to this URL and pass the token as Authorization: Bearer."
+            : (isHeartbeat
+                ? "Replace <heartbeat-token> with the token from a heartbeat. Do not send Authorization: Bearer for heartbeat pings."
+                : "Send alerts to this URL and pass the token as Authorization: Bearer.")
     );
 
     openAppModal("#route-token-box");

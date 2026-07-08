@@ -2904,7 +2904,7 @@ function loadAlertServiceFilter(callback) {
                 return {
                     value: String(service.id),
                     text: [
-                        service.team_slug || service.team_name || null,
+                        service.team_name || service.team_slug || null,
                         service.name || service.slug || service.id
                     ].filter(Boolean).join(" / ")
                 };

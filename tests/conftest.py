@@ -89,10 +89,13 @@ from app.modules.db.models import (  # noqa: E402
     BusinessServiceComponent,
     BusinessServiceIncidentImpact,
     BusinessServiceStatusHistory,
+    Heartbeat,
+    HeartbeatPing,
 )
 
 
 CLEANUP_MODELS = [
+    HeartbeatPing,
     AlertNotificationEvent,
     AlertNotification,
     AlertEvent,
@@ -106,6 +109,7 @@ CLEANUP_MODELS = [
     IncidentStakeholder,
     Silence,
     AlertRouteChannel,
+    Heartbeat,
     Alert,
     AlertGroup,
     NotificationPolicyRuleChannel,

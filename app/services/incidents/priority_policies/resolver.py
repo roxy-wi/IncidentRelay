@@ -125,6 +125,16 @@ def resolve_incident_priority(
     """Resolve automatic incident priority for an incoming alert."""
     team_id = team.id if team else None
 
+    explicit_source_value = _source_priority_value(alert_data)
+    if alert_data.get("priority_set_manually") and explicit_source_value:
+        explicit_priority = _priority_from_source_value(explicit_source_value)
+        if explicit_priority:
+            return PriorityResolution(
+                priority=explicit_priority,
+                source="explicit_source_priority",
+                source_priority_value=explicit_source_value,
+            )
+
     policy = policy_service.get_effective_policy(
         team_id=team_id,
         service=service,

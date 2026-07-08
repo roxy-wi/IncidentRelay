@@ -12,6 +12,8 @@ from app.api.schemas.services import (
 )
 from app.modules.db.models import (
     AlertGroup,
+    BusinessService,
+    BusinessServiceComponent,
     ServiceDependency,
     ServiceLink,
     ServiceMatchRule,
@@ -447,6 +449,224 @@ def test_create_list_update_delete_service_runbooks_api(client, admin_headers):
 
     assert response.status_code == 200
     assert response.get_json()["deleted"] is True
+
+
+
+def test_service_impact_uses_cross_team_dependency_context(client, admin_headers):
+    group = create_group()
+    ops_team = create_team(group, slug="cloud-ops-impact", name="Cloud Ops Impact")
+    dev_team = create_team(group, slug="cloud-dev-impact", name="Cloud Dev Impact")
+    infra_team = create_team(group, slug="infra-impact", name="Infra Impact")
+
+    cloud_api = create_service(ops_team, slug="cloud-api-impact", name="Cloud API Impact")
+    consumer = create_service(dev_team, slug="cloud-consumer-impact", name="Cloud Consumer Impact")
+    rabbitmq = create_service(infra_team, slug="rabbitmq-impact", name="RabbitMQ Impact")
+
+    ServiceDependency.create(
+        service=cloud_api,
+        depends_on_service=consumer,
+        dependency_type="soft",
+        criticality="important",
+        enabled=True,
+    )
+    ServiceDependency.create(
+        service=consumer,
+        depends_on_service=rabbitmq,
+        dependency_type="hard",
+        criticality="required",
+        enabled=True,
+    )
+
+    rabbitmq.status = "major_outage"
+    rabbitmq.save()
+
+    response = client.get(
+        f"/api/services/impact?team_id={ops_team.id}&include_operational=true",
+        headers=admin_headers,
+    )
+
+    assert response.status_code == 200
+    items = response.get_json()["items"]
+    cloud_api_item = next(item for item in items if item["service_id"] == cloud_api.id)
+
+    assert cloud_api_item["primary_reason"] == "upstream_dependency"
+    assert cloud_api_item["dependency_impact_score"] > 0
+    assert cloud_api_item["effective_status"] != "operational"
+    assert any(
+        cause["service_id"] == rabbitmq.id
+        for cause in cloud_api_item["root_causes"]
+    )
+
+
+def test_service_dependency_graph_includes_business_component_cross_team_context(client, admin_headers):
+    group = create_group()
+    ops_team = create_team(group, slug="cloud-ops", name="Cloud Ops")
+    dev_team = create_team(group, slug="cloud-dev", name="Cloud Dev")
+    infra_team = create_team(group, slug="infra", name="Infra")
+
+    cloud_api = create_service(ops_team, slug="cloud-api", name="Cloud API")
+    consumer = create_service(dev_team, slug="cloud-consumer", name="Cloud Consumer")
+    rabbitmq = create_service(infra_team, slug="rabbitmq", name="RabbitMQ")
+
+    business_service = BusinessService.create(
+        group=group,
+        owner_team=ops_team,
+        slug="cloud",
+        name="Cloud",
+        enabled=True,
+    )
+    BusinessServiceComponent.create(
+        business_service=business_service,
+        service=cloud_api,
+        criticality="required",
+        impact_weight=100,
+        enabled=True,
+    )
+
+    ServiceDependency.create(
+        service=consumer,
+        depends_on_service=cloud_api,
+        dependency_type="soft",
+        criticality="important",
+        enabled=True,
+    )
+    ServiceDependency.create(
+        service=consumer,
+        depends_on_service=rabbitmq,
+        dependency_type="hard",
+        criticality="required",
+        enabled=True,
+    )
+
+    rabbitmq.status = "major_outage"
+    rabbitmq.save()
+
+    response = client.get(
+        f"/api/services/dependencies/graph?team_id={ops_team.id}&max_depth=5",
+        headers=admin_headers,
+    )
+
+    assert response.status_code == 200
+    graph_rows = response.get_json()
+    edges = {
+        (row["service_id"], row["depends_on_service_id"])
+        for row in graph_rows
+    }
+
+    assert (consumer.id, cloud_api.id) in edges
+    assert (consumer.id, rabbitmq.id) in edges
+
+    rabbitmq_edge = next(
+        row
+        for row in graph_rows
+        if row["service_id"] == consumer.id
+        and row["depends_on_service_id"] == rabbitmq.id
+    )
+    assert rabbitmq_edge["depends_on_service_effective_status"] == "major_outage"
+    assert rabbitmq_edge["depends_on_service_effective_impact_score"] == 100
+    assert rabbitmq_edge["service_effective_status"] == "major_outage"
+    assert rabbitmq_edge["service_dependency_impact_score"] == 100
+
+    response = client.get(
+        f"/api/services/dependencies?team_id={ops_team.id}",
+        headers=admin_headers,
+    )
+
+    assert response.status_code == 200
+    direct_edges = {
+        (row["service_id"], row["depends_on_service_id"])
+        for row in response.get_json()
+    }
+    assert (consumer.id, rabbitmq.id) not in direct_edges
+
+
+def test_service_dependency_graph_excludes_deleted_dependency_endpoints(client, admin_headers):
+    group = create_group()
+    ops_team = create_team(group, slug="cloud-ops-deleted", name="Cloud Ops Deleted")
+    dev_team = create_team(group, slug="cloud-dev-deleted", name="Cloud Dev Deleted")
+    infra_team = create_team(group, slug="infra-deleted", name="Infra Deleted")
+
+    cloud_api = create_service(ops_team, slug="cloud-api-deleted-test", name="Cloud API Deleted Test")
+    consumer = create_service(dev_team, slug="cloud-consumer-deleted-test", name="Cloud Consumer Deleted Test")
+    rabbitmq = create_service(infra_team, slug="rabbitmq-deleted-test", name="RabbitMQ Deleted Test")
+
+    ServiceDependency.create(
+        service=consumer,
+        depends_on_service=cloud_api,
+        dependency_type="soft",
+        criticality="important",
+        enabled=True,
+    )
+    ServiceDependency.create(
+        service=consumer,
+        depends_on_service=rabbitmq,
+        dependency_type="hard",
+        criticality="required",
+        enabled=True,
+    )
+
+    rabbitmq.deleted = True
+    rabbitmq.enabled = False
+    rabbitmq.save()
+
+    response = client.get(
+        f"/api/services/dependencies/graph?team_id={ops_team.id}&max_depth=5",
+        headers=admin_headers,
+    )
+
+    assert response.status_code == 200
+    edges = {
+        (row["service_id"], row["depends_on_service_id"])
+        for row in response.get_json()
+    }
+
+    assert (consumer.id, cloud_api.id) in edges
+    assert (consumer.id, rabbitmq.id) not in edges
+
+
+def test_business_service_components_endpoint_excludes_deleted_services(client, admin_headers):
+    group = create_group()
+    ops_team = create_team(group, slug="cloud-ops-components", name="Cloud Ops Components")
+
+    active_service = create_service(ops_team, slug="active-component", name="Active Component")
+    deleted_service = create_service(ops_team, slug="deleted-component", name="Deleted Component")
+    business_service = BusinessService.create(
+        group=group,
+        owner_team=ops_team,
+        slug="cloud-components",
+        name="Cloud Components",
+        enabled=True,
+    )
+
+    BusinessServiceComponent.create(
+        business_service=business_service,
+        service=active_service,
+        criticality="required",
+        impact_weight=100,
+        enabled=True,
+    )
+    BusinessServiceComponent.create(
+        business_service=business_service,
+        service=deleted_service,
+        criticality="required",
+        impact_weight=100,
+        enabled=True,
+    )
+
+    deleted_service.deleted = True
+    deleted_service.enabled = False
+    deleted_service.save()
+
+    response = client.get(
+        f"/api/business-services/components?team_id={ops_team.id}",
+        headers=admin_headers,
+    )
+
+    assert response.status_code == 200
+    service_ids = {row["service_id"] for row in response.get_json()}
+
+    assert active_service.id in service_ids
+    assert deleted_service.id not in service_ids
 
 
 def test_create_list_update_delete_service_dependencies_api(client, admin_headers):

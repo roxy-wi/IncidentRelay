@@ -36,3 +36,5 @@ For domain-specific workflows, continue with:
 - [Incident Management](../incidents/index.md)
 - [Services](../services/index.md)
 - [Scheduling](../scheduling/index.md)
+
+- [Heartbeats](heartbeats.md)

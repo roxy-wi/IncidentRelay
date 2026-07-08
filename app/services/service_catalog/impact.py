@@ -136,13 +136,15 @@ def build_service_impact_v2(query, *, team_ids=None):
     requested_team_id = getattr(query, "team_id", None)
     requested_service_id = getattr(query, "service_id", None)
 
-    services = _load_services(
+    scoped_services = _load_services(
         team_ids=team_ids,
         requested_team_id=requested_team_id,
     )
 
-    if not services:
+    if not scoped_services:
         return _empty_payload(query)
+
+    services = _load_services_for_effective_impact(list(scoped_services.keys())) or scoped_services
 
     dependencies = _load_dependencies(services.keys())
     alert_stats = _load_alert_stats(services.keys())
@@ -163,7 +165,7 @@ def build_service_impact_v2(query, *, team_ids=None):
     }
 
     return_service_ids = _select_return_service_ids(
-        services,
+        scoped_services,
         requested_service_id=requested_service_id,
         include_disabled=include_disabled,
     )
@@ -235,18 +237,20 @@ def build_single_service_impact_v2(service_id, query, *, team_ids=None):
     include_blast_radius = bool(getattr(query, "include_blast_radius", True))
     include_paths = bool(getattr(query, "include_paths", True))
 
-    services = _load_services(
+    scoped_services = _load_services(
         team_ids=team_ids,
         requested_team_id=None,
     )
 
-    service = services.get(service_id)
+    service = scoped_services.get(service_id)
 
     if not service:
         return None
 
     if not include_disabled and not service.enabled:
         return None
+
+    services = _load_services_for_effective_impact([service_id]) or scoped_services
 
     dependencies = _load_dependencies(services.keys())
     alert_stats = _load_alert_stats(services.keys())

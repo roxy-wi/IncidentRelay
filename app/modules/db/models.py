@@ -1321,6 +1321,99 @@ class ServiceSloMeasurement(BaseModel):
         )
 
 
+class Heartbeat(SoftDeleteModel):
+    """Dead-man-switch check expecting recurring success pings."""
+
+    id = AutoField()
+    uid = UUIDField(default=uuid.uuid4, unique=True, index=True)
+
+    group = ForeignKeyField(Group, null=True, backref="heartbeats", on_delete="CASCADE")
+    team = ForeignKeyField(Team, backref="heartbeats", on_delete="CASCADE")
+    service = ForeignKeyField(Service, null=True, backref="heartbeats", on_delete="SET NULL")
+    route = DeferredForeignKey("AlertRoute", backref="heartbeats", on_delete="CASCADE")
+
+    name = CharField()
+    slug = CharField()
+    description = TextField(null=True)
+
+    mode = CharField(default="interval", index=True)
+    expected_interval_seconds = IntegerField(null=True)
+    grace_period_seconds = IntegerField(default=300)
+
+    schedule_kind = CharField(null=True)
+    schedule_time = CharField(null=True)
+    schedule_weekday = IntegerField(null=True)
+    schedule_monthday = IntegerField(null=True)
+    timezone = CharField(default="UTC")
+
+    status = CharField(default="new", index=True)
+    enabled = BooleanField(default=True, index=True)
+    auto_resolve = BooleanField(default=True)
+
+    severity = CharField(default="critical", index=True)
+    priority_slug = CharField(default="p2", index=True)
+
+    token_prefix = CharField(null=True, index=True)
+    token_hash = CharField(unique=True, index=True)
+
+    last_seen_at = DateTimeField(null=True, index=True)
+    last_payload = JSONTextField(null=True)
+    last_remote_addr = CharField(null=True)
+    last_user_agent = TextField(null=True)
+
+    next_expected_at = DateTimeField(null=True, index=True)
+    overdue_since = DateTimeField(null=True, index=True)
+    last_overdue_at = DateTimeField(null=True)
+    last_recovered_at = DateTimeField(null=True)
+
+    current_alert_group = DeferredForeignKey(
+        "AlertGroup",
+        null=True,
+        backref="heartbeat_overdue_checks",
+        on_delete="SET NULL",
+    )
+
+    labels = JSONTextField(default=dict)
+    metadata = JSONTextField(default=dict)
+
+    created_by = ForeignKeyField(User, null=True, backref="created_heartbeats", on_delete="SET NULL")
+    created_at = DateTimeField(default=datetime.utcnow)
+    updated_at = DateTimeField(default=datetime.utcnow)
+
+    class Meta:
+        table_name = "heartbeat"
+        indexes = (
+            (("team", "slug"), True),
+            (("team", "status"), False),
+            (("group", "enabled"), False),
+            (("route", "enabled"), False),
+            (("status", "next_expected_at"), False),
+        )
+
+
+class HeartbeatPing(BaseModel):
+    """History of heartbeat pings and state transitions."""
+
+    id = AutoField()
+    heartbeat = ForeignKeyField(Heartbeat, backref="pings", on_delete="CASCADE")
+    received_at = DateTimeField(default=datetime.utcnow, index=True)
+    event_type = CharField(default="ping", index=True)
+    status_before = CharField(null=True)
+    status_after = CharField(null=True)
+    message = TextField(null=True)
+    payload = JSONTextField(null=True)
+    remote_addr = CharField(null=True)
+    user_agent = TextField(null=True)
+    alert_group = DeferredForeignKey("AlertGroup", null=True, backref="heartbeat_events", on_delete="SET NULL")
+
+    class Meta:
+        table_name = "heartbeat_ping"
+        indexes = (
+            (("heartbeat", "received_at"), False),
+            (("heartbeat", "event_type"), False),
+        )
+
+
 class AlertRoute(SoftDeleteModel):
     """Route incoming alerts to a team, rotation and channels."""
 

@@ -8,7 +8,9 @@ from flask import (
     request,
     send_from_directory,
 )
+from urllib.parse import quote
 
+from app.login import normalize_auth_redirect_target
 from app.middleware import load_jwt_user
 
 
@@ -54,6 +56,8 @@ def pwa_service_worker():
 @pages_bp.route("/services/")
 @pages_bp.route("/business-services")
 @pages_bp.route("/business-services/")
+@pages_bp.route("/heartbeats")
+@pages_bp.route("/heartbeats/")
 @pages_bp.route("/maintenance-windows")
 @pages_bp.route("/maintenance-windows/")
 @pages_bp.route("/escalation-policies")
@@ -88,11 +92,12 @@ def app_page(alert_id=None):
 
     if request.path == "/login":
         if user:
-            return redirect("/")
+            return redirect(normalize_auth_redirect_target(request.args.get("next")))
         return render_template("login_only.html")
 
     if not user:
-        return redirect("/login")
+        target = normalize_auth_redirect_target(request.full_path.rstrip("?"))
+        return redirect(f"/login?next={quote(target, safe='')}")
 
     if request.path in ("/admin/users", "/groups", "/admin/sso") and not user.is_admin:
         abort(403)

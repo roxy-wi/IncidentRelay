@@ -47,3 +47,5 @@ Read more: [Browser Push](../usage/browser-push.md).
 4. [Sentry Integration API](sentry-integration.md)
 5. [Voice Call OpenAPI Notes](voice-call-openapi.md)
 6. [Business services](business-services.md)
+
+- [Heartbeats API](heartbeats.md)

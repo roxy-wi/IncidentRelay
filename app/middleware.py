@@ -17,6 +17,7 @@ PUBLIC_API_PATHS = {
 PUBLIC_API_PREFIXES = (
     "/api/auth/sso/",
     "/api/integrations/",
+    "/api/heartbeats/ping/",
     "/api/version",
 )
 
@@ -139,6 +140,9 @@ def required_scopes_for_request():
 
     if path.startswith("/api/calendar"):
         return ["resources:read"]
+
+    if path.startswith("/api/heartbeats"):
+        return ["resources:read"] if method == "GET" else ["resources:write"]
 
     if (
         path.startswith("/api/groups")

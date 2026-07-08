@@ -1564,7 +1564,7 @@ function renderServiceDetailsQuickActions(payload) {
         onClick: function () {
             resetServiceDependencyForm();
             fillServiceSelect("#service-dependency-source", service.id);
-            $("#service-dependency-source").prop("disabled", true);
+            setServiceDependencySelectDisabled("#service-dependency-source", true);
             loadServiceDependencyTargets(function () {
                 openAppModal("#service-dependency-modal");
             });

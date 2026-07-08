@@ -468,6 +468,10 @@ button.impact-path-node {
     flex: 1 1 280px;
 }
 
+.service-dependency-graph-toolbar .page-toolbar-filter {
+    min-width: 100px;
+}
+
 .service-dependency-graph {
     position: relative;
     min-height: 480px;
@@ -499,6 +503,26 @@ button.impact-path-node {
     font-size: 12px;
 }
 
+.service-dependency-graph-legend {
+    display: flex;
+    gap: 14px;
+    flex-wrap: wrap;
+    align-items: center;
+    margin-top: 10px;
+    color: var(--muted-text, #64748b);
+    font-size: 12px;
+}
+
+.graph-legend-section {
+    font-weight: 700;
+    color: var(--body-text, #0f172a);
+    margin-left: 8px;
+}
+
+.graph-legend-section:first-child {
+    margin-left: 0;
+}
+
 .graph-legend-dot {
     display: inline-block;
     width: 10px;
@@ -508,38 +532,74 @@ button.impact-path-node {
     vertical-align: -1px;
 }
 
+.graph-legend-business {
+    display: inline-block;
+    width: 18px;
+    height: 10px;
+    border-radius: 4px;
+    background: #64748b;
+    border: 2px solid #0f172a;
+    margin-right: 6px;
+    vertical-align: -1px;
+}
+
 .graph-legend-line {
     display: inline-block;
-    width: 22px;
+    width: 24px;
     height: 0;
     border-top: 3px solid currentColor;
     margin-right: 6px;
     vertical-align: 3px;
 }
 
-.graph-legend-operational {
+.graph-legend-operational,
+.graph-legend-edge-operational {
     background: #16a34a;
+    color: #16a34a;
 }
 
-.graph-legend-degraded {
+.graph-legend-degraded,
+.graph-legend-edge-degraded {
     background: #f59e0b;
+    color: #f59e0b;
 }
 
-.graph-legend-outage {
+.graph-legend-partial-outage,
+.graph-legend-edge-partial-outage {
+    background: #f97316;
+    color: #f97316;
+}
+
+.graph-legend-outage,
+.graph-legend-edge-outage {
     background: #dc2626;
-}
-
-.graph-legend-business {
-    background: #64748b;
-    border-radius: 3px;
-}
-
-.graph-legend-required {
     color: #dc2626;
 }
 
+.graph-legend-unknown,
+.graph-legend-edge-unknown {
+    background: #64748b;
+    color: #64748b;
+}
+
+.graph-legend-required {
+    color: #64748b;
+    border-top-width: 4px;
+}
+
+.graph-legend-important {
+    color: #64748b;
+    border-top-width: 3px;
+}
+
 .graph-legend-optional {
-    color: #94a3b8;
+    color: #64748b;
+    border-top-width: 2px;
+}
+
+.graph-legend-business-component {
+    color: #0f172a;
+    border-top-style: dotted;
 }
 
 .graph-legend-disabled {

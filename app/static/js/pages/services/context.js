@@ -20,11 +20,71 @@ function getDefaultServiceIdForCreate() {
 }
 
 
-function fillServiceSelect(selectSelector, selectedId) {
-    const select = $(selectSelector);
-    select.empty();
+function isServiceDependencyTomSelect(selectElement) {
+    return !!(
+        selectElement
+        && selectElement.classList
+        && selectElement.classList.contains("js-service-dependency-select")
+        && typeof window.TomSelect !== "undefined"
+    );
+}
 
-    select.append($("<option>").val("").text("Select service"));
+
+function initServiceDependencyTomSelect(selectSelector, options) {
+    const selectElement = getSelectElement(selectSelector);
+
+    if (!isServiceDependencyTomSelect(selectElement)) {
+        return null;
+    }
+
+    if (selectElement.tomselect) {
+        return selectElement.tomselect;
+    }
+
+    return new TomSelect(selectElement, Object.assign({
+        create: false,
+        persist: false,
+        allowEmptyOption: true,
+        maxOptions: 500,
+        placeholder: selectElement.dataset.placeholder || "Select service",
+        searchField: ["text"],
+        sortField: {
+            field: "text",
+            direction: "asc"
+        },
+        plugins: ["clear_button"],
+        render: {
+            no_results: function () {
+                return '<div class="no-results">No services found</div>';
+            }
+        }
+    }, options || {}));
+}
+
+
+function setServiceDependencySelectDisabled(selectSelector, disabled) {
+    if (typeof setEnhancedSelectDisabled === "function") {
+        setEnhancedSelectDisabled(selectSelector, disabled);
+        return;
+    }
+
+    $(selectSelector).prop("disabled", !!disabled);
+}
+
+
+function fillServiceSelect(selectSelector, selectedId) {
+    const selectElement = getSelectElement(selectSelector);
+
+    if (!selectElement) {
+        return;
+    }
+
+    const wasDisabled = $(selectElement).prop("disabled");
+
+    destroyTomSelectIfExists(selectElement);
+
+    const select = $(selectElement);
+    select.empty();
 
     servicesCache.forEach(function (service) {
         if (!service.enabled) {
@@ -48,6 +108,9 @@ function fillServiceSelect(selectSelector, selectedId) {
     if (selectedId) {
         select.val(String(selectedId));
     }
+
+    initServiceDependencyTomSelect(selectElement);
+    setServiceDependencySelectDisabled(selectElement, wasDisabled);
 }
 
 
@@ -108,6 +171,7 @@ function refreshAllServiceContext() {
     allServiceLinksCache = [];
     allServiceRunbooksCache = [];
     allServiceDependenciesCache = [];
+    allServiceGraphDependenciesCache = [];
     businessServiceComponentsCache = [];
 
     $("#services-links-count").text("0");
@@ -115,7 +179,7 @@ function refreshAllServiceContext() {
     $("#services-dependencies-count").text("0");
 
     const query = selectedTeamQuery();
-    let pending = 4;
+    let pending = 5;
 
     function done() {
         pending -= 1;
@@ -159,6 +223,17 @@ function refreshAllServiceContext() {
             dependency._service = getServiceById(dependency.service_id);
             return dependency;
         });
+        done();
+    });
+
+    apiGet("/api/services/dependencies/graph" + query + (query ? "&" : "?") + "max_depth=5", function (dependencies) {
+        allServiceGraphDependenciesCache = asArray(dependencies).map(function (dependency) {
+            dependency._service = getServiceById(dependency.service_id);
+            return dependency;
+        });
+        done();
+    }, function () {
+        allServiceGraphDependenciesCache = [];
         done();
     });
 
@@ -1012,9 +1087,10 @@ function deleteServiceRunbook(runbook) {
 function resetServiceDependencyForm() {
     $("#service-dependency-form-title").text("Create dependency");
     $("#service-dependency-id").val("");
-    $("#service-dependency-source").prop("disabled", false);
+    setServiceDependencySelectDisabled("#service-dependency-source", false);
     fillServiceSelect("#service-dependency-source", getDefaultServiceIdForCreate());
-    $("#service-dependency-target").val("");
+    setServiceDependencySelectDisabled("#service-dependency-source", false);
+    setSelectValue("#service-dependency-target", "");
     $("#service-dependency-type").val("hard");
     $("#service-dependency-criticality").val("important");
     $("#service-dependency-correlation-enabled").prop("checked", true);
@@ -1036,10 +1112,10 @@ function editServiceDependency(dependency) {
     $("#service-dependency-form-title").text("Edit dependency");
     $("#service-dependency-id").val(dependency.id);
     fillServiceSelect("#service-dependency-source", dependency.service_id);
-    $("#service-dependency-source").prop("disabled", true);
+    setServiceDependencySelectDisabled("#service-dependency-source", true);
 
     loadServiceDependencyTargets(function () {
-        $("#service-dependency-target").val(dependency.depends_on_service_id || "");
+        setSelectValue("#service-dependency-target", dependency.depends_on_service_id || "");
         $("#service-dependency-type").val(dependency.dependency_type || "hard");
         $("#service-dependency-criticality").val(dependency.criticality || "important");
         $("#service-dependency-correlation-enabled").prop("checked", dependency.correlation_enabled !== false);
@@ -1053,10 +1129,19 @@ function editServiceDependency(dependency) {
 
 function loadServiceDependencyTargets(callback) {
     const sourceId = Number($("#service-dependency-source").val());
-    const select = $("#service-dependency-target");
+    const selectElement = getSelectElement("#service-dependency-target");
 
+    if (!selectElement) {
+        if (typeof callback === "function") {
+            callback();
+        }
+        return;
+    }
+
+    destroyTomSelectIfExists(selectElement);
+
+    const select = $(selectElement);
     select.empty();
-    select.append($("<option>").val("").text("Select service"));
 
     apiGet("/api/services", function (services) {
         asArray(services).forEach(function (candidate) {
@@ -1076,6 +1161,10 @@ function loadServiceDependencyTargets(callback) {
                         + ")"
                     )
             );
+        });
+
+        initServiceDependencyTomSelect(selectElement, {
+            placeholder: selectElement.dataset.placeholder || "Select dependency service..."
         });
 
         if (typeof callback === "function") {

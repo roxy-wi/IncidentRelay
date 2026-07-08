@@ -6,7 +6,7 @@ from flask import make_response, redirect
 from peewee import IntegrityError
 
 from app.db import database_proxy as db
-from app.login import create_access_token
+from app.login import create_access_token, normalize_auth_redirect_target
 from app.modules.db import groups_repo, teams_repo, users_repo
 from app.modules.db.models import SsoGroupMapping, SsoIdentity, User, UserGroup
 from app.settings import Config
@@ -26,8 +26,9 @@ class SsoLoginError(Exception):
 def build_sso_login_response(user, redirect_to="/"):
     """Issue IncidentRelay JWT cookie and redirect user to the UI."""
     token, _expires_at = create_access_token(user)
+    redirect_to = normalize_auth_redirect_target(redirect_to)
 
-    response = make_response(redirect(redirect_to or "/"))
+    response = make_response(redirect(redirect_to))
     response.set_cookie(
         Config.JWT_COOKIE_NAME,
         token,

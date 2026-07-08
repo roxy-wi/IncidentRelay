@@ -6,13 +6,20 @@ def resolve_alert_service(route, alert_data):
     """Resolve affected service for an alert after route matched.
 
     Priority:
-    1. route-specific ServiceMatchRule
-    2. team-level ServiceMatchRule
-    3. route.service fallback
-    4. None
+    1. internal forced service id, used by first-class IR sources;
+    2. route-specific ServiceMatchRule;
+    3. team-level ServiceMatchRule;
+    4. route.service fallback;
+    5. None.
     """
     if not route or not route.team_id:
         return None
+
+    forced_service_id = alert_data.get("_forced_service_id")
+    if forced_service_id:
+        service = services_repo.get_service_or_none(forced_service_id)
+        if service and service.team_id == route.team_id and services_repo.is_service_active(service):
+            return service
 
     rules = services_repo.list_enabled_match_rules(
         team_id=route.team_id,
