@@ -21,6 +21,23 @@ def response(description, schema=None):
     return item
 
 
+HEARTBEAT_INSTANCE_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "id": {"type": "integer"},
+        "heartbeat_id": {"type": "integer"},
+        "instance_key": {"type": "string"},
+        "status": {"type": "string", "enum": ["new", "ok", "overdue", "paused"]},
+        "enabled": {"type": "boolean"},
+        "auto_discovered": {"type": "boolean"},
+        "last_seen_at": {"type": "string", "format": "date-time", "nullable": True},
+        "next_expected_at": {"type": "string", "format": "date-time", "nullable": True},
+        "deadline_at": {"type": "string", "format": "date-time", "nullable": True},
+        "current_alert_group_id": {"type": "integer", "nullable": True},
+    },
+}
+
+
 HEARTBEAT_SCHEMA = {
     "type": "object",
     "properties": {
@@ -42,10 +59,15 @@ HEARTBEAT_SCHEMA = {
         "next_expected_at": {"type": "string", "format": "date-time", "nullable": True},
         "deadline_at": {"type": "string", "format": "date-time", "nullable": True},
         "current_alert_group_id": {"type": "integer", "nullable": True},
+        "instance_tracking_enabled": {"type": "boolean"},
+        "instance_key": {"type": "string"},
+        "expected_instances_mode": {"type": "string", "enum": ["none", "static", "auto"]},
+        "auto_discovery_ttl_days": {"type": "integer", "nullable": True},
+        "instance_summary": {"type": "object"},
+        "instances": {"type": "array", "items": HEARTBEAT_INSTANCE_SCHEMA},
         "ping_url": {"type": "string", "nullable": True},
     },
 }
-
 
 HEARTBEAT_INPUT_SCHEMA = {
     "type": "object",
@@ -69,6 +91,11 @@ HEARTBEAT_INPUT_SCHEMA = {
         "priority_slug": {"type": "string", "default": "p2"},
         "enabled": {"type": "boolean"},
         "auto_resolve": {"type": "boolean"},
+        "instance_tracking_enabled": {"type": "boolean", "default": False},
+        "instance_key": {"type": "string", "default": "instance"},
+        "expected_instances_mode": {"type": "string", "enum": ["none", "static", "auto"], "default": "none"},
+        "expected_instances": {"type": "array", "items": {"type": "string"}},
+        "auto_discovery_ttl_days": {"type": "integer", "nullable": True, "default": 30},
         "labels": {"type": "object"},
         "metadata": {"type": "object"},
     },
@@ -120,6 +147,27 @@ def paths():
                 "parameters": [path_param("heartbeat_id", "Heartbeat id")],
                 "responses": {"200": response("Deleted")},
             },
+        },
+        "/api/heartbeats/{heartbeat_id}/instances": {
+            "get": {
+                "tags": ["Heartbeats"],
+                "summary": "List heartbeat instances",
+                "security": [{"bearerAuth": []}],
+                "parameters": [path_param("heartbeat_id", "Heartbeat id")],
+                "responses": {"200": response("Heartbeat instances", {"type": "array", "items": HEARTBEAT_INSTANCE_SCHEMA})},
+            }
+        },
+        "/api/heartbeats/{heartbeat_id}/instances/{instance_id}/disable": {
+            "post": {
+                "tags": ["Heartbeats"],
+                "summary": "Disable heartbeat instance",
+                "security": [{"bearerAuth": []}],
+                "parameters": [
+                    path_param("heartbeat_id", "Heartbeat id"),
+                    path_param("instance_id", "Instance id"),
+                ],
+                "responses": {"200": response("Disabled heartbeat instance", HEARTBEAT_INSTANCE_SCHEMA)},
+            }
         },
         "/api/heartbeats/{heartbeat_id}/regenerate-token": {
             "post": {

@@ -151,6 +151,58 @@ function selectedAlertGroupsForBulkAction(action) {
     });
 }
 
+function currentPageSelectableAlertGroupIds(alerts) {
+    return asArray(alerts || alertsCache)
+        .filter(function (alert) {
+            return (
+                alert
+                && isAlertGroup(alert)
+                && canRespondObject(alert)
+                && normalizeAlertValue(alert.status) !== "merged"
+                && alert.id !== null
+                && alert.id !== undefined
+            );
+        })
+        .map(function (alert) {
+            return Number(alert.id);
+        })
+        .filter(Boolean);
+}
+
+function pruneAlertGroupSelectionToCurrentPage(alerts) {
+    const selectableIds = new Set(currentPageSelectableAlertGroupIds(alerts));
+
+    selectedAlertGroupIds.forEach(function (id) {
+        if (!selectableIds.has(Number(id))) {
+            selectedAlertGroupIds.delete(id);
+        }
+    });
+}
+
+function updateAlertsPageSelectAllState() {
+    const checkbox = $("#alerts-select-page");
+
+    if (!checkbox.length) {
+        return;
+    }
+
+    const ids = currentPageSelectableAlertGroupIds(alertsCache);
+    const selectedCount = ids.filter(function (id) {
+        return selectedAlertGroupIds.has(Number(id));
+    }).length;
+
+    checkbox
+        .prop("disabled", ids.length < 1)
+        .prop("checked", ids.length > 0 && selectedCount === ids.length)
+        .prop("indeterminate", selectedCount > 0 && selectedCount < ids.length)
+        .attr(
+            "title",
+            ids.length > 0
+                ? "Select all alert groups on this page"
+                : "No selectable alert groups on this page"
+        );
+}
+
 function ensureAlertsBulkActionsBar() {
     let bar = $("#alerts-bulk-actions");
 
@@ -217,6 +269,7 @@ function renderAlertsBulkActions() {
         .prop("disabled", resolveCount < 1)
         .text(resolveCount > 0 ? "Resolve selected (" + resolveCount + ")" : "Resolve selected");
     bar.find("#alerts-merge-selected").prop("disabled", count < 2);
+    updateAlertsPageSelectAllState();
 }
 
 function clearAlertGroupSelection() {
@@ -954,18 +1007,23 @@ function renderAlertsTable(alerts) {
     const tbody = $("#alerts-table");
     tbody.empty();
 
+    pruneAlertGroupSelectionToCurrentPage(alerts);
+
     if (!alerts.length) {
         tbody.append(
             $("<tr>").append(
                 $("<td>").attr("colspan", "10").addClass("empty-table-cell").text("No alerts found")
             )
         );
+        updateAlertsPageSelectAllState();
         return;
     }
 
     alerts.forEach(function (alert) {
         tbody.append(renderAlertPageRow(alert));
     });
+
+    updateAlertsPageSelectAllState();
 }
 
 function renderAlertPageRow(alert) {
@@ -999,6 +1057,7 @@ function renderAlertPageRow(alert) {
                     }
 
                     renderAlertsBulkActions();
+                    updateAlertsPageSelectAllState();
                 })
         );
     }
@@ -2951,6 +3010,28 @@ if (initialExplainTraceId) {
         openAlertDetailsForTrace(initialExplainTraceId);
     }, 100);
 }
+
+$(document).on("click", "#alerts-select-page", function (event) {
+    event.stopPropagation();
+});
+
+$(document).on("change", "#alerts-select-page", function (event) {
+    event.stopPropagation();
+
+    const checked = $(this).is(":checked");
+    const ids = currentPageSelectableAlertGroupIds(alertsCache);
+
+    ids.forEach(function (id) {
+        if (checked) {
+            selectedAlertGroupIds.add(Number(id));
+        } else {
+            selectedAlertGroupIds.delete(Number(id));
+        }
+    });
+
+    renderAlertsTable(alertsCache);
+    renderAlertsBulkActions();
+});
 
 $(document).on("click", "#alerts-clear-selection", function () {
     clearAlertGroupSelection();

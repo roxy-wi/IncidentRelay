@@ -270,46 +270,40 @@ def normalize_sentry(payload, headers=None, route_config=None):
         alert_obj=alert_obj,
     )
 
-    sentry_url_source = "payload" if sentry_url else None
-
     if not sentry_url:
         sentry_url = sentry_url_from_route_config(
             route_config,
             organization_slug,
             issue_id,
         )
-        if sentry_url:
-            sentry_url_source = "route_config"
 
-    logger.info(
-        "sentry source event url resolved",
-        extra={
-            "extra": {
-                "event_type": "sentry_source_event_url_resolved",
-                "has_sentry_url": bool(sentry_url),
-                "sentry_url_source": sentry_url_source or "missing",
-                "sentry_url": sentry_url or "",
-                "resource": resource,
-                "action": action,
-                "organization_slug": organization_slug or "",
-                "route_sentry_base_url_configured": bool(
-                    sentry_route_config.get("base_url")
-                ),
-                "route_sentry_organization_configured": bool(
-                    sentry_route_config.get("organization_slug")
-                    or sentry_route_config.get("org_slug")
-                ),
-                "issue_id": str(issue_id) if issue_id else "",
-                "event_id": str(event_id) if event_id else "",
-                "alert_id": str(alert_id) if alert_id else "",
-                "top_level_keys": sorted(payload.keys()),
-                "data_keys": sorted(data.keys()),
-                "issue_keys": sorted(issue.keys()),
-                "event_keys": sorted(event.keys()),
-                "metric_alert_keys": sorted(metric_alert.keys()),
-                "event_alert_keys": sorted(event_alert.keys()),
-            }
-        },
+    sentry_tags = normalize_sentry_tags(
+        payload.get("tags"),
+        data.get("tags"),
+        issue.get("tags"),
+        event.get("tags"),
+        metric_alert.get("tags"),
+        event_alert.get("tags"),
+        alert_obj.get("tags"),
+    )
+
+    environment = first_non_empty(
+        event.get("environment"),
+        event.get("environment_name"),
+        issue.get("environment"),
+        issue.get("environment_name"),
+        metric_alert.get("environment"),
+        metric_alert.get("environment_name"),
+        event_alert.get("environment"),
+        event_alert.get("environment_name"),
+        alert_obj.get("environment"),
+        alert_obj.get("environment_name"),
+        data.get("environment"),
+        data.get("environment_name"),
+        payload.get("environment"),
+        payload.get("environment_name"),
+        sentry_tags.get("environment"),
+        sentry_tags.get("env"),
     )
 
     labels = {
@@ -333,11 +327,7 @@ def normalize_sentry(payload, headers=None, route_config=None):
             event_alert.get("title"),
         ),
         "level": raw_level,
-        "environment": first_non_empty(
-            event.get("environment"),
-            issue.get("environment"),
-            data.get("environment"),
-        ),
+        "environment": environment,
         "culprit": first_non_empty(issue.get("culprit"), event.get("culprit")),
         "sentry_url": sentry_url,
     }
@@ -347,16 +337,6 @@ def normalize_sentry(payload, headers=None, route_config=None):
         for key, value in labels.items()
         if value not in (None, "")
     }
-
-    sentry_tags = normalize_sentry_tags(
-        payload.get("tags"),
-        data.get("tags"),
-        issue.get("tags"),
-        event.get("tags"),
-        metric_alert.get("tags"),
-        event_alert.get("tags"),
-        alert_obj.get("tags"),
-    )
 
     for key, value in sentry_tags.items():
         labels.setdefault(key, value)

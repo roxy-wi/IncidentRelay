@@ -64,3 +64,47 @@ curl -fsS https://incidentrelay.example.com/api/heartbeats/ping/<token>
 ```
 
 For ETL jobs, send the ping only after successful completion and data-quality checks.
+
+## Multi-instance heartbeats and auto-discovery
+
+For fleets where the same cronjob runs on many servers, do not use one flat heartbeat without an instance key. One healthy server would keep the heartbeat green while other servers silently stop reporting.
+
+Enable **Track instances / auto-discovery** and send an instance identifier with every ping:
+
+```bash
+curl -fsS -X POST https://incidentrelay.example.com/api/heartbeats/ping/<token> \
+  -H 'Content-Type: application/json' \
+  -d '{
+    "status": "completed",
+    "instance": "server-1.example.com",
+    "payload": {
+      "job": "mysql-backup"
+    }
+  }'
+```
+
+IncidentRelay then tracks each producer independently:
+
+```text
+mysql-backup
+  server-1.example.com  OK
+  server-2.example.com  OK
+  server-3.example.com  OVERDUE
+```
+
+When a single instance is overdue, IR creates a normal alert with:
+
+```text
+alertname = HeartbeatInstanceOverdue
+dedup_key = heartbeat:<uid>:instance:<instance>
+labels.instance = <instance>
+labels.heartbeat_instance = <instance>
+```
+
+If the instance pings again and auto-resolve is enabled, that instance alert is resolved without affecting other instances.
+
+### Expected instances modes
+
+`auto` mode discovers a new instance on first successful ping and expects it from then on. Healthy auto-discovered instances can be disabled automatically after the configured TTL if they stop reporting for a long time and have no active overdue alert.
+
+`static` mode accepts only the configured list of instances. This is stricter and better when the fleet membership is managed by inventory, Ansible or Terraform.

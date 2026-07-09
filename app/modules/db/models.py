@@ -1350,6 +1350,11 @@ class Heartbeat(SoftDeleteModel):
     enabled = BooleanField(default=True, index=True)
     auto_resolve = BooleanField(default=True)
 
+    instance_tracking_enabled = BooleanField(default=False, index=True)
+    instance_key = CharField(default="instance")
+    expected_instances_mode = CharField(default="none", index=True)
+    auto_discovery_ttl_days = IntegerField(null=True)
+
     severity = CharField(default="critical", index=True)
     priority_slug = CharField(default="p2", index=True)
 
@@ -1388,6 +1393,50 @@ class Heartbeat(SoftDeleteModel):
             (("group", "enabled"), False),
             (("route", "enabled"), False),
             (("status", "next_expected_at"), False),
+            (("team", "instance_tracking_enabled"), False),
+        )
+
+
+class HeartbeatInstance(BaseModel):
+    """Per-producer state for multi-instance heartbeats."""
+
+    id = AutoField()
+    heartbeat = ForeignKeyField(Heartbeat, backref="instances", on_delete="CASCADE")
+    instance_key = CharField()
+
+    status = CharField(default="new", index=True)
+    enabled = BooleanField(default=True, index=True)
+    auto_discovered = BooleanField(default=True, index=True)
+
+    first_seen_at = DateTimeField(null=True)
+    last_seen_at = DateTimeField(null=True, index=True)
+    last_payload = JSONTextField(null=True)
+    last_remote_addr = CharField(null=True)
+    last_user_agent = TextField(null=True)
+
+    next_expected_at = DateTimeField(null=True, index=True)
+    overdue_since = DateTimeField(null=True, index=True)
+    last_overdue_at = DateTimeField(null=True)
+    last_recovered_at = DateTimeField(null=True)
+
+    current_alert_group = DeferredForeignKey(
+        "AlertGroup",
+        null=True,
+        backref="heartbeat_instance_overdue_checks",
+        on_delete="SET NULL",
+    )
+
+    metadata = JSONTextField(default=dict)
+    created_at = DateTimeField(default=datetime.utcnow)
+    updated_at = DateTimeField(default=datetime.utcnow)
+
+    class Meta:
+        table_name = "heartbeat_instance"
+        indexes = (
+            (("heartbeat", "instance_key"), True),
+            (("heartbeat", "status"), False),
+            (("enabled", "next_expected_at"), False),
+            (("heartbeat", "auto_discovered"), False),
         )
 
 
@@ -1398,6 +1447,7 @@ class HeartbeatPing(BaseModel):
     heartbeat = ForeignKeyField(Heartbeat, backref="pings", on_delete="CASCADE")
     received_at = DateTimeField(default=datetime.utcnow, index=True)
     event_type = CharField(default="ping", index=True)
+    instance_key = CharField(null=True, index=True)
     status_before = CharField(null=True)
     status_after = CharField(null=True)
     message = TextField(null=True)

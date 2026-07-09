@@ -1,6 +1,6 @@
-from typing import Any, Dict
+from typing import Any, Dict, List
 
-from pydantic import Field, model_validator
+from pydantic import ConfigDict, Field, model_validator
 
 from app.api.schemas.base import ApiModel
 
@@ -10,6 +10,7 @@ HEARTBEAT_STATUS_PATTERN = r"^(new|ok|overdue|paused)$"
 HEARTBEAT_SCHEDULE_KIND_PATTERN = r"^(daily|weekly|monthly)$"
 HEARTBEAT_SEVERITY_PATTERN = r"^(critical|high|medium|warning|low|info)$"
 HEARTBEAT_PRIORITY_PATTERN = r"^p[1-5]$"
+HEARTBEAT_EXPECTED_INSTANCES_MODE_PATTERN = r"^(none|static|auto)$"
 
 
 class HeartbeatBaseSchema(ApiModel):
@@ -36,11 +37,27 @@ class HeartbeatBaseSchema(ApiModel):
 
     enabled: bool = True
     auto_resolve: bool = True
+
+    instance_tracking_enabled: bool = False
+    instance_key: str = Field(default="instance", min_length=1, max_length=64, pattern=r"^[A-Za-z0-9_.:-]+$")
+    expected_instances_mode: str = Field(default="none", pattern=HEARTBEAT_EXPECTED_INSTANCES_MODE_PATTERN)
+    expected_instances: List[str] = Field(default_factory=list)
+    auto_discovery_ttl_days: int | None = Field(default=30, ge=1, le=3650)
+
     labels: Dict[str, Any] = Field(default_factory=dict)
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def validate_mode_fields(self):
+        if not self.instance_tracking_enabled:
+            self.expected_instances_mode = "none"
+            self.expected_instances = []
+            self.auto_discovery_ttl_days = None
+        elif self.expected_instances_mode == "static" and not self.expected_instances:
+            raise ValueError("expected_instances is required when static instance tracking is enabled")
+        elif self.expected_instances_mode == "none":
+            raise ValueError("expected_instances_mode must be static or auto when instance tracking is enabled")
+
         if self.mode == "interval":
             if not self.expected_interval_seconds:
                 raise ValueError("expected_interval_seconds is required for interval heartbeats")
@@ -72,7 +89,13 @@ class HeartbeatUpdateSchema(HeartbeatBaseSchema):
 
 
 class HeartbeatPingSchema(ApiModel):
+    model_config = ConfigDict(extra="allow", str_strip_whitespace=True)
+
     status: str | None = Field(default="completed", max_length=64)
     run_id: str | None = Field(default=None, max_length=255)
+    instance: str | None = Field(default=None, max_length=255)
+    host: str | None = Field(default=None, max_length=255)
+    hostname: str | None = Field(default=None, max_length=255)
+    node: str | None = Field(default=None, max_length=255)
     message: str | None = Field(default=None, max_length=2000)
     payload: Dict[str, Any] = Field(default_factory=dict)

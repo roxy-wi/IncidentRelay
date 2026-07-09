@@ -105,7 +105,18 @@
       <table id="alerts-table-view" class="data-table alerts-table alerts-inbox-table sortable-table">
         <thead>
           <tr>
-              <th data-sort="id">ID</th>
+              <th data-sort="id" class="alerts-select-column">
+                  <span class="alerts-id-header-content">
+                      <input
+                        id="alerts-select-page"
+                        class="alerts-page-select-all-checkbox"
+                        type="checkbox"
+                        title="Select all alert groups on this page"
+                        aria-label="Select all alert groups on this page"
+                      >
+                      <span>ID</span>
+                  </span>
+              </th>
               <th data-sort="status">Status</th>
               <th data-sort="title">Alert</th>
               <th data-sort="severity">Severity</th>

@@ -31,11 +31,17 @@ function closeHeartbeatModal(selector) {
         .css("display", "none");
 }
 
-function heartbeatPingCurl(url) {
+function heartbeatPingCurl(url, item) {
+    const tracksInstances = item && item.instance_tracking_enabled;
+    const instanceKey = item && item.instance_key ? item.instance_key : "instance";
+    const body = tracksInstances
+        ? JSON.stringify({status: "completed", [instanceKey]: "$(hostname -f)", payload: {}}, null, 2)
+        : "{}";
+
     return [
         "curl -fsS -X POST '" + url + "' \\",
         "  -H 'Content-Type: application/json' \\",
-        "  -d '{}'"
+        "  -d '" + body.replace(/'/g, "'\\''") + "'"
     ].join("\n");
 }
 
@@ -107,9 +113,9 @@ function getHeartbeatTimezoneValue() {
     return $("#heartbeat-timezone").val() || "UTC";
 }
 
-function showHeartbeatTokenModal(url) {
+function showHeartbeatTokenModal(url, item) {
     $("#heartbeat-token-url").val(url || "");
-    $("#heartbeat-token-curl").val(url ? heartbeatPingCurl(url) : "");
+    $("#heartbeat-token-curl").val(url ? heartbeatPingCurl(url, item) : "");
     openHeartbeatModal("#heartbeat-token-modal");
 }
 
@@ -212,7 +218,8 @@ function filteredHeartbeats() {
             item.team_slug,
             item.service_name,
             item.route_name,
-            item.status
+            item.status,
+            item.instance_tracking_enabled ? "instances" : ""
         ].join(" ").toLowerCase().indexOf(query) !== -1;
     });
 }
@@ -227,7 +234,7 @@ function renderHeartbeats() {
     tbody.empty();
 
     if (!items.length) {
-        tbody.append($("<tr>").append($("<td>").attr("colspan", 9).addClass("empty-cell").text("No heartbeats found")));
+        tbody.append($("<tr>").append($("<td>").attr("colspan", 10).addClass("empty-cell").text("No heartbeats found")));
         return;
     }
 
@@ -246,6 +253,7 @@ function renderHeartbeats() {
         row.append($("<td>").text(item.team_name || item.team_slug || "-"));
         row.append($("<td>").text(item.service_name || "-"));
         row.append($("<td>").append(heartbeatStatusBadge(item.status)));
+        row.append($("<td>").text(item.instance_tracking_enabled ? heartbeatInstanceSummaryText(item) : "-"));
         row.append($("<td>").text(heartbeatModeText(item)));
         row.append($("<td>").text(formatDateTimeMinutes(item.last_seen_at) || "-"));
         row.append($("<td>").text(formatDateTimeMinutes(item.deadline_at) || "-"));
@@ -353,10 +361,29 @@ function fillHeartbeatSelects(selected) {
 function updateHeartbeatScheduleFields() {
     const mode = $("#heartbeat-mode").val();
     const kind = $("#heartbeat-schedule-kind").val();
+    const tracksInstances = $("#heartbeat-instance-tracking").is(":checked");
+    const instanceMode = $("#heartbeat-expected-instances-mode").val();
+
     $(".heartbeat-interval-field").toggleClass("is-hidden", mode !== "interval");
     $(".heartbeat-scheduled-field").toggleClass("is-hidden", mode !== "scheduled");
     $(".heartbeat-weekly-field").toggleClass("is-hidden", mode !== "scheduled" || kind !== "weekly");
     $(".heartbeat-monthly-field").toggleClass("is-hidden", mode !== "scheduled" || kind !== "monthly");
+    $(".heartbeat-instance-field").toggleClass("is-hidden", !tracksInstances);
+    $(".heartbeat-static-instances-field").toggleClass("is-hidden", !tracksInstances || instanceMode !== "static");
+    $(".heartbeat-auto-discovery-field").toggleClass("is-hidden", !tracksInstances || instanceMode !== "auto");
+}
+
+function heartbeatExpectedInstancesText(item) {
+    const metadata = item && item.metadata && typeof item.metadata === "object" ? item.metadata : {};
+    const values = Array.isArray(metadata.expected_instances) ? metadata.expected_instances : [];
+    return values.join("\n");
+}
+
+function parseHeartbeatExpectedInstances(text) {
+    return String(text || "")
+        .split(/[\n,]+/)
+        .map(function (value) { return value.trim(); })
+        .filter(Boolean);
 }
 
 function openHeartbeatForm(item) {
@@ -381,6 +408,11 @@ function openHeartbeatForm(item) {
     $("#heartbeat-priority").val(item ? item.priority_slug || "p2" : "p2");
     $("#heartbeat-enabled").prop("checked", item ? !!item.enabled : true);
     $("#heartbeat-auto-resolve").prop("checked", item ? !!item.auto_resolve : true);
+    $("#heartbeat-instance-tracking").prop("checked", item ? !!item.instance_tracking_enabled : false);
+    $("#heartbeat-instance-key").val(item ? item.instance_key || "instance" : "instance");
+    $("#heartbeat-expected-instances-mode").val(item ? item.expected_instances_mode || "auto" : "auto");
+    $("#heartbeat-expected-instances").val(item ? heartbeatExpectedInstancesText(item) : "");
+    $("#heartbeat-auto-discovery-ttl").val(item ? item.auto_discovery_ttl_days || 30 : 30);
     $("#heartbeat-labels").val(prettyHeartbeatJson(item ? item.labels || {} : {}));
     $("#delete-heartbeat").toggleClass("is-hidden", !item);
     updateHeartbeatScheduleFields();
@@ -418,6 +450,13 @@ function heartbeatPayloadFromForm() {
         priority_slug: $("#heartbeat-priority").val(),
         enabled: $("#heartbeat-enabled").is(":checked"),
         auto_resolve: $("#heartbeat-auto-resolve").is(":checked"),
+        instance_tracking_enabled: $("#heartbeat-instance-tracking").is(":checked"),
+        instance_key: $("#heartbeat-instance-key").val() || "instance",
+        expected_instances_mode: $("#heartbeat-instance-tracking").is(":checked") ? $("#heartbeat-expected-instances-mode").val() : "none",
+        expected_instances: $("#heartbeat-instance-tracking").is(":checked") ? parseHeartbeatExpectedInstances($("#heartbeat-expected-instances").val()) : [],
+        auto_discovery_ttl_days: $("#heartbeat-instance-tracking").is(":checked") && $("#heartbeat-expected-instances-mode").val() === "auto"
+            ? Number($("#heartbeat-auto-discovery-ttl").val() || 30)
+            : null,
         labels: labels,
         metadata: {}
     };
@@ -446,8 +485,76 @@ function saveHeartbeat() {
         closeHeartbeatForm();
         loadHeartbeats();
         if (item.ping_url) {
-            showHeartbeatTokenModal(item.ping_url);
+            showHeartbeatTokenModal(item.ping_url, item);
         }
+    });
+}
+
+function heartbeatInstanceSummaryText(item) {
+    const summary = item.instance_summary || {};
+    const total = Number(summary.total || 0);
+    if (!total) {
+        return "0 instances";
+    }
+    return total + " total, " + Number(summary.ok || 0) + " ok, " + Number(summary.overdue || 0) + " overdue";
+}
+
+function renderHeartbeatInstances(item) {
+    const section = $("#heartbeat-instances-section");
+    const tbody = $("#heartbeat-instances-table");
+    tbody.empty();
+
+    if (!item.instance_tracking_enabled) {
+        section.addClass("is-hidden");
+        return;
+    }
+
+    section.removeClass("is-hidden");
+    const instances = Array.isArray(item.instances) ? item.instances : [];
+
+    if (!instances.length) {
+        tbody.append($("<tr>").append($("<td>").attr("colspan", 7).addClass("empty-cell").text("No instances discovered or configured yet")));
+        return;
+    }
+
+    instances.forEach(function (instance) {
+        const actions = $("<td>").addClass("actions-cell");
+        if (instance.enabled && typeof makeActionMenu === "function") {
+            actions.append(makeActionMenu({
+                object: instance,
+                items: [
+                    {
+                        label: "Disable instance",
+                        icon: "fas fa-ban",
+                        danger: true,
+                        required: "write",
+                        onClick: function () {
+                            disableHeartbeatInstance(item.id, instance.id);
+                        }
+                    }
+                ]
+            }));
+        } else {
+            actions.text("-");
+        }
+
+        tbody.append(
+            $("<tr>")
+                .append($("<td>").text(instance.instance_key || "-"))
+                .append($("<td>").append(heartbeatStatusBadge(instance.status)))
+                .append($("<td>").text(instance.auto_discovered ? "auto" : "static"))
+                .append($("<td>").text(instance.enabled ? "yes" : "no"))
+                .append($("<td>").text(formatDateTimeMinutes(instance.last_seen_at) || "-"))
+                .append($("<td>").text(formatDateTimeMinutes(instance.deadline_at) || "-"))
+                .append(actions)
+        );
+    });
+}
+
+function disableHeartbeatInstance(heartbeatId, instanceId) {
+    apiPost("/api/heartbeats/" + heartbeatId + "/instances/" + instanceId + "/disable", {}, function () {
+        openHeartbeatDetails(heartbeatId);
+        loadHeartbeats();
     });
 }
 
@@ -475,6 +582,8 @@ function renderHeartbeatDetails(item) {
         ["Next expected", formatDateTimeMinutes(item.next_expected_at)],
         ["Deadline", formatDateTimeMinutes(item.deadline_at)],
         ["Current alert group", item.current_alert_group_id || "-"],
+        ["Instance tracking", item.instance_tracking_enabled ? ((item.expected_instances_mode || "auto") + " / key: " + (item.instance_key || "instance")) : "disabled"],
+        ["Instances", item.instance_tracking_enabled ? heartbeatInstanceSummaryText(item) : "-"],
         ["Curl", curl]
     ];
 
@@ -487,17 +596,20 @@ function renderHeartbeatDetails(item) {
         );
     });
 
+    renderHeartbeatInstances(item);
+
     const tbody = $("#heartbeat-pings-table");
     tbody.empty();
     const pings = Array.isArray(item.pings) ? item.pings : [];
     if (!pings.length) {
-        tbody.append($("<tr>").append($("<td>").attr("colspan", 4).addClass("empty-cell").text("No events")));
+        tbody.append($("<tr>").append($("<td>").attr("colspan", 5).addClass("empty-cell").text("No events")));
     } else {
         pings.forEach(function (ping) {
             tbody.append(
                 $("<tr>")
                     .append($("<td>").text(formatDateTimeMinutes(ping.received_at)))
                     .append($("<td>").text(ping.event_type || "ping"))
+                    .append($("<td>").text(ping.instance_key || "-"))
                     .append($("<td>").text((ping.status_before || "-") + " → " + (ping.status_after || "-")))
                     .append($("<td>").text(ping.message || "-"))
             );
@@ -536,7 +648,7 @@ function regenerateHeartbeatToken() {
         apiPost("/api/heartbeats/" + selectedHeartbeatId + "/regenerate-token", {}, function (item) {
             loadHeartbeats();
             if (item.ping_url) {
-                showHeartbeatTokenModal(item.ping_url);
+                showHeartbeatTokenModal(item.ping_url, item);
             }
         });
     };
@@ -611,7 +723,7 @@ $(document).on("click", "#close-heartbeat-form-modal, #cancel-heartbeat-form", c
 $(document).on("click", "#save-heartbeat", saveHeartbeat);
 $(document).on("click", "#delete-heartbeat", deleteHeartbeat);
 $(document).on("change", "#heartbeat-team", function () { fillHeartbeatSelects(null); });
-$(document).on("change", "#heartbeat-mode, #heartbeat-schedule-kind", updateHeartbeatScheduleFields);
+$(document).on("change", "#heartbeat-mode, #heartbeat-schedule-kind, #heartbeat-instance-tracking, #heartbeat-expected-instances-mode", updateHeartbeatScheduleFields);
 $(document).on("click", "#close-heartbeat-details-modal", closeHeartbeatDetails);
 $(document).on("click", "#heartbeat-details-edit", function () {
     const item = selectedHeartbeatFromCache();

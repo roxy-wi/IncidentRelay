@@ -250,10 +250,8 @@
     display: flex;
     align-items: center;
     gap: 0.75rem;
-    margin: 0 0 1rem;
     padding: 0.75rem 1rem;
-    border: 1px solid var(--border-color, #e5e7eb);
-    border-radius: 12px;
+    border-bottom: 1px solid var(--border-color, #e5e7eb);
     background: var(--surface-color, #fff);
 }
 
@@ -261,6 +259,7 @@
     font-weight: 600;
 }
 
+.alerts-id-header-content,
 .alerts-id-content {
     display: inline-flex;
     align-items: center;
@@ -268,6 +267,11 @@
     white-space: nowrap;
 }
 
+.alerts-select-column {
+    min-width: 76px;
+}
+
+.alerts-page-select-all-checkbox,
 .alerts-group-select {
     width: 16px;
     height: 16px;

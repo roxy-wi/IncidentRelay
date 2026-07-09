@@ -7,6 +7,7 @@ from app.services.heartbeats.service import (
     generate_heartbeat_token,
     initialize_heartbeat_schedule,
     pause_heartbeat,
+    sync_heartbeat_static_instances,
     process_overdue_heartbeats,
     receive_heartbeat_ping,
     resume_heartbeat,
@@ -26,7 +27,13 @@ def _base_url():
 def _request_payload_or_empty():
     if request.is_json:
         return request.get_json(silent=True) or {}
-    return {}
+
+    data = {}
+    for key in ("status", "run_id", "message", "instance", "host", "hostname", "node"):
+        value = request.args.get(key)
+        if value not in (None, ""):
+            data[key] = value
+    return data
 
 
 def _validate_heartbeat_scope(payload):
@@ -99,12 +106,18 @@ def _heartbeat_data(payload, *, token_prefix=None, token_hash=None, created_by_i
         "priority_slug": payload.priority_slug,
         "enabled": payload.enabled,
         "auto_resolve": payload.auto_resolve,
+        "instance_tracking_enabled": payload.instance_tracking_enabled,
+        "instance_key": payload.instance_key or "instance",
+        "expected_instances_mode": payload.expected_instances_mode,
+        "auto_discovery_ttl_days": payload.auto_discovery_ttl_days,
         "labels": payload.labels or {},
-        "metadata": payload.metadata or {},
+        "metadata": dict(payload.metadata or {}),
     }
 
     team = teams_repo.get_team(payload.team_id)
     data["group"] = team.group_id
+
+    data["metadata"]["expected_instances"] = list(payload.expected_instances or [])
 
     if token_prefix is not None:
         data["token_prefix"] = token_prefix
@@ -176,7 +189,10 @@ def create_heartbeat():
             409,
         )
 
-    initialize_heartbeat_schedule(item)
+    if item.instance_tracking_enabled:
+        sync_heartbeat_static_instances(item, payload.expected_instances or [])
+    else:
+        initialize_heartbeat_schedule(item)
     item = heartbeats_repo.get_heartbeat(item.id)
 
     return jsonify(
@@ -197,7 +213,8 @@ def get_heartbeat(heartbeat_id):
         return error
 
     pings = heartbeats_repo.list_pings(item.id, limit=50)
-    return jsonify(serialize_heartbeat(item, pings=pings))
+    instances = heartbeats_repo.list_heartbeat_instances(item.id)
+    return jsonify(serialize_heartbeat(item, pings=pings, instances=instances))
 
 
 @heartbeats_bp.route("/<int:heartbeat_id>", methods=["PUT"])
@@ -228,7 +245,10 @@ def update_heartbeat(heartbeat_id):
         data["status"] = payload.status
 
     item = heartbeats_repo.update_heartbeat(item, data)
-    initialize_heartbeat_schedule(item)
+    if item.instance_tracking_enabled:
+        sync_heartbeat_static_instances(item, payload.expected_instances or [])
+    else:
+        initialize_heartbeat_schedule(item)
     item = heartbeats_repo.get_heartbeat(item.id)
     return jsonify(serialize_heartbeat(item))
 
@@ -254,6 +274,42 @@ def list_heartbeat_pings(heartbeat_id):
     limit = request.args.get("limit", default=50, type=int)
     limit = max(1, min(200, limit))
     return jsonify([serialize_heartbeat_ping(ping) for ping in heartbeats_repo.list_pings(item.id, limit=limit)])
+
+
+@heartbeats_bp.route("/<int:heartbeat_id>/instances", methods=["GET"])
+def list_heartbeat_instances_endpoint(heartbeat_id):
+    item = heartbeats_repo.get_heartbeat(heartbeat_id)
+    error = require_team_read(item.team_id)
+    if error:
+        return error
+
+    from app.services.serializers.heartbeats import serialize_heartbeat_instance
+
+    return jsonify([
+        serialize_heartbeat_instance(instance)
+        for instance in heartbeats_repo.list_heartbeat_instances(item.id)
+    ])
+
+
+@heartbeats_bp.route("/<int:heartbeat_id>/instances/<int:instance_id>/disable", methods=["POST"])
+def disable_heartbeat_instance_endpoint(heartbeat_id, instance_id):
+    item = heartbeats_repo.get_heartbeat(heartbeat_id)
+    error = require_team_or_group_resource_access(item.team_id, write_required=True)
+    if error:
+        return error
+
+    instance = next(
+        (candidate for candidate in heartbeats_repo.list_heartbeat_instances(item.id) if candidate.id == instance_id),
+        None,
+    )
+    if not instance:
+        return make_error_response("instance_not_found", "Heartbeat instance was not found.", 404)
+
+    heartbeats_repo.disable_heartbeat_instance(instance)
+    from app.services.heartbeats.service import refresh_heartbeat_instance_rollup
+    from app.services.serializers.heartbeats import serialize_heartbeat_instance
+    refresh_heartbeat_instance_rollup(item)
+    return jsonify(serialize_heartbeat_instance(instance))
 
 
 @heartbeats_bp.route("/<int:heartbeat_id>/regenerate-token", methods=["POST"])
@@ -334,10 +390,11 @@ def heartbeat_ping(token):
     )
 
     if error:
+        status_code = 404 if error["error"] == "heartbeat_not_found" else 400
         return make_error_response(
             error["error"],
             error["message"],
-            404,
+            status_code,
         )
 
     if request.method == "HEAD":

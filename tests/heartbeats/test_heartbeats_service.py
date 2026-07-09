@@ -121,3 +121,98 @@ def test_non_heartbeat_route_is_rejected(client, db, admin_headers):
 
     assert response.status_code == 400
     assert response.get_json()["error"] == "route_source_mismatch"
+
+
+def test_auto_discovered_instance_ping_creates_instance_state(db):
+    from app.modules.db.models import HeartbeatInstance
+
+    _, team, service, route = _fixture()
+    heartbeat = create_heartbeat(
+        team,
+        route,
+        service=service,
+        token_hash=hash_token("fleet-token"),
+        instance_tracking_enabled=True,
+        instance_key="instance",
+        expected_instances_mode="auto",
+        auto_discovery_ttl_days=30,
+    )
+
+    item, error = receive_heartbeat_ping(
+        "fleet-token",
+        payload={"status": "completed", "instance": "server-1.example.com"},
+        now=datetime.utcnow(),
+    )
+
+    assert error is None
+    assert item.status == "ok"
+
+    instance = HeartbeatInstance.get(
+        (HeartbeatInstance.heartbeat == heartbeat.id)
+        & (HeartbeatInstance.instance_key == "server-1.example.com")
+    )
+    assert instance.status == "ok"
+    assert instance.auto_discovered is True
+    assert instance.last_seen_at is not None
+
+
+def test_missing_auto_discovered_instance_pages_individually(db):
+    from app.modules.db.models import HeartbeatInstance
+
+    _, team, service, route = _fixture()
+    heartbeat = create_heartbeat(
+        team,
+        route,
+        service=service,
+        token_hash=hash_token("fleet-token"),
+        instance_tracking_enabled=True,
+        instance_key="instance",
+        expected_instances_mode="auto",
+    )
+    now = datetime.utcnow()
+    instance = HeartbeatInstance.create(
+        heartbeat=heartbeat,
+        instance_key="server-1.example.com",
+        status="ok",
+        enabled=True,
+        auto_discovered=True,
+        last_seen_at=now - timedelta(minutes=10),
+        next_expected_at=now - timedelta(minutes=5),
+    )
+
+    result = process_overdue_heartbeats(now=now)
+
+    assert result["instances_processed"] >= 1
+    assert result["instances_overdue"] == 1
+
+    instance = HeartbeatInstance.get_by_id(instance.id)
+    heartbeat = heartbeat.__class__.get_by_id(heartbeat.id)
+    assert instance.status == "overdue"
+    assert instance.current_alert_group_id
+    assert heartbeat.status == "overdue"
+
+    group = AlertGroup.get_by_id(instance.current_alert_group_id)
+    assert group.dedup_key.endswith(":instance:server-1.example.com")
+    assert group.status == "firing"
+
+
+def test_static_instance_rejects_unknown_producer(db):
+    _, team, service, route = _fixture()
+    create_heartbeat(
+        team,
+        route,
+        service=service,
+        token_hash=hash_token("static-token"),
+        instance_tracking_enabled=True,
+        expected_instances_mode="static",
+        metadata={"expected_instances": ["server-1.example.com"]},
+    )
+
+    _, error = receive_heartbeat_ping(
+        "static-token",
+        payload={"status": "completed", "instance": "server-2.example.com"},
+        now=datetime.utcnow(),
+    )
+
+    assert error is not None
+    assert error["error"] == "heartbeat_instance_not_expected"

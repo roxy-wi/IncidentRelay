@@ -75,6 +75,7 @@
               <th>Team</th>
               <th>Service</th>
               <th>Status</th>
+              <th>Instances</th>
               <th>Schedule</th>
               <th>Last ping</th>
               <th>Deadline</th>
@@ -83,7 +84,7 @@
             </tr>
           </thead>
           <tbody id="heartbeats-table">
-            <tr><td colspan="9" class="empty-cell">No heartbeats loaded</td></tr>
+            <tr><td colspan="10" class="empty-cell">No heartbeats loaded</td></tr>
           </tbody>
         </table>
       </div>
@@ -103,6 +104,33 @@
         <div id="heartbeat-details-body" class="details-grid">
           <div class="empty-state">No heartbeat selected.</div>
         </div>
+        <section id="heartbeat-instances-section" class="card is-hidden">
+          <div class="card-header">
+            <div>
+              <h2>Instances</h2>
+              <div class="card-subtitle">Per-host or per-producer heartbeat state.</div>
+            </div>
+          </div>
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead>
+                <tr>
+                  <th>Instance</th>
+                  <th>Status</th>
+                  <th>Mode</th>
+                  <th>Enabled</th>
+                  <th>Last ping</th>
+                  <th>Deadline</th>
+                  <th class="actions-th">Actions</th>
+                </tr>
+              </thead>
+              <tbody id="heartbeat-instances-table">
+                <tr><td colspan="7" class="empty-cell">No instances</td></tr>
+              </tbody>
+            </table>
+          </div>
+        </section>
+
         <section class="card">
           <div class="card-header">
             <div>
@@ -116,12 +144,13 @@
                 <tr>
                   <th>Time</th>
                   <th>Event</th>
+                  <th>Instance</th>
                   <th>State</th>
                   <th>Message</th>
                 </tr>
               </thead>
               <tbody id="heartbeat-pings-table">
-                <tr><td colspan="4" class="empty-cell">No events</td></tr>
+                <tr><td colspan="5" class="empty-cell">No events</td></tr>
               </tbody>
             </table>
           </div>
@@ -248,6 +277,33 @@
           <div class="form-row form-row-inline">
             <label class="checkbox-label"><input id="heartbeat-enabled" type="checkbox" checked> Enabled</label>
             <label class="checkbox-label"><input id="heartbeat-auto-resolve" type="checkbox" checked> Auto-resolve overdue alert when ping returns</label>
+            <label class="checkbox-label"><input id="heartbeat-instance-tracking" type="checkbox"> Track instances / auto-discovery</label>
+          </div>
+
+          <div class="form-grid-2 heartbeat-instance-field is-hidden">
+            <div class="form-group">
+              <label for="heartbeat-instance-key">Instance field</label>
+              <input id="heartbeat-instance-key" class="input" type="text" value="instance" placeholder="instance">
+              <div class="help-text">Ping JSON field used as the producer key, for example instance=$(hostname -f).</div>
+            </div>
+            <div class="form-group">
+              <label for="heartbeat-expected-instances-mode">Expected instances</label>
+              <select id="heartbeat-expected-instances-mode" class="input">
+                <option value="auto">Auto-discovery</option>
+                <option value="static">Static list</option>
+              </select>
+              <div class="help-text">Auto-discovery adds new producers on first ping. Static accepts only listed producers.</div>
+            </div>
+            <div class="form-group heartbeat-auto-discovery-field">
+              <label for="heartbeat-auto-discovery-ttl">Auto-discovery TTL, days</label>
+              <input id="heartbeat-auto-discovery-ttl" class="input" type="number" min="1" max="3650" value="30">
+              <div class="help-text">Healthy auto-discovered instances with no pings after this TTL are disabled.</div>
+            </div>
+            <div class="form-group heartbeat-static-instances-field is-hidden">
+              <label for="heartbeat-expected-instances">Static instances</label>
+              <textarea id="heartbeat-expected-instances" class="input monospace" rows="5" placeholder="server-1.example.com&#10;server-2.example.com"></textarea>
+              <div class="help-text">One instance per line or comma-separated.</div>
+            </div>
           </div>
 
           <div class="form-group">

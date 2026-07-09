@@ -2,7 +2,7 @@ from datetime import datetime
 
 from peewee import JOIN
 
-from app.modules.db.models import Group, Heartbeat, HeartbeatPing, Service, Team
+from app.modules.db.models import Group, Heartbeat, HeartbeatInstance, HeartbeatPing, Service, Team
 from app.services.integrations.auth import hash_token
 
 
@@ -62,7 +62,7 @@ def list_heartbeats_for_service(service_id, *, enabled_only=False):
 
 
 def list_due_heartbeat_candidates(now, limit=100, team_ids=None):
-    """Return enabled checks that may be overdue now."""
+    """Return enabled single-producer checks that may be overdue now."""
     query = (
         Heartbeat
         .select(Heartbeat, Team, Group, Service)
@@ -75,12 +75,48 @@ def list_due_heartbeat_candidates(now, limit=100, team_ids=None):
             (Heartbeat.deleted == False)
             & (Heartbeat.enabled == True)
             & (Heartbeat.status != "paused")
+            & (Heartbeat.instance_tracking_enabled == False)
             & (
                 (Heartbeat.next_expected_at.is_null(True))
                 | (Heartbeat.next_expected_at <= now)
             )
         )
         .order_by(Heartbeat.next_expected_at.asc(nulls="FIRST"), Heartbeat.id.asc())
+    )
+
+    if team_ids is not None:
+        team_ids = list(team_ids)
+        if not team_ids:
+            return []
+        query = query.where(Heartbeat.team.in_(team_ids))
+
+    return list(query.limit(limit))
+
+
+def list_due_heartbeat_instance_candidates(now, limit=100, team_ids=None):
+    """Return enabled heartbeat instances that may be overdue now."""
+    query = (
+        HeartbeatInstance
+        .select(HeartbeatInstance, Heartbeat, Team, Group, Service)
+        .join(Heartbeat, on=(HeartbeatInstance.heartbeat == Heartbeat.id))
+        .join(Team, on=(Heartbeat.team == Team.id))
+        .switch(Heartbeat)
+        .join(Group, JOIN.LEFT_OUTER, on=(Heartbeat.group == Group.id))
+        .switch(Heartbeat)
+        .join(Service, JOIN.LEFT_OUTER, on=(Heartbeat.service == Service.id))
+        .where(
+            (Heartbeat.deleted == False)
+            & (Heartbeat.enabled == True)
+            & (Heartbeat.status != "paused")
+            & (Heartbeat.instance_tracking_enabled == True)
+            & (HeartbeatInstance.enabled == True)
+            & (HeartbeatInstance.status != "paused")
+            & (
+                (HeartbeatInstance.next_expected_at.is_null(True))
+                | (HeartbeatInstance.next_expected_at <= now)
+            )
+        )
+        .order_by(HeartbeatInstance.next_expected_at.asc(nulls="FIRST"), HeartbeatInstance.id.asc())
     )
 
     if team_ids is not None:
@@ -175,6 +211,7 @@ def record_ping(
     heartbeat,
     *,
     event_type="ping",
+    instance_key=None,
     status_before=None,
     status_after=None,
     message=None,
@@ -187,6 +224,7 @@ def record_ping(
     return HeartbeatPing.create(
         heartbeat=heartbeat.id,
         event_type=event_type,
+        instance_key=instance_key,
         status_before=status_before,
         status_after=status_after,
         message=message,
@@ -206,3 +244,52 @@ def list_pings(heartbeat_id, limit=50):
         .order_by(HeartbeatPing.received_at.desc(), HeartbeatPing.id.desc())
         .limit(limit)
     )
+
+
+def get_heartbeat_instance(heartbeat_id, instance_key):
+    if not instance_key:
+        return None
+    return (
+        HeartbeatInstance
+        .select()
+        .where(
+            (HeartbeatInstance.heartbeat == heartbeat_id)
+            & (HeartbeatInstance.instance_key == str(instance_key))
+        )
+        .first()
+    )
+
+
+def list_heartbeat_instances(heartbeat_id, *, enabled_only=False):
+    query = HeartbeatInstance.select().where(HeartbeatInstance.heartbeat == heartbeat_id)
+    if enabled_only:
+        query = query.where(HeartbeatInstance.enabled == True)
+    return list(query.order_by(HeartbeatInstance.instance_key.asc()))
+
+
+def create_heartbeat_instance(heartbeat, instance_key, **data):
+    return HeartbeatInstance.create(
+        heartbeat=heartbeat.id if hasattr(heartbeat, "id") else heartbeat,
+        instance_key=str(instance_key),
+        **data,
+    )
+
+
+def update_heartbeat_instance(instance, data):
+    for key, value in data.items():
+        setattr(instance, key, value)
+    instance.updated_at = datetime.utcnow()
+    instance.save()
+    return instance
+
+
+def delete_heartbeat_instance(instance):
+    instance.delete_instance()
+
+
+def disable_heartbeat_instance(instance, status="paused"):
+    instance.enabled = False
+    instance.status = status
+    instance.updated_at = datetime.utcnow()
+    instance.save()
+    return instance

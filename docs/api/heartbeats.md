@@ -91,3 +91,66 @@ POST /api/heartbeats/{id}/resume
 ```
 
 Paused checks accept pings but do not create overdue alerts.
+
+## Multi-instance heartbeat
+
+Use instance tracking when the same job runs on many hosts or producers.
+
+```json
+{
+  "team_id": 1,
+  "route_id": 10,
+  "name": "MySQL backup fleet",
+  "slug": "mysql-backup-fleet",
+  "mode": "scheduled",
+  "schedule_kind": "daily",
+  "schedule_time": "03:00",
+  "timezone": "UTC",
+  "grace_period_seconds": 900,
+  "instance_tracking_enabled": true,
+  "instance_key": "instance",
+  "expected_instances_mode": "auto",
+  "auto_discovery_ttl_days": 30
+}
+```
+
+Ping with an instance value:
+
+```http
+POST /api/heartbeats/ping/<token>
+Content-Type: application/json
+
+{
+  "status": "completed",
+  "instance": "server-1.example.com",
+  "payload": {
+    "duration_seconds": 742
+  }
+}
+```
+
+Static mode accepts only the configured producers:
+
+```json
+{
+  "instance_tracking_enabled": true,
+  "instance_key": "instance",
+  "expected_instances_mode": "static",
+  "expected_instances": [
+    "server-1.example.com",
+    "server-2.example.com"
+  ]
+}
+```
+
+List instance state:
+
+```http
+GET /api/heartbeats/{id}/instances
+```
+
+Disable an obsolete instance:
+
+```http
+POST /api/heartbeats/{id}/instances/{instance_id}/disable
+```
