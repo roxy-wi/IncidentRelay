@@ -192,7 +192,7 @@ def test_missing_auto_discovered_instance_pages_individually(db):
     assert heartbeat.status == "overdue"
 
     group = AlertGroup.get_by_id(instance.current_alert_group_id)
-    assert group.dedup_key.endswith(":instance:server-1.example.com")
+    assert group.group_key.endswith(":instance:server-1.example.com")
     assert group.status == "firing"
 
 
