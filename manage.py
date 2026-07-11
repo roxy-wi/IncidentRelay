@@ -501,7 +501,7 @@ def cmd_sync_slack_admins(args):
             "action": action,
         }
         if raw_password:
-            result["password"] = raw_password
+            result["password_generated"] = args.password is None
 
         results.append(result)
 

@@ -70,4 +70,9 @@ jobs:
 
       - name: Run pytest with coverage
         run: |
-          pytest --cov=app --cov-report=term-missing --cov-fail-under=35
+          pytest \
+            --cov=app \
+            --cov-branch \
+            --cov-report=term-missing \
+            --cov-report=xml \
+            --cov-fail-under=50

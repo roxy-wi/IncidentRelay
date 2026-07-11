@@ -71,9 +71,9 @@ def readyz():
     except Exception as exc:
         response["status"] = "not_ready"
         response["database"] = "error"
-        response["database_error"] = str(exc)
+        response["database_error"] = "database check failed"
         http_status = 503
-        logger.warning("readyz database check failed: %s", exc)
+        logger.warning("readyz database check failed", exc_info=True)
         # If the database is unreachable, there is no point in checking
         # migrations; return early.
         return jsonify(response), http_status
@@ -107,8 +107,8 @@ def readyz():
             http_status = 503
     except Exception as exc:
         response["status"] = "not_ready"
-        response["migrations"] = {"error": str(exc)}
+        response["migrations"] = {"error": "migration check failed"}
         http_status = 503
-        logger.warning("readyz migration check failed: %s", exc)
+        logger.warning("readyz migration check failed", exc_info=True)
 
     return jsonify(response), http_status

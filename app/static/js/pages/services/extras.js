@@ -1,4 +1,20 @@
 // Service details extras: maintenance, timeline, charts, owners and page exports.
+function normalizeServiceExternalUrl(value) {
+    if (!value) {
+        return "#";
+    }
+
+    try {
+        const parsed = new URL(String(value), window.location.origin);
+        if (parsed.protocol !== "http:" && parsed.protocol !== "https:") {
+            return "#";
+        }
+        return parsed.href;
+    } catch (error) {
+        return "#";
+    }
+}
+
 
 function renderServiceDetailsMaintenance(payload) {
     const windows = asArray(payload.maintenance_windows);
@@ -37,7 +53,7 @@ function renderServiceDetailsRunbooks(payload) {
     const rows = runbooks.slice(0, 8).map(function (runbook) {
         return [
             $("<a>")
-                .attr("href", runbook.url)
+                .attr("href", normalizeServiceExternalUrl(runbook.url))
                 .attr("target", "_blank")
                 .attr("rel", "noopener noreferrer")
                 .text(runbook.title || runbook.url || ("Runbook #" + runbook.id)),
@@ -69,7 +85,7 @@ function renderServiceDetailsLinks(payload) {
     const rows = links.slice(0, 10).map(function (link) {
         return [
             $("<a>")
-                .attr("href", link.url)
+                .attr("href", normalizeServiceExternalUrl(link.url))
                 .attr("target", "_blank")
                 .attr("rel", "noopener noreferrer")
                 .text(link.label || link.url || ("Link #" + link.id)),

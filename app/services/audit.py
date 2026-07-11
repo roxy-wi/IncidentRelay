@@ -42,8 +42,8 @@ def write_audit(action, object_type=None, object_id=None, group_id=None, team_id
                 "team_id": team_id,
                 "user_id": user_id or (current_user.id if current_user else None),
                 "api_token_id": api_token.id if api_token else None,
-                "message": safe_message,
-                "data": safe_data,
+                "has_message": bool(safe_message),
+                "data_keys": sorted(safe_data.keys()),
             }
         },
     )
