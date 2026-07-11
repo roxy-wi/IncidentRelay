@@ -1,3 +1,4 @@
+import re
 import logging
 import json
 from json import JSONDecodeError
@@ -22,66 +23,96 @@ def make_json_safe(value):
 
 SENSITIVE_VALIDATION_FIELDS = {
     "password",
-    "current_password",
-    "new_password",
-    "password_confirmation",
+    "passwd",
     "secret",
+    "client_secret",
     "token",
     "api_token",
     "access_token",
     "refresh_token",
     "authorization",
     "private_key",
-    "client_secret",
+    "webhook_secret",
 }
 
+SENSITIVE_MESSAGE_PATTERN = re.compile(
+    r"\b("
+    r"password|passwd|secret|client[_ -]?secret|"
+    r"api[_ -]?token|access[_ -]?token|refresh[_ -]?token|"
+    r"authorization|private[_ -]?key"
+    r")\b",
+    re.IGNORECASE,
+)
 
-def _is_sensitive_validation_location(loc):
-    return any(
+
+def _contains_sensitive_key(value):
+    if isinstance(value, dict):
+        return any(
+            str(key).lower() in SENSITIVE_VALIDATION_FIELDS
+            or _contains_sensitive_key(nested)
+            for key, nested in value.items()
+        )
+
+    if isinstance(value, (list, tuple, set)):
+        return any(_contains_sensitive_key(item) for item in value)
+
+    return False
+
+
+def _validation_error_is_sensitive(loc, input_value, message):
+    if any(
         str(item).lower() in SENSITIVE_VALIDATION_FIELDS
         for item in loc
-    )
+    ):
+        return True
+
+    if _contains_sensitive_key(input_value):
+        return True
+
+    return bool(SENSITIVE_MESSAGE_PATTERN.search(message or ""))
 
 
 def normalize_validation_error(error):
-    """Convert a Pydantic error to a safe API error object."""
+    """Convert one Pydantic error to a safe API error object."""
     loc = [str(item) for item in error.get("loc", [])]
-    error_type = error.get("type")
-    raw_ctx = error.get("ctx") or {}
+    raw_message = error.get("msg") or "Invalid value"
+    input_value = error.get("input")
 
-    contains_exception = any(
-        isinstance(value, BaseException)
-        for value in raw_ctx.values()
+    sensitive = _validation_error_is_sensitive(
+        loc,
+        input_value,
+        raw_message,
     )
 
-    if contains_exception:
+    if sensitive:
         message = "Invalid value"
     else:
-        message = error.get("msg", "Invalid value")
+        message = raw_message
 
         if message.startswith("Value error, "):
-            # A custom validator message may include submitted secrets or
-            # internal implementation details. Do not expose it.
-            message = "Invalid value"
+            message = message[len("Value error, "):]
 
     result = {
         "field": ".".join(loc) if loc else None,
         "loc": loc,
         "message": message,
-        "type": error_type,
+        "type": error.get("type"),
     }
 
     if "input" in error:
-        if _is_sensitive_validation_location(loc):
-            result["input"] = "***REDACTED***"
-        else:
-            result["input"] = make_json_safe(error["input"])
+        result["input"] = (
+            "***REDACTED***"
+            if sensitive
+            else make_json_safe(input_value)
+        )
 
+    raw_ctx = error.get("ctx") or {}
     safe_ctx = {
         key: value
         for key, value in raw_ctx.items()
         if not isinstance(value, BaseException)
     }
+
     if safe_ctx:
         result["ctx"] = make_json_safe(safe_ctx)
 

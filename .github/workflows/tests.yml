@@ -76,3 +76,124 @@ jobs:
             --cov-report=term-missing \
             --cov-report=xml \
             --cov-fail-under=50
+
+
+  postgres-tests:
+    name: PostgreSQL tests
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: incidentrelay_test
+          POSTGRES_USER: incidentrelay
+          POSTGRES_PASSWORD: incidentrelay_test_password
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd="pg_isready -U incidentrelay -d incidentrelay_test"
+          --health-interval=10s
+          --health-timeout=5s
+          --health-retries=10
+
+    env:
+      PYTHONPATH: ${{ github.workspace }}
+      INCIDENTRELAY_CONFIG_FILE: ${{ github.workspace }}/tests/incidentrelay.postgres.conf
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: "3.10"
+          cache: pip
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Prepare runtime directories
+        run: |
+          mkdir -p tests/.tmp
+          mkdir -p logs
+
+      - name: Create PostgreSQL test config
+        run: |
+            cp tests/incidentrelay.test.conf \
+               tests/incidentrelay.postgres.conf
+            
+            python - <<'PY'
+            from configparser import RawConfigParser
+            from pathlib import Path
+            
+            path = Path("tests/incidentrelay.postgres.conf")
+            
+            config = RawConfigParser()
+            config.read(path)
+            
+            if not config.has_section("database"):
+                config.add_section("database")
+            
+            config["database"]["type"] = "postgresql"
+            config["database"]["host"] = "127.0.0.1"
+            config["database"]["port"] = "5432"
+            config["database"]["name"] = "incidentrelay_test"
+            config["database"]["user"] = "incidentrelay"
+            config["database"]["password"] = "incidentrelay_test_password"
+            
+            config["database"].pop("path", None)
+            
+            with path.open("w") as file:
+                config.write(file)
+            PY
+
+      - name: Show database config without password
+        run: |
+          python - <<'PY'
+          from configparser import ConfigParser
+
+          config = ConfigParser()
+          config.read("tests/incidentrelay.postgres.conf")
+
+          database = dict(config["database"])
+          database["password"] = "***"
+
+          print(database)
+          PY
+
+      - name: Check PostgreSQL driver
+        run: |
+          python - <<'PY'
+          try:
+              import psycopg2
+              print("psycopg2:", psycopg2.__version__)
+          except ImportError:
+              try:
+                  import psycopg
+                  print("psycopg:", psycopg.__version__)
+              except ImportError:
+                  raise SystemExit(
+                      "PostgreSQL driver is not installed"
+                  )
+          PY
+
+      - name: Run migrations on PostgreSQL
+        run: |
+          python manage.py migrate
+
+      - name: Check PostgreSQL schema
+        run: |
+          python app/check_schema.py
+
+      - name: Run tests on PostgreSQL
+        run: |
+          pytest tests/postgresql/test_postgresql_smoke.py \
+            --cov=app \
+            --cov-branch \
+            --cov-report=term-missing \
+            --cov-report=xml:coverage-postgresql.xml

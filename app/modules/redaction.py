@@ -59,6 +59,39 @@ REDACTION_PATTERNS = (
         re.compile(r"://([^:/?#\s]+):([^@/\s]+)@"),
         rf"://\1:{REDACTED}@",
     ),
+    (
+        re.compile(
+            r"""
+            (
+                \b
+                (?:
+                    password
+                    |passwd
+                    |secret
+                    |client_secret
+                    |token
+                    |api_token
+                    |access_token
+                    |refresh_token
+                    |bot_token
+                    |telegram_token
+                    |api_key
+                    |private_key
+                )
+                \s*[=:]\s*
+            )
+            (
+                "(?:\\.|[^"])*"
+                |
+                '(?:\\.|[^'])*'
+                |
+                [^\s,;&]+
+            )
+            """,
+            re.IGNORECASE | re.VERBOSE,
+        ),
+        rf"\1{REDACTED}",
+    ),
 )
 
 
