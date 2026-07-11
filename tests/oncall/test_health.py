@@ -101,7 +101,8 @@ def test_readyz_returns_503_when_database_select_fails(client):
     body = response.get_json()
     assert body["status"] == "not_ready"
     assert body["database"] == "error"
-    assert "connection refused" in body["database_error"]
+    assert body["database_error"] == "database check failed"
+    assert "connection refused" not in response.get_data(as_text=True)
     # Migration check is skipped when the DB is down — it would be pointless.
     assert "migrations" not in body
 
@@ -152,7 +153,8 @@ def test_readyz_returns_503_when_migration_check_raises(client):
     assert body["status"] == "not_ready"
     assert body["database"] == "ok"
     assert "error" in body["migrations"]
-    assert "disk gone" in body["migrations"]["error"]
+    assert body["migrations"]["error"] == "migration check failed"
+    assert "disk gone" not in response.get_data(as_text=True)
 
 
 # ---------------------------------------------------------------------------

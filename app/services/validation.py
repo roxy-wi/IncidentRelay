@@ -20,32 +20,70 @@ def make_json_safe(value):
     return str(value)
 
 
-def normalize_validation_error(error):
-    """Convert one Pydantic error to a clean API error object."""
-    loc = [str(item) for item in error.get("loc", [])]
-    message = error.get("msg", "Invalid value")
+SENSITIVE_VALIDATION_FIELDS = {
+    "password",
+    "current_password",
+    "new_password",
+    "password_confirmation",
+    "secret",
+    "token",
+    "api_token",
+    "access_token",
+    "refresh_token",
+    "authorization",
+    "private_key",
+    "client_secret",
+}
 
-    if message.startswith("Value error, "):
-        message = message.replace("Value error, ", "", 1)
+
+def _is_sensitive_validation_location(loc):
+    return any(
+        str(item).lower() in SENSITIVE_VALIDATION_FIELDS
+        for item in loc
+    )
+
+
+def normalize_validation_error(error):
+    """Convert a Pydantic error to a safe API error object."""
+    loc = [str(item) for item in error.get("loc", [])]
+    error_type = error.get("type")
+    raw_ctx = error.get("ctx") or {}
+
+    contains_exception = any(
+        isinstance(value, BaseException)
+        for value in raw_ctx.values()
+    )
+
+    if contains_exception:
+        message = "Invalid value"
+    else:
+        message = error.get("msg", "Invalid value")
+
+        if message.startswith("Value error, "):
+            # A custom validator message may include submitted secrets or
+            # internal implementation details. Do not expose it.
+            message = "Invalid value"
 
     result = {
         "field": ".".join(loc) if loc else None,
         "loc": loc,
         "message": message,
-        "type": error.get("type"),
+        "type": error_type,
     }
 
     if "input" in error:
-        result["input"] = make_json_safe(error["input"])
-    if "ctx" in error:
-        ctx = {
-            key: value
-            for key, value in error["ctx"].items()
-            if not isinstance(value, BaseException)
-        }
+        if _is_sensitive_validation_location(loc):
+            result["input"] = "***REDACTED***"
+        else:
+            result["input"] = make_json_safe(error["input"])
 
-        if ctx:
-            result["ctx"] = make_json_safe(ctx)
+    safe_ctx = {
+        key: value
+        for key, value in raw_ctx.items()
+        if not isinstance(value, BaseException)
+    }
+    if safe_ctx:
+        result["ctx"] = make_json_safe(safe_ctx)
 
     return result
 
