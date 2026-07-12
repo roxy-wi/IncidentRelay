@@ -44,6 +44,42 @@ function renderServiceDetailsMaintenance(payload) {
     return section;
 }
 
+function serviceDetailsSafeExternalUrl(value) {
+    const raw = String(value || "").trim();
+
+    if (!raw) {
+        return "";
+    }
+
+    try {
+        const url = new URL(raw, window.location.origin);
+
+        if (url.protocol === "http:" || url.protocol === "https:" || url.protocol === "mailto:") {
+            return url.href;
+        }
+    } catch (error) {
+        return "";
+    }
+
+    return "";
+}
+
+
+function serviceDetailsExternalLink(url, label, fallback) {
+    const text = label || url || fallback || "-";
+    const safeUrl = serviceDetailsSafeExternalUrl(url);
+
+    if (!safeUrl) {
+        return $("<span>").text(text);
+    }
+
+    return $("<a>")
+        .attr("href", safeUrl)
+        .attr("target", "_blank")
+        .attr("rel", "noopener noreferrer")
+        .text(text);
+}
+
 function renderServiceDetailsRunbooks(payload) {
     const runbooks = asArray(payload.runbooks);
     const section = serviceDetailsSection(
@@ -52,11 +88,11 @@ function renderServiceDetailsRunbooks(payload) {
     );
     const rows = runbooks.slice(0, 8).map(function (runbook) {
         return [
-            $("<a>")
-                .attr("href", normalizeServiceExternalUrl(runbook.url))
-                .attr("target", "_blank")
-                .attr("rel", "noopener noreferrer")
-                .text(runbook.title || runbook.url || ("Runbook #" + runbook.id)),
+            serviceDetailsExternalLink(
+                runbook.url,
+                runbook.title || runbook.url,
+                "Runbook #" + runbook.id
+            ),
             runbook.severity || "any",
             runbook.priority || 0,
             runbook.matcher_preset ? runbook.matcher_preset.name : "-",
@@ -84,11 +120,11 @@ function renderServiceDetailsLinks(payload) {
     );
     const rows = links.slice(0, 10).map(function (link) {
         return [
-            $("<a>")
-                .attr("href", normalizeServiceExternalUrl(link.url))
-                .attr("target", "_blank")
-                .attr("rel", "noopener noreferrer")
-                .text(link.label || link.url || ("Link #" + link.id)),
+            serviceDetailsExternalLink(
+                link.url,
+                link.label || link.url,
+                "Link #" + link.id
+            ),
             link.link_type || "other",
             link.priority || 0,
             link.description || "-",

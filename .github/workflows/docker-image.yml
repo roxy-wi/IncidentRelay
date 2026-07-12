@@ -1,0 +1,92 @@
+name: Docker image
+
+on:
+  workflow_dispatch:
+  push:
+    branches:
+      - main
+    tags:
+      - "v*"
+
+permissions:
+  contents: read
+  packages: write
+
+concurrency:
+  group: docker-image-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_NAME: roxy-wi/incidentrelay
+
+jobs:
+  build-and-push:
+    name: Build and push Docker image
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v3
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Prepare image tags
+        id: image
+        shell: bash
+        run: |
+          image="${REGISTRY}/${IMAGE_NAME}"
+          short_sha="${GITHUB_SHA::12}"
+
+          {
+            echo "tags<<EOF"
+
+            if [[ "${GITHUB_REF_TYPE}" == "tag" ]]; then
+              version="${GITHUB_REF_NAME#v}"
+
+              echo "${image}:${version}"
+
+              if [[ "${version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+                major_minor="$(echo "${version}" | cut -d. -f1,2)"
+                echo "${image}:${major_minor}"
+              fi
+
+              if [[ "${version}" != *-* ]]; then
+                echo "${image}:latest"
+              fi
+            else
+              branch="${GITHUB_REF_NAME//\//-}"
+              echo "${image}:${branch}"
+            fi
+
+            echo "${image}:sha-${short_sha}"
+            echo "EOF"
+          } >> "${GITHUB_OUTPUT}"
+
+          {
+            echo "labels<<EOF"
+            echo "org.opencontainers.image.source=${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}"
+            echo "org.opencontainers.image.revision=${GITHUB_SHA}"
+            echo "org.opencontainers.image.title=IncidentRelay"
+            echo "EOF"
+          } >> "${GITHUB_OUTPUT}"
+
+      - name: Build and push
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: docker/Dockerfile
+          push: true
+          platforms: linux/amd64
+          tags: ${{ steps.image.outputs.tags }}
+          labels: ${{ steps.image.outputs.labels }}
+          cache-from: type=gha
+          cache-to: type=gha,mode=max

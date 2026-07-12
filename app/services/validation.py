@@ -1,3 +1,4 @@
+import re
 import logging
 import json
 from json import JSONDecodeError
@@ -20,13 +21,79 @@ def make_json_safe(value):
     return str(value)
 
 
+SENSITIVE_VALIDATION_FIELDS = {
+    "password",
+    "passwd",
+    "secret",
+    "client_secret",
+    "token",
+    "api_token",
+    "access_token",
+    "refresh_token",
+    "authorization",
+    "private_key",
+    "webhook_secret",
+}
+
+SENSITIVE_MESSAGE_PATTERN = re.compile(
+    r"\b("
+    r"password|passwd|secret|client[_ -]?secret|"
+    r"api[_ -]?token|access[_ -]?token|refresh[_ -]?token|"
+    r"authorization|private[_ -]?key"
+    r")\b",
+    re.IGNORECASE,
+)
+
+
+def _contains_sensitive_key(value):
+    if isinstance(value, dict):
+        for key, item in value.items():
+            if str(key).lower() in SENSITIVE_VALIDATION_FIELDS:
+                return True
+            if _contains_sensitive_key(item):
+                return True
+
+    if isinstance(value, (list, tuple)):
+        return any(_contains_sensitive_key(item) for item in value)
+
+    return False
+
+
+def _validation_error_is_sensitive(loc, input_value, message):
+    if any(str(item).lower() in SENSITIVE_VALIDATION_FIELDS for item in loc):
+        return True
+
+    if _contains_sensitive_key(input_value):
+        return True
+
+    return bool(SENSITIVE_MESSAGE_PATTERN.search(message or ""))
+
+
+def _safe_validation_ctx(ctx):
+    safe = {}
+
+    for key, value in (ctx or {}).items():
+        if isinstance(value, BaseException):
+            continue
+
+        safe[key] = make_json_safe(value)
+
+    return safe
+
+
 def normalize_validation_error(error):
     """Convert one Pydantic error to a clean API error object."""
     loc = [str(item) for item in error.get("loc", [])]
-    message = error.get("msg", "Invalid value")
+    raw_message = error.get("msg", "Invalid value")
+    input_value = error.get("input")
+    sensitive = _validation_error_is_sensitive(loc, input_value, raw_message)
 
-    if message.startswith("Value error, "):
-        message = message.replace("Value error, ", "", 1)
+    if sensitive:
+        message = "Invalid value"
+    else:
+        message = raw_message
+        if message.startswith("Value error, "):
+            message = message.replace("Value error, ", "", 1)
 
     result = {
         "field": ".".join(loc) if loc else None,
@@ -36,16 +103,11 @@ def normalize_validation_error(error):
     }
 
     if "input" in error:
-        result["input"] = make_json_safe(error["input"])
-    if "ctx" in error:
-        ctx = {
-            key: value
-            for key, value in error["ctx"].items()
-            if not isinstance(value, BaseException)
-        }
+        result["input"] = "***REDACTED***" if sensitive else make_json_safe(input_value)
 
-        if ctx:
-            result["ctx"] = make_json_safe(ctx)
+    ctx = _safe_validation_ctx(error.get("ctx"))
+    if ctx:
+        result["ctx"] = ctx
 
     return result
 
