@@ -1,0 +1,18 @@
+services:
+  incidentrelay:
+    image: incidentrelay:dev
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+
+  incidentrelay-scheduler:
+    image: incidentrelay:dev
+    build:
+      context: .
+      dockerfile: docker/Dockerfile
+
+  incidentrelay-telegram:
+    image: incidentrelay:dev
+    build:
+      context: .
+      dockerfile: docker/Dockerfile

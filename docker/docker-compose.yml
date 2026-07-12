@@ -1,9 +1,12 @@
+x-incidentrelay-image: &incidentrelay_image ${INCIDENTRELAY_IMAGE:-ghcr.io/roxy-wi/incidentrelay:1.1}
+x-incidentrelay-common-volumes: &incidentrelay_common_volumes
+  - incidentrelay-data:/var/lib/incidentrelay
+  - incidentrelay-logs:/var/log/incidentrelay
+  - ./custom_voice_providers:/usr/local/lib/incidentrelay/voice_providers:ro
+
 services:
   incidentrelay:
-    image: roxywi/incidentrelay:latest
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
+    image: *incidentrelay_image
     container_name: incidentrelay
     restart: unless-stopped
     environment:
@@ -16,10 +19,7 @@ services:
       INCIDENTRELAY_WEB_TIMEOUT: "120"
     ports:
       - "8080:8080"
-    volumes:
-      - incidentrelay-data:/var/lib/incidentrelay
-      - incidentrelay-logs:/var/log/incidentrelay
-      - ./custom_voice_providers:/usr/local/lib/incidentrelay/voice_providers:ro
+    volumes: *incidentrelay_common_volumes
     healthcheck:
       test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/api/health || curl -fsS http://127.0.0.1:8080/login >/dev/null"]
       interval: 30s
@@ -28,29 +28,20 @@ services:
       start_period: 30s
 
   incidentrelay-scheduler:
-    image: roxywi/incidentrelay:latest
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
+    image: *incidentrelay_image
     container_name: incidentrelay-scheduler
     restart: unless-stopped
     environment:
       INCIDENTRELAY_CONFIG_FILE: /etc/incidentrelay/incidentrelay.conf
       INCIDENTRELAY_SERVICE: scheduler
       INCIDENTRELAY_RUN_MIGRATIONS: "0"
-    volumes:
-      - incidentrelay-data:/var/lib/incidentrelay
-      - incidentrelay-logs:/var/log/incidentrelay
-      - ./custom_voice_providers:/usr/local/lib/incidentrelay/voice_providers:ro
+    volumes: *incidentrelay_common_volumes
     depends_on:
       incidentrelay:
         condition: service_healthy
 
   incidentrelay-telegram:
-    image: roxywi/incidentrelay:latest
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile
+    image: *incidentrelay_image
     container_name: incidentrelay-telegram
     restart: unless-stopped
     environment:
@@ -58,13 +49,11 @@ services:
       INCIDENTRELAY_SERVICE: telegram
       INCIDENTRELAY_RUN_MIGRATIONS: "0"
       PYTHONUNBUFFERED: "1"
-    volumes:
-      - incidentrelay-data:/var/lib/incidentrelay
-      - incidentrelay-logs:/var/log/incidentrelay
-      - ./custom_voice_providers:/usr/local/lib/incidentrelay/voice_providers:ro
+    volumes: *incidentrelay_common_volumes
     depends_on:
       incidentrelay:
         condition: service_healthy
+
 volumes:
   incidentrelay-data:
   incidentrelay-logs:

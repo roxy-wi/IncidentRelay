@@ -192,7 +192,7 @@ jobs:
 
       - name: Run tests on PostgreSQL
         run: |
-          pytest tests/postgresql/test_postgresql_smoke.py \
+          pytest tests/ \
             --cov=app \
             --cov-branch \
             --cov-report=term-missing \
