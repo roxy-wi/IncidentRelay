@@ -1,11 +1,7 @@
 # Default values for the IncidentRelay chart.
 
 image:
-  # NB: no public image is published under this name yet (neither
-  # Docker Hub nor GHCR) — installing with defaults ends in
-  # ImagePullBackOff. Build the image yourself and point repository/tag
-  # at your registry.
-  repository: roxywi/incidentrelay
+  repository: ghcr.io/roxy-wi/incidentrelay
   # Defaults to the chart appVersion when empty.
   tag: ""
   pullPolicy: IfNotPresent
