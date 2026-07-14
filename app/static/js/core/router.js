@@ -35,15 +35,15 @@ function navigate(path, pushState) {
     let routePath = appPath.routePath;
 
     if (routePath === "/admin/sso" && (!currentUser || !currentUser.is_admin)) {
-        showAppError("Admin role is required");
+        showAppError(i18n.t("errors.admin_role_required"));
         path = "/";
     }
     if (routePath === "/admin/users" && !hasGroupUserAdminAccess()) {
-        showAppError("Group Admin role is required");
+        showAppError(i18n.t("errors.group_admin_role_required"));
         path = "/";
     }
     if (routePath === "/groups" && !hasGroupUserAdminAccess()) {
-        showAppError("Group Admin role is required");
+        showAppError(i18n.t("errors.group_admin_role_required"));
         path = "/";
     }
 
@@ -52,8 +52,13 @@ function navigate(path, pushState) {
 
     $(".view").removeClass("view-visible").css("display", "none");
     $("#view-" + selectedRoute.page).addClass("view-visible").css("display", "block");
-    $("#page-title").text(selectedRoute.title);
-    $("#page-subtitle").text(selectedRoute.subtitle);
+    const pageTranslationKey = "pages." + selectedRoute.page;
+    $("#page-title").text(
+      i18n.t(pageTranslationKey + ".title", {}, selectedRoute.title)
+    );
+    $("#page-subtitle").text(
+      i18n.t(pageTranslationKey + ".subtitle", {}, selectedRoute.subtitle)
+    );
 
     $(".menu-link").removeClass("active");
     $(".menu-group").removeClass("is-active");
@@ -89,7 +94,13 @@ function safePageLoad(loadFunction) {
         loadFunction();
     } catch (error) {
         console.error("Page load failed:", error);
-        showAppError("Page load failed: " + error);
+        showAppError(
+      i18n.t(
+        "errors.page_load_failed",
+        {error: error},
+        "Page load failed: {error}"
+      )
+    );
     }
 }
 

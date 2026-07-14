@@ -4,6 +4,7 @@ from peewee import DoesNotExist, IntegrityError
 from app.settings import Config
 from app.db import init_database
 from app.modules.logger import setup_json_logging
+from app.i18n import register_i18n
 from app.middleware import enforce_api_authentication
 from app.views.admin_users_view import admin_users_bp
 from app.views.alerts_view import alerts_bp
@@ -49,6 +50,7 @@ def create_app(log_role=None):
 
     flask_app = Flask(__name__)
     flask_app.config.from_object(Config)
+    register_i18n(flask_app)
     setup_json_logging(flask_app, log_role=log_role)
 
     flask_app.register_error_handler(IntegrityError, handle_integrity_error)

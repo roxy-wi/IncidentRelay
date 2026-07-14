@@ -86,20 +86,16 @@ function alertGroupCountLabel(alert) {
         return "";
     }
 
-    const parts = [];
-
-    parts.push(total + " total");
+    const parts = [i18n.t("alerts.group_count.total", {count: total})];
 
     if (firing) {
-        parts.push(firing + " firing");
+        parts.push(i18n.t("alerts.group_count.firing", {count: firing}));
     }
-
     if (resolved) {
-        parts.push(resolved + " resolved");
+        parts.push(i18n.t("alerts.group_count.resolved", {count: resolved}));
     }
-
     if (silenced) {
-        parts.push(silenced + " silenced");
+        parts.push(i18n.t("alerts.group_count.silenced", {count: silenced}));
     }
 
     return parts.join(" / ");
@@ -198,8 +194,8 @@ function updateAlertsPageSelectAllState() {
         .attr(
             "title",
             ids.length > 0
-                ? "Select all alert groups on this page"
-                : "No selectable alert groups on this page"
+                ? i18n.t("alerts.select_all.page")
+                : i18n.t("alerts.select_all.none")
         );
 }
 
@@ -218,35 +214,35 @@ function ensureAlertsBulkActionsBar() {
             $("<span>")
                 .attr("id", "alerts-bulk-selected-count")
                 .addClass("alerts-bulk-selected-count")
-                .text("0 selected")
+                .text(i18n.t("alerts.bulk.selected", {count: 0}))
         )
         .append(
             $("<button>")
                 .attr("type", "button")
                 .attr("id", "alerts-ack-selected")
                 .addClass("btn btn-warning btn-small")
-                .text("Ack selected")
+                .text(i18n.t("alerts.bulk.ack"))
         )
         .append(
             $("<button>")
                 .attr("type", "button")
                 .attr("id", "alerts-resolve-selected")
                 .addClass("btn btn-resolve btn-small")
-                .text("Resolve selected")
+                .text(i18n.t("alerts.bulk.resolve"))
         )
         .append(
             $("<button>")
                 .attr("type", "button")
                 .attr("id", "alerts-merge-selected")
                 .addClass("btn btn-small")
-                .text("Merge selected")
+                .text(i18n.t("alerts.bulk.merge"))
         )
         .append(
             $("<button>")
                 .attr("type", "button")
                 .attr("id", "alerts-clear-selection")
                 .addClass("btn btn-secondary btn-small")
-                .text("Clear")
+                .text(i18n.t("alerts.bulk.clear"))
         );
 
     $("#alerts-table-view").before(bar);
@@ -261,13 +257,13 @@ function renderAlertsBulkActions() {
     const resolveCount = selectedAlertGroupsForBulkAction("resolve").length;
 
     bar.toggle(count > 0);
-    bar.find("#alerts-bulk-selected-count").text(count + " selected");
+    bar.find("#alerts-bulk-selected-count").text(i18n.t("alerts.bulk.selected", {count: count}));
     bar.find("#alerts-ack-selected")
         .prop("disabled", ackCount < 1)
-        .text(ackCount > 0 ? "Ack selected (" + ackCount + ")" : "Ack selected");
+        .text(ackCount > 0 ? i18n.t("alerts.bulk.ack_count", {count: ackCount}) : i18n.t("alerts.bulk.ack"));
     bar.find("#alerts-resolve-selected")
         .prop("disabled", resolveCount < 1)
-        .text(resolveCount > 0 ? "Resolve selected (" + resolveCount + ")" : "Resolve selected");
+        .text(resolveCount > 0 ? i18n.t("alerts.bulk.resolve_count", {count: resolveCount}) : i18n.t("alerts.bulk.resolve"));
     bar.find("#alerts-merge-selected").prop("disabled", count < 2);
     updateAlertsPageSelectAllState();
 }
@@ -527,19 +523,16 @@ function alertDuration(alert) {
 
 function severityLabel(severity) {
     const value = normalizeAlertValue(severity);
-    if (value === "critical") {
-        return "Critical";
-    }
-    if (value === "high") {
-        return "High";
-    }
-    if (value === "medium") {
-        return "Medium";
-    }
-    if (value === "low") {
-        return "Low";
-    }
-    return severity || "-";
+    const labels = {
+        critical: "alerts.severity.critical",
+        high: "alerts.severity.high",
+        warning: "alerts.severity.warning",
+        medium: "alerts.severity.medium",
+        low: "alerts.severity.low",
+        info: "alerts.severity.info",
+    };
+
+    return labels[value] ? i18n.t(labels[value]) : (severity || "-");
 }
 function alertPrioritySlug(alert) {
     if (!alert) {
@@ -562,23 +555,15 @@ function alertPriorityLabel(alert) {
         return slug.toUpperCase() + " " + priority.name;
     }
 
-    if (slug === "p1") {
-        return "P1 Critical";
-    }
-    if (slug === "p2") {
-        return "P2 High";
-    }
-    if (slug === "p3") {
-        return "P3 Medium";
-    }
-    if (slug === "p4") {
-        return "P4 Low";
-    }
-    if (slug === "p5") {
-        return "P5 Informational";
-    }
+    const labels = {
+        p1: "alerts.priority.p1",
+        p2: "alerts.priority.p2",
+        p3: "alerts.priority.p3",
+        p4: "alerts.priority.p4",
+        p5: "alerts.priority.p5",
+    };
 
-    return slug ? slug.toUpperCase() : "P3 Medium";
+    return labels[slug] ? i18n.t(labels[slug]) : i18n.t("alerts.priority.p3");
 }
 
 
@@ -628,42 +613,28 @@ function priorityBadgeClass(alert) {
 
 function priorityFilterLabel(priority) {
     const slug = normalizeAlertValue(priority);
+    const labels = {
+        p1: "alerts.priority.p1",
+        p2: "alerts.priority.p2",
+        p3: "alerts.priority.p3",
+        p4: "alerts.priority.p4",
+        p5: "alerts.priority.p5",
+    };
 
-    if (slug === "p1") {
-        return "P1 Critical";
-    }
-    if (slug === "p2") {
-        return "P2 High";
-    }
-    if (slug === "p3") {
-        return "P3 Medium";
-    }
-    if (slug === "p4") {
-        return "P4 Low";
-    }
-    if (slug === "p5") {
-        return "P5 Informational";
-    }
-
-    return priority || "-";
+    return labels[slug] ? i18n.t(labels[slug]) : (priority || "-");
 }
 
 
 function statusLabel(status) {
     const value = normalizeAlertValue(status);
-    if (value === "firing") {
-        return "Firing";
-    }
-    if (value === "acknowledged") {
-        return "Acknowledged";
-    }
-    if (value === "resolved") {
-        return "Resolved";
-    }
-    if (value === "silenced") {
-        return "Silenced";
-    }
-    return status || "-";
+    const labels = {
+        firing: "alerts.status.firing",
+        acknowledged: "alerts.status.acknowledged",
+        resolved: "alerts.status.resolved",
+        silenced: "alerts.status.silenced",
+    };
+
+    return labels[value] ? i18n.t(labels[value]) : (status || "-");
 }
 
 function severityBadgeClass(severity) {
@@ -898,7 +869,7 @@ function renderAlertsPagination(pagination) {
         tableSelector: "#alerts-table-view",
         pagination: pagination,
         pageSize: alertsPageSize,
-        rowsLabel: "Rows per page",
+        rowsLabel: i18n.t("alerts.table.rows_per_page"),
         pageSizeOptions: [10, 25, 50, 100],
         alwaysVisible: true,
     });
@@ -918,12 +889,12 @@ function renderActiveAlertFilters() {
     const assignedToMe = $("#assigned-to-me-filter").is(":checked");
 
     if (search) {
-        chips.push({label: "Search", value: search});
+        chips.push({label: i18n.t("alerts.filters.search"), value: search});
     }
 
     if (statuses.length) {
         chips.push({
-            label: "Status",
+            label: i18n.t("alerts.filters.status"),
             value: statuses
                 .map(function (status) {
                     return statusLabel(status);
@@ -934,7 +905,7 @@ function renderActiveAlertFilters() {
 
     if (severities.length) {
         chips.push({
-            label: "Severity",
+            label: i18n.t("alerts.filters.severity"),
             value: severities
                 .map(function (severity) {
                     return severityLabel(severity);
@@ -945,7 +916,7 @@ function renderActiveAlertFilters() {
 
     if (priorities.length) {
         chips.push({
-            label: "Priority",
+            label: i18n.t("alerts.filters.priority"),
             value: priorities
                 .map(function (priority) {
                     return priorityFilterLabel(priority);
@@ -956,7 +927,7 @@ function renderActiveAlertFilters() {
 
     if (serviceIds.length) {
         chips.push({
-            label: "Service",
+            label: i18n.t("alerts.filters.service"),
             value: serviceIds
                 .map(function (serviceId) {
                     return tableSelectOptionLabel("#alerts-service-filter", serviceId);
@@ -966,13 +937,13 @@ function renderActiveAlertFilters() {
     }
     if (assignedToMe) {
         chips.push({
-            label: "Assignee",
-            value: "Me"
+            label: i18n.t("alerts.filters.assignee"),
+            value: i18n.t("alerts.filters.me")
         });
     }
 
     if (typeof selectedTeamId === "function" && selectedTeamId()) {
-        chips.push({label: "Team", value: getSelectedTeamLabel()});
+        chips.push({label: i18n.t("alerts.filters.team"), value: getSelectedTeamLabel()});
     }
 
     renderTableFilterChips("#alerts-active-filters", chips);
@@ -1012,7 +983,7 @@ function renderAlertsTable(alerts) {
     if (!alerts.length) {
         tbody.append(
             $("<tr>").append(
-                $("<td>").attr("colspan", "10").addClass("empty-table-cell").text("No alerts found")
+                $("<td>").attr("colspan", "10").addClass("empty-table-cell").text(i18n.t("alerts.table.empty"))
             )
         );
         updateAlertsPageSelectAllState();
@@ -1065,7 +1036,7 @@ function renderAlertPageRow(alert) {
     idContent.append(
         $("<a>")
             .attr("href", buildAlertDetailsUrl(alert.id))
-            .attr("title", "View alert group details")
+            .attr("title", i18n.t("alerts.table.view_details"))
             .addClass("alerts-id-link")
             .text("#" + alert.id)
             .on("click", function (event) {
@@ -1102,7 +1073,7 @@ function renderAlertPageRow(alert) {
             )
             .append(renderAlertCorrelationBadges(alert))
             .append(renderAlertBusinessImpactBadges(alert))
-            .append($("<div>").addClass("table-age").text("Age: " + alertDuration(alert)))
+            .append($("<div>").addClass("table-age").text(i18n.t("alerts.table.age", {value: alertDuration(alert)})))
     );
 
     row.append(
@@ -1120,11 +1091,11 @@ function renderAlertPageRow(alert) {
     row.append(
         $("<td>")
             .append($("<div>").addClass("alerts-team").text(alert.team_name || alert.team_slug || "-"))
-            .append($("<div>").addClass("table-subtitle").text(alert.route_name || "No route"))
+            .append($("<div>").addClass("table-subtitle").text(alert.route_name || i18n.t("alerts.table.no_route")))
             .append(
                 $("<div>")
                     .addClass("table-subtitle")
-                    .text(alert.service_id ? "Service: " + alertServiceLabel(alert) : "No service")
+                    .text(alert.service_id ? i18n.t("alerts.table.service", {name: alertServiceLabel(alert)}) : i18n.t("alerts.table.no_service"))
             )
     );
 
@@ -1140,26 +1111,28 @@ function buildAlertSubtitle(alert) {
     const parts = [];
 
     if (isAlertGroup(alert)) {
-        parts.push("Group");
+        parts.push(i18n.t("alerts.table.group"));
     }
-
     if (alert.source) {
         parts.push(alert.source);
     }
-
     if (alert.group_key) {
         parts.push(alert.group_key);
     }
 
-    return parts.length ? parts.join(" · ") : "Routed alert";
+    return parts.length ? parts.join(" · ") : i18n.t("alerts.table.routed_alert");
 }
 
 function alertServiceLabel(alert) {
     if (!alert.service_id) {
-        return "No service";
+        return i18n.t("alerts.table.no_service");
     }
 
-    return alert.service_name || alert.service_slug || ("Service #" + alert.service_id);
+    return (
+        alert.service_name
+        || alert.service_slug
+        || i18n.t("alerts.table.service_number", {id: alert.service_id})
+    );
 }
 
 

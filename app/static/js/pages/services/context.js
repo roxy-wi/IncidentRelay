@@ -610,7 +610,7 @@ function renderAllServiceLinksTable() {
     if (!links.length) {
         tbody.append(
             $("<tr>").append(
-                $("<td>").attr("colspan", 7).addClass("empty-cell").text("No links")
+                $("<td>").attr("colspan", 7).addClass("empty-cell").text(i18n.t("services.empty.links"))
             )
         );
         return;
@@ -638,7 +638,7 @@ function renderAllServiceLinksTable() {
                 .append($("<td>").text(link.team_name || link.team_slug || "-"))
                 .append($("<td>").text(link.link_type || "-"))
                 .append($("<td>").text(link.priority || 0))
-                .append($("<td>").append(renderStatusBadge(link.enabled, "Enabled", "Disabled")))
+                .append($("<td>").append(renderStatusBadge(link.enabled, i18n.t("services.status.enabled"), i18n.t("services.status.disabled"))))
                 .append($("<td>").addClass("actions-cell").append(renderServiceLinkActions(service, link)))
         );
     });
@@ -677,7 +677,7 @@ function renderAllServiceRunbooksTable() {
     if (!runbooks.length) {
         tbody.append(
             $("<tr>").append(
-                $("<td>").attr("colspan", 7).addClass("empty-cell").text("No runbooks")
+                $("<td>").attr("colspan", 7).addClass("empty-cell").text(i18n.t("services.empty.runbooks"))
             )
         );
         return;
@@ -705,7 +705,7 @@ function renderAllServiceRunbooksTable() {
                 .append($("<td>").text(runbook.team_name || runbook.team_slug || "-"))
                 .append($("<td>").text(runbook.severity || "-"))
                 .append($("<td>").text(runbook.priority || 0))
-                .append($("<td>").append(renderStatusBadge(runbook.enabled, "Enabled", "Disabled")))
+                .append($("<td>").append(renderStatusBadge(runbook.enabled, i18n.t("services.status.enabled"), i18n.t("services.status.disabled"))))
                 .append($("<td>").addClass("actions-cell").append(renderServiceRunbookActions(service, runbook)))
         );
     });
@@ -749,7 +749,7 @@ function renderAllServiceDependenciesTable() {
     if (!dependencies.length) {
         tbody.append(
             $("<tr>").append(
-                $("<td>").attr("colspan", 7).addClass("empty-cell").text("No dependencies")
+                $("<td>").attr("colspan", 7).addClass("empty-cell").text(i18n.t("services.empty.dependencies"))
             )
         );
         return;
@@ -758,8 +758,8 @@ function renderAllServiceDependenciesTable() {
     dependencies.forEach(function (dependency) {
         const service = dependency._service || getServiceById(dependency.service_id);
         const correlationLabel = dependency.correlation_enabled === false
-            ? "Correlation off"
-            : "Correlation " + (dependency.propagation_delay_seconds || 300) + "s";
+            ? i18n.t("services.dependencies.correlation_off")
+            : i18n.t("services.dependencies.correlation_delay", {seconds: dependency.propagation_delay_seconds || 300});
 
         tbody.append(
             $("<tr>")
@@ -788,9 +788,9 @@ function renderAllServiceDependenciesTable() {
                             + (dependency.depends_on_service_name || dependency.depends_on_service_slug || "-")
                         )
                 )
-                .append($("<td>").text(dependency.dependency_type || "-"))
-                .append($("<td>").text(dependency.criticality || "-"))
-                .append($("<td>").text(dependency.depends_on_service_status || "-"))
+                .append($("<td>").text(serviceDependencyTypeLabel(dependency.dependency_type)))
+                .append($("<td>").text(serviceCriticalityLabel(dependency.criticality)))
+                .append($("<td>").text(serviceStatusLabel(dependency.depends_on_service_status)))
                 .append(
                     $("<td>")
                         .addClass("table-cell-truncate-wide")
@@ -808,7 +808,7 @@ function renderServiceLinkActions(service, link) {
         object: service,
         items: [
             {
-                label: "Edit",
+                label: i18n.t("services.actions.edit"),
                 icon: "fas fa-edit",
                 required: "write",
                 onClick: function () {
@@ -816,7 +816,7 @@ function renderServiceLinkActions(service, link) {
                 }
             },
             {
-                label: "Delete",
+                label: i18n.t("services.actions.delete"),
                 icon: "fas fa-trash",
                 required: "write",
                 danger: true,
@@ -834,7 +834,7 @@ function renderServiceRunbookActions(service, runbook) {
         object: service,
         items: [
             {
-                label: "Edit",
+                label: i18n.t("services.actions.edit"),
                 icon: "fas fa-edit",
                 required: "write",
                 onClick: function () {
@@ -842,7 +842,7 @@ function renderServiceRunbookActions(service, runbook) {
                 }
             },
             {
-                label: "Delete",
+                label: i18n.t("services.actions.delete"),
                 icon: "fas fa-trash",
                 required: "write",
                 danger: true,
@@ -860,7 +860,7 @@ function renderServiceDependencyActions(service, dependency) {
         object: service,
         items: [
             {
-                label: "Edit",
+                label: i18n.t("services.actions.edit"),
                 icon: "fas fa-edit",
                 required: "write",
                 onClick: function () {
@@ -868,7 +868,7 @@ function renderServiceDependencyActions(service, dependency) {
                 }
             },
             {
-                label: "Delete",
+                label: i18n.t("services.actions.delete"),
                 icon: "fas fa-trash",
                 required: "write",
                 danger: true,

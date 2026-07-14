@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ current_locale }}">
 <head>
     <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='images/favicon/apple-touch-icon.png') }}">
     <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='images/favicon/favicon-32x32.png') }}">
@@ -14,7 +14,16 @@
     <link rel="stylesheet" href="/static/css/oncall.css">
     <link rel="stylesheet" href="/static/css/material.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='/css/vendor/fontawesome/all.min.css') }}">
-    <script src="/static/js/vendor/jquery-3.7.1.min.js"></script>
+    <script>
+ window.__INCIDENTRELAY_I18N__ = {
+  locale: {{ current_locale | tojson }},
+  supportedLocales: {{ supported_locales | tojson }},
+  messages: {{ i18n_messages | tojson }}
+ };
+ </script>
+ <script src="{{ url_for('static', filename='js/core/i18n.js') }}"></script>
+
+ <script src="/static/js/vendor/jquery-3.7.1.min.js"></script>
     <script src="/static/js/core/api.js"></script>
     <script src="/static/js/core/auth.js"></script>
     <script src="/static/js/pages/login.js"></script>
@@ -40,7 +49,15 @@
                 Manage schedules, acknowledge alerts and coordinate incident response from one place.
             </p>
 
-            <div id="login-status" class="login-error" style="display:none;"></div>
+            <div class="form-group">
+  <label for="login-language-select">Language</label>
+  <select id="login-language-select" class="input" data-locale-select>
+  {% for locale_code, locale_name in supported_locales.items() %}
+   <option value="{{ locale_code }}"{% if locale_code == current_locale %} selected{% endif %}>{{ locale_name }}</option>
+  {% endfor %}
+  </select>
+ </div>
+ <div id="login-status" class="login-error" style="display:none;"></div>
 
             <form id="login-form" method="post" action="/api/auth/login">
                 <div class="form-group">

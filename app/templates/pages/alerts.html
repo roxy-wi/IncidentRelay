@@ -6,33 +6,33 @@
     <section class="card alerts-table-card">
         <div class="card-header table-card-header">
             <div>
-                <h2>Alert inbox</h2>
+                <h2>{{ _('alerts.inbox.title') }}</h2>
                 <div id="alerts-inbox-counter" class="card-subtitle">
-                    Showing
+                    {{ _('alerts.counter.showing') }}
                     <span data-alerts-counter="from">0</span>-<span data-alerts-counter="to">0</span>
-                    of
+                    {{ _('alerts.counter.of') }}
                     <span data-alerts-counter="filtered">0</span>
-                    alerts
+                    {{ _('alerts.counter.alerts') }}
 
                     <span data-alerts-counter="total-wrapper">
                         /
                         <span data-alerts-counter="total">0</span>
-                        total
+                        {{ _('alerts.counter.total') }}
                     </span>
                 </div>
             </div>
             <div class="card-header-actions">
                 <label class="alerts-switch md-switch">
                     <input id="alerts-auto-refresh" type="checkbox">
-                    <span>Auto refresh</span>
+                    <span>{{ _('alerts.actions.auto_refresh') }}</span>
                 </label>
-                <button id="reload-alerts" type="button" class="btn btn-primary">Reload</button>
+                <button id="reload-alerts" type="button" class="btn btn-primary">{{ _('alerts.actions.reload') }}</button>
 
                 <button type="button" class="btn btn-primary is-hidden" id="open-manual-incident-modal">
-                    Create incident
+                    {{ _('alerts.actions.create_incident') }}
                 </button>
                 <button id="open-alert-explain-trace" type="button" class="btn btn-secondary">
-                    Explain trace
+                    {{ _('alerts.actions.explain_trace') }}
                 </button>
             </div>
         </div>
@@ -43,7 +43,7 @@
                   id="alerts-search"
                   class="input"
                   type="search"
-                  placeholder="Search by ID, alert name, team, assignee, source..."
+                  placeholder="{{ _("alerts.search.placeholder") }}"
                   autocomplete="off"
                 >
             </div>
@@ -51,52 +51,52 @@
                     id="alerts-service-filter"
                     multiple
                     data-table-multi-select
-                    data-placeholder="All services"
+                    data-placeholder="{{ _("alerts.filters.all_services") }}"
                 ></select>
             <select
                 id="status-filter"
                 multiple
                 data-table-multi-select
-                data-placeholder="All statuses"
+                data-placeholder="{{ _("alerts.filters.all_statuses") }}"
             >
-                <option value="firing">Firing</option>
-                <option value="acknowledged">Acknowledged</option>
-                <option value="silenced">Silenced</option>
-                <option value="resolved">Resolved</option>
+                <option value="firing">{{ _("alerts.status.firing") }}</option>
+                <option value="acknowledged">{{ _("alerts.status.acknowledged") }}</option>
+                <option value="silenced">{{ _("alerts.status.silenced") }}</option>
+                <option value="resolved">{{ _("alerts.status.resolved") }}</option>
             </select>
                 <select
                     id="severity-filter"
                     multiple
                     data-table-multi-select
-                    data-placeholder="All severities"
+                    data-placeholder="{{ _("alerts.filters.all_severities") }}"
                 >
-                    <option value="critical">Critical</option>
-                    <option value="high">High</option>
-                    <option value="warning">Warning</option>
-                    <option value="medium">Medium</option>
-                    <option value="low">Low</option>
-                    <option value="info">Info</option>
+                    <option value="critical">{{ _("alerts.severity.critical") }}</option>
+                    <option value="high">{{ _("alerts.severity.high") }}</option>
+                    <option value="warning">{{ _("alerts.severity.warning") }}</option>
+                    <option value="medium">{{ _("alerts.severity.medium") }}</option>
+                    <option value="low">{{ _("alerts.severity.low") }}</option>
+                    <option value="info">{{ _("alerts.severity.info") }}</option>
                 </select>
 
-            <select id="priority-filter" class="table-filter-select" multiple data-table-multi-select data-placeholder="Priority">
-                <option value="p1">P1 Critical</option>
-                <option value="p2">P2 High</option>
-                <option value="p3">P3 Medium</option>
-                <option value="p4">P4 Low</option>
-                <option value="p5">P5 Informational</option>
+            <select id="priority-filter" class="table-filter-select" multiple data-table-multi-select data-placeholder="{{ _("alerts.filters.priority") }}">
+                <option value="p1">{{ _("alerts.priority.p1") }}</option>
+                <option value="p2">{{ _("alerts.priority.p2") }}</option>
+                <option value="p3">{{ _("alerts.priority.p3") }}</option>
+                <option value="p4">{{ _("alerts.priority.p4") }}</option>
+                <option value="p5">{{ _("alerts.priority.p5") }}</option>
             </select>
 
             <select id="alerts-sort" class="input table-filter-select page-toolbar-filter">
-                <option value="activity_desc">Newest activity</option>
-                <option value="created_desc">Newest created</option>
-                <option value="created_asc">Oldest created</option>
-                <option value="severity_desc">Severity first</option>
-                <option value="priority:asc">Priority first</option>
-                <option value="status_asc">Status</option>
+                <option value="activity_desc">{{ _("alerts.sort.newest_activity") }}</option>
+                <option value="created_desc">{{ _("alerts.sort.newest_created") }}</option>
+                <option value="created_asc">{{ _("alerts.sort.oldest_created") }}</option>
+                <option value="severity_desc">{{ _("alerts.sort.severity_first") }}</option>
+                <option value="priority:asc">{{ _("alerts.sort.priority_first") }}</option>
+                <option value="status_asc">{{ _("alerts.sort.status") }}</option>
             </select>
             <label class="alerts-switch md-switch alerts-assigned-filter">
                 <input id="assigned-to-me-filter" type="checkbox">
-                <span>Assigned to me</span>
+                <span>{{ _('alerts.filters.assigned_to_me') }}</span>
             </label>
         </div>
         <div id="alerts-active-filters" class="table-active-filters"></div>
@@ -111,21 +111,21 @@
                         id="alerts-select-page"
                         class="alerts-page-select-all-checkbox"
                         type="checkbox"
-                        title="Select all alert groups on this page"
-                        aria-label="Select all alert groups on this page"
+                        title="{{ _("alerts.select_all.page") }}"
+                        aria-label="{{ _("alerts.select_all.page") }}"
                       >
-                      <span>ID</span>
+                      <span>{{ _('alerts.table.id') }}</span>
                   </span>
               </th>
-              <th data-sort="status">Status</th>
-              <th data-sort="title">Alert</th>
-              <th data-sort="severity">Severity</th>
-              <th data-sort="priority">Priority</th>
-              <th data-sort="team">Team</th>
-              <th data-sort="assignee">Assignee</th>
-              <th data-sort="created">Created</th>
-              <th data-sort="last_seen">Last seen</th>
-              <th>Escalations</th>
+              <th data-sort="status">{{ _("alerts.table.status") }}</th>
+              <th data-sort="title">{{ _("alerts.table.alert") }}</th>
+              <th data-sort="severity">{{ _("alerts.table.severity") }}</th>
+              <th data-sort="priority">{{ _("alerts.table.priority") }}</th>
+              <th data-sort="team">{{ _("alerts.table.team") }}</th>
+              <th data-sort="assignee">{{ _("alerts.table.assignee") }}</th>
+              <th data-sort="created">{{ _("alerts.table.created") }}</th>
+              <th data-sort="last_seen">{{ _("alerts.table.last_seen") }}</th>
+              <th>{{ _('alerts.table.escalations') }}</th>
           </tr>
         </thead>
 
