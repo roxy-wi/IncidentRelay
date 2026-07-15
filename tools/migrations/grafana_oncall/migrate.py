@@ -652,7 +652,7 @@ class Migrator:
                 "telegram_user_id": None,
                 "slack_user_id": slack_id,
                 "mattermost_user_id": None,
-                "active": False,
+                "active": True if self.config.users_mode == "create-active" else False,
                 "is_admin": False,
                 "password": None,
                 "group_id": int(self.target_group["id"]),
@@ -1071,12 +1071,23 @@ class Migrator:
             if user_id in current_members:
                 continue
             payload = {"user_id": user_id, "position": position, "starts_at": None}
-            self.post_or_plan(
-                "layer_member",
-                f"{state_key}:{user_id}",
-                f"/api/rotations/layers/{layer_id}/members",
-                payload,
-            )
+
+            # --- Обертываем в блок try-except для пропуска ошибок ---
+            try:
+                self.post_or_plan(
+                    "layer_membership",
+                    f"{layer_id}:{user_id}",
+                    f"/api/rotations/{rotation_id}/layers/{layer_id}/members",
+                    payload,
+                )
+            except ApiError as exc:
+                self.reporter.add(
+                    "warning",
+                    "layer_membership",
+                    "failed_but_skipped",
+                    f"Skipping user {user_id} due to API Error: {exc}. Details: {exc.payload}",
+                    source_id=f"{layer_id}:{user_id}"
+                )
             current_members.add(user_id)
 
         restrictions = restrictions_from_shift(shift)
@@ -2032,7 +2043,7 @@ def build_parser() -> argparse.ArgumentParser:
     )
     parser.add_argument(
         "--users-mode",
-        choices=("existing-only", "create-inactive"),
+        choices=("existing-only", "create-inactive","create-active"),
         default="existing-only",
     )
     parser.add_argument(
@@ -2126,10 +2137,14 @@ def main(argv: list[str] | None = None) -> int:
             if (output_dir / "route-secrets.json").is_file():
                 print(f"Route secrets: {output_dir / 'route-secrets.json'}")
         return 0
-    except (MigrationError, ApiError, json.JSONDecodeError) as exc:
+    except ApiError as exc:
+            details = ""
+            if exc.payload:
+                details = f"\nAPI Details: {json.dumps(exc.payload, indent=2, ensure_ascii=False)}"
+            reporter.add("error", "migration", "failed", f"{exc}{details}")
+            return 1
+    except (MigrationError, json.JSONDecodeError) as exc:
         reporter.add("error", "migration", "failed", str(exc))
-        reporter.write(output_dir, metadata)
-        print(f"Migration failed: {exc}", file=sys.stderr)
         return 1
 
 

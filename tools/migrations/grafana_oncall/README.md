@@ -43,8 +43,8 @@ labels. Review and configure IncidentRelay matchers before enabling them.
 ## Requirements
 
 - Python 3.10 or newer.
-- A Grafana OnCall API key with read access to users, teams, schedules,
-  escalation chains, integrations, and routes.
+- A Grafana OnCall API key(not grafana service accounts) with read access to users, teams, schedules,
+  escalation chains, integrations, and routes(Home -> Alerts & IRM -> OnCall -> Settings).
 - An IncidentRelay personal/API token belonging to a global administrator, with
   at least `resources:read` and `resources:write` scopes (or `*`).
 
