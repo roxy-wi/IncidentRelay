@@ -3,36 +3,36 @@
     <div class="summary-card summary-primary">
       <div class="summary-icon">↱</div>
       <div>
-        <div class="summary-title">Routes</div>
+        <div class="summary-title">{{ _("routes.summary.routes") }}</div>
         <div id="routes-summary-total" class="summary-value">0</div>
-        <div class="summary-hint">Alert intake rules</div>
+        <div class="summary-hint">{{ _("routes.summary.routes_hint") }}</div>
       </div>
     </div>
 
     <div class="summary-card summary-success">
       <div class="summary-icon">✓</div>
       <div>
-        <div class="summary-title">Enabled</div>
+        <div class="summary-title">{{ _("routes.summary.enabled") }}</div>
         <div id="routes-summary-enabled" class="summary-value">0</div>
-        <div class="summary-hint">Accepting alerts</div>
+        <div class="summary-hint">{{ _("routes.summary.enabled_hint") }}</div>
       </div>
     </div>
 
     <div class="summary-card summary-muted">
       <div class="summary-icon">×</div>
       <div>
-        <div class="summary-title">Disabled</div>
+        <div class="summary-title">{{ _("routes.summary.disabled") }}</div>
         <div id="routes-summary-disabled" class="summary-value">0</div>
-        <div class="summary-hint">Not accepting alerts</div>
+        <div class="summary-hint">{{ _("routes.summary.disabled_hint") }}</div>
       </div>
     </div>
 
     <div class="summary-card summary-info">
       <div class="summary-icon">↻</div>
       <div>
-        <div class="summary-title">With escalation</div>
+        <div class="summary-title">{{ _("routes.summary.escalation") }}</div>
         <div id="routes-summary-rotation" class="summary-value">0</div>
-        <div class="summary-hint">Rotation or policy</div>
+        <div class="summary-hint">{{ _("routes.summary.escalation_hint") }}</div>
       </div>
     </div>
   </div>
@@ -41,20 +41,20 @@
     <section class="card page-layout-main">
       <div class="card-header">
         <div>
-          <h2>Alert routes</h2>
+          <h2>{{ _("routes.list.title") }}</h2>
           <div class="card-subtitle">
-            Showing <span id="routes-filtered-count">0</span>
-            of <span id="routes-total-count">0</span> routes
+            {{ _("routes.list.showing") }} <span id="routes-filtered-count">0</span>
+            {{ _("routes.list.of") }} <span id="routes-total-count">0</span> {{ _("routes.list.routes") }}
           </div>
         </div>
 
         <div class="card-header-actions">
           <button id="open-route-create-modal" type="button" class="btn btn-primary">
-            New route
+            {{ _("routes.actions.new") }}
           </button>
 
           <button id="reload-routes" type="button" class="btn">
-            Reload
+            {{ _("routes.actions.reload") }}
           </button>
         </div>
       </div>
@@ -66,19 +66,19 @@
             id="routes-search"
             class="input"
             type="search"
-            placeholder="Search routes..."
+            placeholder="{{ _('routes.search.placeholder') }}"
             autocomplete="off"
           >
         </div>
 
         <select id="routes-source-filter" class="input page-toolbar-filter">
-          <option value="">All sources</option>
+          <option value="">{{ _("routes.filters.all_sources") }}</option>
         </select>
 
         <select id="routes-status-filter" class="input page-toolbar-filter">
-          <option value="">All statuses</option>
-          <option value="enabled">Enabled</option>
-          <option value="disabled">Disabled</option>
+          <option value="">{{ _("routes.filters.all_statuses") }}</option>
+          <option value="enabled">{{ _("routes.status.enabled") }}</option>
+          <option value="disabled">{{ _("routes.status.disabled") }}</option>
         </select>
       </div>
 
@@ -86,20 +86,20 @@
         <table id="routes-table-view" class="data-table sortable-table">
           <thead>
             <tr>
-              <th data-sort="name">Route</th>
-              <th data-sort="team">Team</th>
-              <th data-sort="source">Source</th>
-              <th data-sort="rotation">Escalation</th>
-              <th data-sort="channels">Channels</th>
-              <th>Token</th>
-              <th data-sort="enabled">Status</th>
-              <th class="actions-th">Actions</th>
+              <th data-sort="name">{{ _("routes.table.route") }}</th>
+              <th data-sort="team">{{ _("routes.table.team") }}</th>
+              <th data-sort="source">{{ _("routes.table.source") }}</th>
+              <th data-sort="rotation">{{ _("routes.table.escalation") }}</th>
+              <th data-sort="channels">{{ _("routes.table.channels") }}</th>
+              <th>{{ _("routes.table.token") }}</th>
+              <th data-sort="enabled">{{ _("routes.table.status") }}</th>
+              <th class="actions-th">{{ _("routes.table.actions") }}</th>
             </tr>
           </thead>
 
           <tbody id="routes-table">
             <tr>
-              <td colspan="8" class="empty-cell">No routes loaded</td>
+              <td colspan="8" class="empty-cell">{{ _("routes.table.empty_loaded") }}</td>
             </tr>
           </tbody>
         </table>
@@ -109,16 +109,16 @@
     <aside class="card page-details-card">
       <div class="card-header">
         <div>
-          <h2>Route details</h2>
+          <h2>{{ _("routes.details.title") }}</h2>
           <div id="route-details-subtitle" class="card-subtitle">
-            Select a route
+            {{ _("routes.details.select") }}
           </div>
         </div>
       </div>
 
       <div id="route-details-body" class="details-body">
         <div class="details-empty">
-          Click a route name to inspect matchers, group by, channels and intake token prefix.
+          {{ _("routes.details.empty") }}
         </div>
       </div>
     </aside>
@@ -128,9 +128,9 @@
     <div class="app-modal-dialog app-modal-dialog-wide">
       <div class="app-modal-header">
         <div>
-          <h2 id="route-form-title">Create route</h2>
+          <h2 id="route-form-title">{{ _("routes.form.create") }}</h2>
           <div class="card-subtitle">
-            Match incoming alerts and deliver them to rotations and channels.
+            {{ _("routes.form.subtitle") }}
           </div>
         </div>
 
@@ -138,7 +138,7 @@
           id="close-route-form-modal"
           type="button"
           class="app-modal-close"
-          aria-label="Close"
+          aria-label="{{ _('routes.actions.close') }}"
         >
           ×
         </button>
@@ -149,9 +149,9 @@
           <section class="card">
             <div class="card-header">
               <div>
-                <h2>Route</h2>
+                <h2>{{ _("routes.form.route_section") }}</h2>
                 <div class="card-subtitle">
-                  Team, source, rotation and notification channels.
+                  {{ _("routes.form.route_section_hint") }}
                 </div>
               </div>
             </div>
@@ -159,19 +159,19 @@
             <div class="form-body">
               <input id="route-id" type="hidden">
 
-              <label for="route-team">Team</label>
+              <label for="route-team">{{ _("routes.form.team") }}</label>
               <select id="route-team" class="input"></select>
 
-              <label for="route-name">Name</label>
+              <label for="route-name">{{ _("routes.form.name") }}</label>
               <input
                 id="route-name"
                 class="input"
                 type="text"
-                placeholder="Critical infrastructure alerts"
+                placeholder="{{ _('routes.form.name_placeholder') }}"
                 autocomplete="off"
               >
 
-              <label for="route-source">Source</label>
+              <label for="route-source">{{ _("routes.form.source") }}</label>
               <select id="route-source" class="input">
                   <option value="alertmanager">Alertmanager</option>
                   <option value="aws_sns">AWS SNS / CloudWatch</option>
@@ -184,19 +184,19 @@
                   <option value="webhook">Webhook</option>
               </select>
                 <div id="route-sentry-settings" class="form-group is-hidden">
-                    <label for="route-sentry-webhook-secret">Sentry webhook secret</label>
+                    <label for="route-sentry-webhook-secret">{{ _("routes.form.sentry_secret") }}</label>
                     <input
                         id="route-sentry-webhook-secret"
                         class="input"
                         type="password"
-                        placeholder="Paste Sentry Client Secret"
+                        placeholder="{{ _('routes.form.sentry_secret_placeholder') }}"
                         autocomplete="new-password"
                     >
                     <div id="route-sentry-secret-help" class="help-text">
-                        Create the route first to get the Sentry webhook URL. Then create a Sentry Internal Integration and paste its Client Secret here.
+                        {{ _("routes.form.sentry_secret_new_help") }}
                     </div>
                     <div class="form-group">
-                        <label for="route-sentry-base-url">Sentry base URL</label>
+                        <label for="route-sentry-base-url">{{ _("routes.form.sentry_base_url") }}</label>
                         <input
                             id="route-sentry-base-url"
                             class="input"
@@ -206,13 +206,12 @@
                             spellcheck="false"
                         >
                         <div class="help-text">
-                            Used as fallback when webhook payload does not include an event URL.
-                            For self-hosted Sentry, use your Sentry root URL.
+                            {{ _("routes.form.sentry_base_url_help") }}
                         </div>
                     </div>
 
                     <div class="form-group">
-                        <label for="route-sentry-organization-slug">Sentry organization slug</label>
+                        <label for="route-sentry-organization-slug">{{ _("routes.form.sentry_org") }}</label>
                         <input
                             id="route-sentry-organization-slug"
                             class="input"
@@ -222,14 +221,14 @@
                             spellcheck="false"
                         >
                         <div class="help-text">
-                            Used together with issue_id to build a fallback Sentry issue link.
+                            {{ _("routes.form.sentry_org_help") }}
                         </div>
                     </div>
                 </div>
                 <div id="route-aws-sns-settings" class="is-hidden">
                     <div class="form-group">
                         <label for="route-aws-sns-topic-arn">
-                            AWS SNS Topic ARN
+                            {{ _("routes.form.sns_topic") }}
                         </label>
 
                         <input
@@ -241,7 +240,7 @@
                         >
 
                         <div class="form-help">
-                            Only signed SNS messages from this exact topic will be accepted.
+                            {{ _("routes.form.sns_topic_help") }}
                         </div>
                     </div>
 
@@ -250,7 +249,7 @@
                         class="form-group is-hidden"
                     >
                         <label for="route-aws-sns-webhook-url">
-                            AWS SNS webhook URL
+                            {{ _("routes.form.sns_webhook") }}
                         </label>
 
                         <input
@@ -260,47 +259,45 @@
                         >
 
                         <div class="form-help">
-                            Add this HTTPS endpoint as an HTTP/S subscription of the SNS topic.
-                            No route intake token is required because SNS requests are verified
-                            by signature and Topic ARN.
+                            {{ _("routes.form.sns_webhook_help") }}
                         </div>
                     </div>
                 </div>
-                <label for="route-service">Default service</label>
+                <label for="route-service">{{ _("routes.form.default_service") }}</label>
                 <select id="route-service" class="input">
-                  <option value="">No service</option>
+                  <option value="">{{ _("routes.form.no_service") }}</option>
                 </select>
                 <div class="form-group">
-                    <label for="route-escalation-mode">Escalation mode</label>
+                    <label for="route-escalation-mode">{{ _("routes.form.escalation_mode") }}</label>
                     <select id="route-escalation-mode">
-                        <option value="rotation">Simple rotation</option>
-                        <option value="policy">Escalation policy</option>
+                        <option value="rotation">{{ _("routes.form.simple_rotation") }}</option>
+                        <option value="policy">{{ _("routes.form.escalation_policy") }}</option>
                     </select>
                 </div>
 
                 <div class="form-group" id="route-policy-group">
-                    <label for="route-escalation-policy">Escalation policy</label>
+                    <label for="route-escalation-policy">{{ _("routes.form.escalation_policy") }}</label>
                     <select id="route-escalation-policy">
-                        <option value="">No policy</option>
+                        <option value="">{{ _("routes.form.no_policy") }}</option>
                     </select>
                 </div>
-              <label for="route-rotation">Rotation</label>
+              <label for="route-rotation">{{ _("routes.form.rotation") }}</label>
               <select id="route-rotation" class="input">
-                <option value="">No rotation</option>
+                <option value="">{{ _("routes.form.no_rotation") }}</option>
               </select>
 
-              <label for="route-channels">Channels</label>
+              <label for="route-channels">{{ _("routes.form.channels") }}</label>
               <select id="route-channels" class="input" multiple></select>
 
                 <label for="route-notification-channel-mode">
-                  Notification channel source
+                  {{ _("routes.form.notification_source") }}
                 </label>
 
                 <select id="route-notification-channel-mode" class="input">
-                  <option value="route_only">Route channels only</option>
-                  <option value="service_policy">Service notification policy</option>
+                  <option value="route_only">{{ _("routes.notification.route_only") }}</option>
+                  <option value="service_policy">{{ _("routes.notification.service_policy") }}</option>
                   <option value="service_policy_plus_route">
-                    Service policy + route channels
+                    {{ _("routes.notification.combined") }}
                   </option>
                 </select>
 
@@ -308,11 +305,11 @@
 
               <label class="md-checkbox">
                 <input id="route-enabled" type="checkbox" checked>
-                <span>Enabled</span>
+                <span>{{ _("routes.form.enabled") }}</span>
               </label>
 
               <div class="help-text">
-                Disabled routes stay visible, but stop accepting incoming alerts.
+                {{ _("routes.form.disabled_help") }}
               </div>
             </div>
           </section>
@@ -320,28 +317,28 @@
           <section class="card">
             <div class="card-header">
               <div>
-                <h2>Matching</h2>
+                <h2>{{ _("routes.form.matching") }}</h2>
                 <div class="card-subtitle">
-                  Alert filters and group-by configuration.
+                  {{ _("routes.form.matching_hint") }}
                 </div>
               </div>
             </div>
 
             <div class="form-body">
-                <label for="route-matcher-preset">Matcher preset</label>
+                <label for="route-matcher-preset">{{ _("routes.form.matcher_preset") }}</label>
                 <select id="route-matcher-preset" class="input">
-                  <option value="">No preset</option>
+                  <option value="">{{ _("routes.form.no_preset") }}</option>
                 </select>
 
                 <div id="route-matcher-preset-hint" class="help-text">
-                  No preset selected. Only the additional matchers below will be evaluated.
+                  {{ _("routes.form.no_preset_hint") }}
                 </div>
 
-                <label for="route-matchers">Additional matchers JSON</label>
+                <label for="route-matchers">{{ _("routes.form.additional_matchers_json") }}</label>
 
               <div class="json-editor">
                 <div class="json-editor-header">
-                  <span>Matchers</span>
+                  <span>{{ _("routes.form.matchers") }}</span>
 
                 </div>
 
@@ -353,11 +350,11 @@
                 >{}</textarea>
               </div>
 
-              <label for="route-group-by">Group by JSON</label>
+              <label for="route-group-by">{{ _("routes.form.group_by_json") }}</label>
 
               <div class="json-editor">
                 <div class="json-editor-header">
-                  <span>Group by</span>
+                  <span>{{ _("routes.form.group_by") }}</span>
                 </div>
 
                 <textarea
@@ -369,7 +366,7 @@
               </div>
 
               <div class="help-text">
-                Matchers are JSON object filters. Group by is a JSON array of label names used for alert aggregation. Leave it empty to keep each dedup key in its own group.
+                {{ _("routes.form.matchers_help") }}
               </div>
             </div>
           </section>
@@ -378,11 +375,11 @@
 
       <div class="app-modal-footer">
         <button id="reset-route-form" type="button" class="btn">
-          Reset
+          {{ _("routes.actions.reset") }}
         </button>
 
         <button id="save-route" type="button" class="btn btn-primary">
-          Save route
+          {{ _("routes.actions.save_route") }}
         </button>
       </div>
     </div>
@@ -391,9 +388,9 @@
         <div class="app-modal-dialog">
             <div class="app-modal-header">
                 <div>
-                    <h2 id="route-intake-title">Route intake details</h2>
+                    <h2 id="route-intake-title">{{ _("routes.intake.title") }}</h2>
                     <p id="route-intake-subtitle">
-                        Copy these values now. The token may not be shown again.
+                        {{ _("routes.intake.copy_now") }}
                     </p>
                 </div>
                 <button id="close-route-token-modal" class="modal-close" type="button">
@@ -404,7 +401,7 @@
             <div class="app-modal-body">
                 <div class="copy-fields">
                     <div class="copy-field">
-                        <label for="route-intake-url">Webhook URL</label>
+                        <label for="route-intake-url">{{ _("routes.intake.webhook_url") }}</label>
                         <input
                             id="route-intake-url"
                             class="input copy-field-control"
@@ -412,12 +409,12 @@
                             readonly
                         >
                         <div id="route-intake-url-help" class="help-text">
-                            Send incoming alerts to this URL.
+                            {{ _("routes.intake.send_url") }}
                         </div>
                     </div>
 
                     <div id="route-intake-token-group" class="copy-field">
-                        <label for="route-intake-token">Token</label>
+                        <label for="route-intake-token">{{ _("routes.intake.token") }}</label>
                         <input
                             id="route-intake-token"
                             class="input copy-field-control"
@@ -425,12 +422,12 @@
                             readonly
                         >
                         <div class="help-text">
-                            Use this token as an Authorization Bearer token.
+                            {{ _("routes.intake.token_help") }}
                         </div>
                     </div>
 
                     <div id="route-intake-command-group" class="copy-field">
-                        <label for="route-intake-curl">Example curl</label>
+                        <label for="route-intake-curl">{{ _("routes.intake.example_curl") }}</label>
                         <textarea
                             id="route-intake-curl"
                             class="input copy-field-control copy-field-code"
@@ -443,16 +440,16 @@
 
             <div class="app-modal-footer">
                 <button id="copy-route-intake-url" class="btn btn-secondary" type="button">
-                    Copy URL
+                    {{ _("routes.intake.copy_url") }}
                 </button>
                 <button id="copy-route-intake-token" class="btn btn-secondary" type="button">
-                    Copy token
+                    {{ _("routes.intake.copy_token") }}
                 </button>
                 <button id="copy-route-intake-curl" class="btn btn-secondary" type="button">
-                    Copy curl
+                    {{ _("routes.intake.copy_curl") }}
                 </button>
                 <button id="close-route-token-modal-footer" class="btn btn-primary" type="button">
-                    Close
+                    {{ _("routes.actions.close") }}
                 </button>
             </div>
         </div>
@@ -461,9 +458,9 @@
   <div class="app-modal-dialog app-modal-dialog-wide">
     <div class="app-modal-header">
       <div>
-        <h2 id="route-service-rules-title">Service rules</h2>
+        <h2 id="route-service-rules-title">{{ _("routes.rules.title") }}</h2>
         <div class="card-subtitle">
-          Match alerts inside this route to affected services.
+          {{ _("routes.rules.subtitle") }}
         </div>
       </div>
 
@@ -471,7 +468,7 @@
         id="close-route-service-rules-modal"
         type="button"
         class="app-modal-close"
-        aria-label="Close"
+        aria-label="{{ _('routes.actions.close') }}"
       >
         ×
       </button>
@@ -482,9 +479,9 @@
         <section class="card">
           <div class="card-header">
             <div>
-              <h2>Rules</h2>
+              <h2>{{ _("routes.rules.rules") }}</h2>
               <div class="card-subtitle">
-                Route-specific service classification rules.
+                {{ _("routes.rules.rules_hint") }}
               </div>
             </div>
           </div>
@@ -493,17 +490,17 @@
             <table class="data-table">
               <thead>
                 <tr>
-                  <th>Position</th>
-                  <th>Name</th>
-                  <th>Service</th>
-                  <th>Matchers</th>
-                  <th>Status</th>
-                  <th class="actions-th">Actions</th>
+                  <th>{{ _("routes.rules.position") }}</th>
+                  <th>{{ _("routes.rules.name") }}</th>
+                  <th>{{ _("routes.rules.service") }}</th>
+                  <th>{{ _("routes.rules.matchers") }}</th>
+                  <th>{{ _("routes.rules.status") }}</th>
+                  <th class="actions-th">{{ _("routes.table.actions") }}</th>
                 </tr>
               </thead>
               <tbody id="route-service-rules-table">
                 <tr>
-                  <td colspan="6" class="empty-cell">No service rules</td>
+                  <td colspan="6" class="empty-cell">{{ _("routes.rules.empty") }}</td>
                 </tr>
               </tbody>
             </table>
@@ -513,9 +510,9 @@
         <section class="card">
           <div class="card-header">
             <div>
-              <h2 id="service-rule-form-title">Create rule</h2>
+              <h2 id="service-rule-form-title">{{ _("routes.rules.create") }}</h2>
               <div class="card-subtitle">
-                Define matchers and target service.
+                {{ _("routes.rules.form_hint") }}
               </div>
             </div>
           </div>
@@ -525,34 +522,34 @@
             <input id="service-rule-team" type="hidden">
             <input id="service-rule-route" type="hidden">
 
-            <label for="service-rule-name">Name</label>
+            <label for="service-rule-name">{{ _("routes.rules.name") }}</label>
             <input
               id="service-rule-name"
               class="input"
               type="text"
-              placeholder="PostgreSQL alerts"
+              placeholder="{{ _('routes.rules.name_placeholder') }}"
               autocomplete="off"
             >
 
-            <label for="service-rule-service">Service</label>
+            <label for="service-rule-service">{{ _("routes.rules.service") }}</label>
             <select id="service-rule-service" class="input">
-              <option value="">Select service</option>
+              <option value="">{{ _("routes.rules.select_service") }}</option>
             </select>
 
-            <label for="service-rule-position">Position</label>
+            <label for="service-rule-position">{{ _("routes.rules.position") }}</label>
             <input id="service-rule-position" class="input" type="number" min="0" value="0">
-              <label for="service-rule-matcher-preset">Matcher preset</label>
+              <label for="service-rule-matcher-preset">{{ _("routes.rules.matcher_preset") }}</label>
               <select id="service-rule-matcher-preset" class="input">
-                  <option value="">No preset</option>
+                  <option value="">{{ _("routes.form.no_preset") }}</option>
               </select>
 
                 <div id="service-rule-matcher-preset-hint" class="help-text">
-                  No preset selected. Only the additional matchers below will be evaluated.
+                  {{ _("routes.form.no_preset_hint") }}
                 </div>
 
             <div class="json-editor">
               <div class="json-editor-header">
-                  <span>Additional matchers</span>
+                  <span>{{ _("routes.rules.additional_matchers") }}</span>
               </div>
 
               <textarea
@@ -569,15 +566,15 @@
 
             <label class="md-checkbox">
               <input id="service-rule-enabled" type="checkbox" checked>
-              <span>Enabled</span>
+              <span>{{ _("routes.form.enabled") }}</span>
             </label>
 
             <div class="form-actions">
               <button id="reset-service-rule-form" type="button" class="btn">
-                Reset
+                {{ _("routes.actions.reset") }}
               </button>
               <button id="save-service-rule" type="button" class="btn btn-primary">
-                Save rule
+                {{ _("routes.actions.save_rule") }}
               </button>
             </div>
           </div>

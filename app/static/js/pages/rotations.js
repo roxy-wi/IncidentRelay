@@ -10,14 +10,30 @@ let rotationOverridesAfterChange = null;
 let selectedRotationDetailsId = null;
 
 const WEEKDAY_LABELS = [
-    "Monday",
-    "Tuesday",
-    "Wednesday",
-    "Thursday",
-    "Friday",
-    "Saturday",
-    "Sunday"
+    i18n.t("rotations.weekday.monday"),
+    i18n.t("rotations.weekday.tuesday"),
+    i18n.t("rotations.weekday.wednesday"),
+    i18n.t("rotations.weekday.thursday"),
+    i18n.t("rotations.weekday.friday"),
+    i18n.t("rotations.weekday.saturday"),
+    i18n.t("rotations.weekday.sunday")
 ];
+
+function rotationUnitLabel(unit) {
+    const labels = {
+        minutes: "rotations.units.minutes_lower",
+        hours: "rotations.units.hours_lower",
+        days: "rotations.units.days_lower",
+        weeks: "rotations.units.weeks_lower"
+    };
+
+    return labels[unit] ? i18n.t(labels[unit]) : (unit || "-");
+}
+
+function rotationActionLabel(key) {
+    return i18n.t("rotations.actions." + key);
+}
+
 
 function getBrowserTimezones() {
     return window.AppTimezones.getBrowserTimezones();
@@ -83,7 +99,7 @@ function closeRotationLayersModal() {
         .append(
             $("<div>")
                 .addClass("empty-cell")
-                .text("No rotation selected")
+                .text(i18n.t("rotations.empty.none_selected"))
         );
 }
 
@@ -91,19 +107,21 @@ function selectRotationLayers(rotationId) {
     const rotation = findRotationInCache(rotationId);
 
     if (!rotation) {
-        showAppError("Rotation was not found.");
+        showAppError(i18n.t("rotations.errors.not_found"));
         return;
     }
 
     selectedRotationForLayers = rotation.id;
-    selectedRotationNameForLayers = rotation.name || ("rotation #" + rotation.id);
+    selectedRotationNameForLayers = rotation.name || i18n.t("rotations.labels.rotation_number", {id: rotation.id});
     rotationLayersCache = [];
     rotationLayerEligibleUsersCache = [];
     layerMembersCache = {};
     layerRestrictionsCache = {};
     expandedLayerId = null;
 
-    $("#rotation-layers-title").text("Rotation layers: " + selectedRotationNameForLayers);
+    $("#rotation-layers-title").text(
+        i18n.t("rotations.layers.title_named", {name: selectedRotationNameForLayers})
+    );
     openAppModal("#rotation-layers-modal");
 
     loadEligibleUsersForLayerCards(rotation.id, function () {
@@ -129,7 +147,7 @@ function loadRotationLayerCards(rotationId, callback) {
         .append(
             $("<div>")
                 .addClass("layer-card-loading")
-                .text("Loading layers...")
+                .text(i18n.t("rotations.layers.loading"))
         );
 
     apiGet("/api/rotations/" + rotationId + "/layers", function (layers) {
@@ -225,7 +243,7 @@ function renderRotationLayerCards() {
         container.append(
             $("<div>")
                 .addClass("empty-cell")
-                .text("No layers. Add the first layer to define on-call coverage.")
+                .text(i18n.t("rotations.layers.none"))
         );
         return;
     }
@@ -270,13 +288,14 @@ function renderLayerCardHeader(layer, number) {
     header.append(
         $("<div>")
             .addClass("rotation-layer-title")
-            .append($("<strong>").text(layer.name || "Unnamed layer"))
+            .append($("<strong>").text(layer.name || i18n.t("rotations.layers.unnamed")))
             .append(
                 $("<span>").text(
-                    "Priority " +
-                    Number(layer.priority || 0) +
+                    i18n.t("rotations.layers.priority", {value: Number(layer.priority || 0)}) +
                     " · " +
-                    (layer.enabled ? "Enabled" : "Disabled") +
+                    (layer.enabled
+                        ? i18n.t("rotations.layers.enabled")
+                        : i18n.t("rotations.layers.disabled")) +
                     " · " +
                     (layer.timezone || "UTC")
                 )
@@ -289,7 +308,11 @@ function renderLayerCardHeader(layer, number) {
         $("<button>")
             .attr("type", "button")
             .addClass("btn btn-small")
-            .text(Number(expandedLayerId) === Number(layer.id) ? "Collapse" : "Edit")
+            .text(
+                Number(expandedLayerId) === Number(layer.id)
+                    ? i18n.t("rotations.layers.collapse")
+                    : i18n.t("rotations.actions.edit")
+            )
             .on("click", function () {
                 toggleLayerEditor(layer.id);
             })
@@ -299,7 +322,7 @@ function renderLayerCardHeader(layer, number) {
         $("<button>")
             .attr("type", "button")
             .addClass("btn btn-danger btn-small")
-            .text("Delete")
+            .text(i18n.t("rotations.actions.delete"))
             .on("click", function () {
                 deleteRotationLayer(layer.id);
             })
@@ -316,21 +339,21 @@ function renderLayerSummary(layer) {
     summary.append(
         $("<div>")
             .addClass("rotation-layer-summary-item")
-            .append($("<span>").text("Who rotates"))
+            .append($("<span>").text(i18n.t("rotations.layers.who_rotates")))
             .append($("<strong>").html(formatLayerMembersSummary(layer.id)))
     );
 
     summary.append(
         $("<div>")
             .addClass("rotation-layer-summary-item")
-            .append($("<span>").text("Rotation"))
+            .append($("<span>").text(i18n.t("rotations.layers.rotation")))
             .append($("<strong>").text(formatLayerCadence(layer)))
     );
 
     summary.append(
         $("<div>")
             .addClass("rotation-layer-summary-item")
-            .append($("<span>").text("Active"))
+            .append($("<span>").text(i18n.t("rotations.layers.active")))
             .append($("<strong>").html(formatLayerRestrictionsSummary(layer.id)))
     );
 
@@ -347,11 +370,15 @@ function formatLayerMembersSummary(layerId) {
         });
 
     if (!members.length) {
-        return "No users";
+        return i18n.t("rotations.layers.no_users");
     }
 
     return members.map(function (member) {
-        return escapeHtml(member.display_name || member.username || ("user #" + member.user_id));
+        return escapeHtml(
+            member.display_name
+            || member.username
+            || i18n.t("rotations.layers.user_number", {id: member.user_id})
+        );
     }).join(" → ");
 }
 
@@ -362,17 +389,28 @@ function formatLayerCadence(layer) {
 
     if (type === "weekly") {
         const weekday = layer.handoff_weekday === null || layer.handoff_weekday === undefined
-            ? "Monday"
+            ? i18n.t("rotations.weekday.monday")
             : weekdayLabel(layer.handoff_weekday);
 
-        return "Weekly, " + weekday + " " + handoff + ", " + timezone;
+        return i18n.t("rotations.cadence.weekly_format", {
+            weekday: weekday,
+            time: handoff,
+            timezone: timezone
+        });
     }
 
     if (type === "custom") {
-        return "Every " + (layer.interval_value || 1) + " " + (layer.interval_unit || "days") + ", " + timezone;
+        return i18n.t("rotations.cadence.every", {
+            value: layer.interval_value || 1,
+            unit: rotationUnitLabel(layer.interval_unit || "days"),
+            timezone: timezone
+        });
     }
 
-    return "Daily, " + handoff + ", " + timezone;
+    return i18n.t("rotations.cadence.daily_format", {
+        time: handoff,
+        timezone: timezone
+    });
 }
 
 function formatLayerRestrictionsSummary(layerId) {
@@ -389,7 +427,9 @@ function formatLayerRestrictionsSummary(layerId) {
     });
 
     if (restrictions.length > 4) {
-        parts.push("+" + (restrictions.length - 4) + " more");
+        parts.push(i18n.t("rotations.layers.more", {
+            count: restrictions.length - 4
+        }));
     }
 
     return parts.join("<br>");
@@ -398,29 +438,38 @@ function formatLayerRestrictionsSummary(layerId) {
 function renderLayerSettingsEditor(layer) {
     const section = $("<section>").addClass("layer-editor-section");
 
-    section.append($("<h4>").text("1. When do they rotate?"));
+    section.append($("<h4>").text(i18n.t("rotations.layers.when_title")));
     section.append(
         $("<div>")
             .addClass("layer-editor-section-subtitle")
-            .text("Configure handoff time, timezone and priority for this layer.")
+            .text(i18n.t("rotations.layers.when_hint"))
     );
 
     const grid = $("<div>").addClass("layer-settings-grid");
 
     grid.append(
-        layerTextField(layer.id, "name", "Name", layer.name || "")
-            .addClass("layer-settings-col-4")
+        layerTextField(
+            layer.id,
+            "name",
+            i18n.t("rotations.form.name"),
+            layer.name || ""
+        ).addClass("layer-settings-col-4")
     );
 
     grid.append(
-        layerNumberField(layer.id, "priority", "Priority", layer.priority || 0, 0)
-            .addClass("layer-settings-col-2")
+        layerNumberField(
+            layer.id,
+            "priority",
+            i18n.t("rotations.form.priority"),
+            layer.priority || 0,
+            0
+        ).addClass("layer-settings-col-2")
     );
 
     grid.append(
         $("<div>")
             .addClass("app-field layer-settings-col-6")
-            .append($("<label>").text("Description"))
+            .append($("<label>").text(i18n.t("rotations.layers.description")))
             .append(
                 $("<textarea>")
                     .addClass("input")
@@ -433,7 +482,7 @@ function renderLayerSettingsEditor(layer) {
     grid.append(
         $("<div>")
             .addClass("app-field layer-settings-col-3")
-            .append($("<label>").text("Schedule starts at"))
+            .append($("<label>").text(i18n.t("rotations.layers.starts_at")))
             .append(
                 $("<input>")
                     .addClass("input")
@@ -446,14 +495,14 @@ function renderLayerSettingsEditor(layer) {
     grid.append(
         $("<div>")
             .addClass("app-field layer-settings-col-3")
-            .append($("<label>").text("Cadence"))
+            .append($("<label>").text(i18n.t("rotations.layers.cadence")))
             .append(
                 $("<select>")
                     .addClass("input")
                     .attr("data-layer-field", "rotation_type")
-                    .append($("<option>").val("daily").text("Daily handoff"))
-                    .append($("<option>").val("weekly").text("Weekly handoff"))
-                    .append($("<option>").val("custom").text("Custom interval"))
+                    .append($("<option>").val("daily").text(i18n.t("rotations.cadence.daily_handoff")))
+                    .append($("<option>").val("weekly").text(i18n.t("rotations.cadence.weekly_handoff")))
+                    .append($("<option>").val("custom").text(i18n.t("rotations.cadence.custom_interval")))
                     .val(layer.rotation_type || "daily")
             )
     );
@@ -461,7 +510,7 @@ function renderLayerSettingsEditor(layer) {
     grid.append(
         $("<div>")
             .addClass("app-field layer-settings-col-2")
-            .append($("<label>").text("Handoff time"))
+            .append($("<label>").text(i18n.t("rotations.form.handoff_time")))
             .append(
                 $("<input>")
                     .addClass("input")
@@ -474,18 +523,18 @@ function renderLayerSettingsEditor(layer) {
     grid.append(
         $("<div>")
             .addClass("app-field layer-weekly-options layer-settings-col-4")
-            .append($("<label>").text("Weekly handoff day"))
+            .append($("<label>").text(i18n.t("rotations.form.weekday")))
             .append(
                 $("<select>")
                     .addClass("input")
                     .attr("data-layer-field", "handoff_weekday")
-                    .append($("<option>").val("0").text("Monday"))
-                    .append($("<option>").val("1").text("Tuesday"))
-                    .append($("<option>").val("2").text("Wednesday"))
-                    .append($("<option>").val("3").text("Thursday"))
-                    .append($("<option>").val("4").text("Friday"))
-                    .append($("<option>").val("5").text("Saturday"))
-                    .append($("<option>").val("6").text("Sunday"))
+                    .append($("<option>").val("0").text(i18n.t("rotations.weekday.monday")))
+                    .append($("<option>").val("1").text(i18n.t("rotations.weekday.tuesday")))
+                    .append($("<option>").val("2").text(i18n.t("rotations.weekday.wednesday")))
+                    .append($("<option>").val("3").text(i18n.t("rotations.weekday.thursday")))
+                    .append($("<option>").val("4").text(i18n.t("rotations.weekday.friday")))
+                    .append($("<option>").val("5").text(i18n.t("rotations.weekday.saturday")))
+                    .append($("<option>").val("6").text(i18n.t("rotations.weekday.sunday")))
                     .val(String(
                         layer.handoff_weekday === null || layer.handoff_weekday === undefined
                             ? 0
@@ -497,7 +546,7 @@ function renderLayerSettingsEditor(layer) {
     grid.append(
         $("<div>")
             .addClass("app-field layer-custom-options layer-settings-col-2")
-            .append($("<label>").text("Every"))
+            .append($("<label>").text(i18n.t("rotations.form.every")))
             .append(
                 $("<input>")
                     .addClass("input")
@@ -511,15 +560,15 @@ function renderLayerSettingsEditor(layer) {
     grid.append(
         $("<div>")
             .addClass("app-field layer-custom-options layer-settings-col-2")
-            .append($("<label>").text("Unit"))
+            .append($("<label>").text(i18n.t("rotations.form.unit")))
             .append(
                 $("<select>")
                     .addClass("input")
                     .attr("data-layer-field", "interval_unit")
-                    .append($("<option>").val("minutes").text("minutes"))
-                    .append($("<option>").val("hours").text("hours"))
-                    .append($("<option>").val("days").text("days"))
-                    .append($("<option>").val("weeks").text("weeks"))
+                    .append($("<option>").val("minutes").text(i18n.t("rotations.units.minutes_lower")))
+                    .append($("<option>").val("hours").text(i18n.t("rotations.units.hours_lower")))
+                    .append($("<option>").val("days").text(i18n.t("rotations.units.days_lower")))
+                    .append($("<option>").val("weeks").text(i18n.t("rotations.units.weeks_lower")))
                     .val(layer.interval_unit || "days")
             )
     );
@@ -543,8 +592,8 @@ function renderLayerSettingsEditor(layer) {
                     )
                     .append(
                         $("<span>")
-                            .append($("<strong>").text("Enabled"))
-                            .append($("<small>").text("Layer participates in final schedule"))
+                            .append($("<strong>").text(i18n.t("rotations.layers.enabled")))
+                            .append($("<small>").text(i18n.t("rotations.layers.enabled_hint")))
                     )
             )
     );
@@ -558,7 +607,7 @@ function renderLayerSettingsEditor(layer) {
                 $("<button>")
                     .attr("type", "button")
                     .addClass("btn btn-primary")
-                    .text("Save layer")
+                    .text(i18n.t("rotations.layers.save"))
                     .on("click", function () {
                         saveRotationLayerFromCard(layer.id);
                     })
@@ -599,19 +648,19 @@ function layerTimezoneField(layerId, value) {
 
     return $("<div>")
         .addClass("app-field")
-        .append($("<label>").text("Timezone"))
+        .append($("<label>").text(i18n.t("rotations.form.timezone")))
         .append(select);
 }
 
 function renderLayerMembersEditor(layer) {
     const section = $("<section>").addClass("layer-editor-section");
 
-    section.append($("<h4>").text("2. Who rotates?"));
+    section.append($("<h4>").text(i18n.t("rotations.layers.who_title")));
 
     section.append(
         $("<div>")
             .addClass("layer-editor-section-subtitle")
-            .text("Users rotate in position order. Removing a user only affects future shifts; past shifts stay visible.")
+            .text(i18n.t("rotations.layers.who_hint"))
     );
 
     const currentMembers = asArray(layerMembersCache[layer.id])
@@ -644,15 +693,19 @@ function renderLayerMembersEditor(layer) {
     const userSelect = $("<select>")
         .addClass("js-user-select")
         .attr("data-layer-member-user", layer.id)
-        .attr("data-placeholder", "Select user...");
+        .attr("data-placeholder", i18n.t("rotations.layers.select_user"));
 
     if (!availableUsers.length) {
         userSelect.append(
             $("<option>")
                 .val("")
-                .text(currentMembers.length ? "All active users are already in this layer" : "No active team members")
+                .text(
+                    currentMembers.length
+                        ? i18n.t("rotations.layers.all_users_added")
+                        : i18n.t("rotations.layers.no_team_members")
+                )
         );
-    }else {
+    } else {
         userSelect.append(
             $("<option>")
                 .val("")
@@ -671,14 +724,14 @@ function renderLayerMembersEditor(layer) {
     addRow.append(
         $("<div>")
             .addClass("app-field")
-            .append($("<label>").text("User"))
+            .append($("<label>").text(i18n.t("rotations.layers.user")))
             .append(userSelect)
     );
 
     addRow.append(
         $("<div>")
             .addClass("app-field")
-            .append($("<label>").text("Position"))
+            .append($("<label>").text(i18n.t("rotations.layers.position")))
             .append(
                 $("<input>")
                     .addClass("input")
@@ -694,7 +747,7 @@ function renderLayerMembersEditor(layer) {
             .addClass("app-field")
             .append(
                 $("<label>")
-                    .text("Starts at")
+                    .text(i18n.t("rotations.overrides.starts"))
                     .append(
                         $("<small>")
                             .addClass("muted")
@@ -715,7 +768,7 @@ function renderLayerMembersEditor(layer) {
             .attr("type", "button")
             .addClass("btn")
             .prop("disabled", !availableUsers.length)
-            .text("Add user")
+            .text(i18n.t("rotations.layers.add_user"))
             .on("click", function () {
                 addLayerMemberFromCard(layer.id);
             })
@@ -729,7 +782,7 @@ function renderLayerMembersEditor(layer) {
         list.append(
             $("<div>")
                 .addClass("layer-empty-box")
-                .text("No active users in this layer yet.")
+                .text(i18n.t("rotations.layers.no_active_users"))
         );
     } else {
         currentMembers.forEach(function (member) {
@@ -744,16 +797,29 @@ function renderLayerMembersEditor(layer) {
 
 function renderLayerMemberRow(layerId, member) {
     const row = $("<div>").addClass("layer-member-row");
+    const starts = member.starts_at
+        ? i18n.t("rotations.layers.starts_suffix", {
+            value: formatDateTime(member.starts_at)
+        })
+        : "";
 
     row.append(
         $("<div>")
             .addClass("layer-member-name")
-            .append($("<strong>").text(member.display_name || member.username || ("user #" + member.user_id)))
+            .append(
+                $("<strong>").text(
+                    member.display_name
+                    || member.username
+                    || i18n.t("rotations.layers.user_number", {id: member.user_id})
+                )
+            )
             .append(
                 $("<small>").text(
-                    "User ID " + member.user_id +
-                    " · member #" + member.id +
-                    (member.starts_at ? " · starts at " + formatDateTime(member.starts_at) : "")
+                    i18n.t("rotations.layers.member_meta", {
+                        user_id: member.user_id,
+                        member_id: member.id,
+                        starts: starts
+                    })
                 )
             )
     );
@@ -773,7 +839,7 @@ function renderLayerMemberRow(layerId, member) {
         $("<button>")
             .attr("type", "button")
             .addClass("btn btn-small")
-            .text("Save position")
+            .text(i18n.t("rotations.layers.save_position"))
             .on("click", function () {
                 updateLayerMemberFromCard(layerId, member.id);
             })
@@ -783,7 +849,7 @@ function renderLayerMemberRow(layerId, member) {
         $("<button>")
             .attr("type", "button")
             .addClass("btn btn-danger btn-small")
-            .text("Remove")
+            .text(i18n.t("rotations.layers.remove"))
             .on("click", function () {
                 removeLayerMemberFromCard(layerId, member.id);
             })
@@ -797,24 +863,24 @@ function renderLayerMemberRow(layerId, member) {
 function renderLayerRestrictionsEditor(layer) {
     const section = $("<section>").addClass("layer-editor-section");
 
-    section.append($("<h4>").text("3. When is this layer active?"));
+    section.append($("<h4>").text(i18n.t("rotations.layers.active_title")));
     section.append(
         $("<div>")
             .addClass("layer-editor-section-subtitle")
-            .text("No restrictions means this layer is active 24/7.")
+            .text(i18n.t("rotations.layers.active_hint"))
     );
 
     const toolbar = $("<div>").addClass("layer-restrictions-toolbar");
 
     toolbar.append(presetButton(layer.id, "24/7", "24x7"));
-    toolbar.append(presetButton(layer.id, "Business hours", "business"));
-    toolbar.append(presetButton(layer.id, "Nights", "nights"));
-    toolbar.append(presetButton(layer.id, "Weekend", "weekend"));
+    toolbar.append(presetButton(layer.id, i18n.t("rotations.layers.business_hours"), "business"));
+    toolbar.append(presetButton(layer.id, i18n.t("rotations.layers.nights"), "nights"));
+    toolbar.append(presetButton(layer.id, i18n.t("rotations.layers.weekend"), "weekend"));
     toolbar.append(
         $("<button>")
             .attr("type", "button")
             .addClass("btn btn-small")
-            .text("+ Add window")
+            .text(i18n.t("rotations.layers.add_window"))
             .on("click", function () {
                 addRestrictionRowToCard(layer.id);
             })
@@ -832,7 +898,7 @@ function renderLayerRestrictionsEditor(layer) {
         list.append(
             $("<div>")
                 .addClass("layer-empty-box")
-                .text("Active 24/7. Add windows if this layer should only work during specific days or hours.")
+                .text(i18n.t("rotations.layers.active_24x7"))
         );
     } else {
         restrictions.forEach(function (restriction, index) {
@@ -849,7 +915,7 @@ function renderLayerRestrictionsEditor(layer) {
                 $("<button>")
                     .attr("type", "button")
                     .addClass("btn btn-primary")
-                    .text("Save restrictions")
+                    .text(i18n.t("rotations.layers.save_restrictions"))
                     .on("click", function () {
                         saveLayerRestrictionsFromCard(layer.id);
                     })
@@ -867,16 +933,20 @@ function renderLayerRestrictionRow(layerId, restriction, index) {
     const weekdaySelect = $("<select>")
         .addClass("input")
         .attr("data-restriction-weekday", index)
-        .append($("<option>").val("").text("Every day"))
-        .append($("<option>").val("0").text("Monday"))
-        .append($("<option>").val("1").text("Tuesday"))
-        .append($("<option>").val("2").text("Wednesday"))
-        .append($("<option>").val("3").text("Thursday"))
-        .append($("<option>").val("4").text("Friday"))
-        .append($("<option>").val("5").text("Saturday"))
-        .append($("<option>").val("6").text("Sunday"));
+        .append($("<option>").val("").text(i18n.t("rotations.weekday.every_day")))
+        .append($("<option>").val("0").text(i18n.t("rotations.weekday.monday")))
+        .append($("<option>").val("1").text(i18n.t("rotations.weekday.tuesday")))
+        .append($("<option>").val("2").text(i18n.t("rotations.weekday.wednesday")))
+        .append($("<option>").val("3").text(i18n.t("rotations.weekday.thursday")))
+        .append($("<option>").val("4").text(i18n.t("rotations.weekday.friday")))
+        .append($("<option>").val("5").text(i18n.t("rotations.weekday.saturday")))
+        .append($("<option>").val("6").text(i18n.t("rotations.weekday.sunday")));
 
-    weekdaySelect.val(restriction.weekday === null || restriction.weekday === undefined ? "" : String(restriction.weekday));
+    weekdaySelect.val(
+        restriction.weekday === null || restriction.weekday === undefined
+            ? ""
+            : String(restriction.weekday)
+    );
 
     row.append(weekdaySelect);
 
@@ -900,7 +970,7 @@ function renderLayerRestrictionRow(layerId, restriction, index) {
         $("<button>")
             .attr("type", "button")
             .addClass("btn btn-danger btn-small")
-            .text("Remove")
+            .text(i18n.t("rotations.layers.remove"))
             .on("click", function () {
                 removeRestrictionRowFromCard(layerId, index);
             })
@@ -1018,22 +1088,28 @@ function nextRotationLayerDefaultName() {
         }
     });
 
-    if (!used["new layer"]) {
-        return "New layer";
+    const firstName = i18n.t("rotations.layers.new");
+
+    if (!used[firstName.toLowerCase()]) {
+        return firstName;
     }
 
     let index = 2;
 
-    while (used[("new layer " + index).toLowerCase()]) {
+    while (
+        used[
+            i18n.t("rotations.layers.new_number", {number: index}).toLowerCase()
+        ]
+    ) {
         index += 1;
     }
 
-    return "New layer " + index;
+    return i18n.t("rotations.layers.new_number", {number: index});
 }
 
 function addLayerCard() {
     if (!selectedRotationForLayers) {
-        showAppError("Select a rotation first.");
+        showAppError(i18n.t("rotations.layers.select_first"));
         return;
     }
 
@@ -1077,9 +1153,9 @@ function saveRotationLayerFromCard(layerId) {
 
 function deleteRotationLayer(layerId) {
     showAppConfirm({
-        title: "Delete this layer?",
-        message: "Delete this layer?",
-        confirmText: "Delete layer",
+        title: i18n.t("rotations.layers.delete_title"),
+        message: i18n.t("rotations.layers.delete_title"),
+        confirmText: i18n.t("rotations.layers.delete_confirm"),
         confirmClass: "btn-danger"
     }).done(function () {
         apiDelete("/api/rotations/layers/" + layerId, function () {
@@ -1114,7 +1190,7 @@ function addLayerMemberFromCard(layerId) {
     const startsAt = $('[data-layer-member-starts-at="' + layerId + '"]').val();
 
     if (!userId) {
-        showAppError("Select a user to add.");
+        showAppError(i18n.t("rotations.layers.select_user_error"));
         return;
     }
 
@@ -1146,9 +1222,9 @@ function updateLayerMemberFromCard(layerId, memberId) {
 
 function removeLayerMemberFromCard(layerId, memberId) {
     showAppConfirm({
-        title: "Remove this user from future shifts?",
-        message: "Past on-call shifts will stay visible. This user will no longer be assigned to future shifts in this layer.",
-        confirmText: "Remove from future shifts",
+        title: i18n.t("rotations.layers.remove_user_title"),
+        message: i18n.t("rotations.layers.remove_user_message"),
+        confirmText: i18n.t("rotations.layers.remove_user_confirm"),
         confirmClass: "btn-danger"
     }).done(function () {
         apiDelete("/api/rotations/layers/members/" + memberId, function () {
@@ -1162,7 +1238,7 @@ function removeLayerMemberFromCard(layerId, memberId) {
 
 function weekdayLabel(value) {
     if (value === null || value === undefined || value === "") {
-        return "Every day";
+        return i18n.t("rotations.weekday.every_day");
     }
 
     return WEEKDAY_LABELS[Number(value)] || "-";
@@ -1332,7 +1408,7 @@ function getRotationRuntimeStatus(rotation) {
     if (!rotation.enabled) {
         return {
             key: "disabled",
-            label: "Disabled",
+            label: i18n.t("rotations.status.disabled"),
         };
     }
 
@@ -1340,20 +1416,20 @@ function getRotationRuntimeStatus(rotation) {
     if (startAt && startAt.getTime() > Date.now()) {
         return {
             key: "scheduled",
-            label: "Scheduled",
+            label: i18n.t("rotations.status.scheduled"),
         };
     }
 
     if (getRotationCurrentUser(rotation)) {
         return {
             key: "active",
-            label: "Active now",
+            label: i18n.t("rotations.status.active_now"),
         };
     }
 
     return {
         key: "idle",
-        label: "No active layer",
+        label: i18n.t("rotations.status.no_active_layer"),
     };
 }
 
@@ -1361,11 +1437,19 @@ function renderRotationRuntimeStatusBadge(rotation) {
     const status = getRotationRuntimeStatus(rotation);
 
     if (status.key === "active") {
-        return renderStatusBadge(true, "Active now", "Disabled");
+        return renderStatusBadge(
+            true,
+            i18n.t("rotations.status.active_now"),
+            i18n.t("rotations.status.disabled")
+        );
     }
 
     if (status.key === "disabled") {
-        return renderStatusBadge(false, "Active now", "Disabled");
+        return renderStatusBadge(
+            false,
+            i18n.t("rotations.status.active_now"),
+            i18n.t("rotations.status.disabled")
+        );
     }
 
     return $("<span>")
@@ -1529,7 +1613,7 @@ function refreshRotations(doneCallback) {
                         $("<td>")
                             .attr("colspan", "6")
                             .addClass("empty-cell")
-                            .text("No rotation selected")
+                            .text(i18n.t("rotations.empty.none_selected"))
                     )
                 );
         }
@@ -1586,11 +1670,13 @@ function editRotation(id) {
     const rotation = findRotationInCache(id);
 
     if (!rotation) {
-        showAppError("Rotation was not found.");
+        showAppError(i18n.t("rotations.errors.not_found"));
         return;
     }
 
-    $("#rotation-form-title").text("Edit rotation #" + id);
+    $("#rotation-form-title").text(
+        i18n.t("rotations.form.edit_title", {id: id})
+    );
     $("#rotation-id").val(rotation.id);
     $("#rotation-team").val(rotation.team_id);
     $("#rotation-name").val(rotation.name);
@@ -1600,21 +1686,31 @@ function editRotation(id) {
     $("#rotation-interval-value").val(rotation.interval_value || 1);
     $("#rotation-interval-unit").val(rotation.interval_unit || "days");
     $("#rotation-handoff-time").val(rotation.handoff_time || "09:00");
-    $("#rotation-weekday").val(rotation.handoff_weekday === null ? 0 : rotation.handoff_weekday);
+    $("#rotation-weekday").val(
+        rotation.handoff_weekday === null ? 0 : rotation.handoff_weekday
+    );
     setReminderFields(rotation.reminder_interval_seconds);
     $("#rotation-timezone").val(rotation.timezone || "UTC");
     updateRotationCadenceFields();
     openRotationFormModal();
-    initTimezoneSelect("#rotation-timezone", rotation.timezone || "UTC", "#rotation-form-modal");
+    initTimezoneSelect(
+        "#rotation-timezone",
+        rotation.timezone || "UTC",
+        "#rotation-form-modal"
+    );
     setTimezoneSelectValue("#rotation-timezone", rotation.timezone || "UTC");
 }
 
 function setRotationEnabled(id, enabled) {
-    const title = enabled ? "Enable this rotation?" : "Disable this rotation?";
+    const title = enabled
+        ? i18n.t("rotations.confirm.enable_title")
+        : i18n.t("rotations.confirm.disable_title");
     const message = enabled
-        ? "Enable this rotation and allow it to participate in on-call scheduling?"
-        : "Disable this rotation without deleting layers, members, overrides or route links?";
-    const confirmText = enabled ? "Enable rotation" : "Disable rotation";
+        ? i18n.t("rotations.confirm.enable_message")
+        : i18n.t("rotations.confirm.disable_message");
+    const confirmText = enabled
+        ? i18n.t("rotations.confirm.enable")
+        : i18n.t("rotations.confirm.disable");
 
     showAppConfirm({
         title: title,
@@ -1635,26 +1731,30 @@ function setRotationEnabled(id, enabled) {
 
 function deleteRotation(id) {
     showAppConfirm({
-        title: "Delete this rotation?",
-        message: "This will remove the rotation, delete its layers, members and overrides, and detach it from alert routes.",
-        confirmText: "Delete rotation",
+        title: i18n.t("rotations.confirm.delete_title"),
+        message: i18n.t("rotations.confirm.delete_message"),
+        confirmText: i18n.t("rotations.confirm.delete"),
         confirmClass: "btn-danger",
     }).done(function () {
         apiDelete("/api/rotations/" + id, function () {
             refreshRotations();
             if (Number(selectedRotationDetailsId) === Number(id)) {
                 selectedRotationDetailsId = null;
-                $("#rotation-details-subtitle").text("Select a rotation");
-                $("#rotation-details-body").html(
-                    "<p>Click a rotation name to inspect current on-call user, cadence, reminders and quick actions.</p>"
+                $("#rotation-details-subtitle").text(
+                    i18n.t("rotations.details.select")
                 );
+                $("#rotation-details-body")
+                    .empty()
+                    .append(
+                        $("<p>").text(i18n.t("rotations.details.help"))
+                    );
             }
         });
     });
 }
 
 function resetRotationForm() {
-    $("#rotation-form-title").text("Create rotation");
+    $("#rotation-form-title").text(i18n.t("rotations.form.create_title"));
     $("#rotation-id").val("");
     $("#rotation-name").val("");
     $("#rotation-description").val("");
@@ -1694,7 +1794,7 @@ function loadRotationForOverride(rotationId, callback) {
 
     apiGet("/api/rotations/" + encodeURIComponent(rotationId), function (rotation) {
         if (!rotation || !rotation.id) {
-            showAppError("Rotation was not found.");
+            showAppError(i18n.t("rotations.errors.not_found"));
             return;
         }
 
@@ -1707,7 +1807,7 @@ function selectOverrideRotation(rotationId, options) {
     options = options || {};
 
     if (!rotationId) {
-        showAppError("Rotation was not found.");
+        showAppError(i18n.t("rotations.errors.not_found"));
         return;
     }
 
@@ -1736,7 +1836,7 @@ function loadOverrides() {
                 $("<td>")
                     .attr("colspan", "6")
                     .addClass("empty-cell")
-                    .text("No rotation selected")
+                    .text(i18n.t("rotations.empty.none_selected"))
             )
         );
         return;
@@ -1744,7 +1844,11 @@ function loadOverrides() {
 
     const rotation = findRotationInCache(rotationId);
 
-    $("#overrides-title").text("Overrides" + (rotation ? ": " + rotation.name : ""));
+    $("#overrides-title").text(
+        rotation
+            ? i18n.t("rotations.overrides.title_named", {name: rotation.name})
+            : i18n.t("rotations.overrides.title")
+    );
 
     apiGet("/api/rotations/" + rotationId + "/overrides", function (overrides) {
         overrides = asArray(overrides);
@@ -1754,7 +1858,7 @@ function loadOverrides() {
                     $("<td>")
                         .attr("colspan", "6")
                         .addClass("empty-cell")
-                        .text("No overrides")
+                        .text(i18n.t("rotations.overrides.none"))
                 )
             );
             return;
@@ -1775,7 +1879,7 @@ function loadOverrides() {
                     $("<button>")
                         .attr("type", "button")
                         .addClass("btn btn-danger btn-small")
-                        .text("Delete")
+                        .text(i18n.t("rotations.actions.delete"))
                         .on("click", function () {
                             deleteOverride(override.id);
                         })
@@ -1792,7 +1896,7 @@ function createOverride() {
     const rotationId = $("#override-rotation").val();
 
     if (!rotationId) {
-        showAppError("Select a rotation first.");
+        showAppError(i18n.t("rotations.layers.select_first"));
         return;
     }
 
@@ -1813,9 +1917,9 @@ function createOverride() {
 
 function deleteOverride(overrideId) {
     showAppConfirm({
-        title: "Delete this override?",
-        message: "Delete this override?",
-        confirmText: "Delete override",
+        title: i18n.t("rotations.overrides.delete_title"),
+        message: i18n.t("rotations.overrides.delete_title"),
+        confirmText: i18n.t("rotations.overrides.delete_confirm"),
         confirmClass: "btn-danger"
     }).done(function () {
         apiDelete("/api/rotations/overrides/" + overrideId, function () {
@@ -1842,7 +1946,7 @@ function renderRotationsTable() {
                 $("<td>")
                     .attr("colspan", "8")
                     .addClass("empty-cell")
-                    .text("No rotations")
+                    .text(i18n.t("rotations.empty.none"))
             )
         );
         return;
@@ -1858,9 +1962,6 @@ function renderRotationsTable() {
 }
 
 function renderRotationRow(rotation) {
-    /*
-     * Render one rotation row.
-     */
     const row = $("<tr>");
 
     const rotationName = $("<button>")
@@ -1877,7 +1978,10 @@ function renderRotationRow(rotation) {
             .append(
                 $("<div>")
                     .addClass("row-subtitle")
-                    .text(rotation.description || "Rotation #" + rotation.id)
+                    .text(
+                        rotation.description
+                        || i18n.t("rotations.labels.rotation_number", {id: rotation.id})
+                    )
             )
     );
 
@@ -1913,7 +2017,7 @@ function renderRotationRow(rotation) {
                             .append(
                                 $("<div>")
                                     .addClass("person-meta")
-                                    .text("Currently on call")
+                                    .text(i18n.t("rotations.labels.currently_oncall"))
                             )
                     )
             )
@@ -1929,16 +2033,8 @@ function renderRotationRow(rotation) {
     }
 
     row.append($("<td>").text(rotation.handoff_time || "-"));
-
-    row.append(
-        $("<td>").text(formatSeconds(rotation.reminder_interval_seconds))
-    );
-
-    row.append(
-        $("<td>").append(
-            renderRotationRuntimeStatusBadge(rotation)
-        )
-    );
+    row.append($("<td>").text(formatSeconds(rotation.reminder_interval_seconds)));
+    row.append($("<td>").append(renderRotationRuntimeStatusBadge(rotation)));
 
     row.append(
         $("<td>")
@@ -1948,48 +2044,50 @@ function renderRotationRow(rotation) {
                     object: rotation,
                     items: [
                         {
-                            label: "Edit",
+                            label: i18n.t("rotations.actions.edit"),
                             icon: "fas fa-edit",
                             required: "write",
-                            denyMessage: "Team manager role is required to edit this rotation.",
+                            denyMessage: i18n.t("rotations.permissions.edit"),
                             onClick: function () {
                                 editRotation(rotation.id);
                             }
                         },
                         {
-                            label: "Layers",
+                            label: i18n.t("rotations.actions.layers"),
                             icon: "fas fa-layer-group",
                             required: "write",
-                            denyMessage: "Team manager role is required to manage rotation layers.",
+                            denyMessage: i18n.t("rotations.permissions.layers"),
                             onClick: function () {
                                 selectRotationLayers(rotation.id);
                             }
                         },
                         {
-                            label: "Overrides",
+                            label: i18n.t("rotations.actions.overrides"),
                             icon: "fas fa-user-clock",
                             required: "write",
-                            denyMessage: "Team manager role is required to manage rotation overrides.",
+                            denyMessage: i18n.t("rotations.permissions.overrides"),
                             onClick: function () {
                                 selectOverrideRotation(rotation.id);
                             }
                         },
                         {
-                            label: rotation.enabled ? "Disable" : "Enable",
+                            label: rotation.enabled
+                                ? i18n.t("rotations.actions.disable")
+                                : i18n.t("rotations.actions.enable"),
                             icon: rotation.enabled ? "fas fa-pause" : "fas fa-play",
                             required: "write",
                             danger: rotation.enabled,
-                            denyMessage: "Team manager role is required to enable or disable this rotation.",
+                            denyMessage: i18n.t("rotations.permissions.toggle"),
                             onClick: function () {
                                 setRotationEnabled(rotation.id, !rotation.enabled);
                             }
                         },
                         {
-                            label: "Delete",
+                            label: i18n.t("rotations.actions.delete"),
                             icon: "fas fa-trash",
                             required: "delete",
                             danger: true,
-                            denyMessage: "Delete permission is required to remove this rotation.",
+                            denyMessage: i18n.t("rotations.permissions.delete"),
                             onClick: function () {
                                 deleteRotation(rotation.id);
                             }
@@ -2009,7 +2107,7 @@ function openRotationFormModal() {
 
 function openCreateRotationModal() {
     resetRotationForm();
-    $("#rotation-form-title").text("Create rotation");
+    $("#rotation-form-title").text(i18n.t("rotations.form.create_title"));
     openRotationFormModal();
 }
 
@@ -2020,15 +2118,19 @@ function closeRotationOverridesModal() {
 
 function getRotationCadence(rotation) {
     if (rotation.rotation_type === "custom") {
-        return (rotation.custom_days || rotation.interval_value || 1) + "d";
+        return i18n.t("rotations.cadence.every", {
+            value: rotation.custom_days || rotation.interval_value || 1,
+            unit: rotationUnitLabel(rotation.interval_unit || "days"),
+            timezone: rotation.timezone || "UTC"
+        });
     }
 
     if (rotation.rotation_type === "weekly") {
-        return "weekly";
+        return i18n.t("rotations.cadence.weekly");
     }
 
     if (rotation.rotation_type === "daily") {
-        return "daily";
+        return i18n.t("rotations.cadence.daily");
     }
 
     return rotation.rotation_type || "-";
@@ -2047,7 +2149,9 @@ function renderRotationDetails(rotation) {
     $("#rotation-details-subtitle").text(
         (rotation.team_slug || rotation.team_name || "-") +
         " / " +
-        (rotation.enabled ? "Active" : "Inactive")
+        (rotation.enabled
+            ? i18n.t("rotations.status.active")
+            : i18n.t("rotations.status.inactive"))
     );
 
     const body = $("#rotation-details-body");
@@ -2056,14 +2160,14 @@ function renderRotationDetails(rotation) {
     body.append(
         $("<div>")
             .addClass("details-list")
-            .append(rotationDetailsItem("Name", rotation.name))
-            .append(rotationDetailsItem("Team", rotation.team_name || rotation.team_slug))
-            .append(rotationDetailsItem("Current on call", getRotationCurrentUser(rotation) || "-"))
-            .append(rotationDetailsItem("Cadence", getRotationCadence(rotation)))
-            .append(rotationDetailsItem("Handoff time", rotation.handoff_time))
-            .append(rotationDetailsItem("Reminder", formatSeconds(rotation.reminder_interval_seconds)))
-            .append(rotationDetailsItem("Timezone", rotation.timezone))
-            .append(rotationDetailsItem("Description", rotation.description))
+            .append(rotationDetailsItem(i18n.t("rotations.details.name"), rotation.name))
+            .append(rotationDetailsItem(i18n.t("rotations.details.team"), rotation.team_name || rotation.team_slug))
+            .append(rotationDetailsItem(i18n.t("rotations.details.current_oncall"), getRotationCurrentUser(rotation) || "-"))
+            .append(rotationDetailsItem(i18n.t("rotations.details.cadence"), getRotationCadence(rotation)))
+            .append(rotationDetailsItem(i18n.t("rotations.details.handoff_time"), rotation.handoff_time))
+            .append(rotationDetailsItem(i18n.t("rotations.details.reminder"), formatSeconds(rotation.reminder_interval_seconds)))
+            .append(rotationDetailsItem(i18n.t("rotations.details.timezone"), rotation.timezone))
+            .append(rotationDetailsItem(i18n.t("rotations.details.description"), rotation.description))
     );
 
     const actions = $("<div>").addClass("details-actions");
@@ -2071,7 +2175,7 @@ function renderRotationDetails(rotation) {
     appendIconActionIfAllowed(actions, rotation, {
         required: "write",
         icon: "fas fa-edit",
-        label: "Edit rotation",
+        label: i18n.t("rotations.actions.edit"),
         onClick: function () {
             editRotation(rotation.id);
         }
@@ -2080,7 +2184,7 @@ function renderRotationDetails(rotation) {
     appendIconActionIfAllowed(actions, rotation, {
         required: "write",
         icon: "fas fa-layer-group",
-        label: "Rotation layers",
+        label: i18n.t("rotations.layers.title"),
         onClick: function () {
             selectRotationLayers(rotation.id);
         }
@@ -2089,7 +2193,7 @@ function renderRotationDetails(rotation) {
     appendIconActionIfAllowed(actions, rotation, {
         required: "write",
         icon: "fas fa-user-clock",
-        label: "Rotation overrides",
+        label: i18n.t("rotations.overrides.title"),
         onClick: function () {
             selectOverrideRotation(rotation.id);
         }
@@ -2098,7 +2202,7 @@ function renderRotationDetails(rotation) {
     actions.append(
         makeIconButton({
             icon: "fas fa-calendar-alt",
-            label: "Open calendar",
+            label: i18n.t("rotations.details.open_calendar"),
             onClick: function () {
                 navigate("/calendar?team_id=" + encodeURIComponent(rotation.team_id), true);
             }
@@ -2108,16 +2212,19 @@ function renderRotationDetails(rotation) {
     appendIconActionIfAllowed(actions, rotation, {
         required: "disable",
         icon: rotation.enabled ? "fas fa-pause" : "fas fa-play",
-        label: rotation.enabled ? "Disable rotation" : "Enable rotation",
+        label: rotation.enabled
+            ? i18n.t("rotations.confirm.disable")
+            : i18n.t("rotations.confirm.enable"),
         className: rotation.enabled ? "btn-warning" : "btn-success",
         onClick: function () {
             setRotationEnabled(rotation.id, !rotation.enabled);
         }
     });
+
     appendIconActionIfAllowed(actions, rotation, {
         required: "delete",
         icon: "fas fa-trash",
-        label: "Delete rotation",
+        label: i18n.t("rotations.confirm.delete"),
         className: "btn-danger",
         onClick: function () {
             deleteRotation(rotation.id);
@@ -2143,7 +2250,7 @@ function fillRotationEligibleUserSelect(selector, rotationId, callback) {
         select.append(
             $("<option>")
                 .val("")
-                .text("Select rotation first")
+                .text(i18n.t("rotations.labels.select_rotation_first"))
         );
 
         if (typeof callback === "function") {
@@ -2160,7 +2267,7 @@ function fillRotationEligibleUserSelect(selector, rotationId, callback) {
             select.append(
                 $("<option>")
                     .val("")
-                    .text("No active team members")
+                    .text(i18n.t("rotations.layers.no_team_members"))
             );
         }
 
@@ -2168,7 +2275,10 @@ function fillRotationEligibleUserSelect(selector, rotationId, callback) {
             select.append(
                 $("<option>")
                     .val(user.user_id)
-                    .text("#" + user.user_id + " " + (user.display_name || user.username || "user"))
+                    .text(
+                        "#" + user.user_id + " " +
+                        (user.display_name || user.username || i18n.t("rotations.labels.user"))
+                    )
             );
         });
 
@@ -2207,7 +2317,7 @@ function initLayerTimezoneSelects() {
 
             select.select2({
                 width: "100%",
-                placeholder: "Select timezone",
+                placeholder: i18n.t("rotations.form.select_timezone"),
                 dropdownParent: $("#rotation-layers-modal")
             });
         }
