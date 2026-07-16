@@ -3,36 +3,36 @@
     <div class="summary-card summary-primary">
       <div class="summary-icon">T</div>
       <div>
-        <div class="summary-title">Teams</div>
+        <div class="summary-title">{{ _('teams.summary.teams') }}</div>
         <div id="teams-summary-total" class="summary-value">0</div>
-        <div class="summary-hint">Current scope</div>
+        <div class="summary-hint">{{ _('teams.summary.teams_hint') }}</div>
       </div>
     </div>
 
     <div class="summary-card summary-success">
       <div class="summary-icon">✓</div>
       <div>
-        <div class="summary-title">Active</div>
+        <div class="summary-title">{{ _('teams.summary.active') }}</div>
         <div id="teams-summary-active" class="summary-value">0</div>
-        <div class="summary-hint">Enabled teams</div>
+        <div class="summary-hint">{{ _('teams.summary.active_hint') }}</div>
       </div>
     </div>
 
     <div class="summary-card summary-info">
       <div class="summary-icon">↗</div>
       <div>
-        <div class="summary-title">Escalation</div>
+        <div class="summary-title">{{ _('teams.summary.escalation') }}</div>
         <div id="teams-summary-escalation" class="summary-value">0</div>
-        <div class="summary-hint">Simple rotation escalation</div>
+        <div class="summary-hint">{{ _('teams.summary.escalation_hint') }}</div>
       </div>
     </div>
 
     <div class="summary-card summary-muted">
       <div class="summary-icon">#</div>
       <div>
-        <div class="summary-title">Groups</div>
+        <div class="summary-title">{{ _('teams.summary.groups') }}</div>
         <div id="teams-summary-groups" class="summary-value">0</div>
-        <div class="summary-hint">Used groups</div>
+        <div class="summary-hint">{{ _('teams.summary.groups_hint') }}</div>
       </div>
     </div>
   </div>
@@ -41,20 +41,20 @@
     <section class="card">
       <div class="card-header">
         <div>
-          <h2>Teams</h2>
+          <h2>{{ _('teams.list.title') }}</h2>
           <div class="card-subtitle">
-            Showing <span id="teams-filtered-count">0</span>
-            of <span id="teams-total-count">0</span> teams
+            {{ _('teams.list.showing') }} <span id="teams-filtered-count">0</span>
+            {{ _('teams.list.of') }} <span id="teams-total-count">0</span> {{ _('teams.list.teams') }}
           </div>
         </div>
 
         <div class="card-header-actions">
           <button id="open-team-create-modal" type="button" class="btn btn-primary">
-            New team
+            {{ _('teams.actions.new') }}
           </button>
 
           <button id="reload-teams" type="button" class="btn">
-            Reload
+            {{ _('teams.actions.reload') }}
           </button>
         </div>
       </div>
@@ -66,19 +66,19 @@
             id="teams-search"
             class="input"
             type="search"
-            placeholder="Search teams..."
+            placeholder="{{ _('teams.search.placeholder') }}"
             autocomplete="off"
           >
         </div>
 
         <select id="teams-group-filter" class="input page-toolbar-filter">
-          <option value="">All groups</option>
+          <option value="">{{ _('teams.filters.all_groups') }}</option>
         </select>
 
         <select id="teams-status-filter" class="input page-toolbar-filter">
-          <option value="">All statuses</option>
-          <option value="active">Active</option>
-          <option value="inactive">Inactive</option>
+          <option value="">{{ _('teams.filters.all_statuses') }}</option>
+          <option value="active">{{ _('teams.filters.active') }}</option>
+          <option value="inactive">{{ _('teams.filters.inactive') }}</option>
         </select>
       </div>
 
@@ -86,13 +86,13 @@
         <table class="data-table teams-table">
           <thead>
             <tr>
-              <th>Team</th>
-              <th>Group</th>
-              <th>Slug</th>
-              <th>Escalation</th>
-              <th>Health</th>
-              <th>Status</th>
-              <th class="actions-th">Actions</th>
+              <th>{{ _('teams.table.team') }}</th>
+              <th>{{ _('teams.table.group') }}</th>
+              <th>{{ _('teams.table.slug') }}</th>
+              <th>{{ _('teams.table.escalation') }}</th>
+              <th>{{ _('teams.table.health') }}</th>
+              <th>{{ _('teams.table.status') }}</th>
+              <th class="actions-th">{{ _('teams.table.actions') }}</th>
             </tr>
           </thead>
 
@@ -104,16 +104,16 @@
     <aside class="card page-details-card">
   <div class="card-header details-header">
     <div>
-      <h2>Team details</h2>
+      <h2>{{ _('teams.details.title') }}</h2>
       <div id="team-details-subtitle" class="card-subtitle">
-        Select a team
+        {{ _('teams.details.select') }}
       </div>
     </div>
   </div>
 
   <div id="team-details-body" class="details-body">
     <div class="details-empty">
-      Click a team name to inspect group, escalation settings and quick actions.
+      {{ _('teams.details.select_help') }}
     </div>
   </div>
 </aside>
@@ -123,15 +123,15 @@
     <div class="app-modal-dialog app-modal-dialog-medium">
       <div class="app-modal-header">
         <div>
-          <h2 id="team-form-title">Create team</h2>
-          <div class="card-subtitle">Create or edit an IncidentRelay team.</div>
+          <h2 id="team-form-title">{{ _('teams.form.create') }}</h2>
+          <div class="card-subtitle">{{ _('teams.form.subtitle') }}</div>
         </div>
 
         <button
           id="close-team-form-modal"
           type="button"
           class="app-modal-close"
-          aria-label="Close"
+          aria-label="{{ _('teams.actions.close') }}"
         >
           ×
         </button>
@@ -141,28 +141,28 @@
         <div class="form-body">
           <input id="team-id" type="hidden">
 
-          <label for="team-group">Group</label>
+          <label for="team-group">{{ _('teams.form.group') }}</label>
           <select id="team-group" class="input"></select>
 
-            <label for="team-name">Name</label>
+            <label for="team-name">{{ _('teams.form.name') }}</label>
               <input
                 id="team-name"
                 class="input"
                 type="text"
-                placeholder="Infrastructure"
+                placeholder="{{ _('teams.form.name_placeholder') }}"
                 autocomplete="off"
               >
 
-          <label for="team-slug">Slug</label>
+          <label for="team-slug">{{ _('teams.form.slug') }}</label>
           <input
             id="team-slug"
             class="input"
             type="text"
-            placeholder="infra"
+            placeholder="{{ _('teams.form.slug_placeholder') }}"
             autocomplete="off"
           >
 
-          <label for="team-escalation-after">Simple escalation after reminders</label>
+          <label for="team-escalation-after">{{ _('teams.form.escalation_after') }}</label>
           <input
             id="team-escalation-after"
             class="input"
@@ -172,25 +172,25 @@
             value="2"
           >
             <p class="help-text">
-                Used only by routes in Simple rotation mode. Routes with an escalation policy use policy rule delays instead.
+                {{ _('teams.form.escalation_help') }}
             </p>
 
-          <label for="team-description">Description</label>
+          <label for="team-description">{{ _('teams.form.description') }}</label>
           <textarea
             id="team-description"
             class="input"
-            placeholder="Team purpose, ownership or routing notes"
+            placeholder="{{ _('teams.form.description_placeholder') }}"
           ></textarea>
 
           <div class="form-check-row">
             <label class="md-checkbox">
               <input id="team-escalation-enabled" type="checkbox" checked>
-              <span>Simple rotation escalation</span>
+              <span>{{ _('teams.form.simple_escalation') }}</span>
             </label>
 
             <label class="md-checkbox">
               <input id="team-active" type="checkbox" checked>
-              <span>Active</span>
+              <span>{{ _('teams.form.active') }}</span>
             </label>
           </div>
         </div>
@@ -198,11 +198,11 @@
 
       <div class="app-modal-footer">
         <button id="reset-team-form" type="button" class="btn">
-          Reset
+          {{ _('teams.actions.reset') }}
         </button>
 
         <button id="save-team" type="button" class="btn btn-primary">
-          Save team
+          {{ _('teams.actions.save') }}
         </button>
       </div>
     </div>
@@ -212,9 +212,9 @@
     <div class="app-modal-dialog app-modal-dialog-wide">
       <div class="app-modal-header">
         <div>
-          <h2 id="team-members-title">Team members</h2>
+          <h2 id="team-members-title">{{ _('teams.members.title') }}</h2>
           <div class="card-subtitle">
-            Manage users, role and membership status.
+            {{ _('teams.members.subtitle') }}
           </div>
         </div>
 
@@ -222,7 +222,7 @@
           id="close-team-members-modal"
           type="button"
           class="app-modal-close"
-          aria-label="Close"
+          aria-label="{{ _('teams.actions.close') }}"
         >
           ×
         </button>
@@ -233,8 +233,8 @@
           <div class="card team-member-form-card">
             <div class="card-header details-header">
               <div>
-                <h2>Membership</h2>
-                <div class="card-subtitle">Add or update one user in this team.</div>
+                <h2>{{ _('teams.members.membership') }}</h2>
+                <div class="card-subtitle">{{ _('teams.members.membership_help') }}</div>
               </div>
             </div>
 
@@ -243,7 +243,7 @@
               <input id="team-member-team-id" type="hidden">
               <input id="team-member-team-name" type="hidden">
 
-              <label for="team-member-team-label">Selected team</label>
+              <label for="team-member-team-label">{{ _('teams.members.selected_team') }}</label>
               <input
                 id="team-member-team-label"
                 class="input"
@@ -251,34 +251,34 @@
                 disabled
               >
 
-              <label for="team-member-user">User</label>
+              <label for="team-member-user">{{ _('teams.members.user') }}</label>
                 <select
                   id="team-member-user"
                   name="team-member-user"
                   class="form-control js-user-select"
-                  data-placeholder="Select user..."
+                  data-placeholder="{{ _('teams.members.user_placeholder') }}"
                 >
                 </select>
 
-              <label for="team-member-role">Role</label>
+              <label for="team-member-role">{{ _('teams.members.role') }}</label>
               <select id="team-member-role" class="input">
-                <option value="viewer">Team Viewer</option>
-                <option value="responder">Team Responder</option>
-                <option value="manager">Team Manager</option>
+                <option value="viewer">{{ _('rbac.team.viewer') }}</option>
+                <option value="responder">{{ _('rbac.team.responder') }}</option>
+                <option value="manager">{{ _('rbac.team.manager') }}</option>
               </select>
 
               <label class="md-checkbox">
                 <input id="team-member-active" type="checkbox" checked>
-                <span>Active</span>
+                <span>{{ _('teams.form.active') }}</span>
               </label>
 
               <div class="form-actions-inline">
                 <button id="save-team-user" type="button" class="btn btn-primary">
-                  Save membership
+                  {{ _('teams.actions.save_membership') }}
                 </button>
 
                 <button id="reset-team-member-form" type="button" class="btn">
-                  Reset
+                  {{ _('teams.actions.reset') }}
                 </button>
               </div>
             </div>
@@ -287,8 +287,8 @@
           <div class="card team-members-table-card">
             <div class="card-header details-header">
               <div>
-                <h2>Members</h2>
-                <div class="card-subtitle">Current users in selected team.</div>
+                <h2>{{ _('teams.members.current') }}</h2>
+                <div class="card-subtitle">{{ _('teams.members.current_help') }}</div>
               </div>
             </div>
 
@@ -296,18 +296,18 @@
               <table class="data-table team-members-table">
                 <thead>
                   <tr>
-                    <th>ID</th>
-                    <th>User</th>
-                    <th>Name</th>
-                    <th>Role</th>
-                    <th>Active</th>
-                    <th class="actions-th">Actions</th>
+                    <th>{{ _('teams.table.id') }}</th>
+                    <th>{{ _('teams.table.user') }}</th>
+                    <th>{{ _('teams.table.name') }}</th>
+                    <th>{{ _('teams.table.role') }}</th>
+                    <th>{{ _('teams.table.active') }}</th>
+                    <th class="actions-th">{{ _('teams.table.actions') }}</th>
                   </tr>
                 </thead>
 
                 <tbody id="team-members-table">
                   <tr>
-                    <td colspan="7" class="empty-cell">No team selected</td>
+                    <td colspan="7" class="empty-cell">{{ _('teams.empty.select_team') }}</td>
                   </tr>
                 </tbody>
               </table>
@@ -318,7 +318,7 @@
 
       <div class="app-modal-footer">
         <button id="close-team-members-modal-footer" type="button" class="btn">
-          Close
+          {{ _('teams.actions.close') }}
         </button>
       </div>
     </div>

@@ -1,9 +1,9 @@
 window.AppMaintenanceBadges = (function () {
     const behaviorLabels = {
-        suppress_notifications: "Suppress notifications",
-        suppress_incident: "Suppress incident",
-        create_maintenance_incident: "Maintenance incident",
-        pause_escalation_only: "Pause escalation",
+        suppress_notifications: i18n.t("maintenance.behavior.suppress_notifications"),
+        suppress_incident: i18n.t("maintenance.behavior.suppress_incident"),
+        create_maintenance_incident: i18n.t("maintenance.behavior.maintenance_incident"),
+        pause_escalation_only: i18n.t("maintenance.behavior.pause_escalation"),
     };
 
     function has(item) {
@@ -20,7 +20,7 @@ window.AppMaintenanceBadges = (function () {
         return (
             behaviorLabels[maintenance.behavior] ||
             maintenance.behavior ||
-            "Maintenance"
+            i18n.t("maintenance.badge.default")
         );
     }
 
@@ -67,7 +67,7 @@ window.AppMaintenanceBadges = (function () {
 
         const maintenance = item.active_maintenance;
         const parts = [
-            maintenance.name || "Maintenance",
+            maintenance.name || i18n.t("maintenance.badge.default"),
             label(item),
             maintenanceTimeText(maintenance),
         ];

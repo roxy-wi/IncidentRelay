@@ -3,9 +3,9 @@ var GROUP_EDITOR_ROLE = "editor";
 var GROUP_USER_ADMIN_ROLE = "user_admin";
 
 var GROUP_ROLES = [
-    { value: GROUP_VIEWER_ROLE, label: "Group Viewer" },
-    { value: GROUP_EDITOR_ROLE, label: "Group Editor" },
-    { value: GROUP_USER_ADMIN_ROLE, label: "Group Admin" },
+    { value: GROUP_VIEWER_ROLE, labelKey: "rbac.group.viewer", fallbackLabel: "Group Viewer" },
+    { value: GROUP_EDITOR_ROLE, labelKey: "rbac.group.editor", fallbackLabel: "Group Editor" },
+    { value: GROUP_USER_ADMIN_ROLE, labelKey: "rbac.group.admin", fallbackLabel: "Group Admin" },
 ];
 
 var TEAM_VIEWER_ROLE = "viewer";
@@ -13,9 +13,9 @@ var TEAM_RESPONDER_ROLE = "responder";
 var TEAM_MANAGER_ROLE = "manager";
 
 var TEAM_ROLES = [
-    { value: TEAM_VIEWER_ROLE, label: "Team Viewer" },
-    { value: TEAM_RESPONDER_ROLE, label: "Team Responder" },
-    { value: TEAM_MANAGER_ROLE, label: "Team Manager" },
+    { value: TEAM_VIEWER_ROLE, labelKey: "rbac.team.viewer", fallbackLabel: "Team Viewer" },
+    { value: TEAM_RESPONDER_ROLE, labelKey: "rbac.team.responder", fallbackLabel: "Team Responder" },
+    { value: TEAM_MANAGER_ROLE, labelKey: "rbac.team.manager", fallbackLabel: "Team Manager" },
 ];
 
 window.RbacRoles = (function () {
@@ -30,7 +30,13 @@ window.RbacRoles = (function () {
             return role.value === selected;
         });
 
-        return item ? item.label : selected;
+        if (!item) {
+            return selected;
+        }
+
+        return window.i18n
+            ? i18n.t(item.labelKey, {}, item.fallbackLabel)
+            : item.fallbackLabel;
     }
 
     function fillSelect(selector, roles, selectedValue, fallbackValue) {
@@ -44,7 +50,11 @@ window.RbacRoles = (function () {
             select.append(
                 $("<option>")
                     .val(role.value)
-                    .text(role.label)
+                    .text(
+                        window.i18n
+                            ? i18n.t(role.labelKey, {}, role.fallbackLabel)
+                            : role.fallbackLabel
+                    )
             );
         });
 

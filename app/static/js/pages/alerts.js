@@ -139,7 +139,7 @@ function selectedAlertGroupsForBulkAction(action) {
             return status === "firing";
         }
 
-        if (action === "resolve") {
+        if (action === i18n.t("alert_details.bulk.resolve_action")) {
             return status !== "resolved" && status !== "merged";
         }
 
@@ -254,7 +254,7 @@ function renderAlertsBulkActions() {
     const bar = ensureAlertsBulkActionsBar();
     const count = selectedAlertGroupIds.size;
     const ackCount = selectedAlertGroupsForBulkAction("ack").length;
-    const resolveCount = selectedAlertGroupsForBulkAction("resolve").length;
+    const resolveCount = selectedAlertGroupsForBulkAction(i18n.t("alert_details.bulk.resolve_action")).length;
 
     bar.toggle(count > 0);
     bar.find("#alerts-bulk-selected-count").text(i18n.t("alerts.bulk.selected", {count: count}));
@@ -703,11 +703,11 @@ function renderAlertCorrelationBadges(alert) {
     if (Number(summary.root_candidates || 0) > 0) {
         wrapper.append(
             makeAlertBadge(
-                "Symptom",
+                i18n.t("alert_details.correlation.symptom"),
                 "ui-pill-medium"
             ).attr(
                 "title",
-                "This alert has possible upstream root cause alerts"
+                i18n.t("alert_details.correlation.symptom_help")
             )
         );
     }
@@ -715,22 +715,22 @@ function renderAlertCorrelationBadges(alert) {
     if (Number(summary.downstream_impacts || 0) > 0) {
         wrapper.append(
             makeAlertBadge(
-                "Root cause",
+                i18n.t("alert_details.correlation.root_cause"),
                 "ui-pill-critical"
             ).attr(
                 "title",
-                "This alert may impact downstream alerts"
+                i18n.t("alert_details.correlation.root_cause_help")
             )
         );
     }
 
     wrapper.append(
         makeAlertBadge(
-            "Correlated " + Number(summary.total || 0),
+            i18n.t("alert_details.correlation.correlated", {count: Number(summary.total || 0)}),
             "ui-pill-info"
         ).attr(
             "title",
-            "Best correlation score: " + Number(summary.best_score || 0)
+            i18n.t("alert_details.correlation.best_score", {score: Number(summary.best_score || 0)})
         )
     );
 
@@ -753,15 +753,15 @@ function alertBusinessImpactSummary(alert) {
 
 function businessImpactBadgeLabel(status) {
     const labels = {
-        unknown: "Unknown",
-        operational: "Operational",
-        degraded: "Degraded",
-        partial_outage: "Partial outage",
-        major_outage: "Major outage",
-        maintenance: "Maintenance"
+        unknown: i18n.t("alert_details.business.unknown"),
+        operational: i18n.t("alert_details.business.operational"),
+        degraded: i18n.t("alert_details.business.degraded"),
+        partial_outage: i18n.t("alert_details.business.partial_outage"),
+        major_outage: i18n.t("alert_details.business.major_outage"),
+        maintenance: i18n.t("alert_details.business.maintenance")
     };
 
-    return labels[status] || status || "Business impact";
+    return labels[status] || status || i18n.t("alert_details.business.impact");
 }
 
 
@@ -798,23 +798,23 @@ function renderAlertBusinessImpactBadges(alert) {
         return (item.public_name || item.business_service_name || item.business_service_slug || "-")
             + " / "
             + businessImpactBadgeLabel(item.impact_status)
-            + " / score "
+            + i18n.t("alert_details.business.score_separator")
             + Number(item.impact_score || 0);
     }).join("\n");
 
     wrapper.append(
         makeAlertBadge(
             first
-                ? "Business: " + (first.public_name || first.business_service_name || first.business_service_slug)
-                : "Business impact",
+                ? i18n.t("alert_details.business.badge", {name: first.public_name || first.business_service_name || first.business_service_slug})
+                : i18n.t("alert_details.business.impact"),
             businessImpactBadgeClass(summary.highest_status)
-        ).attr("title", title || "Business impact")
+        ).attr("title", title || i18n.t("alert_details.business.impact"))
     );
 
     if (Number(summary.total || 0) > 1) {
         wrapper.append(
-            makeAlertBadge("Impacted " + Number(summary.total || 0), "ui-pill-info")
-                .attr("title", title || "Business impact")
+            makeAlertBadge(i18n.t("alert_details.business.impacted", {count: Number(summary.total || 0)}), "ui-pill-info")
+                .attr("title", title || i18n.t("alert_details.business.impact"))
         );
     }
 
@@ -1164,14 +1164,14 @@ function alertServiceDetailsLabel(alert) {
 // }
 function renderEscalationModeBadge(alert) {
     const isPolicy = !!alert.escalation_policy_name;
-    const label = isPolicy ? "Policy" : "Rotation";
+    const label = isPolicy ? i18n.t("alert_details.escalation.policy") : i18n.t("alert_details.target.rotation");
 
     return $("<span>")
         .addClass("pill")
         .addClass(isPolicy ? "alerts-badge-info" : "badge-muted")
         .attr("title", isPolicy
-            ? "Escalation policy: " + alert.escalation_policy_name
-            : "Simple rotation escalation")
+            ? i18n.t("alert_details.escalation.policy_title", {name: alert.escalation_policy_name})
+            : i18n.t("alert_details.escalation.simple"))
         .text(label);
 }
 function renderEscalationCell(alert) {
@@ -1191,8 +1191,7 @@ function renderEscalationCell(alert) {
                 $("<div>")
                     .addClass("alerts-subtitle")
                     .text(
-                        "Rule #" + alert.escalation_rule_position +
-                        " / " + (alert.escalation_rule_target_type || "-")
+                        i18n.t("alert_details.escalation.rule", {position: alert.escalation_rule_position, target: alert.escalation_rule_target_type || "-"})
                     )
             );
         }
@@ -1201,7 +1200,7 @@ function renderEscalationCell(alert) {
             wrapper.append(
                 $("<div>")
                     .addClass("alerts-age")
-                    .text("Next: " + formatDateTimeMinutes(alert.next_escalation_at))
+                    .text(i18n.t("alert_details.escalation.next", {time: formatDateTimeMinutes(alert.next_escalation_at)}))
             );
         }
 
@@ -1211,14 +1210,14 @@ function renderEscalationCell(alert) {
     wrapper.append(
         $("<div>")
             .addClass("alerts-subtitle")
-            .text("Level: " + (alert.escalation_level || 0))
+            .text(i18n.t("alert_details.escalation.level", {level: alert.escalation_level || 0}))
     );
 
     if (alert.team_escalation_enabled) {
         wrapper.append(
             $("<div>")
                 .addClass("alerts-age")
-                .text("After " + (alert.team_escalation_after_reminders || 0) + " reminders")
+                .text(i18n.t("alert_details.escalation.after_reminders", {count: alert.team_escalation_after_reminders || 0}))
         );
     }
 
@@ -1226,10 +1225,10 @@ function renderEscalationCell(alert) {
 }
 function alertEscalationModeLabel(alert) {
     if (alert.escalation_policy_name) {
-        return "Policy";
+        return i18n.t("alert_details.escalation.policy");
     }
 
-    return "Simple rotation";
+    return i18n.t("alert_details.escalation.simple_rotation");
 }
 
 function alertPolicyRuleLabel(alert) {
@@ -1243,14 +1242,14 @@ function alertPolicyRuleLabel(alert) {
 }
 function alertTeamEscalationLabel(alert) {
     if (alert.escalation_policy_name) {
-        return "Used only when escalation mode is Rotation";
+        return i18n.t("alert_details.escalation.rotation_only");
     }
 
     if (alert.team_escalation_enabled) {
-        return "After " + (alert.team_escalation_after_reminders || 0) + " reminders";
+        return i18n.t("alert_details.escalation.after_reminders", {count: alert.team_escalation_after_reminders || 0});
     }
 
-    return "Disabled";
+    return i18n.t("alert_details.status.disabled");
 }
 
 function setAlertDetailsTab(tabName) {
@@ -1289,7 +1288,7 @@ function resetAlertDetailsTabs(alertId) {
     currentDetailsExplainLoadedAlertId = null;
     currentDetailsExplainTraceId = null;
 
-    renderAlertExplainEmpty("Open the Explain tab to load routing trace.");
+    renderAlertExplainEmpty(i18n.t("alert_details.explain.open_tab"));
     setAlertDetailsTab("summary");
 }
 
@@ -1301,40 +1300,40 @@ function renderAlertExplainEmpty(message) {
         .append(
             $("<div>")
                 .addClass("help-text")
-                .text(message || "No explain trace.")
+                .text(message || i18n.t("alert_details.explain.empty"))
         );
 
     modal.find("#alert-explain-steps").empty();
 }
 
 function renderAlertExplainLoading(message) {
-    renderAlertExplainEmpty(message || "Loading explain trace...");
+    renderAlertExplainEmpty(message || i18n.t("alert_details.explain.loading"));
 }
 
 function alertExplainStatusBadge(status) {
     const normalized = normalizeAlertValue(status);
 
     if (normalized === "success" || normalized === "completed") {
-        return makeUiPill(status || "success", "ui-pill-resolved");
+        return makeUiPill(i18n.t("alert_details.explain.status.success"), "ui-pill-resolved");
     }
 
     if (normalized === "warning") {
-        return makeUiPill(status || "warning", "ui-pill-medium");
+        return makeUiPill(i18n.t("alert_details.explain.status.warning"), "ui-pill-medium");
     }
 
     if (normalized === "error" || normalized === "failed") {
-        return makeUiPill(status || "error", "ui-pill-critical");
+        return makeUiPill(i18n.t("alert_details.explain.status.error"), "ui-pill-critical");
     }
 
     if (normalized === "scheduled") {
-        return makeUiPill(status || "scheduled", "ui-pill-info");
+        return makeUiPill(i18n.t("alert_details.explain.status.scheduled"), "ui-pill-info");
     }
 
     if (normalized === "stopped" || normalized === "skipped") {
-        return makeUiPill(status || normalized, "ui-pill-muted");
+        return makeUiPill(i18n.t("alert_details.explain.status." + normalized, {}, status || normalized), "ui-pill-muted");
     }
 
-    return makeUiPill(status || "info", "ui-pill-muted");
+    return makeUiPill(i18n.t("alert_details.explain.status.info"), "ui-pill-muted");
 }
 
 function renderAlertExplainSummary(trace) {
@@ -1342,25 +1341,25 @@ function renderAlertExplainSummary(trace) {
     const target = modal.find("#alert-explain-summary");
 
     target.empty();
-    target.append(detailItem("Trace", trace.trace_id));
+    target.append(detailItem(i18n.t("alert_details.explain.trace"), trace.trace_id));
     target.append(
         $("<div>")
             .addClass("detail-item")
-            .append($("<div>").addClass("detail-label").text("Status"))
+            .append($("<div>").addClass("detail-label").text(i18n.t("alert_details.explain.status")))
             .append(
                 $("<div>")
                     .addClass("detail-value")
                     .append(alertExplainStatusBadge(trace.status))
             )
     );
-    target.append(detailItem("Outcome", trace.outcome));
-    target.append(detailItem("Source", trace.source));
-    target.append(detailItem("Dedup key", trace.dedup_key));
-    target.append(detailItem("Started", formatDateTimeMinutes(trace.started_at)));
-    target.append(detailItem("Finished", formatDateTimeMinutes(trace.finished_at)));
+    target.append(detailItem(i18n.t("alert_details.explain.outcome"), trace.outcome));
+    target.append(detailItem(i18n.t("alert_details.explain.source"), trace.source));
+    target.append(detailItem(i18n.t("alert_details.explain.dedup_key"), trace.dedup_key));
+    target.append(detailItem(i18n.t("alert_details.explain.started"), formatDateTimeMinutes(trace.started_at)));
+    target.append(detailItem(i18n.t("alert_details.explain.finished"), formatDateTimeMinutes(trace.finished_at)));
 
     if (trace.reason) {
-        target.append(detailItem("Reason", trace.reason));
+        target.append(detailItem(i18n.t("alert_details.explain.reason"), trace.reason));
     }
 }
 
@@ -1372,7 +1371,7 @@ function renderAlertExplainSteps(steps) {
     target.empty();
 
     if (!steps.length) {
-        target.append($("<div>").addClass("help-text").text("No explain steps recorded."));
+        target.append($("<div>").addClass("help-text").text(i18n.t("alert_details.explain.steps_empty")));
         return;
     }
 
@@ -1382,7 +1381,7 @@ function renderAlertExplainSteps(steps) {
             .addClass("alert-explain-step-header")
             .append(
                 $("<strong>").text(
-                    "#" + (step.position || "-") + " " + (step.title || step.code || "Step")
+                    "#" + (step.position || "-") + " " + (step.title || step.code || i18n.t("alert_details.explain.step"))
                 )
             )
             .append(" ")
@@ -1407,7 +1406,7 @@ function renderAlertExplainSteps(steps) {
             item.append(
                 $("<details>")
                     .addClass("alert-explain-step-data")
-                    .append($("<summary>").text("Data"))
+                    .append($("<summary>").text(i18n.t("alert_details.explain.data")))
                     .append(
                         $("<pre>")
                             .addClass("details-code")
@@ -1436,11 +1435,11 @@ function pickLatestAlertExplainTrace(traces) {
 
 function loadAlertExplainTrace(traceId) {
     if (!traceId) {
-        renderAlertExplainEmpty("No explain trace selected.");
+        renderAlertExplainEmpty(i18n.t("alert_details.explain.none_selected"));
         return;
     }
 
-    renderAlertExplainLoading("Loading explain trace...");
+    renderAlertExplainLoading(i18n.t("alert_details.explain.loading"));
 
     apiGet("/api/alerts/explain/" + encodeURIComponent(traceId), function (trace) {
         currentDetailsExplainTraceId = trace.trace_id;
@@ -1455,7 +1454,7 @@ function loadAlertExplainForCurrentDetails() {
             return;
         }
 
-        renderAlertExplainEmpty("No incident selected.");
+        renderAlertExplainEmpty(i18n.t("alert_details.explain.no_incident"));
         return;
     }
 
@@ -1464,13 +1463,13 @@ function loadAlertExplainForCurrentDetails() {
     }
 
     currentDetailsExplainLoadedAlertId = currentDetailsAlertId;
-    renderAlertExplainLoading("Loading explain traces...");
+    renderAlertExplainLoading(i18n.t("alert_details.explain.loading_many"));
 
     apiGet("/api/alerts/" + encodeURIComponent(currentDetailsAlertId) + "/explain", function (traces) {
         const latestTrace = pickLatestAlertExplainTrace(traces);
 
         if (!latestTrace) {
-            renderAlertExplainEmpty("No explain trace recorded for this incident.");
+            renderAlertExplainEmpty(i18n.t("alert_details.explain.no_recorded"));
             return;
         }
 
@@ -1485,7 +1484,7 @@ function showAlertDetails(alertId) {
         const modal = alertDetailsModal();
 
         if (!modal.length) {
-            console.error("Alert details modal not found");
+            console.error(i18n.t("alert_details.console.modal_not_found"));
             return;
         }
 
@@ -1493,7 +1492,7 @@ function showAlertDetails(alertId) {
         currentDetailsAlertCanRespond = canRespondObject(alert);
         resetAlertDetailsTabs(alert.id);
 
-        modal.find("#alert-details-title").text(alert.title || "Alert #" + alert.id);
+        modal.find("#alert-details-title").text(alert.title || i18n.t("alert_details.entity.alert_number", {id: alert.id}));
         modal.find("#alert-details-subtitle").text(buildAlertDetailsSubtitle(alert));
 
         renderAlertPrimaryDetails(alert, modal);
@@ -1567,12 +1566,12 @@ function ensureAlertBusinessImpact(modal) {
 
 function businessImpactStatusLabel(status) {
     const labels = {
-        unknown: "Unknown",
-        operational: "Operational",
-        degraded: "Degraded",
-        partial_outage: "Partial outage",
-        major_outage: "Major outage",
-        maintenance: "Maintenance"
+        unknown: i18n.t("alert_details.business.unknown"),
+        operational: i18n.t("alert_details.business.operational"),
+        degraded: i18n.t("alert_details.business.degraded"),
+        partial_outage: i18n.t("alert_details.business.partial_outage"),
+        major_outage: i18n.t("alert_details.business.major_outage"),
+        maintenance: i18n.t("alert_details.business.maintenance")
     };
 
     return labels[status] || status || "-";
@@ -1607,16 +1606,16 @@ function businessImpactTitle(impact) {
         impact.public_name
         || impact.business_service_name
         || impact.business_service_slug
-        || ("Business service #" + impact.business_service_id)
+        || (i18n.t("alert_details.entity.business_service_number", {id: impact.business_service_id}))
     );
 }
 
 
 function businessImpactMeta(impact) {
     return [
-        impact.impact_status ? "status: " + businessImpactStatusLabel(impact.impact_status) : null,
-        Number.isFinite(Number(impact.impact_score)) ? "score: " + Number(impact.impact_score) : null,
-        impact.service_name ? "via: " + impact.service_name : null,
+        impact.impact_status ? i18n.t("alert_details.business.status_prefix") + businessImpactStatusLabel(impact.impact_status) : null,
+        Number.isFinite(Number(impact.impact_score)) ? i18n.t("alert_details.business.score_prefix") + Number(impact.impact_score) : null,
+        impact.service_name ? i18n.t("alert_details.business.via_prefix") + impact.service_name : null,
         impact.relation || null,
     ].filter(Boolean).join(" / ");
 }
@@ -1631,7 +1630,7 @@ function renderBusinessImpactComponentSnapshot(impact) {
     const list = $("<div>").addClass("alert-service-context-list");
 
     if (!affected.length) {
-        return list.append($("<div>").addClass("help-text").text("No affected components in snapshot."));
+        return list.append($("<div>").addClass("help-text").text(i18n.t("alert_details.business.no_components")));
     }
 
     affected.slice(0, 5).forEach(function (item) {
@@ -1641,16 +1640,16 @@ function renderBusinessImpactComponentSnapshot(impact) {
                 .append(
                     $("<div>")
                         .addClass("alert-service-context-title")
-                        .text(item.service_name || item.service_slug || ("Service #" + item.service_id))
+                        .text(item.service_name || item.service_slug || i18n.t("alert_details.entity.service_number", {id: item.service_id}))
                 )
                 .append(
                     $("<div>")
                         .addClass("alert-service-context-meta")
                         .text([
-                            item.service_status ? "status: " + item.service_status : null,
-                            item.criticality ? "criticality: " + item.criticality : null,
-                            Number.isFinite(Number(item.impact_score)) ? "score: " + Number(item.impact_score) : null,
-                            Number.isFinite(Number(item.impact_weight)) ? "weight: " + Number(item.impact_weight) : null,
+                            item.service_status ? i18n.t("alert_details.business.status_prefix") + item.service_status : null,
+                            item.criticality ? i18n.t("alert_details.business.criticality_prefix") + item.criticality : null,
+                            Number.isFinite(Number(item.impact_score)) ? i18n.t("alert_details.business.score_prefix") + Number(item.impact_score) : null,
+                            Number.isFinite(Number(item.impact_weight)) ? i18n.t("alert_details.business.weight_prefix") + Number(item.impact_weight) : null,
                         ].filter(Boolean).join(" / "))
                 )
         );
@@ -1660,7 +1659,7 @@ function renderBusinessImpactComponentSnapshot(impact) {
         list.append(
             $("<div>")
                 .addClass("help-text")
-                .text("+" + (affected.length - 5) + " more affected component(s)")
+                .text(i18n.t("alert_details.business.more_components", {count: affected.length - 5}))
         );
     }
 
@@ -1684,11 +1683,11 @@ function renderAlertBusinessImpact(alert, modal) {
     target.append(
         $("<div>")
             .addClass("alert-service-context-header")
-            .append($("<h3>").text("Business impact"))
+            .append($("<h3>").text(i18n.t("alert_details.business.impact")))
             .append(
                 $("<div>")
                     .addClass("card-subtitle")
-                    .text("Customer-facing services affected by this incident.")
+                    .text(i18n.t("alert_details.business.help"))
             )
     );
 
@@ -1736,8 +1735,8 @@ function buildAlertDetailsSubtitle(alert) {
     return [
         alert.source || null,
         alert.team_slug || null,
-        alert.status || null,
-        alert.severity || null,
+        statusLabel(alert.status) || null,
+        severityLabel(alert.severity) || null,
         alertPriorityShortLabel(alert)
     ].filter(Boolean).join(" / ");
 }
@@ -1797,7 +1796,7 @@ function renderAlertPrimaryDetails(alert, modal) {
     target.append(
         $("<div>")
             .addClass("alert-primary-title")
-            .text(alert.title || "Alert #" + alert.id)
+            .text(alert.title || i18n.t("alert_details.entity.alert_number", {id: alert.id}))
     );
 
     if (message) {
@@ -1810,7 +1809,7 @@ function renderAlertPrimaryDetails(alert, modal) {
         target.append(
             $("<div>")
                 .addClass("help-text")
-                .text("No alert message was provided by the integration.")
+                .text(i18n.t("alert_details.primary.no_message"))
         );
     }
 
@@ -1824,7 +1823,7 @@ function renderAlertPrimaryDetails(alert, modal) {
                         .attr("target", "_blank")
                         .attr("rel", "noopener noreferrer")
                         .addClass("btn btn-secondary btn-sm")
-                        .text("Open source event")
+                        .text(i18n.t("alert_details.primary.open_source"))
                 )
         );
     }
@@ -1854,11 +1853,11 @@ function buildAlertPrimaryTimeLine(alert) {
     const parts = [];
 
     if (alert.first_seen_at || alert.created_at) {
-        parts.push("Created: " + formatDateTimeMinutes(alert.first_seen_at || alert.created_at));
+        parts.push(i18n.t("alert_details.primary.created", {time: formatDateTimeMinutes(alert.first_seen_at || alert.created_at)}));
     }
 
     if (alert.last_seen_at) {
-        parts.push("Last seen: " + formatDateTimeMinutes(alert.last_seen_at));
+        parts.push(i18n.t("alert_details.primary.last_seen", {time: formatDateTimeMinutes(alert.last_seen_at)}));
     }
 
     return parts.join(" · ");
@@ -1868,26 +1867,26 @@ function buildAlertPrimaryTimeLine(alert) {
 function buildAlertPrimaryContext(alert) {
     const context = [
         {
-            label: "Assignee",
+            label: i18n.t("alert_details.detail.assignee"),
             value: alert.assignee || "-"
         },
         {
-            label: "Route",
+            label: i18n.t("alert_details.detail.route"),
             value: alert.route_name || "-"
         },
         {
-            label: "Service",
+            label: i18n.t("alert_details.detail.service"),
             value: alertServiceDetailsLabel(alert)
         },
         {
-            label: "Next escalation",
+            label: i18n.t("alert_details.detail.next_escalation"),
             value: formatDateTimeMinutes(alert.next_escalation_at)
         }
     ];
 
     if (window.AppMaintenanceBadges && window.AppMaintenanceBadges.has(alert)) {
         context.push({
-            label: "Maintenance",
+            label: i18n.t("alert_details.business.maintenance"),
             value: window.AppMaintenanceBadges.text(alert)
         });
     }
@@ -1938,7 +1937,7 @@ function renderAlertPrimaryLabels(labels) {
         wrapper.append(
             $("<span>")
                 .addClass("help-text")
-                .text("No labels.")
+                .text(i18n.t("alert_details.primary.no_labels"))
         );
     }
 
@@ -1991,7 +1990,7 @@ function renderAlertServiceContext(alert, modal) {
     target.append(
         $("<div>")
             .addClass("alert-service-context-header")
-            .append($("<h3>").text("Service context"))
+            .append($("<h3>").text(i18n.t("alert_details.service_context.title")))
             .append(
                 $("<div>")
                     .addClass("card-subtitle")
@@ -2002,12 +2001,12 @@ function renderAlertServiceContext(alert, modal) {
     const linksList = $("<div>")
         .attr("id", "alert-service-links")
         .addClass("alert-service-context-list")
-        .append($("<div>").addClass("help-text").text("Loading links..."));
+        .append($("<div>").addClass("help-text").text(i18n.t("alert_details.loading.links")));
 
     const runbooksList = $("<div>")
         .attr("id", "alert-service-runbooks")
         .addClass("alert-service-context-list")
-        .append($("<div>").addClass("help-text").text("Loading runbooks..."));
+        .append($("<div>").addClass("help-text").text(i18n.t("alert_details.loading.runbooks")));
 
     target.append(
         $("<div>")
@@ -2015,13 +2014,13 @@ function renderAlertServiceContext(alert, modal) {
             .append(
                 $("<section>")
                     .addClass("alert-service-context-section")
-                    .append($("<h4>").text("Links"))
+                    .append($("<h4>").text(i18n.t("alert_details.service_context.links")))
                     .append(linksList)
             )
             .append(
                 $("<section>")
                     .addClass("alert-service-context-section")
-                    .append($("<h4>").text("Runbooks"))
+                    .append($("<h4>").text(i18n.t("alert_details.service_context.runbooks")))
                     .append(runbooksList)
             )
     );
@@ -2045,7 +2044,7 @@ function renderAlertServiceLinks(links) {
     });
 
     if (!enabledLinks.length) {
-        target.append($("<div>").addClass("help-text").text("No links."));
+        target.append($("<div>").addClass("help-text").text(i18n.t("alert_details.service_context.no_links")));
         return;
     }
 
@@ -2076,7 +2075,7 @@ function renderAlertServiceRunbooks(alert, runbooks) {
     });
 
     if (!matchedRunbooks.length) {
-        target.append($("<div>").addClass("help-text").text("No matching runbooks."));
+        target.append($("<div>").addClass("help-text").text(i18n.t("alert_details.service_context.no_runbooks")));
         return;
     }
 
@@ -2093,7 +2092,7 @@ function renderAlertServiceRunbooks(alert, runbooks) {
                         .addClass("alert-service-context-meta")
                         .text(
                             [
-                                runbook.severity ? "severity: " + runbook.severity : null,
+                                runbook.severity ? i18n.t("alert_details.service_context.severity_prefix") + runbook.severity : null,
                                 runbook.description || null,
                             ].filter(Boolean).join(" / ") || "runbook"
                         )
@@ -2189,20 +2188,20 @@ function ensureAlertCorrelationContext(modal) {
 
 function alertCorrelationRoleLabel(role) {
     const labels = {
-        possible_symptom: "Possible symptom",
-        possible_root_cause: "Possible root cause",
-        related: "Related alert"
+        possible_symptom: i18n.t("alert_details.correlation.possible_symptom"),
+        possible_root_cause: i18n.t("alert_details.correlation.possible_root"),
+        related: i18n.t("alert_details.correlation.related")
     };
 
-    return labels[role] || role || "Related alert";
+    return labels[role] || role || i18n.t("alert_details.correlation.related");
 }
 
 
 function alertCorrelationRelationLabel(relationType) {
     const labels = {
-        possible_root_cause: "Possible root cause",
-        possible_downstream_impact: "Possible downstream impact",
-        same_dependency_chain: "Same dependency chain"
+        possible_root_cause: i18n.t("alert_details.correlation.possible_root"),
+        possible_downstream_impact: i18n.t("alert_details.correlation.downstream"),
+        same_dependency_chain: i18n.t("alert_details.correlation.same_chain")
     };
 
     return labels[relationType] || relationType || "-";
@@ -2228,9 +2227,9 @@ function alertCorrelationGroupMeta(group) {
     }
 
     return [
-        group.status || null,
-        group.severity || null,
-        group.priority || null,
+        statusLabel(group.status) || null,
+        severityLabel(group.severity) || null,
+        alertPriorityLabel(group) || null,
         group.source || null,
         formatDateTimeMinutes(group.last_seen_at) || null
     ].filter(Boolean).join(" / ");
@@ -2251,7 +2250,7 @@ function buildAlertCorrelationItem(item) {
         .append(
             $("<span>")
                 .addClass("pill badge-muted")
-                .text("score " + (item.score || 0))
+                .text(i18n.t("alert_details.correlation.score_prefix") + (item.score || 0))
         );
 
     row.append(title);
@@ -2289,7 +2288,7 @@ function buildAlertCorrelationItem(item) {
                     alertCorrelationRelationLabel(item.relation_type),
                     item.dependency_type || null,
                     item.criticality || null,
-                    item.depth ? "depth " + item.depth : null
+                    item.depth ? i18n.t("alert_details.correlation.depth_prefix") + item.depth : null
                 ].filter(Boolean).join(" / ")
             )
     );
@@ -2327,11 +2326,11 @@ function renderAlertCorrelation(alert, modal) {
             .addClass("card-header")
             .append(
                 $("<div>")
-                    .append($("<h2>").text("Correlation"))
+                    .append($("<h2>").text(i18n.t("alert_details.correlation.title")))
                     .append(
                         $("<div>")
                             .addClass("card-subtitle")
-                            .text("Dependency-aware related alert groups.")
+                            .text(i18n.t("alert_details.correlation.help"))
                     )
             )
     );
@@ -2340,7 +2339,7 @@ function renderAlertCorrelation(alert, modal) {
 
     if (rootCandidates.length) {
         body.append(
-            $("<h3>").text("Possible root cause")
+            $("<h3>").text(i18n.t("alert_details.correlation.possible_root"))
         );
 
         rootCandidates.forEach(function (item) {
@@ -2350,7 +2349,7 @@ function renderAlertCorrelation(alert, modal) {
 
     if (downstreamImpacts.length) {
         body.append(
-            $("<h3>").text("Possible downstream impact")
+            $("<h3>").text(i18n.t("alert_details.correlation.downstream"))
         );
 
         downstreamImpacts.forEach(function (item) {
@@ -2366,36 +2365,36 @@ function renderAlertDetailsSummary(alert, modal) {
 
     summary.empty();
 
-    summary.append(detailItem("Source", alert.source));
-    summary.append(detailItem("External ID", alert.external_id));
-    summary.append(detailItem("Group key", alert.group_key));
-    summary.append(detailItem("Dedup key", alert.dedup_key));
+    summary.append(detailItem(i18n.t("alert_details.explain.source"), alert.source));
+    summary.append(detailItem(i18n.t("alert_details.detail.external_id"), alert.external_id));
+    summary.append(detailItem(i18n.t("alert_details.detail.group_key"), alert.group_key));
+    summary.append(detailItem(i18n.t("alert_details.explain.dedup_key"), alert.dedup_key));
 
-    summary.append(detailItem("Team", alert.team_name || alert.team_slug));
-    summary.append(detailItem("Route", alert.route_name));
-    summary.append(detailItem("Service", alertServiceDetailsLabel(alert)));
-    summary.append(detailItem("Priority", alertPriorityLabel(alert)));
-    summary.append(detailItem("Service status", alert.service_status));
-    summary.append(detailItem("Service criticality", alert.service_criticality));
+    summary.append(detailItem(i18n.t("alert_details.target.team"), alert.team_name || alert.team_slug));
+    summary.append(detailItem(i18n.t("alert_details.detail.route"), alert.route_name));
+    summary.append(detailItem(i18n.t("alert_details.detail.service"), alertServiceDetailsLabel(alert)));
+    summary.append(detailItem(i18n.t("alert_details.form.priority"), alertPriorityLabel(alert)));
+    summary.append(detailItem(i18n.t("alert_details.detail.service_status"), alert.service_status));
+    summary.append(detailItem(i18n.t("alert_details.detail.service_criticality"), alert.service_criticality));
 
-    summary.append(detailItem("Escalation mode", alertEscalationModeLabel(alert)));
-    summary.append(detailItem("Escalation policy", alert.escalation_policy_name));
-    summary.append(detailItem("Policy rule", alertPolicyRuleLabel(alert)));
-    summary.append(detailItem("Rotation", alert.rotation_name));
-    summary.append(detailItem("Assignee", alert.assignee));
-    summary.append(detailItem("Next escalation", formatDateTimeMinutes(alert.next_escalation_at)));
-    summary.append(detailItem("Last escalated", formatDateTimeMinutes(alert.last_escalated_at)));
-    summary.append(detailItem("Escalation level", alert.escalation_level || 0));
-    summary.append(detailItem("Policy repeat count", alert.escalation_repeat_count || 0));
-    summary.append(detailItem("Default rotation", alertTeamEscalationLabel(alert)));
+    summary.append(detailItem(i18n.t("alert_details.detail.escalation_mode"), alertEscalationModeLabel(alert)));
+    summary.append(detailItem(i18n.t("alert_details.target.escalation_policy"), alert.escalation_policy_name));
+    summary.append(detailItem(i18n.t("alert_details.detail.policy_rule"), alertPolicyRuleLabel(alert)));
+    summary.append(detailItem(i18n.t("alert_details.target.rotation"), alert.rotation_name));
+    summary.append(detailItem(i18n.t("alert_details.detail.assignee"), alert.assignee));
+    summary.append(detailItem(i18n.t("alert_details.detail.next_escalation"), formatDateTimeMinutes(alert.next_escalation_at)));
+    summary.append(detailItem(i18n.t("alert_details.detail.last_escalated"), formatDateTimeMinutes(alert.last_escalated_at)));
+    summary.append(detailItem(i18n.t("alert_details.detail.escalation_level"), alert.escalation_level || 0));
+    summary.append(detailItem(i18n.t("alert_details.detail.policy_repeat"), alert.escalation_repeat_count || 0));
+    summary.append(detailItem(i18n.t("alert_details.detail.default_rotation"), alertTeamEscalationLabel(alert)));
 
-    summary.append(detailItem("Acknowledged by", alert.acknowledged_by));
-    summary.append(detailItem("Created", formatDateTimeMinutes(alert.first_seen_at || alert.created_at)));
-    summary.append(detailItem("Last seen", formatDateTimeMinutes(alert.last_seen_at)));
-    summary.append(detailItem("Last notification", formatDateTimeMinutes(alert.last_notification_at)));
-    summary.append(detailItem("Reminder count", alert.reminder_count || 0));
+    summary.append(detailItem(i18n.t("alert_details.detail.acknowledged_by"), alert.acknowledged_by));
+    summary.append(detailItem(i18n.t("alert_details.detail.created"), formatDateTimeMinutes(alert.first_seen_at || alert.created_at)));
+    summary.append(detailItem(i18n.t("alert_details.detail.last_seen"), formatDateTimeMinutes(alert.last_seen_at)));
+    summary.append(detailItem(i18n.t("alert_details.detail.last_notification"), formatDateTimeMinutes(alert.last_notification_at)));
+    summary.append(detailItem(i18n.t("alert_details.detail.reminder_count"), alert.reminder_count || 0));
     summary.append(detailItem(
-        "Reminder interval",
+        i18n.t("alert_details.detail.reminder_interval"),
         alert.rotation_reminder_interval_seconds
             ? alert.rotation_reminder_interval_seconds + "s"
             : "-"
@@ -2417,7 +2416,7 @@ function renderAlertGroupChildren(alerts, modal) {
 
     if (!alerts.length) {
         target.append(
-            $("<div>").addClass("help-text").text("No child alerts in this group.")
+            $("<div>").addClass("help-text").text(i18n.t("alert_details.children.empty"))
         );
         return;
     }
@@ -2428,12 +2427,12 @@ function renderAlertGroupChildren(alerts, modal) {
         const lastSeenAt = alert.last_seen_at || alert.updated_at || null;
 
         const subtitle = [
-            alert.status || null,
-            alert.severity || null,
-            createdAt ? "created=" + formatDateTimeMinutes(createdAt) : null,
-            lastSeenAt ? "last_seen=" + formatDateTimeMinutes(lastSeenAt) : null,
-            labels.instance ? "instance=" + labels.instance : null,
-            alert.dedup_key ? "dedup=" + alert.dedup_key : null,
+            statusLabel(alert.status) || null,
+            severityLabel(alert.severity) || null,
+            createdAt ? i18n.t("alert_details.children.created_prefix") + formatDateTimeMinutes(createdAt) : null,
+            lastSeenAt ? i18n.t("alert_details.children.last_seen_prefix") + formatDateTimeMinutes(lastSeenAt) : null,
+            labels.instance ? i18n.t("alert_details.children.instance_prefix") + labels.instance : null,
+            alert.dedup_key ? i18n.t("alert_details.children.dedup_prefix") + alert.dedup_key : null,
         ].filter(Boolean).join(" · ");
 
         target.append(
@@ -2443,7 +2442,7 @@ function renderAlertGroupChildren(alerts, modal) {
                     $("<div>")
                         .addClass("alert-child-header")
                         .append(
-                            $("<span>").text("#" + alert.id + " " + (alert.title || "Alert"))
+                            $("<span>").text("#" + alert.id + " " + (alert.title || i18n.t("alert_details.entity.alert")))
                         )
                         .append(
                             $("<span>")
@@ -2462,12 +2461,12 @@ function renderAlertGroupChildren(alerts, modal) {
                         .append(
                             $("<span>")
                                 .addClass("alert-child-time-item")
-                                .text("Created: " + (formatDateTimeMinutes(createdAt) || "-"))
+                                .text(i18n.t("alert_details.primary.created", {time: formatDateTimeMinutes(createdAt) || "-"}))
                         )
                         .append(
                             $("<span>")
                                 .addClass("alert-child-time-item")
-                                .text("Last seen: " + (formatDateTimeMinutes(lastSeenAt) || "-"))
+                                .text(i18n.t("alert_details.primary.last_seen", {time: formatDateTimeMinutes(lastSeenAt) || "-"}))
                         )
                 )
                 .append(
@@ -2481,18 +2480,18 @@ function renderAlertGroupChildren(alerts, modal) {
 
 function alertEventTypeLabel(eventType) {
     const labels = {
-        correlation_detected: "Correlation detected",
-        correlation_deactivated: "Correlation deactivated",
-        business_impact_detected: "Business impact detected",
-        business_impact_updated: "Business impact updated",
-        business_impact_deactivated: "Business impact deactivated",
-        merged: "Merged",
-        merge_target_updated: "Merge target updated",
-        acknowledged: "Acknowledged",
-        resolved: "Resolved",
-        notification: "Notification",
-        reminder: "Reminder",
-        escalation: "Escalation"
+        correlation_detected: i18n.t("alert_details.events.correlation_detected"),
+        correlation_deactivated: i18n.t("alert_details.events.correlation_deactivated"),
+        business_impact_detected: i18n.t("alert_details.events.business_detected"),
+        business_impact_updated: i18n.t("alert_details.events.business_updated"),
+        business_impact_deactivated: i18n.t("alert_details.events.business_deactivated"),
+        merged: i18n.t("alert_details.events.merged"),
+        merge_target_updated: i18n.t("alert_details.events.merge_target_updated"),
+        acknowledged: i18n.t("alert_details.events.acknowledged"),
+        resolved: i18n.t("alert_details.responder.resolved"),
+        notification: i18n.t("alert_details.events.notification"),
+        reminder: i18n.t("alert_details.events.reminder"),
+        escalation: i18n.t("alert_details.events.escalation")
     };
 
     return labels[eventType] || eventType || "-";
@@ -2509,7 +2508,7 @@ function renderEvents(events, modal) {
         target.append(
             $("<div>")
                 .addClass("help-text")
-                .text("No events.")
+                .text(i18n.t("alert_details.events.empty"))
         );
         return;
     }
@@ -2544,13 +2543,13 @@ function renderNotifications(notifications, modal) {
     target.empty();
 
     if (!notifications.length) {
-        target.append($("<div>").addClass("help-text").text("No delivery records."));
+        target.append($("<div>").addClass("help-text").text(i18n.t("alert_details.delivery.empty")));
         return;
     }
 
     notifications.forEach(function (item) {
         const channel = item.channel ? item.channel.name + " (" + item.channel.channel_type + ")" : "-";
-        const status = item.last_error ? "failed: " + item.last_error : (item.last_event_type || "sent");
+        const status = item.last_error ? i18n.t("alert_details.delivery.failed_prefix") + item.last_error : (item.last_event_type || i18n.t("alert_details.delivery.sent"));
         const requestedChannelId = item.provider_payload && item.provider_payload.requested_channel_id ? item.provider_payload.requested_channel_id : item.configured_channel_id;
 
         target.append(
@@ -2558,10 +2557,10 @@ function renderNotifications(notifications, modal) {
                 .addClass("event-item")
                 .append($("<strong>").text("#" + item.id + " " + channel))
                 .append($("<div>").text((item.provider || "-") + " / " + status))
-                .append($("<div>").text("configured_channel_id: " + (item.configured_channel_id || "-")))
-                .append($("<div>").text("requested_channel_id: " + (requestedChannelId || "-")))
-                .append($("<div>").text("external_channel_id: " + (item.external_channel_id || "-")))
-                .append($("<div>").text("message_id: " + (item.external_message_id || "-")))
+                .append($("<div>").text(i18n.t("alert_details.delivery.configured_channel") + ": " + (item.configured_channel_id || "-")))
+                .append($("<div>").text(i18n.t("alert_details.delivery.requested_channel") + ": " + (requestedChannelId || "-")))
+                .append($("<div>").text(i18n.t("alert_details.delivery.external_channel") + ": " + (item.external_channel_id || "-")))
+                .append($("<div>").text(i18n.t("alert_details.delivery.message_id") + ": " + (item.external_message_id || "-")))
         );
     });
 }
@@ -2865,7 +2864,7 @@ $(document).on("click", "#modal-alert-ack", function () {
         return;
     }
     if (!currentDetailsAlertCanRespond) {
-        showAppError("You do not have permission to acknowledge this alert.");
+        showAppError(i18n.t("alert_details.permissions.ack"));
         return;
     }
 
@@ -2879,7 +2878,7 @@ $(document).on("click", "#modal-alert-resolve", function () {
         return;
     }
     if (!currentDetailsAlertCanRespond) {
-        showAppError("You do not have permission to resolve this alert.");
+        showAppError(i18n.t("alert_details.permissions.resolve"));
         return;
     }
 
@@ -3022,7 +3021,7 @@ $(document).on("click", "#alerts-ack-selected", function () {
 });
 
 $(document).on("click", "#alerts-resolve-selected", function () {
-    bulkUpdateSelectedAlertGroups("resolve");
+    bulkUpdateSelectedAlertGroups(i18n.t("alert_details.bulk.resolve_action"));
 });
 
 $(document).on("click", "#alerts-merge-selected", function () {
@@ -3058,16 +3057,16 @@ function bulkUpdateSelectedAlertGroups(action) {
     if (!ids.length) {
         showAppError(
             action === "ack"
-                ? "Select at least one firing alert group to acknowledge."
-                : "Select at least one unresolved alert group to resolve."
+                ? i18n.t("alert_details.bulk.ack_required")
+                : i18n.t("alert_details.bulk.resolve_required")
         );
         return;
     }
 
-    const label = action === "ack" ? "acknowledge" : "resolve";
-    const title = action === "ack" ? "Acknowledge selected alert groups?" : "Resolve selected alert groups?";
-    const confirmText = action === "ack" ? "Acknowledge groups" : "Resolve groups";
-    const message = "This will " + label + " " + ids.length + " selected alert group(s).";
+    const label = action === "ack" ? i18n.t("alert_details.bulk.ack_action") : i18n.t("alert_details.bulk.resolve_action");
+    const title = action === "ack" ? i18n.t("alert_details.bulk.ack_title") : i18n.t("alert_details.bulk.resolve_title");
+    const confirmText = action === "ack" ? i18n.t("alert_details.bulk.ack_confirm") : i18n.t("alert_details.bulk.resolve_confirm");
+    const message = i18n.t("alert_details.bulk.message", {action: label, count: ids.length});
 
     showAppConfirm({
         title: title,
@@ -3086,14 +3085,14 @@ function mergeSelectedAlertGroups() {
     const ids = Array.from(selectedAlertGroupIds).map(Number).filter(Boolean);
 
     if (ids.length < 2) {
-        showAppError("Select at least two alert groups to merge.");
+        showAppError(i18n.t("alert_details.merge.minimum"));
         return;
     }
 
     const targetId = alertGroupTargetIdFromSelection();
 
     if (!targetId) {
-        showAppError("Could not choose merge target.");
+        showAppError(i18n.t("alert_details.merge.no_target"));
         return;
     }
 
@@ -3106,21 +3105,21 @@ function mergeSelectedAlertGroups() {
     });
 
     const message = [
-        "Selected groups will be merged into group #" + targetId + ".",
-        target && target.title ? "Target: " + target.title : null,
-        "Child alerts from other groups will be moved into the target group.",
+        i18n.t("alert_details.merge.target_group", {id: targetId}),
+        target && target.title ? i18n.t("alert_details.merge.target", {title: target.title}) : null,
+        i18n.t("alert_details.merge.children"),
     ].filter(Boolean).join("\n\n");
 
     showAppConfirm({
-        title: "Merge selected alert groups?",
+        title: i18n.t("alert_details.merge.title"),
         message: message,
-        confirmText: "Merge groups",
+        confirmText: i18n.t("alert_details.merge.confirm"),
         confirmClass: "btn-warning"
     }).done(function () {
         apiPost("/api/alerts/merge", {
             target_group_id: targetId,
             source_group_ids: sourceIds,
-            reason: "Merged from alerts UI"
+            reason: i18n.t("alert_details.merge.reason")
         }, function () {
             selectedAlertGroupIds.clear();
             loadAlerts();
@@ -3141,12 +3140,12 @@ function closeAlertExplainLookupModal() {
 function showAlertExplainLookupError(message) {
     $("#alert-explain-lookup-error")
         .removeClass("is-hidden")
-        .text(message || "Failed to open explain trace.");
+        .text(message || i18n.t("alert_details.trace.open_failed"));
 }
 
 function openAlertDetailsForTrace(traceId) {
     if (!traceId) {
-        showAlertExplainLookupError("Trace ID is required.");
+        showAlertExplainLookupError(i18n.t("alert_details.trace.required"));
         return;
     }
 
@@ -3162,11 +3161,11 @@ function openAlertDetailsForTrace(traceId) {
             currentDetailsExplainTraceId = trace.trace_id;
             currentDetailsExplainLoadedAlertId = trace.group_id || null;
 
-            modal.find("#alert-details-title").text("Explain trace");
+            modal.find("#alert-details-title").text(i18n.t("alert_details.trace.details_title"));
             modal.find("#alert-details-subtitle").text(
                 trace.group_id
                     ? `Alert group #${trace.group_id}`
-                    : "No alert group was created"
+                    : i18n.t("alert_details.trace.no_group")
             );
 
             modal.find("#alert-details-overview").html("");
@@ -3192,7 +3191,7 @@ function openAlertDetailsForTrace(traceId) {
         .fail((xhr) => {
             const payload = xhr.responseJSON || {};
             showAlertExplainLookupError(
-                payload.message || "Explain trace not found."
+                payload.message || i18n.t("alert_details.trace.not_found")
             );
         });
 }
@@ -3228,7 +3227,7 @@ function getAlertsQueryParam(name) {
 function showManualIncidentError(message) {
     $("#manual-incident-error")
         .removeClass("is-hidden")
-        .text(message || "Failed to create incident.");
+        .text(message || i18n.t("alert_details.manual.failed"));
 }
 
 function clearManualIncidentError() {
@@ -3258,7 +3257,7 @@ function renderManualIncidentTeamOptions() {
         select.append(
             $("<option>")
                 .attr("value", "")
-                .text("No teams available")
+                .text(i18n.t("alert_details.manual.no_teams"))
         );
         select.prop("disabled", true);
         return;
@@ -3269,14 +3268,14 @@ function renderManualIncidentTeamOptions() {
     select.append(
         $("<option>")
             .attr("value", "")
-            .text("Select team")
+            .text(i18n.t("alert_details.manual.select_team"))
     );
 
     allowedTeams.forEach(function (team) {
         select.append(
             $("<option>")
                 .attr("value", team.id)
-                .text(team.name || team.slug || ("Team #" + team.id))
+                .text(team.name || team.slug || i18n.t("alert_details.entity.team_number", {id: team.id}))
         );
     });
 
@@ -3307,7 +3306,7 @@ function renderManualIncidentPriorityOptions() {
     select.append(
         $("<option>")
             .attr("value", "")
-            .text("Automatic")
+            .text(i18n.t("alert_details.priority.automatic"))
     );
 
     manualIncidentPriorities
@@ -3324,7 +3323,7 @@ function renderManualIncidentPriorityOptions() {
             select.append(
                 $("<option>")
                     .attr("value", slug)
-                    .text(label || slug || "Priority")
+                    .text(label || slug || i18n.t("alert_details.form.priority"))
             );
         });
 }
@@ -3337,7 +3336,7 @@ function renderManualIncidentServiceOptions() {
     select.append(
         $("<option>")
             .attr("value", "")
-            .text("No service")
+            .text(i18n.t("alert_details.manual.no_service"))
     );
 
     manualIncidentServices
@@ -3348,7 +3347,7 @@ function renderManualIncidentServiceOptions() {
             select.append(
                 $("<option>")
                     .attr("value", service.id)
-                    .text(service.name || service.slug || ("Service #" + service.id))
+                    .text(service.name || service.slug || i18n.t("alert_details.entity.service_number", {id: service.id}))
             );
         });
 }
@@ -3407,7 +3406,7 @@ function resetManualIncidentForm() {
     $("#manual-incident-service").empty().append(
         $("<option>")
             .attr("value", "")
-            .text("No service")
+            .text(i18n.t("alert_details.manual.no_service"))
     );
 }
 
@@ -3426,11 +3425,11 @@ function openManualIncidentModal() {
 
 function validateManualIncidentPayload(payload) {
     if (!payload.team_id) {
-        return "Select a team.";
+        return i18n.t("alert_details.manual.select_team_error");
     }
 
     if (!payload.title) {
-        return "Incident title is required.";
+        return i18n.t("alert_details.manual.title_required");
     }
 
     const team = manualIncidentTeams.find(function (item) {
@@ -3438,7 +3437,7 @@ function validateManualIncidentPayload(payload) {
     });
 
     if (!canCreateManualIncidentForTeam(team)) {
-        return "You do not have permission to create incidents for this team.";
+        return i18n.t("alert_details.manual.permission");
     }
 
     return null;

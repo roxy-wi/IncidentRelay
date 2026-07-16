@@ -55,7 +55,7 @@ function loadPriorityPolicyPriorities(callback) {
 
 function renderPriorityPolicyFallbackPriorityOptions(selectedPriorityId) {
     const select = $("#priority-policy-fallback-priority");
-    select.empty().append($("<option>").val("").text("Select priority"));
+    select.empty().append($("<option>").val("").text(i18n.t("priority_policies.form.select_priority")));
 
     priorityPolicyPrioritiesCache.forEach(function (priority) {
         select.append($("<option>").val(String(priority.id)).text(priority.name + " (" + priority.slug + ")"));
@@ -81,25 +81,25 @@ function renderPriorityPoliciesSummary() {
 
 function priorityPolicyUpdateModeLabel(mode) {
     return {
-        raise_only: "Raise only",
-        recalculate: "Recalculate",
-        initial_only: "Initial only",
+        raise_only: i18n.t("priority_policies.mode.raise_only"),
+        recalculate: i18n.t("priority_policies.mode.recalculate_short"),
+        initial_only: i18n.t("priority_policies.mode.initial_only_short"),
     }[mode] || mode || "-";
 }
 
 function priorityPolicySourceModeLabel(mode) {
     return {
-        ignore: "Ignore source priority",
-        prefer: "Prefer source priority",
+        ignore: i18n.t("priority_policies.source.ignore"),
+        prefer: i18n.t("priority_policies.source.prefer_short"),
     }[mode] || mode || "-";
 }
 
 function priorityPolicyFallbackLabel(policy) {
     if (policy.fallback_mode === "fixed_priority") {
-        return policy.fallback_priority ? policy.fallback_priority.name + " (" + policy.fallback_priority.slug + ")" : "Fixed priority";
+        return policy.fallback_priority ? policy.fallback_priority.name + " (" + policy.fallback_priority.slug + ")" : i18n.t("priority_policies.fallback.fixed_priority_short");
     }
 
-    return "Severity mapping";
+    return i18n.t("priority_policies.fallback.severity_mapping_short");
 }
 
 function getPriorityPolicySearchText(policy) {
@@ -151,7 +151,7 @@ function renderPriorityPoliciesTable() {
     $("#priority-policies-total-count").text(priorityPoliciesCache.length);
 
     if (!policies.length) {
-        tbody.append($("<tr>").append($("<td>").attr("colspan", "7").addClass("empty-cell").text("No priority policies")));
+        tbody.append($("<tr>").append($("<td>").attr("colspan", "7").addClass("empty-cell").text(i18n.t("priority_policies.empty.found"))));
         return;
     }
 
@@ -164,7 +164,7 @@ function renderPriorityPolicyRow(policy) {
     row.append(
         $("<td>")
             .append($("<button>").attr("type", "button").addClass("name-button").text(policy.name || "-").on("click", function () { renderPriorityPolicyDetails(policy, {scroll: true}); }))
-            .append($("<div>").addClass("row-subtitle").text(policy.description || "Policy #" + policy.id))
+            .append($("<div>").addClass("row-subtitle").text(policy.description || i18n.t("priority_policies.row.fallback", {id: policy.id})))
     );
 
     row.append($("<td>").append($("<span>").addClass("pill").text(policy.team_slug || policy.team_name || "-")));
@@ -173,10 +173,10 @@ function renderPriorityPolicyRow(policy) {
     row.append($("<td>").text(policy.services_count || 0));
 
     const status = $("<div>");
-    status.append(renderStatusBadge(policy.enabled, "Enabled", "Disabled"));
+    status.append(renderStatusBadge(policy.enabled, i18n.t("priority_policies.status.enabled"), i18n.t("priority_policies.status.disabled")));
 
     if (policy.default_for_team) {
-        status.append($("<span>").addClass("pill").text("Team default"));
+        status.append($("<span>").addClass("pill").text(i18n.t("priority_policies.status.team_default")));
     }
 
     row.append($("<td>").append(status));
@@ -190,33 +190,33 @@ function renderPriorityPolicyActions(policy) {
         object: policy,
         items: [
             {
-                label: "Edit",
+                label: i18n.t("priority_policies.actions.edit"),
                 icon: "fas fa-edit",
                 required: "write",
-                denyMessage: "Team manager role is required to edit this policy.",
+                denyMessage: i18n.t("priority_policies.permissions.manager_edit"),
                 onClick: function () { editPriorityPolicy(policy.id); },
             },
             {
-                label: "Rules",
+                label: i18n.t("priority_policies.actions.rules"),
                 icon: "fas fa-list",
                 required: "write",
-                denyMessage: "Team manager role is required to manage policy rules.",
+                denyMessage: i18n.t("priority_policies.permissions.manager_rules"),
                 onClick: function () { openPriorityPolicyRulesModal(policy.id); },
             },
             {
-                label: policy.enabled ? "Disable" : "Enable",
+                label: policy.enabled ? i18n.t("priority_policies.actions.disable") : i18n.t("priority_policies.actions.enable"),
                 icon: policy.enabled ? "fas fa-pause" : "fas fa-play",
                 required: "write",
                 danger: policy.enabled,
-                denyMessage: "Team manager role is required to update this policy.",
+                denyMessage: i18n.t("priority_policies.permissions.manager_update"),
                 onClick: function () { setPriorityPolicyEnabled(policy, !policy.enabled); },
             },
             {
-                label: "Remove",
+                label: i18n.t("priority_policies.actions.remove"),
                 icon: "fas fa-trash",
                 required: "delete",
                 danger: true,
-                denyMessage: "Delete permission is required to remove this policy.",
+                denyMessage: i18n.t("priority_policies.permissions.delete"),
                 onClick: function () { removePriorityPolicy(policy); },
             },
         ],
@@ -231,23 +231,23 @@ function priorityPolicyDetailsItem(label, value) {
 
 function renderPriorityPolicyDetails(policy, options) {
     selectedPriorityPolicyDetailsId = policy.id;
-    $("#priority-policy-details-subtitle").text((policy.team_slug || policy.team_name || "-") + " / " + (policy.enabled ? "Enabled" : "Disabled"));
+    $("#priority-policy-details-subtitle").text((policy.team_slug || policy.team_name || "-") + " / " + (policy.enabled ? i18n.t("priority_policies.status.enabled") : i18n.t("priority_policies.status.disabled")));
 
     const body = $("#priority-policy-details-body");
     body.empty();
 
     body.append(
         $("<div>").addClass("details-list")
-            .append(priorityPolicyDetailsItem("Name", policy.name))
-            .append(priorityPolicyDetailsItem("Team", policy.team_slug || policy.team_name))
-            .append(priorityPolicyDetailsItem("Description", policy.description))
-            .append(priorityPolicyDetailsItem("Team default", policy.default_for_team ? "Yes" : "No"))
-            .append(priorityPolicyDetailsItem("Update mode", priorityPolicyUpdateModeLabel(policy.update_mode)))
-            .append(priorityPolicyDetailsItem("Source priority", priorityPolicySourceModeLabel(policy.source_priority_mode)))
-            .append(priorityPolicyDetailsItem("Fallback", priorityPolicyFallbackLabel(policy)))
-            .append(priorityPolicyDetailsItem("Rules", String(policy.rules_count || 0)))
-            .append(priorityPolicyDetailsItem("Services", String(policy.services_count || 0)))
-            .append(priorityPolicyDetailsItem("Status", policy.enabled ? "Enabled" : "Disabled"))
+            .append(priorityPolicyDetailsItem(i18n.t("priority_policies.details.name"), policy.name))
+            .append(priorityPolicyDetailsItem(i18n.t("priority_policies.details.team"), policy.team_slug || policy.team_name))
+            .append(priorityPolicyDetailsItem(i18n.t("priority_policies.details.description"), policy.description))
+            .append(priorityPolicyDetailsItem(i18n.t("priority_policies.details.team_default"), policy.default_for_team ? i18n.t("priority_policies.values.yes") : i18n.t("priority_policies.values.no")))
+            .append(priorityPolicyDetailsItem(i18n.t("priority_policies.details.update_mode"), priorityPolicyUpdateModeLabel(policy.update_mode)))
+            .append(priorityPolicyDetailsItem(i18n.t("priority_policies.details.source_priority"), priorityPolicySourceModeLabel(policy.source_priority_mode)))
+            .append(priorityPolicyDetailsItem(i18n.t("priority_policies.details.fallback"), priorityPolicyFallbackLabel(policy)))
+            .append(priorityPolicyDetailsItem(i18n.t("priority_policies.details.rules"), String(policy.rules_count || 0)))
+            .append(priorityPolicyDetailsItem(i18n.t("priority_policies.details.services"), String(policy.services_count || 0)))
+            .append(priorityPolicyDetailsItem(i18n.t("priority_policies.details.status"), policy.enabled ? i18n.t("priority_policies.status.enabled") : i18n.t("priority_policies.status.disabled")))
     );
 
     const actions = $("<div>").addClass("details-actions");
@@ -255,21 +255,21 @@ function renderPriorityPolicyDetails(policy, options) {
     appendIconActionIfAllowed(actions, policy, {
         required: "write",
         icon: "fas fa-edit",
-        label: "Edit policy",
+        label: i18n.t("priority_policies.actions.edit_policy"),
         onClick: function () { editPriorityPolicy(policy.id); },
     });
 
     appendIconActionIfAllowed(actions, policy, {
         required: "write",
         icon: "fas fa-list",
-        label: "Manage rules",
+        label: i18n.t("priority_policies.actions.manage_rules"),
         onClick: function () { openPriorityPolicyRulesModal(policy.id); },
     });
 
     appendIconActionIfAllowed(actions, policy, {
         required: "write",
         icon: policy.enabled ? "fas fa-pause" : "fas fa-play",
-        label: policy.enabled ? "Disable policy" : "Enable policy",
+        label: policy.enabled ? i18n.t("priority_policies.actions.disable_policy") : i18n.t("priority_policies.actions.enable_policy"),
         className: policy.enabled ? "btn-warning" : "btn-success",
         onClick: function () { setPriorityPolicyEnabled(policy, !policy.enabled); },
     });
@@ -277,7 +277,7 @@ function renderPriorityPolicyDetails(policy, options) {
     appendIconActionIfAllowed(actions, policy, {
         required: "delete",
         icon: "fas fa-trash-alt",
-        label: "Remove policy",
+        label: i18n.t("priority_policies.actions.remove_policy"),
         className: "btn-danger",
         onClick: function () { removePriorityPolicy(policy); },
     });
@@ -293,8 +293,8 @@ function renderPriorityPolicyDetails(policy, options) {
 
 function renderPriorityPolicyDetailsEmpty() {
     selectedPriorityPolicyDetailsId = null;
-    $("#priority-policy-details-subtitle").text("Select a policy");
-    $("#priority-policy-details-body").html('<div class="details-empty">Click a policy name to inspect its configuration.</div>');
+    $("#priority-policy-details-subtitle").text(i18n.t("priority_policies.details.select"));
+    $("#priority-policy-details-body").empty().append($("<div>").addClass("details-empty").text(i18n.t("priority_policies.details.select_help")));
 }
 
 function restorePriorityPolicyDetails() {
@@ -357,17 +357,17 @@ function savePriorityPolicy() {
     const payload = collectPriorityPolicyPayload();
 
     if (!String(payload.name || "").trim()) {
-        showAppError("Priority policy name is required.");
+        showAppError(i18n.t("priority_policies.validation.name_required"));
         return;
     }
 
     if (payload.default_for_team && !payload.enabled) {
-        showAppError("Default priority policy must be enabled.");
+        showAppError(i18n.t("priority_policies.validation.default_enabled"));
         return;
     }
 
     if (payload.fallback_mode === "fixed_priority" && !payload.fallback_priority_id) {
-        showAppError("Select a fallback priority.");
+        showAppError(i18n.t("priority_policies.validation.fallback_required"));
         return;
     }
 
@@ -390,7 +390,7 @@ function savePriorityPolicy() {
 }
 
 function resetPriorityPolicyForm() {
-    $("#priority-policy-form-title").text("Create priority policy");
+    $("#priority-policy-form-title").text(i18n.t("priority_policies.form.create"));
     $("#priority-policy-id").val("");
     $("#priority-policy-name").val("");
     $("#priority-policy-description").val("");
@@ -413,7 +413,7 @@ function resetPriorityPolicyForm() {
 
 function openCreatePriorityPolicyModal() {
     if (!currentUserCanCreateUiObjects()) {
-        showAppError("Write role is required to create priority policies.", "Access denied");
+        showAppError(i18n.t("priority_policies.permissions.create"), i18n.t("priority_policies.errors.access_denied"));
         return;
     }
 
@@ -425,16 +425,16 @@ function editPriorityPolicy(policyId) {
     const policy = getPriorityPolicyById(policyId);
 
     if (!policy) {
-        showAppError("Priority policy was not found.");
+        showAppError(i18n.t("priority_policies.errors.not_found"));
         return;
     }
 
     if (!canWriteObject(policy)) {
-        showAppError("You do not have permission to edit this policy.", "Access denied");
+        showAppError(i18n.t("priority_policies.permissions.edit"), i18n.t("priority_policies.errors.access_denied"));
         return;
     }
 
-    $("#priority-policy-form-title").text("Edit priority policy #" + policy.id);
+    $("#priority-policy-form-title").text(i18n.t("priority_policies.form.edit", {id: policy.id}));
     $("#priority-policy-id").val(policy.id);
     $("#priority-policy-team").val(policy.team_id).prop("disabled", true);
     $("#priority-policy-name").val(policy.name || "");
@@ -451,7 +451,7 @@ function editPriorityPolicy(policyId) {
 
 function setPriorityPolicyEnabled(policy, enabled) {
     if (!canWriteObject(policy)) {
-        showAppError("You do not have permission to update this policy.", "Access denied");
+        showAppError(i18n.t("priority_policies.permissions.update"), i18n.t("priority_policies.errors.access_denied"));
         return;
     }
 
@@ -460,14 +460,14 @@ function setPriorityPolicyEnabled(policy, enabled) {
 
 function removePriorityPolicy(policy) {
     if (!canDeleteObject(policy)) {
-        showAppError("You do not have permission to remove this policy.", "Access denied");
+        showAppError(i18n.t("priority_policies.permissions.remove"), i18n.t("priority_policies.errors.access_denied"));
         return;
     }
 
     showAppConfirm({
-        title: "Remove this priority policy?",
-        message: "Remove policy '" + policy.name + "'? A policy assigned to a service cannot be removed.",
-        confirmText: "Remove policy",
+        title: i18n.t("priority_policies.confirm.remove_title"),
+        message: i18n.t("priority_policies.confirm.remove_message", {name: policy.name}),
+        confirmText: i18n.t("priority_policies.confirm.remove"),
         confirmClass: "btn-danger",
     }).done(function () { apiDelete("/api/priority-policies/" + policy.id, refreshPriorityPolicies); });
 }
@@ -478,19 +478,19 @@ function updatePriorityPolicyBehaviorHints() {
     const fallbackMode = $("#priority-policy-fallback-mode").val();
 
     const updateHints = {
-        raise_only: "New alerts may raise incident priority, but automatic processing will not lower it.",
-        recalculate: "Incident priority is recalculated from all active child alerts and may increase or decrease.",
-        initial_only: "The policy selects priority only when the incident is created.",
+        raise_only: i18n.t("priority_policies.hints.raise_only"),
+        recalculate: i18n.t("priority_policies.hints.recalculate"),
+        initial_only: i18n.t("priority_policies.hints.initial_only"),
     };
 
     const sourceHints = {
-        ignore: "Policy rules are evaluated before fallback. Explicit priority from the source is ignored.",
-        prefer: "A valid explicit source priority is selected before policy rules.",
+        ignore: i18n.t("priority_policies.hints.source_ignore"),
+        prefer: i18n.t("priority_policies.hints.source_prefer"),
     };
 
     const fallbackHints = {
-        severity_mapping: "When no rule matches, alert severity is mapped to the configured incident priorities.",
-        fixed_priority: "When no rule matches, the selected fixed priority is used.",
+        severity_mapping: i18n.t("priority_policies.hints.fallback_severity"),
+        fixed_priority: i18n.t("priority_policies.hints.fallback_fixed"),
     };
 
     $("#priority-policy-update-mode-hint").text(updateHints[updateMode] || "");
@@ -521,27 +521,27 @@ function getPriorityPolicyRuleMatcherPreset(rule) {
 
 function priorityPolicyMatcherPresetHint(preset) {
     if (!preset) {
-        return "No preset selected. Only the additional matchers below will be evaluated.";
+        return i18n.t("priority_policies.preset.none_hint");
     }
 
     if (!preset.enabled) {
-        return "This preset is disabled. The rule will not match until the preset is enabled.";
+        return i18n.t("priority_policies.preset.disabled_hint");
     }
 
-    return "Preset \"" + preset.name + "\" v" + Number(preset.version || 1) + " and the additional matchers must both match.";
+    return i18n.t("priority_policies.preset.active_hint", {name: preset.name, version: Number(preset.version || 1)});
 }
 
 function loadPriorityPolicyRuleCards(policyId, callback) {
     const container = $("#priority-policy-rule-cards");
-    container.empty().append($("<div>").addClass("layer-card-loading").text("Loading rules..."));
+    container.empty().append($("<div>").addClass("layer-card-loading").text(i18n.t("priority_policies.rules.loading")));
 
     apiGet("/api/priority-policies/" + policyId, function (policy) {
         rememberPriorityPolicyInCache(policy);
         selectedPriorityPolicyRulesId = policy.id;
         priorityPolicyRulesCache = asArray(policy.rules).slice().sort(function (left, right) { return Number(left.position || 0) - Number(right.position || 0); });
 
-        $("#priority-policy-rules-title").text("Priority policy rules: " + policy.name);
-        $("#priority-policy-rules-subtitle").text((policy.team_slug || policy.team_name || "-") + " / " + (policy.enabled ? "Enabled" : "Disabled"));
+        $("#priority-policy-rules-title").text(i18n.t("priority_policies.rules.title_named", {name: policy.name}));
+        $("#priority-policy-rules-subtitle").text((policy.team_slug || policy.team_name || "-") + " / " + (policy.enabled ? i18n.t("priority_policies.status.enabled") : i18n.t("priority_policies.status.disabled")));
         renderPriorityPolicyRuleCards();
 
         if (typeof callback === "function") {
@@ -554,12 +554,12 @@ function openPriorityPolicyRulesModal(policyId, ruleIdToExpand) {
     const policy = getPriorityPolicyById(policyId);
 
     if (!policy) {
-        showAppError("Priority policy was not found.");
+        showAppError(i18n.t("priority_policies.errors.not_found"));
         return;
     }
 
     if (!canWriteObject(policy)) {
-        showAppError("You do not have permission to manage policy rules.", "Access denied");
+        showAppError(i18n.t("priority_policies.permissions.manage_rules"), i18n.t("priority_policies.errors.access_denied"));
         return;
     }
 
@@ -569,7 +569,7 @@ function openPriorityPolicyRulesModal(policyId, ruleIdToExpand) {
     expandedPriorityPolicyRuleId = ruleIdToExpand || null;
     unsavedPriorityPolicyRuleCounter = 0;
 
-    $("#priority-policy-rules-title").text("Priority policy rules: " + policy.name);
+    $("#priority-policy-rules-title").text(i18n.t("priority_policies.rules.title_named", {name: policy.name}));
     $("#priority-policy-rules-subtitle").text(policy.team_slug || policy.team_name || "-");
     openAppModal("#priority-policy-rules-modal");
 
@@ -583,7 +583,7 @@ function closePriorityPolicyRulesModal() {
     priorityPolicyMatcherPresetsCache = [];
     expandedPriorityPolicyRuleId = null;
     unsavedPriorityPolicyRuleCounter = 0;
-    $("#priority-policy-rule-cards").empty().append($("<div>").addClass("empty-cell").text("No policy selected"));
+    $("#priority-policy-rule-cards").empty().append($("<div>").addClass("empty-cell").text(i18n.t("priority_policies.rules.none_selected")));
 }
 
 function getNextPriorityPolicyRulePosition() {
@@ -597,7 +597,7 @@ function createUnsavedPriorityPolicyRule() {
 
     return {
         id: "new-" + unsavedPriorityPolicyRuleCounter,
-        name: "Rule " + position,
+        name: i18n.t("priority_policies.rules.default_name", {position: position}),
         description: "",
         position: position,
         matchers: {},
@@ -611,7 +611,7 @@ function createUnsavedPriorityPolicyRule() {
 
 function addPriorityPolicyRule() {
     if (!selectedPriorityPolicyRulesId) {
-        showAppError("Select a priority policy first.");
+        showAppError(i18n.t("priority_policies.validation.policy_first"));
         return;
     }
 
@@ -629,19 +629,19 @@ function addPriorityPolicyRule() {
 
 function formatPriorityPolicyRulePriority(rule) {
     const priority = rule.priority || getPriorityPolicyPriorityById(rule.priority_id);
-    return priority ? priority.name + " (" + priority.slug + ")" : "No priority";
+    return priority ? priority.name + " (" + priority.slug + ")" : i18n.t("priority_policies.rules.no_priority");
 }
 
 function formatPriorityPolicyRuleMatchers(rule) {
     const preset = getPriorityPolicyRuleMatcherPreset(rule);
     const matchers = rule.matchers || {};
-    const localMatchers = Object.keys(matchers).length ? JSON.stringify(matchers) : "All alerts";
+    const localMatchers = Object.keys(matchers).length ? JSON.stringify(matchers) : i18n.t("priority_policies.rules.all_alerts");
 
     if (!preset) {
         return localMatchers;
     }
 
-    return preset.name + " · v" + Number(preset.version || 1) + (preset.enabled ? "" : " · Disabled") + " AND " + localMatchers;
+    return preset.name + " · v" + Number(preset.version || 1) + (preset.enabled ? "" : " · " + i18n.t("priority_policies.rules.disabled_suffix")) + " AND " + localMatchers;
 }
 
 function renderPriorityPolicyRuleCards() {
@@ -649,7 +649,7 @@ function renderPriorityPolicyRuleCards() {
     container.empty();
 
     if (!priorityPolicyRulesCache.length) {
-        container.append($("<div>").addClass("empty-cell").text("No rules. Add the first rule to assign incident priority."));
+        container.append($("<div>").addClass("empty-cell").text(i18n.t("priority_policies.rules.none")));
         return;
     }
 
@@ -679,21 +679,21 @@ function renderPriorityPolicyRuleHeader(rule, number) {
     header.append($("<div>").addClass("rotation-layer-number").text(number));
     header.append(
         $("<div>").addClass("rotation-layer-title")
-            .append($("<strong>").text(rule.name + (unsaved ? " · unsaved" : "")))
+            .append($("<strong>").text(rule.name + (unsaved ? " · " + i18n.t("priority_policies.rules.unsaved") : "")))
             .append($("<span>").text(formatPriorityPolicyRulePriority(rule)))
     );
 
-    actions.append($("<button>").attr("type", "button").addClass("btn btn-small").text(expanded ? "Collapse" : "Edit").on("click", function () { togglePriorityPolicyRuleEditor(rule.id); }));
-    actions.append($("<button>").attr("type", "button").addClass("btn btn-danger btn-small").text(unsaved ? "Remove" : "Delete").on("click", function () { deletePriorityPolicyRule(rule.id); }));
+    actions.append($("<button>").attr("type", "button").addClass("btn btn-small").text(expanded ? i18n.t("priority_policies.actions.collapse") : i18n.t("priority_policies.actions.edit")).on("click", function () { togglePriorityPolicyRuleEditor(rule.id); }));
+    actions.append($("<button>").attr("type", "button").addClass("btn btn-danger btn-small").text(unsaved ? i18n.t("priority_policies.actions.remove") : i18n.t("priority_policies.actions.delete")).on("click", function () { deletePriorityPolicyRule(rule.id); }));
     header.append(actions);
     return header;
 }
 
 function renderPriorityPolicyRuleSummary(rule) {
     return $("<div>").addClass("rotation-layer-summary")
-        .append($("<div>").addClass("rotation-layer-summary-item").append($("<span>").text("Priority")).append($("<strong>").text(formatPriorityPolicyRulePriority(rule))))
-        .append($("<div>").addClass("rotation-layer-summary-item").append($("<span>").text("Matchers")).append($("<strong>").text(formatPriorityPolicyRuleMatchers(rule))))
-        .append($("<div>").addClass("rotation-layer-summary-item").append($("<span>").text("Status")).append($("<strong>").text(rule.enabled ? "Enabled" : "Disabled")));
+        .append($("<div>").addClass("rotation-layer-summary-item").append($("<span>").text(i18n.t("priority_policies.rules.priority"))).append($("<strong>").text(formatPriorityPolicyRulePriority(rule))))
+        .append($("<div>").addClass("rotation-layer-summary-item").append($("<span>").text(i18n.t("priority_policies.rules.matchers"))).append($("<strong>").text(formatPriorityPolicyRuleMatchers(rule))))
+        .append($("<div>").addClass("rotation-layer-summary-item").append($("<span>").text(i18n.t("priority_policies.rules.status"))).append($("<strong>").text(rule.enabled ? i18n.t("priority_policies.status.enabled") : i18n.t("priority_policies.status.disabled"))));
 }
 
 function priorityPolicyRuleFieldId(ruleId, field) {
@@ -733,7 +733,7 @@ function priorityPolicyRulePriorityField(rule) {
     select.val(rule.priority_id ? String(rule.priority_id) : "");
 
     return $("<div>").addClass("app-field layer-settings-col-4")
-        .append($("<label>").attr("for", id).text("Incident priority"))
+        .append($("<label>").attr("for", id).text(i18n.t("priority_policies.rules.incident_priority")))
         .append(select);
 }
 
@@ -743,11 +743,11 @@ function priorityPolicyRuleMatcherPresetField(rule) {
     const selectedPresetId = rule.matcher_preset_id || (rule.matcher_preset ? rule.matcher_preset.id : null);
     const select = $("<select>").attr("id", id).attr("data-rule-id", rule.id).addClass("input priority-policy-rule-matcher-preset");
 
-    select.append($("<option>").val("").text("No preset"));
+    select.append($("<option>").val("").text(i18n.t("priority_policies.rules.no_preset")));
 
     priorityPolicyMatcherPresetsCache.forEach(function (preset) {
         const selected = Number(preset.id) === Number(selectedPresetId);
-        const label = preset.name + " · v" + Number(preset.version || 1) + (preset.enabled ? "" : " · Disabled");
+        const label = preset.name + " · v" + Number(preset.version || 1) + (preset.enabled ? "" : " · " + i18n.t("priority_policies.rules.disabled_suffix"));
         const option = $("<option>").val(String(preset.id)).text(label);
 
         if (!preset.enabled && !selected) {
@@ -761,7 +761,7 @@ function priorityPolicyRuleMatcherPresetField(rule) {
     const preset = getPriorityPolicyMatcherPresetById(selectedPresetId) || rule.matcher_preset || null;
 
     return $("<div>").addClass("app-field layer-settings-col-4")
-        .append($("<label>").attr("for", id).text("Matcher preset"))
+        .append($("<label>").attr("for", id).text(i18n.t("priority_policies.rules.matcher_preset")))
         .append(select)
         .append($("<div>").attr("id", hintId).addClass("help-text").text(priorityPolicyMatcherPresetHint(preset)));
 }
@@ -770,8 +770,8 @@ function priorityPolicyRuleMatchersField(rule) {
     return createMatcherEditor({
         id: priorityPolicyRuleFieldId(rule.id, "matchers"),
         value: rule.matchers || {},
-        label: "Additional matchers",
-        helpText: "Use {} to rely only on the selected preset. Preset and additional matchers use AND.",
+        label: i18n.t("priority_policies.rules.additional_matchers"),
+        helpText: i18n.t("priority_policies.rules.additional_help"),
         context: function () {
             const policy = getPriorityPolicyById(selectedPriorityPolicyRulesId);
             const matcherPresetId = Number($("#" + priorityPolicyRuleFieldId(rule.id, "matcher-preset")).val()) || null;
@@ -792,12 +792,12 @@ function renderPriorityPolicyRuleEditor(rule) {
     const section = $("<section>").addClass("layer-editor-section");
     const grid = $("<div>").addClass("layer-settings-grid");
 
-    section.append($("<h4>").text("Rule settings"));
-    section.append($("<div>").addClass("layer-editor-section-subtitle").text("The first matching enabled rule selects its incident priority."));
+    section.append($("<h4>").text(i18n.t("priority_policies.rules.settings")));
+    section.append($("<div>").addClass("layer-editor-section-subtitle").text(i18n.t("priority_policies.rules.settings_help")));
 
-    grid.append(priorityPolicyRuleTextField(rule, "name", "Name", rule.name, "layer-settings-col-6"));
-    grid.append(priorityPolicyRuleNumberField(rule, "position", "Position", rule.position, "layer-settings-col-2"));
-    grid.append(priorityPolicyRuleCheckbox(rule, "enabled", "Enabled", rule.enabled !== false, "layer-settings-col-4"));
+    grid.append(priorityPolicyRuleTextField(rule, "name", i18n.t("priority_policies.rules.name"), rule.name, "layer-settings-col-6"));
+    grid.append(priorityPolicyRuleNumberField(rule, "position", i18n.t("priority_policies.rules.position"), rule.position, "layer-settings-col-2"));
+    grid.append(priorityPolicyRuleCheckbox(rule, "enabled", i18n.t("priority_policies.rules.enabled"), rule.enabled !== false, "layer-settings-col-4"));
     grid.append(priorityPolicyRulePriorityField(rule));
     grid.append(priorityPolicyRuleMatcherPresetField(rule));
 
@@ -805,7 +805,7 @@ function renderPriorityPolicyRuleEditor(rule) {
 
     grid.append(
         $("<div>").addClass("app-field layer-settings-col-12")
-            .append($("<label>").attr("for", descriptionId).text("Description"))
+            .append($("<label>").attr("for", descriptionId).text(i18n.t("priority_policies.rules.description")))
             .append($("<textarea>").attr("id", descriptionId).attr("rows", "3").addClass("input").val(rule.description || ""))
     );
 
@@ -814,8 +814,8 @@ function renderPriorityPolicyRuleEditor(rule) {
 
     section.append(
         $("<div>").addClass("layer-editor-actions")
-            .append($("<button>").attr("type", "button").addClass("btn btn-primary btn-small").text("Save rule").on("click", function () { savePriorityPolicyRule(rule.id); }))
-            .append($("<button>").attr("type", "button").addClass("btn btn-danger btn-small").text("Delete rule").on("click", function () { deletePriorityPolicyRule(rule.id); }))
+            .append($("<button>").attr("type", "button").addClass("btn btn-primary btn-small").text(i18n.t("priority_policies.actions.save_rule")).on("click", function () { savePriorityPolicyRule(rule.id); }))
+            .append($("<button>").attr("type", "button").addClass("btn btn-danger btn-small").text(i18n.t("priority_policies.actions.delete_rule")).on("click", function () { deletePriorityPolicyRule(rule.id); }))
     );
 
     editor.append(section);
@@ -840,12 +840,12 @@ function savePriorityPolicyRule(ruleId) {
     const payload = collectPriorityPolicyRulePayload(ruleId);
 
     if (!String(payload.name || "").trim()) {
-        showAppError("Rule name is required.");
+        showAppError(i18n.t("priority_policies.validation.rule_name_required"));
         return;
     }
 
     if (!payload.priority_id) {
-        showAppError("Select an incident priority.");
+        showAppError(i18n.t("priority_policies.validation.priority_required"));
         return;
     }
 
@@ -884,9 +884,9 @@ function deletePriorityPolicyRule(ruleId) {
     }
 
     showAppConfirm({
-        title: "Delete this priority rule?",
-        message: "Delete priority policy rule #" + ruleId + "?",
-        confirmText: "Delete rule",
+        title: i18n.t("priority_policies.confirm.delete_rule_title"),
+        message: i18n.t("priority_policies.confirm.delete_rule_message", {id: ruleId}),
+        confirmText: i18n.t("priority_policies.confirm.delete_rule"),
         confirmClass: "btn-danger",
     }).done(function () {
         apiDelete("/api/priority-policies/" + selectedPriorityPolicyRulesId + "/rules/" + ruleId, function () {

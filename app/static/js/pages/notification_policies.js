@@ -74,7 +74,7 @@ function getNotificationPolicySearchText(policy) {
         policy.description,
         policy.team_name,
         policy.team_slug,
-        policy.enabled ? "enabled" : "disabled",
+        policy.enabled ? i18n.t("notification_policies.status.enabled") : i18n.t("notification_policies.status.disabled"),
     ].join(" ").toLowerCase();
 }
 
@@ -118,7 +118,7 @@ function renderNotificationPoliciesTable() {
                 $("<td>")
                     .attr("colspan", "6")
                     .addClass("empty-cell")
-                    .text("No notification policies")
+                    .text(i18n.t("notification_policies.empty.found"))
             )
         );
         return;
@@ -148,7 +148,7 @@ function renderNotificationPolicyRow(policy) {
             .append(
                 $("<div>")
                     .addClass("row-subtitle")
-                    .text(policy.description || "Policy #" + policy.id)
+                    .text(policy.description || i18n.t("notification_policies.table.policy") + " #" + policy.id)
             )
     );
 
@@ -164,7 +164,7 @@ function renderNotificationPolicyRow(policy) {
     row.append($("<td>").text(policy.services_count || 0));
     row.append(
         $("<td>").append(
-            renderStatusBadge(policy.enabled, "Enabled", "Disabled")
+            renderStatusBadge(policy.enabled, i18n.t("notification_policies.status.enabled"), i18n.t("notification_policies.status.disabled"))
         )
     );
 
@@ -182,39 +182,39 @@ function renderNotificationPolicyActions(policy) {
         object: policy,
         items: [
             {
-                label: "Edit",
+                label: i18n.t("notification_policies.actions.edit"),
                 icon: "fas fa-edit",
                 required: "write",
-                denyMessage: "Team manager role is required to edit this policy.",
+                denyMessage: i18n.t("notification_policies.permissions.edit"),
                 onClick: function () {
                     editNotificationPolicy(policy.id);
                 },
             },
             {
-                label: "Rules",
+                label: i18n.t("notification_policies.actions.rules"),
                 icon: "fas fa-list",
                 required: "write",
-                denyMessage: "Team manager role is required to manage policy rules.",
+                denyMessage: i18n.t("notification_policies.permissions.rules"),
                 onClick: function () {
                     openNotificationPolicyRulesModal(policy.id);
                 },
             },
             {
-                label: policy.enabled ? "Disable" : "Enable",
+                label: policy.enabled ? i18n.t("notification_policies.actions.disable") : i18n.t("notification_policies.actions.enable"),
                 icon: policy.enabled ? "fas fa-pause" : "fas fa-play",
                 required: "write",
                 danger: policy.enabled,
-                denyMessage: "Team manager role is required to update this policy.",
+                denyMessage: i18n.t("notification_policies.permissions.update"),
                 onClick: function () {
                     setNotificationPolicyEnabled(policy, !policy.enabled);
                 },
             },
             {
-                label: "Remove",
+                label: i18n.t("notification_policies.actions.remove"),
                 icon: "fas fa-trash",
                 required: "delete",
                 danger: true,
-                denyMessage: "Delete permission is required to remove this policy.",
+                denyMessage: i18n.t("notification_policies.permissions.remove"),
                 onClick: function () {
                     removeNotificationPolicy(policy);
                 },
@@ -236,7 +236,7 @@ function renderNotificationPolicyDetails(policy, options) {
     $("#notification-policy-details-subtitle").text(
         (policy.team_slug || policy.team_name || "-")
         + " / "
-        + (policy.enabled ? "Enabled" : "Disabled")
+        + (policy.enabled ? i18n.t("notification_policies.status.enabled") : i18n.t("notification_policies.status.disabled"))
     );
 
     const body = $("#notification-policy-details-body");
@@ -245,35 +245,35 @@ function renderNotificationPolicyDetails(policy, options) {
     body.append(
         $("<div>")
             .addClass("details-list")
-            .append(notificationPolicyDetailsItem("Name", policy.name))
+            .append(notificationPolicyDetailsItem(i18n.t("notification_policies.details.name"), policy.name))
             .append(
                 notificationPolicyDetailsItem(
-                    "Team",
+                    i18n.t("notification_policies.details.team"),
                     policy.team_slug || policy.team_name
                 )
             )
             .append(
                 notificationPolicyDetailsItem(
-                    "Description",
+                    i18n.t("notification_policies.details.description"),
                     policy.description
                 )
             )
             .append(
                 notificationPolicyDetailsItem(
-                    "Rules",
+                    i18n.t("notification_policies.details.rules"),
                     String(policy.rules_count || 0)
                 )
             )
             .append(
                 notificationPolicyDetailsItem(
-                    "Services",
+                    i18n.t("notification_policies.details.services"),
                     String(policy.services_count || 0)
                 )
             )
             .append(
                 notificationPolicyDetailsItem(
-                    "Status",
-                    policy.enabled ? "Enabled" : "Disabled"
+                    i18n.t("notification_policies.details.status"),
+                    policy.enabled ? i18n.t("notification_policies.status.enabled") : i18n.t("notification_policies.status.disabled")
                 )
             )
     );
@@ -283,7 +283,7 @@ function renderNotificationPolicyDetails(policy, options) {
     appendIconActionIfAllowed(actions, policy, {
         required: "write",
         icon: "fas fa-edit",
-        label: "Edit policy",
+        label: i18n.t("notification_policies.actions.edit_policy"),
         onClick: function () {
             editNotificationPolicy(policy.id);
         },
@@ -292,7 +292,7 @@ function renderNotificationPolicyDetails(policy, options) {
     appendIconActionIfAllowed(actions, policy, {
         required: "write",
         icon: "fas fa-list",
-        label: "Manage rules",
+        label: i18n.t("notification_policies.actions.manage_rules"),
         onClick: function () {
             openNotificationPolicyRulesModal(policy.id);
         },
@@ -301,7 +301,7 @@ function renderNotificationPolicyDetails(policy, options) {
     appendIconActionIfAllowed(actions, policy, {
         required: "write",
         icon: policy.enabled ? "fas fa-pause" : "fas fa-play",
-        label: policy.enabled ? "Disable policy" : "Enable policy",
+        label: policy.enabled ? i18n.t("notification_policies.actions.disable_policy") : i18n.t("notification_policies.actions.enable_policy"),
         className: policy.enabled ? "btn-warning" : "btn-success",
         onClick: function () {
             setNotificationPolicyEnabled(policy, !policy.enabled);
@@ -311,7 +311,7 @@ function renderNotificationPolicyDetails(policy, options) {
     appendIconActionIfAllowed(actions, policy, {
         required: "delete",
         icon: "fas fa-trash-alt",
-        label: "Remove policy",
+        label: i18n.t("notification_policies.actions.remove_policy"),
         className: "btn-danger",
         onClick: function () {
             removeNotificationPolicy(policy);
@@ -333,10 +333,10 @@ function renderNotificationPolicyDetails(policy, options) {
 function renderNotificationPolicyDetailsEmpty() {
     selectedNotificationPolicyDetailsId = null;
 
-    $("#notification-policy-details-subtitle").text("Select a policy");
+    $("#notification-policy-details-subtitle").text(i18n.t("notification_policies.details.select"));
     $("#notification-policy-details-body").html(
         '<div class="details-empty">'
-        + "Click a policy name to inspect its configuration."
+        + i18n.t("notification_policies.details.help")
         + "</div>"
     );
 }
@@ -436,22 +436,22 @@ function formatNotificationPolicyRuleMatcherPreset(rule) {
     const preset = getNotificationPolicyRuleMatcherPreset(rule);
 
     if (!preset) {
-        return "No preset";
+        return i18n.t("notification_policies.rules.no_preset");
     }
 
-    return preset.name + " · v" + Number(preset.version || 1) + (preset.enabled ? "" : " · Disabled");
+    return preset.name + " · v" + Number(preset.version || 1) + (preset.enabled ? "" : " · " + i18n.t("notification_policies.status.disabled"));
 }
 
 function notificationPolicyMatcherPresetHint(preset) {
     if (!preset) {
-        return "No preset selected. Only the local matchers below will be evaluated.";
+        return i18n.t("notification_policies.rules.no_preset_help");
     }
 
     if (!preset.enabled) {
-        return "This preset is disabled. The rule will not match until the preset is enabled.";
+        return i18n.t("notification_policies.rules.preset_disabled_help");
     }
 
-    return "Preset \"" + preset.name + "\" v" + Number(preset.version || 1) + " and the local matchers must both match.";
+    return i18n.t("notification_policies.rules.preset_match_help", {name: preset.name, version: Number(preset.version || 1)});
 }
 
 function loadNotificationPolicyRuleCards(policyId, callback) {
@@ -462,7 +462,7 @@ function loadNotificationPolicyRuleCards(policyId, callback) {
         .append(
             $("<div>")
                 .addClass("layer-card-loading")
-                .text("Loading rules...")
+                .text(i18n.t("notification_policies.rules.loading"))
         );
 
     apiGet("/api/notification-policies/" + policyId, function (policy) {
@@ -477,13 +477,13 @@ function loadNotificationPolicyRuleCards(policyId, callback) {
             });
 
         $("#notification-policy-rules-title").text(
-            "Notification policy rules: " + policy.name
+            i18n.t("notification_policies.rules.title_named", {name: policy.name})
         );
 
         $("#notification-policy-rules-subtitle").text(
             (policy.team_slug || policy.team_name || "-")
             + " / "
-            + (policy.enabled ? "Enabled" : "Disabled")
+            + (policy.enabled ? i18n.t("notification_policies.status.enabled") : i18n.t("notification_policies.status.disabled"))
         );
 
         renderNotificationPolicyRuleCards();
@@ -498,14 +498,14 @@ function openNotificationPolicyRulesModal(policyId, ruleIdToExpand) {
     const policy = getNotificationPolicyById(policyId);
 
     if (!policy) {
-        showAppError("Notification policy was not found.");
+        showAppError(i18n.t("notification_policies.errors.not_found"));
         return;
     }
 
     if (!canWriteObject(policy)) {
         showAppError(
-            "You do not have permission to manage policy rules.",
-            "Access denied"
+            i18n.t("notification_policies.permissions.no_manage"),
+            i18n.t("notification_policies.errors.access_denied")
         );
         return;
     }
@@ -518,7 +518,7 @@ function openNotificationPolicyRulesModal(policyId, ruleIdToExpand) {
     unsavedNotificationPolicyRuleCounter = 0;
 
     $("#notification-policy-rules-title").text(
-        "Notification policy rules: " + policy.name
+        i18n.t("notification_policies.rules.title_named", {name: policy.name})
     );
 
     $("#notification-policy-rules-subtitle").text(
@@ -549,7 +549,7 @@ function closeNotificationPolicyRulesModal() {
         .append(
             $("<div>")
                 .addClass("empty-cell")
-                .text("No policy selected")
+                .text(i18n.t("notification_policies.rules.no_policy"))
         );
 }
 
@@ -566,7 +566,7 @@ function createUnsavedNotificationPolicyRule() {
 
     return {
         id: "new-" + unsavedNotificationPolicyRuleCounter,
-        name: "Rule " + position,
+        name: i18n.t("notification_policies.rules.default_name", {position: position}),
         description: "",
         position: position,
         event_types: [
@@ -586,7 +586,7 @@ function createUnsavedNotificationPolicyRule() {
 
 function addNotificationPolicyRule() {
     if (!selectedNotificationPolicyRulesId) {
-        showAppError("Select a notification policy first.");
+        showAppError(i18n.t("notification_policies.errors.select_policy"));
         return;
     }
 
@@ -615,31 +615,31 @@ function getNotificationPolicyChannelName(channelId) {
 
     return channel
         ? channel.name + " (" + channel.channel_type + ")"
-        : "Channel #" + channelId;
+        : i18n.t("notification_policies.rules.channel_number", {id: channelId});
 }
 
 function formatNotificationPolicyRuleEvents(rule) {
     const labels = {
-        notification: "Notification",
-        reminder: "Reminder",
-        escalation: "Escalation",
+        notification: i18n.t("notification_policies.rules.notification"),
+        reminder: i18n.t("notification_policies.rules.reminder"),
+        escalation: i18n.t("notification_policies.rules.escalation"),
     };
 
     return asArray(rule.event_types).map(function (eventType) {
         return labels[eventType] || eventType;
-    }).join(", ") || "No events";
+    }).join(", ") || i18n.t("notification_policies.rules.no_events");
 }
 
 function formatNotificationPolicyRuleChannels(rule) {
     return asArray(rule.channel_ids).map(function (channelId) {
         return getNotificationPolicyChannelName(channelId);
-    }).join(", ") || "No channels";
+    }).join(", ") || i18n.t("notification_policies.rules.no_channels");
 }
 
 function formatNotificationPolicyRuleMatchers(rule) {
     const preset = getNotificationPolicyRuleMatcherPreset(rule);
     const matchers = rule.matchers || {};
-    const localMatchers = Object.keys(matchers).length ? JSON.stringify(matchers) : "All alerts";
+    const localMatchers = Object.keys(matchers).length ? JSON.stringify(matchers) : i18n.t("notification_policies.rules.all_alerts");
 
     if (!preset) {
         return localMatchers;
@@ -657,7 +657,7 @@ function renderNotificationPolicyRuleCards() {
             $("<div>")
                 .addClass("empty-cell")
                 .text(
-                    "No rules. Add the first rule to select notification channels."
+                    i18n.t("notification_policies.rules.no_rules")
                 )
         );
         return;
@@ -712,7 +712,7 @@ function renderNotificationPolicyRuleHeader(rule, number) {
             .append(
                 $("<strong>").text(
                     rule.name
-                    + (unsaved ? " · unsaved" : "")
+                    + (unsaved ? " · " + i18n.t("notification_policies.rules.unsaved") : "")
                 )
             )
             .append(
@@ -728,7 +728,7 @@ function renderNotificationPolicyRuleHeader(rule, number) {
         $("<button>")
             .attr("type", "button")
             .addClass("btn btn-small")
-            .text(expanded ? "Collapse" : "Edit")
+            .text(expanded ? i18n.t("notification_policies.actions.collapse") : i18n.t("notification_policies.actions.edit"))
             .on("click", function () {
                 toggleNotificationPolicyRuleEditor(rule.id);
             })
@@ -738,7 +738,7 @@ function renderNotificationPolicyRuleHeader(rule, number) {
         $("<button>")
             .attr("type", "button")
             .addClass("btn btn-danger btn-small")
-            .text(unsaved ? "Remove" : "Delete")
+            .text(unsaved ? i18n.t("notification_policies.actions.remove") : i18n.t("notification_policies.actions.delete"))
             .on("click", function () {
                 deleteNotificationPolicyRule(rule.id);
             })
@@ -755,7 +755,7 @@ function renderNotificationPolicyRuleSummary(rule) {
         .append(
             $("<div>")
                 .addClass("rotation-layer-summary-item")
-                .append($("<span>").text("Events"))
+                .append($("<span>").text(i18n.t("notification_policies.rules.events")))
                 .append(
                     $("<strong>").text(
                         formatNotificationPolicyRuleEvents(rule)
@@ -765,7 +765,7 @@ function renderNotificationPolicyRuleSummary(rule) {
         .append(
             $("<div>")
                 .addClass("rotation-layer-summary-item")
-                .append($("<span>").text("Matchers"))
+                .append($("<span>").text(i18n.t("notification_policies.rules.matchers")))
                 .append(
                     $("<strong>").text(
                         formatNotificationPolicyRuleMatchers(rule)
@@ -775,10 +775,10 @@ function renderNotificationPolicyRuleSummary(rule) {
         .append(
             $("<div>")
                 .addClass("rotation-layer-summary-item")
-                .append($("<span>").text("Status"))
+                .append($("<span>").text(i18n.t("notification_policies.rules.status")))
                 .append(
                     $("<strong>").text(
-                        rule.enabled ? "Enabled" : "Disabled"
+                        rule.enabled ? i18n.t("notification_policies.status.enabled") : i18n.t("notification_policies.status.disabled")
                     )
                 )
         );
@@ -891,12 +891,12 @@ function notificationPolicyRuleChannelsField(rule) {
 
     return $("<div>")
         .addClass("app-field layer-settings-col-12")
-        .append($("<label>").attr("for", id).text("Channels"))
+        .append($("<label>").attr("for", id).text(i18n.t("notification_policies.rules.channels")))
         .append(select)
         .append(
             $("<div>")
                 .addClass("help-text")
-                .text("Enabled rules require at least one channel.")
+                .text(i18n.t("notification_policies.rules.channels_help"))
         );
 }
 
@@ -906,11 +906,11 @@ function notificationPolicyRuleMatcherPresetField(rule) {
     const selectedPresetId = rule.matcher_preset_id || (rule.matcher_preset ? rule.matcher_preset.id : null);
     const select = $("<select>").attr("id", id).attr("data-rule-id", rule.id).addClass("input notification-policy-rule-matcher-preset");
 
-    select.append($("<option>").val("").text("No preset"));
+    select.append($("<option>").val("").text(i18n.t("notification_policies.rules.no_preset")));
 
     notificationPolicyMatcherPresetsCache.forEach(function (preset) {
         const selected = Number(preset.id) === Number(selectedPresetId);
-        const label = preset.name + " · v" + Number(preset.version || 1) + (preset.enabled ? "" : " · Disabled");
+        const label = preset.name + " · v" + Number(preset.version || 1) + (preset.enabled ? "" : " · " + i18n.t("notification_policies.status.disabled"));
         const option = $("<option>").val(String(preset.id)).text(label);
 
         if (!preset.enabled && !selected) {
@@ -925,7 +925,7 @@ function notificationPolicyRuleMatcherPresetField(rule) {
     const preset = getNotificationPolicyMatcherPresetById(selectedPresetId) || rule.matcher_preset || null;
 
     return $("<div>").addClass("app-field layer-settings-col-12")
-        .append($("<label>").attr("for", id).text("Matcher preset"))
+        .append($("<label>").attr("for", id).text(i18n.t("notification_policies.rules.matcher_preset")))
         .append(select)
         .append($("<div>").attr("id", hintId).addClass("help-text").text(notificationPolicyMatcherPresetHint(preset)));
 }
@@ -935,13 +935,13 @@ function renderNotificationPolicyRuleEditor(rule) {
     const section = $("<section>").addClass("layer-editor-section");
     const grid = $("<div>").addClass("layer-settings-grid");
 
-    section.append($("<h4>").text("Rule settings"));
+    section.append($("<h4>").text(i18n.t("notification_policies.rules.settings")));
 
     section.append(
         $("<div>")
             .addClass("layer-editor-section-subtitle")
             .text(
-                "Configure events, matchers and shared notification channels."
+                i18n.t("notification_policies.rules.settings_help")
             )
     );
 
@@ -949,7 +949,7 @@ function renderNotificationPolicyRuleEditor(rule) {
         notificationPolicyRuleTextField(
             rule,
             "name",
-            "Name",
+            i18n.t("notification_policies.rules.name"),
             rule.name,
             "layer-settings-col-6"
         )
@@ -959,7 +959,7 @@ function renderNotificationPolicyRuleEditor(rule) {
         notificationPolicyRuleNumberField(
             rule,
             "position",
-            "Position",
+            i18n.t("notification_policies.rules.position"),
             rule.position,
             "layer-settings-col-2"
         )
@@ -969,7 +969,7 @@ function renderNotificationPolicyRuleEditor(rule) {
         notificationPolicyRuleCheckbox(
             rule,
             "enabled",
-            "Enabled",
+            i18n.t("notification_policies.rules.enabled"),
             rule.enabled !== false,
             "layer-settings-col-4"
         )
@@ -981,7 +981,7 @@ function renderNotificationPolicyRuleEditor(rule) {
     grid.append(
         $("<div>")
             .addClass("app-field layer-settings-col-12")
-            .append($("<label>").text("Event types"))
+            .append($("<label>").text(i18n.t("notification_policies.rules.event_types")))
             .append(
                 $("<div>")
                     .addClass("checkbox-grid")
@@ -989,21 +989,21 @@ function renderNotificationPolicyRuleEditor(rule) {
                         notificationPolicyRuleEventCheckbox(
                             rule,
                             "notification",
-                            "Notification"
+                            i18n.t("notification_policies.rules.notification")
                         )
                     )
                     .append(
                         notificationPolicyRuleEventCheckbox(
                             rule,
                             "reminder",
-                            "Reminder"
+                            i18n.t("notification_policies.rules.reminder")
                         )
                     )
                     .append(
                         notificationPolicyRuleEventCheckbox(
                             rule,
                             "escalation",
-                            "Escalation"
+                            i18n.t("notification_policies.rules.escalation")
                         )
                     )
             )
@@ -1013,7 +1013,7 @@ function renderNotificationPolicyRuleEditor(rule) {
         notificationPolicyRuleCheckbox(
             rule,
             "continue-matching",
-            "Continue matching after this rule",
+            i18n.t("notification_policies.rules.continue_matching"),
             rule.continue_matching,
             "layer-settings-col-12"
         )
@@ -1028,7 +1028,7 @@ function renderNotificationPolicyRuleEditor(rule) {
         $("<div>")
             .addClass("app-field layer-settings-col-12")
             .append(
-                $("<label>").attr("for", descriptionId).text("Description")
+                $("<label>").attr("for", descriptionId).text(i18n.t("notification_policies.rules.description"))
             )
             .append(
                 $("<textarea>")
@@ -1043,8 +1043,8 @@ function renderNotificationPolicyRuleEditor(rule) {
         createMatcherEditor({
             id: notificationPolicyRuleFieldId(rule.id, "matchers"),
             value: rule.matchers || {},
-            label: "Additional matchers",
-            helpText: "Use {} to rely only on the selected preset. Preset and additional matchers use AND.",
+            label: i18n.t("notification_policies.rules.additional_matchers"),
+            helpText: i18n.t("notification_policies.rules.additional_matchers_help"),
             context: function () {
                 const policy = getNotificationPolicyById(selectedNotificationPolicyRulesId);
                 const matcherPresetId = Number($("#" + notificationPolicyRuleFieldId(rule.id, "matcher-preset")).val()) || null;
@@ -1069,7 +1069,7 @@ function renderNotificationPolicyRuleEditor(rule) {
                 $("<button>")
                     .attr("type", "button")
                     .addClass("btn btn-primary btn-small")
-                    .text("Save rule")
+                    .text(i18n.t("notification_policies.actions.save_rule"))
                     .on("click", function () {
                         saveNotificationPolicyRule(rule.id);
                     })
@@ -1078,7 +1078,7 @@ function renderNotificationPolicyRuleEditor(rule) {
                 $("<button>")
                     .attr("type", "button")
                     .addClass("btn btn-danger btn-small")
-                    .text("Delete rule")
+                    .text(i18n.t("notification_policies.actions.delete_rule"))
                     .on("click", function () {
                         deleteNotificationPolicyRule(rule.id);
                     })
@@ -1121,17 +1121,17 @@ function saveNotificationPolicyRule(ruleId) {
     const payload = collectNotificationPolicyRulePayload(ruleId);
 
     if (!String(payload.name || "").trim()) {
-        showAppError("Rule name is required.");
+        showAppError(i18n.t("notification_policies.errors.rule_name_required"));
         return;
     }
 
     if (!payload.event_types.length) {
-        showAppError("Select at least one event type.");
+        showAppError(i18n.t("notification_policies.errors.event_required"));
         return;
     }
 
     if (payload.enabled && !payload.channel_ids.length) {
-        showAppError("Enabled rule requires at least one channel.");
+        showAppError(i18n.t("notification_policies.errors.channel_required"));
         return;
     }
 
@@ -1197,9 +1197,9 @@ function deleteNotificationPolicyRule(ruleId) {
     }
 
     showAppConfirm({
-        title: "Delete this notification rule?",
-        message: "Delete notification policy rule #" + ruleId + "?",
-        confirmText: "Delete rule",
+        title: i18n.t("notification_policies.confirm.delete_rule_title"),
+        message: i18n.t("notification_policies.confirm.delete_rule_message", {id: ruleId}),
+        confirmText: i18n.t("notification_policies.actions.delete_rule"),
         confirmClass: "btn-danger",
     }).done(function () {
         apiDelete(
@@ -1267,7 +1267,7 @@ function saveNotificationPolicy() {
 
 function resetNotificationPolicyForm() {
     $("#notification-policy-form-title").text(
-        "Create notification policy"
+        i18n.t("notification_policies.form.create_title")
     );
     $("#notification-policy-id").val("");
     $("#notification-policy-name").val("");
@@ -1285,8 +1285,8 @@ function resetNotificationPolicyForm() {
 function openCreateNotificationPolicyModal() {
     if (!currentUserCanCreateUiObjects()) {
         showAppError(
-            "Write role is required to create notification policies.",
-            "Access denied"
+            i18n.t("notification_policies.permissions.create"),
+            i18n.t("notification_policies.errors.access_denied")
         );
         return;
     }
@@ -1299,20 +1299,20 @@ function editNotificationPolicy(policyId) {
     const policy = getNotificationPolicyById(policyId);
 
     if (!policy) {
-        showAppError("Notification policy was not found.");
+        showAppError(i18n.t("notification_policies.errors.not_found"));
         return;
     }
 
     if (!canWriteObject(policy)) {
         showAppError(
-            "You do not have permission to edit this policy.",
-            "Access denied"
+            i18n.t("notification_policies.permissions.no_edit"),
+            i18n.t("notification_policies.errors.access_denied")
         );
         return;
     }
 
     $("#notification-policy-form-title").text(
-        "Edit notification policy #" + policy.id
+        i18n.t("notification_policies.form.edit_title", {id: policy.id})
     );
     $("#notification-policy-id").val(policy.id);
     $("#notification-policy-team")
@@ -1333,8 +1333,8 @@ function editNotificationPolicy(policyId) {
 function setNotificationPolicyEnabled(policy, enabled) {
     if (!canWriteObject(policy)) {
         showAppError(
-            "You do not have permission to update this policy.",
-            "Access denied"
+            i18n.t("notification_policies.permissions.no_update"),
+            i18n.t("notification_policies.errors.access_denied")
         );
         return;
     }
@@ -1349,19 +1349,16 @@ function setNotificationPolicyEnabled(policy, enabled) {
 function removeNotificationPolicy(policy) {
     if (!canDeleteObject(policy)) {
         showAppError(
-            "You do not have permission to remove this policy.",
-            "Access denied"
+            i18n.t("notification_policies.permissions.no_remove"),
+            i18n.t("notification_policies.errors.access_denied")
         );
         return;
     }
 
     showAppConfirm({
-        title: "Remove this notification policy?",
-        message: (
-            "Remove policy '" + policy.name + "'? "
-            + "A policy assigned to a service cannot be removed."
-        ),
-        confirmText: "Remove policy",
+        title: i18n.t("notification_policies.confirm.remove_title"),
+        message: i18n.t("notification_policies.confirm.remove_message", {name: policy.name}),
+        confirmText: i18n.t("notification_policies.actions.remove_policy"),
         confirmClass: "btn-danger",
     }).done(function () {
         apiDelete(

@@ -3,45 +3,45 @@
     <div class="summary-card summary-primary">
       <div class="summary-icon">#</div>
       <div>
-        <div class="summary-title">Silences</div>
+        <div class="summary-title">{{ _('silences.summary.total') }}</div>
         <div id="silences-summary-total" class="summary-value">0</div>
-        <div class="summary-hint">Current scope</div>
+        <div class="summary-hint">{{ _('silences.summary.total_hint') }}</div>
       </div>
     </div>
 
     <div class="summary-card summary-success">
       <div class="summary-icon">✓</div>
       <div>
-        <div class="summary-title">Active now</div>
+        <div class="summary-title">{{ _('silences.summary.active') }}</div>
         <div id="silences-summary-active" class="summary-value">0</div>
-        <div class="summary-hint">Suppressing alerts</div>
+        <div class="summary-hint">{{ _('silences.summary.active_hint') }}</div>
       </div>
     </div>
 
     <div class="summary-card summary-info">
       <div class="summary-icon">⏱</div>
       <div>
-        <div class="summary-title">Scheduled</div>
+        <div class="summary-title">{{ _('silences.summary.scheduled') }}</div>
         <div id="silences-summary-scheduled" class="summary-value">0</div>
-        <div class="summary-hint">Starts later</div>
+        <div class="summary-hint">{{ _('silences.summary.scheduled_hint') }}</div>
       </div>
     </div>
 
     <div class="summary-card summary-muted">
       <div class="summary-icon">⌛</div>
       <div>
-        <div class="summary-title">Expired</div>
+        <div class="summary-title">{{ _('silences.summary.expired') }}</div>
         <div id="silences-summary-expired" class="summary-value">0</div>
-        <div class="summary-hint">Window ended</div>
+        <div class="summary-hint">{{ _('silences.summary.expired_hint') }}</div>
       </div>
     </div>
 
     <div class="summary-card summary-muted">
       <div class="summary-icon">×</div>
       <div>
-        <div class="summary-title">Disabled</div>
+        <div class="summary-title">{{ _('silences.summary.disabled') }}</div>
         <div id="silences-summary-disabled" class="summary-value">0</div>
-        <div class="summary-hint">Not applied</div>
+        <div class="summary-hint">{{ _('silences.summary.disabled_hint') }}</div>
       </div>
     </div>
   </div>
@@ -50,20 +50,20 @@
     <section class="card page-layout-main">
       <div class="card-header">
         <div>
-          <h2>Silence rules</h2>
+          <h2>{{ _('silences.list.title') }}</h2>
           <div class="card-subtitle">
-            Showing <span id="silences-filtered-count">0</span>
-            of <span id="silences-total-count">0</span> silences
+            {{ _('silences.list.showing') }} <span id="silences-filtered-count">0</span>
+            {{ _('silences.list.of') }} <span id="silences-total-count">0</span> {{ _('silences.list.silences') }}
           </div>
         </div>
 
         <div class="card-header-actions">
           <button id="open-silence-create-modal" type="button" class="btn btn-primary">
-            New silence
+            {{ _('silences.actions.new') }}
           </button>
 
           <button id="reload-silences" type="button" class="btn">
-            Reload
+            {{ _('silences.actions.reload') }}
           </button>
         </div>
       </div>
@@ -75,17 +75,17 @@
             id="silences-search"
             class="input"
             type="search"
-            placeholder="Search silences..."
+            placeholder="{{ _('silences.search.placeholder') }}"
             autocomplete="off"
           >
         </div>
 
         <select id="silences-status-filter" class="input page-toolbar-filter">
-          <option value="">All statuses</option>
-          <option value="active">Active now</option>
-          <option value="scheduled">Scheduled</option>
-          <option value="expired">Expired</option>
-          <option value="disabled">Disabled</option>
+          <option value="">{{ _('silences.filters.all_statuses') }}</option>
+          <option value="active">{{ _('silences.status.active') }}</option>
+          <option value="scheduled">{{ _('silences.status.scheduled') }}</option>
+          <option value="expired">{{ _('silences.status.expired') }}</option>
+          <option value="disabled">{{ _('silences.status.disabled') }}</option>
         </select>
       </div>
 
@@ -93,19 +93,19 @@
         <table class="data-table">
           <thead>
             <tr>
-              <th>Silence</th>
-              <th>Team</th>
-              <th>Reason</th>
-              <th>Window</th>
-              <th>Matching</th>
-              <th>Status</th>
-              <th class="actions-th">Actions</th>
+              <th>{{ _('silences.table.silence') }}</th>
+              <th>{{ _('silences.table.team') }}</th>
+              <th>{{ _('silences.table.reason') }}</th>
+              <th>{{ _('silences.table.window') }}</th>
+              <th>{{ _('silences.table.matching') }}</th>
+              <th>{{ _('silences.table.status') }}</th>
+              <th class="actions-th">{{ _('silences.table.actions') }}</th>
             </tr>
           </thead>
 
           <tbody id="silences-table">
             <tr>
-              <td colspan="7" class="empty-cell">No silences loaded</td>
+              <td colspan="7" class="empty-cell">{{ _('silences.empty.loaded') }}</td>
             </tr>
           </tbody>
         </table>
@@ -115,16 +115,16 @@
     <aside class="card page-details-card">
       <div class="card-header">
         <div>
-          <h2>Silence details</h2>
+          <h2>{{ _('silences.details.title') }}</h2>
           <div id="silence-details-subtitle" class="card-subtitle">
-            Select a silence
+            {{ _('silences.details.select') }}
           </div>
         </div>
       </div>
 
       <div id="silence-details-body" class="details-body">
         <div class="details-empty">
-          Click a silence name to inspect time window, reason and matchers.
+          {{ _('silences.details.select_help') }}
         </div>
       </div>
     </aside>
@@ -134,9 +134,9 @@
     <div class="app-modal-dialog app-modal-dialog-wide">
       <div class="app-modal-header">
         <div>
-          <h2 id="silence-form-title">Create silence</h2>
+          <h2 id="silence-form-title">{{ _('silences.form.create') }}</h2>
           <div class="card-subtitle">
-            Silence matching alerts for a selected team and time window.
+            {{ _('silences.form.subtitle') }}
           </div>
         </div>
 
@@ -144,7 +144,7 @@
           id="close-silence-form-modal"
           type="button"
           class="app-modal-close"
-          aria-label="Close"
+          aria-label="{{ _('common.close') }}"
         >
           ×
         </button>
@@ -155,9 +155,9 @@
           <section class="card">
             <div class="card-header">
               <div>
-                <h2>Silence</h2>
+                <h2>{{ _('silences.form.silence') }}</h2>
                 <div class="card-subtitle">
-                  Team, name, reason and active window.
+                  {{ _('silences.form.silence_help') }}
                 </div>
               </div>
             </div>
@@ -165,26 +165,26 @@
             <div class="form-body">
               <input id="silence-id" type="hidden">
 
-              <label for="silence-team">Team</label>
+              <label for="silence-team">{{ _('silences.form.team') }}</label>
               <select id="silence-team" class="input"></select>
 
-              <label for="silence-name">Name</label>
+              <label for="silence-name">{{ _('silences.form.name') }}</label>
               <input
                 id="silence-name"
                 class="input"
                 type="text"
-                placeholder="Maintenance window"
+                placeholder="{{ _('silences.form.name_placeholder') }}"
                 autocomplete="off"
               >
 
-              <label for="silence-reason">Reason</label>
+              <label for="silence-reason">{{ _('silences.form.reason') }}</label>
               <textarea
                 id="silence-reason"
                 class="input"
-                placeholder="Planned maintenance, noisy alert, temporary suppression..."
+                placeholder="{{ _('silences.form.reason_placeholder') }}"
               ></textarea>
 
-              <label for="silence-starts-at">Starts at</label>
+              <label for="silence-starts-at">{{ _('silences.form.starts_at') }}</label>
               <input
                 id="silence-starts-at"
                 class="input"
@@ -194,7 +194,7 @@
                 step="60"
               >
 
-              <label for="silence-ends-at">Ends at</label>
+              <label for="silence-ends-at">{{ _('silences.form.ends_at') }}</label>
               <input
                 id="silence-ends-at"
                 class="input"
@@ -209,29 +209,28 @@
           <section class="card">
             <div class="card-header">
               <div>
-                <h2>Matchers</h2>
+                <h2>{{ _('silences.form.matchers') }}</h2>
                 <div class="card-subtitle">
-                  JSON filters used to match alerts.
+                  {{ _('silences.form.matchers_help') }}
                 </div>
               </div>
             </div>
 
             <div class="form-body">
-                <label for="silence-matcher-preset">Matcher preset</label>
+                <label for="silence-matcher-preset">{{ _('silences.form.matcher_preset') }}</label>
                 <select id="silence-matcher-preset" class="input">
-                  <option value="">No preset</option>
+                  <option value="">{{ _('silences.form.no_preset') }}</option>
                 </select>
 
                 <div id="silence-matcher-preset-hint" class="help-text">
-                  No preset selected. Only the additional matchers below will be evaluated.
+                  {{ _('silences.form.no_preset_hint') }}
                 </div>
 
-                <label for="silence-matchers">Additional matchers JSON</label>
-              <label for="silence-matchers">Matchers JSON</label>
+              <label for="silence-matchers">{{ _('silences.form.additional_matchers_json') }}</label>
 
               <div class="json-editor">
                 <div class="json-editor-header">
-                  <span>Additional matchers</span>
+                  <span>{{ _('silences.form.additional_matchers') }}</span>
 
                 </div>
 
@@ -244,7 +243,7 @@
               </div>
 
               <div class="help-text">
-                  The preset and additional matchers are combined using AND. Empty {} means no additional conditions.
+                  {{ _('silences.form.additional_help') }}
                 </div>
             </div>
           </section>
@@ -253,11 +252,11 @@
 
       <div class="app-modal-footer">
         <button id="reset-silence-form" type="button" class="btn">
-          Reset
+          {{ _('silences.actions.reset') }}
         </button>
 
         <button id="save-silence" type="button" class="btn btn-primary">
-          Save silence
+          {{ _('silences.actions.save') }}
         </button>
       </div>
     </div>

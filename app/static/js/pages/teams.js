@@ -31,7 +31,7 @@ function loadTeamGroups(callback) {
             $("#team-group").append(
                 $("<option>")
                     .val("")
-                    .text("No groups available")
+                    .text(i18n.t("teams.empty.no_groups"))
             );
         }
         updateTeamCreateButtonState(groups);
@@ -104,7 +104,7 @@ function fillTeamsGroupFilter(teams) {
     });
 
     filter.empty();
-    filter.append($("<option>").val("").text("All groups"));
+    filter.append($("<option>").val("").text(i18n.t("teams.filters.all_groups")));
     Object.keys(groups).sort().forEach(function (groupSlug) {
         filter.append($("<option>").val(groupSlug).text(groupSlug));
     });
@@ -179,7 +179,7 @@ function renderTeamsTable() {
                 $("<td>")
                     .attr("colspan", "7")
                     .addClass("empty-cell")
-                    .text("No teams")
+                    .text(i18n.t("teams.empty.teams"))
             )
         );
         return;
@@ -213,7 +213,7 @@ function renderTeamRow(team) {
             .append(
                 $("<div>")
                     .addClass("row-subtitle")
-                    .text("Team #" + team.id)
+                    .text(i18n.t("teams.row.team_id", {id: team.id}))
             )
     );
     row.append(
@@ -229,7 +229,9 @@ function renderTeamRow(team) {
             $("<span>")
                 .addClass("status-pill")
                 .addClass(team.escalation_enabled ? "status-enabled" : "status-disabled")
-                .text(team.escalation_enabled ? "simple after " + (team.escalation_after_reminders || 0) : "Disabled")
+                .text(team.escalation_enabled
+                    ? i18n.t("teams.row.escalation_simple", {count: team.escalation_after_reminders || 0})
+                    : i18n.t("teams.status.disabled"))
         )
     );
     row.append(
@@ -242,7 +244,7 @@ function renderTeamRow(team) {
                     : $("<span>").text("?")
             )
     );
-    row.append($("<td>").append(renderStatusBadge(team.active, "Active", "Inactive")));
+    row.append($("<td>").append(renderStatusBadge(team.active, i18n.t("teams.status.active"), i18n.t("teams.status.inactive"))));
     row.append($("<td>").addClass("actions-cell").append(renderTeamActions(team)));
     return row;
 }
@@ -255,39 +257,39 @@ function renderTeamActions(team) {
         object: team,
         items: [
             {
-                label: "Edit",
+                label: i18n.t("teams.actions.edit"),
                 icon: "fas fa-edit",
                 required: "write",
-                denyMessage: "Team manager role is required to edit this team.",
+                denyMessage: i18n.t("teams.permissions.edit"),
                 onClick: function () {
                     editTeam(team.id);
                 }
             },
             {
-                label: "Members",
+                label: i18n.t("teams.actions.members"),
                 icon: "fas fa-users",
                 required: "manage_users",
-                denyMessage: "Team manager role is required to manage team members.",
+                denyMessage: i18n.t("teams.permissions.members"),
                 onClick: function () {
                     openTeamMembers(team.id, team.name);
                 }
             },
             {
-                label: team.active ? "Disable" : "Enable",
+                label: team.active ? i18n.t("teams.actions.disable") : i18n.t("teams.actions.enable"),
                 icon: team.active ? "fas fa-pause" : "fas fa-play",
                 required: "write",
                 danger: team.active,
-                denyMessage: "Team manager role is required to enable or disable this team.",
+                denyMessage: i18n.t("teams.permissions.toggle"),
                 onClick: function () {
                     setTeamActive(team, !team.active);
                 }
             },
             {
-                label: "Remove",
+                label: i18n.t("teams.actions.remove"),
                 icon: "fas fa-trash",
                 required: "delete",
                 danger: true,
-                denyMessage: "Delete permission is required to remove this team.",
+                denyMessage: i18n.t("teams.permissions.delete"),
                 onClick: function () {
                     removeTeam(team);
                 }
@@ -312,36 +314,36 @@ function renderTeamDetails(team) {
      */
     selectedTeamDetailsId = team.id;
 
-    $("#team-details-subtitle").text((team.group_slug || "-") + " / " + (team.active ? "Active" : "Inactive"));
+    $("#team-details-subtitle").text((team.group_slug || "-") + " / " + (team.active ? i18n.t("teams.status.active") : i18n.t("teams.status.inactive")));
 
     const body = $("#team-details-body").empty();
     body.append(
         $("<div>")
             .addClass("details-list")
-            .append(teamDetailsItem("Name", team.name))
-            .append(teamDetailsItem("Slug", team.slug))
-            .append(teamDetailsItem("Group", team.group_slug))
-            .append(teamDetailsItem("Description", team.description))
+            .append(teamDetailsItem(i18n.t("teams.details.name"), team.name))
+            .append(teamDetailsItem(i18n.t("teams.details.slug"), team.slug))
+            .append(teamDetailsItem(i18n.t("teams.details.group"), team.group_slug))
+            .append(teamDetailsItem(i18n.t("teams.details.description"), team.description))
             .append(teamDetailsItem(
-                "Simple rotation escalation",
-                team.escalation_enabled ? "Enabled" : "Disabled"
+                i18n.t("teams.details.simple_escalation"),
+                team.escalation_enabled ? i18n.t("teams.status.enabled") : i18n.t("teams.status.disabled")
             ))
             .append(teamDetailsItem(
-                "Simple escalation after reminders",
+                i18n.t("teams.details.after_reminders"),
                 team.escalation_after_reminders || 0
             ))
             .append(teamDetailsItem(
-                "Policy mode",
-                "Routes with an escalation policy use policy rule delays instead"
+                i18n.t("teams.details.policy_mode"),
+                i18n.t("teams.details.policy_mode_help")
             ))
-            .append(teamDetailsItem("Status", team.active ? "Active" : "Inactive"))
+            .append(teamDetailsItem(i18n.t("teams.details.status"), team.active ? i18n.t("teams.status.active") : i18n.t("teams.status.inactive")))
     );
 
     const actions = $("<div>").addClass("details-actions");
     appendIconActionIfAllowed(actions, team, {
         required: "write",
         icon: "fas fa-edit",
-        label: "Edit team",
+        label: i18n.t("teams.actions.edit_team"),
         onClick: function () {
             editTeam(team.id);
         },
@@ -349,7 +351,7 @@ function renderTeamDetails(team) {
     appendIconActionIfAllowed(actions, team, {
         required: "manage_users",
         icon: "fas fa-users",
-        label: "Members",
+        label: i18n.t("teams.actions.members"),
         onClick: function () {
             openTeamMembers(team.id, team.name);
         },
@@ -386,8 +388,8 @@ function renderTeamDetailsEmpty() {
      * Render empty details state.
      */
     selectedTeamDetailsId = null;
-    $("#team-details-subtitle").text("Select a team");
-    $("#team-details-body").html("Click a team name to inspect group, escalation settings and quick actions.");
+    $("#team-details-subtitle").text(i18n.t("teams.details.select"));
+    $("#team-details-body").empty().append($("<div>").addClass("details-empty").text(i18n.t("teams.details.select_help")));
 }
 
 function getSelectedTeamForMembers() {
@@ -466,12 +468,12 @@ function openTeamMembers(teamId, teamName) {
     });
 
     if (!team) {
-        showAppError("Team was not found.");
+        showAppError(i18n.t("teams.validation.team_not_found"));
         return;
     }
 
     if (!canManageUsersObject(team)) {
-        showAppError("You do not have permission to manage this team's members.");
+        showAppError(i18n.t("teams.permissions.manage_members"));
         return;
     }
 
@@ -490,7 +492,7 @@ function loadTeamMembers(teamId, teamName) {
     selectedTeamForMembers = teamId;
     selectedTeamNameForMembers = teamName;
 
-    $("#team-members-title").text("Team members: " + teamName);
+    $("#team-members-title").text(i18n.t("teams.members.title_named", {name: teamName}));
     $("#team-member-team-id").val(teamId);
     $("#team-member-team-name").val(teamName);
     $("#team-member-team-label").val(teamName);
@@ -506,7 +508,7 @@ function loadTeamMembers(teamId, teamName) {
                     $("<td>")
                         .attr("colspan", "6")
                         .addClass("empty-cell")
-                        .text("No members")
+                        .text(i18n.t("teams.empty.members"))
                 )
             );
             return;
@@ -539,7 +541,7 @@ function renderTeamMemberRow(member) {
 
     row.append(
         $("<td>").append(
-            renderStatusBadge(member.active, "Enabled", "Disabled")
+            renderStatusBadge(member.active, i18n.t("teams.status.enabled"), i18n.t("teams.status.disabled"))
         )
     );
 
@@ -551,30 +553,30 @@ function renderTeamMemberRow(member) {
                     object: selectedTeam,
                     items: [
                         {
-                            label: "Edit",
+                            label: i18n.t("teams.actions.edit"),
                             icon: "fas fa-edit",
                             required: "manage_users",
-                            denyMessage: "Team manager role is required to edit team members.",
+                            denyMessage: i18n.t("teams.permissions.edit_member"),
                             onClick: function () {
                                 editTeamMember(member);
                             }
                         },
                         {
-                            label: member.active ? "Disable" : "Enable",
+                            label: member.active ? i18n.t("teams.actions.disable") : i18n.t("teams.actions.enable"),
                             icon: member.active ? "fas fa-pause" : "fas fa-play",
                             required: "manage_users",
                             danger: member.active,
-                            denyMessage: "Team manager role is required to enable or disable team members.",
+                            denyMessage: i18n.t("teams.permissions.toggle_member"),
                             onClick: function () {
                                 setTeamMemberActive(member, !member.active);
                             }
                         },
                         {
-                            label: "Remove",
+                            label: i18n.t("teams.actions.remove"),
                             icon: "fas fa-trash",
                             required: "manage_users",
                             danger: true,
-                            denyMessage: "Team manager role is required to remove team members.",
+                            denyMessage: i18n.t("teams.permissions.remove_member"),
                             onClick: function () {
                                 removeTeamMember(member.id);
                             }
@@ -593,7 +595,7 @@ function editTeamMember(member) {
      */
     const selectedTeam = getSelectedTeamForMembers();
     if (selectedTeam && !canManageUsersObject(selectedTeam)) {
-        showAppError("You do not have permission to manage this team's members.");
+        showAppError(i18n.t("teams.permissions.manage_members"));
         return;
     }
 
@@ -626,15 +628,15 @@ function saveTeamUser() {
     const selectedUserId = Number($("#team-member-user").val());
 
     if (!teamId) {
-        showAppError("Select a team first.");
+        showAppError(i18n.t("teams.validation.select_team"));
         return;
     }
     if (!membershipId && !selectedUserId) {
-        showAppError("User is required.");
+        showAppError(i18n.t("teams.validation.user_required"));
         return;
     }
     if (selectedTeam && !canManageUsersObject(selectedTeam)) {
-        showAppError("You do not have permission to manage this team's members.");
+        showAppError(i18n.t("teams.permissions.manage_members"));
         return;
     }
 
@@ -677,15 +679,15 @@ function setTeamMemberActive(member, active) {
      */
     const selectedTeam = getSelectedTeamForMembers();
     if (selectedTeam && !canManageUsersObject(selectedTeam)) {
-        showAppError("You do not have permission to manage this team's members.");
+        showAppError(i18n.t("teams.permissions.manage_members"));
         return;
     }
 
-    const action = active ? "enable" : "disable";
+    const action = active ? i18n.t("teams.confirm.enable_action") : i18n.t("teams.confirm.disable_action");
     showAppConfirm({
-        title: "Are you sure?",
-        message: "Are you sure you want to " + action + " this team member?",
-        confirmText: action.charAt(0).toUpperCase() + action.slice(1),
+        title: i18n.t("teams.confirm.title"),
+        message: i18n.t("teams.confirm.toggle_member", {action: action}),
+        confirmText: active ? i18n.t("teams.actions.enable") : i18n.t("teams.actions.disable"),
         confirmClass: active ? "btn-success" : "btn-warning",
     }).done(function () {
         apiPut(
@@ -711,7 +713,7 @@ function collectTeamPayload() {
      */
     const groupId = Number($("#team-group").val());
     if (!groupId) {
-        showAppError("Select a group first.");
+        showAppError(i18n.t("teams.validation.select_group"));
         throw new Error("group_id is required");
     }
 
@@ -738,7 +740,7 @@ function saveTeam() {
     const existingTeam = id ? teamsCache.find(function (item) { return Number(item.id) === Number(id); }) : null;
 
     if (existingTeam && !canWriteObject(existingTeam)) {
-        showAppError("You do not have permission to edit this team.");
+        showAppError(i18n.t("teams.permissions.edit_denied"));
         return;
     }
 
@@ -770,11 +772,11 @@ function editTeam(id) {
         return;
     }
     if (!canWriteObject(team)) {
-        showAppError("You do not have permission to edit this team.");
+        showAppError(i18n.t("teams.permissions.edit_denied"));
         return;
     }
 
-    $("#team-form-title").text("Edit team #" + id);
+    $("#team-form-title").text(i18n.t("teams.form.edit", {id: id}));
     $("#team-id").val(team.id);
     $("#team-group").val(String(team.group_id || ""));
     $("#team-slug").val(team.slug);
@@ -797,7 +799,7 @@ function resetTeamForm() {
     /*
      * Reset team form.
      */
-    $("#team-form-title").text("Create team");
+    $("#team-form-title").text(i18n.t("teams.form.create"));
     $("#team-id").val("");
     const firstGroup = $("#team-group option:first").val();
     if (firstGroup) {
@@ -829,7 +831,7 @@ function openCreateTeamModal() {
      * Reset and open create team modal.
      */
     resetTeamForm();
-    $("#team-form-title").text("Create team");
+    $("#team-form-title").text(i18n.t("teams.form.create"));
     openTeamFormModal();
 }
 
@@ -883,14 +885,14 @@ function removeTeamMember(membershipId) {
      */
     const selectedTeam = getSelectedTeamForMembers();
     if (selectedTeam && !canManageUsersObject(selectedTeam)) {
-        showAppError("You do not have permission to manage this team's members.");
+        showAppError(i18n.t("teams.permissions.manage_members"));
         return;
     }
 
     showAppConfirm({
-        title: "Removing team member",
-        message: "Remove this user from the team and from all team rotations?",
-        confirmText: "Remove",
+        title: i18n.t("teams.confirm.remove_member_title"),
+        message: i18n.t("teams.confirm.remove_member_message"),
+        confirmText: i18n.t("teams.actions.remove"),
         confirmClass: "btn-danger",
     }).done(function () {
         apiDelete("/api/teams/users/" + membershipId, function () {
@@ -927,17 +929,17 @@ function setTeamActive(team, active) {
      * Enable or disable a team without deleting rotations, routes, channels or silences.
      */
     if (!canWriteObject(team)) {
-        showAppError("You do not have permission to update this team.");
+        showAppError(i18n.t("teams.permissions.update_denied"));
         return;
     }
 
-    const action = active ? "enable" : "disable";
+    const action = active ? i18n.t("teams.confirm.enable_action") : i18n.t("teams.confirm.disable_action");
     const btnClass = active ? "btn-success" : "btn-warning";
 
     showAppConfirm({
-        title: "Are you sure?",
-        message: "Are you sure you want to " + action + " this team?",
-        confirmText: upperCaseFirst(action),
+        title: i18n.t("teams.confirm.title"),
+        message: i18n.t("teams.confirm.toggle_team", {action: action}),
+        confirmText: active ? i18n.t("teams.actions.enable") : i18n.t("teams.actions.disable"),
         confirmClass: btnClass,
     }).done(function () {
         apiPut(
@@ -967,25 +969,18 @@ function removeTeam(team) {
      * Remove a team and all non-historical resources under it.
      */
     if (!canDeleteObject(team)) {
-        showAppError("You do not have permission to remove this team.");
+        showAppError(i18n.t("teams.permissions.remove_denied"));
         return;
     }
 
-    const message = [
-        "Remove team \"" + (team.name || team.slug || team.id) + "\"?",
-        "",
-        "This will remove rotations, routes, notification channels, silences,",
-        "team memberships and route-channel links for this team.",
-        "",
-        "Historical alerts will be preserved.",
-        "",
-        "Continue?",
-    ].join("\n");
+    const message = i18n.t("teams.confirm.remove_team_message", {
+        team: team.name || team.slug || team.id,
+    });
 
     showAppConfirm({
-        title: "Remove team",
+        title: i18n.t("teams.confirm.remove_team_title"),
         message: message,
-        confirmText: "Remove",
+        confirmText: i18n.t("teams.actions.remove"),
         confirmClass: "btn-danger",
     }).done(function () {
         apiDelete("/api/teams/" + team.id, function () {

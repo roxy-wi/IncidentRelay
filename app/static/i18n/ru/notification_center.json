@@ -1,0 +1,21 @@
+{
+  "notification_center.notifications": "Уведомления",
+  "notification_center.title": "Запросы на участие",
+  "notification_center.empty": "Нет ожидающих запросов",
+  "notification_center.notification": "Уведомление",
+  "notification_center.responder_requested": "Запрошено участие",
+  "notification_center.help_requested": "{requester} просит вас подключиться к этому инциденту.",
+  "notification_center.accept": "Принять",
+  "notification_center.decline": "Отклонить",
+  "notification_center.open_incident": "Открыть инцидент",
+  "notification_center.unknown_user": "Неизвестный пользователь",
+  "notification_center.user_id": "Пользователь №{id}",
+  "notification_center.no_team": "Без команды",
+  "notification_center.no_service": "Без сервиса",
+  "notification_center.status.firing": "Активен",
+  "notification_center.status.acknowledged": "Подтверждён",
+  "notification_center.status.resolved": "Закрыт",
+  "notification_center.status.maintenance": "Обслуживание",
+  "notification_center.status.open": "Открыт",
+  "notification_center.status.closed": "Закрыт"
+}

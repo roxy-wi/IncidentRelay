@@ -21,6 +21,38 @@
         return Array.isArray(value) ? value : [];
     }
 
+    function healthT(key, params, fallback) {
+        if (window.i18n && typeof window.i18n.t === "function") {
+            return window.i18n.t(key, params || {}, fallback || key);
+        }
+        return fallback || key;
+    }
+
+    function localizedHealthStatus(status) {
+        const value = status || "unknown";
+        return healthT(
+            `oncall_health.status.${value}`,
+            {},
+            value
+        );
+    }
+
+    function localizedIssueText(issue, field, fallback) {
+        const code = issue && issue.code ? issue.code : "";
+        if (!code) {
+            return fallback || "";
+        }
+        return healthT(
+            `oncall_health.issues.${code}.${field}`,
+            {
+                username: issue.username || "",
+                rotation: issue.rotation_name || "",
+                layer: issue.layer_name || "",
+            },
+            fallback || ""
+        );
+    }
+
     function loadOncallHealthCss() {
         if (document.getElementById(HEALTH_CSS_ID)) {
             return;
@@ -52,14 +84,22 @@
 
     function healthLabel(health) {
         if (!health) {
-            return "Health status is loading. Click to open diagnostics.";
+            return healthT("oncall_health.indicator.loading", {}, "Health status is loading. Click to open diagnostics.");
         }
 
         if (health.status === "unknown") {
-            return health.tooltip || "Health status is unknown. Click to open diagnostics.";
+            return healthT("oncall_health.indicator.unknown", {}, "Health status is unknown. Click to open diagnostics.");
         }
 
-        return health.tooltip || `Critical: ${health.critical || 0} · Warnings: ${health.warning || 0} · Info: ${health.info || 0}`;
+        if (health.status === "ok") {
+            return healthT("oncall_health.indicator.ok", {}, "OK · click to open diagnostics");
+        }
+
+        return healthT("oncall_health.indicator.counts", {
+            critical: health.critical || 0,
+            warning: health.warning || 0,
+            info: health.info || 0,
+        }, `Critical: ${health.critical || 0} · Warnings: ${health.warning || 0} · Info: ${health.info || 0}`);
     }
 
     function ensureRotationHealthModal() {
@@ -72,10 +112,10 @@
                 <div class="app-modal-card app-modal-wide">
                     <div class="app-modal-header">
                         <div>
-                            <h2 id="rotation-health-title">On-call health</h2>
+                            <h2 id="rotation-health-title">${healthT("oncall_health.title.rotation", {}, "On-call health")}</h2>
                             <p id="rotation-health-subtitle" class="muted"></p>
                         </div>
-                        <button type="button" class="modal-close" data-oncall-health-close="1" aria-label="Close">×</button>
+                        <button type="button" class="modal-close" data-oncall-health-close="1" aria-label="${healthT("oncall_health.close", {}, "Close")}">×</button>
                     </div>
                     <div class="app-modal-body">
                         <div id="rotation-health-window" class="oncall-health-window muted"></div>
@@ -83,7 +123,7 @@
                         <div id="rotation-health-issues" class="oncall-health-issues-list"></div>
                     </div>
                     <div class="app-modal-footer">
-                        <button type="button" class="btn" data-oncall-health-close="1">Close</button>
+                        <button type="button" class="btn" data-oncall-health-close="1">${healthT("oncall_health.close", {}, "Close")}</button>
                     </div>
                 </div>
             </div>`
@@ -125,7 +165,7 @@
         return $("<button>")
             .attr("type", "button")
             .attr("title", label)
-            .attr("aria-label", `Open on-call health details. ${label}`)
+            .attr("aria-label", healthT("oncall_health.indicator.open_rotation", {label: label}, `Open on-call health details. ${label}`))
             .attr("data-rotation-health-open", rotationId || "")
             .addClass("oncall-health-indicator")
             .addClass(`oncall-health-${status}`)
@@ -153,19 +193,21 @@
 
         const existing = headerRow.find("th.oncall-health-th");
         if (!existing.length) {
+            const statusText = healthT("rotations.table.status", {}, "Status").trim().toLowerCase();
             const statusHeader = headerRow.find("th").filter(function () {
-                return $(this).text().trim().toLowerCase() === "status";
+                return $(this).text().trim().toLowerCase() === statusText;
             }).first();
 
             const healthHeader = $("<th>")
                 .addClass("oncall-health-th")
-                .text("Health");
+                .text(healthT("oncall_health.table.health", {}, "Health"));
 
             if (statusHeader.length) {
                 statusHeader.before(healthHeader);
             } else {
                 const actionsHeader = headerRow.find("th").filter(function () {
-                    return $(this).text().trim().toLowerCase() === "actions" || $(this).hasClass("actions-th");
+                    const actionsText = healthT("rotations.table.actions", {}, "Actions").trim().toLowerCase();
+                    return $(this).text().trim().toLowerCase() === actionsText || $(this).hasClass("actions-th");
                 }).first();
                 if (actionsHeader.length) {
                     actionsHeader.before(healthHeader);
@@ -327,7 +369,7 @@
             warning: 0,
             info: 0,
             total: 0,
-            tooltip: message || "Health summary failed to load. Click for full diagnostics.",
+            tooltip: message || healthT("oncall_health.errors.summary_failed", {}, "Health summary failed to load."),
         });
     }
 
@@ -367,13 +409,13 @@
                 if (summary) {
                     updateRotationHealthSummary(id, summary);
                 } else {
-                    markRotationHealthFailed(id, "Health summary was not returned for this rotation.");
+                    markRotationHealthFailed(id, healthT("oncall_health.errors.summary_missing_rotation", {}, "Health summary was not returned for this rotation."));
                 }
             });
         }).fail(function (xhr) {
             const message = xhr.responseJSON && (xhr.responseJSON.message || xhr.responseJSON.error)
                 ? (xhr.responseJSON.message || xhr.responseJSON.error)
-                : "Health summary failed to load.";
+                : healthT("oncall_health.errors.summary_failed", {}, "Health summary failed to load.");
             ids.forEach(function (id) {
                 loadingSummaryIds.delete(id);
                 markRotationHealthFailed(id, message);
@@ -439,7 +481,7 @@
 
     function renderIssue(issue) {
         const severity = issue.severity || "info";
-        const title = issue.title || issue.code || "Health issue";
+        const title = localizedIssueText(issue, "title", issue.title || issue.code || healthT("oncall_health.issue.default", {}, "Health issue"));
 
         const card = $("<div>")
             .addClass("oncall-health-issue")
@@ -451,7 +493,7 @@
 
         $("<span>")
             .addClass("oncall-health-issue-badge")
-            .text(severity)
+            .text(localizedHealthStatus(severity))
             .appendTo(header);
 
         $("<span>")
@@ -462,20 +504,20 @@
         if (issue.message) {
             $("<p>")
                 .addClass("oncall-health-issue-message")
-                .text(issue.message)
+                .text(localizedIssueText(issue, "message", issue.message))
                 .appendTo(card);
         }
 
         const metaItems = [];
 
         if (issue.rotation_name) {
-            metaItems.push(`Rotation: ${issue.rotation_name}`);
+            metaItems.push(healthT("oncall_health.issue.rotation", {name: issue.rotation_name}, `Rotation: ${issue.rotation_name}`));
         }
         if (issue.layer_name) {
-            metaItems.push(`Layer: ${issue.layer_name}`);
+            metaItems.push(healthT("oncall_health.issue.layer", {name: issue.layer_name}, `Layer: ${issue.layer_name}`));
         }
         if (issue.username) {
-            metaItems.push(`User: ${issue.username}`);
+            metaItems.push(healthT("oncall_health.issue.user", {name: issue.username}, `User: ${issue.username}`));
         }
 
         const range = issueTimeRange(issue);
@@ -493,7 +535,7 @@
         if (issue.hint) {
             $("<div>")
                 .addClass("oncall-health-issue-recommendation")
-                .text(issue.hint)
+                .text(localizedIssueText(issue, "hint", issue.hint))
                 .appendTo(card);
         }
 
@@ -529,10 +571,10 @@
         const summary = payload.summary || {};
         const issues = payload.issues || [];
         const title = payload.rotation_name
-            ? `On-call health: ${payload.rotation_name}`
-            : "On-call health";
+            ? healthT("oncall_health.title.rotation_named", {name: payload.rotation_name}, `On-call health: ${payload.rotation_name}`)
+            : healthT("oncall_health.title.rotation", {}, "On-call health");
         const subtitle = payload.team_name || payload.team_slug
-            ? `Team: ${payload.team_name || payload.team_slug}`
+            ? healthT("oncall_health.team_label", {name: payload.team_name || payload.team_slug}, `Team: ${payload.team_name || payload.team_slug}`)
             : "";
 
         if (payload.rotation_id) {
@@ -546,47 +588,50 @@
         const endsAt = payload.window && payload.window.ends_at;
         $("#rotation-health-window").text(
             startsAt && endsAt
-                ? `Checked window: ${formatDateTime(startsAt)} — ${formatDateTime(endsAt)}`
+                ? healthT("oncall_health.window", {
+                    start: formatDateTime(startsAt),
+                    end: formatDateTime(endsAt),
+                }, `Checked window: ${formatDateTime(startsAt)} — ${formatDateTime(endsAt)}`)
                 : ""
         );
 
         const summaryEl = $("#rotation-health-summary").empty();
-        summaryEl.append(renderSummaryCard("Status", summary.status || "unknown", `oncall-health-summary-card-${summary.status || "unknown"}`));
-        summaryEl.append(renderSummaryCard("Critical", summary.critical, "oncall-health-summary-card-critical"));
-        summaryEl.append(renderSummaryCard("Warnings", summary.warning, "oncall-health-summary-card-warning"));
-        summaryEl.append(renderSummaryCard("Info", summary.info, "oncall-health-summary-card-info"));
+        summaryEl.append(renderSummaryCard(healthT("oncall_health.summary.status", {}, "Status"), localizedHealthStatus(summary.status || "unknown"), `oncall-health-summary-card-${summary.status || "unknown"}`));
+        summaryEl.append(renderSummaryCard(healthT("oncall_health.summary.critical", {}, "Critical"), summary.critical, "oncall-health-summary-card-critical"));
+        summaryEl.append(renderSummaryCard(healthT("oncall_health.summary.warning", {}, "Warnings"), summary.warning, "oncall-health-summary-card-warning"));
+        summaryEl.append(renderSummaryCard(healthT("oncall_health.summary.info", {}, "Info"), summary.info, "oncall-health-summary-card-info"));
 
         const issuesEl = $("#rotation-health-issues").empty();
         if (!issues.length) {
             issuesEl.append(
                 $("<div>")
                     .addClass("oncall-health-empty")
-                    .text("No on-call health issues were found for this rotation.")
+                    .text(healthT("oncall_health.empty.rotation", {}, "No on-call health issues were found for this rotation."))
             );
             return;
         }
 
-        renderIssueGroup(issuesEl, "Critical", issues.filter((item) => item.severity === "critical"));
-        renderIssueGroup(issuesEl, "Warnings", issues.filter((item) => item.severity === "warning"));
-        renderIssueGroup(issuesEl, "Info", issues.filter((item) => item.severity === "info"));
+        renderIssueGroup(issuesEl, healthT("oncall_health.summary.critical", {}, "Critical"), issues.filter((item) => item.severity === "critical"));
+        renderIssueGroup(issuesEl, healthT("oncall_health.summary.warning", {}, "Warnings"), issues.filter((item) => item.severity === "warning"));
+        renderIssueGroup(issuesEl, healthT("oncall_health.summary.info", {}, "Info"), issues.filter((item) => item.severity === "info"));
     }
 
     function openRotationHealthModal(rotationId) {
         if (!rotationId) {
             if (typeof window.showAppError === "function") {
-                window.showAppError("Rotation id was not found for this health indicator.");
+                window.showAppError(healthT("oncall_health.errors.rotation_id_missing", {}, "Rotation id was not found for this health indicator."));
             }
             return;
         }
 
         ensureRotationHealthModal();
         openRotationHealthModalElement();
-        $("#rotation-health-title").text("On-call health");
-        $("#rotation-health-subtitle").text("Loading...");
+        $("#rotation-health-title").text(healthT("oncall_health.title.rotation", {}, "On-call health"));
+        $("#rotation-health-subtitle").text(healthT("oncall_health.loading", {}, "Loading..."));
         $("#rotation-health-window").text("");
         $("#rotation-health-summary").empty();
         $("#rotation-health-issues").empty().append(
-            $("<div>").addClass("oncall-health-loading muted").text("Loading health details...")
+            $("<div>").addClass("oncall-health-loading muted").text(healthT("oncall_health.loading.rotation", {}, "Loading health details..."))
         );
 
         $.ajax({
@@ -598,7 +643,7 @@
         }).fail(function (xhr) {
             const message = xhr.responseJSON && (xhr.responseJSON.message || xhr.responseJSON.error)
                 ? (xhr.responseJSON.message || xhr.responseJSON.error)
-                : "Failed to load health details.";
+                : healthT("oncall_health.errors.rotation_details_failed", {}, "Failed to load health details.");
             $("#rotation-health-subtitle").text("");
             $("#rotation-health-summary").empty();
             $("#rotation-health-issues").empty().append(
@@ -659,7 +704,7 @@
         return $("<button>")
             .attr("type", "button")
             .attr("title", label)
-            .attr("aria-label", `Open team on-call health details. ${label}`)
+            .attr("aria-label", healthT("oncall_health.indicator.open_team", {label: label}, `Open team on-call health details. ${label}`))
             .attr("data-team-health-open", teamId || "")
             .addClass("oncall-health-indicator")
             .addClass(`oncall-health-${status}`)
@@ -716,14 +761,14 @@
                         warning: 0,
                         info: 0,
                         total: 0,
-                        tooltip: "Team health summary was not returned.",
+                        tooltip: healthT("oncall_health.errors.summary_missing_team", {}, "Team health summary was not returned."),
                     });
                 }
             });
         }).fail(function (xhr) {
             const message = xhr.responseJSON && (xhr.responseJSON.message || xhr.responseJSON.error)
                 ? (xhr.responseJSON.message || xhr.responseJSON.error)
-                : "Team health summary failed to load.";
+                : healthT("oncall_health.errors.team_summary_failed", {}, "Team health summary failed to load.");
 
             ids.forEach(function (id) {
                 updateTeamHealthSummary(id, {
@@ -744,17 +789,20 @@
         const summary = payload.summary || {};
         const issues = payload.issues || [];
         const title = payload.team_name || payload.team_slug
-            ? `Team on-call health: ${payload.team_name || payload.team_slug}`
-            : "Team on-call health";
+            ? healthT("oncall_health.title.team_named", {name: payload.team_name || payload.team_slug}, `Team on-call health: ${payload.team_name || payload.team_slug}`)
+            : healthT("oncall_health.title.team", {}, "Team on-call health");
 
         $("#rotation-health-title").text(title);
-        $("#rotation-health-subtitle").text(payload.team_slug ? `Team: ${payload.team_slug}` : "");
+        $("#rotation-health-subtitle").text(payload.team_slug ? healthT("oncall_health.team_label", {name: payload.team_slug}, `Team: ${payload.team_slug}`) : "");
 
         const startsAt = payload.window && payload.window.starts_at;
         const endsAt = payload.window && payload.window.ends_at;
         $("#rotation-health-window").text(
             startsAt && endsAt
-                ? `Checked window: ${formatDateTime(startsAt)} — ${formatDateTime(endsAt)}`
+                ? healthT("oncall_health.window", {
+                    start: formatDateTime(startsAt),
+                    end: formatDateTime(endsAt),
+                }, `Checked window: ${formatDateTime(startsAt)} — ${formatDateTime(endsAt)}`)
                 : ""
         );
 
@@ -764,9 +812,9 @@
             summary.status || "unknown",
             `oncall-health-summary-card-status oncall-health-summary-card-${summary.status || "unknown"}`
         ));
-        summaryEl.append(renderSummaryCard("Critical", summary.critical, "oncall-health-summary-card-critical"));
-        summaryEl.append(renderSummaryCard("Warnings", summary.warning, "oncall-health-summary-card-warning"));
-        summaryEl.append(renderSummaryCard("Info", summary.info, "oncall-health-summary-card-info"));
+        summaryEl.append(renderSummaryCard(healthT("oncall_health.summary.critical", {}, "Critical"), summary.critical, "oncall-health-summary-card-critical"));
+        summaryEl.append(renderSummaryCard(healthT("oncall_health.summary.warning", {}, "Warnings"), summary.warning, "oncall-health-summary-card-warning"));
+        summaryEl.append(renderSummaryCard(healthT("oncall_health.summary.info", {}, "Info"), summary.info, "oncall-health-summary-card-info"));
 
         const issuesEl = $("#rotation-health-issues").empty();
 
@@ -774,20 +822,20 @@
             issuesEl.append(
                 $("<div>")
                     .addClass("oncall-health-empty")
-                    .text("No team health issues were found.")
+                    .text(healthT("oncall_health.empty.team", {}, "No team health issues were found."))
             );
             return;
         }
 
-        renderIssueGroup(issuesEl, "Critical", issues.filter((item) => item.severity === "critical"));
-        renderIssueGroup(issuesEl, "Warnings", issues.filter((item) => item.severity === "warning"));
-        renderIssueGroup(issuesEl, "Info", issues.filter((item) => item.severity === "info"));
+        renderIssueGroup(issuesEl, healthT("oncall_health.summary.critical", {}, "Critical"), issues.filter((item) => item.severity === "critical"));
+        renderIssueGroup(issuesEl, healthT("oncall_health.summary.warning", {}, "Warnings"), issues.filter((item) => item.severity === "warning"));
+        renderIssueGroup(issuesEl, healthT("oncall_health.summary.info", {}, "Info"), issues.filter((item) => item.severity === "info"));
     }
 
     function openTeamHealthModal(teamId) {
         if (!teamId) {
             if (typeof window.showAppError === "function") {
-                window.showAppError("Team id was not found for this health indicator.");
+                window.showAppError(healthT("oncall_health.errors.team_id_missing", {}, "Team id was not found for this health indicator."));
             }
             return;
         }
@@ -795,12 +843,12 @@
         ensureRotationHealthModal();
         openRotationHealthModalElement();
 
-        $("#rotation-health-title").text("Team on-call health");
-        $("#rotation-health-subtitle").text("Loading...");
+        $("#rotation-health-title").text(healthT("oncall_health.title.team", {}, "Team on-call health"));
+        $("#rotation-health-subtitle").text(healthT("oncall_health.loading", {}, "Loading..."));
         $("#rotation-health-window").text("");
         $("#rotation-health-summary").empty();
         $("#rotation-health-issues").empty().append(
-            $("<div>").addClass("oncall-health-loading muted").text("Loading team health details...")
+            $("<div>").addClass("oncall-health-loading muted").text(healthT("oncall_health.loading.team", {}, "Loading team health details..."))
         );
 
         $.ajax({
@@ -812,7 +860,7 @@
         }).fail(function (xhr) {
             const message = xhr.responseJSON && (xhr.responseJSON.message || xhr.responseJSON.error)
                 ? (xhr.responseJSON.message || xhr.responseJSON.error)
-                : "Failed to load team health details.";
+                : healthT("oncall_health.errors.team_details_failed", {}, "Failed to load team health details.");
 
             $("#rotation-health-subtitle").text("");
             $("#rotation-health-summary").empty();

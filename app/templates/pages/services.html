@@ -55,7 +55,7 @@
           <span id="services-impact-count" class="page-tab-count">0</span>
         </button>
         <button class="page-tab" type="button" data-services-tab="standards">
-          Standards
+          {{ _('service_standards.tab') }}
           <span id="services-standards-count" class="page-tab-count">0</span>
         </button>
         <button class="page-tab" type="button" data-services-tab="analytics">
@@ -623,22 +623,20 @@
             </div>
           </div>
 
-          <div id="service-reliability-content"></div>
-        </div>
-          <div id="services-tab-standards" class="services-tab-panel" style="display: none;">
+          <div id="service-reliability-content"          <div id="services-tab-standards" class="services-tab-panel" style="display: none;">
           <div class="card-header">
             <div>
-              <h2>Service Standards</h2>
+              <h2>{{ _('service_standards.title') }}</h2>
               <div class="card-subtitle">
-                Readiness requirements applied to services in the selected group.
+                {{ _('service_standards.subtitle') }}
               </div>
             </div>
             <div class="card-header-actions">
               <button id="restore-basic-standard-btn" type="button" class="btn">
-                Restore default standard
+                {{ _('service_standards.actions.restore_default') }}
               </button>
               <button id="new-service-standard-btn" type="button" class="btn btn-primary">
-                New standard
+                {{ _('service_standards.actions.new_standard') }}
               </button>
             </div>
           </div>
@@ -647,8 +645,8 @@
             <section class="card">
               <div class="card-header">
                 <div>
-                  <h2>Standards</h2>
-                  <div class="card-subtitle">Policies that decide readiness score.</div>
+                  <h2>{{ _('service_standards.list.title') }}</h2>
+                  <div class="card-subtitle">{{ _('service_standards.list.subtitle') }}</div>
                 </div>
               </div>
 
@@ -656,16 +654,16 @@
                 <table class="data-table sortable-table">
                   <thead>
                     <tr>
-                      <th>Standard</th>
-                      <th>Applies to</th>
-                      <th>Checks</th>
-                      <th>Status</th>
-                      <th class="actions-th">Actions</th>
+                      <th>{{ _('service_standards.table.standard') }}</th>
+                      <th>{{ _('service_standards.table.applies_to') }}</th>
+                      <th>{{ _('service_standards.table.checks') }}</th>
+                      <th>{{ _('service_standards.table.status') }}</th>
+                      <th class="actions-th">{{ _('service_standards.table.actions') }}</th>
                     </tr>
                   </thead>
                   <tbody id="service-standards-list">
                     <tr>
-                      <td colspan="5" class="empty-cell">No service standards loaded</td>
+                      <td colspan="5" class="empty-cell">{{ _('service_standards.empty.loaded') }}</td>
                     </tr>
                   </tbody>
                 </table>
@@ -675,14 +673,14 @@
             <section class="card">
               <div class="card-header">
                 <div>
-                  <h2>Checks</h2>
+                  <h2>{{ _('service_standards.table.checks') }}</h2>
                   <div id="service-standard-checks-subtitle" class="card-subtitle">
-                    Select a standard to manage checks.
+                    {{ _('service_standards.empty.select') }}
                   </div>
                 </div>
                 <div class="card-header-actions">
                   <button id="new-service-standard-check-btn" type="button" class="btn btn-primary" disabled>
-                    New check
+                    {{ _('service_standards.actions.new_check') }}
                   </button>
                 </div>
               </div>
@@ -691,23 +689,24 @@
                 <table class="data-table sortable-table">
                   <thead>
                     <tr>
-                      <th>Check</th>
-                      <th>Type</th>
-                      <th>Weight</th>
-                      <th>Severity</th>
-                      <th>Status</th>
-                      <th class="actions-th">Actions</th>
+                      <th>{{ _('service_standards.table.check') }}</th>
+                      <th>{{ _('service_standards.table.type') }}</th>
+                      <th>{{ _('service_standards.table.weight') }}</th>
+                      <th>{{ _('service_standards.table.severity') }}</th>
+                      <th>{{ _('service_standards.table.status') }}</th>
+                      <th class="actions-th">{{ _('service_standards.table.actions') }}</th>
                     </tr>
                   </thead>
                   <tbody id="service-standard-checks-list">
                     <tr>
-                      <td colspan="6" class="empty-cell">Select a standard to manage checks</td>
+                      <td colspan="6" class="empty-cell">{{ _('service_standards.empty.select') }}</td>
                     </tr>
                   </tbody>
                 </table>
               </div>
             </section>
           </div>
+        </div>  </div>
         </div>
 
       </section>

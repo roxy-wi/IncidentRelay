@@ -109,7 +109,7 @@ window.AppTimezones = (function () {
 
         select.select2({
             width: "100%",
-            placeholder: "Select timezone",
+            placeholder: i18n.t("shared.timezone.select"),
             dropdownParent: dropdownParent ? $(dropdownParent) : undefined,
         });
     }
@@ -262,7 +262,7 @@ window.AppTimezones = (function () {
             .val("")
             .text(
                 emptyLabel ||
-                ("Use browser timezone (" + browserTimezone + ")")
+                i18n.t("shared.timezone.browser_named", {timezone: browserTimezone})
             )
             .appendTo(select);
 
@@ -302,7 +302,7 @@ window.AppTimezones = (function () {
 
         select.select2({
             width: "100%",
-            placeholder: "Use browser timezone",
+            placeholder: i18n.t("shared.timezone.browser"),
             allowClear: true,
             dropdownParent: dropdownParent ? $(dropdownParent) : undefined,
         });

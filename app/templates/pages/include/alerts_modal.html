@@ -2,7 +2,7 @@
   <div class="app-modal-dialog app-modal-dialog-wide">
     <div class="app-modal-header">
       <div>
-        <h2 id="alert-details-title">Alert details</h2>
+        <h2 id="alert-details-title">{{ _('alert_details.title') }}</h2>
         <div id="alert-details-subtitle" class="card-subtitle"></div>
       </div>
 
@@ -10,7 +10,7 @@
         id="close-alert-details"
         type="button"
         class="app-modal-close"
-        aria-label="Close"
+        aria-label="{{ _('alert_details.close') }}"
       >
         ×
       </button>
@@ -21,7 +21,7 @@
         id="alert-details-tabs"
         class="page-tabs alert-details-tabs"
         role="tablist"
-        aria-label="Alert details tabs"
+        aria-label="{{ _('alert_details.tabs.aria') }}"
       >
         <button
           type="button"
@@ -31,7 +31,7 @@
           aria-selected="true"
           aria-controls="alert-details-summary-tab"
         >
-          Summary
+          {{ _('alert_details.tabs.summary') }}
         </button>
 
         <button
@@ -42,7 +42,7 @@
           aria-selected="false"
           aria-controls="alert-details-details-tab"
         >
-          Details
+          {{ _('alert_details.tabs.details') }}
         </button>
 
         <button
@@ -53,7 +53,7 @@
           aria-selected="false"
           aria-controls="alert-details-alerts-tab"
         >
-          Alerts
+          {{ _('alert_details.tabs.alerts') }}
         </button>
 
         <button
@@ -64,7 +64,7 @@
           aria-selected="false"
           aria-controls="alert-details-events-tab"
         >
-          Events
+          {{ _('alert_details.tabs.events') }}
         </button>
 
         <button
@@ -75,7 +75,7 @@
           aria-selected="false"
           aria-controls="alert-details-explain-tab"
         >
-          Explain
+          {{ _('alert_details.tabs.explain') }}
         </button>
       </div>
 
@@ -90,13 +90,13 @@
 
           <section class="details-section alert-comments-section">
             <div class="details-section-header">
-              <h3>Comments</h3>
+              <h3>{{ _('alert_details.comments.title') }}</h3>
               <button
                 type="button"
                 id="alert-comments-refresh"
                 class="btn btn-secondary btn-small"
               >
-                Refresh
+                {{ _('alert_details.actions.refresh') }}
               </button>
             </div>
             <div id="alert-comments-list" class="alert-comments-list"></div>
@@ -107,24 +107,24 @@
                 class="form-control"
                 rows="3"
                 maxlength="5000"
-                placeholder="Add a comment..."
+                placeholder="{{ _('alert_details.comments.placeholder') }}"
               ></textarea>
 
               <div class="modal-actions">
                 <button type="submit" class="btn btn-primary">
-                  Add comment
+                  {{ _('alert_details.comments.add') }}
                 </button>
               </div>
             </form>
           </section>
 
           <div class="details-section">
-            <div class="details-section-title">Labels</div>
+            <div class="details-section-title">{{ _('alert_details.labels') }}</div>
             <pre id="alert-details-labels" class="details-code"></pre>
           </div>
 
           <div class="details-section">
-            <div class="details-section-title">Payload</div>
+            <div class="details-section-title">{{ _('alert_details.payload') }}</div>
             <pre id="alert-details-payload" class="details-code"></pre>
           </div>
         </section>
@@ -137,7 +137,7 @@
           hidden
         >
           <div class="details-section">
-            <div class="details-section-title">Routing and escalation</div>
+            <div class="details-section-title">{{ _('alert_details.routing.title') }}</div>
             <div id="alert-details-summary" class="details-grid"></div>
           </div>
         </section>
@@ -150,7 +150,7 @@
           hidden
         >
           <section id="alert-group-children-section" class="details-section">
-            <div class="details-section-title">Alerts in this group</div>
+            <div class="details-section-title">{{ _('alert_details.group_alerts') }}</div>
             <div id="alert-group-children"></div>
           </section>
         </section>
@@ -163,12 +163,12 @@
           hidden
         >
           <div class="details-section">
-            <div class="details-section-title">Events</div>
+            <div class="details-section-title">{{ _('alert_details.tabs.events') }}</div>
             <div id="alert-details-events" class="event-list"></div>
           </div>
 
           <div class="details-section">
-            <div class="details-section-title">Notification delivery</div>
+            <div class="details-section-title">{{ _('alert_details.notification_delivery') }}</div>
             <div id="alert-details-notifications" class="event-list"></div>
           </div>
         </section>
@@ -183,9 +183,9 @@
           <div class="details-section">
             <div class="details-section-header">
               <div>
-                <div class="details-section-title">Explain routing</div>
+                <div class="details-section-title">{{ _('alert_details.explain.title') }}</div>
                 <div class="card-subtitle">
-                  Route match, service resolution, grouping, assignment, maintenance and notification decisions.
+                  {{ _('alert_details.explain.help') }}
                 </div>
               </div>
 
@@ -194,7 +194,7 @@
                 id="alert-explain-refresh"
                 class="btn btn-secondary btn-small"
               >
-                Refresh
+                {{ _('alert_details.actions.refresh') }}
               </button>
             </div>
 
@@ -207,15 +207,15 @@
 
     <div class="app-modal-footer">
       <button id="modal-alert-ack" type="button" class="btn btn-warning btn-small">
-        Acknowledge
+        {{ _('alert_details.actions.acknowledge') }}
       </button>
 
       <button id="modal-alert-resolve" type="button" class="btn btn-resolve btn-small">
-        Resolve
+        {{ _('alert_details.actions.resolve') }}
       </button>
 
       <button id="close-alert-details-footer" type="button" class="btn btn-small">
-        Close
+        {{ _('alert_details.close') }}
       </button>
     </div>
   </div>
@@ -224,16 +224,16 @@
     <div class="app-modal-dialog">
         <div class="app-modal-header">
             <div>
-                <h2>Add responder</h2>
+                <h2>{{ _('alert_details.responder.add') }}</h2>
                 <div class="card-subtitle">
-                    Request a user, team, rotation or escalation policy to help with this incident.
+                    {{ _('alert_details.responder.add_help') }}
                 </div>
             </div>
 
             <button
                 type="button"
                 class="app-modal-close"
-                aria-label="Close"
+                aria-label="{{ _('alert_details.close') }}"
                 data-modal-close
             >
                 ×
@@ -244,9 +244,9 @@
             <section class="card">
                 <div class="card-header">
                     <div>
-                        <h2>Responder</h2>
+                        <h2>{{ _('alert_details.responder.title') }}</h2>
                         <div class="card-subtitle">
-                            Select target type and target ID.
+                            {{ _('alert_details.responder.select_help') }}
                         </div>
                     </div>
                 </div>
@@ -254,31 +254,31 @@
                 <div class="form-body">
                     <div id="incident-responder-error" class="alert alert-danger is-hidden"></div>
 
-                    <label for="incident-responder-target-type">Target type</label>
+                    <label for="incident-responder-target-type">{{ _('alert_details.responder.target_type') }}</label>
                     <select id="incident-responder-target-type" class="input">
-                        <option value="user">User</option>
-                        <option value="team">Team</option>
-                        <option value="rotation">Rotation</option>
-                        <option value="escalation_policy">Escalation policy</option>
+                        <option value="user">{{ _('alert_details.target.user') }}</option>
+                        <option value="team">{{ _('alert_details.target.team') }}</option>
+                        <option value="rotation">{{ _('alert_details.target.rotation') }}</option>
+                        <option value="escalation_policy">{{ _('alert_details.target.escalation_policy') }}</option>
                     </select>
 
-                    <label id="incident-responder-target-select-label" for="incident-responder-target-select">User</label>
+                    <label id="incident-responder-target-select-label" for="incident-responder-target-select">{{ _('alert_details.target.user') }}</label>
                     <select id="incident-responder-target-select" class="input">
-                        <option value="">Select user</option>
+                        <option value="">{{ _('alert_details.target.select_user') }}</option>
                     </select>
 
                     <div id="incident-responder-target-help" class="help-text">
-                        Select a responder from the current incident team.
+                        {{ _('alert_details.target.user_help') }}
                     </div>
 
-                    <label for="incident-responder-message">Message</label>
+                    <label for="incident-responder-message">{{ _('alert_details.form.message') }}</label>
                     <textarea
                         id="incident-responder-message"
                         class="input"
                         rows="4"
-                    >Please help with this incident.</textarea>
+                    >{{ _('alert_details.responder.default_message') }}</textarea>
 
-                    <label for="incident-responder-expires">Expires after minutes</label>
+                    <label for="incident-responder-expires">{{ _('alert_details.responder.expires') }}</label>
                     <input
                         id="incident-responder-expires"
                         class="input"
@@ -288,7 +288,7 @@
                     >
 
                     <div class="help-text">
-                        Empty expiration means the responder request does not expire automatically.
+                        {{ _('alert_details.responder.expires_help') }}
                     </div>
                 </div>
             </section>
@@ -296,10 +296,10 @@
 
         <div class="app-modal-footer">
             <button type="button" class="btn" data-modal-close>
-                Cancel
+                {{ _('alert_details.actions.cancel') }}
             </button>
             <button id="save-incident-responder" type="button" class="btn btn-primary">
-                Request responder
+                {{ _('alert_details.responder.request') }}
             </button>
         </div>
     </div>
@@ -309,16 +309,16 @@
     <div class="app-modal-dialog">
         <div class="app-modal-header">
             <div>
-                <h2>Add stakeholder</h2>
+                <h2>{{ _('alert_details.stakeholder.add') }}</h2>
                 <div class="card-subtitle">
-                    Add a person who should receive incident updates.
+                    {{ _('alert_details.stakeholder.add_help') }}
                 </div>
             </div>
 
             <button
                 type="button"
                 class="app-modal-close"
-                aria-label="Close"
+                aria-label="{{ _('alert_details.close') }}"
                 data-modal-close
             >
                 ×
@@ -329,9 +329,9 @@
             <section class="card">
                 <div class="card-header">
                     <div>
-                        <h2>Stakeholder</h2>
+                        <h2>{{ _('alert_details.stakeholder.title') }}</h2>
                         <div class="card-subtitle">
-                            Use either an existing user ID or an email address.
+                            {{ _('alert_details.stakeholder.select_help') }}
                         </div>
                     </div>
                 </div>
@@ -339,7 +339,7 @@
                 <div class="form-body">
                     <div id="incident-stakeholder-error" class="alert alert-danger is-hidden"></div>
 
-                    <label for="incident-stakeholder-email">Email</label>
+                    <label for="incident-stakeholder-email">{{ _('alert_details.form.email') }}</label>
                     <input
                         id="incident-stakeholder-email"
                         class="input"
@@ -347,16 +347,16 @@
                         autocomplete="off"
                     >
 
-                    <label for="incident-stakeholder-user-select">Existing user</label>
+                    <label for="incident-stakeholder-user-select">{{ _('alert_details.stakeholder.existing_user') }}</label>
                     <select id="incident-stakeholder-user-select" class="input">
-                        <option value="">No existing user</option>
+                        <option value="">{{ _('alert_details.stakeholder.no_existing_user') }}</option>
                     </select>
 
                     <div class="help-text">
-                        Select an existing user or enter an external email below.
+                        {{ _('alert_details.stakeholder.user_help') }}
                     </div>
 
-                    <label for="incident-stakeholder-display-name">Display name</label>
+                    <label for="incident-stakeholder-display-name">{{ _('alert_details.form.display_name') }}</label>
                     <input
                         id="incident-stakeholder-display-name"
                         class="input"
@@ -364,33 +364,33 @@
                         autocomplete="off"
                     >
 
-                    <label for="incident-stakeholder-role">Role</label>
+                    <label for="incident-stakeholder-role">{{ _('alert_details.form.role') }}</label>
                     <select id="incident-stakeholder-role" class="input">
-                        <option value="stakeholder">Stakeholder</option>
-                        <option value="business_owner">Business owner</option>
-                        <option value="technical_owner">Technical owner</option>
-                        <option value="manager">Manager</option>
+                        <option value="stakeholder">{{ _('alert_details.stakeholder.title') }}</option>
+                        <option value="business_owner">{{ _('alert_details.stakeholder.business_owner') }}</option>
+                        <option value="technical_owner">{{ _('alert_details.stakeholder.technical_owner') }}</option>
+                        <option value="manager">{{ _('alert_details.stakeholder.manager') }}</option>
                     </select>
 
                     <div class="form-section">
                         <label class="md-checkbox">
                             <input id="incident-stakeholder-notify-created" type="checkbox" checked>
-                            <span>Notify on created</span>
+                            <span>{{ _('alert_details.stakeholder.notify_created') }}</span>
                         </label>
 
                         <label class="md-checkbox">
                             <input id="incident-stakeholder-notify-priority" type="checkbox" checked>
-                            <span>Notify on priority change</span>
+                            <span>{{ _('alert_details.stakeholder.notify_priority') }}</span>
                         </label>
 
                         <label class="md-checkbox">
                             <input id="incident-stakeholder-notify-status" type="checkbox" checked>
-                            <span>Notify on status change</span>
+                            <span>{{ _('alert_details.stakeholder.notify_status') }}</span>
                         </label>
 
                         <label class="md-checkbox">
                             <input id="incident-stakeholder-notify-resolved" type="checkbox" checked>
-                            <span>Notify on resolved</span>
+                            <span>{{ _('alert_details.stakeholder.notify_resolved') }}</span>
                         </label>
                     </div>
                 </div>
@@ -399,10 +399,10 @@
 
         <div class="app-modal-footer">
             <button type="button" class="btn" data-modal-close>
-                Cancel
+                {{ _('alert_details.actions.cancel') }}
             </button>
             <button id="save-incident-stakeholder" type="button" class="btn btn-primary">
-                Add stakeholder
+                {{ _('alert_details.stakeholder.add') }}
             </button>
         </div>
     </div>
@@ -411,9 +411,9 @@
   <div class="app-modal-dialog">
     <div class="app-modal-header">
       <div>
-        <h2>Open explain trace</h2>
+        <h2>{{ _('alert_details.trace.open_title') }}</h2>
         <div class="card-subtitle">
-          Paste trace_id returned by an integration API response.
+          {{ _('alert_details.trace.open_help') }}
         </div>
       </div>
 
@@ -421,14 +421,14 @@
         type="button"
         class="app-modal-close"
         data-alert-explain-lookup-close
-        aria-label="Close"
+        aria-label="{{ _('alert_details.close') }}"
       >
         ×
       </button>
     </div>
 
     <div class="app-modal-body">
-      <label for="alert-explain-trace-id">Trace ID</label>
+      <label for="alert-explain-trace-id">{{ _('alert_details.trace.id') }}</label>
       <input
         id="alert-explain-trace-id"
         class="input"
@@ -449,7 +449,7 @@
         class="btn"
         data-alert-explain-lookup-close
       >
-        Cancel
+        {{ _('alert_details.actions.cancel') }}
       </button>
 
       <button
@@ -457,7 +457,7 @@
         type="button"
         class="btn btn-primary"
       >
-        Open
+        {{ _('alert_details.actions.open') }}
       </button>
     </div>
   </div>
@@ -466,9 +466,9 @@
     <div class="app-modal-dialog app-modal-dialog-wide">
         <div class="app-modal-header">
             <div>
-                <h2 id="manual-incident-modal-title">Create incident</h2>
+                <h2 id="manual-incident-modal-title">{{ _('alert_details.manual.title') }}</h2>
                 <div class="card-subtitle">
-                    Create a manual incident for a team or service.
+                    {{ _('alert_details.manual.help') }}
                 </div>
             </div>
 
@@ -476,7 +476,7 @@
                 id="close-manual-incident-modal"
                 type="button"
                 class="app-modal-close"
-                aria-label="Close"
+                aria-label="{{ _('alert_details.close') }}"
             >
                 ×
             </button>
@@ -487,9 +487,9 @@
                 <section class="card">
                     <div class="card-header">
                         <div>
-                            <h2>Incident</h2>
+                            <h2>{{ _('alert_details.manual.incident') }}</h2>
                             <div class="card-subtitle">
-                                Title, description and severity.
+                                {{ _('alert_details.manual.incident_help') }}
                             </div>
                         </div>
                     </div>
@@ -497,42 +497,42 @@
                     <div class="form-body">
                         <div id="manual-incident-error" class="alert alert-danger is-hidden"></div>
 
-                        <label for="manual-incident-title">Title</label>
+                        <label for="manual-incident-title">{{ _('alert_details.form.title') }}</label>
                         <input
                             id="manual-incident-title"
                             class="input"
                             type="text"
                             maxlength="500"
-                            placeholder="Storage API is unavailable"
+                            placeholder="{{ _('alert_details.form.title_placeholder') }}"
                             autocomplete="off"
                         >
 
-                        <label for="manual-incident-message">Description</label>
+                        <label for="manual-incident-message">{{ _('alert_details.form.description') }}</label>
                         <textarea
                             id="manual-incident-message"
                             class="input"
                             rows="6"
                             maxlength="5000"
-                            placeholder="Impact, links, first observations..."
+                            placeholder="{{ _('alert_details.form.description_placeholder') }}"
                         ></textarea>
 
-                        <label for="manual-incident-severity">Severity</label>
+                        <label for="manual-incident-severity">{{ _('alert_details.form.severity') }}</label>
                         <select id="manual-incident-severity" class="input">
-                            <option value="critical">Critical</option>
-                            <option value="high">High</option>
-                            <option value="warning">Warning</option>
-                            <option value="medium">Medium</option>
-                            <option value="low">Low</option>
-                            <option value="info">Info</option>
+                            <option value="critical">{{ _('alerts.severity.critical') }}</option>
+                            <option value="high">{{ _('alerts.severity.high') }}</option>
+                            <option value="warning">{{ _('alerts.severity.warning') }}</option>
+                            <option value="medium">{{ _('alerts.severity.medium') }}</option>
+                            <option value="low">{{ _('alerts.severity.low') }}</option>
+                            <option value="info">{{ _('alerts.severity.info') }}</option>
                         </select>
 
-                        <label for="manual-incident-priority">Priority</label>
+                        <label for="manual-incident-priority">{{ _('alert_details.form.priority') }}</label>
                         <select id="manual-incident-priority" class="input">
-                            <option value="">Automatic</option>
+                            <option value="">{{ _('alert_details.priority.automatic') }}</option>
                         </select>
 
                         <div class="help-text">
-                            Leave automatic to let priority rules/defaults decide.
+                            {{ _('alert_details.priority.auto_help') }}
                         </div>
                     </div>
                 </section>
@@ -540,31 +540,31 @@
                 <section class="card">
                     <div class="card-header">
                         <div>
-                            <h2>Scope</h2>
+                            <h2>{{ _('alert_details.manual.scope') }}</h2>
                             <div class="card-subtitle">
-                                Team, optional service and notification behavior.
+                                {{ _('alert_details.manual.scope_help') }}
                             </div>
                         </div>
                     </div>
 
                     <div class="form-body">
-                        <label for="manual-incident-team">Team</label>
+                        <label for="manual-incident-team">{{ _('alert_details.target.team') }}</label>
                         <select id="manual-incident-team" class="input"></select>
 
-                        <label for="manual-incident-service">Service</label>
+                        <label for="manual-incident-service">{{ _('alert_details.form.service') }}</label>
                         <select id="manual-incident-service" class="input"></select>
 
                         <div class="help-text">
-                            If a service is selected, the incident will use service ownership and escalation defaults.
+                            {{ _('alert_details.manual.service_help') }}
                         </div>
 
                         <label class="md-checkbox">
                             <input id="manual-incident-notify" type="checkbox" checked>
-                            <span>Notify team</span>
+                            <span>{{ _('alert_details.manual.notify_team') }}</span>
                         </label>
 
                         <div class="help-text">
-                            When enabled, IncidentRelay will schedule notification through the normal alert notification flow.
+                            {{ _('alert_details.manual.notify_help') }}
                         </div>
                     </div>
                 </section>
@@ -573,11 +573,11 @@
 
         <div class="app-modal-footer">
             <button id="reset-manual-incident-form" type="button" class="btn">
-                Reset
+                {{ _('alert_details.actions.reset') }}
             </button>
 
             <button id="save-manual-incident" type="button" class="btn btn-primary">
-                Create incident
+                {{ _('alert_details.manual.title') }}
             </button>
         </div>
     </div>

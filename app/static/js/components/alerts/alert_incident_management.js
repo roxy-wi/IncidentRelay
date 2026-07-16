@@ -14,24 +14,24 @@ window.AlertIncidentManagement = (function () {
     };
 
     const responderTargetLabels = {
-        user: "User",
-        team: "Team",
-        rotation: "Rotation",
-        escalation_policy: "Escalation policy",
+        user: i18n.t("alert_details.target.user"),
+        team: i18n.t("alert_details.target.team"),
+        rotation: i18n.t("alert_details.target.rotation"),
+        escalation_policy: i18n.t("alert_details.target.escalation_policy"),
     };
 
     const responderTargetPlaceholders = {
-        user: "Select user",
-        team: "Select team",
-        rotation: "Select rotation",
-        escalation_policy: "Select escalation policy",
+        user: i18n.t("alert_details.target.select_user"),
+        team: i18n.t("alert_details.manual.select_team"),
+        rotation: i18n.t("alert_details.target.select_rotation"),
+        escalation_policy: i18n.t("alert_details.target.select_policy"),
     };
 
     const responderTargetHelp = {
-        user: "Select a responder from the current incident team.",
-        team: "Select a visible team.",
-        rotation: "Select a rotation from the incident team.",
-        escalation_policy: "Select an escalation policy from the incident team.",
+        user: i18n.t("alert_details.target.user_help"),
+        team: i18n.t("alert_details.target.team_help"),
+        rotation: i18n.t("alert_details.target.rotation_help"),
+        escalation_policy: i18n.t("alert_details.target.policy_help"),
     };
 
     function render(alert, detailsModal, options) {
@@ -165,11 +165,11 @@ window.AlertIncidentManagement = (function () {
             .addClass("details-section-header")
             .append(
                 $("<div>")
-                    .append($("<h3>").text("Incident management"))
+                    .append($("<h3>").text(i18n.t("alert_details.incident_management.title")))
                     .append(
                         $("<p>")
                             .addClass("details-section-subtitle")
-                            .text("Priority, responders and stakeholders.")
+                            .text(i18n.t("alert_details.incident_management.help"))
                     )
             );
     }
@@ -190,7 +190,7 @@ window.AlertIncidentManagement = (function () {
                     .addClass("details-card-header")
                     .append(
                         $("<div>")
-                            .append($("<h4>").text("Priority"))
+                            .append($("<h4>").text(i18n.t("alert_details.form.priority")))
                             .append(
                                 $("<p>")
                                     .addClass("details-muted incident-priority-current")
@@ -208,18 +208,18 @@ window.AlertIncidentManagement = (function () {
                     .addClass("details-card-header")
                     .append(
                         $("<div>")
-                            .append($("<h4>").text("Responders"))
+                            .append($("<h4>").text(i18n.t("alert_details.responders.title")))
                             .append(
                                 $("<p>")
                                     .addClass("details-muted")
-                                    .text("People or teams requested to help.")
+                                    .text(i18n.t("alert_details.responders.help"))
                             )
                     )
                     .append(
                         $("<button>")
                             .attr("type", "button")
                             .addClass("btn btn-secondary btn-sm incident-add-responder")
-                            .text("Add responder")
+                            .text(i18n.t("alert_details.responder.add"))
                     )
             )
             .append($("<div>").addClass("incident-responders-list"));
@@ -233,28 +233,28 @@ window.AlertIncidentManagement = (function () {
                     .addClass("details-card-header")
                     .append(
                         $("<div>")
-                            .append($("<h4>").text("Stakeholders"))
+                            .append($("<h4>").text(i18n.t("alert_details.stakeholders.title")))
                             .append(
                                 $("<p>")
                                     .addClass("details-muted")
-                                    .text("People who receive incident updates.")
+                                    .text(i18n.t("alert_details.stakeholders.help"))
                             )
                     )
                     .append(
                         $("<button>")
                             .attr("type", "button")
                             .addClass("btn btn-secondary btn-sm incident-add-stakeholder")
-                            .text("Add stakeholder")
+                            .text(i18n.t("alert_details.stakeholder.add"))
                     )
             )
             .append($("<div>").addClass("incident-stakeholders-list"));
     }
 
     function renderLoading(section) {
-        section.find(".incident-priority-current").text("Loading...");
-        section.find(".incident-priority-control").empty().append(renderEmpty("Loading priority..."));
-        section.find(".incident-responders-list").empty().append(renderEmpty("Loading responders..."));
-        section.find(".incident-stakeholders-list").empty().append(renderEmpty("Loading stakeholders..."));
+        section.find(".incident-priority-current").text(i18n.t("alert_details.loading"));
+        section.find(".incident-priority-control").empty().append(renderEmpty(i18n.t("alert_details.loading.priority")));
+        section.find(".incident-responders-list").empty().append(renderEmpty(i18n.t("alert_details.loading.responders")));
+        section.find(".incident-stakeholders-list").empty().append(renderEmpty(i18n.t("alert_details.loading.stakeholders")));
     }
 
     function renderPriority(section, incident) {
@@ -262,7 +262,7 @@ window.AlertIncidentManagement = (function () {
         const canWrite = canWriteIncident(incident);
         const container = section.find(".incident-priority-control");
 
-        container.empty().append(renderEmpty("Loading priority..."));
+        container.empty().append(renderEmpty(i18n.t("alert_details.loading.priority")));
 
         loadPriorities(function (priorities) {
             const configuredPriority = priorities.find(function (item) {
@@ -271,10 +271,10 @@ window.AlertIncidentManagement = (function () {
             const priorityName = configuredPriority && configuredPriority.name
                 ? configuredPriority.name
                 : priority.name;
-            const modeLabel = priority.setManually ? "Manual override" : "Automatic";
+            const modeLabel = priority.setManually ? i18n.t("alert_details.priority.manual_override") : i18n.t("alert_details.priority.automatic");
 
             section.find(".incident-priority-current").text(
-                "Current: " + priorityName + " (" + priority.slug.toUpperCase() + ")"
+                i18n.t("alert_details.priority.current", {value: priorityName + " (" + priority.slug.toUpperCase() + ")"})
             );
 
             const controls = $("<div>").addClass("incident-priority-controls");
@@ -299,7 +299,7 @@ window.AlertIncidentManagement = (function () {
                     $("<button>")
                         .attr("type", "button")
                         .addClass("btn btn-ghost btn-sm incident-priority-reset")
-                        .text("Reset to automatic")
+                        .text(i18n.t("alert_details.priority.reset_auto"))
                 );
             }
 
@@ -325,7 +325,7 @@ window.AlertIncidentManagement = (function () {
     function renderPrioritySelect(priorities, currentSlug) {
         const select = $("<select>")
             .addClass("input incident-priority-select")
-            .attr("aria-label", "Incident priority");
+            .attr("aria-label", i18n.t("alert_details.priority.incident_aria"));
 
         priorities.forEach(function (priority) {
             $("<option>")
@@ -345,7 +345,7 @@ window.AlertIncidentManagement = (function () {
         container.empty();
 
         if (!responders.length) {
-            container.append(renderEmpty("No responders requested yet."));
+            container.append(renderEmpty(i18n.t("alert_details.responders.empty")));
             return;
         }
 
@@ -407,70 +407,70 @@ window.AlertIncidentManagement = (function () {
         }
 
         if (responder.target && responder.target.user) {
-            return displayObjectName(responder.target.user, "User");
+            return displayObjectName(responder.target.user, i18n.t("alert_details.target.user"));
         }
 
         if (responder.target && responder.target.team) {
-            return displayObjectName(responder.target.team, "Team");
+            return displayObjectName(responder.target.team, i18n.t("alert_details.target.team"));
         }
 
         if (responder.target && responder.target.rotation) {
-            return displayObjectName(responder.target.rotation, "Rotation");
+            return displayObjectName(responder.target.rotation, i18n.t("alert_details.target.rotation"));
         }
 
         if (responder.target && responder.target.escalation_policy) {
             return displayObjectName(
                 responder.target.escalation_policy,
-                "Escalation policy"
+                i18n.t("alert_details.target.escalation_policy")
             );
         }
 
         if (responder.target_user) {
-            return displayObjectName(responder.target_user, "User");
+            return displayObjectName(responder.target_user, i18n.t("alert_details.target.user"));
         }
 
         if (responder.target_team) {
-            return displayObjectName(responder.target_team, "Team");
+            return displayObjectName(responder.target_team, i18n.t("alert_details.target.team"));
         }
 
         if (responder.target_rotation) {
-            return displayObjectName(responder.target_rotation, "Rotation");
+            return displayObjectName(responder.target_rotation, i18n.t("alert_details.target.rotation"));
         }
 
         if (responder.target_escalation_policy) {
             return displayObjectName(
                 responder.target_escalation_policy,
-                "Escalation policy"
+                i18n.t("alert_details.target.escalation_policy")
             );
         }
 
         if (responder.target_user_id) {
-            return "User #" + responder.target_user_id;
+            return i18n.t("alert_details.entity.user_number", {id: responder.target_user_id});
         }
 
         if (responder.target_team_id) {
-            return "Team #" + responder.target_team_id;
+            return i18n.t("alert_details.entity.team_number", {id: responder.target_team_id});
         }
 
         if (responder.target_rotation_id) {
-            return "Rotation #" + responder.target_rotation_id;
+            return i18n.t("alert_details.entity.rotation_number", {id: responder.target_rotation_id});
         }
 
         if (responder.target_escalation_policy_id) {
-            return "Escalation policy #" + responder.target_escalation_policy_id;
+            return i18n.t("alert_details.entity.policy_number", {id: responder.target_escalation_policy_id});
         }
 
-        return "Responder";
+        return i18n.t("alert_details.responder.title");
     }
 
     function renderResponderStatusBadge(status) {
         const value = String(status || "").toLowerCase();
         const labels = {
-            requested: "Requested",
-            accepted: "Accepted",
-            declined: "Declined",
-            expired: "Expired",
-            resolved: "Resolved",
+            requested: i18n.t("alert_details.responder.requested"),
+            accepted: i18n.t("alert_details.responder.accepted"),
+            declined: i18n.t("alert_details.responder.declined"),
+            expired: i18n.t("alert_details.responder.expired"),
+            resolved: i18n.t("alert_details.responder.resolved"),
         };
 
         return $("<span>")
@@ -521,7 +521,7 @@ window.AlertIncidentManagement = (function () {
                         .addClass("btn btn-success btn-sm incident-responder-action")
                         .attr("data-responder-id", responder.id)
                         .attr("data-status", "accepted")
-                        .text("Accept")
+                        .text(i18n.t("alert_details.actions.accept"))
                 )
                 .append(
                     $("<button>")
@@ -529,7 +529,7 @@ window.AlertIncidentManagement = (function () {
                         .addClass("btn btn-secondary btn-sm incident-responder-action")
                         .attr("data-responder-id", responder.id)
                         .attr("data-status", "declined")
-                        .text("Decline")
+                        .text(i18n.t("alert_details.actions.decline"))
                 );
 
             return actions;
@@ -542,7 +542,7 @@ window.AlertIncidentManagement = (function () {
                     .addClass("btn btn-secondary btn-sm incident-responder-action")
                     .attr("data-responder-id", responder.id)
                     .attr("data-status", "resolved")
-                    .text("Resolve")
+                    .text(i18n.t("alert_details.actions.resolve"))
             );
         }
 
@@ -563,14 +563,14 @@ window.AlertIncidentManagement = (function () {
         }
 
         if (status === "declined") {
-            return "Decline reason: " + responder.response_message;
+            return i18n.t("alert_details.responder.decline_reason") + responder.response_message;
         }
 
         if (status === "resolved") {
-            return "Resolution note: " + responder.response_message;
+            return i18n.t("alert_details.responder.resolution_note") + responder.response_message;
         }
 
-        return "Response: " + responder.response_message;
+        return i18n.t("alert_details.responder.response") + responder.response_message;
     }
 
 
@@ -582,8 +582,8 @@ window.AlertIncidentManagement = (function () {
         }
 
         return responder.notification_error
-            ? "Notification failed: " + responder.notification_error
-            : "Notification failed.";
+            ? i18n.t("alert_details.responder.notification_failed_prefix") + responder.notification_error
+            : i18n.t("alert_details.responder.notification_failed");
     }
 
     function responderMeta(responder) {
@@ -602,7 +602,7 @@ window.AlertIncidentManagement = (function () {
         container.empty();
 
         if (!stakeholders.length) {
-            container.append(renderEmpty("No stakeholders added yet."));
+            container.append(renderEmpty(i18n.t("alert_details.stakeholders.empty")));
             return;
         }
 
@@ -625,7 +625,7 @@ window.AlertIncidentManagement = (function () {
                 .attr("type", "button")
                 .addClass("btn btn-ghost btn-sm incident-remove-stakeholder")
                 .attr("data-stakeholder-id", stakeholder.id)
-                .text("Remove")
+                .text(i18n.t("alert_details.actions.remove"))
                 .appendTo(row);
         }
 
@@ -647,10 +647,10 @@ window.AlertIncidentManagement = (function () {
         }
 
         if (stakeholder.user) {
-            return displayObjectName(stakeholder.user, "User");
+            return displayObjectName(stakeholder.user, i18n.t("alert_details.target.user"));
         }
 
-        return "Stakeholder";
+        return i18n.t("alert_details.stakeholder.title");
     }
 
     function stakeholderMeta(stakeholder) {
@@ -730,9 +730,9 @@ window.AlertIncidentManagement = (function () {
 
         showAppConfirm({
             type: "warning",
-            title: "Reset incident priority",
-            message: "Return this incident to automatic priority management?",
-            confirmText: "Reset to automatic",
+            title: i18n.t("alert_details.priority.reset_title"),
+            message: i18n.t("alert_details.priority.reset_message"),
+            confirmText: i18n.t("alert_details.priority.reset_auto"),
             confirmClass: "btn-primary",
         }).done(function () {
             apiDelete("/api/incidents/" + incidentId + "/priority", function () {
@@ -744,9 +744,9 @@ window.AlertIncidentManagement = (function () {
     function confirmStakeholderRemoval(section, stakeholderId) {
         showAppConfirm({
             type: "warning",
-            title: "Remove stakeholder",
-            message: "Remove this stakeholder from the incident?",
-            confirmText: "Remove",
+            title: i18n.t("alert_details.stakeholder.remove_title"),
+            message: i18n.t("alert_details.stakeholder.remove_message"),
+            confirmText: i18n.t("alert_details.actions.remove"),
             confirmClass: "btn-danger",
         }).done(function () {
             apiDelete(
@@ -780,9 +780,9 @@ window.AlertIncidentManagement = (function () {
         if (status === "declined") {
             showAppConfirm({
                 type: "warning",
-                title: "Decline responder request",
-                message: "Decline this responder request?",
-                confirmText: "Decline",
+                title: i18n.t("alert_details.responder.decline_title"),
+                message: i18n.t("alert_details.responder.decline_message"),
+                confirmText: i18n.t("alert_details.actions.decline"),
                 confirmClass: "btn-warning",
             }).done(runUpdate);
             return;
@@ -791,9 +791,9 @@ window.AlertIncidentManagement = (function () {
         if (status === "resolved") {
             showAppConfirm({
                 type: "info",
-                title: "Resolve responder request",
-                message: "Mark this responder request as resolved?",
-                confirmText: "Resolve",
+                title: i18n.t("alert_details.responder.resolve_title"),
+                message: i18n.t("alert_details.responder.resolve_message"),
+                confirmText: i18n.t("alert_details.actions.resolve"),
                 confirmClass: "btn-secondary",
             }).done(runUpdate);
             return;
@@ -821,9 +821,9 @@ window.AlertIncidentManagement = (function () {
     function resetResponderForm(modal) {
         modal.find("#incident-responder-target-type").val("user");
         modal.find("#incident-responder-target-select").empty().append(
-            $("<option>").val("").text("Loading users...")
+            $("<option>").val("").text(i18n.t("alert_details.loading.users"))
         );
-        modal.find("#incident-responder-message").val("Please help with this incident.");
+        modal.find("#incident-responder-message").val(i18n.t("alert_details.responder.default_message"));
         modal.find("#incident-responder-expires").val("");
 
         clearFormError(modal);
@@ -835,7 +835,7 @@ window.AlertIncidentManagement = (function () {
 
         modal
             .find("#incident-responder-target-select-label")
-            .text(responderTargetLabels[targetType] || "Target");
+            .text(responderTargetLabels[targetType] || i18n.t("alert_details.target.generic"));
 
         modal
             .find("#incident-responder-target-help")
@@ -854,7 +854,7 @@ window.AlertIncidentManagement = (function () {
             fillTargetSelect(
                 modal.find("#incident-responder-target-select"),
                 items,
-                responderTargetPlaceholders[targetType] || "Select target"
+                responderTargetPlaceholders[targetType] || i18n.t("alert_details.target.select_generic")
             );
         });
     }
@@ -890,7 +890,7 @@ window.AlertIncidentManagement = (function () {
 
         modal.find("#incident-responder-target-select")
             .empty()
-            .append($("<option>").val("").text("Loading " + label.toLowerCase() + "..."));
+            .append($("<option>").val("").text(i18n.t("alert_details.target.loading", {target: label.toLowerCase()})));
     }
 
     function fillTargetSelect(select, items, placeholder) {
@@ -905,7 +905,7 @@ window.AlertIncidentManagement = (function () {
         });
 
         if (!items.length) {
-            select.append($("<option>").val("").text("No available options"));
+            select.append($("<option>").val("").text(i18n.t("alert_details.target.none")));
         }
     }
 
@@ -1057,12 +1057,12 @@ window.AlertIncidentManagement = (function () {
         clearFormError(modal);
 
         if (!targetField) {
-            showFormError(modal, "Invalid target type.");
+            showFormError(modal, i18n.t("alert_details.target.invalid"));
             return null;
         }
 
         if (!targetId) {
-            showFormError(modal, "Select a responder target.");
+            showFormError(modal, i18n.t("alert_details.target.required"));
             return null;
         }
 
@@ -1098,7 +1098,7 @@ window.AlertIncidentManagement = (function () {
 
     function resetStakeholderForm(modal) {
         modal.find("#incident-stakeholder-user-select").empty().append(
-            $("<option>").val("").text("Loading users...")
+            $("<option>").val("").text(i18n.t("alert_details.loading.users"))
         );
         modal.find("#incident-stakeholder-email").val("");
         modal.find("#incident-stakeholder-display-name").val("");
@@ -1117,7 +1117,7 @@ window.AlertIncidentManagement = (function () {
             const select = modal.find("#incident-stakeholder-user-select");
 
             select.empty();
-            select.append($("<option>").val("").text("No existing user"));
+            select.append($("<option>").val("").text(i18n.t("alert_details.stakeholder.no_existing_user")));
 
             items.forEach(function (item) {
                 $("<option>")
@@ -1154,7 +1154,7 @@ window.AlertIncidentManagement = (function () {
         clearFormError(modal);
 
         if (!email && !userId) {
-            showFormError(modal, "Select an existing user or enter email.");
+            showFormError(modal, i18n.t("alert_details.stakeholder.required"));
             return null;
         }
 
@@ -1188,8 +1188,8 @@ window.AlertIncidentManagement = (function () {
         if (typeof showAppDialog === "function") {
             showAppDialog({
                 type: "error",
-                title: "Missing modal",
-                message: "Modal #" + modalId + " was not found on the page.",
+                title: i18n.t("alert_details.modal.missing_title"),
+                message: i18n.t("alert_details.modal.missing", {id: modalId}),
             });
         }
     }
@@ -1261,7 +1261,7 @@ window.AlertIncidentManagement = (function () {
             return username + " · " + email;
         }
 
-        return username || email || ("User #" + (item.user_id || item.id));
+        return username || email || (i18n.t("alert_details.entity.user_number", {id: item.user_id || item.id}));
     }
 
     function teamOptionLabel(item) {
@@ -1269,7 +1269,7 @@ window.AlertIncidentManagement = (function () {
             return item.name + " (" + item.slug + ")";
         }
 
-        return item.name || item.slug || ("Team #" + item.id);
+        return item.name || item.slug || (i18n.t("alert_details.entity.team_number", {id: item.id}));
     }
 
     function getInputValue(scope, selector) {
@@ -1293,7 +1293,7 @@ window.AlertIncidentManagement = (function () {
     }
 
     function rotationOptionLabel(item) {
-        const name = item.name || ("Rotation #" + item.id);
+        const name = item.name || (i18n.t("alert_details.entity.rotation_number", {id: item.id}));
         const teamName = item.team_name || item.team_slug || getNestedName(item.team);
 
         if (teamName) {
@@ -1304,7 +1304,7 @@ window.AlertIncidentManagement = (function () {
     }
 
     function escalationPolicyOptionLabel(item) {
-        const name = item.name || ("Escalation policy #" + item.id);
+        const name = item.name || (i18n.t("alert_details.entity.policy_number", {id: item.id}));
         const teamName = item.team_name || item.team_slug || getNestedName(item.team);
 
         if (teamName) {

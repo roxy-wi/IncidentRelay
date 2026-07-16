@@ -42,14 +42,12 @@ function initSidebar() {
             "aria-expanded",
             collapsed ? "false" : "true"
         );
-        toggle.setAttribute(
-            "aria-label",
-            collapsed ? "Expand sidebar" : "Collapse sidebar"
-        );
-        toggle.setAttribute(
-            "title",
-            collapsed ? "Expand sidebar" : "Collapse sidebar"
-        );
+        const toggleLabel = collapsed
+            ? i18n.t("common.expand_sidebar", {}, "Expand sidebar")
+            : i18n.t("common.collapse_sidebar", {}, "Collapse sidebar");
+
+        toggle.setAttribute("aria-label", toggleLabel);
+        toggle.setAttribute("title", toggleLabel);
 
         const icon = toggle.querySelector(".sidebar-toggle-icon");
 

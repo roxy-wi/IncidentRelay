@@ -7,78 +7,76 @@
     let serviceStandardTomSelects = [];
 
     const CHECK_TYPES = [
-        ["field_present", "Field present"],
-        ["field_equals", "Field equals"],
-        ["owner_exists", "Owner exists"],
-        ["active_rotation_exists", "Active rotation exists"],
-        ["escalation_policy_exists", "Escalation policy exists"],
-        ["notification_policy_exists", "Notification policy exists"],
-        ["service_channel_exists", "Service channel exists"],
-        ["route_exists", "Route exists"],
-        ["match_rule_exists", "Match rule exists"],
-        ["runbook_exists", "Runbook exists"],
-        ["link_type_exists", "Link type exists"],
-        ["dependency_exists", "Dependency exists"],
-        ["dependency_cycle_absent", "Dependency cycle absent"],
-        ["metadata_value", "Metadata value"],
+        ["field_present", i18n.t("service_standards.check_type.field_present")],
+        ["field_equals", i18n.t("service_standards.check_type.field_equals")],
+        ["owner_exists", i18n.t("service_standards.check_type.owner_exists")],
+        ["active_rotation_exists", i18n.t("service_standards.check_type.active_rotation_exists")],
+        ["escalation_policy_exists", i18n.t("service_standards.check_type.escalation_policy_exists")],
+        ["notification_policy_exists", i18n.t("service_standards.check_type.notification_policy_exists")],
+        ["service_channel_exists", i18n.t("service_standards.check_type.service_channel_exists")],
+        ["route_exists", i18n.t("service_standards.check_type.route_exists")],
+        ["match_rule_exists", i18n.t("service_standards.check_type.match_rule_exists")],
+        ["runbook_exists", i18n.t("service_standards.check_type.runbook_exists")],
+        ["link_type_exists", i18n.t("service_standards.check_type.link_type_exists")],
+        ["dependency_exists", i18n.t("service_standards.check_type.dependency_exists")],
+        ["dependency_cycle_absent", i18n.t("service_standards.check_type.dependency_cycle_absent")],
+        ["metadata_value", i18n.t("service_standards.check_type.metadata_value")],
     ];
 
     const SEVERITIES = [
-        ["info", "Info"],
-        ["warning", "Warning"],
-        ["critical", "Critical"],
+        ["info", i18n.t("service_standards.severity.info")],
+        ["warning", i18n.t("service_standards.severity.warning")],
+        ["critical", i18n.t("service_standards.severity.critical")],
     ];
 
-    const SERVICE_OPTIONS = window.ServiceCatalogOptions || {};
-
-    const KIND_OPTIONS = SERVICE_OPTIONS.kinds || [
-        ["technical", "Technical"],
-        ["business", "Business"],
+    const KIND_OPTIONS = [
+        ["technical", i18n.t("service_standards.kind.technical")],
+        ["business", i18n.t("service_standards.kind.business")],
     ];
 
-    const LIFECYCLE_OPTIONS = SERVICE_OPTIONS.lifecycles || [
-        ["experimental", "Experimental"],
-        ["development", "Development"],
-        ["production", "Production"],
-        ["deprecated", "Deprecated"],
-        ["retired", "Retired"],
+    const LIFECYCLE_OPTIONS = [
+        ["experimental", i18n.t("service_standards.lifecycle.experimental")],
+        ["development", i18n.t("service_standards.lifecycle.development")],
+        ["production", i18n.t("service_standards.lifecycle.production")],
+        ["deprecated", i18n.t("service_standards.lifecycle.deprecated")],
+        ["retired", i18n.t("service_standards.lifecycle.retired")],
     ];
 
-    const TIER_OPTIONS = SERVICE_OPTIONS.tiers || [
-        ["tier_1", "Tier 1"],
-        ["tier_2", "Tier 2"],
-        ["tier_3", "Tier 3"],
-        ["tier_4", "Tier 4"],
+    const TIER_OPTIONS = [
+        ["tier_1", i18n.t("service_standards.tier.tier_1")],
+        ["tier_2", i18n.t("service_standards.tier.tier_2")],
+        ["tier_3", i18n.t("service_standards.tier.tier_3")],
+        ["tier_4", i18n.t("service_standards.tier.tier_4")],
     ];
 
-    const CRITICALITY_OPTIONS = SERVICE_OPTIONS.criticalities || [
-        ["critical", "Critical"],
-        ["high", "High"],
-        ["medium", "Medium"],
-        ["low", "Low"],
+    const CRITICALITY_OPTIONS = [
+        ["critical", i18n.t("service_standards.criticality.critical")],
+        ["high", i18n.t("service_standards.criticality.high")],
+        ["medium", i18n.t("service_standards.criticality.medium")],
+        ["low", i18n.t("service_standards.criticality.low")],
     ];
 
-    const ENVIRONMENT_OPTIONS = SERVICE_OPTIONS.environments || [
-        ["production", "Production"],
-        ["staging", "Staging"],
-        ["development", "Development"],
-        ["testing", "Testing"],
-        ["shared", "Shared"],
+    const ENVIRONMENT_OPTIONS = [
+        ["production", i18n.t("service_standards.environment.production")],
+        ["staging", i18n.t("service_standards.environment.staging")],
+        ["development", i18n.t("service_standards.environment.development")],
+        ["testing", i18n.t("service_standards.environment.testing")],
+        ["shared", i18n.t("service_standards.environment.shared")],
     ];
 
-    const SERVICE_TYPE_OPTIONS = SERVICE_OPTIONS.serviceTypes || SERVICE_OPTIONS.service_types || [
-        ["api", "API"],
-        ["web", "Web"],
-        ["database", "Database"],
-        ["queue", "Queue"],
-        ["cache", "Cache"],
-        ["worker", "Worker"],
-        ["cron", "Cron"],
-        ["network", "Network"],
-        ["storage", "Storage"],
-        ["infrastructure", "Infrastructure"],
-        ["external", "External"],
-        ["other", "Other"],
+    const SERVICE_TYPE_OPTIONS = [
+        ["api", i18n.t("service_standards.service_type.api")],
+        ["web", i18n.t("service_standards.service_type.web")],
+        ["database", i18n.t("service_standards.service_type.database")],
+        ["queue", i18n.t("service_standards.service_type.queue")],
+        ["cache", i18n.t("service_standards.service_type.cache")],
+        ["worker", i18n.t("service_standards.service_type.worker")],
+        ["cron", i18n.t("service_standards.service_type.cron")],
+        ["network", i18n.t("service_standards.service_type.network")],
+        ["storage", i18n.t("service_standards.service_type.storage")],
+        ["infrastructure", i18n.t("service_standards.service_type.infrastructure")],
+        ["external", i18n.t("service_standards.service_type.external")],
+        ["other", i18n.t("service_standards.service_type.other")],
     ];
 
     function standardsApi(method, url, data) {
@@ -170,7 +168,7 @@
                 maxItems: null,
                 closeAfterSelect: false,
                 hideSelected: true,
-                placeholder: $(this).data("placeholder") || "Select values",
+                placeholder: $(this).data("placeholder") || i18n.t("service_standards.form.select_values"),
             };
 
             if (TomSelectClass.plugins && TomSelectClass.plugins.remove_button) {
@@ -206,7 +204,7 @@
             return;
         }
 
-        if (confirm(options.message || options.title || "Are you sure?")) {
+        if (confirm(options.message || options.title || i18n.t("service_standards.confirm.default"))) {
             callback();
         }
     }
@@ -303,8 +301,8 @@
             return;
         }
 
-        renderStandardsLoading("Loading service standards...");
-        renderChecksEmpty("Select a standard to manage checks.");
+        renderStandardsLoading(i18n.t("service_standards.loading.standards"));
+        renderChecksEmpty(i18n.t("service_standards.empty.select"));
 
         standardsApi("GET", buildStandardsUrl())
             .then(function (payload) {
@@ -328,16 +326,16 @@
                 if (standardsState.selectedStandardId) {
                     loadStandardChecks(standardsState.selectedStandardId);
                 } else {
-                    renderChecksEmpty("Select a standard to manage checks.");
+                    renderChecksEmpty(i18n.t("service_standards.empty.select"));
                 }
             })
             .catch(function (xhr) {
-                renderStandardsEmpty(getErrorMessage(xhr, "Failed to load service standards."));
+                renderStandardsEmpty(getErrorMessage(xhr, i18n.t("service_standards.errors.load_standards")));
             });
     }
 
     function loadStandardChecks(standardId) {
-        renderChecksLoading("Loading checks...");
+        renderChecksLoading(i18n.t("service_standards.loading.checks"));
         $("#new-service-standard-check-btn").prop("disabled", true);
 
         standardsApi("GET", "/api/services/standards/" + encodeURIComponent(standardId) + "/checks?include_disabled=1")
@@ -346,7 +344,7 @@
                 renderChecksTable();
             })
             .catch(function (xhr) {
-                renderChecksEmpty(getErrorMessage(xhr, "Failed to load service standard checks."));
+                renderChecksEmpty(getErrorMessage(xhr, i18n.t("service_standards.errors.load_checks")));
             });
     }
 
@@ -382,7 +380,7 @@
         tbody.empty();
 
         if (!standardsState.standards.length) {
-            renderStandardsEmpty("No service standards configured for this group.");
+            renderStandardsEmpty(i18n.t("service_standards.empty.none"));
             return;
         }
 
@@ -402,7 +400,7 @@
                     $("<button>")
                         .attr("type", "button")
                         .addClass("name-button")
-                        .text(standard.name || standard.slug || ("Standard #" + standard.id))
+                        .text(standardDisplayName(standard))
                         .on("click", function () {
                             selectStandard(standard.id);
                         })
@@ -411,7 +409,7 @@
         );
         row.append($("<td>").addClass("table-cell-truncate-wide").text(formatAppliesTo(standard.applies_to)));
         row.append($("<td>").text(Number(standard.checks_count || 0)));
-        row.append($("<td>").append(renderStatusBadge(!!standard.enabled, "Enabled", "Disabled")));
+        row.append($("<td>").append(renderStatusBadge(!!standard.enabled, i18n.t("service_standards.status.enabled"), i18n.t("service_standards.status.disabled"))));
         row.append($("<td>").addClass("actions-cell").append(renderStandardActions(standard)));
 
         return row;
@@ -424,16 +422,16 @@
         tbody.empty();
         $("#new-service-standard-check-btn").prop("disabled", !standard);
         $("#service-standard-checks-subtitle").text(
-            standard ? (standard.name || standard.slug || "Selected standard") : "Select a standard to manage checks."
+            standard ? standardDisplayName(standard) : i18n.t("service_standards.empty.select")
         );
 
         if (!standard) {
-            renderChecksEmpty("Select a standard to manage checks.");
+            renderChecksEmpty(i18n.t("service_standards.empty.select"));
             return;
         }
 
         if (!standardsState.checks.length) {
-            renderChecksEmpty("This standard has no checks.");
+            renderChecksEmpty(i18n.t("service_standards.empty.no_checks"));
             return;
         }
 
@@ -448,13 +446,13 @@
         row.append(
             $("<td>")
                 .addClass("table-cell-truncate")
-                .append($("<strong>").text(check.name || check.slug || ("Check #" + check.id)))
+                .append($("<strong>").text(checkDisplayName(check)))
                 .append($("<div>").addClass("row-subtitle").text(check.slug || "-"))
         );
-        row.append($("<td>").text(check.check_type || "-"));
+        row.append($("<td>").text(optionLabel(CHECK_TYPES, check.check_type)));
         row.append($("<td>").text(Number(check.weight || 0)));
         row.append($("<td>").append(renderSeverityBadge(check.severity || "warning", !!check.required)));
-        row.append($("<td>").append(renderStatusBadge(!!check.enabled, "Enabled", "Disabled")));
+        row.append($("<td>").append(renderStatusBadge(!!check.enabled, i18n.t("service_standards.status.enabled"), i18n.t("service_standards.status.disabled"))));
         row.append($("<td>").addClass("actions-cell").append(renderCheckActions(check)));
 
         return row;
@@ -466,21 +464,21 @@
                 object: standard,
                 items: [
                     {
-                        label: "Edit",
+                        label: i18n.t("service_standards.actions.edit"),
                         icon: "fas fa-edit",
                         onClick: function () {
                             openStandardModal(standard);
                         },
                     },
                     {
-                        label: standard.enabled ? "Disable" : "Enable",
+                        label: standard.enabled ? i18n.t("service_standards.actions.disable") : i18n.t("service_standards.actions.enable"),
                         icon: standard.enabled ? "fas fa-pause" : "fas fa-play",
                         onClick: function () {
                             toggleStandard(standard);
                         },
                     },
                     {
-                        label: "Delete",
+                        label: i18n.t("service_standards.actions.delete"),
                         icon: "fas fa-trash",
                         danger: true,
                         onClick: function () {
@@ -492,13 +490,13 @@
         }
 
         return renderInlineActionFallback([
-            ["Edit", function () {
+            [i18n.t("service_standards.actions.edit"), function () {
                 openStandardModal(standard);
             }],
-            [standard.enabled ? "Disable" : "Enable", function () {
+            [standard.enabled ? i18n.t("service_standards.actions.disable") : i18n.t("service_standards.actions.enable"), function () {
                 toggleStandard(standard);
             }],
-            ["Delete", function () {
+            [i18n.t("service_standards.actions.delete"), function () {
                 deleteStandard(standard);
             }, true],
         ]);
@@ -510,21 +508,21 @@
                 object: getSelectedStandard() || {},
                 items: [
                     {
-                        label: "Edit",
+                        label: i18n.t("service_standards.actions.edit"),
                         icon: "fas fa-edit",
                         onClick: function () {
                             openCheckModal(check);
                         },
                     },
                     {
-                        label: check.enabled ? "Disable" : "Enable",
+                        label: check.enabled ? i18n.t("service_standards.actions.disable") : i18n.t("service_standards.actions.enable"),
                         icon: check.enabled ? "fas fa-pause" : "fas fa-play",
                         onClick: function () {
                             toggleCheck(check);
                         },
                     },
                     {
-                        label: "Delete",
+                        label: i18n.t("service_standards.actions.delete"),
                         icon: "fas fa-trash",
                         danger: true,
                         onClick: function () {
@@ -536,13 +534,13 @@
         }
 
         return renderInlineActionFallback([
-            ["Edit", function () {
+            [i18n.t("service_standards.actions.edit"), function () {
                 openCheckModal(check);
             }],
-            [check.enabled ? "Disable" : "Enable", function () {
+            [check.enabled ? i18n.t("service_standards.actions.disable") : i18n.t("service_standards.actions.enable"), function () {
                 toggleCheck(check);
             }],
-            ["Delete", function () {
+            [i18n.t("service_standards.actions.delete"), function () {
                 deleteCheck(check);
             }, true],
         ]);
@@ -564,8 +562,53 @@
         return wrapper;
     }
 
+    function optionLabel(options, value) {
+        const match = options.find(function (option) {
+            return String(option[0]) === String(value || "");
+        });
+
+        return match ? match[1] : (value || "-");
+    }
+
+    function optionLabels(options, values) {
+        return (values || []).map(function (value) {
+            return optionLabel(options, value);
+        }).join(", ");
+    }
+
+    function standardDisplayName(standard) {
+        standard = standard || {};
+
+        if (standard.slug === "basic-operational-readiness") {
+            return i18n.t("service_standards.builtin.standard.basic");
+        }
+
+        return standard.name || standard.slug || i18n.t("service_standards.standard_number", {id: standard.id});
+    }
+
+    function checkDisplayName(check) {
+        check = check || {};
+        const builtin = {
+            owner: "service_standards.builtin.check.owner",
+            "escalation-policy": "service_standards.builtin.check.escalation_policy",
+            "notification-policy": "service_standards.builtin.check.notification_policy",
+            "alert-route": "service_standards.builtin.check.alert_route",
+            runbook: "service_standards.builtin.check.runbook",
+            "dependency-cycle": "service_standards.builtin.check.dependency_cycle",
+        };
+
+        if (Object.prototype.hasOwnProperty.call(builtin, check.slug)) {
+            return i18n.t(builtin[check.slug]);
+        }
+
+        return check.name || check.slug || i18n.t("service_standards.check_number", {id: check.id});
+    }
+
     function renderSeverityBadge(severity, required) {
-        const text = required ? severity + " / required" : severity;
+        const severityLabel = optionLabel(SEVERITIES, severity);
+        const text = required
+            ? i18n.t("service_standards.severity.required", {severity: severityLabel})
+            : severityLabel;
         const cssClass = severity === "critical"
             ? "status-pill status-inactive"
             : severity === "warning"
@@ -581,30 +624,42 @@
         const parts = [];
 
         if (appliesTo.kinds && appliesTo.kinds.length) {
-            parts.push("kind: " + appliesTo.kinds.join(", "));
+            parts.push(i18n.t("service_standards.applies.kind", {
+                values: optionLabels(KIND_OPTIONS, appliesTo.kinds),
+            }));
         }
 
         if (appliesTo.lifecycles && appliesTo.lifecycles.length) {
-            parts.push("lifecycle: " + appliesTo.lifecycles.join(", "));
+            parts.push(i18n.t("service_standards.applies.lifecycle", {
+                values: optionLabels(LIFECYCLE_OPTIONS, appliesTo.lifecycles),
+            }));
         }
 
         if (appliesTo.environments && appliesTo.environments.length) {
-            parts.push("env: " + appliesTo.environments.join(", "));
+            parts.push(i18n.t("service_standards.applies.environment", {
+                values: optionLabels(ENVIRONMENT_OPTIONS, appliesTo.environments),
+            }));
         }
 
         if (appliesTo.tiers && appliesTo.tiers.length) {
-            parts.push("tier: " + appliesTo.tiers.join(", "));
+            parts.push(i18n.t("service_standards.applies.tier", {
+                values: optionLabels(TIER_OPTIONS, appliesTo.tiers),
+            }));
         }
 
         if (appliesTo.criticalities && appliesTo.criticalities.length) {
-            parts.push("criticality: " + appliesTo.criticalities.join(", "));
+            parts.push(i18n.t("service_standards.applies.criticality", {
+                values: optionLabels(CRITICALITY_OPTIONS, appliesTo.criticalities),
+            }));
         }
 
         if (appliesTo.service_types && appliesTo.service_types.length) {
-            parts.push("type: " + appliesTo.service_types.join(", "));
+            parts.push(i18n.t("service_standards.applies.type", {
+                values: optionLabels(SERVICE_TYPE_OPTIONS, appliesTo.service_types),
+            }));
         }
 
-        return parts.length ? parts.join(" / ") : "all services";
+        return parts.length ? parts.join(" / ") : i18n.t("service_standards.applies.all");
     }
 
     function getStandardById(id) {
@@ -633,7 +688,7 @@
         const groupId = getSelectedGroupId();
 
         if (!groupId) {
-            notifyError("Group is required to restore the default service standard.");
+            notifyError(i18n.t("service_standards.errors.restore_group"));
             return;
         }
 
@@ -646,7 +701,7 @@
                 loadServiceStandards();
             })
             .catch(function (xhr) {
-                notifyError(getErrorMessage(xhr, "Failed to restore default service standard."));
+                notifyError(getErrorMessage(xhr, i18n.t("service_standards.errors.restore")));
             });
     }
 
@@ -660,15 +715,15 @@
                 loadServiceStandards();
             })
             .catch(function (xhr) {
-                notifyError(getErrorMessage(xhr, "Failed to update service standard."));
+                notifyError(getErrorMessage(xhr, i18n.t("service_standards.errors.update_standard")));
             });
     }
 
     function deleteStandard(standard) {
         confirmAction({
-            title: "Delete this service standard?",
-            message: "Delete service standard \"" + (standard.name || standard.slug || standard.id) + "\"?",
-            confirmText: "Delete",
+            title: i18n.t("service_standards.confirm.delete_standard_title"),
+            message: i18n.t("service_standards.confirm.delete_standard_message", {name: standard.name || standard.slug || standard.id}),
+            confirmText: i18n.t("service_standards.actions.delete"),
             confirmClass: "btn-danger",
         }, function () {
             standardsApi("DELETE", "/api/services/standards/" + encodeURIComponent(standard.id))
@@ -679,7 +734,7 @@
                     loadServiceStandards();
                 })
                 .catch(function (xhr) {
-                    notifyError(getErrorMessage(xhr, "Failed to delete service standard."));
+                    notifyError(getErrorMessage(xhr, i18n.t("service_standards.errors.delete_standard")));
                 });
         });
     }
@@ -700,7 +755,7 @@
                 loadServiceStandards();
             })
             .catch(function (xhr) {
-                notifyError(getErrorMessage(xhr, "Failed to update readiness check."));
+                notifyError(getErrorMessage(xhr, i18n.t("service_standards.errors.update_check")));
             });
     }
 
@@ -708,9 +763,9 @@
         const standard = getSelectedStandard();
 
         confirmAction({
-            title: "Delete this readiness check?",
-            message: "Delete readiness check \"" + (check.name || check.slug || check.id) + "\"?",
-            confirmText: "Delete",
+            title: i18n.t("service_standards.confirm.delete_check_title"),
+            message: i18n.t("service_standards.confirm.delete_check_message", {name: check.name || check.slug || check.id}),
+            confirmText: i18n.t("service_standards.actions.delete"),
             confirmClass: "btn-danger",
         }, function () {
             standardsApi("DELETE", "/api/services/standards/" + encodeURIComponent(standard.id) + "/checks/" + encodeURIComponent(check.id))
@@ -720,7 +775,7 @@
                     loadServiceStandards();
                 })
                 .catch(function (xhr) {
-                    notifyError(getErrorMessage(xhr, "Failed to delete readiness check."));
+                    notifyError(getErrorMessage(xhr, i18n.t("service_standards.errors.delete_check")));
                 });
         });
     }
@@ -780,7 +835,7 @@
         const groupId = standard ? standard.group_id : getSelectedGroupId();
 
         if (!groupId) {
-            notifyError("Group is required to create a service standard.");
+            notifyError(i18n.t("service_standards.errors.create_group"));
             return;
         }
 
@@ -836,14 +891,14 @@
                             .addClass("app-modal-header")
                             .append(
                                 $("<div>")
-                                    .append($("<h2>").text(standard.id ? "Edit service standard" : "New service standard"))
-                                    .append($("<div>").addClass("card-subtitle").text("Readiness requirements for matching services."))
+                                    .append($("<h2>").text(standard.id ? i18n.t("service_standards.form.edit_standard") : i18n.t("service_standards.form.new_standard")))
+                                    .append($("<div>").addClass("card-subtitle").text(i18n.t("service_standards.form.standard_subtitle")))
                             )
                             .append(
                                 $("<button>")
                                     .attr("type", "button")
                                     .addClass("app-modal-close")
-                                    .attr("aria-label", "Close")
+                                    .attr("aria-label", i18n.t("common.close", {}, "Close"))
                                     .text("×")
                                     .on("click", function () {
                                         closeServiceStandardModal("#service-standard-modal");
@@ -858,25 +913,25 @@
                                     .addClass("form-body")
                                     .append(hiddenInput("standard-id", standard.id || ""))
                                     .append(hiddenInput("standard-group-id", standard.group_id || groupId))
-                                    .append(formLabel("service-standard-name", "Name"))
-                                    .append(textInput("service-standard-name", standard.name || "", "Basic operational readiness"))
-                                    .append(formLabel("service-standard-slug", "Slug"))
+                                    .append(formLabel("service-standard-name", i18n.t("service_standards.form.name")))
+                                    .append(textInput("service-standard-name", standard.name || "", i18n.t("service_standards.form.standard_name_placeholder")))
+                                    .append(formLabel("service-standard-slug", i18n.t("service_standards.form.slug")))
                                     .append(textInput("service-standard-slug", standard.slug || "", "basic-operational-readiness"))
-                                    .append(formLabel("service-standard-description", "Description"))
+                                    .append(formLabel("service-standard-description", i18n.t("service_standards.form.description")))
                                     .append(textArea("service-standard-description", standard.description || ""))
-                                    .append(formLabel("service-standard-kind", "Kinds"))
-                                    .append(multiSelectInput("service-standard-kind", KIND_OPTIONS, appliesTo.kinds || [], "Select kinds"))
-                                    .append(formLabel("service-standard-lifecycle", "Lifecycles"))
-                                    .append(multiSelectInput("service-standard-lifecycle", LIFECYCLE_OPTIONS, appliesTo.lifecycles || [], "Select lifecycles"))
-                                    .append(formLabel("service-standard-tier", "Tiers"))
-                                    .append(multiSelectInput("service-standard-tier", TIER_OPTIONS, appliesTo.tiers || [], "Select tiers"))
-                                    .append(formLabel("service-standard-criticality", "Criticalities"))
-                                    .append(multiSelectInput("service-standard-criticality", CRITICALITY_OPTIONS, appliesTo.criticalities || [], "Select criticalities"))
-                                    .append(formLabel("service-standard-environment", "Environments"))
-                                    .append(multiSelectInput("service-standard-environment", ENVIRONMENT_OPTIONS, appliesTo.environments || [], "Select environments"))
-                                    .append(formLabel("service-standard-service-type", "Service types"))
-                                    .append(multiSelectInput("service-standard-service-type", SERVICE_TYPE_OPTIONS, appliesTo.service_types || [], "Select service types"))
-                                    .append(checkboxLine("service-standard-enabled", "Enabled", standard.enabled !== false))
+                                    .append(formLabel("service-standard-kind", i18n.t("service_standards.form.kinds")))
+                                    .append(multiSelectInput("service-standard-kind", KIND_OPTIONS, appliesTo.kinds || [], i18n.t("service_standards.form.select_kinds")))
+                                    .append(formLabel("service-standard-lifecycle", i18n.t("service_standards.form.lifecycles")))
+                                    .append(multiSelectInput("service-standard-lifecycle", LIFECYCLE_OPTIONS, appliesTo.lifecycles || [], i18n.t("service_standards.form.select_lifecycles")))
+                                    .append(formLabel("service-standard-tier", i18n.t("service_standards.form.tiers")))
+                                    .append(multiSelectInput("service-standard-tier", TIER_OPTIONS, appliesTo.tiers || [], i18n.t("service_standards.form.select_tiers")))
+                                    .append(formLabel("service-standard-criticality", i18n.t("service_standards.form.criticalities")))
+                                    .append(multiSelectInput("service-standard-criticality", CRITICALITY_OPTIONS, appliesTo.criticalities || [], i18n.t("service_standards.form.select_criticalities")))
+                                    .append(formLabel("service-standard-environment", i18n.t("service_standards.form.environments")))
+                                    .append(multiSelectInput("service-standard-environment", ENVIRONMENT_OPTIONS, appliesTo.environments || [], i18n.t("service_standards.form.select_environments")))
+                                    .append(formLabel("service-standard-service-type", i18n.t("service_standards.form.service_types")))
+                                    .append(multiSelectInput("service-standard-service-type", SERVICE_TYPE_OPTIONS, appliesTo.service_types || [], i18n.t("service_standards.form.select_service_types")))
+                                    .append(checkboxLine("service-standard-enabled", i18n.t("service_standards.form.enabled"), standard.enabled !== false))
                                     .append(
                                         $("<div>")
                                             .addClass("form-actions")
@@ -884,7 +939,7 @@
                                                 $("<button>")
                                                     .attr("type", "button")
                                                     .addClass("btn")
-                                                    .text("Cancel")
+                                                    .text(i18n.t("service_standards.actions.cancel"))
                                                     .on("click", function () {
                                                         closeServiceStandardModal("#service-standard-modal");
                                                     })
@@ -893,7 +948,7 @@
                                                 $("<button>")
                                                     .attr("type", "button")
                                                     .addClass("btn btn-primary")
-                                                    .text("Save standard")
+                                                    .text(i18n.t("service_standards.actions.save_standard"))
                                                     .on("click", saveStandard)
                                             )
                                     )
@@ -928,14 +983,14 @@
                             .addClass("app-modal-header")
                             .append(
                                 $("<div>")
-                                    .append($("<h2>").text(check.id ? "Edit readiness check" : "New readiness check"))
-                                    .append($("<div>").addClass("card-subtitle").text(standard.name || standard.slug || "Selected standard"))
+                                    .append($("<h2>").text(check.id ? i18n.t("service_standards.form.edit_check") : i18n.t("service_standards.form.new_check")))
+                                    .append($("<div>").addClass("card-subtitle").text(standardDisplayName(standard)))
                             )
                             .append(
                                 $("<button>")
                                     .attr("type", "button")
                                     .addClass("app-modal-close")
-                                    .attr("aria-label", "Close")
+                                    .attr("aria-label", i18n.t("common.close", {}, "Close"))
                                     .text("×")
                                     .on("click", function () {
                                         closeAppModal("#service-standard-check-modal");
@@ -949,24 +1004,24 @@
                                 $("<div>")
                                     .addClass("form-body")
                                     .append(hiddenInput("service-standard-check-id", check.id || ""))
-                                    .append(formLabel("service-standard-check-name", "Name"))
-                                    .append(textInput("service-standard-check-name", check.name || "", "Owner configured"))
-                                    .append(formLabel("service-standard-check-slug", "Slug"))
+                                    .append(formLabel("service-standard-check-name", i18n.t("service_standards.form.name")))
+                                    .append(textInput("service-standard-check-name", check.name || "", i18n.t("service_standards.form.check_name_placeholder")))
+                                    .append(formLabel("service-standard-check-slug", i18n.t("service_standards.form.slug")))
                                     .append(textInput("service-standard-check-slug", check.slug || "", "owner"))
-                                    .append(formLabel("service-standard-check-description", "Description"))
+                                    .append(formLabel("service-standard-check-description", i18n.t("service_standards.form.description")))
                                     .append(textArea("service-standard-check-description", check.description || ""))
-                                    .append(formLabel("service-standard-check-type", "Check type"))
+                                    .append(formLabel("service-standard-check-type", i18n.t("service_standards.form.check_type")))
                                     .append(selectInput("service-standard-check-type", CHECK_TYPES, check.check_type || "owner_exists"))
-                                    .append(formLabel("service-standard-check-configuration", "Configuration JSON"))
+                                    .append(formLabel("service-standard-check-configuration", i18n.t("service_standards.form.configuration")))
                                     .append(textArea("service-standard-check-configuration", JSON.stringify(check.configuration || {}, null, 2)))
-                                    .append(formLabel("service-standard-check-weight", "Weight"))
+                                    .append(formLabel("service-standard-check-weight", i18n.t("service_standards.form.weight")))
                                     .append(numberInput("service-standard-check-weight", check.weight || 0, 0, 100))
-                                    .append(formLabel("service-standard-check-position", "Position"))
+                                    .append(formLabel("service-standard-check-position", i18n.t("service_standards.form.position")))
                                     .append(numberInput("service-standard-check-position", check.position || 0, 0, 10000))
-                                    .append(formLabel("service-standard-check-severity", "Severity"))
+                                    .append(formLabel("service-standard-check-severity", i18n.t("service_standards.form.severity")))
                                     .append(selectInput("service-standard-check-severity", SEVERITIES, check.severity || "warning"))
-                                    .append(checkboxLine("service-standard-check-required", "Required", !!check.required))
-                                    .append(checkboxLine("service-standard-check-enabled", "Enabled", check.enabled !== false))
+                                    .append(checkboxLine("service-standard-check-required", i18n.t("service_standards.form.required"), !!check.required))
+                                    .append(checkboxLine("service-standard-check-enabled", i18n.t("service_standards.form.enabled"), check.enabled !== false))
                                     .append(
                                         $("<div>")
                                             .addClass("form-actions")
@@ -974,7 +1029,7 @@
                                                 $("<button>")
                                                     .attr("type", "button")
                                                     .addClass("btn")
-                                                    .text("Cancel")
+                                                    .text(i18n.t("service_standards.actions.cancel"))
                                                     .on("click", function () {
                                                         closeAppModal("#service-standard-check-modal");
                                                     })
@@ -983,7 +1038,7 @@
                                                 $("<button>")
                                                     .attr("type", "button")
                                                     .addClass("btn btn-primary")
-                                                    .text("Save check")
+                                                    .text(i18n.t("service_standards.actions.save_check"))
                                                     .on("click", saveCheck)
                                             )
                                     )
@@ -1054,7 +1109,7 @@
             .attr("id", id)
             .attr("multiple", "multiple")
             .attr("data-standard-tomselect", "1")
-            .attr("data-placeholder", placeholder || "Select values")
+            .attr("data-placeholder", placeholder || i18n.t("service_standards.form.select_values"))
 
         options.forEach(function (option) {
             const value = String(option[0]);
@@ -1111,7 +1166,7 @@
         };
 
         if (!payload.name || !payload.slug) {
-            notifyError("Name and slug are required.");
+            notifyError(i18n.t("service_standards.validation.name_slug"));
             return;
         }
 
@@ -1128,7 +1183,7 @@
                 loadServiceStandards();
             })
             .catch(function (xhr) {
-                notifyError(getErrorMessage(xhr, "Failed to save service standard."));
+                notifyError(getErrorMessage(xhr, i18n.t("service_standards.errors.save_standard")));
             });
     }
 
@@ -1140,7 +1195,7 @@
         try {
             configuration = JSON.parse($("#service-standard-check-configuration").val() || "{}");
         } catch (error) {
-            notifyError("Configuration must be valid JSON.");
+            notifyError(i18n.t("service_standards.validation.config_json"));
             return;
         }
 
@@ -1158,7 +1213,7 @@
         };
 
         if (!standard || !payload.name || !payload.slug || !payload.check_type) {
-            notifyError("Name, slug and check type are required.");
+            notifyError(i18n.t("service_standards.validation.check_required"));
             return;
         }
 
@@ -1175,7 +1230,7 @@
                 loadServiceStandards();
             })
             .catch(function (xhr) {
-                notifyError(getErrorMessage(xhr, "Failed to save readiness check."));
+                notifyError(getErrorMessage(xhr, i18n.t("service_standards.errors.save_check")));
             });
     }
 

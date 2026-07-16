@@ -7,10 +7,6 @@ description: Documentation for IncidentRelay self-hosted on-call scheduling, ale
 
 IncidentRelay is a self-hosted on-call scheduling, alert routing and notification service. It keeps teams, rotations, routes, notification channels, browser push subscriptions, acknowledgements, resolves, reminders and escalations inside your own infrastructure.
 
-!!! warning "Beta status"
-    IncidentRelay is currently in **beta**.
-    APIs, UI behavior, database schema, configuration options and packaging details may still change.
-
 ## Alert flow
 
 ```text

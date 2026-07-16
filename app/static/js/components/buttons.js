@@ -36,7 +36,7 @@
         options = options || {};
 
         const object = options.object || null;
-        const label = options.label || options.text || "Action";
+        const label = options.label || options.text || i18n.t("shared.action");
         const button = $("<button>")
             .attr("type", "button")
             .addClass(options.className || "btn btn-small btn-secondary")
@@ -87,7 +87,7 @@
         options = options || {};
 
         const object = options.object || null;
-        const label = options.label || "Action";
+        const label = options.label || i18n.t("shared.action");
         const button = $("<button>")
             .attr("type", "button")
             .addClass("btn btn-icon btn-small")

@@ -48,7 +48,7 @@
 
     function getActionItemLabel(item, object) {
         const label = callMaybe(item.label, object);
-        return label || "Action";
+        return label || i18n.t("shared.action");
     }
 
     function getActionItemIcon(item, object) {
@@ -337,7 +337,7 @@
         const menu = $("<div>").addClass("app-action-menu");
         const toggle = $("<button>")
             .attr("type", "button")
-            .attr("aria-label", options.label || "Actions")
+            .attr("aria-label", options.label || i18n.t("shared.actions"))
             .attr("aria-haspopup", "menu")
             .attr("aria-expanded", "false")
             .addClass("app-action-menu-toggle")

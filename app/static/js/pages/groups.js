@@ -44,7 +44,7 @@ function renderGroups(groups) {
       $("<tr>").append(
         $("<td>")
           .attr("colspan", "5")
-          .text("No groups")
+          .text(i18n.t("groups.empty.groups"))
       )
     );
     return;
@@ -68,7 +68,7 @@ function renderGroupRow(group) {
                 $("<button>")
                     .attr("type", "button")
                     .addClass("name-button")
-                    .text(group.name || group.slug || ("Group #" + group.id))
+                    .text(group.name || group.slug || i18n.t("groups.row.fallback", {id: group.id}))
                     .on("click", function () {
                         openExistingGroupModal(group);
                     })
@@ -104,7 +104,7 @@ function renderGroupStatus(active) {
   return $("<span>")
     .addClass("status-pill")
     .addClass(active ? "status-active" : "status-inactive")
-    .text(active ? "Active" : "Inactive");
+    .text(active ? i18n.t("groups.status.active") : i18n.t("groups.status.inactive"));
 }
 
 function renderGroupActions(group) {
@@ -115,21 +115,21 @@ function renderGroupActions(group) {
         object: group,
         items: [
             {
-                label: canEditGroup(group) ? "Edit" : "Details",
+                label: canEditGroup(group) ? i18n.t("groups.actions.edit") : i18n.t("groups.actions.details"),
                 icon: canEditGroup(group) ? "fas fa-edit" : "fas fa-eye",
                 onClick: function () {
                     openExistingGroupModal(group);
                 }
             },
             {
-                label: "Members",
+                label: i18n.t("groups.actions.members"),
                 icon: "fas fa-users",
                 onClick: function () {
                     openExistingGroupModal(group);
                 }
             },
             {
-                label: group.active ? "Disable" : "Enable",
+                label: group.active ? i18n.t("groups.actions.disable") : i18n.t("groups.actions.enable"),
                 icon: group.active ? "fas fa-pause" : "fas fa-play",
                 danger: group.active,
                 visible: function () {
@@ -140,7 +140,7 @@ function renderGroupActions(group) {
                 }
             },
             {
-                label: "Delete",
+                label: i18n.t("groups.actions.delete"),
                 icon: "fas fa-trash",
                 danger: true,
                 visible: function () {
@@ -173,10 +173,10 @@ function openNewGroupModal() {
   resetGroupScopedUserCreateForm();
   setGroupMemberControlsEnabled(false);
   setGroupScopedUserCreateControlsEnabled(false);
-  renderEmptyGroupMembers("Save the group first, then add members");
-  $("#group-modal-title").text("New group");
-  $("#group-modal-subtitle").text("Create a new access group.");
-  $("#group-members-title").text("Group members");
+  renderEmptyGroupMembers(i18n.t("groups.empty.members_save"));
+  $("#group-modal-title").text(i18n.t("groups.modal.new"));
+  $("#group-modal-subtitle").text(i18n.t("groups.modal.new_subtitle"));
+  $("#group-members-title").text(i18n.t("groups.members.title"));
   openAppModal("#group-modal");
 }
 
@@ -192,10 +192,10 @@ function openExistingGroupModal(group) {
   setGroupMemberControlsEnabled(true);
   setGroupScopedUserCreateControlsEnabled(true);
   selectedGroupForMembers = group.id;
-  selectedGroupNameForMembers = group.name || group.slug || ("Group #" + group.id);
-  $("#group-modal-title").text("Group details");
+  selectedGroupNameForMembers = group.name || group.slug || i18n.t("groups.row.fallback", {id: group.id});
+  $("#group-modal-title").text(i18n.t("groups.modal.details"));
   $("#group-modal-subtitle").text(selectedGroupNameForMembers);
-  $("#group-members-title").text("Group members: " + selectedGroupNameForMembers);
+  $("#group-members-title").text(i18n.t("groups.members.title_named", {name: selectedGroupNameForMembers}));
   openAppModal("#group-modal");
   loadGroupMembers(group.id, selectedGroupNameForMembers);
 }
@@ -243,7 +243,7 @@ function saveGroup() {
     const data = buildGroupPayload();
     const groupId = $("#group-id").val();
     if (!data.slug || !data.name) {
-        showAppError("Slug and name are required");
+        showAppError(i18n.t("groups.validation.slug_name"));
         return;
     }
     if (groupId) {
@@ -252,7 +252,7 @@ function saveGroup() {
         });
 
         if (group && !canEditGroup(group)) {
-            showAppError("Group editor or group admin role is required for this group.");
+            showAppError(i18n.t("groups.permissions.edit"));
             return;
         }
 
@@ -269,7 +269,7 @@ function saveGroup() {
             selectedGroupNameForMembers = updatedGroup.name || updatedGroup.slug;
 
             $("#group-modal-subtitle").text(selectedGroupNameForMembers);
-            $("#group-members-title").text("Group members: " + selectedGroupNameForMembers);
+            $("#group-members-title").text(i18n.t("groups.members.title_named", {name: selectedGroupNameForMembers}));
 
             setGroupMemberControlsEnabled(true);
             setGroupScopedUserCreateControlsEnabled(true);
@@ -282,10 +282,10 @@ function saveGroup() {
     apiPost("/api/groups", data, function (group) {
         $("#group-id").val(group.id);
         selectedGroupForMembers = group.id;
-        selectedGroupNameForMembers = group.name || group.slug || ("Group #" + group.id);
-        $("#group-modal-title").text("Group details");
+        selectedGroupNameForMembers = group.name || group.slug || i18n.t("groups.row.fallback", {id: group.id});
+        $("#group-modal-title").text(i18n.t("groups.modal.details"));
         $("#group-modal-subtitle").text(selectedGroupNameForMembers);
-        $("#group-members-title").text("Group members: " + selectedGroupNameForMembers);
+        $("#group-members-title").text(i18n.t("groups.members.title_named", {name: selectedGroupNameForMembers}));
         setGroupMemberControlsEnabled(true);
         setGroupScopedUserCreateControlsEnabled(true);
         loadGroups();
@@ -297,11 +297,11 @@ function setGroupActive(group, active) {
   /*
    * Enable or disable a group using the existing update endpoint.
    */
-  const action = active ? "enable" : "disable";
+  const action = active ? i18n.t("groups.confirm.enable_action") : i18n.t("groups.confirm.disable_action");
   showAppConfirm({
-    title: "Are you sure?",
-    message: "Are you sure you want to " + action + " this group?",
-    confirmText: upperCaseFirst(action),
+    title: i18n.t("groups.confirm.title"),
+    message: i18n.t("groups.confirm.toggle_group", {action: action}),
+    confirmText: active ? i18n.t("groups.actions.enable") : i18n.t("groups.actions.disable"),
     confirmClass: active ? "btn-success" : "btn-warning",
   }).done(function () {
     apiPut(
@@ -350,8 +350,8 @@ function setGroupMemberControlsEnabled(enabled) {
 
     $("#group-member-help").text(
         enabled
-            ? "Add an existing user to this group or update group membership."
-            : "Save or select a group before adding members."
+            ? i18n.t("groups.members.help_saved")
+            : i18n.t("groups.members.help_unsaved")
     );
 
     RbacRoles.fillGroupSelect("#group-member-role", $("#group-member-role").val());
@@ -363,13 +363,13 @@ function loadGroupMembers(groupId, groupName) {
    */
   selectedGroupForMembers = groupId;
   selectedGroupNameForMembers = groupName;
-  $("#group-members-title").text("Group members: " + groupName);
+  $("#group-members-title").text(i18n.t("groups.members.title_named", {name: groupName}));
   const tbody = $("#group-members-table");
   tbody.empty();
   apiGet("/api/groups/" + groupId + "/users", function (members) {
     groupMembersCache = asArray(members);
     if (!groupMembersCache.length) {
-      renderEmptyGroupMembers("No members");
+      renderEmptyGroupMembers(i18n.t("groups.empty.members"));
       return;
     }
     groupMembersCache.forEach(function (member) {
@@ -416,7 +416,7 @@ function renderGroupMemberRow(member) {
             $("<span>")
                 .addClass("status-pill")
                 .addClass(member.active ? "status-active" : "status-inactive")
-                .text(member.active ? "Active" : "Inactive")
+                .text(member.active ? i18n.t("groups.status.active") : i18n.t("groups.status.inactive"))
         )
     );
 
@@ -439,30 +439,30 @@ function renderGroupMemberActions(member) {
         object: selectedGroup,
         items: [
             {
-                label: "Edit",
+                label: i18n.t("groups.actions.edit"),
                 icon: "fas fa-edit",
                 required: "manage_users",
-                denyMessage: "Group admin role is required to edit group members.",
+                denyMessage: i18n.t("groups.permissions.member_edit"),
                 onClick: function () {
                     editGroupMember(member);
                 }
             },
             {
-                label: member.active ? "Disable" : "Enable",
+                label: member.active ? i18n.t("groups.actions.disable") : i18n.t("groups.actions.enable"),
                 icon: member.active ? "fas fa-pause" : "fas fa-play",
                 required: "manage_users",
                 danger: member.active,
-                denyMessage: "Group admin role is required to enable or disable group members.",
+                denyMessage: i18n.t("groups.permissions.member_toggle"),
                 onClick: function () {
                     setGroupMemberActive(member, !member.active);
                 }
             },
             {
-                label: "Delete",
+                label: i18n.t("groups.actions.delete"),
                 icon: "fas fa-trash",
                 required: "manage_users",
                 danger: true,
-                denyMessage: "Group admin role is required to delete group memberships.",
+                denyMessage: i18n.t("groups.permissions.member_delete"),
                 onClick: function () {
                     deleteGroupMember(member);
                 }
@@ -475,7 +475,7 @@ function editGroupMember(member) {
     /*
      * Load membership data into the group member form.
      */
-    $("#group-member-form-title").text("Edit group membership #" + member.id);
+    $("#group-member-form-title").text(i18n.t("groups.members.edit_title", {id: member.id}));
     $("#group-membership-id").val(member.id);
     setSelectValue("#group-member-user", member.user_id);
     setEnhancedSelectDisabled("#group-member-user", true);
@@ -487,7 +487,7 @@ function resetGroupMemberForm() {
     /*
      * Reset group member form.
      */
-    $("#group-member-form-title").text("Add existing user to group");
+    $("#group-member-form-title").text(i18n.t("groups.members.add_existing_title"));
     $("#group-membership-id").val("");
     setSelectValue("#group-member-user", "");
     setEnhancedSelectDisabled("#group-member-user", !selectedGroupForMembers);
@@ -503,7 +503,7 @@ function saveGroupMember() {
   const membershipId = $("#group-membership-id").val();
   const groupId = selectedGroupForMembers || Number($("#group-id").val());
   if (!groupId) {
-    showAppError("Save or select a group first");
+    showAppError(i18n.t("groups.validation.group_first"));
     return;
   }
   if (membershipId) {
@@ -522,7 +522,7 @@ function saveGroupMember() {
   }
   const userId = Number($("#group-member-user").val());
   if (!userId) {
-    showAppError("User is required");
+    showAppError(i18n.t("groups.validation.user"));
     return;
   }
   apiPost(
@@ -544,13 +544,11 @@ function deleteGroupMember(member) {
    * Backend also removes this user from teams and rotations inside this group.
    */
   showAppConfirm({
-    title: "Delete group membership?",
-    message:
-      "User '" +
-      (member.username || member.display_name || ("#" + member.user_id)) +
-      "' will be removed from this group. " +
-      "They will also be removed from teams and rotations inside this group.",
-    confirmText: "Delete",
+    title: i18n.t("groups.confirm.delete_membership_title"),
+    message: i18n.t("groups.confirm.delete_membership_message", {
+      user: member.username || member.display_name || ("#" + member.user_id),
+    }),
+    confirmText: i18n.t("groups.actions.delete"),
     confirmClass: "btn-danger",
   }).done(function () {
     apiDelete("/api/groups/users/" + member.id, function () {
@@ -564,11 +562,11 @@ function setGroupMemberActive(member, active) {
   /*
    * Enable or disable group membership using the existing update endpoint.
    */
-  const action = active ? "enable" : "disable";
+  const action = active ? i18n.t("groups.confirm.enable_action") : i18n.t("groups.confirm.disable_action");
   showAppConfirm({
-    title: "Are you sure?",
-    message: "Are you sure you want to " + action + " this group membership?",
-    confirmText: upperCaseFirst(action),
+    title: i18n.t("groups.confirm.title"),
+    message: i18n.t("groups.confirm.toggle_membership", {action: action}),
+    confirmText: active ? i18n.t("groups.actions.enable") : i18n.t("groups.actions.disable"),
     confirmClass: active ? "btn-success" : "btn-warning",
   }).done(function () {
     apiPut(
@@ -615,8 +613,10 @@ function setGroupScopedUserCreateControlsEnabled(enabled) {
   $("#reset-group-created-user").prop("disabled", !enabled);
   $("#group-create-user-help").text(
     enabled
-      ? "The new user will be created in group: " + (selectedGroupNameForMembers || selectedGroupForMembers || "selected group") + "."
-      : "Save or select a group before creating users."
+      ? i18n.t("groups.create_user.enabled_help", {
+          group: selectedGroupNameForMembers || selectedGroupForMembers || i18n.t("groups.create_user.selected"),
+        })
+      : i18n.t("groups.create_user.disabled_help")
   );
 }
 
@@ -634,16 +634,16 @@ function collectGroupScopedUserCreatePayload() {
 function saveGroupScopedUser() {
   const groupId = selectedGroupForMembers || Number($("#group-id").val());
   if (!groupId) {
-    showAppError("Save or select a group first");
+    showAppError(i18n.t("groups.validation.group_first"));
     return;
   }
   const payload = collectGroupScopedUserCreatePayload();
   if (!payload.username) {
-    showAppError("Username is required");
+    showAppError(i18n.t("groups.validation.username"));
     return;
   }
   if (!payload.password) {
-    showAppError("Password is required");
+    showAppError(i18n.t("groups.validation.password"));
     return;
   }
   apiPost("/api/groups/" + groupId + "/users/create", payload, function () {
@@ -661,7 +661,7 @@ $(document).on("click", "#clear-group-form", function () {
   resetGroupMemberForm();
   resetGroupScopedUserCreateForm();
   setGroupScopedUserCreateControlsEnabled(false);
-  renderEmptyGroupMembers("Save the group first, then add members");
+  renderEmptyGroupMembers(i18n.t("groups.empty.members_save"));
 });
 $(document).on("click", "#save-group-member", saveGroupMember);
 $(document).on("click", "#reset-group-member-form", resetGroupMemberForm);
@@ -688,15 +688,14 @@ function deleteGroup(group) {
   /*
    * Soft-delete a group and all resources under it.
    */
-  const groupName = group.name || group.slug || ("Group #" + group.id);
+  const groupName = group.name || group.slug || i18n.t("groups.row.fallback", {id: group.id});
 
   showAppConfirm({
-    title: "Delete group?",
-    message:
-        "Group '" +
-        groupName +
-        "' will be deleted. Teams, routes, rotations, channels, silences and tokens under this group will be disabled.",
-    confirmText: "Delete",
+    title: i18n.t("groups.confirm.delete_group_title"),
+    message: i18n.t("groups.confirm.delete_group_message", {
+        group: groupName,
+      }),
+    confirmText: i18n.t("groups.actions.delete"),
     confirmClass: "btn-danger",
   }).done(function () {
     apiDelete("/api/groups/" + group.id, function () {

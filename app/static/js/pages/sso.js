@@ -5,6 +5,16 @@ let ssoTeamsCache = [];
 let selectedSsoProvider = null;
 let ssoProviderExtraConfigCache = {};
 
+function ssoRoleLabel(role, scope) {
+  if (!role) {
+    return "—";
+  }
+
+  const normalized = String(role);
+  const key = "sso.roles." + (scope === "team" ? "team" : "group") + "." + normalized;
+  return i18n.t(key, {}, normalized.replace(/_/g, " "));
+}
+
 
 function fillSamlSecurityFields(provider) {
   const security = provider && provider.saml_security ? provider.saml_security : {};
@@ -64,7 +74,7 @@ function fillSsoGroupSelect(selectedValue) {
     select.append(
       $("<option>")
         .val(String(group.id))
-        .text((group.name || group.slug || ("Group #" + group.id)) + " (" + group.slug + ")")
+        .text((group.name || group.slug || i18n.t("groups.row.fallback", {id: group.id}, "Group #" + group.id)) + " (" + group.slug + ")")
     );
   });
 
@@ -107,14 +117,14 @@ function fillSsoTeamSelect(selectedValue) {
   select.append(
     $("<option>")
       .val("")
-      .text("No team mapping")
+      .text(i18n.t("sso.mappings.no_team"))
   );
 
   teams.forEach(function (team) {
     select.append(
       $("<option>")
         .val(String(team.id))
-        .text((team.name || team.slug || ("Team #" + team.id)) + " (" + team.slug + ")")
+        .text((team.name || team.slug || i18n.t("teams.row.team_id", {id: team.id}, "Team #" + team.id)) + " (" + team.slug + ")")
     );
   });
 
@@ -197,7 +207,7 @@ function renderSsoProviders() {
         $("<td>")
           .attr("colspan", "7")
           .addClass("empty-muted")
-          .text("No SSO providers")
+          .text(i18n.t("sso.empty.providers"))
       )
     );
     return;
@@ -244,12 +254,12 @@ function renderSsoProviderRow(provider) {
       $("<span>")
         .addClass("status-pill")
         .addClass(provider.enabled ? "status-active" : "status-inactive")
-        .text(provider.enabled ? "Enabled" : "Disabled")
+        .text(provider.enabled ? i18n.t("sso.status.enabled") : i18n.t("sso.status.disabled"))
     )
   );
 
-  row.append($("<td>").text(provider.auto_create_users ? "Yes" : "No"));
-  row.append($("<td>").text(provider.sync_group_memberships ? "Yes" : "No"));
+  row.append($("<td>").text(provider.auto_create_users ? i18n.t("sso.values.yes") : i18n.t("sso.values.no")));
+  row.append($("<td>").text(provider.sync_group_memberships ? i18n.t("sso.values.yes") : i18n.t("sso.values.no")));
 
   row.append(
     $("<td>")
@@ -265,21 +275,21 @@ function renderSsoProviderActions(provider) {
     object: provider,
     items: [
       {
-        label: "Mappings",
+        label: i18n.t("sso.actions.mappings"),
         icon: "fas fa-project-diagram",
         onClick: function () {
           openSsoMappingsModal(provider);
         }
       },
       {
-        label: "Edit",
+        label: i18n.t("sso.actions.edit"),
         icon: "fas fa-edit",
         onClick: function () {
           openExistingSsoProviderModal(provider);
         }
       },
       {
-        label: "Test",
+        label: i18n.t("sso.actions.test"),
         icon: "fas fa-external-link-alt",
         onClick: function () {
           window.open(
@@ -289,7 +299,7 @@ function renderSsoProviderActions(provider) {
         }
       },
       {
-        label: "Metadata",
+        label: i18n.t("sso.actions.metadata"),
         icon: "fas fa-file-code",
         visible: function () {
           return provider.protocol === "saml";
@@ -302,7 +312,7 @@ function renderSsoProviderActions(provider) {
         }
       },
       {
-        label: provider.enabled ? "Disable" : "Enable",
+        label: provider.enabled ? i18n.t("sso.actions.disable") : i18n.t("sso.actions.enable"),
         icon: provider.enabled ? "fas fa-pause" : "fas fa-play",
         danger: provider.enabled,
         onClick: function () {
@@ -310,7 +320,7 @@ function renderSsoProviderActions(provider) {
         }
       },
       {
-        label: "Delete",
+        label: i18n.t("sso.actions.delete"),
         icon: "fas fa-trash",
         danger: true,
         onClick: function () {
@@ -327,17 +337,15 @@ function openSsoMappingsModal(provider) {
    */
   selectedSsoProvider = provider;
 
-  $("#sso-mappings-modal-title").text("Mappings: " + (provider.label || provider.slug));
+  $("#sso-mappings-modal-title").text(i18n.t("sso.mappings.title_provider", {provider: provider.label || provider.slug}));
   $("#sso-mappings-modal-subtitle").text(
-      "External SSO groups mapped to IncidentRelay groups for provider '" +
-      (provider.slug || provider.id) +
-      "'."
+      i18n.t("sso.mappings.provider_subtitle", {provider: provider.slug || provider.id})
   );
 
   $("#sso-mappings-body").html(
       $("<div>")
           .addClass("details-empty")
-          .text("Loading mappings...")
+          .text(i18n.t("sso.mappings.loading"))
   );
 
   openAppModal("#sso-mappings-modal");
@@ -348,12 +356,12 @@ function clearSsoMappings() {
   selectedSsoProvider = null;
   ssoMappingsCache = [];
 
-  $("#sso-mappings-modal-title").text("Group mappings");
-  $("#sso-mappings-modal-subtitle").text("Map external SSO groups to IncidentRelay groups.");
+  $("#sso-mappings-modal-title").text(i18n.t("sso.mappings.title"));
+  $("#sso-mappings-modal-subtitle").text(i18n.t("sso.mappings.list_subtitle"));
   $("#sso-mappings-body").html(
       $("<div>")
           .addClass("details-empty")
-          .text("Select an SSO provider first.")
+          .text(i18n.t("sso.mappings.select_provider"))
   );
 }
 
@@ -377,7 +385,7 @@ function renderSsoMappings() {
     body.append(
         $("<div>")
             .addClass("details-empty")
-            .text("Select an SSO provider first.")
+            .text(i18n.t("sso.mappings.select_provider"))
     );
     return;
   }
@@ -386,7 +394,7 @@ function renderSsoMappings() {
     body.append(
         $("<div>")
             .addClass("details-empty")
-            .text("No group mappings for this provider.")
+            .text(i18n.t("sso.mappings.empty"))
     );
     return;
   }
@@ -416,11 +424,11 @@ function renderSsoMappingCard(mapping) {
                       $("<div>")
                           .addClass("stack-card-title-sub")
                           .text(
-                              (mapping.group_name || mapping.group_slug || "Group") +
+                              (mapping.group_name || mapping.group_slug || i18n.t("sso.mappings.group_fallback")) +
                               " · " +
-                              (mapping.group_role || "viewer") +
+                              ssoRoleLabel(mapping.group_role || "viewer", "group") +
                               (mapping.team_id
-                                ? " · " + (mapping.team_name || mapping.team_slug || "Team") + " / " + (mapping.team_role || "viewer")
+                                ? " · " + (mapping.team_name || mapping.team_slug || i18n.t("sso.mappings.team_fallback")) + " / " + ssoRoleLabel(mapping.team_role || "viewer", "team")
                                 : "")
                           )
                   )
@@ -435,12 +443,12 @@ function renderSsoMappingCard(mapping) {
   card.append(
       $("<div>")
           .addClass("summary-mini-grid")
-          .append(renderSsoMiniItem("IncidentRelay group", mapping.group_name || mapping.group_slug))
-          .append(renderSsoMiniItem("Group role", mapping.group_role || "viewer"))
-          .append(renderSsoMiniItem("IncidentRelay team", mapping.team_name || mapping.team_slug || "—"))
-          .append(renderSsoMiniItem("Team role", mapping.team_role || "—"))
-          .append(renderSsoMiniItem("Priority", mapping.priority))
-          .append(renderSsoMiniItem("Status", mapping.active ? "Enabled" : "Disabled"))
+          .append(renderSsoMiniItem(i18n.t("sso.mappings.ir_group"), mapping.group_name || mapping.group_slug))
+          .append(renderSsoMiniItem(i18n.t("sso.mappings.group_role"), ssoRoleLabel(mapping.group_role || "viewer", "group")))
+          .append(renderSsoMiniItem(i18n.t("sso.mappings.ir_team"), mapping.team_name || mapping.team_slug || "—"))
+          .append(renderSsoMiniItem(i18n.t("sso.mappings.team_role"), mapping.team_role ? ssoRoleLabel(mapping.team_role, "team") : "—"))
+          .append(renderSsoMiniItem(i18n.t("sso.mappings.priority"), mapping.priority))
+          .append(renderSsoMiniItem(i18n.t("sso.table.status"), mapping.active ? i18n.t("sso.status.enabled") : i18n.t("sso.status.disabled")))
   );
 
   return card;
@@ -450,14 +458,14 @@ function renderSsoMappingActions(mapping) {
     object: mapping,
     items: [
       {
-        label: "Edit",
+        label: i18n.t("sso.actions.edit"),
         icon: "fas fa-edit",
         onClick: function () {
           openExistingSsoMappingModal(mapping);
         }
       },
       {
-        label: "Delete",
+        label: i18n.t("sso.actions.delete"),
         icon: "fas fa-trash",
         danger: true,
         onClick: function () {
@@ -477,8 +485,8 @@ function renderSsoMiniItem(label, value) {
 
 function openNewSsoProviderModal() {
   resetSsoProviderForm();
-  $("#sso-provider-modal-title").text("New SSO provider");
-  $("#sso-provider-modal-subtitle").text("Configure OIDC or SAML login.");
+  $("#sso-provider-modal-title").text(i18n.t("sso.provider.new"));
+  $("#sso-provider-modal-subtitle").text(i18n.t("sso.provider.subtitle"));
   openAppModal("#sso-provider-modal");
 }
 
@@ -523,7 +531,7 @@ function openExistingSsoProviderModal(provider) {
   $("#sso-saml-sp-entity-id").val(provider.saml_sp_entity_id || "");
   $("#sso-saml-sp-acs-url").val(provider.saml_sp_acs_url || "");
 
-  $("#sso-provider-modal-title").text("Edit SSO provider");
+  $("#sso-provider-modal-title").text(i18n.t("sso.provider.edit"));
   $("#sso-provider-modal-subtitle").text(provider.label || provider.slug);
 
   ssoProviderExtraConfigCache = provider.extra_config || {};
@@ -657,17 +665,17 @@ function saveSsoProvider() {
   const payload = collectSsoProviderPayload();
 
   if (!payload.slug || !payload.label) {
-    showAppError("Slug and label are required");
+    showAppError(i18n.t("sso.validation.slug_label"));
     return;
   }
 
   if (payload.protocol === "oidc" && !payload.client_id) {
-    showAppError("Client ID is required for OIDC provider");
+    showAppError(i18n.t("sso.validation.oidc_client"));
     return;
   }
 
   if (payload.protocol === "saml" && (!payload.saml_idp_entity_id || !payload.saml_idp_sso_url)) {
-    showAppError("IdP Entity ID and IdP SSO URL are required for SAML provider");
+    showAppError(i18n.t("sso.validation.saml_idp"));
     return;
   }
 
@@ -689,9 +697,9 @@ function saveSsoProvider() {
 
 function deleteSsoProvider(provider) {
   showAppConfirm({
-    title: "Delete SSO provider?",
-    message: "Provider '" + (provider.label || provider.slug) + "' will be disabled and deleted. Group mappings will be disabled.",
-    confirmText: "Delete",
+    title: i18n.t("sso.confirm.delete_provider_title"),
+    message: i18n.t("sso.confirm.delete_provider_message", {provider: provider.label || provider.slug}),
+    confirmText: i18n.t("sso.actions.delete"),
     confirmClass: "btn-danger",
   }).done(function () {
     apiDelete("/api/admin/sso/providers/" + provider.id, function () {
@@ -741,12 +749,12 @@ function toggleSsoProtocolFields() {
 
 function openNewSsoMappingModal() {
   if (!selectedSsoProvider) {
-    showAppError("Select SSO provider first");
+    showAppError(i18n.t("sso.validation.select_provider"));
     return;
   }
 
   resetSsoMappingForm();
-  $("#sso-mapping-modal-title").text("New group mapping");
+  $("#sso-mapping-modal-title").text(i18n.t("sso.mappings.new"));
   $("#sso-mapping-modal-subtitle").text(selectedSsoProvider.label || selectedSsoProvider.slug);
   openAppModal("#sso-mapping-modal");
 }
@@ -758,13 +766,13 @@ function openExistingSsoMappingModal(mapping) {
   $("#sso-mapping-external-group").val(mapping.external_group || "");
   fillSsoGroupSelect(mapping.group_id);
   fillSsoTeamSelect(mapping.team_id);
-  $("#sso-mapping-role").val(mapping.group_role || "viewer");
-  $("#sso-mapping-team-role").val(mapping.team_role || "viewer");
+  $("#sso-mapping-role").valssoRoleLabel(mapping.group_role || "viewer", "group");
+  $("#sso-mapping-team-role").valssoRoleLabel(mapping.team_role || "viewer", "team");
   $("#sso-mapping-team-role").prop("disabled", !mapping.team_id);
   $("#sso-mapping-priority").val(mapping.priority || 100);
   $("#sso-mapping-active").prop("checked", !!mapping.active);
 
-  $("#sso-mapping-modal-title").text("Edit group mapping");
+  $("#sso-mapping-modal-title").text(i18n.t("sso.mappings.edit"));
   $("#sso-mapping-modal-subtitle").text(mapping.external_group || "");
   openAppModal("#sso-mapping-modal");
 }
@@ -795,7 +803,7 @@ function collectSsoMappingPayload() {
 
 function saveSsoMapping() {
   if (!selectedSsoProvider) {
-    showAppError("Select SSO provider first");
+    showAppError(i18n.t("sso.validation.select_provider"));
     return;
   }
 
@@ -803,12 +811,12 @@ function saveSsoMapping() {
   const payload = collectSsoMappingPayload();
 
   if (!payload.external_group) {
-    showAppError("External SSO group is required");
+    showAppError(i18n.t("sso.validation.external_group"));
     return;
   }
 
   if (!payload.group_id) {
-    showAppError("IncidentRelay group is required");
+    showAppError(i18n.t("sso.validation.ir_group"));
     return;
   }
 
@@ -828,9 +836,9 @@ function saveSsoMapping() {
 
 function deleteSsoMapping(mapping) {
   showAppConfirm({
-    title: "Delete group mapping?",
-    message: "Mapping for external group '" + mapping.external_group + "' will be deleted.",
-    confirmText: "Delete",
+    title: i18n.t("sso.confirm.delete_mapping_title"),
+    message: i18n.t("sso.confirm.delete_mapping_message", {group: mapping.external_group}),
+    confirmText: i18n.t("sso.actions.delete"),
     confirmClass: "btn-danger",
   }).done(function () {
     apiDelete("/api/admin/sso/mappings/" + mapping.id, function () {
@@ -898,13 +906,13 @@ function toggleSsoProviderEnabled(provider) {
    * Enable or disable an SSO provider without deleting it.
    */
   const enabled = !provider.enabled;
-  const action = enabled ? "enable" : "disable";
-  const label = provider.label || provider.slug || "SSO provider";
+  const action = enabled ? i18n.t("sso.confirm.enable_action") : i18n.t("sso.confirm.disable_action");
+  const label = provider.label || provider.slug || i18n.t("sso.provider.fallback");
 
   showAppConfirm({
-    title: enabled ? "Enable SSO provider" : "Disable SSO provider",
-    message: "Are you sure you want to " + action + " '" + label + "'?",
-    confirmText: upperCaseFirst(action),
+    title: enabled ? i18n.t("sso.confirm.enable_title") : i18n.t("sso.confirm.disable_title"),
+    message: i18n.t("sso.confirm.toggle_message", {action: action, provider: label}),
+    confirmText: enabled ? i18n.t("sso.actions.enable") : i18n.t("sso.actions.disable"),
     confirmClass: enabled ? "btn-primary" : "btn-warning",
   }).done(function () {
     apiPut(
@@ -928,11 +936,11 @@ function fetchSamlMetadata() {
   status.text("");
 
   if (!metadataUrl) {
-    status.text("Metadata URL is required.");
+    status.text(i18n.t("sso.metadata.url_required"));
     return;
   }
 
-  status.text("Fetching metadata...");
+  status.text(i18n.t("sso.metadata.fetching"));
 
   apiPost(
       "/api/admin/sso/saml/metadata/parse",
@@ -946,10 +954,10 @@ function fetchSamlMetadata() {
         $("#sso-saml-idp-slo-url").val(metadata.saml_idp_slo_url || "");
         $("#sso-saml-idp-x509-cert").val(metadata.saml_idp_x509_cert || "");
 
-        status.text("Metadata loaded. Review values and save provider.");
+        status.text(i18n.t("sso.metadata.loaded"));
       },
       function () {
-        status.text("Could not fetch metadata.");
+        status.text(i18n.t("sso.metadata.failed"));
       }
   );
 }

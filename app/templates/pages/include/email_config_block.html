@@ -1,11 +1,11 @@
 <div class="app-field app-form-wide channel-config" data-channel-config="email" style="display: none;">
           <div class="app-help">
-            Email notifications are sent to the assigned user's profile email.
+            {{ _('channels.email.help') }}
           </div>
           <div class="app-field app-form-wide">
             <div class="app-json-header">
-              <label for="cfg-email-html-template">HTML template</label>
-              <button id="reset-email-template" type="button" class="btn btn-small"><i class="fas fa-undo"></i> Reset default</button>
+              <label for="cfg-email-html-template">{{ _('channels.email.template') }}</label>
+              <button id="reset-email-template" type="button" class="btn btn-small"><i class="fas fa-undo"></i> {{ _('channels.email.reset') }}</button>
             </div>
             <textarea id="cfg-email-html-template" class="input" rows="14" spellcheck="false" data-default-template="&lt;!doctype html&gt;
 &lt;html&gt;
@@ -87,8 +87,7 @@
   &lt;/body&gt;
 &lt;/html&gt;</textarea>
             <div class="app-help">
-              Supported placeholders: {alert_id}, {event_type}, {title}, {message}, {severity}, {status}, {team}, {assignee}, {source}, {alert_url}.
-              Leave the default template unchanged to use the built-in template.
+              {{ _('channels.email.placeholders') }}
             </div>
           </div>
         </div>

@@ -3,27 +3,27 @@
       <div class="summary-card summary-primary">
         <div class="summary-icon"><i class="fa-solid fa-right-to-bracket"></i></div>
         <div>
-          <div class="summary-title">Providers</div>
+          <div class="summary-title">{{ _('sso.summary.providers') }}</div>
           <div id="sso-summary-total" class="summary-value">0</div>
-          <div class="summary-hint">Login sources</div>
+          <div class="summary-hint">{{ _('sso.summary.providers_hint') }}</div>
         </div>
       </div>
 
       <div class="summary-card summary-success">
         <div class="summary-icon"><i class="fa-solid fa-circle-check"></i></div>
         <div>
-          <div class="summary-title">Enabled</div>
+          <div class="summary-title">{{ _('sso.status.enabled') }}</div>
           <div id="sso-summary-enabled" class="summary-value">0</div>
-          <div class="summary-hint">Shown on login</div>
+          <div class="summary-hint">{{ _('sso.summary.enabled_hint') }}</div>
         </div>
       </div>
 
       <div class="summary-card summary-muted">
         <div class="summary-icon"><i class="fa-solid fa-circle-xmark"></i></div>
         <div>
-          <div class="summary-title">Disabled</div>
+          <div class="summary-title">{{ _('sso.status.disabled') }}</div>
           <div id="sso-summary-disabled" class="summary-value">0</div>
-          <div class="summary-hint">Hidden from login</div>
+          <div class="summary-hint">{{ _('sso.summary.disabled_hint') }}</div>
         </div>
       </div>
 
@@ -32,7 +32,7 @@
         <div>
           <div class="summary-title">OIDC</div>
           <div id="sso-summary-oidc" class="summary-value">0</div>
-          <div class="summary-hint">OpenID Connect</div>
+          <div class="summary-hint">{{ _('sso.summary.oidc_hint') }}</div>
         </div>
       </div>
 
@@ -41,7 +41,7 @@
             <div>
               <div class="summary-title">SAML</div>
               <div id="sso-summary-saml" class="summary-value">0</div>
-              <div class="summary-hint">SAML 2.0</div>
+              <div class="summary-hint">{{ _('sso.summary.saml_hint') }}</div>
             </div>
         </div>
     </div>
@@ -49,33 +49,33 @@
     <div class="card">
         <div class="card-header">
           <div>
-            <h2>SSO providers</h2>
+            <h2>{{ _('sso.list.title') }}</h2>
             <p>
-              <span id="sso-filtered-count">0</span> of
-              <span id="sso-total-count">0</span> providers
+              <span id="sso-filtered-count">0</span> {{ _('sso.list.of') }}
+              <span id="sso-total-count">0</span> {{ _('sso.list.providers') }}
             </p>
           </div>
           <div class="card-header-actions">
             <button id="open-sso-provider-create-modal" type="button" class="btn btn-primary btn-small">
-              Add provider
+              {{ _('sso.actions.add_provider') }}
             </button>
             <button id="reload-sso-providers" type="button" class="btn btn-secondary btn-small">
-              Reload
+              {{ _('sso.actions.reload') }}
             </button>
           </div>
         </div>
 
         <div class="page-toolbar is-flush-top">
-          <input id="sso-search" class="page-toolbar-search" type="search" placeholder="Search provider">
+          <input id="sso-search" class="page-toolbar-search" type="search" placeholder="{{ _('sso.search.placeholder') }}">
           <select id="sso-protocol-filter" class="page-toolbar-filter">
-            <option value="">All protocols</option>
+            <option value="">{{ _('sso.filters.all_protocols') }}</option>
             <option value="oidc">OIDC</option>
             <option value="saml">SAML</option>
           </select>
           <select id="sso-status-filter" class="page-toolbar-filter">
-            <option value="">All statuses</option>
-            <option value="enabled">Enabled</option>
-            <option value="disabled">Disabled</option>
+            <option value="">{{ _('sso.filters.all_statuses') }}</option>
+            <option value="enabled">{{ _('sso.status.enabled') }}</option>
+            <option value="disabled">{{ _('sso.status.disabled') }}</option>
           </select>
         </div>
 
@@ -83,13 +83,13 @@
           <table class="data-table">
             <thead>
               <tr>
-                <th>ID</th>
-                <th>Provider</th>
-                <th>Protocol</th>
-                <th>Status</th>
-                <th>Auto create</th>
-                <th>Sync groups</th>
-                <th class="actions-th">Actions</th>
+                <th>{{ _('sso.table.id') }}</th>
+                <th>{{ _('sso.table.provider') }}</th>
+                <th>{{ _('sso.table.protocol') }}</th>
+                <th>{{ _('sso.table.status') }}</th>
+                <th>{{ _('sso.table.auto_create') }}</th>
+                <th>{{ _('sso.table.sync_groups') }}</th>
+                <th class="actions-th">{{ _('sso.table.actions') }}</th>
               </tr>
             </thead>
             <tbody id="sso-providers-table"></tbody>
@@ -102,8 +102,8 @@
     <div class="app-modal-dialog app-modal-dialog-wide">
       <div class="app-modal-header">
         <div>
-          <h3 id="sso-provider-modal-title">New SSO provider</h3>
-          <p id="sso-provider-modal-subtitle">Configure OIDC or SAML login.</p>
+          <h3 id="sso-provider-modal-title">{{ _('sso.provider.new') }}</h3>
+          <p id="sso-provider-modal-subtitle">{{ _('sso.provider.subtitle') }}</p>
         </div>
         <button id="close-sso-provider-modal" type="button" class="app-modal-close">
           <i class="fa-solid fa-xmark"></i>
@@ -116,17 +116,17 @@
         <div class="form-body">
           <div class="grid-two">
             <label>
-              <span>Slug</span>
+              <span>{{ _('sso.provider.slug') }}</span>
               <input id="sso-provider-slug" type="text" placeholder="keycloak">
             </label>
 
             <label>
-              <span>Label</span>
+              <span>{{ _('sso.provider.label') }}</span>
               <input id="sso-provider-label" type="text" placeholder="Keycloak">
             </label>
 
             <label>
-              <span>Protocol</span>
+              <span>{{ _('sso.table.protocol') }}</span>
               <select id="sso-provider-protocol">
                 <option value="oidc">OIDC</option>
                 <option value="saml">SAML</option>
@@ -135,140 +135,140 @@
 
             <label class="form-check-row">
               <input id="sso-provider-enabled" type="checkbox" checked>
-              <span>Enabled</span>
+              <span>{{ _('sso.status.enabled') }}</span>
             </label>
           </div>
 
           <div class="form-section">
-            <h4>Claims</h4>
+            <h4>{{ _('sso.claims.title') }}</h4>
             <div class="grid-two">
               <label>
-                <span>Subject claim</span>
+                <span>{{ _('sso.claims.subject') }}</span>
                 <input id="sso-subject-claim" type="text" value="sub">
               </label>
 
               <label>
-                <span>Email claim</span>
+                <span>{{ _('sso.claims.email') }}</span>
                 <input id="sso-email-claim" type="text" value="email">
               </label>
 
               <label>
-                <span>Username claim</span>
+                <span>{{ _('sso.claims.username') }}</span>
                 <input id="sso-username-claim" type="text" value="preferred_username">
               </label>
 
               <label>
-                <span>Display name claim</span>
+                <span>{{ _('sso.claims.display_name') }}</span>
                 <input id="sso-display-name-claim" type="text" value="name">
               </label>
 
                 <label class="field">
-                  <span>Phone claim</span>
+                  <span>{{ _('sso.claims.phone') }}</span>
                   <input id="sso-phone-claim" type="text" placeholder="mobile">
                 </label>
 
               <label>
-                <span>Groups claim</span>
+                <span>{{ _('sso.claims.groups') }}</span>
                 <input id="sso-groups-claim" type="text" value="groups">
               </label>
 
               <label>
-                <span>Allowed domains</span>
+                <span>{{ _('sso.claims.allowed_domains') }}</span>
                 <input id="sso-allowed-domains" type="text" placeholder="example.com, company.local">
               </label>
             </div>
           </div>
 
           <div class="form-section">
-            <h4>Login policy</h4>
+            <h4>{{ _('sso.policy.title') }}</h4>
             <div class="checkbox-grid">
               <label class="md-checkbox">
                 <input id="sso-auto-create-users" type="checkbox">
-                <span>Auto-create users</span>
+                <span>{{ _('sso.policy.auto_create') }}</span>
               </label>
 
               <label class="md-checkbox">
                 <input id="sso-auto-link-by-email" type="checkbox" checked>
-                <span>Auto-link by email</span>
+                <span>{{ _('sso.policy.auto_link') }}</span>
               </label>
 
               <label class="md-checkbox">
                 <input id="sso-require-verified-email" type="checkbox">
-                <span>Require verified email</span>
+                <span>{{ _('sso.policy.verified_email') }}</span>
               </label>
 
               <label class="md-checkbox">
                 <input id="sso-sync-group-memberships" type="checkbox" checked>
-                <span>Sync group memberships</span>
+                <span>{{ _('sso.policy.sync_memberships') }}</span>
               </label>
 
               <label class="md-checkbox">
                 <input id="sso-remove-missing-group-memberships" type="checkbox">
-                <span>Remove missing memberships</span>
+                <span>{{ _('sso.policy.remove_missing') }}</span>
               </label>
             </div>
           </div>
 
           <div id="sso-oidc-settings" class="form-section" style="display: none;">
-            <h4>OIDC settings</h4>
+            <h4>{{ _('sso.oidc.title') }}</h4>
             <div class="grid-two">
               <label>
-                <span>Client ID</span>
+                <span>{{ _('sso.oidc.client_id') }}</span>
                 <input id="sso-client-id" type="text">
               </label>
 
               <label>
-                <span>Client Secret</span>
-                <input id="sso-client-secret" type="password" placeholder="Leave empty to keep existing">
+                <span>{{ _('sso.oidc.client_secret') }}</span>
+                <input id="sso-client-secret" type="password" placeholder="{{ _('sso.placeholder.keep_existing') }}">
               </label>
 
                 <label>
-                    <span>Issuer URL</span>
+                    <span>{{ _('sso.oidc.issuer') }}</span>
                     <input id="sso-oidc-issuer" type="url" placeholder="https://idp.example.com">
                 </label>
 
               <label class="grid-span-2">
-                <span>Metadata URL</span>
+                <span>{{ _('sso.oidc.metadata_url') }}</span>
                 <input id="sso-oidc-metadata-url" type="url" placeholder="https://idp.example.com/.well-known/openid-configuration">
               </label>
 
               <label class="grid-span-2">
-                <span>Scope</span>
+                <span>{{ _('sso.oidc.scope') }}</span>
                 <input id="sso-oidc-scope" type="text" value="openid email profile">
               </label>
             </div>
               <div class="form-divider"></div>
-              <h4>OIDC advanced endpoints</h4>
+              <h4>{{ _('sso.oidc.advanced') }}</h4>
                 <div class="grid-two">
                   <label class="field">
-                    <span>Authorization endpoint</span>
+                    <span>{{ _('sso.oidc.authorization') }}</span>
                     <input id="sso-oidc-authorization-endpoint" type="url" placeholder="https://idp.example.com/oauth2/authorize">
                   </label>
 
                   <label class="field">
-                    <span>Token endpoint</span>
+                    <span>{{ _('sso.oidc.token') }}</span>
                     <input id="sso-oidc-token-endpoint" type="url" placeholder="https://idp.example.com/oauth2/token">
                   </label>
                 </div>
 
                 <div class="grid-two">
                   <label class="field">
-                    <span>UserInfo endpoint</span>
+                    <span>{{ _('sso.oidc.userinfo') }}</span>
                     <input id="sso-oidc-userinfo-endpoint" type="url" placeholder="https://idp.example.com/oauth2/userinfo">
                   </label>
 
                   <label class="field">
-                    <span>JWKS URI</span>
+                    <span>{{ _('sso.oidc.jwks') }}</span>
                     <input id="sso-oidc-jwks-uri" type="url" placeholder="https://idp.example.com/oauth2/jwks">
                   </label>
                 </div>
           </div>
 
           <div id="sso-saml-settings" class="form-section" style="display: none;">
-            <h4>SAML settings</h4>
+            <h4>{{ _('sso.saml.title') }}</h4>
             <div class="grid-two">
                 <label>
-                  <span>IdP metadata URL</span>
+                  <span>{{ _('sso.saml.metadata_url') }}</span>
                   <input
                     id="sso-saml-idp-metadata-url"
                     type="url"
@@ -278,105 +278,105 @@
 
                 <div class="form-actions-inline">
                   <button id="fetch-saml-metadata" type="button" class="btn btn-secondary btn-small">
-                    Fetch metadata
+                    {{ _('sso.actions.fetch_metadata') }}
                   </button>
                   <span id="sso-saml-metadata-status" class="empty-muted"></span>
                 </div>
               <label class="grid-span-2">
-                <span>IdP Entity ID</span>
+                <span>{{ _('sso.saml.entity_id') }}</span>
                 <input id="sso-saml-idp-entity-id" type="text">
               </label>
 
               <label class="grid-span-2">
-                <span>IdP SSO URL</span>
+                <span>{{ _('sso.saml.sso_url') }}</span>
                 <input id="sso-saml-idp-sso-url" type="url">
               </label>
 
               <label class="grid-span-2">
-                <span>IdP SLO URL</span>
+                <span>{{ _('sso.saml.slo_url') }}</span>
                 <input id="sso-saml-idp-slo-url" type="url">
               </label>
 
               <label class="grid-span-2">
-                <span>IdP x509 certificate</span>
+                <span>{{ _('sso.saml.idp_cert') }}</span>
                 <textarea id="sso-saml-idp-x509-cert" class="code-textarea" rows="5"></textarea>
               </label>
 
               <label class="grid-span-2">
-                <span>SP Entity ID</span>
-                <input id="sso-saml-sp-entity-id" type="text" placeholder="Leave empty to use metadata URL">
+                <span>{{ _('sso.saml.sp_entity_id') }}</span>
+                <input id="sso-saml-sp-entity-id" type="text" placeholder="{{ _('sso.placeholder.use_metadata') }}">
               </label>
 
               <label class="grid-span-2">
-                <span>SP ACS URL</span>
-                <input id="sso-saml-sp-acs-url" type="url" placeholder="Leave empty to use callback URL">
+                <span>{{ _('sso.saml.acs_url') }}</span>
+                <input id="sso-saml-sp-acs-url" type="url" placeholder="{{ _('sso.placeholder.use_callback') }}">
               </label>
                 <label class="grid-span-2">
-                  <span>SP SLS URL</span>
-                  <input id="sso-saml-sp-sls-url" type="url" placeholder="Optional single logout URL">
+                  <span>{{ _('sso.saml.sls_url') }}</span>
+                  <input id="sso-saml-sp-sls-url" type="url" placeholder="{{ _('sso.placeholder.optional_logout') }}">
                 </label>
 
                 <label class="grid-span-2">
-                  <span>SP x509 certificate</span>
-                  <textarea id="sso-saml-sp-x509-cert" class="code-textarea" rows="5" placeholder="Required when signing AuthnRequest, logout or metadata"></textarea>
+                  <span>{{ _('sso.saml.sp_cert') }}</span>
+                  <textarea id="sso-saml-sp-x509-cert" class="code-textarea" rows="5" placeholder="{{ _('sso.placeholder.signing_required') }}"></textarea>
                 </label>
 
                 <label class="grid-span-2">
-                  <span>SP private key</span>
-                  <textarea id="sso-saml-sp-private-key" class="code-textarea" rows="5" placeholder="Leave empty to keep existing"></textarea>
+                  <span>{{ _('sso.saml.private_key') }}</span>
+                  <textarea id="sso-saml-sp-private-key" class="code-textarea" rows="5" placeholder="{{ _('sso.placeholder.keep_existing') }}"></textarea>
                 </label>
 
                 <label class="grid-span-2">
-                  <span>NameID format</span>
+                  <span>{{ _('sso.saml.nameid_format') }}</span>
                   <input id="sso-saml-name-id-format" type="text" value="urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress">
                 </label>
                 <div class="grid-span-2 section-box">
-                  <h4>SAML security</h4>
+                  <h4>{{ _('sso.saml.security') }}</h4>
 
                   <div class="checkbox-grid">
                     <label class="md-checkbox">
                       <input id="sso-saml-authn-requests-signed" type="checkbox">
-                      <span>Sign AuthnRequest</span>
+                      <span>{{ _('sso.saml.sign_authn') }}</span>
                     </label>
 
                     <label class="md-checkbox">
                       <input id="sso-saml-logout-request-signed" type="checkbox">
-                      <span>Sign LogoutRequest</span>
+                      <span>{{ _('sso.saml.sign_logout_request') }}</span>
                     </label>
 
                     <label class="md-checkbox">
                       <input id="sso-saml-logout-response-signed" type="checkbox">
-                      <span>Sign LogoutResponse</span>
+                      <span>{{ _('sso.saml.sign_logout_response') }}</span>
                     </label>
 
                     <label class="md-checkbox">
                       <input id="sso-saml-sign-metadata" type="checkbox">
-                      <span>Sign SP metadata</span>
+                      <span>{{ _('sso.saml.sign_metadata') }}</span>
                     </label>
 
                     <label class="md-checkbox">
                       <input id="sso-saml-want-messages-signed" type="checkbox">
-                      <span>Require signed responses</span>
+                      <span>{{ _('sso.saml.require_signed_responses') }}</span>
                     </label>
 
                     <label class="md-checkbox">
                       <input id="sso-saml-want-assertions-signed" type="checkbox">
-                      <span>Require signed assertions</span>
+                      <span>{{ _('sso.saml.require_signed_assertions') }}</span>
                     </label>
 
                     <label class="md-checkbox">
                       <input id="sso-saml-want-name-id-encrypted" type="checkbox">
-                      <span>Require encrypted NameID</span>
+                      <span>{{ _('sso.saml.require_encrypted_nameid') }}</span>
                     </label>
 
                     <label class="md-checkbox">
                       <input id="sso-saml-want-assertions-encrypted" type="checkbox">
-                      <span>Require encrypted assertions</span>
+                      <span>{{ _('sso.saml.require_encrypted_assertions') }}</span>
                     </label>
 
                     <label class="md-checkbox">
                       <input id="sso-saml-want-attribute-statement" type="checkbox">
-                      <span>Require AttributeStatement</span>
+                      <span>{{ _('sso.saml.require_attributes') }}</span>
                     </label>
                   </div>
                 </div>
@@ -387,10 +387,10 @@
 
       <div class="app-modal-footer">
         <button id="reset-sso-provider-form" type="button" class="btn btn-secondary">
-          Reset
+          {{ _('sso.actions.reset') }}
         </button>
         <button id="save-sso-provider" type="button" class="btn btn-primary">
-          Save provider
+          {{ _('sso.actions.save_provider') }}
         </button>
       </div>
     </div>
@@ -400,8 +400,8 @@
     <div class="app-modal-dialog">
       <div class="app-modal-header">
         <div>
-          <h3 id="sso-mapping-modal-title">New group mapping</h3>
-          <p id="sso-mapping-modal-subtitle">Map SSO group to IncidentRelay group.</p>
+          <h3 id="sso-mapping-modal-title">{{ _('sso.mappings.new') }}</h3>
+          <p id="sso-mapping-modal-subtitle">{{ _('sso.mappings.subtitle') }}</p>
         </div>
         <button id="close-sso-mapping-modal" type="button" class="app-modal-close">
           <i class="fa-solid fa-xmark"></i>
@@ -413,58 +413,58 @@
 
         <div class="form-body">
           <label>
-            <span>External SSO group</span>
+            <span>{{ _('sso.mappings.external_group') }}</span>
             <input id="sso-mapping-external-group" type="text" placeholder="infra">
           </label>
 
           <label id="sso-mapping-group-field">
-              <span>IncidentRelay group</span>
+              <span>{{ _('sso.mappings.ir_group') }}</span>
               <select id="sso-mapping-group"></select>
           </label>
 
           <label>
-            <span>Group role</span>
+            <span>{{ _('sso.mappings.group_role') }}</span>
             <select id="sso-mapping-role">
-                <option value="viewer">Group Viewer</option>
-                <option value="editor">Group Editor</option>
-                <option value="user_admin">Group Admin</option>
-                <option value="global_admin">Global admin</option>
+                <option value="viewer">{{ _('sso.roles.group.viewer') }}</option>
+                <option value="editor">{{ _('sso.roles.group.editor') }}</option>
+                <option value="user_admin">{{ _('sso.roles.group.user_admin') }}</option>
+                <option value="global_admin">{{ _('sso.mappings.global_admin') }}</option>
             </select>
           </label>
 
           <label>
-            <span>IncidentRelay team</span>
+            <span>{{ _('sso.mappings.ir_team') }}</span>
             <select id="sso-mapping-team"></select>
-            <small>Optional. When selected, matching users are also added to this team.</small>
+            <small>{{ _('sso.mappings.team_help') }}</small>
           </label>
 
           <label>
-            <span>Team role</span>
+            <span>{{ _('sso.mappings.team_role') }}</span>
             <select id="sso-mapping-team-role" disabled>
-                <option value="viewer">Team Viewer</option>
-                <option value="responder">Team Responder</option>
-                <option value="manager">Team Manager</option>
+                <option value="viewer">{{ _('sso.roles.team.viewer') }}</option>
+                <option value="responder">{{ _('sso.roles.team.responder') }}</option>
+                <option value="manager">{{ _('sso.roles.team.manager') }}</option>
             </select>
           </label>
 
           <label>
-            <span>Priority</span>
+            <span>{{ _('sso.mappings.priority') }}</span>
             <input id="sso-mapping-priority" type="number" value="100" min="0">
           </label>
 
           <label class="form-check-row">
             <input id="sso-mapping-active" type="checkbox" checked>
-            <span>Enabled</span>
+            <span>{{ _('sso.status.enabled') }}</span>
           </label>
         </div>
       </div>
 
       <div class="app-modal-footer">
         <button id="reset-sso-mapping-form" type="button" class="btn btn-secondary">
-          Reset
+          {{ _('sso.actions.reset') }}
         </button>
         <button id="save-sso-mapping" type="button" class="btn btn-primary">
-          Save mapping
+          {{ _('sso.actions.save_mapping') }}
         </button>
       </div>
     </div>
@@ -473,8 +473,8 @@
   <div class="app-modal-dialog app-modal-dialog-wide">
     <div class="app-modal-header">
       <div>
-        <h3 id="sso-mappings-modal-title">Group mappings</h3>
-        <p id="sso-mappings-modal-subtitle">Map external SSO groups to IncidentRelay groups.</p>
+        <h3 id="sso-mappings-modal-title">{{ _('sso.mappings.title') }}</h3>
+        <p id="sso-mappings-modal-subtitle">{{ _('sso.mappings.list_subtitle') }}</p>
       </div>
 
       <button id="close-sso-mappings-modal" type="button" class="app-modal-close">
@@ -485,24 +485,24 @@
     <div class="app-modal-body">
       <div class="details-actions">
         <button id="add-sso-mapping" type="button" class="btn btn-primary btn-small">
-          Add mapping
+          {{ _('sso.actions.add_mapping') }}
         </button>
 
         <button id="reload-sso-mappings" type="button" class="btn btn-secondary btn-small">
-          Reload
+          {{ _('sso.actions.reload') }}
         </button>
       </div>
 
       <div id="sso-mappings-body" class="stack-list">
         <div class="details-empty">
-          Select an SSO provider first.
+          {{ _('sso.mappings.select_provider') }}
         </div>
       </div>
     </div>
 
     <div class="app-modal-footer">
       <button type="button" class="btn btn-secondary" data-modal-close="#sso-mappings-modal">
-        Close
+        {{ _('sso.actions.close') }}
       </button>
     </div>
   </div>

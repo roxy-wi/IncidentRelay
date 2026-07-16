@@ -8,17 +8,17 @@ let maintenanceReferenceCache = {
 let selectedMaintenanceWindowId = null;
 
 const maintenanceBehaviorLabels = {
-    suppress_notifications: "Suppress notifications",
-    suppress_incident: "Suppress incident",
-    create_maintenance_incident: "Create maintenance incident",
-    pause_escalation_only: "Pause escalation only",
+    suppress_notifications: i18n.t("maintenance.behavior.suppress_notifications"),
+    suppress_incident: i18n.t("maintenance.behavior.suppress_incident"),
+    create_maintenance_incident: i18n.t("maintenance.behavior.create_maintenance_incident"),
+    pause_escalation_only: i18n.t("maintenance.behavior.pause_escalation_only"),
 };
 
 const maintenanceStatusLabels = {
-    scheduled: "Scheduled",
-    active: "Active",
-    finished: "Finished",
-    cancelled: "Cancelled",
+    scheduled: i18n.t("maintenance.status.scheduled"),
+    active: i18n.t("maintenance.status.active"),
+    finished: i18n.t("maintenance.status.finished"),
+    cancelled: i18n.t("maintenance.status.cancelled"),
 };
 
 function getMaintenanceCreateParamsFromUrl() {
@@ -139,7 +139,7 @@ function fillMaintenanceReferences(callback) {
         maintenanceReferenceCache.groups = normalizeItems(payload).map(function (item) {
             return {
                 id: item.id,
-                label: item.name || item.slug || ("Group #" + item.id),
+                label: item.name || item.slug || i18n.t("maintenance.values.group_number", {id: item.id}),
             };
         });
         done();
@@ -236,9 +236,9 @@ function renderMaintenanceWindowsTable() {
         tbody.append(
             $("<tr>").append(
                 $("<td>")
-                    .attr("colspan", "7")
+                    .attr("colspan", "8")
                     .addClass("empty-cell")
-                    .text("No maintenance windows")
+                    .text(i18n.t("maintenance.empty.found"))
             )
         );
         return;
@@ -260,7 +260,7 @@ function renderMaintenanceRow(item) {
                 $("<button>")
                     .attr("type", "button")
                     .addClass("name-button")
-                    .text(item.name || ("Window #" + item.id))
+                    .text(item.name || i18n.t("maintenance.values.window_number", {id: item.id}))
                     .on("click", function () {
                         renderMaintenanceDetails(item);
                     })
@@ -327,50 +327,50 @@ function renderMaintenanceStatusBadge(item) {
 function renderMaintenanceActions(item) {
     const actions = [
         {
-            label: "Edit",
+            label: i18n.t("maintenance.actions.edit"),
             icon: "fas fa-edit",
             required: "write",
-            denyMessage: "Team manager role is required to edit this maintenance window.",
+            denyMessage: i18n.t("maintenance.permissions.edit"),
             onClick: function () {
                 editMaintenanceWindow(item.id);
             },
         },
         {
-            label: "Extend 1h",
+            label: i18n.t("maintenance.actions.extend"),
             icon: "fas fa-clock",
             required: "write",
             hidden: item.deleted || item.status === "cancelled",
-            denyMessage: "Team manager role is required to extend this maintenance window.",
+            denyMessage: i18n.t("maintenance.permissions.extend"),
             onClick: function () {
                 extendMaintenanceWindow(item, 1);
             },
         },
         {
-            label: "Duplicate",
+            label: i18n.t("maintenance.actions.duplicate"),
             icon: "fas fa-copy",
             required: "write",
-            denyMessage: "Team manager role is required to duplicate this maintenance window.",
+            denyMessage: i18n.t("maintenance.permissions.duplicate"),
             onClick: function () {
                 duplicateMaintenanceWindow(item);
             },
         },
         {
-            label: "Cancel",
+            label: i18n.t("maintenance.actions.cancel"),
             icon: "fas fa-ban",
             required: "write",
             danger: true,
             hidden: item.deleted || item.status === "cancelled",
-            denyMessage: "Team manager role is required to cancel this maintenance window.",
+            denyMessage: i18n.t("maintenance.permissions.cancel"),
             onClick: function () {
                 cancelMaintenanceWindow(item);
             },
         },
         {
-            label: "Delete",
+            label: i18n.t("maintenance.actions.delete"),
             icon: "fas fa-trash",
             required: "delete",
             danger: true,
-            denyMessage: "Delete permission is required to delete this maintenance window.",
+            denyMessage: i18n.t("maintenance.permissions.delete"),
             onClick: function () {
                 deleteMaintenanceWindow(item);
             },
@@ -407,23 +407,23 @@ function renderMaintenanceDetails(item) {
     body.append(
         $("<div>")
             .addClass("details-list")
-            .append(maintenanceDetailsItem("Name", item.name))
-            .append(maintenanceDetailsItem("Description", item.description))
-            .append(maintenanceDetailsItem("Status", maintenanceStatusLabels[item.status] || item.status))
-            .append(maintenanceDetailsItem("Behavior", maintenanceBehaviorLabels[item.behavior] || item.behavior))
-            .append(maintenanceDetailsItem("Repeat", formatMaintenanceRepeat(item.rrule)))
-            .append(maintenanceDetailsItem("Scope", getMaintenanceScopeText(item)))
+            .append(maintenanceDetailsItem(i18n.t("maintenance.details.name"), item.name))
+            .append(maintenanceDetailsItem(i18n.t("maintenance.details.description"), item.description))
+            .append(maintenanceDetailsItem(i18n.t("maintenance.details.status"), maintenanceStatusLabels[item.status] || item.status))
+            .append(maintenanceDetailsItem(i18n.t("maintenance.details.behavior"), maintenanceBehaviorLabels[item.behavior] || item.behavior))
+            .append(maintenanceDetailsItem(i18n.t("maintenance.details.repeat"), formatMaintenanceRepeat(item.rrule)))
+            .append(maintenanceDetailsItem(i18n.t("maintenance.details.scope"), getMaintenanceScopeText(item)))
             .append(maintenanceDetailsItem(
-                "Starts",
+                i18n.t("maintenance.details.starts"),
                 window.AppTimezones.formatPlainDatetime(item.starts_at, item.timezone)
             ))
             .append(maintenanceDetailsItem(
-                "Ends",
+                i18n.t("maintenance.details.ends"),
                 window.AppTimezones.formatPlainDatetime(item.ends_at, item.timezone)
             ))
-            .append(maintenanceDetailsItem("Timezone", item.timezone || "UTC"))
-            .append(maintenanceDetailsItem("RRULE", item.rrule))
-            .append(maintenanceDetailsItem("Enabled", item.enabled !== false ? "Yes" : "No"))
+            .append(maintenanceDetailsItem(i18n.t("maintenance.details.timezone"), item.timezone || "UTC"))
+            .append(maintenanceDetailsItem(i18n.t("maintenance.details.rrule"), item.rrule))
+            .append(maintenanceDetailsItem(i18n.t("maintenance.details.enabled"), item.enabled !== false ? i18n.t("maintenance.values.yes") : i18n.t("maintenance.values.no")))
     );
 
     const actions = $("<div>").addClass("details-actions");
@@ -433,7 +433,7 @@ function renderMaintenanceDetails(item) {
             $("<button>")
                 .attr("type", "button")
                 .addClass("btn")
-                .text("Edit window")
+                .text(i18n.t("maintenance.actions.edit_window"))
                 .on("click", function () {
                     editMaintenanceWindow(item.id);
                 })
@@ -442,7 +442,7 @@ function renderMaintenanceDetails(item) {
             $("<button>")
                 .attr("type", "button")
                 .addClass("btn")
-                .text("Cancel window")
+                .text(i18n.t("maintenance.actions.cancel_window"))
                 .on("click", function () {
                     cancelMaintenanceWindow(item);
                 })
@@ -453,8 +453,8 @@ function renderMaintenanceDetails(item) {
 
 function renderMaintenanceDetailsEmpty() {
     selectedMaintenanceWindowId = null;
-    $("#maintenance-details-subtitle").text("Select a window");
-    $("#maintenance-details-body").html("<p>Click a maintenance window name to inspect schedule, scope and behavior.</p>");
+    $("#maintenance-details-subtitle").text(i18n.t("maintenance.details.select"));
+    $("#maintenance-details-body").empty().append($("<p>").text(i18n.t("maintenance.details.help")));
 }
 
 function restoreMaintenanceDetails() {
@@ -475,7 +475,7 @@ function restoreMaintenanceDetails() {
 
 function openMaintenanceCreateModal() {
     resetMaintenanceForm();
-    $("#maintenance-window-modal-title").text("Create maintenance window");
+    $("#maintenance-window-modal-title").text(i18n.t("maintenance.form.create"));
     window.AppTimezones.initSelect(
         "#maintenance-timezone",
         window.AppTimezones.getBrowserDefaultTimezone(),
@@ -488,13 +488,13 @@ function editMaintenanceWindow(windowId) {
     const item = findMaintenanceWindow(windowId);
 
     if (!item) {
-        showMaintenanceErrorDialog("Maintenance window not found.");
+        showMaintenanceErrorDialog(i18n.t("maintenance.errors.not_found"));
         return;
     }
 
     resetMaintenanceForm();
     fillMaintenanceForm(item);
-    $("#maintenance-window-modal-title").text("Edit maintenance window");
+    $("#maintenance-window-modal-title").text(i18n.t("maintenance.form.edit"));
     openAppModal($("#maintenance-window-modal"));
 }
 
@@ -545,17 +545,17 @@ function buildMaintenancePayload() {
     clearMaintenanceFormError();
 
     if (!name) {
-        showMaintenanceFormError("Name is required.");
+        showMaintenanceFormError(i18n.t("maintenance.errors.name_required"));
         return null;
     }
 
     if (!startsAt || !endsAt) {
-        showMaintenanceFormError("Start and end time are required.");
+        showMaintenanceFormError(i18n.t("maintenance.errors.times_required"));
         return null;
     }
 
     if (!scopeType || !scopeTargetId) {
-        showMaintenanceFormError("Scope target is required.");
+        showMaintenanceFormError(i18n.t("maintenance.errors.scope_required"));
         return null;
     }
 
@@ -638,7 +638,7 @@ function updateMaintenanceScopeTargetSelect() {
     const items = getMaintenanceScopeItems(scopeType);
 
     select.empty();
-    select.append($("<option>").val("").text("Select " + scopeType));
+    select.append($("<option>").val("").text(i18n.t("maintenance.values.select_type", {type: maintenanceScopeTypeLabel(scopeType)})));
 
     items.forEach(function (item) {
         $("<option>").val(item.id).text(item.label).appendTo(select);
@@ -652,14 +652,14 @@ function cancelMaintenanceWindow(item) {
 
     showAppConfirm({
         type: "warning",
-        title: "Cancel maintenance window",
-        message: "Cancel maintenance window " + item.name + "?",
-        confirmText: "Cancel window",
+        title: i18n.t("maintenance.confirm.cancel_title"),
+        message: i18n.t("maintenance.confirm.cancel_message", {name: item.name}),
+        confirmText: i18n.t("maintenance.actions.cancel_window"),
         confirmClass: "btn-danger",
     }).done(function () {
         apiPost(
             "/api/maintenance-windows/" + item.id + "/cancel",
-            { reason: "Cancelled from UI" },
+            { reason: i18n.t("maintenance.confirm.cancel_reason") },
             refreshMaintenanceWindows
         );
     });
@@ -672,13 +672,24 @@ function deleteMaintenanceWindow(item) {
 
     showAppConfirm({
         type: "warning",
-        title: "Delete maintenance window",
-        message: "Delete maintenance window " + item.name + "?",
-        confirmText: "Delete",
+        title: i18n.t("maintenance.confirm.delete_title"),
+        message: i18n.t("maintenance.confirm.delete_message", {name: item.name}),
+        confirmText: i18n.t("maintenance.actions.delete"),
         confirmClass: "btn-danger",
     }).done(function () {
         apiDelete("/api/maintenance-windows/" + item.id, refreshMaintenanceWindows);
     });
+}
+
+function maintenanceScopeTypeLabel(scopeType) {
+    const labels = {
+        group: "maintenance.form.group",
+        team: "maintenance.form.team",
+        service: "maintenance.form.service",
+        route: "maintenance.form.route",
+    };
+
+    return labels[scopeType] ? i18n.t(labels[scopeType]) : scopeType;
 }
 
 function getMaintenanceScopeItems(scopeType) {
@@ -704,7 +715,7 @@ function getMaintenanceScopeText(item) {
         return "-";
     }
 
-    return scope.scope_type + ": " + getMaintenanceScopeTargetLabel(scope);
+    return maintenanceScopeTypeLabel(scope.scope_type) + ": " + getMaintenanceScopeTargetLabel(scope);
 }
 
 function firstMaintenanceScope(item) {
@@ -796,18 +807,18 @@ function teamLabel(item) {
         return item.name + " (" + item.slug + ")";
     }
 
-    return item.name || item.slug || ("Team #" + item.id);
+    return item.name || item.slug || i18n.t("maintenance.values.team_number", {id: item.id});
 }
 
 function serviceLabel(item) {
-    const name = item.name || item.slug || ("Service #" + item.id);
+    const name = item.name || item.slug || i18n.t("maintenance.values.service_number", {id: item.id});
     const team = item.team_name || item.team_slug || nestedName(item.team);
 
     return team ? name + " · " + team : name;
 }
 
 function routeLabel(item) {
-    const name = item.name || item.slug || item.source || ("Route #" + item.id);
+    const name = item.name || item.slug || item.source || i18n.t("maintenance.values.route_number", {id: item.id});
     const team = item.team_name || item.team_slug || nestedName(item.team);
 
     return team ? name + " · " + team : name;
@@ -962,7 +973,7 @@ function formatMaintenanceRepeat(rrule) {
     const text = String(rrule || "").trim();
 
     if (!text) {
-        return "Does not repeat";
+        return i18n.t("maintenance.repeat.no");
     }
 
     const normalized = text.replace(/^RRULE:/i, "");
@@ -970,15 +981,15 @@ function formatMaintenanceRepeat(rrule) {
     const count = countMatch ? countMatch[1] : null;
 
     if (/^FREQ=DAILY(?:;COUNT=\d+)?$/i.test(normalized)) {
-        return count ? "Daily · " + count + " times" : "Daily";
+        return count ? i18n.t("maintenance.repeat.with_count", {period: i18n.t("maintenance.repeat.daily"), count: count}) : i18n.t("maintenance.repeat.daily");
     }
 
     if (/^FREQ=WEEKLY(?:;COUNT=\d+)?$/i.test(normalized)) {
-        return count ? "Weekly · " + count + " times" : "Weekly";
+        return count ? i18n.t("maintenance.repeat.with_count", {period: i18n.t("maintenance.repeat.weekly"), count: count}) : i18n.t("maintenance.repeat.weekly");
     }
 
     if (/^FREQ=MONTHLY(?:;COUNT=\d+)?$/i.test(normalized)) {
-        return count ? "Monthly · " + count + " times" : "Monthly";
+        return count ? i18n.t("maintenance.repeat.with_count", {period: i18n.t("maintenance.repeat.monthly"), count: count}) : i18n.t("maintenance.repeat.monthly");
     }
 
     return normalized;
@@ -1078,11 +1089,11 @@ function updateMaintenanceTimeWarning() {
     const warnings = [];
 
     if (isMaintenanceInputDateInPast(startsAt)) {
-        warnings.push("Start time is in the past.");
+        warnings.push(i18n.t("maintenance.errors.start_past"));
     }
 
     if (isMaintenanceInputDateInPast(endsAt)) {
-        warnings.push("End time is in the past.");
+        warnings.push(i18n.t("maintenance.errors.end_past"));
     }
 
     const warning = $("#maintenance-time-warning");
@@ -1116,7 +1127,7 @@ function extendMaintenanceWindow(item, hours) {
         },
         function (xhr) {
             showAppDialog(
-                "Failed to extend maintenance window",
+                i18n.t("maintenance.errors.extend_failed"),
                 getApiErrorMessage(xhr)
             );
         }
@@ -1128,7 +1139,7 @@ function duplicateMaintenanceWindow(item) {
     const endsAt = window.AppTimezones.toDatetimeLocalInput(source.ends_at);
 
     const payload = {
-        name: (source.name || "Maintenance window") + " copy",
+        name: i18n.t("maintenance.values.copy_suffix", {name: source.name || i18n.t("maintenance.values.default_name")}),
         description: source.description || null,
         behavior: source.behavior || "suppress_notifications",
         timezone: source.timezone || window.AppTimezones.getBrowserDefaultTimezone(),
@@ -1148,7 +1159,7 @@ function duplicateMaintenanceWindow(item) {
         },
         function (xhr) {
             showAppDialog(
-                "Failed to duplicate maintenance window",
+                i18n.t("maintenance.errors.duplicate_failed"),
                 getApiErrorMessage(xhr)
             );
         }
@@ -1255,17 +1266,17 @@ function validateMaintenanceWindowForm() {
     const customRrule = getValue("#maintenance-rrule");
 
     if (!name) {
-        setMaintenanceFieldError("#maintenance-name", "Name is required.");
+        setMaintenanceFieldError("#maintenance-name", i18n.t("maintenance.errors.name_required"));
         isValid = false;
     }
 
     if (!startsAt) {
-        setMaintenanceFieldError("#maintenance-starts-at", "Start time is required.");
+        setMaintenanceFieldError("#maintenance-starts-at", i18n.t("maintenance.errors.start_required"));
         isValid = false;
     }
 
     if (!endsAt) {
-        setMaintenanceFieldError("#maintenance-ends-at", "End time is required.");
+        setMaintenanceFieldError("#maintenance-ends-at", i18n.t("maintenance.errors.end_required"));
         isValid = false;
     }
 
@@ -1276,14 +1287,14 @@ function validateMaintenanceWindowForm() {
         if (startDate && endDate && endDate.getTime() <= startDate.getTime()) {
             setMaintenanceFieldError(
                 "#maintenance-ends-at",
-                "End time must be later than start time."
+                i18n.t("maintenance.errors.end_after_start")
             );
             isValid = false;
         }
     }
 
     if (!scopeType) {
-        setMaintenanceFieldError("#maintenance-scope-type", "Scope type is required.");
+        setMaintenanceFieldError("#maintenance-scope-type", i18n.t("maintenance.errors.scope_type_required"));
         isValid = false;
     }
 
@@ -1298,13 +1309,13 @@ function validateMaintenanceWindowForm() {
     if (repeat === "custom" && !customRrule) {
         setMaintenanceFieldError(
             "#maintenance-rrule",
-            "Custom RRULE is required when repeat is set to Custom RRULE."
+            i18n.t("maintenance.errors.rrule_required")
         );
         isValid = false;
     }
 
     if (!isValid) {
-        showMaintenanceFormError("Please fix the highlighted fields.");
+        showMaintenanceFormError(i18n.t("maintenance.errors.fix_fields"));
         focusFirstMaintenanceError();
     }
 
@@ -1313,22 +1324,22 @@ function validateMaintenanceWindowForm() {
 
 function getMaintenanceScopeTargetRequiredMessage(scopeType) {
     if (scopeType === "group") {
-        return "Group is required.";
+        return i18n.t("maintenance.errors.group_required");
     }
 
     if (scopeType === "team") {
-        return "Team is required.";
+        return i18n.t("maintenance.errors.team_required");
     }
 
     if (scopeType === "service") {
-        return "Service is required.";
+        return i18n.t("maintenance.errors.service_required");
     }
 
     if (scopeType === "route") {
-        return "Route is required.";
+        return i18n.t("maintenance.errors.route_required");
     }
 
-    return "Scope target is required.";
+    return i18n.t("maintenance.errors.scope_required");
 }
 $(document).on(
     "input change",

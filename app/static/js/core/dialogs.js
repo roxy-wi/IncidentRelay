@@ -18,16 +18,16 @@ function resetAppDialog() {
     $("#app-dialog-modal")
         .removeClass("app-dialog-error app-dialog-warning app-dialog-success app-dialog-info");
 
-    $("#app-dialog-title").text("Message");
+    $("#app-dialog-title").text(i18n.t("shared.dialog.message"));
     $("#app-dialog-subtitle").text("");
     $("#app-dialog-message").text("");
     $("#app-dialog-icon").text("!");
 
-    $("#app-dialog-cancel").show().text("Cancel");
+    $("#app-dialog-cancel").show().text(i18n.t("shared.dialog.cancel"));
     $("#app-dialog-confirm")
         .removeClass("btn-danger btn-warning btn-success btn-primary")
         .addClass("btn-primary")
-        .text("OK");
+        .text(i18n.t("shared.dialog.ok"));
 }
 
 function showAppDialog(options) {
@@ -47,21 +47,21 @@ function showAppDialog(options) {
     dialog.addClass("app-dialog-" + type);
     openAppModal(dialog);
 
-    $("#app-dialog-title").text(opts.title || "Message");
+    $("#app-dialog-title").text(opts.title || i18n.t("shared.dialog.message"));
     $("#app-dialog-subtitle").text(opts.subtitle || "");
     $("#app-dialog-message").text(opts.message || "");
 
     $("#app-dialog-icon").text(opts.icon || getAppDialogIcon(type));
 
     $("#app-dialog-confirm")
-        .text(opts.confirmText || "OK")
+        .text(opts.confirmText || i18n.t("shared.dialog.ok"))
         .removeClass("btn-primary btn-danger btn-warning btn-success")
         .addClass(opts.confirmClass || getAppDialogButtonClass(type));
 
     if (opts.cancelText === null || opts.hideCancel) {
         $("#app-dialog-cancel").hide();
     } else {
-        $("#app-dialog-cancel").show().text(opts.cancelText || "Cancel");
+        $("#app-dialog-cancel").show().text(opts.cancelText || i18n.t("shared.dialog.cancel"));
     }
 
     $("#app-dialog-confirm").off("click.appDialog").on("click.appDialog", function () {
@@ -126,9 +126,9 @@ function showAppSuccess(message, title) {
      */
     return showAppDialog({
         type: "success",
-        title: title || "Success",
-        message: message || "Done",
-        confirmText: "OK",
+        title: title || i18n.t("shared.dialog.success"),
+        message: message || i18n.t("shared.dialog.done"),
+        confirmText: i18n.t("shared.dialog.ok"),
         hideCancel: true
     });
 }
@@ -140,11 +140,11 @@ function showAppConfirm(options) {
      */
     return showAppDialog({
         type: options.type || "warning",
-        title: options.title || "Confirm action",
+        title: options.title || i18n.t("shared.dialog.confirm_action"),
         subtitle: options.subtitle || "",
-        message: options.message || "Are you sure?",
-        confirmText: options.confirmText || "Confirm",
-        cancelText: options.cancelText || "Cancel",
+        message: options.message || i18n.t("shared.dialog.are_you_sure"),
+        confirmText: options.confirmText || i18n.t("shared.dialog.confirm"),
+        cancelText: options.cancelText || i18n.t("shared.dialog.cancel"),
         confirmClass: options.confirmClass || "btn-warning"
     });
 }
@@ -191,8 +191,8 @@ function formatJsonTextarea(selector, fallbackValue, label) {
         parsed = raw ? JSON.parse(raw) : fallbackValue;
     } catch (error) {
         showAppError(
-            label + " contains invalid JSON:\n\n" + error.message,
-            "Invalid JSON"
+            i18n.t("shared.json.invalid_field", {label: label, error: error.message}),
+            i18n.t("shared.json.invalid_title")
         );
         return false;
     }

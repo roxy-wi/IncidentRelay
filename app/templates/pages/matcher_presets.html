@@ -3,36 +3,36 @@
     <div class="summary-card summary-primary">
       <div class="summary-icon">↗</div>
       <div>
-        <div class="summary-title">Presets</div>
+        <div class="summary-title">{{ _('matcher_presets.summary.presets') }}</div>
         <div id="matcher-presets-summary-total" class="summary-value">0</div>
-        <div class="summary-hint">Reusable matcher definitions</div>
+        <div class="summary-hint">{{ _('matcher_presets.summary.presets_hint') }}</div>
       </div>
     </div>
 
     <div class="summary-card summary-success">
       <div class="summary-icon">✓</div>
       <div>
-        <div class="summary-title">Enabled</div>
+        <div class="summary-title">{{ _('matcher_presets.summary.enabled') }}</div>
         <div id="matcher-presets-summary-enabled" class="summary-value">0</div>
-        <div class="summary-hint">Available for new rules</div>
+        <div class="summary-hint">{{ _('matcher_presets.summary.enabled_hint') }}</div>
       </div>
     </div>
 
     <div class="summary-card summary-info">
       <div class="summary-icon">#</div>
       <div>
-        <div class="summary-title">Used presets</div>
+        <div class="summary-title">{{ _('matcher_presets.summary.used') }}</div>
         <div id="matcher-presets-summary-used" class="summary-value">0</div>
-        <div class="summary-hint">Referenced by policy rules</div>
+        <div class="summary-hint">{{ _('matcher_presets.summary.used_hint') }}</div>
       </div>
     </div>
 
     <div class="summary-card summary-muted">
       <div class="summary-icon">R</div>
       <div>
-        <div class="summary-title">Rule usages</div>
+        <div class="summary-title">{{ _('matcher_presets.summary.usages') }}</div>
         <div id="matcher-presets-summary-usages" class="summary-value">0</div>
-        <div class="summary-hint">Total policy rule references</div>
+        <div class="summary-hint">{{ _('matcher_presets.summary.usages_hint') }}</div>
       </div>
     </div>
   </div>
@@ -41,23 +41,23 @@
     <section class="card page-layout-main">
       <div class="card-header">
         <div>
-          <h2>Matcher presets</h2>
+          <h2>{{ _('matcher_presets.list.title') }}</h2>
           <div class="card-subtitle">
-            Showing
+            {{ _('matcher_presets.list.showing') }}
             <span id="matcher-presets-filtered-count">0</span>
-            of
+            {{ _('matcher_presets.list.of') }}
             <span id="matcher-presets-total-count">0</span>
-            presets
+            {{ _('matcher_presets.list.presets') }}
           </div>
         </div>
 
         <div class="card-header-actions">
           <button id="open-matcher-preset-create-modal" type="button" class="btn btn-primary">
-            New preset
+            {{ _('matcher_presets.actions.new') }}
           </button>
 
           <button id="reload-matcher-presets" type="button" class="btn">
-            Reload
+            {{ _('matcher_presets.actions.reload') }}
           </button>
         </div>
       </div>
@@ -69,17 +69,17 @@
             id="matcher-presets-search"
             class="input"
             type="search"
-            placeholder="Search matcher presets..."
+            placeholder="{{ _('matcher_presets.search.placeholder') }}"
             autocomplete="off"
           >
         </div>
 
         <select id="matcher-presets-status-filter" class="input page-toolbar-filter">
-          <option value="">All statuses</option>
-          <option value="enabled">Enabled</option>
-          <option value="disabled">Disabled</option>
-          <option value="used">Used by rules</option>
-          <option value="unused">Not used</option>
+          <option value="">{{ _('matcher_presets.filters.all_statuses') }}</option>
+          <option value="enabled">{{ _('matcher_presets.filters.enabled') }}</option>
+          <option value="disabled">{{ _('matcher_presets.filters.disabled') }}</option>
+          <option value="used">{{ _('matcher_presets.filters.used') }}</option>
+          <option value="unused">{{ _('matcher_presets.filters.unused') }}</option>
         </select>
       </div>
 
@@ -87,18 +87,18 @@
         <table class="data-table">
           <thead>
             <tr>
-              <th>Preset</th>
-              <th>Team</th>
-              <th>Version</th>
-              <th>Usages</th>
-              <th>Status</th>
-              <th class="actions-th">Actions</th>
+              <th>{{ _('matcher_presets.table.preset') }}</th>
+              <th>{{ _('matcher_presets.table.team') }}</th>
+              <th>{{ _('matcher_presets.table.version') }}</th>
+              <th>{{ _('matcher_presets.table.usages') }}</th>
+              <th>{{ _('matcher_presets.table.status') }}</th>
+              <th class="actions-th">{{ _('matcher_presets.table.actions') }}</th>
             </tr>
           </thead>
 
           <tbody id="matcher-presets-table">
             <tr>
-              <td colspan="6" class="empty-cell">No matcher presets loaded</td>
+              <td colspan="6" class="empty-cell">{{ _('matcher_presets.empty.loaded') }}</td>
             </tr>
           </tbody>
         </table>
@@ -108,16 +108,16 @@
     <aside class="card page-details-card">
       <div class="card-header">
         <div>
-          <h2>Preset details</h2>
+          <h2>{{ _('matcher_presets.details.title') }}</h2>
           <div id="matcher-preset-details-subtitle" class="card-subtitle">
-            Select a matcher preset
+            {{ _('matcher_presets.details.select') }}
           </div>
         </div>
       </div>
 
       <div id="matcher-preset-details-body" class="details-body">
         <div class="details-empty">
-          Click a matcher preset name to inspect its configuration.
+          {{ _('matcher_presets.details.select_help') }}
         </div>
       </div>
     </aside>
@@ -127,9 +127,9 @@
     <div class="app-modal-dialog app-modal-dialog-wide">
       <div class="app-modal-header">
         <div>
-          <h2 id="matcher-preset-form-title">Create matcher preset</h2>
+          <h2 id="matcher-preset-form-title">{{ _('matcher_presets.form.create') }}</h2>
           <div class="card-subtitle">
-            Define a reusable condition for notification and priority rules.
+            {{ _('matcher_presets.form.subtitle') }}
           </div>
         </div>
 
@@ -137,7 +137,7 @@
           id="close-matcher-preset-form-modal"
           type="button"
           class="app-modal-close"
-          aria-label="Close"
+          aria-label="{{ _('common.close') }}"
         >
           ×
         </button>
@@ -148,41 +148,41 @@
           <section class="card">
             <div class="card-header">
               <div>
-                <h2>Preset</h2>
-                <div class="card-subtitle">Team, name and status.</div>
+                <h2>{{ _('matcher_presets.form.preset') }}</h2>
+                <div class="card-subtitle">{{ _('matcher_presets.form.preset_help') }}</div>
               </div>
             </div>
 
             <div class="form-body">
               <input id="matcher-preset-id" type="hidden">
 
-              <label for="matcher-preset-team">Team</label>
+              <label for="matcher-preset-team">{{ _('matcher_presets.form.team') }}</label>
               <select id="matcher-preset-team" class="input"></select>
 
-              <label for="matcher-preset-name">Name</label>
+              <label for="matcher-preset-name">{{ _('matcher_presets.form.name') }}</label>
               <input
                 id="matcher-preset-name"
                 class="input"
                 type="text"
-                placeholder="Production services"
+                placeholder="{{ _('matcher_presets.form.name_placeholder') }}"
                 autocomplete="off"
               >
 
-              <label for="matcher-preset-description">Description</label>
+              <label for="matcher-preset-description">{{ _('matcher_presets.form.description') }}</label>
               <textarea
                 id="matcher-preset-description"
                 class="input"
                 rows="4"
-                placeholder="Matches production services."
+                placeholder="{{ _('matcher_presets.form.description_placeholder') }}"
               ></textarea>
 
               <label class="md-checkbox">
                 <input id="matcher-preset-enabled" type="checkbox" checked>
-                <span>Enabled</span>
+                <span>{{ _('matcher_presets.form.enabled') }}</span>
               </label>
 
               <div class="help-text">
-                Disabled presets cannot be assigned to new rules. Existing rules stop matching.
+                {{ _('matcher_presets.form.disabled_help') }}
               </div>
             </div>
           </section>
@@ -190,25 +190,25 @@
           <section class="card">
             <div class="card-header">
               <div>
-                <h2>Matchers</h2>
+                <h2>{{ _('matcher_presets.form.matchers') }}</h2>
                 <div class="card-subtitle">
-                  The preset condition is combined with rule matchers using AND.
+                  {{ _('matcher_presets.form.matchers_help') }}
                 </div>
               </div>
             </div>
 
             <div class="form-body">
-              <label for="matcher-preset-matchers">Matchers JSON</label>
+              <label for="matcher-preset-matchers">{{ _('matcher_presets.form.matchers_json') }}</label>
                 <div class="json-editor">
                   <div class="json-editor-header">
-                    <span>Matchers</span>
+                    <span>{{ _('matcher_presets.form.matchers') }}</span>
                   </div>
 
                   <textarea id="matcher-preset-matchers" class="input code-textarea json-editor-textarea" spellcheck="false" autocomplete="off">{}</textarea>
                 </div>
 
                 <div class="help-text">
-                  Use {} as a catch-all preset. The matcher format is shared with policy rules.
+                  {{ _('matcher_presets.form.catch_all_help') }}
                 </div>
             </div>
           </section>
@@ -217,11 +217,11 @@
 
       <div class="app-modal-footer">
         <button id="reset-matcher-preset-form" type="button" class="btn">
-          Reset
+          {{ _('matcher_presets.actions.reset') }}
         </button>
 
         <button id="save-matcher-preset" type="button" class="btn btn-primary">
-          Save preset
+          {{ _('matcher_presets.actions.save') }}
         </button>
       </div>
     </div>

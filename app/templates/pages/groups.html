@@ -3,25 +3,25 @@
     <div class="summary-card summary-primary">
       <div class="summary-icon">G</div>
       <div>
-        <div class="summary-title">Groups</div>
+        <div class="summary-title">{{ _('groups.summary.groups') }}</div>
         <div id="groups-total-count" class="summary-value">0</div>
-        <div class="summary-hint">Visible access groups</div>
+        <div class="summary-hint">{{ _('groups.summary.groups_hint') }}</div>
       </div>
     </div>
     <div class="summary-card summary-success">
       <div class="summary-icon">✓</div>
       <div>
-        <div class="summary-title">Active</div>
+        <div class="summary-title">{{ _('groups.summary.active') }}</div>
         <div id="groups-active-count" class="summary-value">0</div>
-        <div class="summary-hint">Enabled groups</div>
+        <div class="summary-hint">{{ _('groups.summary.active_hint') }}</div>
       </div>
     </div>
     <div class="summary-card summary-muted">
       <div class="summary-icon">−</div>
       <div>
-        <div class="summary-title">Inactive</div>
+        <div class="summary-title">{{ _('groups.summary.inactive') }}</div>
         <div id="groups-inactive-count" class="summary-value">0</div>
-        <div class="summary-hint">Disabled groups</div>
+        <div class="summary-hint">{{ _('groups.summary.inactive_hint') }}</div>
       </div>
     </div>
   </div>
@@ -29,18 +29,18 @@
   <section class="card">
     <div class="card-header">
       <div>
-        <h2>Groups</h2>
+        <h2>{{ _('groups.list.title') }}</h2>
         <div class="card-subtitle">
-          Access boundaries for teams, users and routes.
+          {{ _('groups.list.subtitle') }}
         </div>
       </div>
       <div class="card-header-actions">
         <button id="reload-groups" type="button" class="btn">
-          Reload
+          {{ _('groups.actions.reload') }}
         </button>
 
         <button id="new-group" type="button" class="btn btn-primary">
-          New group
+          {{ _('groups.actions.new') }}
         </button>
       </div>
     </div>
@@ -48,18 +48,18 @@
       <table class="data-table">
         <thead>
           <tr>
-            <th>ID</th>
-            <th>Group</th>
-            <th>Description</th>
-            <th>Status</th>
-            <th class="actions-th">Actions</th>
+            <th>{{ _('groups.table.id') }}</th>
+            <th>{{ _('groups.table.group') }}</th>
+            <th>{{ _('groups.table.description') }}</th>
+            <th>{{ _('groups.table.status') }}</th>
+            <th class="actions-th">{{ _('groups.table.actions') }}</th>
           </tr>
         </thead>
 
         <tbody id="groups-table">
           <tr>
             <td colspan="5" class="empty-cell">
-              No groups loaded
+              {{ _('groups.empty.groups_loaded') }}
             </td>
           </tr>
         </tbody>
@@ -71,9 +71,9 @@
     <div class="app-modal-dialog app-modal-dialog-wide">
       <div class="app-modal-header">
         <div>
-          <h2 id="group-modal-title">Group details</h2>
+          <h2 id="group-modal-title">{{ _('groups.modal.details') }}</h2>
           <div id="group-modal-subtitle" class="card-subtitle">
-            Edit group settings and membership.
+            {{ _('groups.modal.details_subtitle') }}
           </div>
         </div>
 
@@ -81,7 +81,7 @@
           id="close-group-modal"
           type="button"
           class="app-modal-close"
-          aria-label="Close"
+          aria-label="{{ _('groups.actions.close') }}"
         >
           ×
         </button>
@@ -92,55 +92,55 @@
             <section class="card">
             <div class="card-header">
               <div>
-                <h2>Group settings</h2>
+                <h2>{{ _('groups.settings.title') }}</h2>
                 <div class="card-subtitle">
-                  Slug, display name and status.
+                  {{ _('groups.settings.subtitle') }}
                 </div>
               </div>
             </div>
             <div class="form-body">
               <input id="group-id" type="hidden">
-              <label for="group-slug">Slug</label>
+              <label for="group-slug">{{ _('groups.form.slug') }}</label>
               <input
                 id="group-slug"
                 class="input"
                 type="text"
-                placeholder="infra"
+                placeholder="{{ _('groups.form.slug_placeholder') }}"
                 autocomplete="off"
               >
 
-              <label for="group-name">Name</label>
+              <label for="group-name">{{ _('groups.form.name') }}</label>
               <input
                 id="group-name"
                 class="input"
                 type="text"
-                placeholder="Infrastructure"
+                placeholder="{{ _('groups.form.name_placeholder') }}"
                 autocomplete="off"
               >
 
-              <label for="group-description">Description</label>
+              <label for="group-description">{{ _('groups.form.description') }}</label>
               <textarea
                 id="group-description"
                 class="input"
-                placeholder="Group purpose or access boundary"
+                placeholder="{{ _('groups.form.description_placeholder') }}"
               ></textarea>
 
               <label class="md-checkbox">
                 <input id="group-active" type="checkbox" checked>
-                <span>Active</span>
+                <span>{{ _('groups.form.active') }}</span>
               </label>
 
               <div class="form-actions-inline">
                 <button id="save-group" type="button" class="btn btn-primary">
-                  Save group
+                  {{ _('groups.actions.save') }}
                 </button>
 
                 <button id="clear-group-form" type="button" class="btn">
-                  Clear
+                  {{ _('groups.actions.clear') }}
                 </button>
               </div>
               <div class="help-text">
-                Only admins can create groups. Users with RW role can edit groups they belong to.
+                {{ _('groups.form.help') }}
               </div>
             </div>
           </section>
@@ -148,40 +148,40 @@
           <section class="card">
             <div class="card-header">
               <div>
-                <h2 id="group-member-form-title">Add user to group</h2>
+                <h2 id="group-member-form-title">{{ _('groups.members.add_title') }}</h2>
                 <div class="card-subtitle">
-                  Add a user or edit selected membership.
+                  {{ _('groups.members.form_subtitle') }}
                 </div>
               </div>
             </div>
             <div class="form-body">
               <input id="group-membership-id" type="hidden">
-              <label for="group-member-user">User</label>
-              <select id="group-member-user" class="js-user-select" data-placeholder="Select user..."></select>
-              <label for="group-member-role">Role</label>
+              <label for="group-member-user">{{ _('groups.members.user') }}</label>
+              <select id="group-member-user" class="js-user-select" data-placeholder="{{ _('groups.members.user_placeholder') }}"></select>
+              <label for="group-member-role">{{ _('groups.members.role') }}</label>
               <select id="group-member-role" class="input">
-                  <option value="viewer">Group Viewer</option>
-                  <option value="editor">Group Editor</option>
-                  <option value="user_admin">Group Admin</option>
+                  <option value="viewer">{{ _('rbac.group.viewer') }}</option>
+                  <option value="editor">{{ _('rbac.group.editor') }}</option>
+                  <option value="user_admin">{{ _('rbac.group.admin') }}</option>
               </select>
 
               <label class="md-checkbox">
                 <input id="group-member-active" type="checkbox" checked>
-                <span>Active</span>
+                <span>{{ _('groups.form.active') }}</span>
               </label>
 
               <div class="form-actions-inline">
                 <button id="save-group-member" type="button" class="btn btn-primary">
-                  Save membership
+                  {{ _('groups.actions.save_membership') }}
                 </button>
 
                 <button id="reset-group-member-form" type="button" class="btn">
-                  Reset
+                  {{ _('groups.actions.reset') }}
                 </button>
               </div>
 
               <div id="group-member-help" class="help-text">
-                Save the group first, then add members.
+                {{ _('groups.empty.members_save') }}
               </div>
             </div>
           </section>
@@ -190,15 +190,15 @@
         <section class="card">
           <div class="card-header">
             <div>
-              <h2 id="group-members-title">Group members</h2>
+              <h2 id="group-members-title">{{ _('groups.members.title') }}</h2>
               <div class="card-subtitle">
-                Users assigned to this group.
+                {{ _('groups.members.subtitle') }}
               </div>
             </div>
 
             <div class="card-header-actions">
               <button id="reload-group-members" type="button" class="btn">
-                Reload members
+                {{ _('groups.actions.reload_members') }}
               </button>
             </div>
           </div>
@@ -206,18 +206,18 @@
             <table class="data-table">
               <thead>
                 <tr>
-                  <th>User ID</th>
-                  <th>User</th>
-                  <th>Name</th>
-                  <th>Role</th>
-                  <th>Status</th>
-                  <th class="actions-th">Actions</th>
+                  <th>{{ _('groups.table.user_id') }}</th>
+                  <th>{{ _('groups.table.user') }}</th>
+                  <th>{{ _('groups.table.name') }}</th>
+                  <th>{{ _('groups.table.role') }}</th>
+                  <th>{{ _('groups.table.status') }}</th>
+                  <th class="actions-th">{{ _('groups.table.actions') }}</th>
                 </tr>
               </thead>
               <tbody id="group-members-table">
                 <tr>
                   <td colspan="6" class="empty-cell">
-                    Save or select a group to manage members
+                    {{ _('groups.empty.members_select') }}
                   </td>
                 </tr>
               </tbody>
@@ -228,7 +228,7 @@
 
       <div class="app-modal-footer">
         <button id="close-group-modal-footer" type="button" class="btn">
-          Close
+          {{ _('groups.actions.close') }}
         </button>
       </div>
     </div>

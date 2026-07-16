@@ -3,36 +3,36 @@
         <div class="summary-card summary-primary">
             <div class="summary-icon">↗</div>
             <div>
-                <div class="summary-title">Policies</div>
+                <div class="summary-title">{{ _("escalations.summary.policies") }}</div>
                 <div id="escalation-policies-summary-total" class="summary-value">0</div>
-                <div class="summary-hint">Escalation chains</div>
+                <div class="summary-hint">{{ _("escalations.summary.policies_hint") }}</div>
             </div>
         </div>
 
         <div class="summary-card summary-success">
             <div class="summary-icon">✓</div>
             <div>
-                <div class="summary-title">Enabled</div>
+                <div class="summary-title">{{ _("escalations.summary.enabled") }}</div>
                 <div id="escalation-policies-summary-enabled" class="summary-value">0</div>
-                <div class="summary-hint">Ready for routes</div>
+                <div class="summary-hint">{{ _("escalations.summary.enabled_hint") }}</div>
             </div>
         </div>
 
         <div class="summary-card summary-info">
             <div class="summary-icon">#</div>
             <div>
-                <div class="summary-title">Rules</div>
+                <div class="summary-title">{{ _("escalations.summary.rules") }}</div>
                 <div id="escalation-policies-summary-rules" class="summary-value">0</div>
-                <div class="summary-hint">Configured levels</div>
+                <div class="summary-hint">{{ _("escalations.summary.rules_hint") }}</div>
             </div>
         </div>
 
         <div class="summary-card summary-muted">
             <div class="summary-icon">×</div>
             <div>
-                <div class="summary-title">Disabled</div>
+                <div class="summary-title">{{ _("escalations.summary.disabled") }}</div>
                 <div id="escalation-policies-summary-disabled" class="summary-value">0</div>
-                <div class="summary-hint">Not used by routes</div>
+                <div class="summary-hint">{{ _("escalations.summary.disabled_hint") }}</div>
             </div>
         </div>
     </div>
@@ -41,18 +41,18 @@
         <section class="card page-layout-main">
             <div class="card-header">
                 <div>
-                    <h2>Escalation policies</h2>
+                    <h2>{{ _("escalations.list.title") }}</h2>
                     <div class="card-subtitle">
-                        Showing <span id="escalation-policies-filtered-count">0</span>
-                        of <span id="escalation-policies-total-count">0</span> policies
+                        {{ _("escalations.list.showing") }} <span id="escalation-policies-filtered-count">0</span>
+                        {{ _("escalations.list.of") }} <span id="escalation-policies-total-count">0</span> {{ _("escalations.list.policies") }}
                     </div>
                 </div>
                 <div class="card-header-actions">
                     <button id="open-escalation-policy-create-modal" type="button" class="btn btn-primary">
-                        New policy
+                        {{ _("escalations.actions.new_policy") }}
                     </button>
                     <button id="reload-escalation-policies" type="button" class="btn">
-                        Reload
+                        {{ _("escalations.actions.reload") }}
                     </button>
                 </div>
             </div>
@@ -64,15 +64,15 @@
                         id="escalation-policies-search"
                         class="input"
                         type="search"
-                        placeholder="Search policies..."
+                        placeholder="{{ _('escalations.search.placeholder') }}"
                         autocomplete="off"
                     >
                 </div>
 
                 <select id="escalation-policies-status-filter" class="input page-toolbar-filter">
-                    <option value="">All statuses</option>
-                    <option value="enabled">Enabled</option>
-                    <option value="disabled">Disabled</option>
+                    <option value="">{{ _("escalations.filters.all_statuses") }}</option>
+                    <option value="enabled">{{ _("escalations.status.enabled") }}</option>
+                    <option value="disabled">{{ _("escalations.status.disabled") }}</option>
                 </select>
             </div>
 
@@ -80,17 +80,17 @@
                 <table id="escalation-policies-table-view" class="data-table">
                     <thead>
                     <tr>
-                        <th>Policy</th>
-                        <th>Team</th>
-                        <th>Rules</th>
-                        <th>Repeat</th>
-                        <th>Status</th>
-                        <th class="actions-th">Actions</th>
+                        <th>{{ _("escalations.table.policy") }}</th>
+                        <th>{{ _("escalations.table.team") }}</th>
+                        <th>{{ _("escalations.table.rules") }}</th>
+                        <th>{{ _("escalations.table.repeat") }}</th>
+                        <th>{{ _("escalations.table.status") }}</th>
+                        <th class="actions-th">{{ _("escalations.table.actions") }}</th>
                     </tr>
                     </thead>
                     <tbody id="escalation-policies-table">
                     <tr>
-                        <td colspan="6" class="empty-cell">No policies loaded</td>
+                        <td colspan="6" class="empty-cell">{{ _("escalations.empty.loaded") }}</td>
                     </tr>
                     </tbody>
                 </table>
@@ -100,15 +100,15 @@
         <aside class="card page-details-card">
             <div class="card-header">
                 <div>
-                    <h2>Policy details</h2>
+                    <h2>{{ _("escalations.details.title") }}</h2>
                     <div id="escalation-policy-details-subtitle" class="card-subtitle">
-                        Select a policy
+                        {{ _("escalations.details.select") }}
                     </div>
                 </div>
             </div>
             <div id="escalation-policy-details-body" class="details-body">
                 <div class="details-empty">
-                    Click a policy name to inspect rules and quick actions.
+                    {{ _("escalations.details.hint") }}
                 </div>
             </div>
         </aside>
@@ -118,16 +118,16 @@
         <div class="app-modal-dialog app-modal-dialog-wide">
             <div class="app-modal-header">
                 <div>
-                    <h2 id="escalation-policy-form-title">Create policy</h2>
+                    <h2 id="escalation-policy-form-title">{{ _("escalations.form.create_title") }}</h2>
                     <div class="card-subtitle">
-                        Define escalation chain settings for a team.
+                        {{ _("escalations.form.subtitle") }}
                     </div>
                 </div>
                 <button
                     id="close-escalation-policy-form-modal"
                     type="button"
                     class="app-modal-close"
-                    aria-label="Close"
+                    aria-label="{{ _('common.close') }}"
                 >
                     ×
                 </button>
@@ -138,34 +138,34 @@
                     <section class="card">
                         <div class="card-header">
                             <div>
-                                <h2>Policy</h2>
+                                <h2>{{ _("escalations.form.policy_section") }}</h2>
                                 <div class="card-subtitle">
-                                    Team, name and status.
+                                    {{ _("escalations.form.policy_section_hint") }}
                                 </div>
                             </div>
                         </div>
                         <div class="form-body">
                             <input id="escalation-policy-id" type="hidden">
 
-                            <label for="escalation-policy-team">Team</label>
+                            <label for="escalation-policy-team">{{ _("escalations.form.team") }}</label>
                             <select id="escalation-policy-team" class="input"></select>
 
-                            <label for="escalation-policy-name">Name</label>
+                            <label for="escalation-policy-name">{{ _("escalations.form.name") }}</label>
                             <input
                                 id="escalation-policy-name"
                                 class="input"
                                 type="text"
-                                placeholder="Critical production alerts"
+                                placeholder="{{ _('escalations.form.name_placeholder') }}"
                                 autocomplete="off"
                             >
 
                             <label class="md-checkbox">
                                 <input id="escalation-policy-enabled" type="checkbox" checked>
-                                <span>Enabled</span>
+                                <span>{{ _("escalations.form.enabled") }}</span>
                             </label>
 
                             <div class="help-text">
-                                Disabled policies stay visible, but should not be selected for new routes.
+                                {{ _("escalations.form.disabled_help") }}
                             </div>
                         </div>
                     </section>
@@ -173,14 +173,14 @@
                     <section class="card">
                         <div class="card-header">
                             <div>
-                                <h2>Behavior</h2>
+                                <h2>{{ _("escalations.form.behavior") }}</h2>
                                 <div class="card-subtitle">
-                                    Repeat count and description.
+                                    {{ _("escalations.form.behavior_hint") }}
                                 </div>
                             </div>
                         </div>
                         <div class="form-body">
-                            <label for="escalation-policy-repeat-count">Repeat count</label>
+                            <label for="escalation-policy-repeat-count">{{ _("escalations.form.repeat_count") }}</label>
                             <input
                                 id="escalation-policy-repeat-count"
                                 class="input"
@@ -190,16 +190,16 @@
                                 value="0"
                             >
 
-                            <label for="escalation-policy-description">Description</label>
+                            <label for="escalation-policy-description">{{ _("escalations.form.description") }}</label>
                             <textarea
                                 id="escalation-policy-description"
                                 class="input"
                                 rows="6"
-                                placeholder="Primary rotation, backup rotation, team lead"
+                                placeholder="{{ _('escalations.form.description_placeholder') }}"
                             ></textarea>
 
                             <div class="help-text">
-                                Rules are configured from policy details after the policy is saved.
+                                {{ _("escalations.form.rules_help") }}
                             </div>
                         </div>
                     </section>
@@ -208,10 +208,10 @@
 
             <div class="app-modal-footer">
                 <button id="reset-escalation-policy-form" type="button" class="btn">
-                    Reset
+                    {{ _("escalations.actions.reset") }}
                 </button>
                 <button id="save-escalation-policy" type="button" class="btn btn-primary">
-                    Save policy
+                    {{ _("escalations.actions.save_policy") }}
                 </button>
             </div>
         </div>
@@ -221,16 +221,16 @@
         <div class="app-modal-dialog app-modal-dialog-wide">
             <div class="app-modal-header">
                 <div>
-                    <h2 id="escalation-rules-title">Policy rules</h2>
+                    <h2 id="escalation-rules-title">{{ _("escalations.rules.title") }}</h2>
                     <div id="escalation-rules-subtitle" class="card-subtitle">
-                        Select a policy first.
+                        {{ _("escalations.rules.select_policy") }}
                     </div>
                 </div>
                 <button
                     id="close-escalation-rules-modal"
                     type="button"
                     class="app-modal-close"
-                    aria-label="Close"
+                    aria-label="{{ _('common.close') }}"
                 >
                     ×
                 </button>
@@ -240,30 +240,30 @@
                 <section class="card">
                     <div class="card-header">
                         <div>
-                            <h2>Rules</h2>
+                            <h2>{{ _("escalations.rules.section_title") }}</h2>
                             <div class="card-subtitle">
-                                Rules are evaluated in position order. Each rule defines the next escalation target and delay.
+                                {{ _("escalations.rules.section_hint") }}
                             </div>
                         </div>
                         <div class="card-header-actions">
                             <button id="add-escalation-rule-card" type="button" class="btn btn-primary">
-                                Add rule
+                                {{ _("escalations.actions.add_rule") }}
                             </button>
                             <button id="reload-escalation-rules" type="button" class="btn">
-                                Reload
+                                {{ _("escalations.actions.reload") }}
                             </button>
                         </div>
                     </div>
 
                     <div id="escalation-rule-cards" class="rotation-layer-cards">
-                        <div class="empty-cell">No policy selected</div>
+                        <div class="empty-cell">{{ _("escalations.rules.no_policy") }}</div>
                     </div>
                 </section>
             </div>
 
             <div class="app-modal-footer">
                 <button id="close-escalation-rules-modal-footer" type="button" class="btn">
-                    Close
+                    {{ _("escalations.actions.close") }}
                 </button>
             </div>
         </div>

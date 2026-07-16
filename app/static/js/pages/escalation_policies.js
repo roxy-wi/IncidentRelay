@@ -33,11 +33,27 @@ function getEscalationRuleTargetName(targetType, targetId) {
         });
 
         return member
-            ? (member.display_name || member.username || ("User #" + member.user_id))
+            ? (member.display_name || member.username || i18n.t("escalations.target.user_number", {id: member.user_id}))
             : null;
     }
 
     return null;
+}
+
+function escalationPolicyStatusLabel(enabled) {
+    return i18n.t(enabled ? "escalations.status.enabled" : "escalations.status.disabled");
+}
+
+function escalationRuleTargetTypeLabel(targetType) {
+    if (targetType === "rotation") {
+        return i18n.t("escalations.rules.rotation");
+    }
+
+    if (targetType === "user") {
+        return i18n.t("escalations.rules.user");
+    }
+
+    return targetType || "-";
 }
 
 function createUnsavedEscalationRule() {
@@ -177,7 +193,7 @@ function renderEscalationPoliciesTable() {
                 $("<td>")
                     .attr("colspan", "6")
                     .addClass("empty-cell")
-                    .text("No escalation policies")
+                    .text(i18n.t("escalations.empty.found"))
             )
         );
         return;
@@ -206,7 +222,7 @@ function renderEscalationPolicyRow(policy) {
             .append(
                 $("<div>")
                     .addClass("row-subtitle")
-                    .text(policy.description || "Policy #" + policy.id)
+                    .text(policy.description || i18n.t("escalations.policy.number", {id: policy.id}))
             )
     );
 
@@ -219,7 +235,7 @@ function renderEscalationPolicyRow(policy) {
     );
     row.append($("<td>").text(rules.length));
     row.append($("<td>").text(policy.repeat_count || 0));
-    row.append($("<td>").append(renderStatusBadge(policy.enabled, "Enabled", "Disabled")));
+    row.append($("<td>").append(renderStatusBadge(policy.enabled, i18n.t("escalations.status.enabled"), i18n.t("escalations.status.disabled"))));
     row.append($("<td>").addClass("actions-cell").append(renderEscalationPolicyActions(policy)));
 
     return row;
@@ -230,39 +246,39 @@ function renderEscalationPolicyActions(policy) {
         object: policy,
         items: [
             {
-                label: "Edit",
+                label: i18n.t("escalations.actions.edit"),
                 icon: "fas fa-edit",
                 required: "write",
-                denyMessage: "Team manager role is required to edit this policy.",
+                denyMessage: i18n.t("escalations.permissions.edit"),
                 onClick: function () {
                     editEscalationPolicy(policy.id);
                 }
             },
             {
-                label: "Rules",
+                label: i18n.t("escalations.actions.rules"),
                 icon: "fas fa-list-ol",
                 required: "write",
-                denyMessage: "Team manager role is required to manage policy rules.",
+                denyMessage: i18n.t("escalations.permissions.rules"),
                 onClick: function () {
                     openEscalationRulesModal(policy.id);
                 }
             },
             {
-                label: policy.enabled ? "Disable" : "Enable",
+                label: policy.enabled ? i18n.t("escalations.actions.disable") : i18n.t("escalations.actions.enable"),
                 icon: policy.enabled ? "fas fa-pause" : "fas fa-play",
                 required: "write",
                 danger: policy.enabled,
-                denyMessage: "Team manager role is required to enable or disable this policy.",
+                denyMessage: i18n.t("escalations.permissions.toggle"),
                 onClick: function () {
                     setEscalationPolicyEnabled(policy, !policy.enabled);
                 }
             },
             {
-                label: "Remove",
+                label: i18n.t("escalations.actions.remove"),
                 icon: "fas fa-trash",
                 required: "delete",
                 danger: true,
-                denyMessage: "Delete permission is required to remove this policy.",
+                denyMessage: i18n.t("escalations.permissions.remove"),
                 onClick: function () {
                     removeEscalationPolicy(policy);
                 }
@@ -279,11 +295,19 @@ function escalationPolicyDetailsItem(label, value) {
 }
 
 function formatEscalationPolicyRule(rule) {
-    const target = upperCaseFirst(rule.target_type || "-") + ": " + (rule.target_name || rule.target_id || "-");
+    const target = i18n.t("escalations.rules.target_summary", {
+        type: escalationRuleTargetTypeLabel(rule.target_type),
+        name: rule.target_name || rule.target_id || "-",
+    });
     const delay = formatSeconds(rule.delay_seconds || 0);
-    const status = rule.enabled ? "enabled" : "disabled";
+    const status = escalationPolicyStatusLabel(rule.enabled);
 
-    return "#" + rule.position + " — " + target + " — after " + delay + " — " + status;
+    return i18n.t("escalations.rules.formatted", {
+        position: rule.position,
+        target: target,
+        delay: delay,
+        status: status,
+    });
 }
 
 function renderEscalationPolicyRules(policy) {
@@ -295,16 +319,16 @@ function renderEscalationPolicyRules(policy) {
     const header = $("<div>").addClass("details-item");
     const actions = $("<div>").addClass("table-actions");
 
-    header.append($("<div>").addClass("details-label").text("Rules"));
+    header.append($("<div>").addClass("details-label").text(i18n.t("escalations.details.rules")));
     header.append(
         $("<div>")
             .addClass("details-value")
-            .text(rules.length ? rules.length + " configured" : "No rules")
+            .text(rules.length ? i18n.t("escalations.details.configured", {count: rules.length}) : i18n.t("escalations.details.no_rules"))
     );
 
     appendActionIfAllowed(actions, policy, {
         required: "write",
-        text: "Manage rules",
+        text: i18n.t("escalations.actions.manage_rules"),
         className: "btn btn-small",
         onClick: function () {
             openEscalationRulesModal(policy.id);
@@ -321,11 +345,11 @@ function renderEscalationPolicyRules(policy) {
         wrapper.append(
             $("<div>")
                 .addClass("details-item")
-                .append($("<div>").addClass("details-label").text("First rule"))
+                .append($("<div>").addClass("details-label").text(i18n.t("escalations.details.first_rule")))
                 .append(
                     $("<div>")
                         .addClass("details-value")
-                        .text("Open rules and add the first escalation rule.")
+                        .text(i18n.t("escalations.details.first_rule_hint"))
                 )
         );
         return wrapper;
@@ -335,7 +359,7 @@ function renderEscalationPolicyRules(policy) {
         wrapper.append(
             $("<div>")
                 .addClass("details-item")
-                .append($("<div>").addClass("details-label").text("Rule " + rule.position))
+                .append($("<div>").addClass("details-label").text(i18n.t("escalations.details.rule", {position: rule.position})))
                 .append($("<div>").addClass("details-value").text(formatEscalationPolicyRule(rule)))
         );
     });
@@ -347,7 +371,7 @@ function renderEscalationPolicyDetails(policy, options) {
     selectedEscalationPolicyDetailsId = policy.id;
 
     $("#escalation-policy-details-subtitle").text(
-        (policy.team_slug || policy.team_name || "-") + " / " + (policy.enabled ? "Enabled" : "Disabled")
+        (policy.team_slug || policy.team_name || "-") + " / " + escalationPolicyStatusLabel(policy.enabled)
     );
 
     const body = $("#escalation-policy-details-body");
@@ -356,11 +380,11 @@ function renderEscalationPolicyDetails(policy, options) {
     body.append(
         $("<div>")
             .addClass("details-list")
-            .append(escalationPolicyDetailsItem("Name", policy.name))
-            .append(escalationPolicyDetailsItem("Team", policy.team_slug || policy.team_name))
-            .append(escalationPolicyDetailsItem("Description", policy.description))
-            .append(escalationPolicyDetailsItem("Repeat count", policy.repeat_count || 0))
-            .append(escalationPolicyDetailsItem("Status", policy.enabled ? "Enabled" : "Disabled"))
+            .append(escalationPolicyDetailsItem(i18n.t("escalations.details.name"), policy.name))
+            .append(escalationPolicyDetailsItem(i18n.t("escalations.details.team"), policy.team_slug || policy.team_name))
+            .append(escalationPolicyDetailsItem(i18n.t("escalations.details.description"), policy.description))
+            .append(escalationPolicyDetailsItem(i18n.t("escalations.details.repeat_count"), policy.repeat_count || 0))
+            .append(escalationPolicyDetailsItem(i18n.t("escalations.details.status"), escalationPolicyStatusLabel(policy.enabled)))
     );
 
     body.append(renderEscalationPolicyRules(policy));
@@ -370,7 +394,7 @@ function renderEscalationPolicyDetails(policy, options) {
     appendIconActionIfAllowed(actions, policy, {
         required: "write",
         icon: "fas fa-edit",
-        label: "Edit policy",
+        label: i18n.t("escalations.actions.edit_policy"),
         onClick: function () {
             editEscalationPolicy(policy.id);
         },
@@ -379,7 +403,7 @@ function renderEscalationPolicyDetails(policy, options) {
     appendIconActionIfAllowed(actions, policy, {
         required: "write",
         icon: "fas fa-layer-group",
-        label: "Manage rules",
+        label: i18n.t("escalations.actions.manage_rules"),
         onClick: function () {
             openEscalationRulesModal(policy.id);
         },
@@ -388,7 +412,7 @@ function renderEscalationPolicyDetails(policy, options) {
     appendIconActionIfAllowed(actions, policy, {
         required: "write",
         icon: policy.enabled ? "fas fa-pause" : "fas fa-play",
-        label: policy.enabled ? "Disable policy" : "Enable policy",
+        label: policy.enabled ? i18n.t("escalations.actions.disable_policy") : i18n.t("escalations.actions.enable_policy"),
         className: policy.enabled ? "btn-warning" : "btn-success",
         onClick: function () {
             setEscalationPolicyEnabled(policy, !policy.enabled);
@@ -398,7 +422,7 @@ function renderEscalationPolicyDetails(policy, options) {
     appendIconActionIfAllowed(actions, policy, {
         required: "delete",
         icon: "fas fa-trash-alt",
-        label: "Remove policy",
+        label: i18n.t("escalations.actions.remove_policy"),
         className: "btn-danger",
         onClick: function () {
             removeEscalationPolicy(policy);
@@ -419,8 +443,8 @@ function renderEscalationPolicyDetails(policy, options) {
 
 function renderEscalationPolicyDetailsEmpty() {
     selectedEscalationPolicyDetailsId = null;
-    $("#escalation-policy-details-subtitle").text("Select a policy");
-    $("#escalation-policy-details-body").html("Click a policy name to inspect rules and quick actions.");
+    $("#escalation-policy-details-subtitle").text(i18n.t("escalations.details.select"));
+    $("#escalation-policy-details-body").text(i18n.t("escalations.details.hint"));
 }
 
 function restoreEscalationPolicyDetails() {
@@ -504,7 +528,7 @@ function saveEscalationPolicy() {
 }
 
 function resetEscalationPolicyForm() {
-    $("#escalation-policy-form-title").text("Create policy");
+    $("#escalation-policy-form-title").text(i18n.t("escalations.form.create_title"));
     $("#escalation-policy-id").val("");
     $("#escalation-policy-name").val("");
     $("#escalation-policy-description").val("");
@@ -520,7 +544,7 @@ function resetEscalationPolicyForm() {
 
 function openCreateEscalationPolicyModal() {
     if (!currentUserCanCreateUiObjects()) {
-        showAppError("Write role is required to create policies.", "Access denied");
+        showAppError(i18n.t("escalations.errors.create"), i18n.t("escalations.errors.access_denied"));
         return;
     }
 
@@ -532,16 +556,16 @@ function editEscalationPolicy(id) {
     const policy = getEscalationPolicyById(id);
 
     if (!policy) {
-        showAppError("Policy was not found.");
+        showAppError(i18n.t("escalations.errors.not_found"));
         return;
     }
 
     if (!canWriteObject(policy)) {
-        showAppError("You do not have permission to edit this policy.", "Access denied");
+        showAppError(i18n.t("escalations.errors.edit"), i18n.t("escalations.errors.access_denied"));
         return;
     }
 
-    $("#escalation-policy-form-title").text("Edit policy #" + id);
+    $("#escalation-policy-form-title").text(i18n.t("escalations.form.edit_title", {id: id}));
     $("#escalation-policy-id").val(policy.id);
     $("#escalation-policy-team").val(policy.team_id).prop("disabled", true);
     $("#escalation-policy-name").val(policy.name || "");
@@ -554,7 +578,7 @@ function editEscalationPolicy(id) {
 
 function setEscalationPolicyEnabled(policy, enabled) {
     if (!canWriteObject(policy)) {
-        showAppError("You do not have permission to update this policy.", "Access denied");
+        showAppError(i18n.t("escalations.errors.update"), i18n.t("escalations.errors.access_denied"));
         return;
     }
 
@@ -563,14 +587,14 @@ function setEscalationPolicyEnabled(policy, enabled) {
 
 function removeEscalationPolicy(policy) {
     if (!canDeleteObject(policy)) {
-        showAppError("You do not have permission to remove this policy.", "Access denied");
+        showAppError(i18n.t("escalations.errors.remove"), i18n.t("escalations.errors.access_denied"));
         return;
     }
 
     showAppConfirm({
-        title: "Remove this policy?",
-        message: "Remove policy '" + policy.name + "'? Existing alerts keep their current state, but new routes will not be able to use this policy.",
-        confirmText: "Remove policy",
+        title: i18n.t("escalations.confirm.remove_title"),
+        message: i18n.t("escalations.confirm.remove_message", {name: policy.name}),
+        confirmText: i18n.t("escalations.confirm.remove_button"),
         confirmClass: "btn-danger",
     }).done(function () {
         apiDelete("/api/escalation-policies/" + policy.id, refreshEscalationPolicies);
@@ -593,7 +617,7 @@ function closeEscalationRulesModal() {
         .append(
             $("<div>")
                 .addClass("empty-cell")
-                .text("No policy selected")
+                .text(i18n.t("escalations.rules.no_policy"))
         );
 }
 
@@ -601,25 +625,25 @@ function openEscalationRulesModal(policyId, ruleIdToExpand) {
     const policy = getEscalationPolicyById(policyId);
 
     if (!policy) {
-        showAppError("Policy was not found.");
+        showAppError(i18n.t("escalations.errors.not_found"));
         return;
     }
 
     if (!canWriteObject(policy)) {
-        showAppError("You do not have permission to manage policy rules.", "Access denied");
+        showAppError(i18n.t("escalations.errors.manage_rules"), i18n.t("escalations.errors.access_denied"));
         return;
     }
 
     selectedEscalationPolicyRulesId = policy.id;
-    selectedEscalationPolicyRulesName = policy.name || ("policy #" + policy.id);
+    selectedEscalationPolicyRulesName = policy.name || i18n.t("escalations.policy.number", {id: policy.id});
     expandedEscalationRuleId = ruleIdToExpand || null;
     escalationPolicyRulesCache = [];
     escalationRuleTargetRotationsCache = [];
     escalationRuleTargetUsersCache = [];
 
-    $("#escalation-rules-title").text("Policy rules: " + selectedEscalationPolicyRulesName);
+    $("#escalation-rules-title").text(i18n.t("escalations.rules.title_named", {name: selectedEscalationPolicyRulesName}));
     $("#escalation-rules-subtitle").text(
-        (policy.team_slug || policy.team_name || "-") + " / " + (policy.enabled ? "Enabled" : "Disabled")
+        (policy.team_slug || policy.team_name || "-") + " / " + escalationPolicyStatusLabel(policy.enabled)
     );
 
     openAppModal("#escalation-rules-modal");
@@ -680,20 +704,20 @@ function loadEscalationRuleCards(policyId, callback) {
         .append(
             $("<div>")
                 .addClass("layer-card-loading")
-                .text("Loading rules...")
+                .text(i18n.t("escalations.rules.loading"))
         );
 
     apiGet("/api/escalation-policies/" + policyId, function (policy) {
         rememberEscalationPolicyInCache(policy);
         selectedEscalationPolicyRulesId = policy.id;
-        selectedEscalationPolicyRulesName = policy.name || ("policy #" + policy.id);
+        selectedEscalationPolicyRulesName = policy.name || i18n.t("escalations.policy.number", {id: policy.id});
         escalationPolicyRulesCache = asArray(policy.rules).slice().sort(function (left, right) {
             return Number(left.position || 0) - Number(right.position || 0);
         });
 
-        $("#escalation-rules-title").text("Policy rules: " + selectedEscalationPolicyRulesName);
+        $("#escalation-rules-title").text(i18n.t("escalations.rules.title_named", {name: selectedEscalationPolicyRulesName}));
         $("#escalation-rules-subtitle").text(
-            (policy.team_slug || policy.team_name || "-") + " / " + (policy.enabled ? "Enabled" : "Disabled")
+            (policy.team_slug || policy.team_name || "-") + " / " + escalationPolicyStatusLabel(policy.enabled)
         );
 
         renderEscalationRuleCards();
@@ -720,7 +744,7 @@ function renderEscalationRuleCards() {
         container.append(
             $("<div>")
                 .addClass("empty-cell")
-                .text("No rules. Add the first rule to define the escalation chain.")
+                .text(i18n.t("escalations.rules.empty"))
         );
         return;
     }
@@ -769,14 +793,19 @@ function renderEscalationRuleCardHeader(rule, number) {
         .addClass("rotation-layer-title")
         .append(
             $("<strong>").text(
-                "Rule " + (rule.position || number) + (isUnsaved ? " · unsaved" : "")
+                i18n.t("escalations.rules.card_title", {
+                    position: rule.position || number,
+                    suffix: isUnsaved ? " · " + i18n.t("escalations.rules.unsaved") : "",
+                })
             )
         )
         .append(
             $("<span>").text(
-                formatRuleTargetSummary(rule) +
-                " · after " + formatSeconds(rule.delay_seconds || 0) +
-                " · " + (rule.enabled ? "Enabled" : "Disabled")
+                i18n.t("escalations.rules.card_summary", {
+                    target: formatRuleTargetSummary(rule),
+                    delay: formatSeconds(rule.delay_seconds || 0),
+                    status: escalationPolicyStatusLabel(rule.enabled),
+                })
             )
         );
 
@@ -786,7 +815,7 @@ function renderEscalationRuleCardHeader(rule, number) {
         $("<button>")
             .attr("type", "button")
             .addClass("btn btn-small")
-            .text(isExpanded ? "Collapse" : "Edit")
+            .text(isExpanded ? i18n.t("escalations.actions.collapse") : i18n.t("escalations.actions.edit"))
             .on("click", function () {
                 toggleEscalationRuleEditor(rule.id);
             })
@@ -796,7 +825,7 @@ function renderEscalationRuleCardHeader(rule, number) {
         $("<button>")
             .attr("type", "button")
             .addClass("btn btn-danger btn-small")
-            .text(isUnsaved ? "Remove" : "Delete")
+            .text(isUnsaved ? i18n.t("escalations.actions.remove") : i18n.t("escalations.actions.delete"))
             .on("click", function () {
                 deleteEscalationRule(rule.id);
             })
@@ -813,22 +842,22 @@ function renderEscalationRuleSummary(rule) {
     summary.append(
         $("<div>")
             .addClass("rotation-layer-summary-item")
-            .append($("<span>").text("Target"))
+            .append($("<span>").text(i18n.t("escalations.rules.target")))
             .append($("<strong>").text(formatRuleTargetSummary(rule)))
     );
 
     summary.append(
         $("<div>")
             .addClass("rotation-layer-summary-item")
-            .append($("<span>").text("Escalate after"))
+            .append($("<span>").text(i18n.t("escalations.rules.escalate_after")))
             .append($("<strong>").text(formatSeconds(rule.delay_seconds || 0)))
     );
 
     summary.append(
         $("<div>")
             .addClass("rotation-layer-summary-item")
-            .append($("<span>").text("Status"))
-            .append($("<strong>").text(rule.enabled ? "Enabled" : "Disabled"))
+            .append($("<span>").text(i18n.t("escalations.details.status")))
+            .append($("<strong>").text(escalationPolicyStatusLabel(rule.enabled)))
     );
 
     return summary;
@@ -839,19 +868,19 @@ function renderEscalationRuleEditor(rule) {
     const section = $("<section>").addClass("layer-editor-section");
     const grid = $("<div>").addClass("form-grid-4");
 
-    section.append($("<h4>").text("Rule settings"));
+    section.append($("<h4>").text(i18n.t("escalations.rules.settings")));
     section.append(
         $("<div>")
             .addClass("layer-editor-section-subtitle")
-            .text("Configure position, delay and the target for this escalation rule.")
+            .text(i18n.t("escalations.rules.settings_hint"))
     );
 
-    grid.append(ruleNumberField(rule.id, "position", "Position", rule.position || 1, 1));
-    grid.append(ruleNumberField(rule.id, "delay-seconds", "Escalate after seconds", rule.delay_seconds || 0, 0));
+    grid.append(ruleNumberField(rule.id, "position", i18n.t("escalations.rules.position"), rule.position || 1, 1));
+    grid.append(ruleNumberField(rule.id, "delay-seconds", i18n.t("escalations.rules.delay_seconds"), rule.delay_seconds || 0, 0));
     grid.append(ruleTargetTypeField(rule));
     grid.append(ruleRotationTargetField(rule));
     grid.append(ruleUserTargetField(rule));
-    grid.append(ruleCheckboxField(rule.id, "enabled", "Enabled", rule.enabled !== false));
+    grid.append(ruleCheckboxField(rule.id, "enabled", i18n.t("escalations.form.enabled"), rule.enabled !== false));
 
     section.append(grid);
     section.append(
@@ -861,7 +890,7 @@ function renderEscalationRuleEditor(rule) {
                 $("<button>")
                     .attr("type", "button")
                     .addClass("btn btn-primary btn-small")
-                    .text("Save rule")
+                    .text(i18n.t("escalations.actions.save_rule"))
                     .on("click", function () {
                         saveEscalationRuleFromCard(rule.id);
                     })
@@ -870,7 +899,7 @@ function renderEscalationRuleEditor(rule) {
                 $("<button>")
                     .attr("type", "button")
                     .addClass("btn btn-danger btn-small")
-                    .text("Delete rule")
+                    .text(i18n.t("escalations.actions.delete_rule"))
                     .on("click", function () {
                         deleteEscalationRule(rule.id);
                     })
@@ -915,13 +944,13 @@ function ruleCheckboxField(ruleId, field, label, checked) {
 function ruleTargetTypeField(rule) {
     return $("<div>")
         .addClass("app-field")
-        .append($("<label>").attr("for", ruleFieldId(rule.id, "target-type")).text("Target type"))
+        .append($("<label>").attr("for", ruleFieldId(rule.id, "target-type")).text(i18n.t("escalations.rules.target_type")))
         .append(
             $("<select>")
                 .attr("id", ruleFieldId(rule.id, "target-type"))
                 .addClass("input")
-                .append($("<option>").val("rotation").text("Rotation"))
-                .append($("<option>").val("user").text("User"))
+                .append($("<option>").val("rotation").text(i18n.t("escalations.rules.rotation")))
+                .append($("<option>").val("user").text(i18n.t("escalations.rules.user")))
                 .val(rule.target_type || "rotation")
                 .on("change", function () {
                     updateEscalationRuleTargetTypeUi(rule.id);
@@ -946,14 +975,14 @@ function ruleRotationTargetField(rule) {
     });
 
     if (!select.children().length) {
-        select.append($("<option>").val("").text("No active rotations"));
+        select.append($("<option>").val("").text(i18n.t("escalations.rules.no_rotations")));
     }
 
     if (rule.target_type === "rotation") {
         select.val(String(rule.target_id || ""));
     }
 
-    field.append($("<label>").attr("for", ruleFieldId(rule.id, "target-rotation")).text("Rotation"));
+    field.append($("<label>").attr("for", ruleFieldId(rule.id, "target-rotation")).text(i18n.t("escalations.rules.rotation")));
     field.append(select);
 
     return field;
@@ -966,13 +995,13 @@ function ruleUserTargetField(rule) {
     const select = $("<select>")
         .attr("id", ruleFieldId(rule.id, "target-user"))
         .addClass("js-user-select")
-        .attr("data-placeholder", "Select user...");
+        .attr("data-placeholder", i18n.t("escalations.rules.select_user"));
 
     if (!escalationRuleTargetUsersCache.length) {
         select.append(
             $("<option>")
                 .val("")
-                .text("No active users")
+                .text(i18n.t("escalations.rules.no_users"))
         );
     } else {
         select.append(
@@ -994,7 +1023,7 @@ function ruleUserTargetField(rule) {
         select.val(String(rule.target_id || ""));
     }
 
-    field.append($("<label>").attr("for", ruleFieldId(rule.id, "target-user")).text("User"));
+    field.append($("<label>").attr("for", ruleFieldId(rule.id, "target-user")).text(i18n.t("escalations.rules.user")));
     field.append(select);
 
     return field;
@@ -1011,12 +1040,15 @@ function updateEscalationRuleTargetTypeUi(ruleId) {
 }
 
 function formatRuleTargetSummary(rule) {
-    return upperCaseFirst(rule.target_type || "-") + ": " + (
-        rule.target_name ||
-        getEscalationRuleTargetName(rule.target_type, rule.target_id) ||
-        rule.target_id ||
-        "-"
-    );
+    return i18n.t("escalations.rules.target_summary", {
+        type: escalationRuleTargetTypeLabel(rule.target_type),
+        name: (
+            rule.target_name
+            || getEscalationRuleTargetName(rule.target_type, rule.target_id)
+            || rule.target_id
+            || "-"
+        ),
+    });
 }
 
 function getNextEscalationRulePosition() {
@@ -1045,14 +1077,14 @@ function getDefaultEscalationRuleTarget() {
 
 function addEscalationRuleCard() {
     if (!selectedEscalationPolicyRulesId) {
-        showAppError("Select a policy first.");
+        showAppError(i18n.t("escalations.errors.select_policy"));
         return;
     }
 
     const rule = createUnsavedEscalationRule();
 
     if (!rule) {
-        showAppError("Add an active rotation or team user before creating rules.");
+        showAppError(i18n.t("escalations.errors.no_targets"));
         return;
     }
 
@@ -1087,7 +1119,7 @@ function saveEscalationRuleFromCard(ruleId) {
     const payload = collectEscalationRulePayloadFromCard(ruleId);
 
     if (!payload.target_id) {
-        showAppError("Select rule target.");
+        showAppError(i18n.t("escalations.errors.select_target"));
         return;
     }
 
@@ -1127,9 +1159,9 @@ function deleteEscalationRule(ruleId) {
     }
 
     showAppConfirm({
-        title: "Delete this rule?",
-        message: "Delete escalation rule #" + ruleId + "?",
-        confirmText: "Delete rule",
+        title: i18n.t("escalations.confirm.delete_rule_title"),
+        message: i18n.t("escalations.confirm.delete_rule_message", {id: ruleId}),
+        confirmText: i18n.t("escalations.actions.delete_rule"),
         confirmClass: "btn-danger",
     }).done(function () {
         apiDelete("/api/escalation-policies/rules/" + ruleId, function () {

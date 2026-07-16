@@ -3,36 +3,36 @@
     <div class="summary-card summary-primary">
       <div class="summary-icon">☑</div>
       <div>
-        <div class="summary-title">Maintenance</div>
+        <div class="summary-title">{{ _('maintenance.summary.title') }}</div>
         <div id="maintenance-total-count" class="summary-value">0</div>
-        <div class="summary-hint">Current scope</div>
+        <div class="summary-hint">{{ _('maintenance.summary.current_scope') }}</div>
       </div>
     </div>
 
     <div class="summary-card summary-success">
       <div class="summary-icon">▶</div>
       <div>
-        <div class="summary-title">Active</div>
+        <div class="summary-title">{{ _('maintenance.summary.active') }}</div>
         <div id="maintenance-active-count" class="summary-value">0</div>
-        <div class="summary-hint">Affecting alerts now</div>
+        <div class="summary-hint">{{ _('maintenance.summary.active_hint') }}</div>
       </div>
     </div>
 
     <div class="summary-card summary-muted">
       <div class="summary-icon">⏱</div>
       <div>
-        <div class="summary-title">Scheduled</div>
+        <div class="summary-title">{{ _('maintenance.summary.scheduled') }}</div>
         <div id="maintenance-scheduled-count" class="summary-value">0</div>
-        <div class="summary-hint">Planned windows</div>
+        <div class="summary-hint">{{ _('maintenance.summary.scheduled_hint') }}</div>
       </div>
     </div>
 
     <div class="summary-card summary-info">
       <div class="summary-icon">×</div>
       <div>
-        <div class="summary-title">Cancelled</div>
+        <div class="summary-title">{{ _('maintenance.summary.cancelled') }}</div>
         <div id="maintenance-cancelled-count" class="summary-value">0</div>
-        <div class="summary-hint">Cancelled windows</div>
+        <div class="summary-hint">{{ _('maintenance.summary.cancelled_hint') }}</div>
       </div>
     </div>
   </div>
@@ -41,16 +41,16 @@
     <section class="card page-layout-main">
       <div class="card-header">
         <div>
-          <h2>Maintenance windows</h2>
+          <h2>{{ _('maintenance.list.title') }}</h2>
           <div class="card-subtitle">
-            Showing <span id="maintenance-filtered-count">0</span>
-            of <span id="maintenance-total-list-count">0</span> windows
+            {{ _('maintenance.list.showing') }} <span id="maintenance-filtered-count">0</span>
+            {{ _('maintenance.list.of') }} <span id="maintenance-total-list-count">0</span> {{ _('maintenance.list.windows') }}
           </div>
         </div>
 
         <div class="card-header-actions">
-          <button id="open-maintenance-create-modal" type="button" class="btn btn-primary">New window</button>
-          <button id="reload-maintenance-windows" type="button" class="btn">Reload</button>
+          <button id="open-maintenance-create-modal" type="button" class="btn btn-primary">{{ _('maintenance.actions.new') }}</button>
+          <button id="reload-maintenance-windows" type="button" class="btn">{{ _('maintenance.actions.reload') }}</button>
         </div>
       </div>
 
@@ -61,25 +61,25 @@
             id="maintenance-window-search"
             class="input"
             type="search"
-            placeholder="Search maintenance windows..."
+            placeholder="{{ _('maintenance.search.placeholder') }}"
             autocomplete="off"
           >
         </div>
 
         <select id="maintenance-window-status-filter" class="input page-toolbar-filter">
-          <option value="">All statuses</option>
-          <option value="scheduled">Scheduled</option>
-          <option value="active">Active</option>
-          <option value="finished">Finished</option>
-          <option value="cancelled">Cancelled</option>
+          <option value="">{{ _('maintenance.filters.all_statuses') }}</option>
+          <option value="scheduled">{{ _('maintenance.status.scheduled') }}</option>
+          <option value="active">{{ _('maintenance.status.active') }}</option>
+          <option value="finished">{{ _('maintenance.status.finished') }}</option>
+          <option value="cancelled">{{ _('maintenance.status.cancelled') }}</option>
         </select>
 
         <select id="maintenance-window-behavior-filter" class="input page-toolbar-filter">
-          <option value="">All behaviors</option>
-          <option value="suppress_notifications">Suppress notifications</option>
-          <option value="suppress_incident">Suppress incident</option>
-          <option value="create_maintenance_incident">Create maintenance incident</option>
-          <option value="pause_escalation_only">Pause escalation only</option>
+          <option value="">{{ _('maintenance.filters.all_behaviors') }}</option>
+          <option value="suppress_notifications">{{ _('maintenance.behavior.suppress_notifications') }}</option>
+          <option value="suppress_incident">{{ _('maintenance.behavior.suppress_incident') }}</option>
+          <option value="create_maintenance_incident">{{ _('maintenance.behavior.create_maintenance_incident') }}</option>
+          <option value="pause_escalation_only">{{ _('maintenance.behavior.pause_escalation_only') }}</option>
         </select>
       </div>
 
@@ -87,19 +87,19 @@
         <table id="maintenance-windows-table-view" class="data-table sortable-table">
           <thead>
             <tr>
-                <th>Window</th>
-                <th>Scope</th>
-                <th>Status</th>
-                <th>Behavior</th>
-                <th>Repeat</th>
-                <th>Starts</th>
-                <th>Ends</th>
-                <th class="actions-th">Actions</th>
+                <th>{{ _('maintenance.table.window') }}</th>
+                <th>{{ _('maintenance.table.scope') }}</th>
+                <th>{{ _('maintenance.table.status') }}</th>
+                <th>{{ _('maintenance.table.behavior') }}</th>
+                <th>{{ _('maintenance.table.repeat') }}</th>
+                <th>{{ _('maintenance.table.starts') }}</th>
+                <th>{{ _('maintenance.table.ends') }}</th>
+                <th class="actions-th">{{ _('maintenance.table.actions') }}</th>
             </tr>
           </thead>
           <tbody id="maintenance-windows-table">
             <tr>
-              <td colspan="7" class="empty-cell">No maintenance windows loaded</td>
+              <td colspan="8" class="empty-cell">{{ _('maintenance.empty.loaded') }}</td>
             </tr>
           </tbody>
         </table>
@@ -109,13 +109,13 @@
     <aside id="maintenance-details-card" class="card page-details-card">
       <div class="card-header">
         <div>
-          <h2>Window details</h2>
-          <div id="maintenance-details-subtitle" class="card-subtitle">Select a window</div>
+          <h2>{{ _('maintenance.details.title') }}</h2>
+          <div id="maintenance-details-subtitle" class="card-subtitle">{{ _('maintenance.details.select') }}</div>
         </div>
       </div>
 
       <div id="maintenance-details-body" class="details-body">
-        <p>Click a maintenance window name to inspect schedule, scope and behavior.</p>
+        <p>{{ _('maintenance.details.help') }}</p>
       </div>
     </aside>
   </div>
@@ -125,9 +125,9 @@
   <div class="app-modal-dialog app-modal-dialog-wide">
     <div class="app-modal-header">
       <div>
-        <h2 id="maintenance-window-modal-title">Create maintenance window</h2>
+        <h2 id="maintenance-window-modal-title">{{ _('maintenance.form.create') }}</h2>
         <div class="card-subtitle">
-          Configure planned maintenance and matching alert behavior.
+          {{ _('maintenance.form.subtitle') }}
         </div>
       </div>
       <button id="close-maintenance-window-modal" type="button" class="app-modal-close" aria-label="Close">×</button>
@@ -138,8 +138,8 @@
         <section class="card">
           <div class="card-header">
             <div>
-              <h2>Window</h2>
-              <div class="card-subtitle">Name, description and behavior.</div>
+              <h2>{{ _('maintenance.form.window') }}</h2>
+              <div class="card-subtitle">{{ _('maintenance.form.window_hint') }}</div>
             </div>
           </div>
 
@@ -147,42 +147,42 @@
             <input id="maintenance-window-id" type="hidden">
             <div id="maintenance-window-error" class="alert alert-danger is-hidden"></div>
 
-            <label for="maintenance-name">Name</label>
-            <input id="maintenance-name" class="input" type="text" placeholder="Payments deploy">
+            <label for="maintenance-name">{{ _('maintenance.form.name') }}</label>
+            <input id="maintenance-name" class="input" type="text" placeholder="{{ _('maintenance.form.name_placeholder') }}">
 
-            <label for="maintenance-description">Description</label>
+            <label for="maintenance-description">{{ _('maintenance.form.description') }}</label>
             <textarea id="maintenance-description" class="input" rows="3"></textarea>
 
-            <label for="maintenance-behavior">Behavior</label>
+            <label for="maintenance-behavior">{{ _('maintenance.form.behavior') }}</label>
             <select id="maintenance-behavior" class="input">
-              <option value="suppress_notifications">Suppress notifications</option>
-              <option value="suppress_incident">Suppress incident</option>
-              <option value="create_maintenance_incident">Create maintenance incident</option>
-              <option value="pause_escalation_only">Pause escalation only</option>
+              <option value="suppress_notifications">{{ _('maintenance.behavior.suppress_notifications') }}</option>
+              <option value="suppress_incident">{{ _('maintenance.behavior.suppress_incident') }}</option>
+              <option value="create_maintenance_incident">{{ _('maintenance.behavior.create_maintenance_incident') }}</option>
+              <option value="pause_escalation_only">{{ _('maintenance.behavior.pause_escalation_only') }}</option>
             </select>
 
-            <label for="maintenance-timezone">Timezone</label>
+            <label for="maintenance-timezone">{{ _('maintenance.form.timezone') }}</label>
             <select id="maintenance-timezone" class="input timezone-select"></select>
 
-            <label for="maintenance-repeat">Repeat</label>
+            <label for="maintenance-repeat">{{ _('maintenance.form.repeat') }}</label>
             <select id="maintenance-repeat" class="input">
-                <option value="">Does not repeat</option>
-                <option value="daily">Daily</option>
-                <option value="weekly">Weekly</option>
-                <option value="monthly">Monthly</option>
-                <option value="custom">Custom RRULE</option>
+                <option value="">{{ _('maintenance.form.no_repeat') }}</option>
+                <option value="daily">{{ _('maintenance.form.daily') }}</option>
+                <option value="weekly">{{ _('maintenance.form.weekly') }}</option>
+                <option value="monthly">{{ _('maintenance.form.monthly') }}</option>
+                <option value="custom">{{ _('maintenance.form.custom_rrule') }}</option>
             </select>
 
             <div id="maintenance-repeat-count-row">
-                <label for="maintenance-repeat-count">Repeat count</label>
+                <label for="maintenance-repeat-count">{{ _('maintenance.form.repeat_count') }}</label>
                 <input id="maintenance-repeat-count" class="input" type="number" min="1" max="365" value="1">
-                <div class="help-text">How many occurrences should be created.</div>
+                <div class="help-text">{{ _('maintenance.form.repeat_help') }}</div>
             </div>
 
             <div id="maintenance-custom-rrule-row" style="display: none;">
-                <label for="maintenance-rrule">Custom RRULE</label>
+                <label for="maintenance-rrule">{{ _('maintenance.form.custom_rrule') }}</label>
                 <input id="maintenance-rrule" class="input" type="text" placeholder="FREQ=WEEKLY;BYDAY=MO">
-                <div class="help-text">Use RFC5545 RRULE without the RRULE: prefix.</div>
+                <div class="help-text">{{ _('maintenance.form.rrule_help') }}</div>
             </div>
           </div>
         </section>
@@ -190,39 +190,39 @@
         <section class="card">
           <div class="card-header">
             <div>
-              <h2>Schedule and scope</h2>
-              <div class="card-subtitle">Time range and affected object.</div>
+              <h2>{{ _('maintenance.form.schedule_scope') }}</h2>
+              <div class="card-subtitle">{{ _('maintenance.form.schedule_scope_hint') }}</div>
             </div>
           </div>
 
           <div class="form-body">
-            <label for="maintenance-starts-at">Starts at</label>
+            <label for="maintenance-starts-at">{{ _('maintenance.form.starts_at') }}</label>
             <input id="maintenance-starts-at" class="input" type="datetime-local">
 
-            <label for="maintenance-ends-at">Ends at</label>
+            <label for="maintenance-ends-at">{{ _('maintenance.form.ends_at') }}</label>
             <input id="maintenance-ends-at" class="input" type="datetime-local">
 
-            <label for="maintenance-scope-type">Scope type</label>
+            <label for="maintenance-scope-type">{{ _('maintenance.form.scope_type') }}</label>
             <select id="maintenance-scope-type" class="input">
-              <option value="service">Service</option>
-              <option value="team">Team</option>
-              <option value="route">Route</option>
-              <option value="group">Group</option>
+              <option value="service">{{ _('maintenance.form.service') }}</option>
+              <option value="team">{{ _('maintenance.form.team') }}</option>
+              <option value="route">{{ _('maintenance.form.route') }}</option>
+              <option value="group">{{ _('maintenance.form.group') }}</option>
             </select>
 
-            <label for="maintenance-scope-target">Scope target</label>
+            <label for="maintenance-scope-target">{{ _('maintenance.form.scope_target') }}</label>
             <select id="maintenance-scope-target" class="input">
-              <option value="">Select target</option>
+              <option value="">{{ _('maintenance.form.select_target') }}</option>
             </select>
 
             <label class="md-checkbox">
               <input id="maintenance-enabled" type="checkbox" checked>
-              <span>Enabled</span>
+              <span>{{ _('maintenance.form.enabled') }}</span>
             </label>
 
             <div class="form-actions">
-              <button id="reset-maintenance-window-form" type="button" class="btn">Reset</button>
-              <button id="save-maintenance-window" type="button" class="btn btn-primary">Save window</button>
+              <button id="reset-maintenance-window-form" type="button" class="btn">{{ _('maintenance.actions.reset') }}</button>
+              <button id="save-maintenance-window" type="button" class="btn btn-primary">{{ _('maintenance.actions.save') }}</button>
             </div>
           </div>
         </section>

@@ -16,8 +16,8 @@ function loadChannelGroups(callback) {
     fillGroupSelect("#channel-group", false, function (groups) {
         groups = asArray(groups);
         if (!groups.length) {
-            $("#channel-group").append($("<option>").val("").text("No groups available"));
-            $("#channel-team").empty().append($("<option>").val("").text("No teams available"));
+            $("#channel-group").append($("<option>").val("").text(i18n.t("channels.empty.groups")));
+            $("#channel-team").empty().append($("<option>").val("").text(i18n.t("channels.empty.teams")));
             if (typeof callback === "function") {
                 callback();
             }
@@ -61,7 +61,7 @@ function loadChannelTeams(callback) {
         });
 
         if (!filteredTeams.length) {
-            select.append($("<option>").val("").text("No teams in this group"));
+            select.append($("<option>").val("").text(i18n.t("channels.empty.teams_group")));
         } else {
             filteredTeams.forEach(function (team) {
                 select.append(
@@ -84,7 +84,7 @@ function loadChannelTypes() {
         select.empty();
         types = asArray(types);
         types.forEach(function (type) {
-            select.append($("<option>").val(type).text(type));
+            select.append($("<option>").val(type).text(getChannelTypeLabel(type)));
         });
         fillChannelTypeFilter(types);
         showChannelFields();
@@ -150,12 +150,12 @@ function buildSlackConfig(config) {
 
 function updateWebhookLabel(type) {
     const labels = {
-        slack: "Slack webhook URL",
-        webhook: "Webhook URL",
-        discord: "Discord webhook URL",
-        teams: "Microsoft Teams webhook URL",
+        slack: i18n.t("channels.webhook.slack"),
+        webhook: i18n.t("channels.webhook.url"),
+        discord: i18n.t("channels.webhook.discord"),
+        teams: i18n.t("channels.webhook.teams"),
     };
-    $("#cfg-webhook-label").text(labels[type] || "Webhook URL");
+    $("#cfg-webhook-label").text(labels[type] || i18n.t("channels.webhook.url"));
 }
 
 function showMattermostModeFields() {
@@ -286,7 +286,7 @@ function canWriteChannelResourceForTeam(team) {
 function collectChannelPayload() {
     const teamId = Number($("#channel-team").val());
     if (!teamId) {
-        showAppError("Select a team first.");
+        showAppError(i18n.t("channels.validation.select_team"));
         throw new Error("team_id is required");
     }
 
@@ -323,7 +323,7 @@ function renderChannels() {
     if (!channels.length) {
         tbody.append(
             $("<tr>").append(
-                $("<td>").attr("colspan", "7").addClass("empty-cell").text("No channels")
+                $("<td>").attr("colspan", "7").addClass("empty-cell").text(i18n.t("channels.empty.channels"))
             )
         );
         return;
@@ -349,13 +349,13 @@ function renderChannelRow(channel) {
                         renderChannelDetails(channel);
                     })
             )
-            .append($("<div>").addClass("row-subtitle").text("Channel #" + channel.id))
+            .append($("<div>").addClass("row-subtitle").text(i18n.t("channels.row.id", {id: channel.id})))
     );
     row.append($("<td>").text(channel.group_name || channel.group_slug || "-"));
     row.append($("<td>").text(channel.team_name|| channel.team_slug || "-"));
-    row.append($("<td>").append($("<span>").addClass("channel-type-pill").text(channel.channel_type || "-")));
+    row.append($("<td>").append($("<span>").addClass("channel-type-pill").text(getChannelTypeLabel(channel.channel_type))));
     row.append($("<td>").append($("<span>").addClass("channel-mode-pill").text(mode)));
-    row.append($("<td>").append(renderStatusBadge(channel.enabled, "Enabled", "Disabled")));
+    row.append($("<td>").append(renderStatusBadge(channel.enabled, i18n.t("channels.status.enabled"), i18n.t("channels.status.disabled"))));
     row.append($("<td>").addClass("actions-cell").append(renderChannelActions(channel)));
     return row;
 }
@@ -368,29 +368,29 @@ function renderChannelActions(channel) {
         object: channel,
         items: [
             {
-                label: "Edit",
+                label: i18n.t("channels.actions.edit"),
                 icon: "fas fa-edit",
                 required: "write",
-                denyMessage: "Team manager role is required to edit this channel.",
+                denyMessage: i18n.t("channels.permissions.edit"),
                 onClick: function () {
                     editChannel(channel.id);
                 }
             },
             {
-                label: "Test",
+                label: i18n.t("channels.actions.test"),
                 icon: "fas fa-vial",
                 required: "write",
-                denyMessage: "Team manager role is required to test this channel.",
+                denyMessage: i18n.t("channels.permissions.test"),
                 onClick: function () {
                     testChannel(channel.id);
                 }
             },
             {
-                label: channel.enabled ? "Disable" : "Enable",
+                label: channel.enabled ? i18n.t("channels.actions.disable") : i18n.t("channels.actions.enable"),
                 icon: channel.enabled ? "fas fa-pause" : "fas fa-play",
                 required: "write",
                 danger: channel.enabled,
-                denyMessage: "Team manager role is required to enable or disable this channel.",
+                denyMessage: i18n.t("channels.permissions.toggle"),
                 onClick: function () {
                     if (channel.enabled) {
                         disableChannel(channel);
@@ -400,11 +400,11 @@ function renderChannelActions(channel) {
                 }
             },
             {
-                label: "Delete",
+                label: i18n.t("channels.actions.delete"),
                 icon: "fas fa-trash",
                 required: "delete",
                 danger: true,
-                denyMessage: "Delete permission is required to delete this channel.",
+                denyMessage: i18n.t("channels.permissions.delete"),
                 onClick: function () {
                     deleteChannel(channel);
                 }
@@ -419,11 +419,11 @@ function saveChannel() {
     const selectedTeam = getSelectedChannelTeam();
 
     if (existing && !canWriteObject(existing)) {
-        showAppError("You do not have permission to edit this channel.");
+        showAppError(i18n.t("channels.permissions.edit_denied"));
         return;
     }
     if (!existing && selectedTeam && !canWriteChannelResourceForTeam(selectedTeam)) {
-        showAppError("Team manager or group editor role is required to create channels in this team.");
+        showAppError(i18n.t("channels.permissions.create_denied"));
         return;
     }
 
@@ -452,11 +452,11 @@ function editChannel(id) {
         return;
     }
     if (!canWriteObject(channel)) {
-        showAppError("You do not have permission to edit this channel.");
+        showAppError(i18n.t("channels.permissions.edit_denied"));
         return;
     }
 
-    $("#channel-form-title").text("Edit channel #" + id);
+    $("#channel-form-title").text(i18n.t("channels.form.edit", {id: id}));
     $("#channel-id").val(channel.id);
 
     const team = channelTeamsCache.find(function (item) {
@@ -583,15 +583,15 @@ function confirmChannelAction(options, onConfirm) {
 
 function disableChannel(channel) {
     if (!canWriteObject(channel)) {
-        showAppError("You do not have permission to disable this channel.");
+        showAppError(i18n.t("channels.permissions.disable_denied"));
         return;
     }
 
-    const channelName = channel.name || ("Channel #" + channel.id);
+    const channelName = channel.name || i18n.t("channels.row.id", {id: channel.id});
     confirmChannelAction({
-        title: "Disable this channel?",
-        message: "Disable channel \"" + channelName + "\"?\n\nThe channel will stop receiving notifications, but it will stay visible and can be enabled again.",
-        confirmText: "Disable",
+        title: i18n.t("channels.confirm.disable_title"),
+        message: i18n.t("channels.confirm.disable_message", {name: channelName}),
+        confirmText: i18n.t("channels.actions.disable"),
         confirmClass: "btn-warning",
     }, function () {
         apiPost("/api/channels/" + channel.id + "/disable", {}, function () {
@@ -602,7 +602,7 @@ function disableChannel(channel) {
 
 function enableChannel(channel) {
     if (!canWriteObject(channel)) {
-        showAppError("You do not have permission to enable this channel.");
+        showAppError(i18n.t("channels.permissions.enable_denied"));
         return;
     }
 
@@ -613,15 +613,15 @@ function enableChannel(channel) {
 
 function deleteChannel(channel) {
     if (!canDeleteObject(channel)) {
-        showAppError("You do not have permission to delete this channel.");
+        showAppError(i18n.t("channels.permissions.delete_denied"));
         return;
     }
 
-    const channelName = channel.name || ("Channel #" + channel.id);
+    const channelName = channel.name || i18n.t("channels.row.id", {id: channel.id});
     confirmChannelAction({
-        title: "Delete this channel?",
-        message: "Delete channel \"" + channelName + "\"?\n\nThis will remove the channel from active channel lists and detach it from routes.\nHistorical alerts will be preserved.",
-        confirmText: "Delete",
+        title: i18n.t("channels.confirm.delete_title"),
+        message: i18n.t("channels.confirm.delete_message", {name: channelName}),
+        confirmText: i18n.t("channels.actions.delete"),
         confirmClass: "btn-danger",
     }, function () {
         apiDelete("/api/channels/" + channel.id, function () {
@@ -639,7 +639,7 @@ function testChannel(id) {
         return Number(item.id) === Number(id);
     });
     if (channel && !canWriteObject(channel)) {
-        showAppError("You do not have permission to test this channel.");
+        showAppError(i18n.t("channels.permissions.test_denied"));
         return;
     }
 
@@ -649,7 +649,7 @@ function testChannel(id) {
 }
 
 function resetChannelForm() {
-    $("#channel-form-title").text("Create channel");
+    $("#channel-form-title").text(i18n.t("channels.form.create"));
     $("#channel-id").val("");
     $("#channel-name").val("");
     $("#channel-config-json").val("{}");
@@ -659,17 +659,43 @@ function resetChannelForm() {
     showChannelFields();
 }
 
+function getChannelTypeLabel(type) {
+    const labels = {
+        telegram: "channels.type.telegram",
+        mattermost: "channels.type.mattermost",
+        slack: "channels.type.slack",
+        webhook: "channels.type.webhook",
+        discord: "channels.type.discord",
+        teams: "channels.type.teams",
+        email: "channels.type.email",
+    };
+    return labels[type] ? i18n.t(labels[type]) : (type || "-");
+}
+
+function getChannelModeTranslation(mode) {
+    const labels = {
+        bot_api: "channels.mode.bot_api",
+        webhook: "channels.mode.webhook",
+        email: "channels.mode.email",
+    };
+    return labels[mode] ? i18n.t(labels[mode]) : (mode || "-");
+}
+
+function getChannelSeverityValueLabel(severity) {
+    return i18n.t("channels.severity." + severity, {}, severity);
+}
+
 function getChannelModeLabel(channel) {
     const config = channel.config || {};
     if (channel.channel_type === "mattermost") {
-        return config.mode || (config.api_url ? "bot_api" : "webhook");
+        return getChannelModeTranslation(config.mode || (config.api_url ? "bot_api" : "webhook"));
     }
     if (channel.channel_type === "slack") {
         if (config.mode) {
-            return config.mode;
+            return getChannelModeTranslation(config.mode);
         }
 
-        return (
+        return getChannelModeTranslation(
             config.bot_token && config.channel_id
                 ? "bot_api"
                 : "webhook"
@@ -681,10 +707,10 @@ function getChannelModeLabel(channel) {
             channel.channel_type
         )
     ) {
-        return "webhook";
+        return getChannelModeTranslation("webhook");
     }
     if (channel.channel_type === "email") {
-        return "email";
+        return getChannelModeTranslation("email");
     }
     return "-";
 }
@@ -751,9 +777,9 @@ function fillChannelTypeFilter(types) {
     const filter = $("#channels-type-filter");
     const selected = filter.val();
     filter.empty();
-    filter.append($("<option>").val("").text("All types"));
+    filter.append($("<option>").val("").text(i18n.t("channels.filters.all_types")));
     types.forEach(function (type) {
-        filter.append($("<option>").val(type).text(type));
+        filter.append($("<option>").val(type).text(getChannelTypeLabel(type)));
     });
     if (selected && types.includes(selected)) {
         filter.val(selected);
@@ -773,7 +799,7 @@ function getSafeChannelConfigSummary(channel) {
         return getChannelModeLabel(channel);
     }
     if (channel.channel_type === "email") {
-        return "Assigned user profile email; " + (config.html_template ? "custom HTML template" : "default HTML template");
+        return config.html_template ? i18n.t("channels.config.email_custom") : i18n.t("channels.config.email_default");
     }
     if (channel.channel_type === "slack") {
         const mode = getChannelModeLabel(channel);
@@ -781,50 +807,50 @@ function getSafeChannelConfigSummary(channel) {
         if (mode === "bot_api") {
             return (
                 config.bot_token && config.channel_id
-                    ? "Bot API configured"
-                    : "Bot API incomplete"
+                    ? i18n.t("channels.config.bot_ready")
+                    : i18n.t("channels.config.bot_incomplete")
             );
         }
 
         return (
             config.webhook_url
-                ? "Webhook configured"
-                : "Webhook missing"
+                ? i18n.t("channels.config.webhook_ready")
+                : i18n.t("channels.config.webhook_missing")
         );
     }
     if (["webhook", "discord", "teams"].includes(channel.channel_type)) {
-        return config.webhook_url ? "Webhook configured" : "Webhook missing";
+        return config.webhook_url ? i18n.t("channels.config.webhook_ready") : i18n.t("channels.config.webhook_missing");
     }
     if (channel.channel_type === "telegram") {
-        return config.chat_id ? "Chat configured" : "Chat missing";
+        return config.chat_id ? i18n.t("channels.config.chat_ready") : i18n.t("channels.config.chat_missing");
     }
     return "-";
 }
 
 function renderChannelDetails(channel) {
     selectedChannelDetailsId = channel.id;
-    $("#channel-details-subtitle").text((channel.team_name || channel.team_slug || "-") + " / " + (channel.enabled ? "Enabled" : "Disabled"));
+    $("#channel-details-subtitle").text((channel.team_name || channel.team_slug || "-") + " / " + (channel.enabled ? i18n.t("channels.status.enabled") : i18n.t("channels.status.disabled")));
 
     const body = $("#channel-details-body");
     body.empty();
     body.append(
         $("<div>")
             .addClass("details-list")
-            .append(channelDetailsItem("Name", channel.name))
-            .append(channelDetailsItem("Group", channel.group_slug))
-            .append(channelDetailsItem("Team", channel.team_name || channel.team_slug || "-"))
-            .append(channelDetailsItem("Type", channel.channel_type))
-            .append(channelDetailsItem("Mode", getChannelModeLabel(channel)))
-            .append(channelDetailsItem("Severity filter", getChannelSeverityLabel(channel)))
-            .append(channelDetailsItem("Status", channel.enabled ? "Enabled" : "Disabled"))
-            .append(channelDetailsItem("Config", getSafeChannelConfigSummary(channel)))
+            .append(channelDetailsItem(i18n.t("channels.details.name"), channel.name))
+            .append(channelDetailsItem(i18n.t("channels.details.group"), channel.group_slug))
+            .append(channelDetailsItem(i18n.t("channels.details.team"), channel.team_name || channel.team_slug || "-"))
+            .append(channelDetailsItem(i18n.t("channels.details.type"), getChannelTypeLabel(channel.channel_type)))
+            .append(channelDetailsItem(i18n.t("channels.details.mode"), getChannelModeLabel(channel)))
+            .append(channelDetailsItem(i18n.t("channels.details.severity"), getChannelSeverityLabel(channel)))
+            .append(channelDetailsItem(i18n.t("channels.details.status"), channel.enabled ? i18n.t("channels.status.enabled") : i18n.t("channels.status.disabled")))
+            .append(channelDetailsItem(i18n.t("channels.details.config"), getSafeChannelConfigSummary(channel)))
     );
 
     const actions = $("<div>").addClass("details-actions");
     appendIconActionIfAllowed(actions, channel, {
         required: "write",
         icon: "fas fa-edit",
-        label: "Edit channel",
+        label: i18n.t("channels.actions.edit_channel"),
         onClick: function () {
             editChannel(channel.id);
         },
@@ -832,7 +858,7 @@ function renderChannelDetails(channel) {
     appendIconActionIfAllowed(actions, channel, {
         required: "write",
         icon: "fas fa-paper-plane",
-        label: "Test channel",
+        label: i18n.t("channels.actions.test_channel"),
         onClick: function () {
             testChannel(channel.id);
         },
@@ -840,7 +866,7 @@ function renderChannelDetails(channel) {
     appendIconActionIfAllowed(actions, channel, {
         required: "write",
         icon: channel.enabled ? "fas fa-pause" : "fas fa-play",
-        label: channel.enabled ? "Disable channel" : "Enable channel",
+        label: channel.enabled ? i18n.t("channels.actions.disable_channel") : i18n.t("channels.actions.enable_channel"),
         className: channel.enabled ? "btn-warning" : "btn-success",
         onClick: function () {
             if (channel.enabled) {
@@ -853,7 +879,7 @@ function renderChannelDetails(channel) {
     appendIconActionIfAllowed(actions, channel, {
         required: "delete",
         icon: "fas fa-trash-alt",
-        label: "Delete channel",
+        label: i18n.t("channels.actions.delete_channel"),
         className: "btn-danger",
         onClick: function () {
             deleteChannel(channel);
@@ -878,16 +904,16 @@ function restoreChannelDetails() {
 
 function renderChannelDetailsEmpty() {
     selectedChannelDetailsId = null;
-    $("#channel-details-subtitle").text("Select a channel");
-    $("#channel-details-body").html("<p class=\"muted\">Click a channel name to inspect delivery type, team binding and safe configuration summary.</p>");
+    $("#channel-details-subtitle").text(i18n.t("channels.details.select"));
+    $("#channel-details-body").empty().append($("<p>").addClass("muted").text(i18n.t("channels.details.select_help")));
 }
 
 function openCreateChannelModal() {
     resetChannelForm();
-    $("#channel-form-title").text("Create channel");
+    $("#channel-form-title").text(i18n.t("channels.form.create"));
     const team = getSelectedChannelTeam();
     if (team && !canWriteChannelResourceForTeam(team)) {
-        showAppError("Team manager or group editor role is required to create channels in this team.");
+        showAppError(i18n.t("channels.permissions.create_denied"));
         return;
     }
     openAppModal("#channel-form-modal");
@@ -903,9 +929,9 @@ function getChannelSeverityLabel(channel) {
     const config = channel.config || {};
     const severities = config.notify_on_severities || [];
     if (!severities.length) {
-        return "All severities";
+        return i18n.t("channels.severity.all");
     }
-    return severities.join(", ");
+    return severities.map(getChannelSeverityValueLabel).join(", ");
 }
 
 function setChannelNotifySeverities(severities) {

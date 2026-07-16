@@ -40,9 +40,9 @@ function buildTablePaginationControls(options) {
 
     const prefix = options.prefix || id;
     const pageSizeOptions = options.pageSizeOptions || [10, 25, 50, 100];
-    const rowsLabel = options.rowsLabel || "Rows per page";
-    const previousLabel = options.previousLabel || "Previous";
-    const nextLabel = options.nextLabel || "Next";
+    const rowsLabel = options.rowsLabel || i18n.t("shared.pagination.rows");
+    const previousLabel = options.previousLabel || i18n.t("shared.pagination.previous");
+    const nextLabel = options.nextLabel || i18n.t("shared.pagination.next");
 
     const controls = $("<div>")
         .attr("id", id)
@@ -64,20 +64,20 @@ function buildTablePaginationControls(options) {
                 .append(
                     $("<span>")
                         .addClass("details-meta table-pagination-range")
-                        .append(" Showing ")
+                        .append(" " + i18n.t("shared.pagination.showing") + " ")
                         .append($("<span>").attr("id", prefix + "-page-from").text("0"))
                         .append("-")
                         .append($("<span>").attr("id", prefix + "-page-to").text("0"))
-                        .append(" of ")
+                        .append(" " + i18n.t("shared.pagination.of") + " ")
                         .append($("<span>").attr("id", prefix + "-filtered-count").text("0"))
                 )
         )
         .append(
             $("<div>")
                 .addClass("table-pagination-center")
-                .append(" Page ")
+                .append(" " + i18n.t("shared.pagination.page") + " ")
                 .append($("<span>").attr("id", prefix + "-current-page").text("1"))
-                .append(" of ")
+                .append(" " + i18n.t("shared.pagination.of") + " ")
                 .append($("<span>").attr("id", prefix + "-total-pages").text("1"))
         )
         .append(

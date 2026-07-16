@@ -29,8 +29,8 @@
 
         const button = $("<button>")
             .attr("type", "button")
-            .attr("aria-label", "Notifications")
-            .attr("title", "Notifications")
+            .attr("aria-label", i18n.t("notification_center.notifications"))
+            .attr("title", i18n.t("notification_center.notifications"))
             .addClass("btn btn-icon notification-center-button")
             .append(
                 $("<i>")
@@ -70,18 +70,91 @@
         root.append(button).append(panel);
     }
 
+    function notificationCenterUserLabel(user) {
+        if (!user) {
+            return i18n.t("notification_center.unknown_user");
+        }
+
+        return (
+            user.display_name ||
+            user.username ||
+            user.email ||
+            i18n.t("notification_center.user_id", {id: user.id || "-"})
+        );
+    }
+
+    function notificationCenterItemTitle(item) {
+        if (item && item.type === "responder_request") {
+            return i18n.t("notification_center.responder_requested");
+        }
+
+        return item && item.title
+            ? item.title
+            : i18n.t("notification_center.notification");
+    }
+
+    function notificationCenterItemBody(item) {
+        if (!item || item.type !== "responder_request" || !item.responder) {
+            return item && item.body ? item.body : "";
+        }
+
+        const responder = item.responder;
+        const requester = notificationCenterUserLabel(responder.requested_by);
+
+        if (responder.message) {
+            return requester + ": " + responder.message;
+        }
+
+        return i18n.t("notification_center.help_requested", {
+            requester: requester,
+        });
+    }
+
+    function notificationCenterActionLabel(action) {
+        if (!action) {
+            return "";
+        }
+
+        if (action.id === "accept") {
+            return i18n.t("notification_center.accept");
+        }
+
+        if (action.id === "decline") {
+            return i18n.t("notification_center.decline");
+        }
+
+        return action.label || "";
+    }
+
+    function notificationCenterIncidentStatus(status) {
+        const normalized = String(status || "").toLowerCase();
+
+        const keys = {
+            firing: "notification_center.status.firing",
+            acknowledged: "notification_center.status.acknowledged",
+            resolved: "notification_center.status.resolved",
+            maintenance: "notification_center.status.maintenance",
+            open: "notification_center.status.open",
+            closed: "notification_center.status.closed",
+        };
+
+        return keys[normalized]
+            ? i18n.t(keys[normalized])
+            : (status || "-");
+    }
+
     function renderNotificationItems(panel, items) {
         panel.empty();
 
         $("<div>")
             .addClass("notification-center-title")
-            .text("Responder requests")
+            .text(i18n.t("notification_center.title"))
             .appendTo(panel);
 
         if (!items.length) {
             $("<div>")
                 .addClass("notification-center-empty")
-                .text("No pending requests")
+                .text(i18n.t("notification_center.empty"))
                 .appendTo(panel);
             return;
         }
@@ -96,21 +169,21 @@
 
         $("<div>")
             .addClass("notification-center-item-title")
-            .text(item.title || "Notification")
+            .text(notificationCenterItemTitle(item))
             .appendTo(row);
 
         $("<div>")
             .addClass("notification-center-item-body")
-            .text(item.body || "")
+            .text(notificationCenterItemBody(item))
             .appendTo(row);
 
         if (item.incident) {
             $("<div>")
                 .addClass("notification-center-item-meta")
                 .text([
-                    item.incident.team_name || "-",
-                    item.incident.service_name || "-",
-                    item.incident.status || "-",
+                    item.incident.team_name || i18n.t("notification_center.no_team"),
+                    item.incident.service_name || i18n.t("notification_center.no_service"),
+                    notificationCenterIncidentStatus(item.incident.status),
                 ].join(" · "))
                 .appendTo(row);
         }
@@ -129,7 +202,7 @@
                         ? "btn btn-sm btn-success"
                         : "btn btn-sm btn-secondary"
                 )
-                .text(action.label)
+                .text(notificationCenterActionLabel(action))
                 .on("click", function () {
                     updateResponderFromNotification(action.url, action.status);
                 })
@@ -144,7 +217,7 @@
             $("<a>")
                 .attr("href", item.url)
                 .addClass("notification-center-open")
-                .text("Open incident")
+                .text(i18n.t("notification_center.open_incident"))
                 .appendTo(row);
         }
 

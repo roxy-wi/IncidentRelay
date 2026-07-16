@@ -625,6 +625,10 @@ function renderAnalyticsChart(key, selector, config) {
         serviceAnalyticsCharts[key].destroy();
     }
 
+    config = window.servicesI18nTranslateChartConfig
+        ? window.servicesI18nTranslateChartConfig(config)
+        : config;
+
     serviceAnalyticsCharts[key] = new Chart(canvas, {
         type: config.type,
         data: {

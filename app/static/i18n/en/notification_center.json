@@ -1,0 +1,21 @@
+{
+  "notification_center.notifications": "Notifications",
+  "notification_center.title": "Responder requests",
+  "notification_center.empty": "No pending requests",
+  "notification_center.notification": "Notification",
+  "notification_center.responder_requested": "Responder requested",
+  "notification_center.help_requested": "{requester} requested your help with this incident.",
+  "notification_center.accept": "Accept",
+  "notification_center.decline": "Decline",
+  "notification_center.open_incident": "Open incident",
+  "notification_center.unknown_user": "Unknown user",
+  "notification_center.user_id": "User #{id}",
+  "notification_center.no_team": "No team",
+  "notification_center.no_service": "No service",
+  "notification_center.status.firing": "Firing",
+  "notification_center.status.acknowledged": "Acknowledged",
+  "notification_center.status.resolved": "Resolved",
+  "notification_center.status.maintenance": "Maintenance",
+  "notification_center.status.open": "Open",
+  "notification_center.status.closed": "Closed"
+}

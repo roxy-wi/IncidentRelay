@@ -1,7 +1,7 @@
 <!doctype html>
 <html lang="{{ current_locale }}">
 <head>
-    <link rel="manifest" href="/manifest.webmanifest?v=1.0.2">
+    <link rel="manifest" href="/manifest.webmanifest?v=1.0.3">
 
     <meta name="theme-color" content="#1570ef">
     <meta name="mobile-web-app-capable" content="yes">
@@ -13,7 +13,6 @@
     <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='images/favicon/favicon-32x32.png') }}">
     <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='images/favicon/favicon-16x16.png') }}">
     <link rel="shortcut icon" href="{{ url_for('static', filename='images/favicon/favicon.ico') }}">
-    <link rel="manifest" href="{{ url_for('static', filename='images/favicon/site.webmanifest') }}">
     <meta name="theme-color" content="#0b5cff">
     <meta charset="utf-8">
     <title>IncidentRelay</title>
@@ -51,135 +50,135 @@
                 <img class="brand-logo-icon" src="/static/images/incidentrelay-icon.svg" alt="IncidentRelay">
             </a>
 
-            <button id="sidebar-toggle" class="sidebar-toggle" type="button" aria-label="Collapse sidebar" aria-expanded="true">
+            <button id="sidebar-toggle" class="sidebar-toggle" type="button" aria-label="{{ _('common.collapse_sidebar') }}" title="{{ _('common.collapse_sidebar') }}" aria-expanded="true">
                 <span class="sidebar-toggle-icon">‹</span>
             </button>
         </div>
 
     <nav class="menu">
-        <a href="/" data-page="dashboard" class="menu-link" title="Overview">
+        <a href="/" data-page="dashboard" class="menu-link" title="{{ _('nav.overview') }}">
             <svg class="menu-icon"><use href="#icon-overview"></use></svg>
-            <span class="menu-text">Overview</span>
+            <span class="menu-text">{{ _('nav.overview') }}</span>
         </a>
 
-        <a href="/alerts" data-page="alerts" class="menu-link" title="Alerts">
+        <a href="/alerts" data-page="alerts" class="menu-link" title="{{ _('nav.alerts') }}">
             <svg class="menu-icon"><use href="#icon-alerts"></use></svg>
-            <span class="menu-text">Alerts</span>
+            <span class="menu-text">{{ _('nav.alerts') }}</span>
         </a>
 
-        <a href="/rotations" data-page="rotations" class="menu-link" title="Rotations">
+        <a href="/rotations" data-page="rotations" class="menu-link" title="{{ _('nav.rotations') }}">
             <svg class="menu-icon"><use href="#icon-rotations"></use></svg>
-            <span class="menu-text">Rotations</span>
+            <span class="menu-text">{{ _('nav.rotations') }}</span>
         </a>
 
-        <a href="/calendar" data-page="calendar" class="menu-link" title="Calendar">
+        <a href="/calendar" data-page="calendar" class="menu-link" title="{{ _('nav.calendar') }}">
             <svg class="menu-icon"><use href="#icon-calendar"></use></svg>
-            <span class="menu-text">Calendar</span>
+            <span class="menu-text">{{ _('nav.calendar') }}</span>
         </a>
 
-        <a href="/routes" data-page="routes" class="menu-link" title="Routes">
+        <a href="/routes" data-page="routes" class="menu-link" title="{{ _('nav.routes') }}">
             <svg class="menu-icon"><use href="#icon-routes"></use></svg>
-            <span class="menu-text">Routes</span>
+            <span class="menu-text">{{ _('nav.routes') }}</span>
         </a>
 
-        <a href="/heartbeats" data-page="heartbeats" class="menu-link" title="Heartbeats">
+        <a href="/heartbeats" data-page="heartbeats" class="menu-link" title="{{ _('nav.heartbeats') }}">
             <span class="menu-icon">♥</span>
-            <span class="menu-text">Heartbeats</span>
+            <span class="menu-text">{{ _('nav.heartbeats') }}</span>
         </a>
 
         <div class="menu-group" data-menu-group="services">
-          <button id="services-menu-toggle" type="button" class="menu-group-toggle" title="Services" aria-expanded="false" aria-controls="services-menu-items">
+          <button id="services-menu-toggle" type="button" class="menu-group-toggle" title="{{ _('nav.services') }}" aria-expanded="false" aria-controls="services-menu-items">
             <svg class="menu-icon">
               <use href="#icon-services"></use>
             </svg>
 
-            <span class="menu-text">Services</span>
+            <span class="menu-text">{{ _('nav.services') }}</span>
             <i class="fa-solid fa-chevron-down menu-group-chevron" aria-hidden="true"></i>
           </button>
 
           <div id="services-menu-items" class="menu-group-items">
-            <a href="/services" data-page="services" class="menu-link menu-sub-link" title="Service Catalog">
+            <a href="/services" data-page="services" class="menu-link menu-sub-link" title="{{ _('nav.service_catalog') }}">
               <svg class="menu-icon">
                 <use href="#icon-services"></use>
               </svg>
 
-              <span class="menu-text">Service Catalog</span>
+              <span class="menu-text">{{ _('nav.service_catalog') }}</span>
             </a>
-              <a class="menu-link menu-sub-link" href="/business-services" data-page="business-services">
+              <a class="menu-link menu-sub-link" href="/business-services" data-page="business-services" title="{{ _('nav.business_services') }}">
                 <span class="menu-icon">◆</span>
-                <span class="menu-text">Business Services</span>
+                <span class="menu-text">{{ _('nav.business_services') }}</span>
             </a>
 
-            <a href="/maintenance-windows" data-page="maintenance-windows" class="menu-link menu-sub-link" title="Maintenance">
+            <a href="/maintenance-windows" data-page="maintenance-windows" class="menu-link menu-sub-link" title="{{ _('nav.maintenance') }}">
               <svg class="menu-icon">
                 <use href="#icon-calendar"></use>
               </svg>
 
-              <span class="menu-text">Maintenance</span>
+              <span class="menu-text">{{ _('nav.maintenance') }}</span>
             </a>
 
-            <a href="/notification-policies" data-page="notification-policies" class="menu-link menu-sub-link" title="Notification Policies">
+            <a href="/notification-policies" data-page="notification-policies" class="menu-link menu-sub-link" title="{{ _('nav.notification_policies') }}">
               <svg class="menu-icon">
                 <use href="#icon-notification-policies"></use>
               </svg>
 
-              <span class="menu-text">Notification Policies</span>
+              <span class="menu-text">{{ _('nav.notification_policies') }}</span>
             </a>
 
-              <a href="/matcher-presets" data-page="matcher-presets" class="menu-link menu-sub-link" title="Matcher Presets">
+              <a href="/matcher-presets" data-page="matcher-presets" class="menu-link menu-sub-link" title="{{ _('nav.matcher_presets') }}">
                   <svg class="menu-icon">
                     <use href="#icon-matcher-presets"></use>
                   </svg>
-                  <span class="menu-text">Matcher Presets</span>
+                  <span class="menu-text">{{ _('nav.matcher_presets') }}</span>
               </a>
-               <a href="/priority-policies" data-page="priority-policies" class="menu-link menu-sub-link" title="Priority Policies">
+               <a href="/priority-policies" data-page="priority-policies" class="menu-link menu-sub-link" title="{{ _('nav.priority_policies') }}">
                  <svg class="menu-icon"><use href="#icon-priority-policies"></use></svg>
-                 <span class="menu-text">Priority Policies</span>
+                 <span class="menu-text">{{ _('nav.priority_policies') }}</span>
                </a>
           </div>
         </div>
 
-        <a href="/escalation-policies" data-page="escalation-policies" class="menu-link" title="Escalation Policies">
+        <a href="/escalation-policies" data-page="escalation-policies" class="menu-link" title="{{ _('nav.escalation_policies') }}">
           <svg class="menu-icon"><use href="#icon-escalation-policies"></use></svg>
-          <span class="menu-text">Escalation Policies</span>
+          <span class="menu-text">{{ _('nav.escalation_policies') }}</span>
         </a>
 
-        <a href="/channels" data-page="channels" class="menu-link" title="Channels">
+        <a href="/channels" data-page="channels" class="menu-link" title="{{ _('nav.channels') }}">
             <svg class="menu-icon"><use href="#icon-channels"></use></svg>
-            <span class="menu-text">Channels</span>
+            <span class="menu-text">{{ _('nav.channels') }}</span>
         </a>
 
-        <a href="/silences" data-page="silences" class="menu-link" title="Silences">
+        <a href="/silences" data-page="silences" class="menu-link" title="{{ _('nav.silences') }}">
             <svg class="menu-icon"><use href="#icon-silences"></use></svg>
-            <span class="menu-text">Silences</span>
+            <span class="menu-text">{{ _('nav.silences') }}</span>
         </a>
 
-        <a href="/teams" data-page="teams" class="menu-link" title="Teams">
+        <a href="/teams" data-page="teams" class="menu-link" title="{{ _('nav.teams') }}">
             <svg class="menu-icon"><use href="#icon-teams"></use></svg>
-            <span class="menu-text">Teams</span>
+            <span class="menu-text">{{ _('nav.teams') }}</span>
         </a>
 
         <div class="menu-section menu-link-admin is-hidden">
-            <div class="menu-section-title">Administration</div>
+            <div class="menu-section-title">{{ _('nav.administration') }}</div>
 
-            <a href="/groups" data-page="groups" class="menu-link menu-sub-link menu-link-groups is-hidden" title="Groups">
+            <a href="/groups" data-page="groups" class="menu-link menu-sub-link menu-link-groups is-hidden" title="{{ _('nav.groups') }}">
                 <svg class="menu-icon"><use href="#icon-groups"></use></svg>
-                <span class="menu-text">Groups</span>
+                <span class="menu-text">{{ _('nav.groups') }}</span>
             </a>
 
-            <a href="/admin/users" data-page="admin-users" class="menu-link menu-sub-link menu-link-users is-hidden" title="Users">
+            <a href="/admin/users" data-page="admin-users" class="menu-link menu-sub-link menu-link-users is-hidden" title="{{ _('nav.users') }}">
                 <svg class="menu-icon"><use href="#icon-users"></use></svg>
-                <span class="menu-text">Users</span>
+                <span class="menu-text">{{ _('nav.users') }}</span>
             </a>
-            <a href="/admin/sso" data-page="sso" class="menu-link menu-sub-link menu-link-global-admin is-hidden" title="SSO">
+            <a href="/admin/sso" data-page="sso" class="menu-link menu-sub-link menu-link-global-admin is-hidden" title="{{ _('nav.sso') }}">
                 <svg class="menu-icon"><use href="#icon-sso"></use></svg>
-                <span class="menu-text">SSO</span>
+                <span class="menu-text">{{ _('nav.sso') }}</span>
             </a>
         </div>
 
-        <a href="/docs" class="menu-link" title="Swagger">
+        <a href="/docs" class="menu-link" title="{{ _('nav.swagger') }}">
             <svg class="menu-icon"><use href="#icon-swagger"></use></svg>
-            <span class="menu-text">Swagger</span>
+            <span class="menu-text">{{ _('nav.swagger') }}</span>
         </a>
     </nav>
     </aside>
@@ -189,14 +188,14 @@
             <div class="topbar-main">
                 <div class="topbar-title-block">
                     <div class="topbar-kicker">IncidentRelay</div>
-                    <h1 id="page-title">Overview</h1>
-                    <div id="page-subtitle" class="page-subtitle">Current duty and alerts</div>
+                    <h1 id="page-title">{{ _('pages.dashboard.title') }}</h1>
+                    <div id="page-subtitle" class="page-subtitle">{{ _('pages.dashboard.subtitle') }}</div>
                 </div>
 
                 <div class="topbar-actions">
 
  <div class="topbar-select-group">
-  <label class="topbar-select-label" for="global-language-filter">Language</label>
+  <label class="topbar-select-label" for="global-language-filter">{{ _('common.language') }}</label>
   <select id="global-language-filter" class="input topbar-select" data-locale-select>
   {% for locale_code, locale_name in supported_locales.items() %}
   <option value="{{ locale_code }}"{% if locale_code == current_locale %} selected{% endif %}>{{ locale_name }}</option>
@@ -205,7 +204,7 @@
  </div>
 
                     <div class="topbar-select-group">
-                        <label class="topbar-select-label" for="global-team-filter">Team</label>
+                        <label class="topbar-select-label" for="global-team-filter">{{ _('common.team') }}</label>
                         <select id="global-team-filter" class="input topbar-select"></select>
                     </div>
                     <button id="topbar-profile" type="button" class="btn btn-small topbar-profile-btn">
@@ -218,8 +217,8 @@
                         <span
                             id="topbar-oncall-indicator"
                             class="topbar-oncall-indicator topbar-oncall-unknown"
-                            title="Loading on-call status..."
-                            aria-label="Loading on-call status"
+                            title="{{ _('common.loading_oncall_status') }}"
+                            aria-label="{{ _('common.loading_oncall_status') }}"
                         ></span>
                     </button>
 
@@ -229,8 +228,8 @@
                         id="topbar-logout"
                         type="button"
                         class="topbar-icon-button"
-                        title="Logout"
-                        aria-label="Logout"
+                        title="{{ _('common.logout') }}"
+                        aria-label="{{ _('common.logout') }}"
                     >
                         <i class="fa-solid fa-right-from-bracket" aria-hidden="true"></i>
                     </button>
@@ -238,8 +237,8 @@
                         id="topbar-install-app"
                         type="button"
                         class="topbar-icon-button is-hidden"
-                        title="Install app"
-                        aria-label="Install app"
+                        title="{{ _('common.install_app') }}"
+                        aria-label="{{ _('common.install_app') }}"
                     >
                         <i class="fa-solid fa-download" aria-hidden="true"></i>
                     </button>
@@ -277,7 +276,7 @@
             <div class="app-modal-dialog app-modal-dialog-small">
             <div class="app-modal-header">
                 <div>
-                    <h2 id="app-dialog-title">Message</h2>
+                    <h2 id="app-dialog-title">{{ _('common.message') }}</h2>
                     <div id="app-dialog-subtitle" class="card-subtitle"></div>
                 </div>
 
@@ -285,7 +284,7 @@
                     id="app-dialog-close"
                     type="button"
                     class="app-modal-close"
-                    aria-label="Close"
+                    aria-label="{{ _('common.close') }}"
                 >
                     ×
                 </button>
@@ -300,10 +299,10 @@
 
             <div class="app-modal-footer">
                 <button id="app-dialog-cancel" type="button" class="btn">
-                    Cancel
+                    {{ _('common.cancel') }}
                 </button>
                 <button id="app-dialog-confirm" type="button" class="btn btn-primary">
-                    OK
+                    {{ _('common.ok') }}
                 </button>
             </div>
         </div>
@@ -345,6 +344,7 @@
 <script src="{{ url_for('static', filename='js/pages/oncall_health.js') }}"></script>
 <script src="/static/js/pages/calendar.js"></script>
 <script src="/static/js/pages/routes.js"></script>
+<script src="{{ url_for('static', filename='js/pages/services/i18n_runtime.js') }}"></script>
 <script src="{{ url_for('static', filename='js/pages/services/core.js') }}"></script>
 <script src="{{ url_for('static', filename='js/pages/services/details.js') }}"></script>
 <script src="{{ url_for('static', filename='js/pages/services/context.js') }}"></script>
