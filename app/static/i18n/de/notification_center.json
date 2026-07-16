@@ -1,0 +1,21 @@
+{
+  "notification_center.notifications": "Benachrichtigungen",
+  "notification_center.title": "Antwortanfragen",
+  "notification_center.empty": "Keine anhängigen Anträge",
+  "notification_center.notification": "Benachrichtigung",
+  "notification_center.responder_requested": "Responder angefordert",
+  "notification_center.help_requested": "{requester} bat um Ihre Hilfe bei diesem Vorfall.",
+  "notification_center.accept": "Akzeptieren",
+  "notification_center.decline": "Rückgang",
+  "notification_center.open_incident": "Offener Vorfall",
+  "notification_center.unknown_user": "Unbekannter Benutzer",
+  "notification_center.user_id": "Benutzer #{id}",
+  "notification_center.no_team": "Kein Team",
+  "notification_center.no_service": "Kein Service",
+  "notification_center.status.firing": "Ausgelöst",
+  "notification_center.status.acknowledged": "Bestätigt",
+  "notification_center.status.resolved": "Gelöst",
+  "notification_center.status.maintenance": "Wartung",
+  "notification_center.status.open": "Offen",
+  "notification_center.status.closed": "Geschlossen"
+}

@@ -542,6 +542,18 @@
             [/^Edit SLO #(\d+)$/i, "Изменить SLO №$1"],
         ];
 
+        const numberedGerman = [
+            [/^Service #(\d+)$/i, "Service Nr. $1"],
+            [/^Runbook #(\d+)$/i, "Runbook Nr. $1"],
+            [/^Link #(\d+)$/i, "Link Nr. $1"],
+            [/^Window #(\d+)$/i, "Fenster Nr. $1"],
+            [/^User #(\d+)$/i, "Benutzer Nr. $1"],
+            [/^SLI #(\d+)$/i, "SLI Nr. $1"],
+            [/^SLO #(\d+)$/i, "SLO Nr. $1"],
+            [/^Edit SLI #(\d+)$/i, "SLI Nr. $1 bearbeiten"],
+            [/^Edit SLO #(\d+)$/i, "SLO Nr. $1 bearbeiten"],
+        ];
+
         if (window.i18n && i18n.locale === "ru") {
             for (const pair of numbered) {
                 if (pair[0].test(normalized)) {
@@ -611,6 +623,78 @@
             match = normalized.match(/^([0-9]+) \/ ([0-9]+) upstream \/ downstream$/i);
             if (match) {
                 return "Вышестоящих: " + match[1] + " / нижестоящих: " + match[2];
+            }
+        }
+
+        if (window.i18n && i18n.locale === "de") {
+            for (const pair of numberedGerman) {
+                if (pair[0].test(normalized)) {
+                    return normalized.replace(pair[0], pair[1]);
+                }
+            }
+
+            match = normalized.match(/^Correlation (\d+)s$/i);
+            if (match) {
+                return "Korrelation: " + match[1] + " s";
+            }
+
+            match = normalized.match(/^(\d+) day window$/i);
+            if (match) {
+                return "Zeitraum: " + match[1] + " Tage";
+            }
+
+            match = normalized.match(/^Loading service details for\s+(.+?)(?:\.\.\.)?$/i);
+            if (match) {
+                return "Servicedetails für „" + match[1] + "“ werden geladen...";
+            }
+
+            match = normalized.match(/^(\d+) more path\(s\)$/i);
+            if (match) {
+                return match[1] + " weitere Pfade";
+            }
+
+            match = normalized.match(/^(\d+) more downstream path\(s\)$/i);
+            if (match) {
+                return match[1] + " weitere nachgelagerte Pfade";
+            }
+
+            match = normalized.match(/^Budget used:\s*(.+)$/i);
+            if (match) {
+                return "Verwendetes Budget: " + match[1];
+            }
+
+            match = normalized.match(/^Delete SLI [“\"]?(.+?)[”\"]?\? SLOs attached to it will be deleted by the database\.$/i);
+            if (match) {
+                return "SLI „" + match[1] + "“ löschen? Zugehörige SLOs werden von der Datenbank gelöscht.";
+            }
+
+            match = normalized.match(/^Delete (service|link|runbook|dependency|SLI|SLO|default stakeholder) [“\"]?(.+?)[”\"]?\?$/i);
+            if (match) {
+                const names = {
+                    service: "Service",
+                    link: "Link",
+                    runbook: "Runbook",
+                    dependency: "Abhängigkeit",
+                    sli: "SLI",
+                    slo: "SLO",
+                    "default stakeholder": "Standard-Stakeholder",
+                };
+                return names[match[1].toLowerCase()] + " „" + match[2] + "“ löschen?";
+            }
+
+            match = normalized.match(/^Delete dependency on [“\"]?(.+?)[”\"]?\?$/i);
+            if (match) {
+                return "Abhängigkeit von „" + match[1] + "“ löschen?";
+            }
+
+            match = normalized.match(/^([0-9]+) upstream \/ ([0-9]+) downstream$/i);
+            if (match) {
+                return "Vorgelagert: " + match[1] + " / nachgelagert: " + match[2];
+            }
+
+            match = normalized.match(/^([0-9]+) \/ ([0-9]+) upstream \/ downstream$/i);
+            if (match) {
+                return "Vorgelagert: " + match[1] + " / nachgelagert: " + match[2];
             }
         }
 

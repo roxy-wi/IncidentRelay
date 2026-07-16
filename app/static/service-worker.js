@@ -144,16 +144,31 @@ const IR_SW_MESSAGES = {
         network_error: "ошибка сети",
         acknowledged: "{alert} подтверждён",
         resolved: "{alert} закрыт"
+    },
+    de: {
+        acknowledge: "Bestätigen",
+        resolve: "Lösen",
+        alert: "Alarm",
+        action_failed: "Aktion fehlgeschlagen: {error}",
+        unknown_error: "unbekannter Fehler",
+        network_error: "Netzwerkfehler",
+        acknowledged: "{alert} bestätigt",
+        resolved: "{alert} gelöst"
     }
 };
 
 function normalizeIncidentRelayLocale(value) {
-    return String(value || "")
+    const locale = String(value || "")
         .toLowerCase()
-        .replace("_", "-")
-        .startsWith("ru")
-        ? "ru"
-        : "en";
+        .replace("_", "-");
+
+    if (locale.startsWith("ru")) {
+        return "ru";
+    }
+    if (locale.startsWith("de")) {
+        return "de";
+    }
+    return "en";
 }
 
 function incidentRelaySwText(locale, key, params) {

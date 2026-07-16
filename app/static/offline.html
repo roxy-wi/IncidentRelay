@@ -103,6 +103,12 @@
             heading: "Нет подключения к сети",
             description: "Для отображения актуальных алертов, ротаций и влияния на сервисы IncidentRelay требуется подключение к сети. Проверьте соединение и повторите попытку.",
             retry: "Повторить"
+        },
+        de: {
+            title: "IncidentRelay – offline",
+            heading: "Sie sind offline",
+            description: "IncidentRelay benötigt eine Netzwerkverbindung, um aktuelle Alarme, Rotationen und Auswirkungen auf Services anzuzeigen. Überprüfen Sie Ihre Verbindung und versuchen Sie es erneut.",
+            retry: "Erneut versuchen"
         }
     };
 
@@ -113,11 +119,14 @@
         ? decodeURIComponent(cookieMatch[1])
         : "";
     const browserLocale = navigator.language || "en";
-    const locale = String(cookieLocale || browserLocale)
+    const requestedLocale = String(cookieLocale || browserLocale)
         .toLowerCase()
-        .startsWith("ru")
+        .replace("_", "-");
+    const locale = requestedLocale.startsWith("ru")
         ? "ru"
-        : "en";
+        : requestedLocale.startsWith("de")
+            ? "de"
+            : "en";
     const selected = messages[locale];
 
     document.documentElement.lang = locale;
