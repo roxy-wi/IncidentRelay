@@ -185,13 +185,15 @@ class ZabbixWebhookSchema(ApiModel):
 
 
 class GenericWebhookSchema(ApiModel):
-    """
-    Validate generic webhook payload.
-    """
+    """Validate generic or PagerDuty Events API v2-compatible payloads."""
 
-    model_config = ConfigDict(extra="ignore")
+    # Generic senders frequently add custom fields. PagerDuty Events API v2
+    # also has nested payload, links, images and client metadata. Preserve all
+    # of them in the raw alert payload instead of silently dropping them.
+    model_config = ConfigDict(extra="allow")
 
-    title: str = Field(min_length=1, max_length=255)
+    # IncidentRelay generic webhook fields.
+    title: str | None = Field(default=None, min_length=1, max_length=255)
     message: str | None = None
     severity: str | None = None
     status: str | None = None
@@ -206,6 +208,68 @@ class GenericWebhookSchema(ApiModel):
     source_url: str | None = None
     dashboard_url: str | None = None
     runbook_url: str | None = None
+
+    # PagerDuty Events API v2-compatible fields. The route intake token is
+    # supplied as routing_key when this format is used.
+    routing_key: str | None = None
+    event_action: str | None = None
+    dedup_key: str | None = None
+    payload: Dict[str, Any] | None = None
+    links: List[Dict[str, Any]] = Field(default_factory=list)
+    images: List[Dict[str, Any]] = Field(default_factory=list)
+    client: str | None = None
+    client_url: str | None = None
+
+    @model_validator(mode="after")
+    def validate_supported_format(self):
+        action = str(self.event_action or "").strip().lower()
+
+        if action:
+            if action not in {"trigger", "acknowledge", "resolve"}:
+                raise ValueError(
+                    "event_action must be trigger, acknowledge or resolve"
+                )
+
+            if not str(self.routing_key or "").strip():
+                raise ValueError(
+                    "routing_key is required for PagerDuty Events API v2 payloads"
+                )
+
+            if action in {"acknowledge", "resolve"}:
+                if not str(self.dedup_key or "").strip():
+                    raise ValueError(
+                        "dedup_key is required for acknowledge and resolve events"
+                    )
+                return self
+
+            event_payload = self.payload or {}
+            missing = [
+                key
+                for key in ("summary", "source", "severity")
+                if not str(event_payload.get(key) or "").strip()
+            ]
+
+            if missing:
+                raise ValueError(
+                    "PagerDuty trigger payload is missing required fields: "
+                    + ", ".join(missing)
+                )
+
+            severity = str(event_payload.get("severity") or "").strip().lower()
+            if severity not in {"critical", "error", "warning", "info"}:
+                raise ValueError(
+                    "PagerDuty payload.severity must be critical, error, warning or info"
+                )
+
+            return self
+
+        if not str(self.title or "").strip():
+            raise ValueError(
+                "Generic webhook payload must contain title, or use "
+                "PagerDuty Events API v2 event_action"
+            )
+
+        return self
 
 
 class RmonWebhookSchema(ApiModel):

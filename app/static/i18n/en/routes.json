@@ -191,5 +191,10 @@
   "matcher.preset.disabled_suffix": "Disabled",
   "matcher.preset.none_hint": "No preset selected. Only the additional matchers below will be evaluated.",
   "matcher.preset.disabled_hint": "This preset is disabled. Matching will not succeed until the preset is enabled.",
-  "matcher.preset.match_both": "Preset \"{name}\" v{version} and the additional matchers must both match."
+  "matcher.preset.match_both": "Preset \"{name}\" v{version} and the additional matchers must both match.",
+  "routes.form.webhook_pd_help": "Webhook routes accept IncidentRelay generic payloads and PagerDuty Events API v2-compatible trigger, acknowledge and resolve events. Use the route intake token as routing_key.",
+  "routes.intake.generic_example_comment": "IncidentRelay generic webhook format",
+  "routes.intake.pagerduty_example_comment": "PagerDuty Events API v2-compatible format",
+  "routes.intake.webhook_subtitle": "Use this token as Authorization: Bearer for generic payloads or as routing_key for PagerDuty Events API v2-compatible payloads.",
+  "routes.intake.webhook_help": "Generic payloads use Authorization: Bearer. PagerDuty Events API v2-compatible payloads put the same token in routing_key."
 }

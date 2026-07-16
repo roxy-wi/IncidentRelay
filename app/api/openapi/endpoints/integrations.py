@@ -1876,7 +1876,7 @@ def paths():
         }
     }
 
-    webhook_body = {
+    generic_webhook_body = {
         "type": "object",
         "required": ["title"],
         "additionalProperties": True,
@@ -1912,7 +1912,7 @@ def paths():
             },
             "labels": {
                 "type": "object",
-                "additionalProperties": {"type": "string"},
+                "additionalProperties": True,
                 "description": "Alert labels.",
                 "example": {
                     "team": "infra",
@@ -1978,6 +1978,100 @@ def paths():
             "event_link": "https://monitoring.example.com/events/deploy-incident-42",
         },
     }
+
+    pagerduty_events_v2_body = {
+        "type": "object",
+        "required": ["routing_key", "event_action"],
+        "additionalProperties": True,
+        "properties": {
+            "routing_key": {
+                "type": "string",
+                "description": "IncidentRelay webhook route intake token.",
+            },
+            "event_action": {
+                "type": "string",
+                "enum": ["trigger", "acknowledge", "resolve"],
+            },
+            "dedup_key": {
+                "type": "string",
+                "nullable": True,
+                "description": "Stable incident key. Required for acknowledge and resolve.",
+                "example": "database-prod-01",
+            },
+            "payload": {
+                "type": "object",
+                "nullable": True,
+                "description": "PagerDuty Common Event Format payload. Required for trigger.",
+                "properties": {
+                    "summary": {"type": "string"},
+                    "source": {"type": "string"},
+                    "severity": {
+                        "type": "string",
+                        "enum": ["critical", "error", "warning", "info"],
+                    },
+                    "timestamp": {"type": "string", "nullable": True},
+                    "component": {"type": "string", "nullable": True},
+                    "group": {"type": "string", "nullable": True},
+                    "class": {"type": "string", "nullable": True},
+                    "custom_details": {
+                        "type": "object",
+                        "additionalProperties": True,
+                    },
+                },
+            },
+            "links": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "href": {"type": "string"},
+                        "text": {"type": "string", "nullable": True},
+                    },
+                },
+            },
+            "images": {
+                "type": "array",
+                "items": {"type": "object", "additionalProperties": True},
+            },
+            "client": {"type": "string", "nullable": True},
+            "client_url": {"type": "string", "nullable": True},
+        },
+        "example": {
+            "routing_key": "WEBHOOK_ROUTE_INTAKE_TOKEN",
+            "event_action": "trigger",
+            "dedup_key": "database-prod-01",
+            "payload": {
+                "summary": "Production database is unavailable",
+                "source": "db-prod-01",
+                "severity": "critical",
+                "component": "postgresql",
+                "group": "production",
+                "class": "database",
+                "custom_details": {
+                    "team": "sre",
+                    "environment": "prod",
+                },
+            },
+            "links": [
+                {
+                    "href": "https://monitoring.example.com/incidents/db-prod-01",
+                    "text": "Open monitoring",
+                }
+            ],
+        },
+    }
+
+    webhook_body = {
+        "oneOf": [
+            generic_webhook_body,
+            pagerduty_events_v2_body,
+        ],
+        "description": (
+            "IncidentRelay generic webhook payload or a PagerDuty Events API "
+            "v2-compatible alert event."
+        ),
+    }
+
 
     return {
         "/api/integrations/alertmanager": {
@@ -2180,14 +2274,17 @@ def paths():
         "/api/integrations/webhook": {
             "post": {
                 "tags": ["integrations"],
-                "summary": "Receive generic webhook alerts",
+                "summary": "Receive generic or PagerDuty-compatible webhook alerts",
                 "description": (
-                    "Receives a generic alert payload. The route intake token must belong "
-                    "to a route with source=webhook. Provide a stable fingerprint to avoid duplicate alerts."
+                    "Receives either the IncidentRelay generic payload or a PagerDuty "
+                    "Events API v2-compatible trigger, acknowledge or resolve event. "
+                    "Generic payloads normally use Authorization: Bearer. PagerDuty-compatible "
+                    "payloads use the webhook route intake token as routing_key. Provide a "
+                    "stable fingerprint or dedup_key to avoid duplicate alerts."
                 ),
                 "operationId": "receiveGenericWebhookAlerts",
                 "security": [{"bearerAuth": []}],
-                "requestBody": json_body("Generic webhook payload.", webhook_body),
+                "requestBody": json_body("Generic or PagerDuty Events API v2-compatible payload.", webhook_body),
                 "responses": incoming_alert_responses("Generic webhook alert accepted."),
             }
         },

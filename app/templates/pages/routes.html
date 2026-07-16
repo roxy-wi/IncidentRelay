@@ -181,8 +181,11 @@
                   <option value="zabbix">Zabbix</option>
                   <option value="sentry">Sentry</option>
                   <option value="librenms">LibreNMS</option>
-                  <option value="webhook">Webhook</option>
+                  <option value="webhook">Webhook / PagerDuty Events API v2</option>
               </select>
+              <div id="route-webhook-compatibility-help" class="help-text is-hidden">
+                {{ _("routes.form.webhook_pd_help") }}
+              </div>
                 <div id="route-sentry-settings" class="form-group is-hidden">
                     <label for="route-sentry-webhook-secret">{{ _("routes.form.sentry_secret") }}</label>
                     <input

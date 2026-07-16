@@ -26,7 +26,7 @@ Incoming integrations create or update alerts in IncidentRelay. They are selecte
 | Zabbix              | `POST /api/integrations/zabbix`            | [Zabbix](zabbix.md)                                       |
 | Sentry              | `POST /api/integrations/sentry/<route_id>` | [Sentry](sentry.md)                                       |
 | LibreNMS            | `POST /api/integrations/librenms`          | [LibreNMS](librenms.md)                                   |
-| Generic webhook     | `POST /api/integrations/webhook`           | [Generic webhook](generic-webhook.md)                     |
+| Generic webhook / PagerDuty Events API v2 | `POST /api/integrations/webhook` | [Generic webhook](generic-webhook.md) |
 
 Route intake tokens belong to routes, not to channels. Create a route first, copy its intake token, and use that token in the monitoring system.
 

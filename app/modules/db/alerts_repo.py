@@ -796,23 +796,32 @@ def normalize_alert_order(order):
     return "desc"
 
 
-def find_existing_alert(source, dedup_key, window_seconds=None):
+def find_existing_alert(
+    source,
+    dedup_key,
+    window_seconds=None,
+    route_id=None,
+):
     """
     Return an existing non-resolved alert by source and dedup key.
 
     Resolved alerts are final occurrences. If the same fingerprint fires again
     after resolve, a new alert must be created with a new id and first_seen_at.
+
+    route_id can scope lifecycle actions submitted with a route intake token.
+    This prevents a PagerDuty-compatible routing key from acknowledging or
+    resolving an alert owned by another webhook route that reused a dedup key.
     """
-    return (
-        Alert.select()
-        .where(
-            (Alert.source == source)
-            & (Alert.dedup_key == dedup_key)
-            & (Alert.status != "resolved")
-        )
-        .order_by(Alert.id.desc())
-        .first()
+    query = Alert.select().where(
+        (Alert.source == source)
+        & (Alert.dedup_key == dedup_key)
+        & (Alert.status != "resolved")
     )
+
+    if route_id is not None:
+        query = query.where(Alert.route == route_id)
+
+    return query.order_by(Alert.id.desc()).first()
 
 
 def create_alert(**kwargs):

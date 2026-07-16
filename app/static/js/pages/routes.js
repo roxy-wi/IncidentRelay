@@ -1096,8 +1096,13 @@ function updateRouteSourceUi() {
 
     const isSentry = source === "sentry";
     const isAwsSns = source === "aws_sns";
+    const isWebhook = source === "webhook";
 
     $("#route-sentry-settings").toggleClass("is-hidden", !isSentry);
+    $("#route-webhook-compatibility-help").toggleClass(
+        "is-hidden",
+        !isWebhook
+    );
 
     $("#route-aws-sns-settings").toggleClass("is-hidden", !isAwsSns);
 
@@ -1515,6 +1520,21 @@ function buildRouteIntakeCurl(route, token) {
         ].join("\n");
     }
 
+    if (source === "webhook") {
+        return [
+            "# " + i18n.t("routes.intake.generic_example_comment"),
+            "curl -X POST '" + url + "' \\",
+            "  -H 'Content-Type: application/json' \\",
+            "  -H 'Authorization: Bearer " + (token || "<route-token>") + "' \\",
+            "  -d '{\"title\":\"Example alert\",\"severity\":\"critical\",\"fingerprint\":\"example-1\"}'",
+            "",
+            "# " + i18n.t("routes.intake.pagerduty_example_comment"),
+            "curl -X POST '" + url + "' \\",
+            "  -H 'Content-Type: application/json' \\",
+            "  -d '{\"routing_key\":\"" + (token || "<route-token>") + "\",\"event_action\":\"trigger\",\"dedup_key\":\"example-1\",\"payload\":{\"summary\":\"Example alert\",\"source\":\"example-host\",\"severity\":\"critical\"}}'"
+        ].join("\n");
+    }
+
     return [
         "curl -X POST '" + url + "' \\",
         "  -H 'Content-Type: application/json' \\",
@@ -1528,6 +1548,7 @@ function showRouteIntakeDetails(route) {
     const token = route.intake_token || "";
     const isSentry = source === "sentry";
     const isHeartbeat = source === "heartbeat";
+    const isWebhook = source === "webhook";
     const url = getRouteIntakeUrl(route);
 
     let titleKey = "routes.intake.title";
@@ -1542,6 +1563,9 @@ function showRouteIntakeDetails(route) {
         titleKey = "routes.intake.heartbeat_title";
         subtitleKey = "routes.intake.heartbeat_subtitle";
         helpKey = "routes.intake.heartbeat_help";
+    } else if (isWebhook) {
+        subtitleKey = "routes.intake.webhook_subtitle";
+        helpKey = "routes.intake.webhook_help";
     }
 
     $("#route-intake-title").text(i18n.t(titleKey));

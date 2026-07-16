@@ -191,5 +191,10 @@
   "matcher.preset.disabled_suffix": "Отключён",
   "matcher.preset.none_hint": "Набор не выбран. Будут проверяться только дополнительные условия ниже.",
   "matcher.preset.disabled_hint": "Этот набор отключён. Сопоставление не сработает, пока набор не будет включён.",
-  "matcher.preset.match_both": "Набор «{name}» v{version} и дополнительные условия должны совпасть одновременно."
+  "matcher.preset.match_both": "Набор «{name}» v{version} и дополнительные условия должны совпасть одновременно.",
+  "routes.form.webhook_pd_help": "Webhook-маршруты принимают обычный формат IncidentRelay и совместимые с PagerDuty Events API v2 события trigger, acknowledge и resolve. Используйте intake token маршрута в поле routing_key.",
+  "routes.intake.generic_example_comment": "Обычный формат webhook IncidentRelay",
+  "routes.intake.pagerduty_example_comment": "Формат, совместимый с PagerDuty Events API v2",
+  "routes.intake.webhook_subtitle": "Для обычного payload используйте токен как Authorization: Bearer, а для формата PagerDuty Events API v2 — как routing_key.",
+  "routes.intake.webhook_help": "Обычный payload использует Authorization: Bearer. Совместимый с PagerDuty Events API v2 payload передаёт тот же токен в routing_key."
 }
