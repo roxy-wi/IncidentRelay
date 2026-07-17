@@ -96,6 +96,12 @@ def create_group_if_missing(slug, name, description=None):
         group.active = True
         group.save()
 
+    # Demo/bootstrap groups are created after migrations have already run.
+    # Keep the built-in readiness standard consistent with groups created
+    # through the regular Groups API.
+    from app.services.service_catalog.presets import ensure_basic_operational_standard
+
+    ensure_basic_operational_standard(group)
     return group
 
 
