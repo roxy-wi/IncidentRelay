@@ -321,6 +321,7 @@ function fillRouteSourceFilter(routes) {
     const sources = {
         alertmanager: true,
         aws_sns: true,
+        datadog: true,
         grafana: true,
         rmon: true,
         heartbeat: true,
@@ -1096,12 +1097,17 @@ function updateRouteSourceUi() {
 
     const isSentry = source === "sentry";
     const isAwsSns = source === "aws_sns";
+    const isDatadog = source === "datadog";
     const isWebhook = source === "webhook";
 
     $("#route-sentry-settings").toggleClass("is-hidden", !isSentry);
     $("#route-webhook-compatibility-help").toggleClass(
         "is-hidden",
         !isWebhook
+    );
+    $("#route-datadog-help").toggleClass(
+        "is-hidden",
+        !isDatadog
     );
 
     $("#route-aws-sns-settings").toggleClass("is-hidden", !isAwsSns);
@@ -1127,6 +1133,10 @@ function updateRouteSourceUi() {
         } else if (source === "grafana") {
             $("#route-group-by").val(
                 '["alertname","grafana_folder","instance"]'
+            );
+        } else if (source === "datadog") {
+            $("#route-group-by").val(
+                '["datadog_alert_id","datadog_scope"]'
             );
         } else if (source === "rmon") {
             $("#route-group-by").val(
@@ -1520,6 +1530,16 @@ function buildRouteIntakeCurl(route, token) {
         ].join("\n");
     }
 
+    if (source === "datadog") {
+        return [
+            "# " + i18n.t("routes.intake.datadog_example_comment"),
+            `curl -X POST '${url}' \\`,
+            "  -H 'Content-Type: application/json' \\",
+            `  -H 'Authorization: Bearer ${token || "<route-token>"}' \\`,
+            "  -d '{\"alert_title\":\"[Triggered] Example monitor\",\"text_only_msg\":\"Example Datadog alert\",\"alert_id\":\"1234\",\"alert_cycle_key\":\"cycle-example-1\",\"alert_transition\":\"Triggered\",\"alert_type\":\"error\",\"alert_priority\":\"P1\",\"alert_scope\":\"env:prod,service:api\",\"hostname\":\"api-01\",\"link\":\"https://app.datadoghq.com/monitors/1234\",\"tags\":\"env:prod,service:api\"}'"
+        ].join("\n");
+    }
+
     if (source === "webhook") {
         return [
             "# " + i18n.t("routes.intake.generic_example_comment"),
@@ -1548,6 +1568,7 @@ function showRouteIntakeDetails(route) {
     const token = route.intake_token || "";
     const isSentry = source === "sentry";
     const isHeartbeat = source === "heartbeat";
+    const isDatadog = source === "datadog";
     const isWebhook = source === "webhook";
     const url = getRouteIntakeUrl(route);
 
@@ -1563,6 +1584,9 @@ function showRouteIntakeDetails(route) {
         titleKey = "routes.intake.heartbeat_title";
         subtitleKey = "routes.intake.heartbeat_subtitle";
         helpKey = "routes.intake.heartbeat_help";
+    } else if (isDatadog) {
+        subtitleKey = "routes.intake.datadog_subtitle";
+        helpKey = "routes.intake.datadog_help";
     } else if (isWebhook) {
         subtitleKey = "routes.intake.webhook_subtitle";
         helpKey = "routes.intake.webhook_help";

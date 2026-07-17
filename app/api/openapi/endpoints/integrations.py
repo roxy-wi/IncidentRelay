@@ -1271,6 +1271,97 @@ def paths():
         },
     }
 
+    datadog_body = {
+        "type": "object",
+        "minProperties": 1,
+        "additionalProperties": True,
+        "description": (
+            "Custom JSON payload configured in the Datadog Webhooks "
+            "integration. IncidentRelay accepts the documented lower-case "
+            "keys and equivalent upper-case Datadog variable names."
+        ),
+        "properties": {
+            "alert_title": {
+                "type": "string",
+                "description": "Rendered $ALERT_TITLE value.",
+            },
+            "text_only_msg": {
+                "type": "string",
+                "description": "Rendered $TEXT_ONLY_MSG value.",
+            },
+            "alert_id": {
+                "oneOf": [{"type": "string"}, {"type": "integer"}],
+                "description": "Rendered $ALERT_ID monitor id.",
+            },
+            "alert_cycle_key": {
+                "type": "string",
+                "description": (
+                    "Rendered $ALERT_CYCLE_KEY. Preferred deduplication key "
+                    "because it remains stable from trigger through recovery."
+                ),
+            },
+            "aggreg_key": {
+                "type": "string",
+                "description": "Rendered $AGGREG_KEY fallback deduplication key.",
+            },
+            "alert_transition": {
+                "type": "string",
+                "description": "Rendered $ALERT_TRANSITION value.",
+                "example": "Triggered",
+            },
+            "alert_type": {
+                "type": "string",
+                "description": "Rendered $ALERT_TYPE value.",
+                "example": "error",
+            },
+            "alert_priority": {
+                "type": "string",
+                "description": "Rendered $ALERT_PRIORITY value.",
+                "example": "P1",
+            },
+            "alert_scope": {
+                "type": "string",
+                "description": "Rendered $ALERT_SCOPE comma-separated tags.",
+            },
+            "event_type": {
+                "type": "string",
+                "description": "Rendered $EVENT_TYPE value.",
+            },
+            "hostname": {
+                "type": "string",
+                "description": "Rendered $HOSTNAME value.",
+            },
+            "link": {
+                "type": "string",
+                "format": "uri",
+                "description": "Rendered $LINK value.",
+            },
+            "tags": {
+                "oneOf": [
+                    {"type": "string"},
+                    {"type": "array", "items": {"type": "string"}},
+                    {"type": "object", "additionalProperties": True},
+                ],
+                "description": "Rendered $TAGS value or a pre-parsed tag collection.",
+            },
+        },
+        "example": {
+            "alert_title": "[Triggered] API latency is high",
+            "text_only_msg": "p95 latency exceeded 2 seconds",
+            "alert_id": "1234",
+            "alert_cycle_key": "cycle-1234-prod-api",
+            "aggreg_key": "monitor-1234-prod-api",
+            "alert_transition": "Triggered",
+            "alert_type": "error",
+            "alert_priority": "P1",
+            "alert_scope": "env:prod,service:api",
+            "event_type": "query_alert_monitor",
+            "hostname": "api-01",
+            "link": "https://app.datadoghq.com/monitors/1234",
+            "tags": "env:prod,service:api,team:sre",
+        },
+    }
+
     rmon_body = {
         "type": "object",
         "required": ["title"],
@@ -2109,6 +2200,28 @@ def paths():
                 ),
                 "responses": incoming_alert_responses(
                     "Grafana alerts accepted."
+                ),
+            },
+        },
+        "/api/integrations/datadog": {
+            "post": {
+                "tags": ["integrations"],
+                "summary": "Receive Datadog webhook alerts",
+                "description": (
+                    "Receives a custom payload from the Datadog Webhooks "
+                    "integration. The route intake token must belong to an "
+                    "active route with source=datadog. Use ALERT_CYCLE_KEY and "
+                    "ALERT_TRANSITION so trigger and recovery update the same "
+                    "IncidentRelay alert."
+                ),
+                "operationId": "receiveDatadogAlerts",
+                "security": [{"bearerAuth": []}],
+                "requestBody": json_body(
+                    "Datadog Webhooks custom payload.",
+                    datadog_body,
+                ),
+                "responses": incoming_alert_responses(
+                    "Datadog alert accepted."
                 ),
             },
         },

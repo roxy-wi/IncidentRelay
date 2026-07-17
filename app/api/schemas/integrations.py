@@ -184,6 +184,53 @@ class ZabbixWebhookSchema(ApiModel):
         return self
 
 
+class DatadogWebhookSchema(ApiModel):
+    """Validate a Datadog Webhooks integration payload."""
+
+    # Datadog payloads are user-configurable. Keep the common IncidentRelay
+    # template fields typed while preserving any additional Datadog variables.
+    model_config = ConfigDict(extra="allow")
+
+    title: str | None = None
+    alert_title: str | None = None
+    event_title: str | None = None
+    message: str | None = None
+    text_only_msg: str | None = None
+    event_msg: str | None = None
+
+    alert_id: str | int | None = None
+    event_id: str | int | None = None
+    id: str | int | None = None
+    alert_cycle_key: str | None = None
+    aggreg_key: str | None = None
+    alert_transition: str | None = None
+    alert_type: str | None = None
+    alert_priority: str | None = None
+    alert_scope: str | None = None
+
+    hostname: str | None = None
+    link: str | None = None
+    tags: Any = None
+    labels: Dict[str, Any] = Field(default_factory=dict)
+    team: str | None = None
+
+    @model_validator(mode="after")
+    def validate_not_empty(self):
+        payload = self.model_dump(exclude_none=True)
+
+        # model_dump includes default empty labels. Ignore it when deciding
+        # whether the sender supplied any useful content.
+        if payload.get("labels") == {}:
+            payload.pop("labels", None)
+
+        if not payload:
+            raise ValueError(
+                "Datadog webhook payload must contain at least one field"
+            )
+
+        return self
+
+
 class GenericWebhookSchema(ApiModel):
     """Validate generic or PagerDuty Events API v2-compatible payloads."""
 

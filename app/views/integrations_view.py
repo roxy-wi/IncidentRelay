@@ -7,6 +7,7 @@ from peewee import DoesNotExist
 from app.api.schemas.integrations import (
     AlertmanagerWebhookSchema,
     AwsSnsEnvelopeSchema,
+    DatadogWebhookSchema,
     GenericWebhookSchema,
     GrafanaWebhookSchema,
     LibreNMSWebhookSchema,
@@ -29,6 +30,7 @@ from app.services.integrations.normalizers.zabbix import normalize_zabbix
 from app.services.integrations.normalizers.alertmanager import normalize_alertmanager
 from app.services.integrations.normalizers.librenms import normalize_librenms
 from app.services.integrations.normalizers.grafana import normalize_grafana
+from app.services.integrations.normalizers.datadog import normalize_datadog
 from app.services.integrations.normalizers.rmon import normalize_rmon
 from app.services.validation import make_error_response, validate_body
 from app.notifiers.voice.loader import create_voice_provider
@@ -73,6 +75,29 @@ def grafana_webhook():
 
     return process_incoming_alerts(
         normalize_grafana(payload.model_dump())
+    )
+
+
+@integrations_bp.route("/datadog", methods=["POST"])
+@require_alert_token()
+def datadog_webhook():
+    """Receive alerts from the Datadog Webhooks integration."""
+
+    intake_route = getattr(request, "current_intake_route", None)
+
+    if intake_route and intake_route.source != "datadog":
+        return make_error_response(
+            error="route_source_mismatch",
+            message="Route source must be datadog.",
+            status_code=400,
+        )
+
+    payload, error = validate_body(DatadogWebhookSchema)
+    if error:
+        return error
+
+    return process_incoming_alerts(
+        normalize_datadog(payload.model_dump(exclude_none=True))
     )
 
 

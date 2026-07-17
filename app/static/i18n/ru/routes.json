@@ -196,5 +196,9 @@
   "routes.intake.generic_example_comment": "Обычный формат webhook IncidentRelay",
   "routes.intake.pagerduty_example_comment": "Формат, совместимый с PagerDuty Events API v2",
   "routes.intake.webhook_subtitle": "Для обычного payload используйте токен как Authorization: Bearer, а для формата PagerDuty Events API v2 — как routing_key.",
-  "routes.intake.webhook_help": "Обычный payload использует Authorization: Bearer. Совместимый с PagerDuty Events API v2 payload передаёт тот же токен в routing_key."
+  "routes.intake.webhook_help": "Обычный payload использует Authorization: Bearer. Совместимый с PagerDuty Events API v2 payload передаёт тот же токен в routing_key.",
+  "routes.form.datadog_help": "Создайте Datadog Webhooks integration, которая отправляет рекомендуемый custom payload в этот маршрут. Добавьте intake token маршрута в custom header Authorization: Bearer.",
+  "routes.intake.datadog_example_comment": "Пример custom payload для Datadog Webhooks",
+  "routes.intake.datadog_subtitle": "Используйте этот endpoint в Datadog Webhooks integration и добавьте токен маршрута в custom header Authorization: Bearer.",
+  "routes.intake.datadog_help": "Настройте JSON custom payload с ALERT_CYCLE_KEY и ALERT_TRANSITION, чтобы recovery обновлял тот же алерт IncidentRelay."
 }

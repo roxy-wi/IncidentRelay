@@ -176,6 +176,7 @@
                   <option value="alertmanager">Alertmanager</option>
                   <option value="aws_sns">AWS SNS / CloudWatch</option>
                   <option value="grafana">Grafana</option>
+                  <option value="datadog">Datadog</option>
                   <option value="rmon">RMON</option>
                   <option value="heartbeat">Heartbeat</option>
                   <option value="zabbix">Zabbix</option>
@@ -185,6 +186,9 @@
               </select>
               <div id="route-webhook-compatibility-help" class="help-text is-hidden">
                 {{ _("routes.form.webhook_pd_help") }}
+              </div>
+              <div id="route-datadog-help" class="help-text is-hidden">
+                {{ _("routes.form.datadog_help") }}
               </div>
                 <div id="route-sentry-settings" class="form-group is-hidden">
                     <label for="route-sentry-webhook-secret">{{ _("routes.form.sentry_secret") }}</label>
