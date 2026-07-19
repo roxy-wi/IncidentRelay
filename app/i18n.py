@@ -49,8 +49,13 @@ def get_current_locale() -> str:
 
 @lru_cache(maxsize=32)
 def _load_catalog(static_folder: str, locale: str) -> dict[str, str]:
-    directory = Path(static_folder) / "i18n" / locale
+    safe_locale = normalize_locale(locale)
     messages: dict[str, str] = {}
+
+    if not safe_locale:
+        return messages
+
+    directory = Path(static_folder) / "i18n" / safe_locale
 
     if not directory.is_dir():
         return messages
