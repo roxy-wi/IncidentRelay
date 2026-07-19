@@ -304,3 +304,28 @@ Check that:
 - Socket Mode is enabled in the Slack app;
 - the Slack worker service or container is running;
 - outbound HTTPS and WebSocket connections to Slack are allowed.
+
+## Slack worker logging
+
+The Socket Mode worker uses the `slack` logging role and writes JSON logs to a separate file. Configure the path in `incidentrelay.conf`:
+
+```ini
+[logging]
+slack_worker_file = /var/log/incidentrelay/incidentrelay-slack-worker.log
+```
+
+The file contains `oncall.slack`, `oncall.slack.socket`, and worker-level `oncall.error` events. The packaged logrotate rule already covers this file through `/var/log/incidentrelay/*.log`.
+
+For systemd installations:
+
+```bash
+tail -f /var/log/incidentrelay/incidentrelay-slack-worker.log
+journalctl -u incidentrelay-slack-worker -f
+```
+
+For Docker Compose:
+
+```bash
+docker compose exec incidentrelay-slack \
+  tail -f /var/log/incidentrelay/incidentrelay-slack-worker.log
+```

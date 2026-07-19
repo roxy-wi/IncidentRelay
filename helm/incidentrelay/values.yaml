@@ -50,6 +50,7 @@ config:
     file: /var/log/incidentrelay/incidentrelay.log
     scheduler_file: /var/log/incidentrelay/incidentrelay-scheduler.log
     telegram_worker_file: /var/log/incidentrelay/incidentrelay-telegram-worker.log
+    slack_worker_file: /var/log/incidentrelay/incidentrelay-slack-worker.log
   voice:
     provider: stub
     providers_dir: /usr/local/lib/incidentrelay/voice_providers

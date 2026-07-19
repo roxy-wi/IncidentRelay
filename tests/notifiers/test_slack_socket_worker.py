@@ -1,6 +1,93 @@
 from types import SimpleNamespace
+import json
+import logging
 
 from app.notifiers.slack import socket_worker
+from app.modules.logger import (
+    EventOnlyFilter,
+    LOG_ROLE_SLACK,
+    _log_file_for_role,
+    _normalize_log_role,
+    setup_json_logging,
+)
+from app.settings import Config
+
+
+def _record(name, level=logging.INFO):
+    return logging.LogRecord(
+        name=name,
+        level=level,
+        pathname=__file__,
+        lineno=1,
+        msg="test",
+        args=(),
+        exc_info=None,
+    )
+
+
+def test_slack_log_role_aliases_and_file(monkeypatch, tmp_path):
+    log_file = tmp_path / "incidentrelay-slack-worker.log"
+    monkeypatch.setattr(Config, "LOG_SLACK_WORKER_FILE", str(log_file))
+
+    assert _normalize_log_role("slack") == LOG_ROLE_SLACK
+    assert _normalize_log_role("slack-worker") == LOG_ROLE_SLACK
+    assert _normalize_log_role("socket-mode") == LOG_ROLE_SLACK
+    assert _log_file_for_role(LOG_ROLE_SLACK) == str(log_file)
+
+
+def test_slack_role_filter_isolates_worker_events():
+    role_filter = EventOnlyFilter(LOG_ROLE_SLACK)
+
+    assert role_filter.filter(_record("oncall.slack")) is True
+    assert role_filter.filter(_record("oncall.slack.socket")) is True
+    assert role_filter.filter(_record("oncall.error", logging.ERROR)) is True
+    assert role_filter.filter(_record("oncall.scheduler")) is False
+    assert role_filter.filter(_record("oncall.telegram")) is False
+
+
+def test_slack_role_writes_json_to_separate_file(monkeypatch, tmp_path):
+    log_file = tmp_path / "incidentrelay-slack-worker.log"
+    monkeypatch.setattr(Config, "LOG_SLACK_WORKER_FILE", str(log_file))
+    monkeypatch.setattr(Config, "LOG_LEVEL", "INFO")
+
+    root = logging.getLogger()
+    old_handlers = list(root.handlers)
+    old_level = root.level
+    werkzeug = logging.getLogger("werkzeug")
+    old_werkzeug_disabled = werkzeug.disabled
+
+    try:
+        setup_json_logging(log_role="slack")
+        logging.getLogger("oncall.slack").info("Slack worker test event")
+        logging.getLogger("oncall.slack.socket").warning("Slack socket test event")
+        logging.getLogger("oncall.scheduler").info("must not be written")
+
+        for handler in root.handlers:
+            handler.flush()
+    finally:
+        current_handlers = list(root.handlers)
+        root.handlers.clear()
+        for handler in current_handlers:
+            handler.close()
+        root.handlers.extend(old_handlers)
+        root.setLevel(old_level)
+        werkzeug.disabled = old_werkzeug_disabled
+
+    records = [
+        json.loads(line)
+        for line in log_file.read_text(encoding="utf-8").splitlines()
+    ]
+    logger_names = {record["logger"] for record in records}
+
+    assert "oncall.slack" in logger_names
+    assert "oncall.slack.socket" in logger_names
+    assert "oncall.scheduler" not in logger_names
+    assert any(
+        record.get("log_role") == "slack"
+        and record.get("log_file") == str(log_file)
+        for record in records
+    )
+
 
 
 class FakeClient:
