@@ -2715,3 +2715,314 @@ class CalendarFeed(SoftDeleteModel):
     )
     created_at = DateTimeField(default=datetime.utcnow)
     last_used_at = DateTimeField(null=True)
+
+# BEGIN EVENT ORCHESTRATION V1 MODELS
+
+EVENT_ORCHESTRATION_SCOPES = ("global", "service")
+EVENT_ORCHESTRATION_MODES = ("active", "shadow", "disabled")
+EVENT_ORCHESTRATION_VERSION_STATUSES = ("draft", "published", "archived")
+EVENT_ORCHESTRATION_PROCESSING_MODES = (
+    "continue",
+    "stop",
+    "evaluate_children",
+    "children_then_continue",
+)
+
+
+class EventOrchestration(SoftDeleteModel):
+    """A group-owned orchestration with one atomically selected active version."""
+
+    id = AutoField()
+    uid = UUIDField(default=uuid.uuid4, unique=True, index=True)
+    group = ForeignKeyField(
+        Group,
+        backref="event_orchestrations",
+        on_delete="CASCADE",
+        index=True,
+    )
+    name = CharField(max_length=255)
+    description = TextField(null=True)
+    scope = CharField(max_length=32, default="global", index=True)
+    service = ForeignKeyField(
+        Service,
+        backref="event_orchestrations",
+        null=True,
+        on_delete="SET NULL",
+        index=True,
+    )
+    enabled = BooleanField(default=False, index=True)
+    mode = CharField(max_length=32, default="disabled", index=True)
+    # Kept as an integer to avoid a circular DDL dependency between the
+    # orchestration and orchestration-version tables. Repository code verifies
+    # that the selected version belongs to this orchestration.
+    active_version_id = IntegerField(null=True, index=True)
+    created_by = ForeignKeyField(
+        User,
+        backref="created_event_orchestrations",
+        null=True,
+        on_delete="SET NULL",
+    )
+    created_at = DateTimeField(default=datetime.utcnow, index=True)
+    updated_at = DateTimeField(default=datetime.utcnow)
+
+    class Meta:
+        table_name = "event_orchestration"
+        indexes = (
+            (("group", "name"), True),
+            (("group", "scope"), False),
+            (("group", "mode", "enabled"), False),
+            (("service", "enabled"), False),
+        )
+
+    def save(self, *args, **kwargs):
+        if self.scope not in EVENT_ORCHESTRATION_SCOPES:
+            raise ValueError("Invalid orchestration scope")
+        if self.mode not in EVENT_ORCHESTRATION_MODES:
+            raise ValueError("Invalid orchestration mode")
+
+        if self.scope == "global" and self.service_id is not None:
+            raise ValueError("Global orchestration cannot reference a service")
+        if self.scope == "service" and self.service_id is None:
+            raise ValueError("Service-scoped orchestration requires a service")
+
+        if self.service_id is not None:
+            service_group_id = (
+                Service.select(Service.group)
+                .where(Service.id == self.service_id)
+                .scalar()
+            )
+            if service_group_id is None:
+                raise ValueError("Referenced service does not exist")
+            if int(service_group_id) != int(self.group_id):
+                raise ValueError("Referenced service belongs to another group")
+
+        self.updated_at = datetime.utcnow()
+        return super().save(*args, **kwargs)
+
+
+class EventOrchestrationVersion(BaseModel):
+    """An immutable published orchestration definition."""
+
+    id = AutoField()
+    orchestration = ForeignKeyField(
+        EventOrchestration,
+        backref="versions",
+        on_delete="CASCADE",
+        index=True,
+    )
+    version_number = IntegerField()
+    status = CharField(max_length=32, default="draft", index=True)
+    definition_hash = CharField(max_length=64, null=True, index=True)
+    definition_json = JSONTextField(default=dict)
+    comment = TextField(null=True)
+    created_by = ForeignKeyField(
+        User,
+        backref="created_event_orchestration_versions",
+        null=True,
+        on_delete="SET NULL",
+    )
+    published_by = ForeignKeyField(
+        User,
+        backref="published_event_orchestration_versions",
+        null=True,
+        on_delete="SET NULL",
+    )
+    created_at = DateTimeField(default=datetime.utcnow, index=True)
+    updated_at = DateTimeField(default=datetime.utcnow)
+    published_at = DateTimeField(null=True, index=True)
+
+    class Meta:
+        table_name = "event_orchestration_version"
+        indexes = (
+            (("orchestration", "version_number"), True),
+            (("orchestration", "status"), False),
+        )
+
+    def save(self, *args, **kwargs):
+        if self.status not in EVENT_ORCHESTRATION_VERSION_STATUSES:
+            raise ValueError("Invalid orchestration version status")
+
+        if self.id is None and self.status != "draft":
+            raise ValueError("New orchestration versions must start as drafts")
+
+        if self.id is not None:
+            current = (
+                EventOrchestrationVersion.select(
+                    EventOrchestrationVersion.status,
+                )
+                .where(EventOrchestrationVersion.id == self.id)
+                .dicts()
+                .get()
+            )
+            dirty = {field.name for field in self.dirty_fields}
+            current_status = current["status"]
+
+            # A published version may only be archived. All other changes are
+            # rejected. Repository publication uses an atomic UPDATE for this
+            # narrowly allowed state transition.
+            archive_only = (
+                current_status == "published"
+                and self.status == "archived"
+                and dirty.issubset({"status", "updated_at"})
+            )
+            if current_status in ("published", "archived") and not archive_only:
+                raise ValueError("Published orchestration versions are immutable")
+
+        self.updated_at = datetime.utcnow()
+        return super().save(*args, **kwargs)
+
+    def delete_instance(self, *args, **kwargs):
+        if self.status != "draft":
+            raise ValueError("Published orchestration versions cannot be deleted")
+        return super().delete_instance(*args, **kwargs)
+
+
+class EventOrchestrationRule(BaseModel):
+    """A deterministic ordered rule tree belonging to one draft/version."""
+
+    id = AutoField()
+    version = ForeignKeyField(
+        EventOrchestrationVersion,
+        backref="rules",
+        on_delete="CASCADE",
+        index=True,
+    )
+    parent_rule = ForeignKeyField(
+        "self",
+        backref="children",
+        null=True,
+        on_delete="CASCADE",
+        index=True,
+    )
+    position = IntegerField(default=0)
+    name = CharField(max_length=255)
+    description = TextField(null=True)
+    enabled = BooleanField(default=True, index=True)
+    condition_tree_json = JSONTextField(default=dict)
+    actions_json = JSONTextField(default=list)
+    processing_mode = CharField(max_length=32, default="continue")
+    created_at = DateTimeField(default=datetime.utcnow, index=True)
+    updated_at = DateTimeField(default=datetime.utcnow)
+
+    class Meta:
+        table_name = "event_orchestration_rule"
+        indexes = (
+            (("version", "parent_rule", "position"), True),
+            (("version", "enabled"), False),
+        )
+
+    def _assert_draft(self):
+        version_status = (
+            EventOrchestrationVersion.select(EventOrchestrationVersion.status)
+            .where(EventOrchestrationVersion.id == self.version_id)
+            .scalar()
+        )
+        if version_status != "draft":
+            raise ValueError("Rules of published orchestration versions are immutable")
+
+    def save(self, *args, **kwargs):
+        if self.processing_mode not in EVENT_ORCHESTRATION_PROCESSING_MODES:
+            raise ValueError("Invalid orchestration rule processing mode")
+        if self.version_id is None:
+            raise ValueError("Orchestration rule requires a version")
+        self._assert_draft()
+
+        if self.parent_rule_id is not None:
+            parent_version_id = (
+                EventOrchestrationRule.select(EventOrchestrationRule.version)
+                .where(EventOrchestrationRule.id == self.parent_rule_id)
+                .scalar()
+            )
+            if parent_version_id is None:
+                raise ValueError("Parent orchestration rule does not exist")
+            if int(parent_version_id) != int(self.version_id):
+                raise ValueError("Parent rule belongs to another version")
+
+        self.updated_at = datetime.utcnow()
+        return super().save(*args, **kwargs)
+
+    def delete_instance(self, *args, **kwargs):
+        self._assert_draft()
+        return super().delete_instance(*args, **kwargs)
+
+
+class OrchestrationIntakeToken(BaseModel):
+    """Hashed intake credential scoped to a single orchestration."""
+
+    id = AutoField()
+    orchestration = ForeignKeyField(
+        EventOrchestration,
+        backref="intake_tokens",
+        on_delete="CASCADE",
+        index=True,
+    )
+    name = CharField(max_length=255)
+    token_hash = CharField(max_length=255, unique=True, index=True)
+    token_prefix = CharField(max_length=24, null=True, index=True)
+    enabled = BooleanField(default=True, index=True)
+    created_by = ForeignKeyField(
+        User,
+        backref="created_orchestration_intake_tokens",
+        null=True,
+        on_delete="SET NULL",
+    )
+    created_at = DateTimeField(default=datetime.utcnow, index=True)
+    last_used_at = DateTimeField(null=True)
+    revoked_at = DateTimeField(null=True, index=True)
+
+    class Meta:
+        table_name = "orchestration_intake_token"
+        indexes = (
+            (("orchestration", "name"), True),
+            (("orchestration", "enabled"), False),
+        )
+
+
+class OrchestrationExecution(BaseModel):
+    """Immutable execution audit record for explainability and retention."""
+
+    id = AutoField()
+    uid = UUIDField(default=uuid.uuid4, unique=True, index=True)
+    group = ForeignKeyField(
+        Group,
+        backref="orchestration_executions",
+        on_delete="CASCADE",
+        index=True,
+    )
+    orchestration = ForeignKeyField(
+        EventOrchestration,
+        backref="executions",
+        on_delete="CASCADE",
+        index=True,
+    )
+    version = ForeignKeyField(
+        EventOrchestrationVersion,
+        backref="executions",
+        on_delete="RESTRICT",
+        index=True,
+    )
+    source = CharField(max_length=128, null=True, index=True)
+    integration_name = CharField(max_length=255, null=True)
+    event_fingerprint = CharField(max_length=255, null=True, index=True)
+    disposition = CharField(max_length=64, null=True, index=True)
+    matched_rule_count = IntegerField(default=0)
+    duration_ms = IntegerField(null=True)
+    trace_json = JSONTextField(default=dict)
+    # Deliberately retained as scalar IDs: execution history must remain
+    # readable even if an alert or alert group is later removed.
+    alert_id = IntegerField(null=True, index=True)
+    alert_group_id = IntegerField(null=True, index=True)
+    created_at = DateTimeField(default=datetime.utcnow, index=True)
+    expires_at = DateTimeField(null=True, index=True)
+
+    class Meta:
+        table_name = "orchestration_execution"
+        indexes = (
+            (("group", "created_at"), False),
+            (("orchestration", "created_at"), False),
+            (("version", "created_at"), False),
+            (("event_fingerprint", "created_at"), False),
+        )
+
+
+# END EVENT ORCHESTRATION V1 MODELS
