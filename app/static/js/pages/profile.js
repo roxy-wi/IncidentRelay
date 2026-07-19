@@ -38,7 +38,7 @@ function renderProfileHeader(profile) {
     /*
      * Render profile summary header.
      */
-    const title = profile.display_name || profile.username || "Profile";
+    const title = profile.display_name || profile.username || i18n.t("profile.title");
     const metaItems = [];
 
     if (profile.username) {
@@ -50,7 +50,7 @@ function renderProfileHeader(profile) {
 
     $("#profile-avatar").text(getProfileInitials(profile));
     $("#profile-display-title").text(title);
-    $("#profile-display-meta").text(metaItems.join(" · ") || "No contact information");
+    $("#profile-display-meta").text(metaItems.join(" · ") || i18n.t("profile.header.no_contact"));
     renderProfileGroupsSummary(profile.groups || []);
 }
 
@@ -66,13 +66,13 @@ function renderProfileGroupsSummary(groups) {
             $("<span>")
                 .addClass("badge")
                 .addClass("badge-info")
-                .text("No groups")
+                .text(i18n.t("profile.groups.none"))
         );
         return;
     }
 
     groups.forEach(function (membership) {
-        const groupName = membership.group_name || membership.group_slug || ("Group #" + membership.group_id);
+        const groupName = membership.group_name || membership.group_slug || i18n.t("profile.groups.fallback", {id: membership.group_id});
         container.append(
             $("<span>")
                 .addClass("badge")
@@ -92,11 +92,11 @@ function fillProfileGroupSelects(profile) {
     tokenGroupSelect.empty();
     activeGroupSelect.empty();
 
-    tokenGroupSelect.append($("<option>").val("").text("No group limit"));
-    activeGroupSelect.append($("<option>").val("").text("All my groups"));
+    tokenGroupSelect.append($("<option>").val("").text(i18n.t("profile.groups.no_limit")));
+    activeGroupSelect.append($("<option>").val("").text(i18n.t("profile.groups.all")));
 
     (profile.groups || []).forEach(function (membership) {
-        const groupName = membership.group_name || membership.group_slug || ("Group #" + membership.group_id);
+        const groupName = membership.group_name || membership.group_slug || i18n.t("profile.groups.fallback", {id: membership.group_id});
         const label = groupName + " (" + RbacRoles.groupLabel(membership.role) + ")";
         tokenGroupSelect.append(
             $("<option>")
@@ -161,7 +161,7 @@ function saveProfile() {
     /*
      * Save the current user profile.
      */
-    setProfileStatus("#profile-save-status", "Saving...", false);
+    setProfileStatus("#profile-save-status", i18n.t("profile.status.saving"), false);
     apiPut(
         "/api/profile",
         {
@@ -179,7 +179,7 @@ function saveProfile() {
             notify_oncall_shift_start_mattermost: $("#profile-notify-shift-start-mattermost").is(":checked")
         },
         function (profile) {
-            setProfileStatus("#profile-save-status", "Saved", false);
+            setProfileStatus("#profile-save-status", i18n.t("profile.status.saved"), false);
             renderProfileHeader(profile);
             loadProfile();
         }
@@ -190,7 +190,7 @@ function saveProfileShiftNotificationPreferences() {
     /*
      * Save shift notification preferences immediately when a switch changes.
      */
-    setProfileInlineStatus("#profile-shift-notification-status", "Saving...", false);
+    setProfileInlineStatus("#profile-shift-notification-status", i18n.t("profile.status.saving"), false);
 
     apiPut(
         "/api/profile",
@@ -201,13 +201,13 @@ function saveProfileShiftNotificationPreferences() {
         },
         function (profile) {
             currentProfileData = profile;
-            setProfileInlineStatus("#profile-shift-notification-status", "Saved", false);
+            setProfileInlineStatus("#profile-shift-notification-status", i18n.t("profile.status.saved"), false);
             renderProfileHeader(profile);
         },
         function (xhr) {
             setProfileInlineStatus(
                 "#profile-shift-notification-status",
-                getApiErrorMessage(xhr, "Failed to save notification preferences."),
+                getApiErrorMessage(xhr, i18n.t("profile.status.save_notifications_failed")),
                 true
             );
         }
@@ -236,7 +236,7 @@ function renderProfileTokens(tokens) {
                 $("<td>")
                     .attr("colspan", "9")
                     .addClass("empty-table-cell")
-                    .text("No personal API tokens")
+                    .text(i18n.t("profile.tokens.none"))
             )
         );
         return;
@@ -255,17 +255,17 @@ function renderProfileTokenRow(token) {
 
     row.append($("<td>").text(token.name || "-"));
     row.append($("<td>").text(token.token_prefix || "-"));
-    row.append($("<td>").text(token.group_name || token.group_slug || "No group limit"));
+    row.append($("<td>").text(token.group_name || token.group_slug || i18n.t("profile.groups.no_limit")));
     row.append($("<td>").text((token.scopes || []).join(", ") || "-"));
     row.append($("<td>").text(formatDateTime24(token.created_at, { seconds: false })));
-    row.append($("<td>").text(token.expires_at ? formatDateTime24(token.expires_at, { seconds: false }) : "Never"));
-    row.append($("<td>").text(token.last_used_at ? formatDateTime24(token.last_used_at, { seconds: false }) : "Never"));
+    row.append($("<td>").text(token.expires_at ? formatDateTime24(token.expires_at, { seconds: false }) : i18n.t("profile.tokens.never")));
+    row.append($("<td>").text(token.last_used_at ? formatDateTime24(token.last_used_at, { seconds: false }) : i18n.t("profile.tokens.never")));
     row.append(
         $("<td>").append(
             $("<span>")
                 .addClass("badge")
                 .addClass(token.active && !token.expired ? "badge-success" : "badge-muted")
-                .text(token.expired ? "Expired" : (token.active ? "Active" : "Revoked"))
+                .text(token.expired ? i18n.t("profile.tokens.expired") : (token.active ? i18n.t("profile.tokens.active") : i18n.t("profile.tokens.revoked")))
         )
     );
 
@@ -275,7 +275,7 @@ function renderProfileTokenRow(token) {
             $("<button>")
                 .attr("type", "button")
                 .addClass("btn btn-danger btn-small")
-                .text("Revoke")
+                .text(i18n.t("profile.tokens.revoke"))
                 .on("click", function () {
                     revokeProfileToken(token);
                 })
@@ -290,9 +290,9 @@ function revokeProfileToken(token) {
      * Revoke a personal API token.
      */
     showAppConfirm({
-        title: "Revoke this token?",
-        message: "Revoke token \"" + (token.name || token.id) + "\"?",
-        confirmText: "Revoke",
+        title: i18n.t("profile.tokens.revoke_title"),
+        message: i18n.t("profile.tokens.revoke_message", {name: token.name || token.id}),
+        confirmText: i18n.t("profile.tokens.revoke"),
         confirmClass: "btn-danger",
     }).done(function () {
         apiDelete("/api/profile/tokens/" + token.id, function () {
@@ -306,7 +306,7 @@ function resetProfileTokenModal() {
      * Reset token generation modal output.
      */
     lastGeneratedProfileToken = "";
-    $("#profile-token-result").text("No token generated yet.");
+    $("#profile-token-result").text(i18n.t("profile.tokens.none_generated"));
     $("#copy-profile-token").addClass("is-hidden");
     setProfileInlineStatus("#profile-token-status", "", false);
 }
@@ -320,7 +320,7 @@ function createProfileToken() {
     const name = $("#profile-token-name").val().trim() || "personal-api-token";
 
     if (days < 0) {
-        setProfileInlineStatus("#profile-token-status", "Expiration days cannot be negative.", true);
+        setProfileInlineStatus("#profile-token-status", i18n.t("profile.tokens.days_negative"), true);
         return;
     }
 
@@ -336,7 +336,7 @@ function createProfileToken() {
             lastGeneratedProfileToken = data.token || "";
             $("#profile-token-result").text(lastGeneratedProfileToken || JSON.stringify(data, null, 2));
             $("#copy-profile-token").toggleClass("is-hidden", !lastGeneratedProfileToken);
-            setProfileInlineStatus("#profile-token-status", "Token generated", false);
+            setProfileInlineStatus("#profile-token-status", i18n.t("profile.tokens.generated_status"), false);
             loadProfileTokens();
         }
     );
@@ -351,7 +351,7 @@ function copyProfileToken() {
     }
 
     navigator.clipboard.writeText(lastGeneratedProfileToken).then(function () {
-        setProfileInlineStatus("#profile-token-status", "Token copied", false);
+        setProfileInlineStatus("#profile-token-status", i18n.t("profile.tokens.copied"), false);
     });
 }
 
@@ -365,7 +365,7 @@ function changeProfilePassword() {
     if (!oldPassword || !newPassword) {
         setProfileInlineStatus(
             "#profile-password-modal-status",
-            "Old and new password are required.",
+            i18n.t("profile.password.required"),
             true
         );
         return;
@@ -380,8 +380,8 @@ function changeProfilePassword() {
         function () {
             $("#profile-old-password").val("");
             $("#profile-new-password").val("");
-            setProfileInlineStatus("#profile-password-modal-status", "Password changed", false);
-            setProfileInlineStatus("#profile-password-status", "Password changed", false);
+            setProfileInlineStatus("#profile-password-modal-status", i18n.t("profile.password.changed"), false);
+            setProfileInlineStatus("#profile-password-status", i18n.t("profile.password.changed"), false);
             closeAppModal("#profile-password-modal");
         }
     );
@@ -392,7 +392,7 @@ function saveActiveGroup() {
      * Set the active group from the profile page.
      */
     const groupId = $("#profile-active-group").val();
-    setProfileStatus("#profile-active-group-status", "Updating...", false);
+    setProfileStatus("#profile-active-group-status", i18n.t("profile.access.updating"), false);
 
     apiPost(
         "/api/profile/active-group",
@@ -406,7 +406,7 @@ function saveActiveGroup() {
             fillTeamSelect("#global-team-filter", true, function () {
                 navigate(window.location.pathname, false);
             });
-            setProfileStatus("#profile-active-group-status", "Active group updated", false);
+            setProfileStatus("#profile-active-group-status", i18n.t("profile.access.updated"), false);
         }
     );
 }
@@ -475,19 +475,19 @@ function renderProfileOncallSlot(slot) {
         .text(profileOncallDisplayName(
             slot.team_name,
             slot.team_slug,
-            "Team"
+            i18n.t("profile.oncall.team")
         ));
 
     const meta = [
-        slot.rotation_name || ("Rotation #" + slot.rotation_id),
+        slot.rotation_name || i18n.t("profile.oncall.rotation", {id: slot.rotation_id}),
         slot.layer_name || (
             slot.type === "override"
-                ? "Override"
-                : "Layer"
+                ? i18n.t("profile.oncall.override")
+                : i18n.t("profile.oncall.layer")
         ),
-        "Shown in " + displayTimezone,
+        i18n.t("profile.oncall.shown_in", {timezone: displayTimezone}),
         sourceTimezone !== displayTimezone
-            ? "Source " + sourceTimezone
+            ? i18n.t("profile.oncall.source", {timezone: sourceTimezone})
             : null,
     ].filter(Boolean).join(" · ");
 
@@ -541,7 +541,7 @@ function renderProfileOncallStatus(data) {
         status
             .removeClass("profile-oncall-status-idle")
             .addClass("profile-oncall-status-active")
-            .text("You are on-call now");
+            .text(i18n.t("profile.oncall.now"));
 
         current.forEach(function (slot) {
             currentList.append(renderProfileOncallSlot(slot));
@@ -550,14 +550,14 @@ function renderProfileOncallStatus(data) {
         status
             .removeClass("profile-oncall-status-active")
             .addClass("profile-oncall-status-idle")
-            .text("You are not on-call now");
+            .text(i18n.t("profile.oncall.not_now"));
     }
 
     if (!next.length) {
         nextList.append(
             $("<div>")
                 .addClass("profile-oncall-empty")
-                .text("No upcoming shifts in the next " + (data.lookahead_days || 30) + " days.")
+                .text(i18n.t("profile.oncall.no_upcoming", {days: data.lookahead_days || 30}))
         );
         return;
     }
@@ -568,7 +568,7 @@ function renderProfileOncallStatus(data) {
 }
 
 function loadProfileOncallStatus() {
-    $("#profile-oncall-status").text("Loading on-call status...");
+    $("#profile-oncall-status").text(i18n.t("profile.oncall.loading"));
 
     apiGet("/api/profile/oncall?days=30", function (data) {
         renderProfileOncallStatus(data || {});
@@ -616,7 +616,7 @@ function copyProfileField(selector, statusSelector, successMessage) {
     const value = $(selector).val() || "";
 
     if (!value) {
-        setProfileInlineStatus(statusSelector, "Nothing to copy.", true);
+        setProfileInlineStatus(statusSelector, i18n.t("profile.copy.nothing"), true);
         return;
     }
 
@@ -647,7 +647,7 @@ function openCreateCaldavTokenModal() {
     if (!scopes.val() || scopes.val().indexOf("calendar:read") === -1) {
         setProfileInlineStatus(
             "#profile-caldav-status",
-            "calendar:read scope is not available. Add it to the token scope list first.",
+            i18n.t("profile.caldav.scope_missing"),
             true
         );
         return;
@@ -655,7 +655,7 @@ function openCreateCaldavTokenModal() {
 
     setProfileInlineStatus(
         "#profile-token-status",
-        "Calendar token will be created with calendar:read scope.",
+        i18n.t("profile.caldav.token_info"),
         false
     );
 
@@ -665,7 +665,7 @@ $(document).on("click", "#copy-profile-caldav-url", function () {
     copyProfileField(
         "#profile-caldav-url",
         "#profile-caldav-status",
-        "CalDAV URL copied."
+        i18n.t("profile.caldav.url_copied")
     );
 });
 
@@ -673,7 +673,7 @@ $(document).on("click", "#copy-profile-caldav-username", function () {
     copyProfileField(
         "#profile-caldav-username",
         "#profile-caldav-status",
-        "Username copied."
+        i18n.t("profile.caldav.username_copied")
     );
 });
 

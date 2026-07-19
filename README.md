@@ -11,7 +11,7 @@ It provides the core building blocks of an on-call system:
 - access groups and RBAC-style group roles;
 - teams and on-call rotations;
 - alert intake routes with per-route tokens;
-- Alertmanager, Grafana, Zabbix, Sentry, LibreNMS, and generic webhook integrations;
+- Alertmanager, AWS SNS/Cloud watch, Grafana, Zabbix, Sentry, LibreNMS, Datalog, RMON and generic webhook/PagerDuty Event API v2 integrations;
 - Mattermost, Slack, Telegram, Discord, Microsoft Teams, email, webhook, and voice-call notifications;
 - profile-level browser/PWA push notifications;
 - profile notification rules for browser push, email, and voice-call follow-up;
@@ -111,6 +111,7 @@ IncidentRelay includes Swagger/OpenAPI documentation and personal API tokens wit
 | Source          | Endpoint                                   |
 |-----------------|--------------------------------------------|
 | Alertmanager    | `POST /api/integrations/alertmanager`      |
+| Datalog         | `POST /api/integrations/datalog`           |
 | Grafana         | `POST /api/integrations/grafana`           |
 | RMON            | `POST /api/integrations/rmon`              |
 | Zabbix          | `POST /api/integrations/zabbix`            |
@@ -400,8 +401,9 @@ curl -X POST http://127.0.0.1:8080/api/integrations/alertmanager \
 More examples:
 
 - [Alertmanager integration](docs/integrations/alertmanager.md)
-- AWS SNS/Cloud watch [AWS SNS/Cloud watch](integrations/aws-sns-cloudwatch.md)
+- [AWS SNS/Cloud watch](integrations/aws-sns-cloudwatch.md)
 - [Grafana integration](docs/integrations/grafana.md)
+- [Datalog integration](docs/integrations/datadog.md)
 - [RMON integration](docs/integrations/rmon.md)
 - [Sentry integration](docs/integrations/sentry.md)
 - [LibreNMS integration](docs/integrations/librenms.md)

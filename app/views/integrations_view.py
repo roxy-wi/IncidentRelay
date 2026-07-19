@@ -7,6 +7,7 @@ from peewee import DoesNotExist
 from app.api.schemas.integrations import (
     AlertmanagerWebhookSchema,
     AwsSnsEnvelopeSchema,
+    DatadogWebhookSchema,
     GenericWebhookSchema,
     GrafanaWebhookSchema,
     LibreNMSWebhookSchema,
@@ -21,11 +22,15 @@ from app.services.alerts.actions import acknowledge_alert, resolve_alert
 from app.services.alerts.lifecycle import upsert_alert
 from app.services.integrations.auth import require_alert_token
 from app.services.integrations.normalizers.sentry import normalize_sentry
-from app.services.integrations.normalizers.webhook import normalize_webhook
+from app.services.integrations.normalizers.webhook import (
+    is_pagerduty_events_v2,
+    normalize_webhook,
+)
 from app.services.integrations.normalizers.zabbix import normalize_zabbix
 from app.services.integrations.normalizers.alertmanager import normalize_alertmanager
 from app.services.integrations.normalizers.librenms import normalize_librenms
 from app.services.integrations.normalizers.grafana import normalize_grafana
+from app.services.integrations.normalizers.datadog import normalize_datadog
 from app.services.integrations.normalizers.rmon import normalize_rmon
 from app.services.validation import make_error_response, validate_body
 from app.notifiers.voice.loader import create_voice_provider
@@ -70,6 +75,29 @@ def grafana_webhook():
 
     return process_incoming_alerts(
         normalize_grafana(payload.model_dump())
+    )
+
+
+@integrations_bp.route("/datadog", methods=["POST"])
+@require_alert_token()
+def datadog_webhook():
+    """Receive alerts from the Datadog Webhooks integration."""
+
+    intake_route = getattr(request, "current_intake_route", None)
+
+    if intake_route and intake_route.source != "datadog":
+        return make_error_response(
+            error="route_source_mismatch",
+            message="Route source must be datadog.",
+            status_code=400,
+        )
+
+    payload, error = validate_body(DatadogWebhookSchema)
+    if error:
+        return error
+
+    return process_incoming_alerts(
+        normalize_datadog(payload.model_dump(exclude_none=True))
     )
 
 
@@ -236,17 +264,91 @@ def zabbix_webhook():
     return process_incoming_alerts(normalize_zabbix(payload.model_dump()))
 
 
+def _pagerduty_events_success(dedup_key):
+    """Return the standard successful Events API v2 response shape."""
+
+    return jsonify({
+        "status": "success",
+        "message": "Event processed",
+        "dedup_key": dedup_key,
+    }), 202
+
+
+def _process_pagerduty_events_v2(alert_data):
+    """Process one PagerDuty Events API v2-compatible webhook event."""
+
+    action = alert_data.get("lifecycle_action")
+    dedup_key = alert_data.get("dedup_key")
+    intake_route = getattr(request, "current_intake_route", None)
+
+    if not intake_route or intake_route.source != "webhook":
+        return make_error_response(
+            error="route_source_mismatch",
+            message="PagerDuty routing_key must belong to a webhook route.",
+            status_code=400,
+        )
+
+    if action == "trigger":
+        response, status_code = process_incoming_alerts([alert_data])
+
+        if status_code >= 400:
+            return response, status_code
+
+        return _pagerduty_events_success(dedup_key)
+
+    existing_alert = alerts_repo.find_existing_alert(
+        source="webhook",
+        dedup_key=dedup_key,
+        route_id=intake_route.id,
+    )
+
+    if existing_alert and existing_alert.group:
+        group_id = existing_alert.group.id
+
+        if action == "acknowledge":
+            acknowledge_alert(group_id)
+        elif action == "resolve":
+            resolve_alert(group_id)
+
+    logging.getLogger("oncall.alerts").info(
+        "PagerDuty Events API v2 lifecycle event processed",
+        extra={
+            "extra": {
+                "event_type": "pagerduty_events_api_v2",
+                "event_action": action,
+                "dedup_key": dedup_key,
+                "route_id": intake_route.id,
+                "matched_alert_id": existing_alert.id if existing_alert else None,
+                "matched_group_id": (
+                    existing_alert.group.id
+                    if existing_alert and existing_alert.group
+                    else None
+                ),
+            }
+        },
+    )
+
+    # PagerDuty accepts follow-up events asynchronously. Keep unknown or
+    # already-resolved dedup keys as successful no-ops for compatibility.
+    return _pagerduty_events_success(dedup_key)
+
+
 @integrations_bp.route("/webhook", methods=["POST"])
-@require_alert_token()
+@require_alert_token(allow_json_routing_key=True)
 def generic_webhook():
-    """
-    Receive alerts from a generic webhook.
-    """
+    """Receive generic or PagerDuty Events API v2-compatible alerts."""
 
     payload, error = validate_body(GenericWebhookSchema)
     if error:
         return error
-    return process_incoming_alerts(normalize_webhook(payload.model_dump()))
+
+    raw_payload = payload.model_dump()
+    normalized_alerts = normalize_webhook(raw_payload)
+
+    if is_pagerduty_events_v2(raw_payload):
+        return _process_pagerduty_events_v2(normalized_alerts[0])
+
+    return process_incoming_alerts(normalized_alerts)
 
 
 @integrations_bp.route("/sentry/<int:route_id>", methods=["POST"])

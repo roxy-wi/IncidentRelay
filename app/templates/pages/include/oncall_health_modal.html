@@ -7,7 +7,7 @@
     <div class="app-modal-card app-modal-wide">
         <div class="app-modal-header">
             <div>
-                <h2 id="rotation-health-title">On-call health</h2>
+                <h2 id="rotation-health-title">{{ _('oncall_health.title.rotation') }}</h2>
                 <p id="rotation-health-subtitle" class="muted"></p>
             </div>
 
@@ -15,7 +15,7 @@
                 type="button"
                 class="modal-close"
                 onclick="closeAppModal('#rotation-health-modal')"
-                aria-label="Close"
+                aria-label="{{ _('oncall_health.close') }}"
             >
                 ×
             </button>
@@ -41,7 +41,7 @@
                 class="btn"
                 onclick="closeAppModal('#rotation-health-modal')"
             >
-                Close
+                {{ _('oncall_health.close') }}
             </button>
         </div>
     </div>

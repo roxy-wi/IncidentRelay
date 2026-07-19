@@ -47,6 +47,7 @@ class JsonFormatter(logging.Formatter):
 LOG_ROLE_APP = "app"
 LOG_ROLE_SCHEDULER = "scheduler"
 LOG_ROLE_TELEGRAM = "telegram"
+LOG_ROLE_SLACK = "slack"
 
 
 class EventOnlyFilter(logging.Filter):
@@ -67,6 +68,8 @@ class EventOnlyFilter(logging.Filter):
             if self.log_role == LOG_ROLE_APP and record.name in {
                 "oncall.scheduler",
                 "oncall.telegram",
+                "oncall.slack",
+                "oncall.slack.socket",
             }:
                 return False
 
@@ -95,6 +98,9 @@ def _normalize_log_role(log_role=None):
     if value in {"telegram", "telegram-worker", "telegram_worker"}:
         return LOG_ROLE_TELEGRAM
 
+    if value in {"slack", "slack-worker", "slack_worker", "socket-mode"}:
+        return LOG_ROLE_SLACK
+
     return LOG_ROLE_APP
 
 
@@ -105,6 +111,9 @@ def _log_file_for_role(log_role):
 
     if log_role == LOG_ROLE_TELEGRAM:
         return Config.LOG_TELEGRAM_WORKER_FILE
+
+    if log_role == LOG_ROLE_SLACK:
+        return Config.LOG_SLACK_WORKER_FILE
 
     return Config.LOG_APP_FILE
 
@@ -129,6 +138,13 @@ def _allowed_loggers_for_role(log_role):
     if log_role == LOG_ROLE_TELEGRAM:
         return {
             "oncall.telegram",
+            "oncall.error",
+        }
+
+    if log_role == LOG_ROLE_SLACK:
+        return {
+            "oncall.slack",
+            "oncall.slack.socket",
             "oncall.error",
         }
 

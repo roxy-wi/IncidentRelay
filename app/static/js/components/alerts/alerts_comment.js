@@ -8,7 +8,7 @@ function loadAlertComments(groupId) {
     list.empty().append(
         $("<div>")
             .addClass("help-text")
-            .text("Loading comments...")
+            .text(i18n.t("alert_details.loading.comments"))
     );
 
     apiGet("/api/alerts/" + groupId + "/comments", function (comments) {
@@ -19,7 +19,7 @@ function loadAlertComments(groupId) {
             list.append(
                 $("<div>")
                     .addClass("alert-comments-empty")
-                    .text("No comments yet.")
+                    .text(i18n.t("alert_details.comments.empty"))
             );
             return;
         }
@@ -36,7 +36,7 @@ function renderAlertComment(comment) {
         user.display_name ||
         user.username ||
         user.email ||
-        "Unknown user"
+        i18n.t("alert_details.comments.unknown_user")
     );
 
     const article = $("<article>")
@@ -48,7 +48,7 @@ function renderAlertComment(comment) {
         .append($("<strong>").text(author));
 
     const timeText = comment.edited
-        ? formatDateTimeMinutes(comment.created_at) + " · edited " + formatDateTimeMinutes(comment.updated_at)
+        ? formatDateTimeMinutes(comment.created_at) + " · " + i18n.t("alert_details.comments.edited") + " " + formatDateTimeMinutes(comment.updated_at)
         : formatDateTimeMinutes(comment.created_at);
 
     meta.append($("<span>").text(timeText));
@@ -77,12 +77,12 @@ $(document)
         const body = textarea.val() || "";
 
         if (!groupId) {
-            showAppError("Alert group id is missing.");
+            showAppError(i18n.t("alert_details.comments.group_missing"));
             return;
         }
 
         if (!body.trim()) {
-            showAppError("Comment cannot be empty.", "Validation error");
+            showAppError(i18n.t("alert_details.comments.empty_error"), i18n.t("alert_details.validation_error"));
             return;
         }
 
@@ -136,13 +136,13 @@ function renderAlertCommentActions(comment) {
             $("<button>")
                 .attr("type", "button")
                 .addClass("btn btn-secondary btn-small alert-comment-edit")
-                .text("Edit")
+                .text(i18n.t("alert_details.actions.edit"))
         )
         .append(
             $("<button>")
                 .attr("type", "button")
                 .addClass("btn btn-danger btn-small alert-comment-delete")
-                .text("Delete")
+                .text(i18n.t("alert_details.actions.delete"))
         );
 }
 function startEditAlertComment(article) {
@@ -167,14 +167,14 @@ function startEditAlertComment(article) {
             $("<button>")
                 .attr("type", "button")
                 .addClass("btn btn-primary btn-small alert-comment-save")
-                .text("Save")
+                .text(i18n.t("alert_details.actions.save"))
         )
         .append(
             $("<button>")
                 .attr("type", "button")
                 .addClass("btn btn-secondary btn-small alert-comment-cancel")
                 .attr("data-original-body", currentBody)
-                .text("Cancel")
+                .text(i18n.t("alert_details.actions.cancel"))
         );
 }
 
@@ -195,23 +195,23 @@ function cancelEditAlertComment(article) {
             $("<button>")
                 .attr("type", "button")
                 .addClass("btn btn-secondary btn-small alert-comment-edit")
-                .text("Edit")
+                .text(i18n.t("alert_details.actions.edit"))
         )
         .append(
             $("<button>")
                 .attr("type", "button")
                 .addClass("btn btn-danger btn-small alert-comment-delete")
-                .text("Delete")
+                .text(i18n.t("alert_details.actions.delete"))
         );
 }
 function confirmDeleteAlertComment(onConfirm) {
     if (typeof showAppDialog === "function") {
         showAppDialog({
             type: "warning",
-            title: "Delete comment",
-            message: "Delete this comment?",
-            confirmText: "Delete",
-            cancelText: "Cancel"
+            title: i18n.t("alert_details.comments.delete_title"),
+            message: i18n.t("alert_details.comments.delete_message"),
+            confirmText: i18n.t("alert_details.actions.delete"),
+            cancelText: i18n.t("alert_details.actions.cancel")
         }).done(function () {
             onConfirm();
         });
@@ -219,7 +219,7 @@ function confirmDeleteAlertComment(onConfirm) {
         return;
     }
 
-    if (window.confirm("Delete this comment?")) {
+    if (window.confirm(i18n.t("alert_details.comments.delete_message"))) {
         onConfirm();
     }
 }
@@ -260,12 +260,12 @@ $(document)
         const body = textarea.val() || "";
 
         if (!groupId || !commentId) {
-            showAppError("Comment id or alert group id is missing.");
+            showAppError(i18n.t("alert_details.comments.id_missing"));
             return;
         }
 
         if (!body.trim()) {
-            showAppError("Comment cannot be empty.", "Validation error");
+            showAppError(i18n.t("alert_details.comments.empty_error"), i18n.t("alert_details.validation_error"));
             return;
         }
 
@@ -289,7 +289,7 @@ $(document)
         const groupId = $("#alert-comment-form").attr("data-group-id") || currentDetailsAlertId;
 
         if (!groupId || !commentId) {
-            showAppError("Comment id or alert group id is missing.");
+            showAppError(i18n.t("alert_details.comments.id_missing"));
             return;
         }
 

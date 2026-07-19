@@ -5,36 +5,36 @@
     <div class="summary-card summary-primary">
       <div class="summary-icon">T</div>
       <div>
-        <div class="summary-title">Visible teams</div>
+        <div class="summary-title">{{ _("calendar.summary.visible_teams") }}</div>
         <div id="calendar-summary-teams" class="summary-value">0</div>
-        <div class="summary-hint">Current calendar scope</div>
+        <div class="summary-hint">{{ _("calendar.summary.current_scope") }}</div>
       </div>
     </div>
 
     <div class="summary-card summary-success">
       <div class="summary-icon">✓</div>
       <div>
-        <div class="summary-title">People on call</div>
+        <div class="summary-title">{{ _("calendar.summary.people_on_call") }}</div>
         <div id="calendar-summary-users" class="summary-value">0</div>
-        <div class="summary-hint">Unique users in range</div>
+        <div class="summary-hint">{{ _("calendar.summary.unique_users") }}</div>
       </div>
     </div>
 
     <div class="summary-card summary-info">
       <div class="summary-icon">↻</div>
       <div>
-        <div class="summary-title">Assignments</div>
+        <div class="summary-title">{{ _("calendar.summary.assignments") }}</div>
         <div id="calendar-summary-assignments" class="summary-value">0</div>
-        <div class="summary-hint">Scheduled shifts</div>
+        <div class="summary-hint">{{ _("calendar.summary.scheduled_shifts") }}</div>
       </div>
     </div>
 
     <div class="summary-card summary-muted">
       <div class="summary-icon">⌁</div>
       <div>
-        <div class="summary-title">Overrides</div>
+        <div class="summary-title">{{ _("calendar.summary.overrides") }}</div>
         <div id="calendar-summary-overrides" class="summary-value">0</div>
-        <div class="summary-hint">Manual changes</div>
+        <div class="summary-hint">{{ _("calendar.summary.manual_changes") }}</div>
       </div>
     </div>
   </div>
@@ -43,31 +43,31 @@
     <section class="card page-layout-main">
       <div class="card-header">
         <div>
-          <h2>On-call calendar</h2>
+          <h2>{{ _("calendar.title") }}</h2>
           <div id="calendar-range-title" class="card-subtitle">
-            Current week
+            {{ _("calendar.current_week") }}
           </div>
         </div>
 
         <div class="card-header-actions">
           <button id="calendar-today" type="button" class="btn">
-            Today
+            {{ _("calendar.actions.today") }}
           </button>
 
-          <button id="calendar-prev" type="button" class="btn btn-icon" aria-label="Previous">
+          <button id="calendar-prev" type="button" class="btn btn-icon" aria-label="{{ _("calendar.actions.previous") }}">
             ‹
           </button>
 
-          <button id="calendar-next" type="button" class="btn btn-icon" aria-label="Next">
+          <button id="calendar-next" type="button" class="btn btn-icon" aria-label="{{ _("calendar.actions.next") }}">
             ›
           </button>
 
             <button id="calendar-export" type="button" class="btn btn-secondary is-hidden">
-                Export
+                {{ _("calendar.actions.export") }}
             </button>
 
           <button id="reload-calendar" type="button" class="btn btn-primary">
-            Reload
+            {{ _("calendar.actions.reload") }}
           </button>
         </div>
       </div>
@@ -79,7 +79,7 @@
             id="calendar-search"
             class="input"
             type="search"
-            placeholder="Search user, team or rotation..."
+            placeholder="{{ _("calendar.search.placeholder") }}"
             autocomplete="off"
           >
         </div>
@@ -87,17 +87,20 @@
             id="calendar-rotation-filter"
             class="input filter-select"
             style="display: none;"
+            aria-label="{{ _('calendar.filters.rotation') }}"
         ></select>
         <input
           id="calendar-start"
           class="input page-toolbar-filter"
           type="date"
+          aria-label="{{ _('calendar.filters.start_date') }}"
         >
 
         <input
           id="calendar-end"
           class="input page-toolbar-filter"
           type="date"
+          aria-label="{{ _('calendar.filters.end_date') }}"
         >
       </div>
 
@@ -112,16 +115,16 @@
     <aside class="card page-details-card">
       <div class="card-header">
         <div>
-          <h2>Shift details</h2>
+          <h2>{{ _("calendar.details.title") }}</h2>
           <div id="calendar-details-subtitle" class="card-subtitle">
-            Select an assignment
+            {{ _("calendar.details.select_assignment") }}
           </div>
         </div>
       </div>
 
       <div id="calendar-details-body" class="details-body">
         <div class="details-empty">
-          Click any shift in the calendar to see user, team, rotation and time range.
+          {{ _("calendar.details.empty") }}
         </div>
       </div>
     </aside>
@@ -130,18 +133,23 @@
     <div class="app-modal-dialog">
         <div class="app-modal-header">
             <div>
-                <h2>Export calendar</h2>
+                <h2>{{ _("calendar.export.title") }}</h2>
                 <p class="card-subtitle">
-                    Create an Outlook-compatible ICS subscription URL for this team's on-call calendar.
+                    {{ _("calendar.export.description") }}
                 </p>
             </div>
-            <button id="close-calendar-export-modal" class="modal-close" type="button">×</button>
+            <button
+                id="close-calendar-export-modal"
+                class="modal-close"
+                type="button"
+                aria-label="{{ _('common.close') }}"
+            >×</button>
         </div>
 
         <div class="app-modal-body">
             <div class="copy-fields">
                 <div class="copy-field">
-                    <label for="calendar-export-url">ICS subscription URL</label>
+                    <label for="calendar-export-url">{{ _("calendar.export.url") }}</label>
                     <input
                         id="calendar-export-url"
                         class="input copy-field-control"
@@ -149,8 +157,7 @@
                         readonly
                     >
                     <div class="help-text">
-                        Use this URL in Outlook: Calendar → Add calendar → Subscribe from web.
-                        Anyone with this URL can view this team's on-call schedule.
+                        {{ _("calendar.export.help") }}
                     </div>
                 </div>
             </div>
@@ -160,16 +167,16 @@
 
         <div class="app-modal-footer">
             <button id="create-calendar-export-feed" class="btn btn-secondary" type="button">
-                Create URL
+                {{ _("calendar.export.create_url") }}
             </button>
             <button id="copy-calendar-export-url" class="btn btn-secondary" type="button">
-                Copy URL
+                {{ _("calendar.export.copy_url") }}
             </button>
             <button id="regenerate-calendar-export-url" class="btn btn-danger" type="button">
-                Regenerate
+                {{ _("calendar.export.regenerate") }}
             </button>
             <button id="close-calendar-export-modal-footer" class="btn btn-primary" type="button">
-                Close
+                {{ _("common.close") }}
             </button>
         </div>
     </div>

@@ -3,36 +3,36 @@
     <div class="summary-card summary-primary">
       <div class="summary-icon">#</div>
       <div>
-        <div class="summary-title">Channels</div>
+        <div class="summary-title">{{ _('channels.summary.channels') }}</div>
         <div id="channels-summary-total" class="summary-value">0</div>
-        <div class="summary-hint">Notification targets</div>
+        <div class="summary-hint">{{ _('channels.summary.channels_hint') }}</div>
       </div>
     </div>
 
     <div class="summary-card summary-success">
       <div class="summary-icon">✓</div>
       <div>
-        <div class="summary-title">Enabled</div>
+        <div class="summary-title">{{ _('channels.summary.enabled') }}</div>
         <div id="channels-summary-enabled" class="summary-value">0</div>
-        <div class="summary-hint">Ready to deliver</div>
+        <div class="summary-hint">{{ _('channels.summary.enabled_hint') }}</div>
       </div>
     </div>
 
     <div class="summary-card summary-muted">
       <div class="summary-icon">×</div>
       <div>
-        <div class="summary-title">Disabled</div>
+        <div class="summary-title">{{ _('channels.summary.disabled') }}</div>
         <div id="channels-summary-disabled" class="summary-value">0</div>
-        <div class="summary-hint">Muted targets</div>
+        <div class="summary-hint">{{ _('channels.summary.disabled_hint') }}</div>
       </div>
     </div>
 
     <div class="summary-card summary-info">
       <div class="summary-icon">☎</div>
       <div>
-        <div class="summary-title">Webhook channels</div>
+        <div class="summary-title">{{ _('channels.summary.webhooks') }}</div>
         <span id="channels-summary-webhooks">0</span>
-        <div class="summary-hint">External delivery targets</div>
+        <div class="summary-hint">{{ _('channels.summary.webhooks_hint') }}</div>
       </div>
     </div>
   </div>
@@ -41,20 +41,20 @@
     <section class="card page-layout-main">
       <div class="card-header">
         <div>
-          <h2>Notification channels</h2>
+          <h2>{{ _('channels.list.title') }}</h2>
           <div class="card-subtitle">
-            Showing <span id="channels-filtered-count">0</span>
-            of <span id="channels-total-count">0</span> channels
+            {{ _('channels.list.showing') }} <span id="channels-filtered-count">0</span>
+            {{ _('channels.list.of') }} <span id="channels-total-count">0</span> {{ _('channels.list.channels') }}
           </div>
         </div>
 
         <div class="card-header-actions">
           <button id="open-channel-create-modal" type="button" class="btn btn-primary">
-            New channel
+            {{ _('channels.actions.new') }}
           </button>
 
           <button id="reload-channels" type="button" class="btn">
-            Reload
+            {{ _('channels.actions.reload') }}
           </button>
         </div>
       </div>
@@ -66,19 +66,19 @@
             id="channels-search"
             class="input"
             type="search"
-            placeholder="Search channels..."
+            placeholder="{{ _('channels.search.placeholder') }}"
             autocomplete="off"
           >
         </div>
 
         <select id="channels-type-filter" class="input page-toolbar-filter">
-          <option value="">All types</option>
+          <option value="">{{ _('channels.filters.all_types') }}</option>
         </select>
 
         <select id="channels-status-filter" class="input page-toolbar-filter">
-          <option value="">All statuses</option>
-          <option value="enabled">Enabled</option>
-          <option value="disabled">Disabled</option>
+          <option value="">{{ _('channels.filters.all_statuses') }}</option>
+          <option value="enabled">{{ _('channels.status.enabled') }}</option>
+          <option value="disabled">{{ _('channels.status.disabled') }}</option>
         </select>
       </div>
 
@@ -86,19 +86,19 @@
         <table class="data-table">
           <thead>
             <tr>
-              <th>Channel</th>
-              <th>Group</th>
-              <th>Team</th>
-              <th>Type</th>
-              <th>Mode</th>
-              <th>Status</th>
-              <th class="actions-th">Actions</th>
+              <th>{{ _('channels.table.channel') }}</th>
+              <th>{{ _('channels.table.group') }}</th>
+              <th>{{ _('channels.table.team') }}</th>
+              <th>{{ _('channels.table.type') }}</th>
+              <th>{{ _('channels.table.mode') }}</th>
+              <th>{{ _('channels.table.status') }}</th>
+              <th class="actions-th">{{ _('channels.table.actions') }}</th>
             </tr>
           </thead>
 
           <tbody id="channels-table">
             <tr>
-              <td colspan="7" class="empty-cell">No channels loaded</td>
+              <td colspan="7" class="empty-cell">{{ _('channels.empty.loaded') }}</td>
             </tr>
           </tbody>
         </table>
@@ -108,16 +108,16 @@
     <aside class="card page-details-card">
       <div class="card-header">
         <div>
-          <h2>Channel details</h2>
+          <h2>{{ _('channels.details.title') }}</h2>
           <div id="channel-details-subtitle" class="card-subtitle">
-            Select a channel
+            {{ _('channels.details.select') }}
           </div>
         </div>
       </div>
 
       <div id="channel-details-body" class="details-body">
         <div class="details-empty">
-          Click a channel name to inspect delivery type, team binding and safe configuration summary.
+          {{ _('channels.details.select_help') }}
         </div>
       </div>
     </aside>
@@ -127,9 +127,9 @@
     <div class="app-modal-dialog app-modal-dialog-wide">
       <div class="app-modal-header">
         <div>
-          <h2 id="channel-form-title">Create channel</h2>
+          <h2 id="channel-form-title">{{ _('channels.form.create') }}</h2>
           <div class="card-subtitle">
-            Configure where IncidentRelay sends notifications.
+            {{ _('channels.form.subtitle') }}
           </div>
         </div>
 
@@ -137,7 +137,7 @@
           id="close-channel-form-modal"
           type="button"
           class="app-modal-close"
-          aria-label="Close"
+          aria-label="{{ _('channels.actions.close') }}"
         >
           ×
         </button>
@@ -148,9 +148,9 @@
           <section class="card">
             <div class="card-header">
               <div>
-                <h2>Channel</h2>
+                <h2>{{ _('channels.form.channel') }}</h2>
                 <div class="card-subtitle">
-                  Scope, name, type and enabled state.
+                  {{ _('channels.form.channel_help') }}
                 </div>
               </div>
             </div>
@@ -158,66 +158,66 @@
             <div class="form-body">
               <input id="channel-id" type="hidden">
 
-              <label for="channel-group">Group</label>
+              <label for="channel-group">{{ _('channels.form.group') }}</label>
               <select id="channel-group" class="input"></select>
 
-              <label for="channel-team">Team</label>
+              <label for="channel-team">{{ _('channels.form.team') }}</label>
               <select id="channel-team" class="input"></select>
 
-              <label for="channel-name">Name</label>
+              <label for="channel-name">{{ _('channels.form.name') }}</label>
               <input
                 id="channel-name"
                 class="input"
                 type="text"
-                placeholder="Telegram primary"
+                placeholder="{{ _('channels.form.name_placeholder') }}"
                 autocomplete="off"
               >
 
-              <label for="channel-type">Type</label>
+              <label for="channel-type">{{ _('channels.form.type') }}</label>
               <select id="channel-type" class="input"></select>
 
               <div>
-                <label>Notify on severities</label>
+                <label>{{ _('channels.form.notify_severities') }}</label>
                 <div class="checkbox-grid">
                   <label class="md-checkbox">
                     <input class="cfg-channel-severity" type="checkbox" name="notify_on_severities" value="critical">
-                    <span>Critical</span>
+                    <span>{{ _('channels.severity.critical') }}</span>
                   </label>
 
                   <label class="md-checkbox">
                     <input class="cfg-channel-severity" type="checkbox" name="notify_on_severities" value="high">
-                    <span>High</span>
+                    <span>{{ _('channels.severity.high') }}</span>
                   </label>
 
                   <label class="md-checkbox">
                     <input class="cfg-channel-severity" type="checkbox" name="notify_on_severities" value="medium">
-                    <span>Medium</span>
+                    <span>{{ _('channels.severity.medium') }}</span>
                   </label>
 
                   <label class="md-checkbox">
                     <input class="cfg-channel-severity" type="checkbox" name="notify_on_severities" value="warning">
-                    <span>Warning</span>
+                    <span>{{ _('channels.severity.warning') }}</span>
                   </label>
 
                   <label class="md-checkbox">
                     <input class="cfg-channel-severity" type="checkbox" name="notify_on_severities" value="low">
-                    <span>Low</span>
+                    <span>{{ _('channels.severity.low') }}</span>
                   </label>
 
                   <label class="md-checkbox">
                     <input class="cfg-channel-severity" type="checkbox" name="notify_on_severities" value="info">
-                    <span>Info</span>
+                    <span>{{ _('channels.severity.info') }}</span>
                   </label>
                 </div>
               </div>
 
               <label class="md-checkbox">
                 <input id="channel-enabled" type="checkbox" checked>
-                <span>Enabled</span>
+                <span>{{ _('channels.form.enabled') }}</span>
               </label>
 
               <div class="help-text">
-                Enabled channels can be used by routes and notification delivery.
+                {{ _('channels.form.enabled_help') }}
               </div>
             </div>
           </section>
@@ -225,9 +225,9 @@
           <section class="card">
             <div class="card-header">
               <div>
-                <h2>Delivery config</h2>
+                <h2>{{ _('channels.form.delivery') }}</h2>
                 <div class="card-subtitle">
-                  Visible fields are merged into advanced JSON config.
+                  {{ _('channels.form.delivery_help') }}
                 </div>
               </div>
             </div>
@@ -235,7 +235,7 @@
             <div class="form-body">
               <div class="channel-config" data-channel-config="telegram">
                 <div class="form-section">
-                  <label for="cfg-telegram-bot-token">Telegram bot token</label>
+                  <label for="cfg-telegram-bot-token">{{ _('channels.telegram.bot_token') }}</label>
                   <input
                     id="cfg-telegram-bot-token"
                     class="input"
@@ -244,7 +244,7 @@
                     placeholder="123456:ABC..."
                   >
 
-                  <label for="cfg-telegram-chat-id">Telegram chat ID</label>
+                  <label for="cfg-telegram-chat-id">{{ _('channels.telegram.chat_id') }}</label>
                   <input
                     id="cfg-telegram-chat-id"
                     class="input"
@@ -257,15 +257,15 @@
 
               <div class="channel-config" data-channel-config="mattermost">
                 <div class="form-section">
-                  <label for="cfg-mm-mode">Mattermost mode</label>
+                  <label for="cfg-mm-mode">{{ _('channels.mattermost.mode') }}</label>
                   <select id="cfg-mm-mode" class="input">
-                    <option value="bot_api">Bot API with buttons and message updates</option>
-                    <option value="webhook">Incoming webhook only</option>
+                    <option value="bot_api">{{ _('channels.mattermost.bot_api_option') }}</option>
+                    <option value="webhook">{{ _('channels.mattermost.webhook_option') }}</option>
                   </select>
 
                   <div id="cfg-mm-bot-fields">
                     <div class="form-section">
-                      <label for="cfg-mm-api-url">Mattermost URL</label>
+                      <label for="cfg-mm-api-url">{{ _('channels.mattermost.url') }}</label>
                       <input
                         id="cfg-mm-api-url"
                         class="input"
@@ -273,7 +273,7 @@
                         placeholder="https://mattermost.example.com"
                       >
 
-                      <label for="cfg-mm-bot-token">Bot token</label>
+                      <label for="cfg-mm-bot-token">{{ _('channels.mattermost.bot_token') }}</label>
                       <input
                         id="cfg-mm-bot-token"
                         class="input"
@@ -281,7 +281,7 @@
                         autocomplete="off"
                       >
 
-                      <label for="cfg-mm-channel-id">Channel ID</label>
+                      <label for="cfg-mm-channel-id">{{ _('channels.mattermost.channel_id') }}</label>
                       <input
                         id="cfg-mm-channel-id"
                         class="input"
@@ -289,7 +289,7 @@
                         autocomplete="off"
                       >
 
-                      <label for="cfg-mm-callback-secret">Callback secret</label>
+                      <label for="cfg-mm-callback-secret">{{ _('channels.mattermost.callback_secret') }}</label>
                       <input
                         id="cfg-mm-callback-secret"
                         class="input"
@@ -301,7 +301,7 @@
 
                   <div id="cfg-mm-webhook-fields">
                     <div class="form-section">
-                      <label for="cfg-mm-webhook-url">Mattermost incoming webhook URL</label>
+                      <label for="cfg-mm-webhook-url">{{ _('channels.mattermost.webhook_url') }}</label>
                       <input
                         id="cfg-mm-webhook-url"
                         class="input"
@@ -312,7 +312,7 @@
                   </div>
 
                   <div class="help-text">
-                    Bot API mode supports Acknowledge and Resolve buttons. Incoming webhook mode sends plain messages only.
+                    {{ _('channels.mattermost.help') }}
                   </div>
                 </div>
               </div>
@@ -321,29 +321,27 @@
                     <div class="form-section">
                         <div class="form-section-header">
                             <div>
-                                <div class="form-section-title">Slack connection</div>
+                                <div class="form-section-title">{{ _('channels.slack.connection') }}</div>
                                 <div class="form-section-description">
-                                    Use a Slack bot to update alert messages after acknowledgment
-                                    or resolution, or use a simple incoming webhook.
+                                    {{ _('channels.slack.connection_help') }}
                                 </div>
                             </div>
                         </div>
 
                         <div class="form-grid">
                             <div class="form-field form-field-full">
-                                <label for="cfg-slack-mode">Connection mode</label>
+                                <label for="cfg-slack-mode">{{ _('channels.slack.mode') }}</label>
                                 <select id="cfg-slack-mode" class="input">
                                     <option value="bot_api">
-                                        Bot API
+                                        {{ _('channels.slack.bot_api') }}
                                     </option>
                                     <option value="webhook">
-                                        Incoming webhook
+                                        {{ _('channels.slack.webhook') }}
                                     </option>
                                 </select>
 
                                 <div class="field-help">
-                                    Bot API supports sending and updating messages.
-                                    Incoming webhook supports sending only.
+                                    {{ _('channels.slack.mode_help') }}
                                 </div>
                             </div>
                         </div>
@@ -352,7 +350,7 @@
                             <div class="form-grid">
                                 <div class="form-field form-field-full">
                                     <label for="cfg-slack-bot-token">
-                                        Bot token
+                                        {{ _('channels.slack.bot_token') }}
                                     </label>
                                     <input
                                         id="cfg-slack-bot-token"
@@ -362,13 +360,13 @@
                                         placeholder="xoxb-..."
                                     >
                                     <div class="field-help">
-                                        Slack bot token with the chat:write permission.
+                                        {{ _('channels.slack.bot_token_help') }}
                                     </div>
                                 </div>
 
                                 <div class="form-field form-field-full">
                                     <label for="cfg-slack-channel-id">
-                                        Channel ID
+                                        {{ _('channels.slack.channel_id') }}
                                     </label>
                                     <input
                                         id="cfg-slack-channel-id"
@@ -377,7 +375,62 @@
                                         placeholder="C0123456789"
                                     >
                                     <div class="field-help">
-                                        Use the Slack channel ID, not its display name.
+                                        {{ _('channels.slack.channel_id_help') }}
+                                    </div>
+                                </div>
+
+                                <div class="form-field form-field-full">
+                                    <label for="cfg-slack-connection-mode">
+                                        {{ _('channels.slack.action_connection') }}
+                                    </label>
+                                    <select id="cfg-slack-connection-mode" class="input">
+                                        <option value="http">
+                                            {{ _('channels.slack.http_mode') }}
+                                        </option>
+                                        <option value="socket_mode">
+                                            {{ _('channels.slack.socket_mode') }}
+                                        </option>
+                                    </select>
+                                    <div class="field-help">
+                                        {{ _('channels.slack.action_connection_help') }}
+                                    </div>
+                                </div>
+
+                                <div
+                                    id="cfg-slack-http-action-fields"
+                                    class="form-field form-field-full"
+                                >
+                                    <label for="cfg-slack-signing-secret">
+                                        {{ _('channels.slack.signing_secret') }}
+                                    </label>
+                                    <input
+                                        id="cfg-slack-signing-secret"
+                                        class="input"
+                                        type="password"
+                                        autocomplete="new-password"
+                                    >
+                                    <div class="field-help">
+                                        {{ _('channels.slack.signing_secret_help') }}
+                                    </div>
+                                </div>
+
+                                <div
+                                    id="cfg-slack-socket-action-fields"
+                                    class="form-field form-field-full"
+                                    style="display: none;"
+                                >
+                                    <label for="cfg-slack-app-token">
+                                        {{ _('channels.slack.app_token') }}
+                                    </label>
+                                    <input
+                                        id="cfg-slack-app-token"
+                                        class="input"
+                                        type="password"
+                                        autocomplete="new-password"
+                                        placeholder="xapp-..."
+                                    >
+                                    <div class="field-help">
+                                        {{ _('channels.slack.app_token_help') }}
                                     </div>
                                 </div>
                             </div>
@@ -387,7 +440,7 @@
                             <div class="form-grid">
                                 <div class="form-field form-field-full">
                                     <label for="cfg-slack-webhook-url">
-                                        Incoming webhook URL
+                                        {{ _('channels.slack.webhook_url') }}
                                     </label>
                                     <input
                                         id="cfg-slack-webhook-url"
@@ -403,7 +456,7 @@
 
               <div class="channel-config" data-channel-config="webhook">
                 <div class="form-section">
-                  <label id="cfg-webhook-label" for="cfg-webhook-url">Webhook URL</label>
+                  <label id="cfg-webhook-label" for="cfg-webhook-url">{{ _('channels.webhook.url') }}</label>
                   <input
                     id="cfg-webhook-url"
                     class="input"
@@ -422,7 +475,7 @@
                 
               <div class="form-divider"></div>
 
-              <label for="channel-config-json">Advanced JSON config</label>
+              <label for="channel-config-json">{{ _('channels.form.advanced') }}</label>
 
               <div class="json-editor">
                 <div class="json-editor-header">
@@ -433,7 +486,7 @@
                     type="button"
                     class="btn btn-small"
                   >
-                    Format
+                    {{ _('channels.actions.format') }}
                   </button>
                 </div>
 
@@ -446,7 +499,7 @@
               </div>
 
               <div class="help-text">
-                Optional raw JSON config. Values from the visible fields are merged into this config on save.
+                {{ _('channels.form.advanced_help') }}
               </div>
             </div>
           </section>
@@ -455,11 +508,11 @@
 
       <div class="app-modal-footer">
         <button id="reset-channel-form" type="button" class="btn">
-          Reset
+          {{ _('channels.actions.reset') }}
         </button>
 
         <button id="save-channel" type="button" class="btn btn-primary">
-          Save channel
+          {{ _('channels.actions.save') }}
         </button>
       </div>
     </div>

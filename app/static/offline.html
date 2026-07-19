@@ -2,7 +2,7 @@
 <html lang="en">
 <head>
     <meta charset="utf-8">
-    <title>IncidentRelay offline</title>
+    <title id="offline-title">IncidentRelay offline</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#1570ef">
     <style>
@@ -79,15 +79,64 @@
         IncidentRelay
     </div>
 
-    <h1>You are offline</h1>
-    <p>
+    <h1 id="offline-heading">You are offline</h1>
+    <p id="offline-description">
         IncidentRelay needs a network connection to show current alerts,
         rotations and service impact. Check your connection and try again.
     </p>
 
-    <button type="button" onclick="window.location.reload()">
+    <button id="offline-retry" type="button" onclick="window.location.reload()">
         Retry
     </button>
 </main>
+<script>
+(function () {
+    const messages = {
+        en: {
+            title: "IncidentRelay offline",
+            heading: "You are offline",
+            description: "IncidentRelay needs a network connection to show current alerts, rotations and service impact. Check your connection and try again.",
+            retry: "Retry"
+        },
+        ru: {
+            title: "IncidentRelay — нет подключения",
+            heading: "Нет подключения к сети",
+            description: "Для отображения актуальных алертов, ротаций и влияния на сервисы IncidentRelay требуется подключение к сети. Проверьте соединение и повторите попытку.",
+            retry: "Повторить"
+        },
+        de: {
+            title: "IncidentRelay – offline",
+            heading: "Sie sind offline",
+            description: "IncidentRelay benötigt eine Netzwerkverbindung, um aktuelle Alarme, Rotationen und Auswirkungen auf Services anzuzeigen. Überprüfen Sie Ihre Verbindung und versuchen Sie es erneut.",
+            retry: "Erneut versuchen"
+        }
+    };
+
+    const cookieMatch = document.cookie.match(
+        /(?:^|;\s*)incidentrelay_locale=([^;]+)/
+    );
+    const cookieLocale = cookieMatch
+        ? decodeURIComponent(cookieMatch[1])
+        : "";
+    const browserLocale = navigator.language || "en";
+    const requestedLocale = String(cookieLocale || browserLocale)
+        .toLowerCase()
+        .replace("_", "-");
+    const locale = requestedLocale.startsWith("ru")
+        ? "ru"
+        : requestedLocale.startsWith("de")
+            ? "de"
+            : "en";
+    const selected = messages[locale];
+
+    document.documentElement.lang = locale;
+    document.title = selected.title;
+    document.getElementById("offline-title").textContent = selected.title;
+    document.getElementById("offline-heading").textContent = selected.heading;
+    document.getElementById("offline-description").textContent =
+        selected.description;
+    document.getElementById("offline-retry").textContent = selected.retry;
+})();
+</script>
 </body>
 </html>

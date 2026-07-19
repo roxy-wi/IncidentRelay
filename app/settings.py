@@ -115,6 +115,11 @@ class Config:
         "telegram_worker_file",
         "./logs/incidentrelay-telegram-worker.log",
     )
+    LOG_SLACK_WORKER_FILE = settings.get(
+        "logging",
+        "slack_worker_file",
+        "./logs/incidentrelay-slack-worker.log",
+    )
     LOG_LEVEL = settings.get("logging", "level", "INFO")
     LOG_REQUESTS = False
 

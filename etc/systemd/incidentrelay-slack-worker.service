@@ -1,0 +1,23 @@
+[Unit]
+Description=IncidentRelay Slack Socket Mode worker
+After=network.target incidentrelay.service
+
+[Service]
+Type=simple
+User=incidentrelay
+Group=incidentrelay
+WorkingDirectory=/var/www/incidentrelay
+
+Environment=INCIDENTRELAY_CONFIG_FILE=/etc/incidentrelay/incidentrelay.conf
+Environment=PYTHONUNBUFFERED=1
+
+ExecStart=/usr/bin/python3 -m app.slack_worker
+
+Restart=always
+RestartSec=5
+
+KillSignal=SIGTERM
+TimeoutStopSec=30
+
+[Install]
+WantedBy=multi-user.target

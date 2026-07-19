@@ -78,7 +78,8 @@ class SlackNotifier(IncomingWebhookNotifier):
             text,
             event_type,
             include_actions=(
-                self._should_include_actions_after_update(
+                self._actions_ready(config)
+                and self._should_include_actions_after_update(
                     alert,
                     event_type,
                 )
@@ -182,7 +183,7 @@ class SlackNotifier(IncomingWebhookNotifier):
             alert,
             text,
             event_type,
-            include_actions=True,
+            include_actions=self._actions_ready(config),
         )
         payload["channel"] = config["channel_id"]
 
@@ -252,12 +253,26 @@ class SlackNotifier(IncomingWebhookNotifier):
 
     @staticmethod
     def _bot_api_ready(config):
-        """Check that Slack Bot API and actions config is complete."""
+        """Check that Slack Bot API message delivery is configured."""
         return bool(
             config.get("bot_token")
             and config.get("channel_id")
-            and config.get("signing_secret")
         )
+
+    @staticmethod
+    def _actions_ready(config):
+        """Check that one inbound interactive action transport is ready."""
+        if config.get("mode") != "bot_api":
+            return False
+
+        connection_mode = str(
+            config.get("connection_mode") or "http"
+        ).strip()
+
+        if connection_mode == "socket_mode":
+            return bool(config.get("app_token"))
+
+        return bool(config.get("signing_secret"))
 
     def _build_message_payload(
             self,

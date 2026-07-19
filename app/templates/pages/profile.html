@@ -4,16 +4,16 @@
             <div class="person-inline">
                 <div id="profile-avatar" class="person-avatar">?</div>
                 <div>
-                    <h2 id="profile-display-title">Profile</h2>
+                    <h2 id="profile-display-title">{{ _('profile.title') }}</h2>
                     <div id="profile-display-meta" class="card-subtitle">
-                        Loading profile...
+                        {{ _('profile.loading') }}
                     </div>
                     <div id="profile-groups-summary" class="inline-pills"></div>
                 </div>
             </div>
             <div class="card-header-actions">
                 <button id="save-profile-top" type="button" class="btn btn-primary">
-                    Save profile
+                    {{ _('profile.actions.save') }}
                 </button>
             </div>
         </div>
@@ -21,16 +21,16 @@
 
     <div id="profile-page-tabs" class="page-tabs">
         <button type="button" class="page-tab is-active" data-profile-tab="details">
-            Profile
+            {{ _('profile.title') }}
         </button>
         <button type="button" class="page-tab" data-profile-tab="oncall">
-            On-call
+            {{ _('profile.tabs.oncall') }}
         </button>
         <button type="button" class="page-tab" data-profile-tab="notifications">
-            Notifications
+            {{ _('profile.tabs.notifications') }}
         </button>
         <button type="button" class="page-tab" data-profile-tab="tokens">
-            API tokens
+            {{ _('profile.tabs.tokens') }}
         </button>
     </div>
 
@@ -45,15 +45,15 @@
                     <section class="card">
                         <div class="card-header">
                             <div>
-                                <h2>Personal information</h2>
+                                <h2>{{ _('profile.personal.title') }}</h2>
                                 <div class="card-subtitle">
-                                    Contact details used by notification channels.
+                                    {{ _('profile.personal.subtitle') }}
                                 </div>
                             </div>
                         </div>
 
                         <div class="form-body">
-                            <label for="profile-username">Username</label>
+                            <label for="profile-username">{{ _('profile.fields.username') }}</label>
                             <input
                                 id="profile-username"
                                 class="input"
@@ -61,7 +61,7 @@
                                 disabled
                             >
 
-                            <label for="profile-display-name">Display name</label>
+                            <label for="profile-display-name">{{ _('profile.fields.display_name') }}</label>
                             <input
                                 id="profile-display-name"
                                 class="input"
@@ -69,7 +69,7 @@
                                 autocomplete="name"
                             >
 
-                            <label for="profile-email">Email</label>
+                            <label for="profile-email">{{ _('profile.fields.email') }}</label>
                             <input
                                 id="profile-email"
                                 class="input"
@@ -77,7 +77,7 @@
                                 autocomplete="email"
                             >
 
-                            <label for="profile-phone">Phone</label>
+                            <label for="profile-phone">{{ _('profile.fields.phone') }}</label>
                             <input
                                 id="profile-phone"
                                 class="input"
@@ -88,16 +88,16 @@
                             >
                             
                             <label class="form-field">
-                                <span>Timezone</span>
+                                <span>{{ _('profile.fields.timezone') }}</span>
                                 <select id="profile-timezone" class="input"></select>
                                 <span class="field-hint">
-                                    Used by calendar display. Leave empty to use browser timezone.
+                                    {{ _('profile.fields.timezone_help') }}
                                 </span>
                             </label>
 
                             <div class="form-actions-inline">
                                 <button id="save-profile" type="button" class="btn btn-primary">
-                                    Save profile
+                                    {{ _('profile.actions.save') }}
                                 </button>
                                 <span id="profile-save-status" class="inline-status"></span>
                             </div>
@@ -107,15 +107,15 @@
                     <section class="card">
                         <div class="card-header">
                             <div>
-                                <h2>Messenger IDs</h2>
+                                <h2>{{ _('profile.messengers.title') }}</h2>
                                 <div class="card-subtitle">
-                                    Used by Telegram, Slack and Mattermost notifications.
+                                    {{ _('profile.messengers.subtitle') }}
                                 </div>
                             </div>
                         </div>
 
                         <div class="form-body">
-                            <label for="profile-telegram">Telegram user ID</label>
+                            <label for="profile-telegram">{{ _('profile.fields.telegram') }}</label>
                             <input
                                 id="profile-telegram"
                                 class="input"
@@ -124,7 +124,7 @@
                                 placeholder="123456789"
                             >
 
-                            <label for="profile-slack">Slack user ID</label>
+                            <label for="profile-slack">{{ _('profile.fields.slack') }}</label>
                             <input
                                 id="profile-slack"
                                 class="input"
@@ -133,7 +133,7 @@
                                 placeholder="U012ABCDEF"
                             >
 
-                            <label for="profile-mattermost">Mattermost user ID</label>
+                            <label for="profile-mattermost">{{ _('profile.fields.mattermost') }}</label>
                             <input
                                 id="profile-mattermost"
                                 class="input"
@@ -149,20 +149,20 @@
             <aside class="card page-details-card">
                 <div class="card-header">
                     <div>
-                        <h2>Access context</h2>
+                        <h2>{{ _('profile.access.title') }}</h2>
                         <div class="card-subtitle">
-                            Current group scope for list views.
+                            {{ _('profile.access.subtitle') }}
                         </div>
                     </div>
                 </div>
 
                 <div class="details-body">
-                    <label for="profile-active-group">Active group</label>
+                    <label for="profile-active-group">{{ _('profile.access.active_group') }}</label>
                     <select id="profile-active-group" class="input"></select>
 
                     <div class="details-actions">
                         <button id="save-active-group" type="button" class="btn btn-primary">
-                            Set active group
+                            {{ _('profile.access.set_group') }}
                         </button>
                     </div>
 
@@ -170,9 +170,9 @@
 
                     <div class="details-list">
                         <div class="details-item">
-                            <div class="details-label">Scope behavior</div>
+                            <div class="details-label">{{ _('profile.access.behavior') }}</div>
                             <div class="details-value">
-                                Select “All my groups” to see everything you can access.
+                                {{ _('profile.access.behavior_help') }}
                             </div>
                         </div>
                     </div>
@@ -180,9 +180,9 @@
 
                 <div class="card-header">
                     <div>
-                        <h2>Password</h2>
+                        <h2>{{ _('profile.password.label') }}</h2>
                         <div class="card-subtitle">
-                            Change your local account password.
+                            {{ _('profile.password.subtitle') }}
                         </div>
                     </div>
                 </div>
@@ -190,7 +190,7 @@
                 <div class="details-body">
                     <div class="details-actions">
                         <button id="open-profile-password-modal" type="button" class="btn">
-                            Change password
+                            {{ _('profile.password.change') }}
                         </button>
                     </div>
                     <div id="profile-password-status" class="inline-status"></div>
@@ -210,9 +210,9 @@
                 <section class="card">
                     <div class="card-header">
                         <div>
-                            <h2>On-call status</h2>
+                            <h2>{{ _('profile.oncall.title') }}</h2>
                             <div class="card-subtitle">
-                                Primary rotation shifts and escalation backup participation.
+                                {{ _('profile.oncall.subtitle') }}
                             </div>
                         </div>
                     </div>
@@ -226,9 +226,9 @@
             <aside class="card page-details-card">
                 <div class="card-header">
                     <div>
-                        <h2>On-call shift notifications</h2>
+                        <h2>{{ _('profile.shift_notifications.title') }}</h2>
                         <div class="card-subtitle">
-                            Choose which shift notifications should be sent to your email or Mattermost.
+                            {{ _('profile.shift_notifications.subtitle') }}
                         </div>
                     </div>
                 </div>
@@ -238,8 +238,8 @@
                         <input id="profile-notify-shift-start-email" type="checkbox">
                         <span class="md-switch-ui"></span>
                         <span>
-                            <strong>Email me when my on-call shift starts</strong>
-                            <small>Send an email when I become primary on-call.</small>
+                            <strong>{{ _('profile.shift_notifications.email_start') }}</strong>
+                            <small>{{ _('profile.shift_notifications.email_start_help') }}</small>
                         </span>
                     </label>
 
@@ -247,8 +247,8 @@
                         <input id="profile-notify-shift-end-email" type="checkbox">
                         <span class="md-switch-ui"></span>
                         <span>
-                            <strong>Email me when my on-call shift ends</strong>
-                            <small>Send an email when my primary on-call shift is over.</small>
+                            <strong>{{ _('profile.shift_notifications.email_end') }}</strong>
+                            <small>{{ _('profile.shift_notifications.email_end_help') }}</small>
                         </span>
                     </label>
 
@@ -258,8 +258,8 @@
                         <input id="profile-notify-shift-start-mattermost" type="checkbox">
                         <span class="md-switch-ui"></span>
                         <span>
-                            <strong>Send me a Mattermost direct message when my on-call shift starts</strong>
-                            <small>Requires a Mattermost user ID in your profile and a configured Mattermost bot.</small>
+                            <strong>{{ _('profile.shift_notifications.mm_start') }}</strong>
+                            <small>{{ _('profile.shift_notifications.mm_start_help') }}</small>
                         </span>
                     </label>
 
@@ -267,10 +267,9 @@
 
                     <div class="details-list">
                         <div class="details-item">
-                            <div class="details-label">Escalation backup</div>
+                            <div class="details-label">{{ _('profile.shift_notifications.backup') }}</div>
                             <div class="details-value">
-                                Escalation backup participation is shown in the UI but does not
-                                send shift start/end emails.
+                                {{ _('profile.shift_notifications.backup_help') }}
                             </div>
                         </div>
                     </div>
@@ -283,32 +282,32 @@
         <section class="card" id="browser-push-card">
             <div class="card-header">
                 <div>
-                    <h2>Browser push notifications</h2>
+                    <h2>{{ _('profile.push.title') }}</h2>
                     <div class="card-subtitle">
-                        Receive alert notifications directly in this browser, including ACK and Resolve actions.
+                        {{ _('profile.push.subtitle') }}
                     </div>
                 </div>
             </div>
 
             <div class="form-body">
-                <label for="push-device-name">Device name</label>
+                <label for="push-device-name">{{ _('profile.push.device_name') }}</label>
                 <input
                     type="text"
                     id="push-device-name"
                     class="input"
-                    placeholder="My laptop, work phone..."
+                    placeholder="{{ _('profile.push.device_placeholder') }}"
                     autocomplete="off"
                 >
 
                 <div class="form-actions-inline">
                     <button type="button" class="btn btn-primary" id="enable-push-btn">
-                        Enable push on this device
+                        {{ _('profile.push.enable') }}
                     </button>
                     <button type="button" class="btn" id="send-test-push-btn">
-                        Send test push
+                        {{ _('profile.push.test') }}
                     </button>
                     <button type="button" class="btn" id="reload-push-devices-btn">
-                        Reload devices
+                        {{ _('profile.push.reload') }}
                     </button>
                     <span id="push-status" class="inline-status"></span>
                 </div>
@@ -318,16 +317,16 @@
                 <table class="data-table" id="push-devices-table">
                     <thead>
                         <tr>
-                            <th>Device</th>
-                            <th>Status</th>
-                            <th>Last seen</th>
-                            <th>Created</th>
-                            <th class="actions-th">Actions</th>
+                            <th>{{ _('profile.push.device') }}</th>
+                            <th>{{ _('profile.common.status') }}</th>
+                            <th>{{ _('profile.push.last_seen') }}</th>
+                            <th>{{ _('profile.common.created') }}</th>
+                            <th class="actions-th">{{ _('profile.common.actions') }}</th>
                         </tr>
                     </thead>
                     <tbody id="push-devices-body">
                         <tr>
-                            <td colspan="5">Loading devices...</td>
+                            <td colspan="5">{{ _('profile.push.loading') }}</td>
                         </tr>
                     </tbody>
                 </table>
@@ -339,17 +338,17 @@
         <section class="card" id="notification-rules-card">
             <div class="card-header">
                 <div>
-                    <h2>Notification rules</h2>
+                    <h2>{{ _('profile.rules.title') }}</h2>
                     <div class="card-subtitle">
-                        Configure how IncidentRelay should notify you when an alert is assigned to you.
+                        {{ _('profile.rules.subtitle') }}
                     </div>
                 </div>
                 <div class="card-actions">
                     <button type="button" class="btn btn-primary" id="open-notification-rule-modal">
-                        New rule
+                        {{ _('profile.rules.new') }}
                     </button>
                     <button type="button" class="btn" id="reload-notification-rules-btn">
-                        Reload
+                        {{ _('profile.actions.reload') }}
                     </button>
                 </div>
             </div>
@@ -358,18 +357,18 @@
                 <table class="data-table" id="notification-rules-table">
                     <thead>
                         <tr>
-                            <th>Order</th>
-                            <th>Method</th>
-                            <th>Delay</th>
-                            <th>Severities</th>
-                            <th>Event types</th>
-                            <th>Status</th>
-                            <th class="actions-th">Actions</th>
+                            <th>{{ _('profile.rules.order') }}</th>
+                            <th>{{ _('profile.rules.method') }}</th>
+                            <th>{{ _('profile.rules.delay') }}</th>
+                            <th>{{ _('profile.rules.severities') }}</th>
+                            <th>{{ _('profile.rules.event_types') }}</th>
+                            <th>{{ _('profile.common.status') }}</th>
+                            <th class="actions-th">{{ _('profile.common.actions') }}</th>
                         </tr>
                     </thead>
                     <tbody id="notification-rules-body">
                         <tr>
-                            <td colspan="7" class="empty-cell">Loading notification rules...</td>
+                            <td colspan="7" class="empty-cell">{{ _('profile.rules.loading') }}</td>
                         </tr>
                     </tbody>
                 </table>
@@ -380,16 +379,16 @@
             <div class="app-modal-dialog app-modal-dialog-wide">
                 <div class="app-modal-header">
                     <div>
-                        <h2 id="notification-rule-modal-title">Create notification rule</h2>
+                        <h2 id="notification-rule-modal-title">{{ _('profile.rules.create') }}</h2>
                         <div class="card-subtitle">
-                            Personal notification rule for assigned alerts.
+                            {{ _('profile.rules.modal_subtitle') }}
                         </div>
                     </div>
                     <button
                         id="close-notification-rule-modal"
                         type="button"
                         class="app-modal-close"
-                        aria-label="Close"
+                        aria-label="{{ _('profile.actions.close') }}"
                     >
                         ×
                     </button>
@@ -402,39 +401,39 @@
                         <section class="card">
                             <div class="card-header">
                                 <div>
-                                    <h2>Rule</h2>
+                                    <h2>{{ _('profile.rules.rule') }}</h2>
                                     <div class="card-subtitle">
-                                        Delivery method, delay and enabled state.
+                                        {{ _('profile.rules.rule_help') }}
                                     </div>
                                 </div>
                             </div>
 
                             <div class="form-body">
-                                <label for="notification-rule-method">Method</label>
+                                <label for="notification-rule-method">{{ _('profile.rules.method') }}</label>
                                 <select id="notification-rule-method" class="input">
-                                    <option value="browser_push">Browser push</option>
-                                    <option value="email">Email</option>
-                                    <option value="voice_call">Voice call</option>
+                                    <option value="browser_push">{{ _('profile.rules.browser_push') }}</option>
+                                    <option value="email">{{ _('profile.fields.email') }}</option>
+                                    <option value="voice_call">{{ _('profile.rules.voice_call') }}</option>
                                 </select>
 
-                                <label for="notification-rule-delay">Delay</label>
+                                <label for="notification-rule-delay">{{ _('profile.rules.delay') }}</label>
                                 <select id="notification-rule-delay" class="input">
-                                    <option value="0">Immediately</option>
-                                    <option value="60">After 1 minute</option>
-                                    <option value="120">After 2 minutes</option>
-                                    <option value="300">After 5 minutes</option>
-                                    <option value="600">After 10 minutes</option>
-                                    <option value="900">After 15 minutes</option>
-                                    <option value="1800">After 30 minutes</option>
+                                    <option value="0">{{ _('profile.rules.immediately') }}</option>
+                                    <option value="60">{{ _('profile.rules.after_1m') }}</option>
+                                    <option value="120">{{ _('profile.rules.after_2m') }}</option>
+                                    <option value="300">{{ _('profile.rules.after_5m') }}</option>
+                                    <option value="600">{{ _('profile.rules.after_10m') }}</option>
+                                    <option value="900">{{ _('profile.rules.after_15m') }}</option>
+                                    <option value="1800">{{ _('profile.rules.after_30m') }}</option>
                                 </select>
 
                                 <label class="md-checkbox">
                                     <input id="notification-rule-enabled" type="checkbox" checked>
-                                    <span>Enabled</span>
+                                    <span>{{ _('profile.common.enabled') }}</span>
                                 </label>
 
                                 <div class="help-text">
-                                    Disabled rules stay visible but are not used for alert delivery.
+                                    {{ _('profile.rules.disabled_help') }}
                                 </div>
                             </div>
                         </section>
@@ -442,67 +441,67 @@
                         <section class="card">
                             <div class="card-header">
                                 <div>
-                                    <h2>Filters</h2>
+                                    <h2>{{ _('profile.rules.filters') }}</h2>
                                     <div class="card-subtitle">
-                                        Optional severity and event filters.
+                                        {{ _('profile.rules.filters_help') }}
                                     </div>
                                 </div>
                             </div>
 
                             <div class="form-body">
                                 <div>
-                                    <label>Severities</label>
+                                    <label>{{ _('profile.rules.severities') }}</label>
                                     <div class="checkbox-grid">
                                         <label class="md-checkbox">
                                             <input type="checkbox" class="notification-rule-severity" value="critical">
-                                            <span>Critical</span>
+                                            <span>{{ _('profile.severity.critical') }}</span>
                                         </label>
                                         <label class="md-checkbox">
                                             <input type="checkbox" class="notification-rule-severity" value="warning">
-                                            <span>Warning</span>
+                                            <span>{{ _('profile.severity.warning') }}</span>
                                         </label>
                                         <label class="md-checkbox">
                                             <input type="checkbox" class="notification-rule-severity" value="info">
-                                            <span>Info</span>
+                                            <span>{{ _('profile.severity.info') }}</span>
                                         </label>
                                         <label class="md-checkbox">
                                             <input type="checkbox" class="notification-rule-severity" value="unknown">
-                                            <span>Unknown</span>
+                                            <span>{{ _('profile.common.unknown') }}</span>
                                         </label>
                                     </div>
                                     <div class="help-text">
-                                        Leave empty to match all severities.
+                                        {{ _('profile.rules.all_severities_help') }}
                                     </div>
                                 </div>
 
                                 <div class="form-divider"></div>
 
                                 <div>
-                                    <label>Event types</label>
+                                    <label>{{ _('profile.rules.event_types') }}</label>
                                     <div class="checkbox-grid">
                                         <label class="md-checkbox">
                                             <input type="checkbox" class="notification-rule-event-type" value="notification">
-                                            <span>Initial alert</span>
+                                            <span>{{ _('profile.events.notification') }}</span>
                                         </label>
                                         <label class="md-checkbox">
                                             <input type="checkbox" class="notification-rule-event-type" value="reminder">
-                                            <span>Reminder</span>
+                                            <span>{{ _('profile.events.reminder') }}</span>
                                         </label>
                                         <label class="md-checkbox">
                                             <input type="checkbox" class="notification-rule-event-type" value="escalation">
-                                            <span>Escalation</span>
+                                            <span>{{ _('profile.events.escalation') }}</span>
                                         </label>
                                         <label class="md-checkbox">
                                             <input type="checkbox" class="notification-rule-event-type" value="acknowledged">
-                                            <span>Acknowledged</span>
+                                            <span>{{ _('profile.events.acknowledged') }}</span>
                                         </label>
                                         <label class="md-checkbox">
                                             <input type="checkbox" class="notification-rule-event-type" value="resolved">
-                                            <span>Resolved</span>
+                                            <span>{{ _('profile.events.resolved') }}</span>
                                         </label>
                                     </div>
                                     <div class="help-text">
-                                        Leave empty for initial alert, reminders and escalations.
+                                        {{ _('profile.rules.default_events_help') }}
                                     </div>
                                 </div>
                             </div>
@@ -512,10 +511,10 @@
 
                 <div class="app-modal-footer">
                     <button id="cancel-notification-rule" type="button" class="btn">
-                        Cancel
+                        {{ _('profile.actions.cancel') }}
                     </button>
                     <button id="save-notification-rule-btn" type="button" class="btn btn-primary">
-                        Save rule
+                        {{ _('profile.rules.save') }}
                     </button>
                 </div>
             </div>
@@ -533,14 +532,14 @@
         <section class="card">
             <div class="card-header">
                 <div>
-                    <h2>Personal API tokens</h2>
+                    <h2>{{ _('profile.tokens.title') }}</h2>
                     <div class="card-subtitle">
-                        Tokens for scripts, integrations and API access.
+                        {{ _('profile.tokens.subtitle') }}
                     </div>
                 </div>
                 <div class="card-header-actions">
                     <button id="open-profile-token-modal" type="button" class="btn btn-primary">
-                        Generate token
+                        {{ _('profile.tokens.generate') }}
                     </button>
                 </div>
             </div>
@@ -549,20 +548,20 @@
                 <table class="data-table">
                     <thead>
                         <tr>
-                            <th>Name</th>
-                            <th>Prefix</th>
-                            <th>Group</th>
-                            <th>Scopes</th>
-                            <th>Created</th>
-                            <th>Expires</th>
-                            <th>Last used</th>
-                            <th>Status</th>
-                            <th class="actions-th">Actions</th>
+                            <th>{{ _('profile.common.name') }}</th>
+                            <th>{{ _('profile.tokens.prefix') }}</th>
+                            <th>{{ _('profile.common.group') }}</th>
+                            <th>{{ _('profile.tokens.scopes') }}</th>
+                            <th>{{ _('profile.common.created') }}</th>
+                            <th>{{ _('profile.tokens.expires') }}</th>
+                            <th>{{ _('profile.tokens.last_used') }}</th>
+                            <th>{{ _('profile.common.status') }}</th>
+                            <th class="actions-th">{{ _('profile.common.actions') }}</th>
                         </tr>
                     </thead>
                     <tbody id="profile-tokens-table">
                         <tr>
-                            <td colspan="9" class="empty-cell">Loading tokens...</td>
+                            <td colspan="9" class="empty-cell">{{ _('profile.tokens.loading') }}</td>
                         </tr>
                     </tbody>
                 </table>
@@ -572,16 +571,15 @@
         <section class="card" id="profile-caldav-card">
             <div class="card-header">
                 <div>
-                    <h2>CalDAV calendar sync</h2>
+                    <h2>{{ _('profile.caldav.title') }}</h2>
                     <div class="card-subtitle">
-                        Connect your on-call calendar to Apple Calendar, Thunderbird, DAVx5
-                        or another CalDAV-compatible client.
+                        {{ _('profile.caldav.subtitle') }}
                     </div>
                 </div>
             </div>
 
             <div class="form-body">
-                <label for="profile-caldav-url">CalDAV URL</label>
+                <label for="profile-caldav-url">{{ _('profile.caldav.url') }}</label>
                 <input
                     id="profile-caldav-url"
                     class="input"
@@ -589,10 +587,10 @@
                     readonly
                 >
                 <div class="help-text">
-                    Use this URL as the server address in your calendar client.
+                    {{ _('profile.caldav.url_help') }}
                 </div>
 
-                <label for="profile-caldav-username">Username</label>
+                <label for="profile-caldav-username">{{ _('profile.fields.username') }}</label>
                 <input
                     id="profile-caldav-username"
                     class="input"
@@ -600,24 +598,23 @@
                     readonly
                 >
                 <div class="help-text">
-                    Use your IncidentRelay username or email.
+                    {{ _('profile.caldav.username_help') }}
                 </div>
 
-                <label>Password</label>
+                <label>{{ _('profile.password.label') }}</label>
                 <div class="help-text">
-                    Use a personal API token with the <code>calendar:read</code> scope.
-                    Do not use your login password.
+                    {{ _('profile.caldav.password_prefix') }} <code>calendar:read</code> {{ _('profile.caldav.password_suffix') }}
                 </div>
 
                 <div class="form-actions-inline">
                     <button id="copy-profile-caldav-url" type="button" class="btn">
-                        Copy URL
+                        {{ _('profile.caldav.copy_url') }}
                     </button>
                     <button id="copy-profile-caldav-username" type="button" class="btn">
-                        Copy username
+                        {{ _('profile.caldav.copy_username') }}
                     </button>
                     <button id="create-profile-caldav-token" type="button" class="btn btn-primary">
-                        Generate calendar token
+                        {{ _('profile.caldav.generate_token') }}
                     </button>
                     <span id="profile-caldav-status" class="inline-status"></span>
                 </div>
@@ -629,16 +626,16 @@
         <div class="app-modal-dialog app-modal-dialog-medium">
             <div class="app-modal-header">
                 <div>
-                    <h2>Generate personal API token</h2>
+                    <h2>{{ _('profile.tokens.modal_title') }}</h2>
                     <div class="card-subtitle">
-                        The full token is shown only once.
+                        {{ _('profile.tokens.once') }}
                     </div>
                 </div>
                 <button
                     id="close-profile-token-modal"
                     type="button"
                     class="app-modal-close"
-                    aria-label="Close"
+                    aria-label="{{ _('profile.actions.close') }}"
                 >
                     ×
                 </button>
@@ -646,7 +643,7 @@
 
             <div class="app-modal-body">
                 <div class="form-body">
-                    <label for="profile-token-name">Token name</label>
+                    <label for="profile-token-name">{{ _('profile.tokens.name') }}</label>
                     <input
                         id="profile-token-name"
                         class="input"
@@ -655,7 +652,7 @@
                         autocomplete="off"
                     >
 
-                    <label for="profile-token-days">Expires in days</label>
+                    <label for="profile-token-days">{{ _('profile.tokens.days') }}</label>
                     <input
                         id="profile-token-days"
                         class="input"
@@ -664,13 +661,13 @@
                         value="30"
                     >
 
-                    <label for="profile-token-group">Group</label>
+                    <label for="profile-token-group">{{ _('profile.common.group') }}</label>
                     <select id="profile-token-group" class="input"></select>
                     <div class="help-text">
-                        Leave empty to create a token without group limit.
+                        {{ _('profile.tokens.group_help') }}
                     </div>
 
-                    <label for="profile-token-scopes">Scopes</label>
+                    <label for="profile-token-scopes">{{ _('profile.tokens.scopes') }}</label>
                     <select id="profile-token-scopes" class="input" multiple>
                         <option value="alerts:read">alerts:read</option>
                         <option value="alerts:write">alerts:write</option>
@@ -684,21 +681,21 @@
 
                     <div class="form-actions-inline">
                         <button id="create-profile-token" type="button" class="btn btn-primary">
-                            Generate token
+                            {{ _('profile.tokens.generate') }}
                         </button>
                         <span id="profile-token-status" class="inline-status"></span>
                     </div>
 
-                    <label for="profile-token-result">Generated token</label>
+                    <label for="profile-token-result">{{ _('profile.tokens.generated') }}</label>
                     <div class="json-editor">
                         <div class="json-editor-header">
-                            <span>Token</span>
+                            <span>{{ _('profile.tokens.token') }}</span>
                             <button
                                 id="copy-profile-token"
                                 type="button"
                                 class="btn btn-small is-hidden"
                             >
-                                Copy token
+                                {{ _('profile.tokens.copy') }}
                             </button>
                         </div>
                         <textarea
@@ -706,18 +703,18 @@
                             class="input code-textarea json-editor-textarea"
                             readonly
                             spellcheck="false"
-                        >No token generated yet.</textarea>
+                        >{{ _('profile.tokens.none_generated') }}</textarea>
                     </div>
 
                     <div class="help-text">
-                        Copy it now. You will not be able to see it again.
+                        {{ _('profile.tokens.copy_now') }}
                     </div>
                 </div>
             </div>
 
             <div class="app-modal-footer">
                 <button id="close-profile-token-modal-footer" type="button" class="btn">
-                    Close
+                    {{ _('profile.actions.close') }}
                 </button>
             </div>
         </div>
@@ -727,16 +724,16 @@
         <div class="app-modal-dialog app-modal-dialog-medium">
             <div class="app-modal-header">
                 <div>
-                    <h2>Change password</h2>
+                    <h2>{{ _('profile.password.change') }}</h2>
                     <div class="card-subtitle">
-                        Update your local account password.
+                        {{ _('profile.password.modal_subtitle') }}
                     </div>
                 </div>
                 <button
                     id="close-profile-password-modal"
                     type="button"
                     class="app-modal-close"
-                    aria-label="Close"
+                    aria-label="{{ _('profile.actions.close') }}"
                 >
                     ×
                 </button>
@@ -744,7 +741,7 @@
 
             <div class="app-modal-body">
                 <div class="form-body">
-                    <label for="profile-old-password">Old password</label>
+                    <label for="profile-old-password">{{ _('profile.password.old') }}</label>
                     <input
                         id="profile-old-password"
                         class="input"
@@ -752,7 +749,7 @@
                         autocomplete="current-password"
                     >
 
-                    <label for="profile-new-password">New password</label>
+                    <label for="profile-new-password">{{ _('profile.password.new') }}</label>
                     <input
                         id="profile-new-password"
                         class="input"
@@ -762,7 +759,7 @@
 
                     <div class="form-actions-inline">
                         <button id="change-profile-password" type="button" class="btn btn-primary">
-                            Change password
+                            {{ _('profile.password.change') }}
                         </button>
                         <span id="profile-password-modal-status" class="inline-status"></span>
                     </div>
@@ -771,7 +768,7 @@
 
             <div class="app-modal-footer">
                 <button id="close-profile-password-modal-footer" type="button" class="btn">
-                    Close
+                    {{ _('profile.actions.close') }}
                 </button>
             </div>
         </div>

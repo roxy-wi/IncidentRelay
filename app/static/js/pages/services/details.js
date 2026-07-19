@@ -1145,14 +1145,14 @@ function renderServiceDetailsReadiness(payload) {
     const readiness = payload.readiness || {};
     const state = readiness.state || null;
     const evaluations = asArray(readiness.evaluations);
-    const section = serviceDetailsSection("Readiness", null);
+    const section = serviceDetailsSection(i18n.t("service_standards.readiness.title"), null);
 
     const headerActions = $("<div>").addClass("details-actions");
 
     appendIconActionIfAllowed(headerActions, service, {
         required: "write",
         icon: "fas fa-sync",
-        label: "Evaluate",
+        label: i18n.t("service_standards.actions.evaluate"),
         onClick: function () {
             evaluateServiceReadiness(service);
         },
@@ -1164,7 +1164,7 @@ function renderServiceDetailsReadiness(payload) {
         section.append(
             $("<div>")
                 .addClass("empty-state compact")
-                .text("Readiness has not been evaluated.")
+                .text(i18n.t("service_standards.readiness.not_evaluated"))
         );
 
         return section;
@@ -1178,7 +1178,7 @@ function renderServiceDetailsReadiness(payload) {
         section.append(
             $("<div>")
                 .addClass("empty-state compact")
-                .text("No standards apply to this service.")
+                .text(i18n.t("service_standards.readiness.no_standards"))
         );
 
         return section;
@@ -1195,25 +1195,24 @@ function renderReadinessSummaryTable(state, scoreLabel) {
 
     tbody.append(
         $("<tr>")
-            .append($("<th>").text("Score"))
-            .append($("<td>").text(scoreLabel + " · " + formatServiceReadinessStatus(state.status)))
-            .append($("<th>").text("Standards"))
+            .append($("<th>").text(i18n.t("service_standards.readiness.score")))
+            .append($("<td>").text(scoreLabel + " · " + serviceStandardReadinessStatus(state.status)))
+            .append($("<th>").text(i18n.t("service_standards.readiness.standards")))
             .append($("<td>").text(Number(state.standards_count || 0)))
     );
 
     tbody.append(
         $("<tr>")
-            .append($("<th>").text("Checks"))
+            .append($("<th>").text(i18n.t("service_standards.readiness.checks")))
             .append($("<td>").text(Number(state.checks_count || 0)))
-            .append($("<th>").text("Failed"))
+            .append($("<th>").text(i18n.t("service_standards.readiness.failed")))
             .append(
                 $("<td>").text(
-                    Number(state.failed_count || 0) +
-                    " total / " +
-                    Number(state.failed_required_count || 0) +
-                    " required / " +
-                    Number(state.failed_critical_count || 0) +
-                    " critical"
+                    i18n.t("service_standards.readiness.failed_breakdown", {
+                        total: Number(state.failed_count || 0),
+                        required: Number(state.failed_required_count || 0),
+                        critical: Number(state.failed_critical_count || 0),
+                    })
                 )
             )
     );
@@ -1231,10 +1230,10 @@ function renderReadinessStandardsTable(evaluations) {
     table.append(
         $("<thead>").append(
             $("<tr>")
-                .append($("<th>").text("Standard"))
-                .append($("<th>").text("Score"))
-                .append($("<th>").text("Status"))
-                .append($("<th>").text("Failed checks"))
+                .append($("<th>").text(i18n.t("service_standards.table.standard")))
+                .append($("<th>").text(i18n.t("service_standards.readiness.score")))
+                .append($("<th>").text(i18n.t("service_standards.table.status")))
+                .append($("<th>").text(i18n.t("service_standards.readiness.failed_checks")))
         )
     );
 
@@ -1250,11 +1249,11 @@ function renderReadinessStandardsTable(evaluations) {
                 .append(
                     $("<td>")
                         .addClass("table-cell-truncate-wide")
-                        .append($("<strong>").text(standard.name || standard.slug || "Standard"))
+                        .append($("<strong>").text(serviceStandardDisplayName(standard)))
                         .append($("<div>").addClass("row-subtitle").text(standard.slug || "-"))
                 )
                 .append($("<td>").text(evaluation.score + "/100"))
-                .append($("<td>").append($("<span>").addClass(getReadinessStatusClass(evaluation.status)).text(formatServiceReadinessStatus(evaluation.status))))
+                .append($("<td>").append($("<span>").addClass(getReadinessStatusClass(evaluation.status)).text(serviceStandardReadinessStatus(evaluation.status))))
                 .append($("<td>").append(renderReadinessFailedChecks(failed)))
         );
     });
@@ -1279,12 +1278,16 @@ function renderReadinessFailedChecks(failed) {
                 .append(
                     $("<div>")
                         .addClass("compact-list-title")
-                        .text(result.check_name || result.check_slug || result.check_type || "Check")
+                        .text(serviceStandardCheckDisplayName(result))
                 )
                 .append(
                     $("<div>")
                         .addClass("compact-list-meta")
-                        .text((result.message || result.status || "failed") + " / " + Number(result.weight || 0) + " pt")
+                        .text(
+                            translateServiceReadinessMessage(result) +
+                            " / " +
+                            i18n.t("service_standards.readiness.points", {weight: Number(result.weight || 0)})
+                        )
                 )
         );
     });
@@ -1293,11 +1296,121 @@ function renderReadinessFailedChecks(failed) {
         wrapper.append(
             $("<div>")
                 .addClass("compact-list-meta")
-                .text("+" + (failed.length - 4) + " more")
+                .text(i18n.t("service_standards.readiness.more", {count: failed.length - 4}))
         );
     }
 
     return wrapper;
+}
+
+function serviceStandardDisplayName(standard) {
+    standard = standard || {};
+
+    if (standard.slug === "basic-operational-readiness") {
+        return i18n.t("service_standards.builtin.standard.basic");
+    }
+
+    return standard.name || standard.slug || i18n.t("service_standards.readiness.standard_fallback");
+}
+
+function serviceStandardCheckDisplayName(result) {
+    result = result || {};
+    const builtin = {
+        owner: "service_standards.builtin.check.owner",
+        "escalation-policy": "service_standards.builtin.check.escalation_policy",
+        "notification-policy": "service_standards.builtin.check.notification_policy",
+        "alert-route": "service_standards.builtin.check.alert_route",
+        runbook: "service_standards.builtin.check.runbook",
+        "dependency-cycle": "service_standards.builtin.check.dependency_cycle",
+    };
+
+    if (Object.prototype.hasOwnProperty.call(builtin, result.check_slug)) {
+        return i18n.t(builtin[result.check_slug]);
+    }
+
+    return result.check_name ||
+        result.check_slug ||
+        translateServiceStandardCheckType(result.check_type) ||
+        i18n.t("service_standards.readiness.check_fallback");
+}
+
+function serviceStandardReadinessStatus(status) {
+    const normalized = String(status || "not_applicable");
+
+    return i18n.t(
+        "service_standards.readiness.status." + normalized,
+        {},
+        normalized.replace(/_/g, " ")
+    );
+}
+
+function translateServiceStandardCheckType(checkType) {
+    const key = String(checkType || "");
+    const supported = [
+        "field_present",
+        "field_equals",
+        "owner_exists",
+        "active_rotation_exists",
+        "escalation_policy_exists",
+        "notification_policy_exists",
+        "service_channel_exists",
+        "route_exists",
+        "match_rule_exists",
+        "runbook_exists",
+        "link_type_exists",
+        "dependency_exists",
+        "dependency_cycle_absent",
+        "metadata_value",
+    ];
+
+    return supported.indexOf(key) !== -1
+        ? i18n.t("service_standards.check_type." + key)
+        : key;
+}
+
+function translateServiceReadinessMessage(result) {
+    result = result || {};
+    const message = String(result.message || "");
+    const details = result.details || {};
+
+    if (result.check_type === "owner_exists") {
+        return result.status === "passed"
+            ? i18n.t("service_standards.result.owner_passed", {count: Number(details.count || 0)})
+            : i18n.t("service_standards.result.owner_failed", {minimum: Number(details.minimum || 1)});
+    }
+
+    const exactMessages = {
+        "Service has no default rotation": "service_standards.result.rotation_missing",
+        "Service has an active default rotation": "service_standards.result.rotation_passed",
+        "Service default rotation is disabled or deleted": "service_standards.result.rotation_invalid",
+        "Service has no default escalation policy": "service_standards.result.escalation_missing",
+        "Service escalation policy is disabled or deleted": "service_standards.result.escalation_invalid",
+        "Service escalation policy has no active rules": "service_standards.result.escalation_no_rules",
+        "Service has an active escalation policy": "service_standards.result.escalation_passed",
+        "Service has no notification policy": "service_standards.result.notification_missing",
+        "Service notification policy is disabled or deleted": "service_standards.result.notification_invalid",
+        "Service notification policy has no active rules": "service_standards.result.notification_no_rules",
+        "Service notification policy has no active channels": "service_standards.result.notification_no_channels",
+        "Service has an active notification policy": "service_standards.result.notification_passed",
+        "Service has an active direct alert route": "service_standards.result.route_direct",
+        "Service has an active route through a match rule": "service_standards.result.route_match",
+        "Service has no active alert route": "service_standards.result.route_missing",
+        "Service is not part of a dependency cycle": "service_standards.result.cycle_absent",
+        "Service is part of a dependency cycle": "service_standards.result.cycle_present",
+        "Readiness check could not be evaluated": "service_standards.result.evaluation_error",
+    };
+
+    if (Object.prototype.hasOwnProperty.call(exactMessages, message)) {
+        return i18n.t(exactMessages[message]);
+    }
+
+    if (result.check_type === "runbook_exists") {
+        return result.status === "passed"
+            ? i18n.t("service_standards.result.runbook_passed", {count: Number(details.count || 0)})
+            : i18n.t("service_standards.result.runbook_failed", {minimum: Number(details.minimum || 1)});
+    }
+
+    return message || result.status || i18n.t("service_standards.readiness.failed_fallback");
 }
 
 function getReadinessStatusClass(status) {

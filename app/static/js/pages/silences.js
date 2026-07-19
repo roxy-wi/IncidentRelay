@@ -14,8 +14,8 @@ function buildSilencesApiUrl() {
 
 function initializeSilenceMatcherEditor() {
     enhanceMatcherEditor("#silence-matchers", {
-        label: "Additional matchers JSON",
-        header: "Additional matchers",
+        label: i18n.t("silences.form.additional_matchers_json"),
+        header: i18n.t("silences.form.additional_matchers"),
         context: function () {
             return {
                 scope: "silence",
@@ -134,19 +134,8 @@ function getSilenceStatus(silence) {
 }
 
 function getSilenceStatusLabel(status) {
-    if (status === "active") {
-        return "Active now";
-    }
-    if (status === "scheduled") {
-        return "Scheduled";
-    }
-    if (status === "expired") {
-        return "Expired";
-    }
-    if (status === "disabled") {
-        return "Disabled";
-    }
-    return status || "-";
+    const key = "silences.status." + String(status || "");
+    return i18n.t(key, {}, status || "-");
 }
 
 function renderSilencesSummary(silences) {
@@ -218,7 +207,7 @@ function renderSilencesTable() {
     if (!silences.length) {
         tbody.append(
             $("<tr>").append(
-                $("<td>").attr("colspan", "7").addClass("empty-cell").text("No silences")
+                $("<td>").attr("colspan", "7").addClass("empty-cell").text(i18n.t("silences.empty.found"))
             )
         );
         return;
@@ -244,7 +233,7 @@ function renderSilenceRow(silence) {
                         renderSilenceDetails(silence);
                     })
             )
-            .append($("<div>").addClass("row-subtitle").text("Silence #" + silence.id))
+            .append($("<div>").addClass("row-subtitle").text(i18n.t("silences.row.id", {id: silence.id})))
     );
     row.append($("<td>").append($("<span>").addClass("pill").text(silence.team_name || silence.team_slug || "-")));
     row.append($("<td>").text(silence.reason || "-"));
@@ -253,7 +242,7 @@ function renderSilenceRow(silence) {
             $("<div>")
                 .addClass("details-compact-list")
                 .append($("<div>").addClass("item-title").text(formatDateTime24(silence.starts_at)))
-                .append($("<div>").addClass("item-subtitle").text("until " + formatDateTime24(silence.ends_at)))
+                .append($("<div>").addClass("item-subtitle").text(i18n.t("silences.row.until", {time: formatDateTime24(silence.ends_at)})))
         )
     );
     const matchingCell = $("<td>");
@@ -263,8 +252,9 @@ function renderSilenceRow(silence) {
             $("<div>")
                 .addClass("row-subtitle")
                 .text(
-                    "Preset: " +
-                    formatMatcherPresetOption(silence.matcher_preset)
+                    i18n.t("silences.row.preset", {
+                        preset: formatMatcherPresetOption(silence.matcher_preset)
+                    })
                 )
         );
     }
@@ -300,21 +290,21 @@ function renderSilenceActions(silence) {
         object: silence,
         items: [
             {
-                label: "Edit",
+                label: i18n.t("silences.actions.edit"),
                 icon: "fas fa-edit",
                 required: "write",
-                denyMessage: "Team manager role is required to edit this silence.",
+                denyMessage: i18n.t("silences.permissions.edit"),
                 onClick: function () {
                     editSilence(silence.id);
                 }
             },
             {
-                label: silence.enabled ? "Disable" : "Enable",
+                label: silence.enabled ? i18n.t("silences.actions.disable") : i18n.t("silences.actions.enable"),
                 icon: silence.enabled ? "fas fa-pause" : "fas fa-play",
                 required: "write",
                 danger: silence.enabled,
                 hidden: !silence.enabled && typeof enableSilence !== "function",
-                denyMessage: "Team manager role is required to enable or disable this silence.",
+                denyMessage: i18n.t("silences.permissions.toggle"),
                 onClick: function () {
                     if (silence.enabled) {
                         disableSilence(silence.id);
@@ -351,23 +341,23 @@ function renderSilenceDetails(silence) {
     body.empty().append(
         $("<div>")
             .addClass("details-list")
-            .append(silenceDetailsItem("Name", silence.name))
-            .append(silenceDetailsItem("Team", silence.team_slug))
-            .append(silenceDetailsItem("Reason", silence.reason))
-            .append(silenceDetailsItem("Starts at", formatDateTime24(silence.starts_at)))
-            .append(silenceDetailsItem("Ends at", formatDateTime24(silence.ends_at)))
-            .append(silenceDetailsItem("Status", getSilenceStatusLabel(status)))
+            .append(silenceDetailsItem(i18n.t("silences.details.name"), silence.name))
+            .append(silenceDetailsItem(i18n.t("silences.details.team"), silence.team_slug))
+            .append(silenceDetailsItem(i18n.t("silences.details.reason"), silence.reason))
+            .append(silenceDetailsItem(i18n.t("silences.details.starts_at"), formatDateTime24(silence.starts_at)))
+            .append(silenceDetailsItem(i18n.t("silences.details.ends_at"), formatDateTime24(silence.ends_at)))
+            .append(silenceDetailsItem(i18n.t("silences.details.status"), getSilenceStatusLabel(status)))
             .append(
                 silenceDetailsItem(
-                    "Matcher preset",
+                    i18n.t("silences.details.matcher_preset"),
                     silence.matcher_preset
                         ? formatMatcherPresetOption(silence.matcher_preset)
-                        : "No preset"
+                        : i18n.t("silences.form.no_preset")
                 )
             )
             .append(
                 silenceDetailsCode(
-                    "Additional matchers",
+                    i18n.t("silences.details.additional_matchers"),
                     silence.matchers || {}
                 )
             )
@@ -377,7 +367,7 @@ function renderSilenceDetails(silence) {
     appendIconActionIfAllowed(actions, silence, {
         required: "write",
         icon: "fas fa-edit",
-        label: "Edit silence",
+        label: i18n.t("silences.actions.edit_silence"),
         onClick: function () {
             editSilence(silence.id);
         },
@@ -386,7 +376,7 @@ function renderSilenceDetails(silence) {
         appendIconActionIfAllowed(actions, silence, {
             required: "write",
             icon: "fas fa-pause",
-            label: "Disable silence",
+            label: i18n.t("silences.actions.disable_silence"),
             className: "btn-warning",
             onClick: function () {
                 disableSilence(silence.id);
@@ -396,7 +386,7 @@ function renderSilenceDetails(silence) {
         appendIconActionIfAllowed(actions, silence, {
             required: "write",
             icon: "fas fa-play",
-            label: "Enable silence",
+            label: i18n.t("silences.actions.enable_silence"),
             className: "btn-success",
             onClick: function () {
                 enableSilence(silence.id);
@@ -437,8 +427,14 @@ function applySilenceSummaryFilter(status) {
 
 function renderSilenceDetailsEmpty() {
     selectedSilenceDetailsId = null;
-    $("#silence-details-subtitle").text("Select a silence");
-    $("#silence-details-body").html("<p class=\"muted\">Click a silence name to inspect time window, reason and matchers.</p>");
+    $("#silence-details-subtitle").text(i18n.t("silences.details.select"));
+    $("#silence-details-body")
+        .empty()
+        .append(
+            $("<p>")
+                .addClass("muted")
+                .text(i18n.t("silences.details.select_help"))
+        );
 }
 
 function collectSilencePayload() {
@@ -460,7 +456,7 @@ function saveSilence() {
     const existing = id ? silencesCache.find(function (item) { return Number(item.id) === Number(id); }) : null;
 
     if (existing && !canWriteObject(existing)) {
-        showAppError("You do not have permission to edit this silence.");
+        showAppError(i18n.t("silences.permissions.edit_denied"));
         return;
     }
 
@@ -490,14 +486,14 @@ function editSilence(id) {
     }
 
     if (!canWriteObject(silence)) {
-        showAppError("You do not have permission to edit this silence.");
+        showAppError(i18n.t("silences.permissions.edit_denied"));
         return;
     }
 
     const matcherPresetId = silence.matcher_preset_id ||
         (silence.matcher_preset ? silence.matcher_preset.id : null);
 
-    $("#silence-form-title").text("Edit silence #" + id);
+    $("#silence-form-title").text(i18n.t("silences.form.edit", {id: id}));
     $("#silence-id").val(silence.id);
     $("#silence-team").val(String(silence.team_id));
     $("#silence-name").val(silence.name);
@@ -520,14 +516,14 @@ function disableSilence(id) {
         return Number(item.id) === Number(id);
     });
     if (silence && !canWriteObject(silence)) {
-        showAppError("You do not have permission to disable this silence.");
+        showAppError(i18n.t("silences.permissions.disable_denied"));
         return;
     }
 
     showAppConfirm({
-        title: "Disable this silence?",
-        message: "Disable this silence?",
-        confirmText: "Disable",
+        title: i18n.t("silences.confirm.disable_title"),
+        message: i18n.t("silences.confirm.disable_message"),
+        confirmText: i18n.t("silences.confirm.disable"),
         confirmClass: "btn-warning",
     }).done(function () {
         apiDelete("/api/silences/" + id, refreshSilences);
@@ -535,7 +531,7 @@ function disableSilence(id) {
 }
 
 function resetSilenceForm() {
-    $("#silence-form-title").text("Create silence");
+    $("#silence-form-title").text(i18n.t("silences.form.create"));
     $("#silence-id").val("");
     $("#silence-name").val("");
     $("#silence-reason").val("");
@@ -567,7 +563,7 @@ function openCreateSilenceModal() {
     const teamId = Number($("#silence-team").val()) || null;
 
     loadSilenceMatcherPresets(teamId, null, function () {
-        $("#silence-form-title").text("Create silence");
+        $("#silence-form-title").text(i18n.t("silences.form.create"));
         openAppModal("#silence-form-modal");
     });
 }

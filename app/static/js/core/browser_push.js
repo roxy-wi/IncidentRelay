@@ -23,27 +23,27 @@ function browserPushSupported() {
 }
 
 function browserPushDeviceName() {
-    const platform = navigator.platform || "Browser";
+    const platform = navigator.platform || i18n.t("shared.push.browser");
     const userAgent = navigator.userAgent || "";
 
     if (/Android/i.test(userAgent)) {
-        return "Android browser";
+        return i18n.t("shared.push.android");
     }
 
     if (/iPhone|iPad|iPod/i.test(userAgent)) {
-        return "iOS browser";
+        return i18n.t("shared.push.ios");
     }
 
     if (/Windows/i.test(platform)) {
-        return "Windows browser";
+        return i18n.t("shared.push.windows");
     }
 
     if (/Mac/i.test(platform)) {
-        return "macOS browser";
+        return i18n.t("shared.push.macos");
     }
 
     if (/Linux/i.test(platform)) {
-        return "Linux browser";
+        return i18n.t("shared.push.linux");
     }
 
     return platform;
@@ -55,19 +55,19 @@ function browserPushGetVapidKey(callback) {
 
 function browserPushEnableCurrentDevice(done) {
     if (!browserPushSupported()) {
-        showError("Browser push is not supported by this browser.");
+        showError(i18n.t("shared.push.unsupported"));
         return;
     }
 
     browserPushGetVapidKey(function (config) {
         if (!config || !config.enabled || !config.public_key) {
-            showError("Browser push is not configured on the server.");
+            showError(i18n.t("shared.push.not_configured"));
             return;
         }
 
         Notification.requestPermission().then(function (permission) {
             if (permission !== "granted") {
-                showError("Notification permission was not granted.");
+                showError(i18n.t("shared.push.permission_denied"));
                 return;
             }
 

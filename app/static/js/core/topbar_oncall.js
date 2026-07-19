@@ -17,9 +17,9 @@ function topbarFormatOncallDate(value, timezone) {
 }
 
 function topbarFormatOncallSlot(slot) {
-    const team = topbarDisplayName(slot.team_name, slot.team_slug, "Team");
-    const rotation = slot.rotation_name || ("Rotation #" + slot.rotation_id);
-    const layer = slot.layer_name || (slot.type === "override" ? "Override" : "Layer");
+    const team = topbarDisplayName(slot.team_name, slot.team_slug, i18n.t("shared.oncall.team"));
+    const rotation = slot.rotation_name || i18n.t("shared.oncall.rotation", {id: slot.rotation_id});
+    const layer = slot.layer_name || (slot.type === "override" ? i18n.t("shared.oncall.override") : i18n.t("shared.oncall.layer"));
     const timezone = slot.timezone || "UTC";
 
     return [
@@ -36,25 +36,25 @@ function buildTopbarOncallTooltip(data) {
     const lines = [];
 
     if (data && data.is_oncall) {
-        lines.push("You are on-call now");
+        lines.push(i18n.t("shared.oncall.oncall_now"));
 
         current.slice(0, 3).forEach(function (slot) {
             lines.push("• " + topbarFormatOncallSlot(slot));
         });
     } else {
-        lines.push("You are not on-call now");
+        lines.push(i18n.t("shared.oncall.not_now"));
     }
 
     lines.push("");
 
     if (next.length) {
-        lines.push("Next shifts:");
+        lines.push(i18n.t("shared.oncall.next_shifts"));
 
         next.slice(0, 5).forEach(function (slot) {
             lines.push("• " + topbarFormatOncallSlot(slot));
         });
     } else {
-        lines.push("No upcoming shifts in the next " + ((data && data.lookahead_days) || 30) + " days.");
+        lines.push(i18n.t("shared.oncall.no_upcoming", {days: ((data && data.lookahead_days) || 30)}));
     }
 
     return lines.join("\n");
@@ -88,17 +88,17 @@ function renderTopbarOncallStatus(data) {
         .attr(
             "aria-label",
             status === "primary"
-                ? "You are primary on-call now"
+                ? i18n.t("shared.oncall.primary_now")
                 : status === "escalation"
-                    ? "You are escalation backup now"
-                    : "You are not on-call now"
+                    ? i18n.t("shared.oncall.backup_now")
+                    : i18n.t("shared.oncall.not_now")
         );
 
     $("#topbar-profile").attr("title", tooltip);
 }
 
 function renderTopbarOncallUnknown(message) {
-    const tooltip = message || "On-call status is unavailable";
+    const tooltip = message || i18n.t("shared.oncall.unavailable");
 
     $("#topbar-oncall-indicator")
         .removeClass("topbar-oncall-active topbar-oncall-idle")
@@ -111,7 +111,7 @@ function renderTopbarOncallUnknown(message) {
 
 function loadTopbarOncallStatus() {
     if (!currentUser) {
-        renderTopbarOncallUnknown("Not authenticated");
+        renderTopbarOncallUnknown(i18n.t("shared.oncall.not_authenticated"));
         return;
     }
 
@@ -121,7 +121,7 @@ function loadTopbarOncallStatus() {
             renderTopbarOncallStatus(data || {});
         },
         function () {
-            renderTopbarOncallUnknown("On-call status is unavailable");
+            renderTopbarOncallUnknown(i18n.t("shared.oncall.unavailable"));
         }
     );
 }

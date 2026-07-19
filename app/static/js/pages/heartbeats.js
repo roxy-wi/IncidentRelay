@@ -58,7 +58,7 @@ function prettyHeartbeatJson(value) {
 
 function formatHeartbeatLabels() {
     if (typeof formatJsonTextarea === "function") {
-        return formatJsonTextarea("#heartbeat-labels", {}, "Labels JSON");
+        return formatJsonTextarea("#heartbeat-labels", {}, i18n.t("heartbeats.form.labels_json"));
     }
 
     try {
@@ -66,7 +66,7 @@ function formatHeartbeatLabels() {
         $("#heartbeat-labels").val(JSON.stringify(value ? JSON.parse(value) : {}, null, 2));
         return true;
     } catch (error) {
-        heartbeatToast("Labels JSON is invalid: " + error.message, "error");
+        heartbeatToast(i18n.t("heartbeats.messages.labels_invalid", {error: error.message}), "error");
         return false;
     }
 }
@@ -135,19 +135,25 @@ function heartbeatEscape(value) {
 
 function heartbeatStatusBadge(status) {
     const label = status || "unknown";
+    const labelKey = "heartbeats.status." + label;
     let cls = "badge-info";
     if (label === "ok") { cls = "badge-success"; }
     if (label === "overdue") { cls = "badge-danger"; }
     if (label === "paused") { cls = "badge-muted"; }
     if (label === "new") { cls = "badge-warning"; }
-    return $("<span>").addClass("badge " + cls).text(label.replace(/_/g, " "));
+    return $("<span>").addClass("badge " + cls).text(i18n.t(labelKey, {}, label.replace(/_/g, " ")));
 }
 
 function heartbeatModeText(item) {
     if (item.mode === "scheduled") {
         let text = (item.schedule_kind || "scheduled") + " at " + (item.schedule_time || "--:--");
         if (item.schedule_kind === "weekly") {
-            const names = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+            const names = [
+                i18n.t("heartbeats.weekday.mon"), i18n.t("heartbeats.weekday.tue"),
+                i18n.t("heartbeats.weekday.wed"), i18n.t("heartbeats.weekday.thu"),
+                i18n.t("heartbeats.weekday.fri"), i18n.t("heartbeats.weekday.sat"),
+                i18n.t("heartbeats.weekday.sun")
+            ];
             text += " " + (names[item.schedule_weekday] || "");
         }
         if (item.schedule_kind === "monthly") {
@@ -155,7 +161,7 @@ function heartbeatModeText(item) {
         }
         return text + " " + (item.timezone || "UTC");
     }
-    return "every " + (item.expected_interval_seconds || 0) + "s + " + (item.grace_period_seconds || 0) + "s grace";
+    return i18n.t("heartbeats.mode.every", {interval: item.expected_interval_seconds || 0, grace: item.grace_period_seconds || 0});
 }
 
 function heartbeatSelectedTeamId() {
@@ -234,7 +240,7 @@ function renderHeartbeats() {
     tbody.empty();
 
     if (!items.length) {
-        tbody.append($("<tr>").append($("<td>").attr("colspan", 10).addClass("empty-cell").text("No heartbeats found")));
+        tbody.append($("<tr>").append($("<td>").attr("colspan", 10).addClass("empty-cell").text(i18n.t("heartbeats.empty.found"))));
         return;
     }
 
@@ -273,26 +279,26 @@ function renderHeartbeatActions(item) {
             object: item,
             items: [
                 {
-                    label: "Details",
+                    label: i18n.t("heartbeats.actions.details"),
                     icon: "fas fa-eye",
                     onClick: function () {
                         openHeartbeatDetails(item.id);
                     }
                 },
                 {
-                    label: "Edit",
+                    label: i18n.t("heartbeats.actions.edit"),
                     icon: "fas fa-edit",
                     required: "write",
-                    denyMessage: "Team manager role is required to edit this heartbeat.",
+                    denyMessage: i18n.t("heartbeats.permissions.edit"),
                     onClick: function () {
                         openHeartbeatForm(item);
                     }
                 },
                 {
-                    label: item.status === "paused" ? "Resume" : "Pause",
+                    label: item.status === "paused" ? i18n.t("heartbeats.actions.resume") : i18n.t("heartbeats.actions.pause"),
                     icon: item.status === "paused" ? "fas fa-play" : "fas fa-pause",
                     required: "write",
-                    denyMessage: "Team manager role is required to pause or resume this heartbeat.",
+                    denyMessage: i18n.t("heartbeats.permissions.pause"),
                     onClick: function () {
                         selectedHeartbeatId = item.id;
                         if (item.status === "paused") {
@@ -303,11 +309,11 @@ function renderHeartbeatActions(item) {
                     }
                 },
                 {
-                    label: "Regenerate token",
+                    label: i18n.t("heartbeats.actions.regenerate"),
                     icon: "fas fa-key",
                     required: "write",
                     danger: true,
-                    denyMessage: "Team manager role is required to regenerate heartbeat tokens.",
+                    denyMessage: i18n.t("heartbeats.permissions.token"),
                     onClick: function () {
                         selectedHeartbeatId = item.id;
                         regenerateHeartbeatToken();
@@ -317,7 +323,7 @@ function renderHeartbeatActions(item) {
         });
     }
 
-    return $("<button>").addClass("btn btn-small").text("Details").on("click", function () {
+    return $("<button>").addClass("btn btn-small").text(i18n.t("heartbeats.actions.details")).on("click", function () {
         openHeartbeatDetails(item.id);
     });
 }
@@ -345,7 +351,7 @@ function fillHeartbeatSelects(selected) {
     });
 
     serviceSelect.empty();
-    serviceSelect.append($("<option>").val("").text("No service"));
+    serviceSelect.append($("<option>").val("").text(i18n.t("heartbeats.form.no_service")));
     heartbeatServicesCache.filter(function (service) {
         return !currentTeamId || Number(service.team_id) === currentTeamId;
     }).forEach(function (service) {
@@ -388,7 +394,7 @@ function parseHeartbeatExpectedInstances(text) {
 
 function openHeartbeatForm(item) {
     selectedHeartbeatId = item ? item.id : null;
-    $("#heartbeat-form-title").text(item ? "Edit heartbeat" : "New heartbeat");
+    $("#heartbeat-form-title").text(item ? i18n.t("heartbeats.form.edit") : i18n.t("heartbeats.form.new"));
     $("#heartbeat-id").val(item ? item.id : "");
     fillHeartbeatSelects(item);
 
@@ -468,7 +474,7 @@ function saveHeartbeat() {
     try {
         payload = heartbeatPayloadFromForm();
     } catch (error) {
-        heartbeatToast("Labels JSON is invalid: " + error.message, "error");
+        heartbeatToast(i18n.t("heartbeats.messages.labels_invalid", {error: error.message}), "error");
         return;
     }
 
@@ -494,9 +500,9 @@ function heartbeatInstanceSummaryText(item) {
     const summary = item.instance_summary || {};
     const total = Number(summary.total || 0);
     if (!total) {
-        return "0 instances";
+        return i18n.t("heartbeats.instance.zero");
     }
-    return total + " total, " + Number(summary.ok || 0) + " ok, " + Number(summary.overdue || 0) + " overdue";
+    return i18n.t("heartbeats.instance.summary", {total: total, ok: Number(summary.ok || 0), overdue: Number(summary.overdue || 0)});
 }
 
 function renderHeartbeatInstances(item) {
@@ -513,7 +519,7 @@ function renderHeartbeatInstances(item) {
     const instances = Array.isArray(item.instances) ? item.instances : [];
 
     if (!instances.length) {
-        tbody.append($("<tr>").append($("<td>").attr("colspan", 7).addClass("empty-cell").text("No instances discovered or configured yet")));
+        tbody.append($("<tr>").append($("<td>").attr("colspan", 7).addClass("empty-cell").text(i18n.t("heartbeats.instances.none_configured"))));
         return;
     }
 
@@ -524,7 +530,7 @@ function renderHeartbeatInstances(item) {
                 object: instance,
                 items: [
                     {
-                        label: "Disable instance",
+                        label: i18n.t("heartbeats.actions.disable_instance"),
                         icon: "fas fa-ban",
                         danger: true,
                         required: "write",
@@ -542,8 +548,8 @@ function renderHeartbeatInstances(item) {
             $("<tr>")
                 .append($("<td>").text(instance.instance_key || "-"))
                 .append($("<td>").append(heartbeatStatusBadge(instance.status)))
-                .append($("<td>").text(instance.auto_discovered ? "auto" : "static"))
-                .append($("<td>").text(instance.enabled ? "yes" : "no"))
+                .append($("<td>").text(instance.auto_discovered ? i18n.t("heartbeats.values.auto") : i18n.t("heartbeats.values.static")))
+                .append($("<td>").text(instance.enabled ? i18n.t("heartbeats.values.yes") : i18n.t("heartbeats.values.no")))
                 .append($("<td>").text(formatDateTimeMinutes(instance.last_seen_at) || "-"))
                 .append($("<td>").text(formatDateTimeMinutes(instance.deadline_at) || "-"))
                 .append(actions)
@@ -561,7 +567,7 @@ function disableHeartbeatInstance(heartbeatId, instanceId) {
 function deleteHeartbeat() {
     const id = $("#heartbeat-id").val();
     if (!id) { return; }
-    if (!window.confirm("Delete this heartbeat?")) { return; }
+    if (!window.confirm(i18n.t("heartbeats.confirm.delete"))) { return; }
     apiDelete("/api/heartbeats/" + id, function () {
         closeHeartbeatForm();
         loadHeartbeats();
@@ -571,20 +577,20 @@ function deleteHeartbeat() {
 function renderHeartbeatDetails(item) {
     const body = $("#heartbeat-details-body");
     body.empty();
-    const curl = item.ping_url_hint ? "curl -fsS \"" + item.ping_url_hint + "\"" : "Ping URL token is hidden. Regenerate token to view a new URL.";
+    const curl = item.ping_url_hint ? "curl -fsS \"" + item.ping_url_hint + "\"" : i18n.t("heartbeats.messages.token_hidden");
     const fields = [
-        ["Status", item.status],
-        ["Team", item.team_name || item.team_slug || "-"],
-        ["Service", item.service_name || "-"],
-        ["Route", item.route_name || item.route_id || "-"],
-        ["Mode", heartbeatModeText(item)],
-        ["Last ping", formatDateTimeMinutes(item.last_seen_at)],
-        ["Next expected", formatDateTimeMinutes(item.next_expected_at)],
-        ["Deadline", formatDateTimeMinutes(item.deadline_at)],
-        ["Current alert group", item.current_alert_group_id || "-"],
-        ["Instance tracking", item.instance_tracking_enabled ? ((item.expected_instances_mode || "auto") + " / key: " + (item.instance_key || "instance")) : "disabled"],
-        ["Instances", item.instance_tracking_enabled ? heartbeatInstanceSummaryText(item) : "-"],
-        ["Curl", curl]
+        [i18n.t("heartbeats.table.status"), item.status],
+        [i18n.t("heartbeats.table.team"), item.team_name || item.team_slug || "-"],
+        [i18n.t("heartbeats.table.service"), item.service_name || "-"],
+        [i18n.t("heartbeats.details.route"), item.route_name || item.route_id || "-"],
+        [i18n.t("heartbeats.details.mode"), heartbeatModeText(item)],
+        [i18n.t("heartbeats.table.last_ping"), formatDateTimeMinutes(item.last_seen_at)],
+        [i18n.t("heartbeats.details.next_expected"), formatDateTimeMinutes(item.next_expected_at)],
+        [i18n.t("heartbeats.table.deadline"), formatDateTimeMinutes(item.deadline_at)],
+        [i18n.t("heartbeats.details.current_alert_group"), item.current_alert_group_id || "-"],
+        [i18n.t("heartbeats.details.instance_tracking"), item.instance_tracking_enabled ? ((item.expected_instances_mode || i18n.t("heartbeats.values.auto")) + " / key: " + (item.instance_key || "instance")) : i18n.t("heartbeats.values.disabled")],
+        [i18n.t("heartbeats.table.instances"), item.instance_tracking_enabled ? heartbeatInstanceSummaryText(item) : "-"],
+        [i18n.t("heartbeats.details.curl"), curl]
     ];
 
     fields.forEach(function (field) {
@@ -602,7 +608,7 @@ function renderHeartbeatDetails(item) {
     tbody.empty();
     const pings = Array.isArray(item.pings) ? item.pings : [];
     if (!pings.length) {
-        tbody.append($("<tr>").append($("<td>").attr("colspan", 5).addClass("empty-cell").text("No events")));
+        tbody.append($("<tr>").append($("<td>").attr("colspan", 5).addClass("empty-cell").text(i18n.t("heartbeats.events.none"))));
     } else {
         pings.forEach(function (ping) {
             tbody.append(
@@ -656,17 +662,17 @@ function regenerateHeartbeatToken() {
     if (typeof showAppConfirm === "function") {
         showAppConfirm({
             type: "warning",
-            title: "Regenerate heartbeat token?",
-            subtitle: "Existing ping URLs will stop working immediately.",
-            message: "All producers using the current URL must be updated with the new token. Continue only if you are ready to replace the old ping URL.",
-            confirmText: "Regenerate token",
+            title: i18n.t("heartbeats.confirm.regenerate_title"),
+            subtitle: i18n.t("heartbeats.confirm.regenerate_subtitle"),
+            message: i18n.t("heartbeats.confirm.regenerate_message"),
+            confirmText: i18n.t("heartbeats.actions.regenerate"),
             confirmClass: "btn-danger",
-            cancelText: "Cancel"
+            cancelText: i18n.t("heartbeats.actions.cancel")
         }).done(run);
         return;
     }
 
-    if (window.confirm("Regenerate heartbeat token? Existing ping URLs will stop working immediately.")) {
+    if (window.confirm(i18n.t("heartbeats.confirm.regenerate_title") + " " + i18n.t("heartbeats.confirm.regenerate_subtitle"))) {
         run();
     }
 }
@@ -708,11 +714,11 @@ function copyHeartbeatText(selector, message) {
 }
 
 function copyHeartbeatTokenUrl() {
-    copyHeartbeatText("#heartbeat-token-url", "Ping URL copied");
+    copyHeartbeatText("#heartbeat-token-url", i18n.t("heartbeats.messages.url_copied"));
 }
 
 function copyHeartbeatTokenCurl() {
-    copyHeartbeatText("#heartbeat-token-curl", "Curl command copied");
+    copyHeartbeatText("#heartbeat-token-curl", i18n.t("heartbeats.messages.curl_copied"));
 }
 
 $(document).on("click", "#reload-heartbeats", loadHeartbeats);

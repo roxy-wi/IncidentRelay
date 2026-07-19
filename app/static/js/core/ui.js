@@ -14,7 +14,7 @@ function parseJsonInput(selector, fallback) {
     try {
         return JSON.parse(raw);
     } catch (error) {
-        const message = "Invalid JSON in " + selector + ": " + error;
+        const message = i18n.t("shared.json.invalid_selector", {selector: selector, error: error});
         if (typeof showAppError === "function") {
             showAppError(message);
         } else {
@@ -62,12 +62,19 @@ function uiStatusBadgeVariantForStatus(status) {
 }
 
 
-function renderStatusBadge(isActive, activeText = "Enabled", inactiveText = "Disabled") {
+function renderStatusBadge(isActive, activeText, inactiveText) {
     /*
      * Render a reusable enabled/disabled badge.
      */
+    const enabledText = activeText === undefined
+        ? i18n.t("shared.enabled")
+        : activeText;
+    const disabledText = inactiveText === undefined
+        ? i18n.t("shared.disabled")
+        : inactiveText;
+
     return uiStatusBadge(
-        isActive ? activeText : inactiveText,
+        isActive ? enabledText : disabledText,
         isActive ? "success" : "muted"
     );
 }
@@ -524,7 +531,8 @@ function initAppUxNavigationHelpers() {
      * - team name opens details below the table.
      */
     $(document).on("click.appUxNavigation", "#group-members-table .btn", function () {
-        if ($.trim($(this).text()) !== "Edit") {
+        const label = $.trim($(this).text());
+        if (label !== i18n.t("shared.edit") && label !== "Edit") {
             return;
         }
 
@@ -537,7 +545,8 @@ function initAppUxNavigationHelpers() {
     });
 
     $(document).on("click.appUxNavigation", "#team-members-table .btn", function () {
-        if ($.trim($(this).text()) !== "Edit") {
+        const label = $.trim($(this).text());
+        if (label !== i18n.t("shared.edit") && label !== "Edit") {
             return;
         }
 

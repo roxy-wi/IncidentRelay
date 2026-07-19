@@ -3,12 +3,12 @@
        role="button"
        tabindex="0"
        data-href="/alerts?status=firing"
-       title="Show firing alerts">
+       title="{{ _("alerts.summary.show_firing") }}">
     <div class="summary-icon">!</div>
     <div>
-      <div class="summary-title">Firing alerts</div>
+      <div class="summary-title">{{ _("alerts.summary.firing") }}</div>
       <div class="summary-value" data-summary-value="firing">0</div>
-      <div class="summary-hint">Need attention</div>
+      <div class="summary-hint">{{ _("alerts.summary.firing_hint") }}</div>
     </div>
   </div>
 
@@ -16,12 +16,12 @@
        role="button"
        tabindex="0"
        data-href="/alerts?status=acknowledged"
-       title="Show acknowledged alerts">
+       title="{{ _("alerts.summary.show_acknowledged") }}">
     <div class="summary-icon">✓</div>
     <div>
-      <div class="summary-title">Acknowledged</div>
+      <div class="summary-title">{{ _("alerts.summary.acknowledged") }}</div>
       <div class="summary-value" data-summary-value="acknowledged">0</div>
-      <div class="summary-hint">Someone is working</div>
+      <div class="summary-hint">{{ _("alerts.summary.acknowledged_hint") }}</div>
     </div>
   </div>
 
@@ -29,12 +29,12 @@
        role="button"
        tabindex="0"
        data-href="/alerts?status=resolved"
-       title="Show resolved alerts">
+       title="{{ _("alerts.summary.show_resolved") }}">
     <div class="summary-icon">✓</div>
     <div>
-      <div class="summary-title">Resolved</div>
+      <div class="summary-title">{{ _("alerts.summary.resolved") }}</div>
       <div class="summary-value" data-summary-value="resolved">0</div>
-      <div class="summary-hint">Closed incidents</div>
+      <div class="summary-hint">{{ _("alerts.summary.resolved_hint") }}</div>
     </div>
   </div>
 
@@ -42,12 +42,12 @@
        role="button"
        tabindex="0"
        data-href="/alerts?sort=reminders&order=desc"
-       title="Show alerts sorted by reminders">
+       title="{{ _("alerts.summary.show_reminders") }}">
     <div class="summary-icon">↻</div>
     <div>
-      <div class="summary-title">Reminders</div>
+      <div class="summary-title">{{ _("alerts.summary.reminders") }}</div>
       <div class="summary-value" data-summary-value="reminders">0</div>
-      <div class="summary-hint">Repeated notifications</div>
+      <div class="summary-hint">{{ _("alerts.summary.reminders_hint") }}</div>
     </div>
   </div>
 
@@ -55,12 +55,12 @@
        role="button"
        tabindex="0"
        data-href="/alerts"
-       title="Show all alerts">
+       title="{{ _("alerts.summary.show_all") }}">
     <div class="summary-icon">#</div>
     <div>
-      <div class="summary-title">Total alerts</div>
+      <div class="summary-title">{{ _("alerts.summary.total") }}</div>
       <div class="summary-value" data-summary-value="total">0</div>
-      <div class="summary-hint">Current selection</div>
+      <div class="summary-hint">{{ _("alerts.summary.total_hint") }}</div>
     </div>
   </div>
 </div>

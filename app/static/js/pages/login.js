@@ -35,11 +35,11 @@ function login(event) {
     const password = $("#password").val();
 
     if (!username || !password) {
-        setLoginStatus("Please enter username and password", "error");
+        setLoginStatus(i18n.t("login.credentials_required"), "error");
         return;
     }
 
-    setLoginStatus("Signing in...", "info");
+    setLoginStatus(i18n.t("login.signing_in"), "info");
 
     apiPost(
         "/api/auth/login",
@@ -51,7 +51,10 @@ function login(event) {
             localStorage.setItem("incidentrelay_jwt", data.access_token);
 
             setLoginStatus(
-                "Logged in as " + data.user.username + "\nExpires at: " + data.expires_at,
+                i18n.t("login.logged_in", {
+                    username: data.user.username,
+                    expires_at: data.expires_at,
+                }),
                 "success"
             );
 
@@ -60,11 +63,11 @@ function login(event) {
         function (xhr) {
             const message = getApiErrorMessage(
                 xhr,
-                "Invalid username or password"
+                i18n.t("login.invalid_credentials")
             );
 
             if (xhr && xhr.status === 401) {
-                setLoginStatus("Invalid username or password", "error");
+                setLoginStatus(i18n.t("login.invalid_credentials"), "error");
                 return;
             }
 
@@ -80,7 +83,7 @@ function loadLogin() {
     const token = localStorage.getItem("incidentrelay_jwt");
 
     if (token) {
-        setLoginStatus("JWT token is stored in this browser.", "info");
+        setLoginStatus(i18n.t("login.token_stored"), "info");
     } else {
         $("#login-status").hide().text("");
     }
@@ -129,8 +132,8 @@ function renderSsoProviders(providers) {
                 .append(
                     $("<span>")
                         .addClass("login-sso-main")
-                        .append($("<span>").addClass("login-sso-title").text("Sign in with " + label))
-                        .append($("<span>").addClass("login-sso-subtitle").text("Continue using your identity provider"))
+                        .append($("<span>").addClass("login-sso-title").text(i18n.t("login.sign_in_with", {provider: label})))
+                        .append($("<span>").addClass("login-sso-subtitle").text(i18n.t("login.identity_provider")))
                 )
                 .append($("<span>").addClass("login-sso-protocol").text(protocol))
         );

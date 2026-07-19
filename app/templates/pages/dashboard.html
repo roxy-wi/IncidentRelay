@@ -8,19 +8,19 @@
     <div class="card dashboard-active-card">
       <div class="card-header">
         <div>
-          <h2>Active incidents</h2>
+          <h2>{{ _('overview.active.title') }}</h2>
           <div class="card-subtitle">
-            Latest firing and acknowledged alerts
+            {{ _('overview.active.subtitle') }}
           </div>
         </div>
 
         <div class="card-header-actions">
           <a href="/alerts" class="btn btn-small">
-            View all
+            {{ _('overview.actions.view_all') }}
           </a>
 
           <button id="reload-dashboard" type="button" class="btn btn-primary btn-small">
-            Reload
+            {{ _('overview.actions.reload') }}
           </button>
         </div>
       </div>
@@ -29,15 +29,15 @@
         <table class="data-table dashboard-alerts-table">
           <thead>
             <tr>
-                <th>ID</th>
-                <th>Alert</th>
-                <th>Severity</th>
-                <th>Priority</th>
-                <th>Status</th>
-                <th>Team</th>
-                <th>Duration</th>
-                <th>Updated</th>
-                <th>Actions</th>
+                <th>{{ _('overview.table.id') }}</th>
+                <th>{{ _('overview.table.alert') }}</th>
+                <th>{{ _('overview.table.severity') }}</th>
+                <th>{{ _('overview.table.priority') }}</th>
+                <th>{{ _('overview.table.status') }}</th>
+                <th>{{ _('overview.table.team') }}</th>
+                <th>{{ _('overview.table.duration') }}</th>
+                <th>{{ _('overview.table.updated') }}</th>
+                <th>{{ _('overview.table.actions') }}</th>
             </tr>
           </thead>
 
@@ -50,9 +50,9 @@
         <div class="card dashboard-status-card">
             <div class="card-header">
                 <div>
-                    <h2>System status</h2>
+                    <h2>{{ _('overview.system.title') }}</h2>
                     <div class="card-subtitle">
-                        Current operational summary
+                        {{ _('overview.system.subtitle') }}
                     </div>
                 </div>
             </div>
@@ -61,7 +61,7 @@
                 <div class="dashboard-status-icon">●</div>
 
                 <div id="dashboard-system-status" class="dashboard-status-text">
-                    Waiting for data...
+                    {{ _('overview.system.waiting') }}
                 </div>
             </div>
         </div>
@@ -69,15 +69,15 @@
         <div class="card dashboard-list-card dashboard-impact-card">
             <div class="card-header">
                 <div>
-                    <h2>Impacted services</h2>
+                    <h2>{{ _('overview.impact.title') }}</h2>
                     <div class="card-subtitle">
-                        Service impact from alerts and dependencies
+                        {{ _('overview.impact.subtitle') }}
                         <span id="dashboard-impacted-services-count" class="overview-count-badge">0</span>
                     </div>
                 </div>
 
                 <a href="/services" class="btn btn-small">
-                    View all
+                    {{ _('overview.actions.view_all') }}
                 </a>
             </div>
 
@@ -87,14 +87,14 @@
         <div class="card dashboard-list-card">
             <div class="card-header">
                 <div>
-                    <h2>Recent alerts</h2>
+                    <h2>{{ _('overview.recent.title') }}</h2>
                     <div class="card-subtitle">
-                        Last activity
+                        {{ _('overview.recent.subtitle') }}
                     </div>
                 </div>
 
                 <a href="/alerts" class="btn btn-small">
-                    View all
+                    {{ _('overview.actions.view_all') }}
                 </a>
             </div>
 
@@ -104,10 +104,10 @@
         <div class="card dashboard-list-card">
             <div class="card-header">
                 <div>
-                    <h2>Teams involved now</h2>
+                    <h2>{{ _('overview.teams.title') }}</h2>
 
                     <div class="card-subtitle">
-                        Based on active alerts
+                        {{ _('overview.teams.subtitle') }}
                     </div>
                 </div>
             </div>
@@ -121,8 +121,8 @@
       <div class="card dashboard-chart-card">
           <div class="card-header">
               <div>
-                  <h2>Severity split</h2>
-                  <div class="card-subtitle">Current alert distribution</div>
+                  <h2>{{ _('overview.charts.severity_title') }}</h2>
+                  <div class="card-subtitle">{{ _('overview.charts.severity_subtitle') }}</div>
               </div>
           </div>
           <div id="dashboard-severity-split" class="dashboard-bars"></div>
@@ -130,8 +130,8 @@
       <div class="card dashboard-chart-card">
           <div class="card-header">
               <div>
-                  <h2>Priority split</h2>
-                  <div class="card-subtitle">Current incident priority distribution</div>
+                  <h2>{{ _('overview.charts.priority_title') }}</h2>
+                  <div class="card-subtitle">{{ _('overview.charts.priority_subtitle') }}</div>
               </div>
           </div>
           <div id="dashboard-priority-split" class="dashboard-bars"></div>
@@ -140,9 +140,9 @@
     <div class="card dashboard-chart-card">
       <div class="card-header">
         <div>
-          <h2>Team summary</h2>
+          <h2>{{ _('overview.charts.team_title') }}</h2>
           <div class="card-subtitle">
-            Alerts by team
+            {{ _('overview.charts.team_subtitle') }}
           </div>
         </div>
       </div>

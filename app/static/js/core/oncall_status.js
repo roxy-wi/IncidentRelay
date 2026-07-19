@@ -35,9 +35,9 @@ function oncallFormatDate(value, timezone) {
 }
 
 function oncallFormatPrimarySlot(slot) {
-    const team = oncallDisplayName(slot.team_name, slot.team_slug, "Team");
-    const rotation = slot.rotation_name || ("Rotation #" + slot.rotation_id);
-    const layer = slot.layer_name || (slot.type === "override" ? "Override" : "Layer");
+    const team = oncallDisplayName(slot.team_name, slot.team_slug, i18n.t("shared.oncall.team"));
+    const rotation = slot.rotation_name || i18n.t("shared.oncall.rotation", {id: slot.rotation_id});
+    const layer = slot.layer_name || (slot.type === "override" ? i18n.t("shared.oncall.override") : i18n.t("shared.oncall.layer"));
     const timezone = slot.timezone || "UTC";
 
     return [
@@ -49,9 +49,9 @@ function oncallFormatPrimarySlot(slot) {
 }
 
 function oncallFormatEscalationItem(item) {
-    const team = oncallDisplayName(item.team_name, item.team_slug, item.team_display || "Team");
-    const policy = item.policy_name || ("Policy #" + item.policy_id);
-    const level = "level " + (item.level || "-");
+    const team = oncallDisplayName(item.team_name, item.team_slug, item.team_display || i18n.t("shared.oncall.team"));
+    const policy = item.policy_name || i18n.t("shared.oncall.policy", {id: item.policy_id});
+    const level = i18n.t("shared.oncall.level", {level: item.level || "-"});
     const delay = Number(item.delay_seconds || 0);
 
     const parts = [
@@ -61,11 +61,11 @@ function oncallFormatEscalationItem(item) {
     ];
 
     if (delay > 0) {
-        parts.push("after " + Math.round(delay / 60) + " min");
+        parts.push(i18n.t("shared.oncall.after_minutes", {count: Math.round(delay / 60)}));
     }
 
     if (item.kind === "rotation" && item.start && item.end) {
-        const rotation = item.rotation_name || ("Rotation #" + item.rotation_id);
+        const rotation = item.rotation_name || i18n.t("shared.oncall.rotation", {id: item.rotation_id});
         const timezone = item.timezone || "UTC";
 
         return parts.join(" / ")
@@ -89,38 +89,38 @@ function oncallBuildTooltip(data) {
     const lines = [];
 
     if (current.length) {
-        lines.push("You are primary on-call now");
+        lines.push(i18n.t("shared.oncall.primary_now"));
         current.slice(0, 3).forEach(function (slot) {
             lines.push("• " + oncallFormatPrimarySlot(slot));
         });
     } else if (escalationCurrent.length) {
-        lines.push("You are escalation backup now");
+        lines.push(i18n.t("shared.oncall.backup_now"));
     } else {
-        lines.push("You are not on-call now");
+        lines.push(i18n.t("shared.oncall.not_now"));
     }
 
     if (escalationCurrent.length) {
         lines.push("");
-        lines.push("Escalation backup:");
+        lines.push(i18n.t("shared.oncall.backup"));
         escalationCurrent.slice(0, 5).forEach(function (item) {
             lines.push("• " + oncallFormatEscalationItem(item));
         });
     }
 
     lines.push("");
-    lines.push("Next primary shifts:");
+    lines.push(i18n.t("shared.oncall.next_primary"));
 
     if (next.length) {
         next.slice(0, 5).forEach(function (slot) {
             lines.push("• " + oncallFormatPrimarySlot(slot));
         });
     } else {
-        lines.push("No upcoming primary shifts in the next " + ((data && data.lookahead_days) || 30) + " days.");
+        lines.push(i18n.t("shared.oncall.no_primary", {days: ((data && data.lookahead_days) || 30)}));
     }
 
     if (escalationNext.length) {
         lines.push("");
-        lines.push("Next escalation backup shifts:");
+        lines.push(i18n.t("shared.oncall.next_backup"));
         escalationNext.slice(0, 5).forEach(function (item) {
             lines.push("• " + oncallFormatEscalationItem(item));
         });

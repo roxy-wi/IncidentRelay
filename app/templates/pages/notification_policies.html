@@ -3,36 +3,36 @@
     <div class="summary-card summary-primary">
       <div class="summary-icon">↗</div>
       <div>
-        <div class="summary-title">Policies</div>
+        <div class="summary-title">{{ _("notification_policies.summary.policies") }}</div>
         <div id="notification-policies-summary-total" class="summary-value">0</div>
-        <div class="summary-hint">Channel selection policies</div>
+        <div class="summary-hint">{{ _("notification_policies.summary.policies_hint") }}</div>
       </div>
     </div>
 
     <div class="summary-card summary-success">
       <div class="summary-icon">✓</div>
       <div>
-        <div class="summary-title">Enabled</div>
+        <div class="summary-title">{{ _("notification_policies.summary.enabled") }}</div>
         <div id="notification-policies-summary-enabled" class="summary-value">0</div>
-        <div class="summary-hint">Available for services</div>
+        <div class="summary-hint">{{ _("notification_policies.summary.enabled_hint") }}</div>
       </div>
     </div>
 
     <div class="summary-card summary-info">
       <div class="summary-icon">#</div>
       <div>
-        <div class="summary-title">Rules</div>
+        <div class="summary-title">{{ _("notification_policies.summary.rules") }}</div>
         <div id="notification-policies-summary-rules" class="summary-value">0</div>
-        <div class="summary-hint">Configured delivery rules</div>
+        <div class="summary-hint">{{ _("notification_policies.summary.rules_hint") }}</div>
       </div>
     </div>
 
     <div class="summary-card summary-muted">
       <div class="summary-icon">S</div>
       <div>
-        <div class="summary-title">Services</div>
+        <div class="summary-title">{{ _("notification_policies.summary.services") }}</div>
         <div id="notification-policies-summary-services" class="summary-value">0</div>
-        <div class="summary-hint">Services using policies</div>
+        <div class="summary-hint">{{ _("notification_policies.summary.services_hint") }}</div>
       </div>
     </div>
   </div>
@@ -41,13 +41,13 @@
     <section class="card page-layout-main">
       <div class="card-header">
         <div>
-          <h2>Notification policies</h2>
+          <h2>{{ _("notification_policies.list.title") }}</h2>
           <div class="card-subtitle">
-            Showing
+            {{ _("notification_policies.list.showing") }}
             <span id="notification-policies-filtered-count">0</span>
-            of
+            {{ _("notification_policies.list.of") }}
             <span id="notification-policies-total-count">0</span>
-            policies
+            {{ _("notification_policies.list.policies") }}
           </div>
         </div>
 
@@ -57,7 +57,7 @@
             type="button"
             class="btn btn-primary"
           >
-            New policy
+            {{ _("notification_policies.actions.new") }}
           </button>
 
           <button
@@ -65,7 +65,7 @@
             type="button"
             class="btn"
           >
-            Reload
+            {{ _("notification_policies.actions.reload") }}
           </button>
         </div>
       </div>
@@ -77,7 +77,7 @@
             id="notification-policies-search"
             class="input"
             type="search"
-            placeholder="Search policies..."
+            placeholder="{{ _('notification_policies.search.placeholder') }}"
             autocomplete="off"
           >
         </div>
@@ -86,9 +86,9 @@
           id="notification-policies-status-filter"
           class="input page-toolbar-filter"
         >
-          <option value="">All statuses</option>
-          <option value="enabled">Enabled</option>
-          <option value="disabled">Disabled</option>
+          <option value="">{{ _("notification_policies.filters.all_statuses") }}</option>
+          <option value="enabled">{{ _("notification_policies.status.enabled") }}</option>
+          <option value="disabled">{{ _("notification_policies.status.disabled") }}</option>
         </select>
       </div>
 
@@ -96,18 +96,18 @@
         <table id="notification-policies-table-view" class="data-table">
           <thead>
             <tr>
-              <th>Policy</th>
-              <th>Team</th>
-              <th>Rules</th>
-              <th>Services</th>
-              <th>Status</th>
-              <th class="actions-th">Actions</th>
+              <th>{{ _("notification_policies.table.policy") }}</th>
+              <th>{{ _("notification_policies.table.team") }}</th>
+              <th>{{ _("notification_policies.table.rules") }}</th>
+              <th>{{ _("notification_policies.table.services") }}</th>
+              <th>{{ _("notification_policies.table.status") }}</th>
+              <th class="actions-th">{{ _("notification_policies.table.actions") }}</th>
             </tr>
           </thead>
           <tbody id="notification-policies-table">
             <tr>
               <td colspan="6" class="empty-cell">
-                No notification policies loaded
+                {{ _("notification_policies.empty.loaded") }}
               </td>
             </tr>
           </tbody>
@@ -118,19 +118,19 @@
     <aside class="card page-details-card">
       <div class="card-header">
         <div>
-          <h2>Policy details</h2>
+          <h2>{{ _("notification_policies.details.title") }}</h2>
           <div
             id="notification-policy-details-subtitle"
             class="card-subtitle"
           >
-            Select a policy
+            {{ _("notification_policies.details.select") }}
           </div>
         </div>
       </div>
 
       <div id="notification-policy-details-body" class="details-body">
         <div class="details-empty">
-          Click a policy name to inspect its configuration.
+          {{ _("notification_policies.details.help") }}
         </div>
       </div>
     </aside>
@@ -145,10 +145,10 @@
       <div class="app-modal-header">
         <div>
           <h2 id="notification-policy-form-title">
-            Create notification policy
+            {{ _("notification_policies.form.create_title") }}
           </h2>
           <div class="card-subtitle">
-            Define reusable notification behavior for services.
+            {{ _("notification_policies.form.subtitle") }}
           </div>
         </div>
 
@@ -156,7 +156,7 @@
           id="close-notification-policy-form-modal"
           type="button"
           class="app-modal-close"
-          aria-label="Close"
+          aria-label="{{ _('notification_policies.actions.close') }}"
         >
           ×
         </button>
@@ -167,9 +167,9 @@
           <section class="card">
             <div class="card-header">
               <div>
-                <h2>Policy</h2>
+                <h2>{{ _("notification_policies.form.policy") }}</h2>
                 <div class="card-subtitle">
-                  Team, name and status.
+                  {{ _("notification_policies.form.policy_hint") }}
                 </div>
               </div>
             </div>
@@ -177,18 +177,18 @@
             <div class="form-body">
               <input id="notification-policy-id" type="hidden">
 
-              <label for="notification-policy-team">Team</label>
+              <label for="notification-policy-team">{{ _("notification_policies.form.team") }}</label>
               <select
                 id="notification-policy-team"
                 class="input"
               ></select>
 
-              <label for="notification-policy-name">Name</label>
+              <label for="notification-policy-name">{{ _("notification_policies.form.name") }}</label>
               <input
                 id="notification-policy-name"
                 class="input"
                 type="text"
-                placeholder="Production notifications"
+                placeholder="{{ _('notification_policies.form.name_placeholder') }}"
                 autocomplete="off"
               >
 
@@ -198,12 +198,11 @@
                   type="checkbox"
                   checked
                 >
-                <span>Enabled</span>
+                <span>{{ _("notification_policies.form.enabled") }}</span>
               </label>
 
               <div class="help-text">
-                Disabled policies remain visible but cannot be assigned to new
-                services.
+                {{ _("notification_policies.form.disabled_help") }}
               </div>
             </div>
           </section>
@@ -211,21 +210,21 @@
           <section class="card">
             <div class="card-header">
               <div>
-                <h2>Description</h2>
+                <h2>{{ _("notification_policies.form.description") }}</h2>
                 <div class="card-subtitle">
-                  Explain which services should use this policy.
+                  {{ _("notification_policies.form.description_hint") }}
                 </div>
               </div>
             </div>
 
             <div class="form-body">
               <label for="notification-policy-description">
-                Description
+                {{ _("notification_policies.form.description") }}
               </label>
-              <textarea id="notification-policy-description" class="input" rows="8" placeholder="Shared delivery rules for production services"></textarea>
+              <textarea id="notification-policy-description" class="input" rows="8" placeholder="{{ _('notification_policies.form.description_placeholder') }}"></textarea>
 
               <div class="help-text">
-                Rules and channels are configured after the policy is saved.
+                {{ _("notification_policies.form.rules_help") }}
               </div>
             </div>
           </section>
@@ -238,7 +237,7 @@
           type="button"
           class="btn"
         >
-          Reset
+          {{ _("notification_policies.actions.reset") }}
         </button>
 
         <button
@@ -246,7 +245,7 @@
           type="button"
           class="btn btn-primary"
         >
-          Save policy
+          {{ _("notification_policies.actions.save_policy") }}
         </button>
       </div>
     </div>
@@ -255,13 +254,13 @@
       <div class="app-modal-dialog app-modal-dialog-wide">
         <div class="app-modal-header">
           <div>
-            <h2 id="notification-policy-rules-title">Notification policy rules</h2>
+            <h2 id="notification-policy-rules-title">{{ _("notification_policies.rules.title") }}</h2>
             <div id="notification-policy-rules-subtitle" class="card-subtitle">
-              Select channels for notification events.
+              {{ _("notification_policies.rules.subtitle") }}
             </div>
           </div>
 
-          <button id="close-notification-policy-rules-modal" type="button" class="app-modal-close" aria-label="Close">
+          <button id="close-notification-policy-rules-modal" type="button" class="app-modal-close" aria-label="{{ _('notification_policies.actions.close') }}">
             ×
           </button>
         </div>
@@ -269,29 +268,28 @@
         <div class="app-modal-body">
           <div class="page-toolbar is-flush-top">
             <div>
-              Rules are evaluated by position. Processing stops after the first
-              matching rule unless Continue matching is enabled.
+              {{ _("notification_policies.rules.evaluation_help") }}
             </div>
 
             <div class="card-header-actions">
               <button id="add-notification-policy-rule" type="button" class="btn btn-primary">
-                Add rule
+                {{ _("notification_policies.actions.add_rule") }}
               </button>
 
               <button id="reload-notification-policy-rules" type="button" class="btn">
-                Reload
+                {{ _("notification_policies.actions.reload") }}
               </button>
             </div>
           </div>
 
           <div id="notification-policy-rule-cards" class="rotation-layer-list">
-            <div class="empty-cell">No policy selected</div>
+            <div class="empty-cell">{{ _("notification_policies.rules.no_policy") }}</div>
           </div>
         </div>
 
         <div class="app-modal-footer">
           <button id="close-notification-policy-rules-modal-footer" type="button" class="btn">
-            Close
+            {{ _("notification_policies.actions.close") }}
           </button>
         </div>
       </div>

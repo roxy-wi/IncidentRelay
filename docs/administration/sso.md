@@ -668,6 +668,11 @@ Update this field in the SAML provider settings:
 ```text
 IdP x509 certificate
 ```
+---
+
+### Zitadel return sso_oidc_callback_failed
+
+Update Authentication Method to Basic and generate clietn secret.
 
 ---
 

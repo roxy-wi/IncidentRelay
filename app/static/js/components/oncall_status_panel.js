@@ -11,15 +11,15 @@ function renderOncallStatusPill(data) {
     const status = oncallStatusKind(data || {});
 
     const textByStatus = {
-        primary: "Primary on-call now",
-        escalation: "Escalation backup now",
-        idle: "Not on-call now"
+        primary: i18n.t("profile.oncall.primary_now"),
+        escalation: i18n.t("profile.oncall.backup_now"),
+        idle: i18n.t("profile.oncall.not_oncall")
     };
 
     return $("<span>")
         .addClass("status-pill")
         .addClass(oncallStatusPillClass(status))
-        .text(textByStatus[status] || "Unknown");
+        .text(textByStatus[status] || i18n.t("profile.common.unknown"));
 }
 
 function renderOncallPrimarySlotCard(slot) {
@@ -28,15 +28,15 @@ function renderOncallPrimarySlotCard(slot) {
     card.append(
         $("<div>")
             .addClass("slot-title")
-            .text(oncallDisplayName(slot.team_name, slot.team_slug, "Team"))
+            .text(oncallDisplayName(slot.team_name, slot.team_slug, i18n.t("profile.oncall.team")))
     );
 
     card.append(
         $("<div>")
             .addClass("slot-meta")
             .text([
-                slot.rotation_name || ("Rotation #" + slot.rotation_id),
-                slot.layer_name || (slot.type === "override" ? "Override" : "Layer"),
+                slot.rotation_name || i18n.t("profile.oncall.rotation", {id: slot.rotation_id}),
+                slot.layer_name || (slot.type === "override" ? i18n.t("profile.oncall.override") : i18n.t("profile.oncall.layer")),
                 slot.timezone || "UTC"
             ].filter(Boolean).join(" · "))
     );
@@ -68,16 +68,16 @@ function renderOncallEscalationCard(item) {
     card.append(
         $("<div>")
             .addClass("slot-title")
-            .text(oncallDisplayName(item.team_name, item.team_slug, item.team_display || "Team"))
+            .text(oncallDisplayName(item.team_name, item.team_slug, item.team_display || i18n.t("profile.oncall.team")))
     );
 
     card.append(
         $("<div>")
             .addClass("slot-meta")
             .text([
-                item.policy_name || ("Policy #" + item.policy_id),
-                "level " + (item.level || "-"),
-                item.delay_seconds ? "after " + Math.round(Number(item.delay_seconds) / 60) + " min" : null
+                item.policy_name || i18n.t("profile.oncall.policy", {id: item.policy_id}),
+                i18n.t("profile.oncall.level", {level: item.level || "-"}),
+                item.delay_seconds ? i18n.t("profile.oncall.after_minutes", {count: Math.round(Number(item.delay_seconds) / 60)}) : null
             ].filter(Boolean).join(" · "))
     );
 
@@ -86,7 +86,7 @@ function renderOncallEscalationCard(item) {
             $("<div>")
                 .addClass("slot-time")
                 .text(
-                    (item.rotation_name || ("Rotation #" + item.rotation_id))
+                    (item.rotation_name || i18n.t("profile.oncall.rotation", {id: item.rotation_id}))
                     + " · "
                     + oncallFormatDate(item.start, item.timezone)
                     + " → "
@@ -97,7 +97,7 @@ function renderOncallEscalationCard(item) {
         card.append(
             $("<div>")
                 .addClass("slot-time")
-                .text("Direct user escalation target")
+                .text(i18n.t("profile.oncall.direct_target"))
         );
     }
 
@@ -149,7 +149,7 @@ function renderOncallStatusPanel(target, data) {
         $("<button>")
             .attr("type", "button")
             .addClass("btn btn-small")
-            .text("Refresh")
+            .text(i18n.t("profile.actions.refresh"))
             .on("click", function () {
                 loadOncallStatusPanel(root);
             })
@@ -159,37 +159,37 @@ function renderOncallStatusPanel(target, data) {
 
     root.append(
         renderOncallSection(
-            "Current primary shifts",
+            i18n.t("profile.oncall.current_primary"),
             current,
             renderOncallPrimarySlotCard,
-            "You are not primary on-call now."
+            i18n.t("profile.oncall.no_current_primary")
         )
     );
 
     root.append(
         renderOncallSection(
-            "Current escalation backup",
+            i18n.t("profile.oncall.current_backup"),
             escalationCurrent,
             renderOncallEscalationCard,
-            "You are not an active escalation backup now."
+            i18n.t("profile.oncall.no_current_backup")
         )
     );
 
     root.append(
         renderOncallSection(
-            "Next primary shifts",
+            i18n.t("profile.oncall.next_primary"),
             next,
             renderOncallPrimarySlotCard,
-            "No upcoming primary shifts in the selected lookahead window."
+            i18n.t("profile.oncall.no_next_primary")
         )
     );
 
     root.append(
         renderOncallSection(
-            "Next escalation backup shifts",
+            i18n.t("profile.oncall.next_backup"),
             escalationNext,
             renderOncallEscalationCard,
-            "No upcoming escalation backup shifts in the selected lookahead window."
+            i18n.t("profile.oncall.no_next_backup")
         )
     );
 }
@@ -203,7 +203,7 @@ function loadOncallStatusPanel(target, options) {
     root.empty().append(
         $("<div>")
             .addClass("empty")
-            .text("Loading on-call status...")
+            .text(i18n.t("profile.oncall.loading"))
     );
 
     apiGet(endpoint + "?days=" + encodeURIComponent(days), function (data) {

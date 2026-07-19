@@ -225,18 +225,33 @@ function findMatcherPresetById(presets, presetId) {
 
 
 function formatMatcherPresetOption(preset) {
-    return preset.name + " · v" + Number(preset.version || 1) + (preset.enabled ? "" : " · Disabled");
+    return (
+        preset.name
+        + " · v"
+        + Number(preset.version || 1)
+        + (
+            preset.enabled
+                ? ""
+                : " · " + i18n.t("matcher.preset.disabled_suffix")
+        )
+    );
 }
 
 
 function fillMatcherPresetSelect(selector, presets, selectedPresetId) {
     const select = $(selector);
 
-    select.empty().append($("<option>").val("").text("No preset"));
+    select.empty().append(
+        $("<option>")
+            .val("")
+            .text(i18n.t("matcher.preset.none"))
+    );
 
     asArray(presets).forEach(function (preset) {
         const selected = Number(preset.id) === Number(selectedPresetId);
-        const option = $("<option>").val(String(preset.id)).text(formatMatcherPresetOption(preset));
+        const option = $("<option>")
+            .val(String(preset.id))
+            .text(formatMatcherPresetOption(preset));
 
         if (!preset.enabled && !selected) {
             option.prop("disabled", true);
@@ -251,14 +266,17 @@ function fillMatcherPresetSelect(selector, presets, selectedPresetId) {
 
 function matcherPresetAndLocalHint(preset) {
     if (!preset) {
-        return "No preset selected. Only the additional matchers below will be evaluated.";
+        return i18n.t("matcher.preset.none_hint");
     }
 
     if (!preset.enabled) {
-        return "This preset is disabled. Matching will not succeed until the preset is enabled.";
+        return i18n.t("matcher.preset.disabled_hint");
     }
 
-    return "Preset \"" + preset.name + "\" v" + Number(preset.version || 1) + " and the additional matchers must both match.";
+    return i18n.t("matcher.preset.match_both", {
+        name: preset.name,
+        version: Number(preset.version || 1),
+    });
 }
 
 

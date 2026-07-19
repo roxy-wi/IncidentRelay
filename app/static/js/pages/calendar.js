@@ -7,7 +7,27 @@ let selectedCalendarClippedStart = null;
 let selectedCalendarClippedEnd = null;
 let calendarExportFeed = null;
 
-const calendarWeekdaysShort = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const calendarWeekdaysShort = [
+    i18n.t("calendar.weekdays.sun"),
+    i18n.t("calendar.weekdays.mon"),
+    i18n.t("calendar.weekdays.tue"),
+    i18n.t("calendar.weekdays.wed"),
+    i18n.t("calendar.weekdays.thu"),
+    i18n.t("calendar.weekdays.fri"),
+    i18n.t("calendar.weekdays.sat"),
+];
+
+function getCalendarLocale() {
+    return i18n.locale === "ru" ? "ru-RU" : "en-GB";
+}
+
+function formatCalendarDateForTitle(date, options) {
+    return new Intl.DateTimeFormat(
+        getCalendarLocale(),
+        options
+    ).format(date);
+}
+
 
 const calendarUserColors = [
     "#1f77b4",
@@ -282,39 +302,55 @@ function calendarDaysBetween(start, end) {
 
 function calendarWeekdayLabel(date) {
     /*
-     * Return weekday label with European short date.
+     * Return a localized weekday label with a short date.
      */
 
-    return calendarWeekdaysShort[date.getDay()] + " " + formatShortDate(date);
+    return formatCalendarDateForTitle(date, {
+        weekday: "short",
+        day: "2-digit",
+        month: "2-digit",
+    });
 }
 
 
 function calendarRangeLabel(start, end) {
     /*
-     * Format a European date range.
+     * Format a localized inclusive date range.
      */
 
     const endInclusive = addCalendarDays(end, -1);
+    const formatter = new Intl.DateTimeFormat(getCalendarLocale(), {
+        day: "2-digit",
+        month: "long",
+        year: "numeric",
+    });
 
-    return formatDate(start) + " - " + formatDate(endInclusive);
+    if (typeof formatter.formatRange === "function") {
+        return formatter.formatRange(start, endInclusive);
+    }
+
+    return formatter.format(start) + " – " + formatter.format(endInclusive);
 }
 
 
 function calendarMonthLabel(start) {
     /*
-     * Format month title using numeric European style.
+     * Format the month title in the selected interface language.
      */
 
-    return padDateTimePart(start.getMonth() + 1) + "." + start.getFullYear();
+    return formatCalendarDateForTitle(start, {
+        month: "long",
+        year: "numeric",
+    });
 }
 
 
 function getCalendarUserLabel(event) {
-    /*
-     * Return display name for event user.
-     */
-
-    return event.display_name || event.username || ("user-" + event.user_id);
+    return (
+        event.display_name
+        || event.username
+        || i18n.t("calendar.fallback.user", {id: event.user_id})
+    );
 }
 
 
@@ -677,7 +713,7 @@ function updateCalendarRotationFilter(calendars) {
         select.append(
             $("<option>")
                 .val(calendar.rotation_id)
-                .text(calendar.rotation_name || ("rotation #" + calendar.rotation_id))
+                .text(calendar.rotation_name || i18n.t("calendar.fallback.rotation", {id: calendar.rotation_id}))
         );
     });
 
@@ -742,7 +778,7 @@ function refreshCalendar() {
         grid.append(
             $("<div>")
                 .addClass("calendar-empty")
-                .text("No teams available.")
+                .text(i18n.t("calendar.empty.no_teams"))
         );
         $("#calendar-legend").empty();
         renderCalendarSummaryCards();
@@ -765,7 +801,7 @@ function refreshCalendar() {
                     event.team_id = getCalendarEventTeamId(event) || teamId;
                     event.team_slug = event.team_slug || team.slug;
                     event.team_name = event.team_name || team.name;
-                    event.display_name = event.display_name || event.username || ("user-" + event.user_id);
+                    event.display_name = event.display_name || event.username || i18n.t("calendar.fallback.user", {id: event.user_id});
                 });
 
                 calendarEventsCache = calendarEventsCache.concat(events);
@@ -874,7 +910,7 @@ function getRotationCalendarsFromEvents() {
                 team_name: event.team_name || visibleTeamIds[teamId].name,
                 team_slug: event.team_slug || visibleTeamIds[teamId].slug,
                 rotation_id: rotationId,
-                rotation_name: event.rotation_name || ("rotation #" + rotationId)
+                rotation_name: event.rotation_name || i18n.t("calendar.fallback.rotation", {id: rotationId})
             };
         }
     });
@@ -926,7 +962,7 @@ function renderRotationCalendars(monthMode) {
         grid.append(
             $("<div>")
                 .addClass("calendar-empty")
-                .text("No calendars found.")
+                .text(i18n.t("calendar.empty.no_calendars"))
         );
         $("#calendar-legend").empty();
         return;
@@ -966,7 +1002,7 @@ function renderRotationCalendarBlock(calendar, days, monthMode, rangeStart, rang
             .addClass("rotation-calendar-header")
             .append(
                 $("<div>")
-                    .append($("<h3>").text(calendar.rotation_name || ("rotation #" + calendar.rotation_id)))
+                    .append($("<h3>").text(calendar.rotation_name || i18n.t("calendar.fallback.rotation", {id: calendar.rotation_id})))
             )
     );
 
@@ -991,7 +1027,7 @@ function renderRotationWeekGrid(calendar, days) {
     header.append(
         $("<div>")
             .addClass("calendar-team-header")
-            .text("Calendar")
+            .text(i18n.t("calendar.labels.calendar"))
     );
 
     days.forEach(function (day) {
@@ -1015,7 +1051,7 @@ function renderRotationWeekGrid(calendar, days) {
                         "/calendar?team_id=" + calendar.team_id + "&rotation_id=" + calendar.rotation_id
                     )
                     .addClass("calendar-team-link")
-                    .text(calendar.team_name || calendar.team_slug || ("team #" + calendar.team_id))
+                    .text(calendar.team_name || calendar.team_slug || i18n.t("calendar.fallback.team", {id: calendar.team_id}))
                     .on("click", function (event) {
                         event.preventDefault();
                         openCalendarTeam(calendar.team_id, calendar.rotation_id);
@@ -1024,7 +1060,7 @@ function renderRotationWeekGrid(calendar, days) {
             .append(
                 $("<div>")
                     .addClass("calendar-team-subtitle")
-                    .text(calendar.rotation_name || ("rotation #" + calendar.rotation_id))
+                    .text(calendar.rotation_name || i18n.t("calendar.fallback.rotation", {id: calendar.rotation_id}))
             )
     );
 
@@ -1051,7 +1087,15 @@ function renderRotationMonthGrid(calendar, days, rangeStart, rangeEnd) {
     const header = $("<div>").addClass("calendar-month-header");
     const body = $("<div>").addClass("calendar-month-body");
 
-    ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"].forEach(function (weekday) {
+    [
+        i18n.t("calendar.weekdays.mon"),
+        i18n.t("calendar.weekdays.tue"),
+        i18n.t("calendar.weekdays.wed"),
+        i18n.t("calendar.weekdays.thu"),
+        i18n.t("calendar.weekdays.fri"),
+        i18n.t("calendar.weekdays.sat"),
+        i18n.t("calendar.weekdays.sun"),
+    ].forEach(function (weekday) {
         header.append(
             $("<div>")
                 .addClass("calendar-month-weekday")
@@ -1150,7 +1194,9 @@ function renderCalendarDayTimeline(events, dayStart, dayEnd, monthMode) {
         timeline.append(
             $("<div>")
                 .addClass("calendar-no-duty calendar-no-duty-timeline")
-                .text("-")
+                .attr("title", i18n.t("calendar.empty.no_duty"))
+                .attr("aria-label", i18n.t("calendar.empty.no_duty"))
+                .text("—")
         );
 
         return timeline;
@@ -1211,8 +1257,8 @@ function renderCalendarTimelineAssignment(event, dayStart, dayEnd, monthMode) {
     const label = getCalendarUserLabel(event);
     const color = getCalendarUserColor(event.user_id);
     const layerLabel = event.type === "override"
-        ? "override"
-        : (event.layer_name || "final");
+        ? i18n.t("calendar.labels.override_lower")
+        : (event.layer_name || i18n.t("calendar.labels.final"));
 
     const item = $("<button>")
         .attr("type", "button")
@@ -1228,15 +1274,23 @@ function renderCalendarTimelineAssignment(event, dayStart, dayEnd, monthMode) {
         )
         .attr(
             "title",
-            label +
-            " / " +
-            (event.rotation_name || "-") +
-            " / " +
-            layerLabel +
-            " / " +
-            formatTimeMinutesInTimezone(clippedStart, displayTimezone) +
-            " - " +
-            formatTimeMinutesInTimezone(clippedEnd, displayTimezone)
+            i18n.t("calendar.assignment.tooltip", {
+                user: label,
+                rotation: event.rotation_name || "-",
+                layer: layerLabel,
+                start: formatTimeMinutesInTimezone(clippedStart, displayTimezone),
+                end: formatTimeMinutesInTimezone(clippedEnd, displayTimezone),
+            })
+        )
+        .attr(
+            "aria-label",
+            i18n.t("calendar.assignment.tooltip", {
+                user: label,
+                rotation: event.rotation_name || "-",
+                layer: layerLabel,
+                start: formatTimeMinutesInTimezone(clippedStart, displayTimezone),
+                end: formatTimeMinutesInTimezone(clippedEnd, displayTimezone),
+            })
         )
         .on("click", function () {
             renderCalendarDetails(event, clippedStart, clippedEnd);
@@ -1252,7 +1306,7 @@ function renderCalendarTimelineAssignment(event, dayStart, dayEnd, monthMode) {
         item.append(
             $("<span>")
                 .addClass("calendar-assignment-badge")
-                .text("override")
+                .text(i18n.t("calendar.labels.override_lower"))
         );
     }
 
@@ -1440,13 +1494,11 @@ function calendarDetailsItem(label, value) {
 
 
 function renderCalendarDetails(event, clippedStart, clippedEnd) {
-    /*
-     * Render selected assignment details.
-     */
-
     const userLabel = getCalendarUserLabel(event);
     const body = $("#calendar-details-body");
-    const typeLabel = event.type === "override" ? "override" : "scheduled layer";
+    const typeLabel = event.type === "override"
+        ? i18n.t("calendar.labels.override_lower")
+        : i18n.t("calendar.labels.scheduled_layer");
     const displayTimezone = getCalendarEventTimezone(event);
     const sourceTimezone = getCalendarSourceTimezone(event);
 
@@ -1454,7 +1506,11 @@ function renderCalendarDetails(event, clippedStart, clippedEnd) {
     selectedCalendarClippedStart = clippedStart;
     selectedCalendarClippedEnd = clippedEnd;
 
-    $("#calendar-details-subtitle").text(event.team_name || event.team_slug || "Selected shift");
+    $("#calendar-details-subtitle").text(
+        event.team_name
+        || event.team_slug
+        || i18n.t("calendar.labels.selected_shift")
+    );
 
     body.empty();
 
@@ -1476,41 +1532,94 @@ function renderCalendarDetails(event, clippedStart, clippedEnd) {
                     .append(
                         $("<div>")
                             .addClass("details-meta")
-                            .text(event.username || "On-call user")
+                            .text(
+                                event.username
+                                || i18n.t("calendar.labels.on_call_user")
+                            )
                     )
             )
     );
 
     const details = $("<div>")
         .addClass("details-list")
-        .append(calendarDetailsItem("Team", event.team_name || event.team_slug))
-        .append(calendarDetailsItem("Rotation", event.rotation_name))
-        .append(calendarDetailsItem("Layer", event.layer_name || (event.type === "override" ? "Override" : "Final schedule")))
-        .append(calendarDetailsItem("Layer priority", event.layer_priority === null || event.layer_priority === undefined ? "-" : String(event.layer_priority)))
-        .append(calendarDetailsItem("Timezone", displayTimezone))
+        .append(
+            calendarDetailsItem(
+                i18n.t("calendar.labels.team"),
+                event.team_name || event.team_slug
+            )
+        )
+        .append(
+            calendarDetailsItem(
+                i18n.t("calendar.labels.rotation"),
+                event.rotation_name
+            )
+        )
+        .append(
+            calendarDetailsItem(
+                i18n.t("calendar.labels.layer"),
+                event.layer_name
+                || (
+                    event.type === "override"
+                    ? i18n.t("calendar.labels.override")
+                    : i18n.t("calendar.labels.final_schedule")
+                )
+            )
+        )
+        .append(
+            calendarDetailsItem(
+                i18n.t("calendar.labels.layer_priority"),
+                event.layer_priority === null
+                || event.layer_priority === undefined
+                    ? "-"
+                    : String(event.layer_priority)
+            )
+        )
+        .append(
+            calendarDetailsItem(
+                i18n.t("calendar.labels.timezone"),
+                displayTimezone
+            )
+        )
         .append(
             sourceTimezone !== displayTimezone
-                ? calendarDetailsItem("Source timezone", sourceTimezone)
+                ? calendarDetailsItem(
+                    i18n.t("calendar.labels.source_timezone"),
+                    sourceTimezone
+                )
                 : $("")
         )
-        .append(calendarDetailsItem("Type", typeLabel))
-        .append(calendarDetailsItem(
-            "Start",
-            formatDateTimeMinutesInTimezone(
-                clippedStart || event.start,
-                displayTimezone
+        .append(
+            calendarDetailsItem(
+                i18n.t("calendar.labels.type"),
+                typeLabel
             )
-        ))
-        .append(calendarDetailsItem(
-            "End",
-            formatDateTimeMinutesInTimezone(
-                clippedEnd || event.end,
-                displayTimezone
+        )
+        .append(
+            calendarDetailsItem(
+                i18n.t("calendar.labels.start"),
+                formatDateTimeMinutesInTimezone(
+                    clippedStart || event.start,
+                    displayTimezone
+                )
             )
-        ))
+        )
+        .append(
+            calendarDetailsItem(
+                i18n.t("calendar.labels.end"),
+                formatDateTimeMinutesInTimezone(
+                    clippedEnd || event.end,
+                    displayTimezone
+                )
+            )
+        );
 
     if (event.reason) {
-        details.append(calendarDetailsItem("Reason", event.reason));
+        details.append(
+            calendarDetailsItem(
+                i18n.t("calendar.labels.reason"),
+                event.reason
+            )
+        );
     }
 
     body.append(details);
@@ -1521,7 +1630,7 @@ function renderCalendarDetails(event, clippedStart, clippedEnd) {
         actions.append(
             makeIconButton({
                 icon: "fas fa-user-clock",
-                label: "Create override",
+                label: i18n.t("calendar.actions.create_override"),
                 onClick: function () {
                     openCalendarOverrideModal(event, clippedStart, clippedEnd);
                 }
@@ -1536,18 +1645,20 @@ function renderCalendarDetails(event, clippedStart, clippedEnd) {
 
 
 function renderCalendarDetailsEmpty() {
-    /*
-     * Reset details panel.
-     */
-
     selectedCalendarEvent = null;
     selectedCalendarClippedStart = null;
     selectedCalendarClippedEnd = null;
 
-    $("#calendar-details-subtitle").text("Select an assignment");
-    $("#calendar-details-body").html(
-        '<div class="empty-state">Click any shift in the calendar to see user, team, rotation and time range.</div>'
+    $("#calendar-details-subtitle").text(
+        i18n.t("calendar.details.select_assignment")
     );
+    $("#calendar-details-body")
+        .empty()
+        .append(
+            $("<div>")
+                .addClass("empty-state")
+                .text(i18n.t("calendar.details.empty"))
+        );
 }
 
 
@@ -1579,7 +1690,7 @@ function openCalendarOverrideModal(event, clippedStart, clippedEnd) {
      */
 
     if (!event || !event.rotation_id) {
-        showAppError("This calendar item is not linked to a rotation.");
+        showAppError(i18n.t("calendar.errors.no_rotation"));
         return;
     }
 
@@ -1659,7 +1770,7 @@ function openCalendarExportModal() {
     const teamId = getCalendarExportTeamId();
 
     if (!teamId) {
-        setCalendarExportStatus("Select a team before exporting calendar.", true);
+        setCalendarExportStatus(i18n.t("calendar.export.select_team"), true);
         return;
     }
 
@@ -1676,7 +1787,7 @@ function openCalendarExportModal() {
 
             if (!feeds.length) {
                 setCalendarExportStatus(
-                    "No subscription URL exists yet. Click Create URL.",
+                    i18n.t("calendar.export.not_created"),
                     false
                 );
                 return;
@@ -1688,7 +1799,7 @@ function openCalendarExportModal() {
                 $("#calendar-export-url").val(calendarExportFeed.feed_url);
             } else {
                 setCalendarExportStatus(
-                    "This URL was created earlier and cannot be shown again. Click Regenerate to create a new URL.",
+                    i18n.t("calendar.export.hidden_token"),
                     true
                 );
             }
@@ -1699,7 +1810,7 @@ function openCalendarExportModal() {
 function createCalendarExportFeed() {
     const teamId = getCalendarExportTeamId();
     if (!teamId) {
-        setCalendarExportStatus("Select a team before exporting calendar.", true);
+        setCalendarExportStatus(i18n.t("calendar.export.select_team"), true);
         return;
     }
 
@@ -1707,14 +1818,14 @@ function createCalendarExportFeed() {
         "/api/calendar/feeds",
         {
             team_id: teamId,
-            name: "On-call calendar",
+            name: i18n.t("calendar.export.feed_name"),
             past_days: 7,
             future_days: 90
         },
         function (feed) {
             calendarExportFeed = feed;
             $("#calendar-export-url").val(feed.feed_url || "");
-            setCalendarExportStatus("Subscription URL created. Copy it now.", false);
+            setCalendarExportStatus(i18n.t("calendar.export.created"), false);
         }
     );
 }
@@ -1725,38 +1836,60 @@ function regenerateCalendarExportFeed() {
         return;
     }
 
-    apiPost(
-        "/api/calendar/feeds/" + calendarExportFeed.id + "/token",
-        {},
-        function (feed) {
-            calendarExportFeed = feed;
-            $("#calendar-export-url").val(feed.feed_url || "");
-            setCalendarExportStatus(
-                "Subscription URL regenerated. The old URL no longer works.",
-                false
-            );
+    showAppConfirm({
+        title: i18n.t("calendar.export.regenerate_confirm_title"),
+        message: i18n.t("calendar.export.regenerate_confirm_message"),
+        confirmText: i18n.t("calendar.export.regenerate_confirm"),
+        confirmClass: "btn-danger",
+    }).done(function () {
+        apiPost(
+            "/api/calendar/feeds/" + calendarExportFeed.id + "/token",
+            {},
+            function (feed) {
+                calendarExportFeed = feed;
+                $("#calendar-export-url").val(feed.feed_url || "");
+                setCalendarExportStatus(
+                    i18n.t("calendar.export.regenerated"),
+                    false
+                );
+            }
+        );
+    });
+}
+
+function copyCalendarExportUrlFallback() {
+    $("#calendar-export-url").trigger("select");
+
+    try {
+        if (document.execCommand("copy")) {
+            setCalendarExportStatus(i18n.t("calendar.export.copied"), false);
+            return;
         }
-    );
+    } catch (error) {
+        // The localized status below is enough for the user.
+    }
+
+    setCalendarExportStatus(i18n.t("calendar.export.copy_failed"), true);
 }
 
 function copyCalendarExportUrl() {
     const value = $("#calendar-export-url").val() || "";
 
     if (!value) {
-        setCalendarExportStatus("There is no URL to copy.", true);
+        setCalendarExportStatus(i18n.t("calendar.export.no_url"), true);
         return;
     }
 
     if (navigator.clipboard && navigator.clipboard.writeText) {
-        navigator.clipboard.writeText(value).then(function () {
-            setCalendarExportStatus("Subscription URL copied.", false);
-        });
+        navigator.clipboard.writeText(value)
+            .then(function () {
+                setCalendarExportStatus(i18n.t("calendar.export.copied"), false);
+            })
+            .catch(copyCalendarExportUrlFallback);
         return;
     }
 
-    $("#calendar-export-url").trigger("select");
-    document.execCommand("copy");
-    setCalendarExportStatus("Subscription URL copied.", false);
+    copyCalendarExportUrlFallback();
 }
 
 function closeCalendarExportModal() {

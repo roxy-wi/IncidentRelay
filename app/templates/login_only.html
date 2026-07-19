@@ -1,20 +1,29 @@
 <!DOCTYPE html>
-<html lang="en">
+<html lang="{{ current_locale }}">
 <head>
     <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='images/favicon/apple-touch-icon.png') }}">
     <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='images/favicon/favicon-32x32.png') }}">
     <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='images/favicon/favicon-16x16.png') }}">
     <link rel="shortcut icon" href="{{ url_for('static', filename='images/favicon/favicon.ico') }}">
-    <link rel="manifest" href="{{ url_for('static', filename='images/favicon/site.webmanifest') }}">
+    <link rel="manifest" href="/manifest.webmanifest?v=1.0.3">
     <meta name="theme-color" content="#0b5cff">
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>IncidentRelay - Login</title>
+    <title>IncidentRelay - {{ _('login.title') }}</title>
     <link rel="stylesheet" href="/static/css/login.css">
     <link rel="stylesheet" href="/static/css/oncall.css">
     <link rel="stylesheet" href="/static/css/material.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='/css/vendor/fontawesome/all.min.css') }}">
-    <script src="/static/js/vendor/jquery-3.7.1.min.js"></script>
+    <script>
+ window.__INCIDENTRELAY_I18N__ = {
+  locale: {{ current_locale | tojson }},
+  supportedLocales: {{ supported_locales | tojson }},
+  messages: {{ i18n_messages | tojson }}
+ };
+ </script>
+ <script src="{{ url_for('static', filename='js/core/i18n.js') }}"></script>
+
+ <script src="/static/js/vendor/jquery-3.7.1.min.js"></script>
     <script src="/static/js/core/api.js"></script>
     <script src="/static/js/core/auth.js"></script>
     <script src="/static/js/pages/login.js"></script>
@@ -33,57 +42,57 @@
         </div>
 
         <div class="login-form-wrap">
-            <div class="login-badge">Secure operator access</div>
+            <div class="login-badge">{{ _('login.badge') }}</div>
 
-            <h1>Sign in</h1>
+            <h1>{{ _('login.heading') }}</h1>
             <p class="login-description">
-                Manage schedules, acknowledge alerts and coordinate incident response from one place.
+                {{ _('login.description') }}
             </p>
 
-            <div id="login-status" class="login-error" style="display:none;"></div>
+            <div class="form-group">
+  <label for="login-language-select">{{ _('common.language') }}</label>
+  <select id="login-language-select" class="input" data-locale-select>
+  {% for locale_code, locale_name in supported_locales.items() %}
+   <option value="{{ locale_code }}"{% if locale_code == current_locale %} selected{% endif %}>{{ locale_name }}</option>
+  {% endfor %}
+  </select>
+ </div>
+ <div id="login-status" class="login-error" style="display:none;"></div>
 
             <form id="login-form" method="post" action="/api/auth/login">
                 <div class="form-group">
-                    <label for="username">Username</label>
+                    <label for="username">{{ _('login.username') }}</label>
                     <input
                         id="username"
                         name="username"
                         type="text"
-                        placeholder="Enter username"
+                        placeholder="{{ _('login.username_placeholder') }}"
                         autocomplete="username"
                     >
                 </div>
 
                 <div class="form-group">
-                    <label for="password">Password</label>
+                    <label for="password">{{ _('login.password') }}</label>
                     <input
                         id="password"
                         name="password"
                         type="password"
-                        placeholder="Enter password"
+                        placeholder="{{ _('login.password_placeholder') }}"
                         autocomplete="current-password"
                     >
                 </div>
 
-                <button type="submit" class="btn-login">Sign in</button>
+                <button type="submit" class="btn-login">{{ _('login.submit') }}</button>
             </form>
         </div>
         <div id="sso-login-section" class="login-sso-section" style="display: none;">
           <div class="login-divider">
-            <span>or continue with SSO</span>
+            <span>{{ _('login.sso') }}</span>
           </div>
 
           <div id="sso-provider-buttons" class="login-sso-buttons"></div>
         </div>
     </div>
 </div>
-<script>
-$(function () {
-    $('#login-form').on('submit', function (e) {
-        login();
-        e.preventDefault();
-    });
-});
-</script>
 </body>
 </html>

@@ -39,6 +39,23 @@ def get_bearer_token():
     return auth_header.split(" ", 1)[1].strip()
 
 
+def get_json_routing_key():
+    """Return PagerDuty-compatible routing_key from a JSON request body."""
+
+    payload = request.get_json(silent=True)
+
+    if not isinstance(payload, dict):
+        return None
+
+    routing_key = payload.get("routing_key")
+
+    if routing_key is None:
+        return None
+
+    routing_key = str(routing_key).strip()
+    return routing_key or None
+
+
 def authenticate_api_token(raw_token=None):
     """
     Authenticate a stored API token.
@@ -162,18 +179,36 @@ def require_api_token(scopes=None, required=None):
     return decorator
 
 
-def require_alert_token():
+def require_alert_token(allow_json_routing_key=False):
     """
     Require a token that can submit incoming alerts.
 
     Accepted tokens:
     - personal/API token with alerts:write scope;
-    - route intake token created on the Routes page.
+    - route intake token created on the Routes page;
+    - PagerDuty-compatible JSON routing_key when explicitly enabled.
+
+    routing_key is checked before Authorization so it remains the routing
+    boundary for PagerDuty Events API v2-compatible requests.
     """
 
     def decorator(func):
         @wraps(func)
         def wrapper(*args, **kwargs):
+            if allow_json_routing_key:
+                routing_key = get_json_routing_key()
+
+                if routing_key:
+                    route = authenticate_route_token(routing_key)
+
+                    if route:
+                        request.current_auth_type = "pagerduty_routing_key"
+                        return func(*args, **kwargs)
+
+                    # Do not silently fall back to another credential when a
+                    # sender explicitly supplied a PagerDuty routing key.
+                    return jsonify({"error": "Route intake token is required"}), 401
+
             raw_token = get_bearer_token()
 
             api_token = authenticate_api_token(raw_token)

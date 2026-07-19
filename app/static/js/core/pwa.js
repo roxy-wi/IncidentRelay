@@ -1,6 +1,29 @@
 let incidentRelayInstallPrompt = null;
 let incidentRelayPwaRefreshing = false;
 
+function currentIncidentRelayLocale() {
+    if (window.i18n && i18n.locale) {
+        return i18n.locale;
+    }
+
+    return document.documentElement.lang || navigator.language || "en";
+}
+
+function syncIncidentRelayServiceWorkerLocale(registration) {
+    if (!registration) {
+        return;
+    }
+
+    const worker = registration.active || registration.waiting || registration.installing;
+
+    if (worker) {
+        worker.postMessage({
+            type: "SET_LOCALE",
+            locale: currentIncidentRelayLocale()
+        });
+    }
+}
+
 function isIncidentRelayPwaStandalone() {
     return (
         window.matchMedia("(display-mode: standalone)").matches
@@ -39,6 +62,8 @@ function registerIncidentRelayServiceWorker() {
     navigator.serviceWorker.register("/service-worker.js", {
         scope: "/"
     }).then(function (registration) {
+        syncIncidentRelayServiceWorkerLocale(registration);
+
         if (registration.waiting) {
             registration.waiting.postMessage({type: "SKIP_WAITING"});
         }
@@ -69,6 +94,11 @@ function registerIncidentRelayServiceWorker() {
         }
 
         incidentRelayPwaRefreshing = true;
+
+        navigator.serviceWorker.ready.then(function (registration) {
+            syncIncidentRelayServiceWorkerLocale(registration);
+        });
+
         window.location.reload();
     });
 }

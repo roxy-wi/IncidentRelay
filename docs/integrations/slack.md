@@ -12,6 +12,11 @@ IncidentRelay supports two Slack delivery modes:
 1. Incoming webhook mode for one-way notifications.
 2. Bot API mode with interactive `Acknowledge` and `Resolve` buttons and message updates.
 
+Bot API interactive actions can be received in two ways:
+
+- HTTP Request URL with a signing secret;
+- Socket Mode through an outbound WebSocket connection with an app-level token.
+
 Bot API mode is recommended when responders should manage alerts directly from Slack.
 
 ## Incoming webhook mode
@@ -39,14 +44,27 @@ Bot API mode supports:
 - removing actions after the alert is resolved;
 - optional attribution to an IncidentRelay user.
 
-Typical channel configuration:
+HTTP actions configuration:
 
 ```json
 {
   "mode": "bot_api",
+  "connection_mode": "http",
   "bot_token": "xoxb-...",
   "channel_id": "C0123456789",
   "signing_secret": "..."
+}
+```
+
+Socket Mode configuration:
+
+```json
+{
+  "mode": "bot_api",
+  "connection_mode": "socket_mode",
+  "bot_token": "xoxb-...",
+  "app_token": "xapp-...",
+  "channel_id": "C0123456789"
 }
 ```
 
@@ -67,7 +85,12 @@ Typical channel configuration:
 
 IncidentRelay uses `chat.postMessage` to send messages and `chat.update` to update existing messages.
 
-## Enable interactive actions
+## Choose the interactive action transport
+
+### HTTP Request URL
+
+Use HTTP mode when Slack can reach IncidentRelay over public HTTPS.
+
 
 Open **Interactivity & Shortcuts** in the Slack app settings and enable interactivity.
 
@@ -95,6 +118,37 @@ Copy the **Signing Secret** into the IncidentRelay Slack channel configuration.
 
 Do not use the old Slack verification token. IncidentRelay validates signed requests using the signing secret.
 
+## Socket Mode
+
+Socket Mode is recommended for private networks, NAT and firewall-restricted installations. IncidentRelay opens an outbound WebSocket connection to Slack, so no public Request URL or `public_base_url` is required for the action buttons.
+
+In the Slack app settings:
+
+1. Open **Settings → Socket Mode** and enable Socket Mode.
+2. Open **Basic Information → App-Level Tokens**.
+3. Generate a token with the `connections:write` scope.
+4. Copy the token beginning with `xapp-`.
+5. Keep **Interactivity & Shortcuts** enabled; no Request URL is needed in Socket Mode.
+
+In IncidentRelay select **Bot API → Socket Mode** and enter the bot token, app-level token and Slack channel ID.
+
+The Slack worker must be running. Docker Compose includes `incidentrelay-slack`. For systemd:
+
+```bash
+sudo cp etc/systemd/incidentrelay-slack-worker.service /etc/systemd/system/
+sudo systemctl daemon-reload
+sudo systemctl enable --now incidentrelay-slack-worker
+```
+
+Check status:
+
+```bash
+systemctl status incidentrelay-slack-worker
+journalctl -u incidentrelay-slack-worker -f
+```
+
+One Socket Mode connection is opened for each distinct app-level token. Multiple IncidentRelay Slack channels may share the same Slack app and app-level token.
+
 ## Find the channel ID
 
 Open the target Slack channel and copy its channel ID.
@@ -116,28 +170,15 @@ In IncidentRelay:
 1. Open **Channels**.
 2. Create or edit a Slack channel.
 3. Select **Bot API**.
-4. Enter:
-   - Bot token;
-   - Channel ID;
-   - Signing secret.
-5. Save the channel.
-6. Attach the channel to the required route.
-7. Send a test notification or a real test alert.
+4. Enter the Bot token and Channel ID.
+5. Select the interactive action connection:
+   - **HTTP Request URL** and enter the Signing Secret; or
+   - **Socket Mode** and enter the App-Level Token.
+6. Save the channel.
+7. Attach the channel to the required route.
+8. Send a test notification or a real test alert.
 
-For interactive actions, configure the public URL:
-
-```ini
-[server]
-public_base_url = https://incidentrelay.example.com
-```
-
-The Slack workspace must be able to reach:
-
-```text
-POST /api/integrations/slack/actions
-```
-
-Use HTTPS in production.
+For HTTP interactive actions, configure `public_base_url` and ensure Slack can reach `POST /api/integrations/slack/actions` over HTTPS. Socket Mode does not require this endpoint to be publicly reachable.
 
 ## User attribution
 
@@ -251,3 +292,40 @@ Incoming webhook deliveries cannot be updated.
 - [chat.postMessage](https://api.slack.com/methods/chat.postMessage)
 - [chat.update](https://api.slack.com/methods/chat.update)
 - [Incoming webhooks](https://api.slack.com/messaging/webhooks)
+
+### Socket Mode worker has no connections
+
+Check that:
+
+- the Slack channel is enabled;
+- `connection_mode` is `socket_mode`;
+- the app token starts with `xapp-`;
+- the app token has `connections:write`;
+- Socket Mode is enabled in the Slack app;
+- the Slack worker service or container is running;
+- outbound HTTPS and WebSocket connections to Slack are allowed.
+
+## Slack worker logging
+
+The Socket Mode worker uses the `slack` logging role and writes JSON logs to a separate file. Configure the path in `incidentrelay.conf`:
+
+```ini
+[logging]
+slack_worker_file = /var/log/incidentrelay/incidentrelay-slack-worker.log
+```
+
+The file contains `oncall.slack`, `oncall.slack.socket`, and worker-level `oncall.error` events. The packaged logrotate rule already covers this file through `/var/log/incidentrelay/*.log`.
+
+For systemd installations:
+
+```bash
+tail -f /var/log/incidentrelay/incidentrelay-slack-worker.log
+journalctl -u incidentrelay-slack-worker -f
+```
+
+For Docker Compose:
+
+```bash
+docker compose exec incidentrelay-slack \
+  tail -f /var/log/incidentrelay/incidentrelay-slack-worker.log
+```

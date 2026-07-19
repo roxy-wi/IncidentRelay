@@ -178,7 +178,7 @@ function renderAdminUsersTable(users) {
                 $("<td>")
                     .attr("colspan", "7")
                     .addClass("empty-table-cell")
-                    .text("No users")
+                    .text(i18n.t("users.empty"))
             )
         );
         return;
@@ -203,7 +203,7 @@ function renderAdminUserRow(user) {
                 $("<button>")
                     .attr("type", "button")
                     .addClass("name-button")
-                    .text(user.display_name || user.username || ("User #" + user.id))
+                    .text(user.display_name || user.username || i18n.t("users.row.user_fallback", {id: user.id}))
                     .on("click", function () {
                         openExistingAdminUserModal(user);
                     })
@@ -220,7 +220,7 @@ function renderAdminUserRow(user) {
         $("<td>").append(
             $("<span>")
                 .addClass(user.is_admin ? "role-editor" : "role-viewer")
-                .text(user.is_admin ? "Admin" : "User")
+                .text(user.is_admin ? i18n.t("users.row.admin") : i18n.t("users.row.user"))
         )
     );
     row.append(
@@ -228,7 +228,7 @@ function renderAdminUserRow(user) {
             $("<span>")
                 .addClass("status-pill")
                 .addClass(user.active ? "status-active" : "status-inactive")
-                .text(user.active ? "Active" : "Inactive")
+                .text(user.active ? i18n.t("users.row.active") : i18n.t("users.row.inactive"))
         )
     );
     row.append(
@@ -247,11 +247,11 @@ function renderAdminUserContacts(user) {
      */
     const box = $("<div>").addClass("details-compact-list");
 
-    box.append($("<div>").text(user.email || "No email"));
+    box.append($("<div>").text(user.email || i18n.t("users.row.no_email")));
     box.append(
         $("<div>")
             .addClass("details-meta")
-            .text(user.phone || "No phone")
+            .text(user.phone || i18n.t("users.row.no_phone"))
     );
 
     return box;
@@ -264,16 +264,16 @@ function renderAdminUserMessengers(user) {
      */
     const box = $("<div>").addClass("details-compact-list");
 
-    box.append($("<div>").text("Telegram: " + (user.telegram_user_id || "-")));
+    box.append($("<div>").text(i18n.t("users.row.telegram", {id: user.telegram_user_id || "-"})));
     box.append(
         $("<div>")
             .addClass("details-meta")
-            .text("Slack: " + (user.slack_user_id || "-"))
+            .text(i18n.t("users.row.slack", {id: user.slack_user_id || "-"}))
     );
     box.append(
         $("<div>")
             .addClass("details-meta")
-            .text("Mattermost: " + (user.mattermost_user_id || "-"))
+            .text(i18n.t("users.row.mattermost", {id: user.mattermost_user_id || "-"}))
     );
 
     return box;
@@ -292,7 +292,7 @@ function renderAdminUserActions(user) {
 
     const items = [
         {
-            label: "Edit",
+            label: i18n.t("users.actions.edit"),
             icon: "fas fa-edit",
             visible: function () {
                 return typeof hasGroupUserAdminAccess === "function"
@@ -304,7 +304,7 @@ function renderAdminUserActions(user) {
             },
         },
         {
-            label: user.active ? "Disable" : "Enable",
+            label: user.active ? i18n.t("users.actions.disable") : i18n.t("users.actions.enable"),
             icon: user.active ? "fas fa-pause" : "fas fa-play",
             danger: user.active,
             visible: function () {
@@ -315,7 +315,7 @@ function renderAdminUserActions(user) {
             },
         },
         {
-            label: "Remove",
+            label: i18n.t("users.actions.remove"),
             icon: "fas fa-trash",
             danger: true,
             visible: function () {
@@ -340,7 +340,7 @@ function renderAdminUserActions(user) {
                 .append(
                     $("<span>")
                         .addClass("details-meta")
-                        .text("Current user")
+                        .text(i18n.t("users.row.current"))
                 );
         }
 
@@ -358,14 +358,14 @@ function renderAdminUserActionButtons(user) {
         $("<button>")
             .attr("type", "button")
             .addClass("btn btn-small")
-            .text("Edit")
+            .text(i18n.t("users.actions.edit"))
             .on("click", function () {
                 openExistingAdminUserModal(user);
             })
     );
 
     if (isCurrentAdminUser(user)) {
-        actions.append($("<span>").addClass("details-meta").text("Current user"));
+        actions.append($("<span>").addClass("details-meta").text(i18n.t("users.row.current")));
         return actions;
     }
 
@@ -374,7 +374,7 @@ function renderAdminUserActionButtons(user) {
             $("<button>")
                 .attr("type", "button")
                 .addClass("btn btn-warning btn-small")
-                .text("Disable")
+                .text(i18n.t("users.actions.disable"))
                 .on("click", function () {
                     setAdminUserActive(user, false);
                 })
@@ -384,7 +384,7 @@ function renderAdminUserActionButtons(user) {
             $("<button>")
                 .attr("type", "button")
                 .addClass("btn btn-success btn-small")
-                .text("Enable")
+                .text(i18n.t("users.actions.enable"))
                 .on("click", function () {
                     setAdminUserActive(user, true);
                 })
@@ -395,7 +395,7 @@ function renderAdminUserActionButtons(user) {
         $("<button>")
             .attr("type", "button")
             .addClass("btn btn-danger btn-small")
-            .text("Remove")
+            .text(i18n.t("users.actions.remove"))
             .on("click", function () {
                 removeAdminUser(user);
             })
@@ -414,7 +414,7 @@ function ensureAdminUsersPaginationControls() {
         id: "admin-users-pagination",
         prefix: "admin-users",
         tableSelector: "#admin-users-table",
-        rowsLabel: "Rows per page",
+        rowsLabel: i18n.t("users.pagination.rows"),
         pageSizeOptions: [10, 25, 50, 100],
     });
 }
@@ -433,7 +433,7 @@ function renderAdminUsersPagination(pagination) {
         tableSelector: "#admin-users-table",
         pagination: pagination,
         pageSize: adminUsersPageSize,
-        rowsLabel: "Rows per page",
+        rowsLabel: i18n.t("users.pagination.rows"),
         pageSizeOptions: [10, 25, 50, 100],
         alwaysVisible: true,
     });
@@ -516,9 +516,9 @@ function openNewAdminUserModal() {
     setAdminUserGroupControlsEnabled(true);
     applyAdminUserFormPermissions(null);
 
-    $("#admin-user-modal-title").text("New user");
-    $("#admin-user-modal-subtitle").text("Create local user account.");
-    $("#admin-user-password").attr("placeholder", "Password");
+    $("#admin-user-modal-title").text(i18n.t("users.modal.new"));
+    $("#admin-user-modal-subtitle").text(i18n.t("users.modal.new_subtitle"));
+    $("#admin-user-password").attr("placeholder", i18n.t("users.form.password"));
 
     openAdminUserModal();
 }
@@ -531,9 +531,9 @@ function openExistingAdminUserModal(user) {
     fillAdminUserForm(user);
     setAdminUserGroupControlsEnabled(true);
 
-    $("#admin-user-modal-title").text("User details");
-    $("#admin-user-modal-subtitle").text(user.display_name || user.username || ("User #" + user.id));
-    $("#admin-user-password").attr("placeholder", "Leave empty to keep current password");
+    $("#admin-user-modal-title").text(i18n.t("users.modal.details"));
+    $("#admin-user-modal-subtitle").text(user.display_name || user.username || i18n.t("users.modal.user_fallback", {id: user.id}));
+    $("#admin-user-password").attr("placeholder", i18n.t("users.form.password_keep"));
 
     applyAdminUserSelfProtection(user);
     applyAdminUserFormPermissions(user);
@@ -575,12 +575,12 @@ function validateAdminUserPayload(data, isCreate) {
      * Validate user form before sending it to the API.
      */
     if (!data.username) {
-        showAppError("Username is required");
+        showAppError(i18n.t("users.validation.username"));
         return false;
     }
 
     if (isCreate && !data.password) {
-        showAppError("Password is required for a new user");
+        showAppError(i18n.t("users.validation.password"));
         return false;
     }
 
@@ -680,7 +680,7 @@ function applyAdminUserSelfProtection(user) {
 
     $("#admin-user-active").prop("disabled", isSelf);
     $("#admin-user-active-help").text(
-        isSelf ? "You cannot disable your own account. Ask another global administrator to do it." : ""
+        isSelf ? i18n.t("users.self.disable_help") : ""
     );
 }
 
@@ -690,17 +690,17 @@ function setAdminUserActive(user, active) {
      * Enable or disable user through the update endpoint.
      */
     if (isCurrentAdminUser(user) && !active) {
-        showAppError("You cannot disable your own account.");
+        showAppError(i18n.t("users.self.disable_error"));
         return;
     }
 
-    const action = active ? "enable" : "disable";
+    const action = active ? i18n.t("users.confirm.enable") : i18n.t("users.confirm.disable");
     const btnClass = active ? "btn-success" : "btn-warning";
 
     showAppConfirm({
-        title: "Are you sure?",
-        message: "Are you sure you want to " + action + " this user?",
-        confirmText: upperCaseFirst(action),
+        title: i18n.t("users.confirm.title"),
+        message: i18n.t("users.confirm.toggle", {action: action}),
+        confirmText: active ? i18n.t("users.actions.enable") : i18n.t("users.actions.disable"),
         confirmClass: btnClass,
     }).done(function () {
         apiPut(
@@ -753,25 +753,18 @@ function removeAdminUser(user) {
      * Soft-delete a user from the admin workspace.
      */
     if (isCurrentAdminUser(user)) {
-        showAppError("You cannot remove your own account.");
+        showAppError(i18n.t("users.self.remove_error"));
         return;
     }
 
-    const message = [
-        "Remove user \"" + (user.username || user.id) + "\"?",
-        "",
-        "This will revoke personal API tokens and remove the user from groups,",
-        "teams, rotations and overrides.",
-        "",
-        "Historical alerts will be preserved.",
-        "",
-        "Continue?",
-    ].join("\n");
+    const message = i18n.t("users.confirm.remove_message", {
+        user: user.username || user.id,
+    });
 
     showAppConfirm({
-        title: "Remove user?",
+        title: i18n.t("users.confirm.remove_title"),
         message: message,
-        confirmText: "Remove user",
+        confirmText: i18n.t("users.confirm.remove"),
         confirmClass: "btn-danger",
     }).done(function () {
         apiDelete("/api/admin/users/" + user.id, function () {
@@ -791,7 +784,7 @@ function fillAdminUserGroupSelect() {
         select.append(
             $("<option>")
                 .val("")
-                .text("Do not add to group")
+                .text(i18n.t("users.form.no_group"))
         );
 
         asArray(groups).forEach(function (group) {
@@ -834,8 +827,8 @@ function setAdminUserGroupControlsEnabled(enabled) {
     $("#admin-user-group-role").prop("disabled", !enabled);
     $("#admin-user-group-help").text(
         enabled
-            ? "Global admins can assign or update this user's default group and role. Removing extra memberships is managed on the Groups page."
-            : "Group controls are disabled."
+            ? i18n.t("users.form.group_help_manage")
+            : i18n.t("users.form.group_help_disabled")
     );
 }
 
@@ -869,13 +862,13 @@ function applyAdminUserFormPermissions(user) {
     if (!isGlobal) {
         $("#admin-user-is-admin").prop("checked", false);
         $("#admin-user-active-help").text(
-            "Group admins cannot globally enable or disable user accounts. Use group membership status on the Groups page."
+            i18n.t("users.permissions.group_admin_help")
         );
         return;
     }
 
     $("#admin-user-active-help").text(
-        isSelf ? "You cannot disable your own account. Ask another global administrator to do it." : ""
+        isSelf ? i18n.t("users.self.disable_help") : ""
     );
 }
 

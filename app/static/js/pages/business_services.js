@@ -63,7 +63,7 @@ function refreshBusinessServiceGroupsCache() {
         groups.push({
             id: groupId,
             slug: group.group_slug || group.slug || "",
-            name: group.group_name || group.name || group.group_slug || group.slug || ("Group " + groupId)
+            name: group.group_name || group.name || group.group_slug || group.slug || i18n.t("business_services.fallback.group", {id: groupId})
         });
     });
 
@@ -77,7 +77,7 @@ function refreshBusinessServiceGroupsCache() {
         groups.push({
             id: groupId,
             slug: team.group_slug || "",
-            name: team.group_name || team.group_slug || ("Group " + groupId)
+            name: team.group_name || team.group_slug || i18n.t("business_services.fallback.group", {id: groupId})
         });
     });
 
@@ -139,16 +139,60 @@ function businessServiceListQuery() {
 
 
 function businessServiceStatusLabel(status) {
-    const labels = {
-        unknown: "Unknown",
-        operational: "Operational",
-        degraded: "Degraded",
-        partial_outage: "Partial outage",
-        major_outage: "Major outage",
-        maintenance: "Maintenance"
-    };
+    const normalized = status || "unknown";
+    const key = "business_services.status." + normalized;
 
-    return labels[status] || status || "-";
+    return i18n.t(key, {}, normalized || "-");
+}
+
+
+function businessServiceCriticalityLabel(value) {
+    if (!value) {
+        return "-";
+    }
+
+    return i18n.t("business_services.criticality." + value, {}, value);
+}
+
+
+function businessServiceTierLabel(value) {
+    if (!value) {
+        return "-";
+    }
+
+    return i18n.t("business_services.tier." + value, {}, value);
+}
+
+
+function businessServiceStatusMessageLabel(message) {
+    if (!message) {
+        return "-";
+    }
+
+    if (message === "Calculated status: no enabled components") {
+        return i18n.t("business_services.status_message.no_components");
+    }
+
+    let match = /^Affected components: (.+)\. Calculated status: ([a-z_]+), impact score=(\d+)$/.exec(message);
+
+    if (match) {
+        return i18n.t("business_services.status_message.affected", {
+            components: match[1],
+            status: businessServiceStatusLabel(match[2]),
+            score: match[3],
+        });
+    }
+
+    match = /^Calculated status: ([a-z_]+), impact score=(\d+)$/.exec(message);
+
+    if (match) {
+        return i18n.t("business_services.status_message.calculated", {
+            status: businessServiceStatusLabel(match[1]),
+            score: match[2],
+        });
+    }
+
+    return message;
 }
 
 
@@ -190,7 +234,7 @@ function fillBusinessServiceGroupSelect(selectedId) {
         select.append(
             $("<option>")
                 .val(String(group.id))
-                .text(group.name || group.slug || ("Group " + group.id))
+                .text(group.name || group.slug || i18n.t("business_services.fallback.group", {id: group.id}))
         );
     });
 
@@ -236,7 +280,7 @@ function fillBusinessServiceOwnerTeamSelect(selectedId) {
     const groupId = selectedBusinessServiceFormGroupId();
 
     select.empty();
-    select.append($("<option>").val("").text("No owner team"));
+    select.append($("<option>").val("").text(i18n.t("business_services.form.no_owner")));
 
     businessServiceTeamsCache.forEach(function (team) {
         if (!team.active || (groupId && Number(team.group_id) !== Number(groupId))) {
@@ -246,7 +290,7 @@ function fillBusinessServiceOwnerTeamSelect(selectedId) {
         select.append(
             $("<option>")
                 .val(String(team.id))
-                .text((team.slug || team.name || "team") + " / " + (team.name || team.slug || ""))
+                .text((team.slug || team.name || i18n.t("business_services.fallback.team")) + " / " + (team.name || team.slug || ""))
         );
     });
 
@@ -261,7 +305,7 @@ function fillBusinessServiceComponentServiceSelect(selectedId) {
     const groupId = businessServiceDetailsCache ? businessServiceDetailsCache.group_id : selectedBusinessServiceFormGroupId();
 
     select.empty();
-    select.append($("<option>").val("").text("Select technical service"));
+    select.append($("<option>").val("").text(i18n.t("business_services.component.select_service")));
 
     businessServiceTechnicalServicesCache.forEach(function (service) {
         if (!service.enabled || (groupId && Number(service.group_id) !== Number(groupId))) {
@@ -377,7 +421,7 @@ function renderBusinessServicesTable() {
     if (!items.length) {
         tbody.append(
             $("<tr>").append(
-                $("<td>").attr("colspan", 9).addClass("empty-cell").text("No business services")
+                $("<td>").attr("colspan", 9).addClass("empty-cell").text(i18n.t("business_services.empty.services"))
             )
         );
         return;
@@ -404,10 +448,10 @@ function renderBusinessServicesTable() {
                 .append($("<td>").text(item.group_name || item.group_slug || "-"))
                 .append($("<td>").text(item.owner_team_name || item.owner_team_slug || "-"))
                 .append($("<td>").append(businessServiceStatusPill(item.status)))
-                .append($("<td>").text(item.criticality || "-"))
-                .append($("<td>").text(item.tier || "-"))
+                .append($("<td>").text(businessServiceCriticalityLabel(item.criticality)))
+                .append($("<td>").text(businessServiceTierLabel(item.tier)))
                 .append($("<td>").text(businessServiceComponentCount(item)))
-                .append($("<td>").append(renderStatusBadge(!!item.public, "Public", "Private")))
+                .append($("<td>").append(renderStatusBadge(!!item.public, i18n.t("business_services.visibility.public"), i18n.t("business_services.visibility.private"))))
                 .append($("<td>").addClass("actions-cell").append(renderBusinessServiceActions(item)))
         );
     });
@@ -419,14 +463,14 @@ function renderBusinessServiceActions(item) {
         object: item,
         items: [
             {
-                label: "Details",
+                label: i18n.t("business_services.actions.details"),
                 icon: "fas fa-info-circle",
                 onClick: function () {
                     openBusinessServiceDetailsModal(item.id);
                 }
             },
             {
-                label: "Edit",
+                label: i18n.t("business_services.actions.edit"),
                 icon: "fas fa-edit",
                 required: "write",
                 onClick: function () {
@@ -434,7 +478,7 @@ function renderBusinessServiceActions(item) {
                 }
             },
             {
-                label: item.enabled ? "Disable" : "Enable",
+                label: item.enabled ? i18n.t("business_services.actions.disable") : i18n.t("business_services.actions.enable"),
                 icon: item.enabled ? "fas fa-pause" : "fas fa-play",
                 required: "write",
                 danger: item.enabled,
@@ -443,7 +487,7 @@ function renderBusinessServiceActions(item) {
                 }
             },
             {
-                label: "Delete",
+                label: i18n.t("business_services.actions.delete"),
                 icon: "fas fa-trash",
                 required: "write",
                 danger: true,
@@ -461,7 +505,7 @@ function renderBusinessServiceComponentActions(component) {
         object: businessServiceDetailsCache || component,
         items: [
             {
-                label: "Edit",
+                label: i18n.t("business_services.actions.edit"),
                 icon: "fas fa-edit",
                 required: "write",
                 onClick: function () {
@@ -469,7 +513,7 @@ function renderBusinessServiceComponentActions(component) {
                 }
             },
             {
-                label: component.enabled ? "Disable" : "Enable",
+                label: component.enabled ? i18n.t("business_services.actions.disable") : i18n.t("business_services.actions.enable"),
                 icon: component.enabled ? "fas fa-pause" : "fas fa-play",
                 required: "write",
                 danger: component.enabled,
@@ -478,7 +522,7 @@ function renderBusinessServiceComponentActions(component) {
                 }
             },
             {
-                label: "Delete",
+                label: i18n.t("business_services.actions.delete"),
                 icon: "fas fa-trash",
                 required: "write",
                 danger: true,
@@ -527,23 +571,13 @@ function openBusinessServiceDetailsModal(id) {
 
     const serial = ++businessServiceDetailsLoadSerial;
 
-    selectedBusinessServiceId = item.id;
-    businessServiceDetailsCache = item;
-
-    replaceBusinessServiceInCache(item);
-    renderBusinessServicesSummary();
-    renderBusinessServicesTable();
-
-    renderBusinessServiceDetails(item);
-    showBusinessServiceDetailsModal();
-
     apiGet("/api/business-services/" + id, function (item) {
         if (serial !== businessServiceDetailsLoadSerial) {
             return;
         }
 
         if (!item || !item.id) {
-            showBusinessServiceDetailsLoadError("Business service details were not found.");
+            showBusinessServiceDetailsLoadError(i18n.t("business_services.errors.details_not_found"));
             return;
         }
 
@@ -557,7 +591,7 @@ function openBusinessServiceDetailsModal(id) {
             return;
         }
 
-        showBusinessServiceDetailsLoadError(apiErrorMessage(xhr, "Failed to load business service details."));
+        showBusinessServiceDetailsLoadError(apiErrorMessage(xhr, i18n.t("business_services.errors.details_load")));
     });
 }
 
@@ -599,7 +633,7 @@ function renderBusinessServiceDetails(item) {
         ? asArray(item.status_history)
         : [];
 
-    $("#business-service-details-title").text(item.name || item.slug || "Business service");
+    $("#business-service-details-title").text(item.name || item.slug || i18n.t("business_services.details.fallback"));
     $("#business-service-details-subtitle").text(
         (item.public_name || item.name || "") + " · " + businessServiceStatusLabel(item.status)
     );
@@ -607,14 +641,14 @@ function renderBusinessServiceDetails(item) {
     $("#open-business-service-component-modal").prop("disabled", false);
 
     body.empty();
-    body.append(detailItem("Status", businessServiceStatusLabel(item.status)));
-    body.append(detailItem("Status message", item.status_message || "-"));
-    body.append(detailItem("Group", item.group_name || item.group_slug || "-"));
-    body.append(detailItem("Owner team", item.owner_team_name || item.owner_team_slug || "-"));
-    body.append(detailItem("Criticality", item.criticality || "-"));
-    body.append(detailItem("Tier", item.tier || "-"));
-    body.append(detailItem("Visibility", item.public ? "Public" : "Private"));
-    body.append(detailItem("Components", components.length || businessServiceComponentCount(item)));
+    body.append(detailItem(i18n.t("business_services.table.status"), businessServiceStatusLabel(item.status)));
+    body.append(detailItem(i18n.t("business_services.details.status_message"), businessServiceStatusMessageLabel(item.status_message)));
+    body.append(detailItem(i18n.t("business_services.table.group"), item.group_name || item.group_slug || "-"));
+    body.append(detailItem(i18n.t("business_services.table.owner_team"), item.owner_team_name || item.owner_team_slug || "-"));
+    body.append(detailItem(i18n.t("business_services.table.criticality"), businessServiceCriticalityLabel(item.criticality)));
+    body.append(detailItem(i18n.t("business_services.table.tier"), businessServiceTierLabel(item.tier)));
+    body.append(detailItem(i18n.t("business_services.table.visibility"), item.public ? i18n.t("business_services.visibility.public") : i18n.t("business_services.visibility.private")));
+    body.append(detailItem(i18n.t("business_services.table.components"), components.length || businessServiceComponentCount(item)));
 
     renderBusinessServiceManualStatus(item);
     renderBusinessServiceComponents(components);
@@ -638,7 +672,7 @@ function renderBusinessServiceComponents(components) {
     if (!components.length) {
         tbody.append(
             $("<tr>").append(
-                $("<td>").attr("colspan", 7).addClass("empty-cell").text("No components")
+                $("<td>").attr("colspan", 7).addClass("empty-cell").text(i18n.t("business_services.empty.components"))
             )
         );
         return;
@@ -656,7 +690,7 @@ function renderBusinessServiceComponents(components) {
                 )
                 .append($("<td>").text(component.team_name || component.team_slug || "-"))
                 .append($("<td>").append(businessServiceStatusPill(component.effective_status || component.service_status)))
-                .append($("<td>").text(component.criticality || "-"))
+                .append($("<td>").text(businessServiceCriticalityLabel(component.criticality)))
                 .append($("<td>").text(component.impact_weight || 0))
                 .append($("<td>").addClass("table-cell-truncate-wide").text(component.description || "-"))
                 .append($("<td>").addClass("actions-cell").append(renderBusinessServiceComponentActions(component)))
@@ -673,7 +707,7 @@ function renderBusinessServiceHistory(history) {
     if (!history.length) {
         tbody.append(
             $("<tr>").append(
-                $("<td>").attr("colspan", 5).addClass("empty-cell").text("No status history")
+                $("<td>").attr("colspan", 5).addClass("empty-cell").text(i18n.t("business_services.empty.history"))
             )
         );
         return;
@@ -686,7 +720,7 @@ function renderBusinessServiceHistory(history) {
                 .append($("<td>").text(businessServiceStatusLabel(item.old_status)))
                 .append($("<td>").append(businessServiceStatusPill(item.new_status)))
                 .append($("<td>").text(item.impact_score || 0))
-                .append($("<td>").addClass("table-cell-truncate-wide").text(item.message || "-"))
+                .append($("<td>").addClass("table-cell-truncate-wide").text(businessServiceStatusMessageLabel(item.message)))
         );
     });
 }
@@ -695,7 +729,7 @@ function renderBusinessServiceHistory(history) {
 function resetBusinessServiceForm() {
     const groupId = selectedBusinessServiceFormGroupId();
 
-    $("#business-service-form-title").text("Create business service");
+    $("#business-service-form-title").text(i18n.t("business_services.form.create"));
     $("#business-service-id").val("");
     fillBusinessServiceGroupSelect(groupId);
     fillBusinessServiceOwnerTeamSelect(null);
@@ -726,7 +760,7 @@ function openCreateBusinessServiceModal() {
 function editBusinessService(item) {
     const groupId = Number(item.group_id);
 
-    $("#business-service-form-title").text("Edit business service");
+    $("#business-service-form-title").text(i18n.t("business_services.form.edit"));
     $("#business-service-id").val(item.id);
     fillBusinessServiceGroupSelect(groupId);
     fillBusinessServiceOwnerTeamSelect(item.owner_team_id);
@@ -775,17 +809,17 @@ function saveBusinessService() {
     const payload = collectBusinessServicePayload();
 
     if (!payload.group_id) {
-        showAppError("Group is required.");
+        showAppError(i18n.t("business_services.validation.group"));
         return;
     }
 
     if (!payload.name) {
-        showAppError("Name is required.");
+        showAppError(i18n.t("business_services.validation.name"));
         return;
     }
 
     if (!payload.slug) {
-        showAppError("Slug is required.");
+        showAppError(i18n.t("business_services.validation.slug"));
         return;
     }
 
@@ -807,9 +841,9 @@ function saveBusinessService() {
 
 function deleteBusinessService(item) {
     showAppConfirm({
-        title: "Delete this business service?",
-        message: "Delete business service \"" + (item.name || item.slug || item.id) + "\"?",
-        confirmText: "Delete business service",
+        title: i18n.t("business_services.confirm.delete_title"),
+        message: i18n.t("business_services.confirm.delete_message", {name: item.name || item.slug || item.id}),
+        confirmText: i18n.t("business_services.confirm.delete_confirm"),
         confirmClass: "btn-danger"
     }).done(function () {
         apiDelete("/api/business-services/" + item.id, function () {
@@ -864,7 +898,7 @@ function setBusinessServiceEnabled(item, enabled) {
 
 
 function resetBusinessServiceComponentForm() {
-    $("#business-service-component-form-title").text("Add component");
+    $("#business-service-component-form-title").text(i18n.t("business_services.component.add"));
     $("#business-service-component-id").val("");
     fillBusinessServiceComponentServiceSelect(null);
     $("#business-service-component-criticality").val("required");
@@ -877,7 +911,7 @@ function resetBusinessServiceComponentForm() {
 
 function openBusinessServiceComponentModal() {
     if (!businessServiceDetailsCache) {
-        showAppError("Select a business service first.");
+        showAppError(i18n.t("business_services.validation.select_first"));
         return;
     }
 
@@ -890,7 +924,7 @@ function openBusinessServiceComponentModal() {
 
 function editBusinessServiceComponent(component) {
     loadBusinessServiceTechnicalServices(businessServiceDetailsCache ? businessServiceDetailsCache.group_id : null, function () {
-        $("#business-service-component-form-title").text("Edit component");
+        $("#business-service-component-form-title").text(i18n.t("business_services.component.edit"));
         $("#business-service-component-id").val(component.id);
         fillBusinessServiceComponentServiceSelect(component.service_id);
         $("#business-service-component-criticality").val(component.criticality || "required");
@@ -919,7 +953,7 @@ function collectBusinessServiceComponentPayload() {
 
 function saveBusinessServiceComponent() {
     if (!businessServiceDetailsCache) {
-        showAppError("Select a business service first.");
+        showAppError(i18n.t("business_services.validation.select_first"));
         return;
     }
 
@@ -927,7 +961,7 @@ function saveBusinessServiceComponent() {
     const payload = collectBusinessServiceComponentPayload();
 
     if (!payload.service_id) {
-        showAppError("Technical service is required.");
+        showAppError(i18n.t("business_services.validation.technical_service"));
         return;
     }
 
@@ -948,9 +982,9 @@ function saveBusinessServiceComponent() {
 
 function deleteBusinessServiceComponent(component) {
     showAppConfirm({
-        title: "Delete this component?",
-        message: "Remove technical service \"" + (component.service_name || component.service_slug || component.id) + "\" from this business service?",
-        confirmText: "Delete component",
+        title: i18n.t("business_services.confirm.component_title"),
+        message: i18n.t("business_services.confirm.component_message", {name: component.service_name || component.service_slug || component.id}),
+        confirmText: i18n.t("business_services.confirm.component_confirm"),
         confirmClass: "btn-danger"
     }).done(function () {
         apiDelete("/api/business-services/components/" + component.id, function () {
@@ -1092,13 +1126,13 @@ function renderBusinessServiceManualStatus(details) {
     const manualActive = Boolean(details.manual_status_active);
 
     $("#business-service-details-status-source").text(
-        source === "manual" ? "Manual" : "Calculated"
+        source === "manual" ? i18n.t("business_services.details.manual") : i18n.t("business_services.details.calculated")
     );
 
     $("#business-service-details-manual-status").text(
         manualActive
             ? businessServiceStatusLabel(details.manual_status)
-            : "No active override"
+            : i18n.t("business_services.details.no_override")
     );
 
     $("#business-service-details-manual-message").text(
@@ -1108,7 +1142,7 @@ function renderBusinessServiceManualStatus(details) {
     $("#business-service-details-manual-until").text(
         details.manual_status_until
             ? businessServiceFormatDateTime(details.manual_status_until)
-            : "Until cleared manually"
+            : i18n.t("business_services.details.until_cleared")
     );
 
     $("#business-service-manual-status").val(
@@ -1139,19 +1173,19 @@ function setBusinessServiceManualStatus() {
     const id = selectedBusinessServiceDetailsId();
 
     if (!id) {
-        showBusinessServiceManualStatusError("Business service is not selected.");
+        showBusinessServiceManualStatusError(i18n.t("business_services.validation.not_selected"));
         return;
     }
 
     const until = businessServiceManualStatusIsoValue();
 
     if ($("#business-service-manual-status-until").val() && !until) {
-        showBusinessServiceManualStatusError("Manual status expiration time is invalid.");
+        showBusinessServiceManualStatusError(i18n.t("business_services.validation.expiration_invalid"));
         return;
     }
 
     if (until && new Date(until).getTime() <= Date.now()) {
-        showBusinessServiceManualStatusError("Manual status expiration must be in the future.");
+        showBusinessServiceManualStatusError(i18n.t("business_services.validation.expiration_future"));
         return;
     }
 
@@ -1176,7 +1210,7 @@ function setBusinessServiceManualStatus() {
         renderBusinessServiceDetails(item);
     }, function (xhr) {
         $("#set-business-service-manual-status").prop("disabled", false);
-        showBusinessServiceManualStatusError(apiErrorMessage(xhr, "Failed to set manual status."));
+        showBusinessServiceManualStatusError(apiErrorMessage(xhr, i18n.t("business_services.errors.manual_set")));
     });
 }
 
@@ -1185,7 +1219,7 @@ function clearBusinessServiceManualStatus() {
     const id = selectedBusinessServiceDetailsId();
 
     if (!id) {
-        showBusinessServiceManualStatusError("Business service is not selected.");
+        showBusinessServiceManualStatusError(i18n.t("business_services.validation.not_selected"));
         return;
     }
 
@@ -1204,7 +1238,7 @@ function clearBusinessServiceManualStatus() {
         renderBusinessServiceDetails(item);
     }, function (xhr) {
         $("#clear-business-service-manual-status").prop("disabled", false);
-        showBusinessServiceManualStatusError(apiErrorMessage(xhr, "Failed to clear manual status."));
+        showBusinessServiceManualStatusError(apiErrorMessage(xhr, i18n.t("business_services.errors.manual_clear")));
     });
 }
 

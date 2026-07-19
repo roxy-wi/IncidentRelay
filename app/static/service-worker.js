@@ -1,4 +1,4 @@
-const IR_PWA_VERSION = "incidentrelay-pwa-v1.0.2";
+const IR_PWA_VERSION = "incidentrelay-pwa-v1.0.3";
 const IR_STATIC_CACHE = IR_PWA_VERSION + "-static";
 const IR_OFFLINE_CACHE = IR_PWA_VERSION + "-offline";
 const OFFLINE_URL = "/static/offline.html";
@@ -122,9 +122,118 @@ self.addEventListener("activate", function (event) {
     );
 });
 
+const IR_LOCALE_CACHE = "incidentrelay-settings";
+const IR_LOCALE_REQUEST = "/__incidentrelay_locale__";
+const IR_SW_MESSAGES = {
+    en: {
+        acknowledge: "Acknowledge",
+        resolve: "Resolve",
+        alert: "Alert",
+        action_failed: "Action failed: {error}",
+        unknown_error: "unknown error",
+        network_error: "network error",
+        acknowledged: "{alert} acknowledged",
+        resolved: "{alert} resolved"
+    },
+    ru: {
+        acknowledge: "Подтвердить",
+        resolve: "Закрыть",
+        alert: "Алерт",
+        action_failed: "Не удалось выполнить действие: {error}",
+        unknown_error: "неизвестная ошибка",
+        network_error: "ошибка сети",
+        acknowledged: "{alert} подтверждён",
+        resolved: "{alert} закрыт"
+    },
+    de: {
+        acknowledge: "Bestätigen",
+        resolve: "Lösen",
+        alert: "Alarm",
+        action_failed: "Aktion fehlgeschlagen: {error}",
+        unknown_error: "unbekannter Fehler",
+        network_error: "Netzwerkfehler",
+        acknowledged: "{alert} bestätigt",
+        resolved: "{alert} gelöst"
+    }
+};
+
+function normalizeIncidentRelayLocale(value) {
+    const locale = String(value || "")
+        .toLowerCase()
+        .replace("_", "-");
+
+    if (locale.startsWith("ru")) {
+        return "ru";
+    }
+    if (locale.startsWith("de")) {
+        return "de";
+    }
+    return "en";
+}
+
+function incidentRelaySwText(locale, key, params) {
+    const selectedLocale = normalizeIncidentRelayLocale(locale);
+    const template = (
+        IR_SW_MESSAGES[selectedLocale][key]
+        || IR_SW_MESSAGES.en[key]
+        || key
+    );
+    const replacements = params || {};
+
+    return template.replace(/\{([A-Za-z0-9_]+)\}/g, function (match, name) {
+        return Object.prototype.hasOwnProperty.call(replacements, name)
+            ? String(replacements[name])
+            : match;
+    });
+}
+
+async function saveIncidentRelayLocale(locale) {
+    const selectedLocale = normalizeIncidentRelayLocale(locale);
+    const cache = await caches.open(IR_LOCALE_CACHE);
+
+    await cache.put(
+        IR_LOCALE_REQUEST,
+        new Response(selectedLocale, {
+            headers: {"Content-Type": "text/plain; charset=utf-8"}
+        })
+    );
+
+    return selectedLocale;
+}
+
+async function loadIncidentRelayLocale(preferredLocale) {
+    if (preferredLocale) {
+        return saveIncidentRelayLocale(preferredLocale);
+    }
+
+    try {
+        const cache = await caches.open(IR_LOCALE_CACHE);
+        const response = await cache.match(IR_LOCALE_REQUEST);
+
+        if (response) {
+            return normalizeIncidentRelayLocale(await response.text());
+        }
+    } catch (error) {
+        // Browser language is a safe fallback when Cache Storage is unavailable.
+    }
+
+    return normalizeIncidentRelayLocale(
+        self.navigator && self.navigator.language
+    );
+}
+
 self.addEventListener("message", function (event) {
-    if (event.data && event.data.type === "SKIP_WAITING") {
+    if (!event.data) {
+        return;
+    }
+
+    if (event.data.type === "SKIP_WAITING") {
         self.skipWaiting();
+        return;
+    }
+
+    if (event.data.type === "SET_LOCALE") {
+        event.waitUntil(saveIncidentRelayLocale(event.data.locale));
     }
 });
 
@@ -154,135 +263,75 @@ self.addEventListener("fetch", function (event) {
         event.respondWith(staleWhileRevalidateStatic(request));
     }
 });
-self.addEventListener("push", event => {
-    let payload = {};
 
-    if (event.data) {
-        try {
-            payload = event.data.json();
-        } catch (error) {
-            payload = {
-                title: "IncidentRelay",
-                body: event.data.text()
-            };
-        }
-    }
+self.addEventListener("push", function (event) {
+    event.waitUntil((async function () {
+        let payload = {};
 
-    const title = payload.title || "IncidentRelay";
-    const actionTokens = payload.action_tokens || {};
-
-    const actions = [];
-
-    if (actionTokens.ack) {
-        actions.push({
-            action: "ack",
-            title: "Acknowledge"
-        });
-    }
-
-    if (actionTokens.resolve) {
-        actions.push({
-            action: "resolve",
-            title: "Resolve"
-        });
-    }
-
-    const options = {
-        body: payload.body || "",
-        tag: payload.tag || `incidentrelay-${Date.now()}`,
-        renotify: payload.renotify !== false,
-        requireInteraction: payload.require_interaction !== false,
-        silent: payload.silent === true,
-        data: {
-            url: payload.url || "/alerts",
-            alert_id: payload.alert_id,
-            alert_title: payload.alert_title || payload.title || "Alert",
-            status: payload.status,
-            action_tokens: actionTokens
-        },
-        actions
-    };
-
-    if (!options.silent && Array.isArray(payload.vibrate)) {
-        options.vibrate = payload.vibrate;
-    }
-
-    event.waitUntil(
-        self.registration.showNotification(title, options)
-    );
-});
-
-
-self.addEventListener("notificationclick", event => {
-    const notification = event.notification;
-    const action = event.action;
-    const data = notification.data || {};
-    const actionTokens = data.action_tokens || {};
-
-    notification.close();
-
-    if (action === "ack" || action === "resolve") {
-        const token = actionTokens[action];
-
-        if (!token) {
-            event.waitUntil(openIncidentRelayUrl(data.url || "/alerts"));
-            return;
+        if (event.data) {
+            try {
+                payload = event.data.json();
+            } catch (error) {
+                payload = {
+                    title: "IncidentRelay",
+                    body: event.data.text()
+                };
+            }
         }
 
-        event.waitUntil(
-            fetch("/api/push/actions", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json"
-                },
-                body: JSON.stringify({
-                    action,
-                    token
-                })
-            })
-                .then(response => response.json().catch(() => ({})))
-                .then(result => {
-                    if (!result.ok) {
-                        return self.registration.showNotification("IncidentRelay", {
-                            body: `Action failed: ${result.error || "unknown_error"}`,
-                            tag: `incidentrelay-action-error-${Date.now()}`
-                        });
-                    }
+        const locale = await loadIncidentRelayLocale(payload.locale);
+        const title = payload.title || "IncidentRelay";
+        const actionTokens = payload.action_tokens || {};
+        const actions = [];
 
-                    const alertTitle = data.alert_title || `Alert #${result.alert_id}`;
+        if (actionTokens.ack) {
+            actions.push({
+                action: "ack",
+                title: incidentRelaySwText(locale, "acknowledge")
+            });
+        }
 
-                    return self.registration.showNotification("IncidentRelay", {
-                        body: action === "ack"
-                            ? `${alertTitle} acknowledged`
-                            : `${alertTitle} resolved`,
-                        tag: `incidentrelay-alert-${result.alert_id}`,
-                        renotify: true,
-                        silent: false,
-                        data: {
-                            url: data.url || "/alerts"
-                        }
-                    });
-                })
-                .catch(() => {
-                    return self.registration.showNotification("IncidentRelay", {
-                        body: "Action failed: network error",
-                        tag: `incidentrelay-action-error-${Date.now()}`
-                    });
-                })
-        );
+        if (actionTokens.resolve) {
+            actions.push({
+                action: "resolve",
+                title: incidentRelaySwText(locale, "resolve")
+            });
+        }
 
-        return;
-    }
+        const options = {
+            body: payload.body || "",
+            tag: payload.tag || `incidentrelay-${Date.now()}`,
+            renotify: payload.renotify !== false,
+            requireInteraction: payload.require_interaction !== false,
+            silent: payload.silent === true,
+            data: {
+                url: payload.url || "/alerts",
+                alert_id: payload.alert_id,
+                alert_title: (
+                    payload.alert_title
+                    || payload.title
+                    || incidentRelaySwText(locale, "alert")
+                ),
+                status: payload.status,
+                action_tokens: actionTokens,
+                locale
+            },
+            actions
+        };
 
-    event.waitUntil(openIncidentRelayUrl(data.url || "/alerts"));
+        if (!options.silent && Array.isArray(payload.vibrate)) {
+            options.vibrate = payload.vibrate;
+        }
+
+        return self.registration.showNotification(title, options);
+    })());
 });
-
 
 function openIncidentRelayUrl(url) {
     return clients.matchAll({
         type: "window",
         includeUncontrolled: true
-    }).then(clientList => {
+    }).then(function (clientList) {
         for (const client of clientList) {
             if ("focus" in client) {
                 client.focus();
@@ -304,50 +353,95 @@ function openIncidentRelayUrl(url) {
 }
 
 self.addEventListener("notificationclick", function (event) {
-    event.notification.close();
-
+    const notification = event.notification;
     const action = event.action || "open";
-    const data = event.notification.data || {};
+    const data = notification.data || {};
     const actionTokens = data.action_tokens || {};
     const url = data.url || "/alerts";
 
-    if (action === "ack" || action === "resolve") {
-        const token = actionTokens[action];
+    notification.close();
 
-        if (!token) {
-            event.waitUntil(clients.openWindow(url));
-            return;
-        }
+    if (action !== "ack" && action !== "resolve") {
+        event.waitUntil(openIncidentRelayUrl(url));
+        return;
+    }
 
-        event.waitUntil(
-            fetch("/api/push/actions", {
+    const token = actionTokens[action];
+
+    if (!token) {
+        event.waitUntil(openIncidentRelayUrl(url));
+        return;
+    }
+
+    event.waitUntil((async function () {
+        const locale = await loadIncidentRelayLocale(data.locale);
+
+        try {
+            const response = await fetch("/api/push/actions", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json"
                 },
                 credentials: "include",
                 body: JSON.stringify({
-                    action: action,
-                    token: token
+                    action,
+                    token
                 })
-            })
-                .then(function () {
-                    return self.registration.showNotification(
-                        action === "ack" ? "Alert acknowledged" : "Alert resolved",
+            });
+            const result = await response.json().catch(function () {
+                return {};
+            });
+
+            if (!response.ok || result.ok === false) {
+                return self.registration.showNotification("IncidentRelay", {
+                    body: incidentRelaySwText(
+                        locale,
+                        "action_failed",
                         {
-                            body: "IncidentRelay action completed.",
-                            icon: "/static/images/pwa/icon-192.png",
-                            tag: "incidentrelay-action-" + (data.alert_id || Date.now())
+                            error: (
+                                result.error
+                                || incidentRelaySwText(locale, "unknown_error")
+                            )
                         }
-                    );
-                })
-                .catch(function () {
-                    return clients.openWindow(url);
-                })
-        );
+                    ),
+                    tag: `incidentrelay-action-error-${Date.now()}`,
+                    data: {url, locale}
+                });
+            }
 
-        return;
-    }
+            const alertTitle = (
+                data.alert_title
+                || `${incidentRelaySwText(locale, "alert")} #${result.alert_id || data.alert_id || ""}`.trim()
+            );
+            const body = action === "ack"
+                ? incidentRelaySwText(
+                    locale,
+                    "acknowledged",
+                    {alert: alertTitle}
+                )
+                : incidentRelaySwText(
+                    locale,
+                    "resolved",
+                    {alert: alertTitle}
+                );
 
-    event.waitUntil(clients.openWindow(url));
+            return self.registration.showNotification("IncidentRelay", {
+                body,
+                tag: `incidentrelay-alert-${result.alert_id || data.alert_id || Date.now()}`,
+                renotify: true,
+                silent: false,
+                data: {url, locale}
+            });
+        } catch (error) {
+            return self.registration.showNotification("IncidentRelay", {
+                body: incidentRelaySwText(
+                    locale,
+                    "action_failed",
+                    {error: incidentRelaySwText(locale, "network_error")}
+                ),
+                tag: `incidentrelay-action-error-${Date.now()}`,
+                data: {url, locale}
+            });
+        }
+    })());
 });

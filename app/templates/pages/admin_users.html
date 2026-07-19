@@ -3,36 +3,36 @@
     <div class="summary-card summary-primary">
       <div class="summary-icon">U</div>
       <div>
-        <div class="summary-title">Users</div>
+        <div class="summary-title">{{ _('users.summary.users') }}</div>
         <div id="admin-users-total-count" class="summary-value">0</div>
-        <div class="summary-hint">Registered users</div>
+        <div class="summary-hint">{{ _('users.summary.users_hint') }}</div>
       </div>
     </div>
 
     <div class="summary-card summary-success">
       <div class="summary-icon">✓</div>
       <div>
-        <div class="summary-title">Active</div>
+        <div class="summary-title">{{ _('users.summary.active') }}</div>
         <div id="admin-users-active-count" class="summary-value">0</div>
-        <div class="summary-hint">Enabled users</div>
+        <div class="summary-hint">{{ _('users.summary.active_hint') }}</div>
       </div>
     </div>
 
     <div class="summary-card summary-muted">
       <div class="summary-icon">−</div>
       <div>
-        <div class="summary-title">Inactive</div>
+        <div class="summary-title">{{ _('users.summary.inactive') }}</div>
         <div id="admin-users-inactive-count" class="summary-value">0</div>
-        <div class="summary-hint">Disabled users</div>
+        <div class="summary-hint">{{ _('users.summary.inactive_hint') }}</div>
       </div>
     </div>
 
     <div class="summary-card summary-info">
       <div class="summary-icon">A</div>
       <div>
-        <div class="summary-title">Admins</div>
+        <div class="summary-title">{{ _('users.summary.admins') }}</div>
         <div id="admin-users-admin-count" class="summary-value">0</div>
-        <div class="summary-hint">Global administrators</div>
+        <div class="summary-hint">{{ _('users.summary.admins_hint') }}</div>
       </div>
     </div>
   </div>
@@ -40,9 +40,9 @@
   <div class="card">
     <div class="card-header">
       <div>
-        <h2>Users</h2>
+        <h2>{{ _('users.list.title') }}</h2>
         <div class="card-subtitle">
-          Manage local users, notification IDs and administrator access.
+          {{ _('users.list.subtitle') }}
         </div>
       </div>
 
@@ -51,15 +51,15 @@
           id="admin-users-search"
           class="input"
           type="search"
-          placeholder="Search users..."
+          placeholder="{{ _('users.search.placeholder') }}"
         >
 
         <button id="reload-admin-users" type="button" class="btn btn-primary">
-          Reload
+          {{ _('users.actions.reload') }}
         </button>
 
         <button id="new-admin-user" type="button" class="btn">
-          New user
+          {{ _('users.actions.new') }}
         </button>
       </div>
     </div>
@@ -68,13 +68,13 @@
       <table class="data-table admin-users-table">
         <thead>
           <tr>
-            <th>ID</th>
-            <th>User</th>
-            <th>Contacts</th>
-            <th>Messengers</th>
-            <th>Role</th>
-            <th>Status</th>
-            <th>Actions</th>
+            <th>{{ _('users.table.id') }}</th>
+            <th>{{ _('users.table.user') }}</th>
+            <th>{{ _('users.table.contacts') }}</th>
+            <th>{{ _('users.table.messengers') }}</th>
+            <th>{{ _('users.table.role') }}</th>
+            <th>{{ _('users.table.status') }}</th>
+            <th>{{ _('users.table.actions') }}</th>
           </tr>
         </thead>
 
@@ -87,9 +87,9 @@
     <div class="app-modal-dialog app-modal-dialog-wide">
       <div class="app-modal-header">
         <div>
-          <h2 id="admin-user-modal-title">User details</h2>
+          <h2 id="admin-user-modal-title">{{ _('users.modal.details') }}</h2>
           <div id="admin-user-modal-subtitle" class="card-subtitle">
-            Create or update a user account.
+            {{ _('users.modal.details_subtitle') }}
           </div>
         </div>
 
@@ -97,7 +97,7 @@
           id="close-admin-user-modal"
           type="button"
           class="app-modal-close"
-          aria-label="Close"
+          aria-label="{{ _('users.actions.close') }}"
         >
           ×
         </button>
@@ -108,9 +108,9 @@
           <div class="card">
             <div class="card-header details-header">
               <div>
-                <h2>Account</h2>
+                <h2>{{ _('users.form.account') }}</h2>
                 <div class="card-subtitle">
-                  Login, display name and access flags.
+                  {{ _('users.form.account_help') }}
                 </div>
               </div>
             </div>
@@ -118,7 +118,7 @@
             <div class="form-body">
               <input id="admin-user-id" type="hidden">
 
-              <label for="admin-user-username">Username</label>
+              <label for="admin-user-username">{{ _('users.form.username') }}</label>
               <input
                 id="admin-user-username"
                 class="input"
@@ -126,44 +126,44 @@
                 autocomplete="username"
               >
 
-              <label for="admin-user-display">Display name</label>
+              <label for="admin-user-display">{{ _('users.form.display_name') }}</label>
               <input
                 id="admin-user-display"
                 class="input"
                 placeholder="Ivan"
               >
 
-              <label for="admin-user-password">Password</label>
+              <label for="admin-user-password">{{ _('users.form.password') }}</label>
               <input
                 id="admin-user-password"
                 class="input"
                 type="password"
                 autocomplete="new-password"
-                placeholder="Leave empty to keep current password"
+                placeholder="{{ _('users.form.password_keep') }}"
               >
 
-              <label for="admin-user-group">Group</label>
+              <label for="admin-user-group">{{ _('users.form.group') }}</label>
               <select id="admin-user-group" class="input"></select>
 
               <div id="admin-user-group-help" class="help-text">
-                Global admins can assign or update this user's default group and role.
+                {{ _('users.form.group_help') }}
               </div>
 
-              <label for="admin-user-group-role">Group role</label>
+              <label for="admin-user-group-role">{{ _('users.form.group_role') }}</label>
                 <select id="admin-user-group-role" class="input">
-                    <option value="viewer">Group Viewer</option>
-                    <option value="editor">Group Editor</option>
-                    <option value="user_admin">Group Admin</option>
+                    <option value="viewer">{{ _('rbac.group.viewer') }}</option>
+                    <option value="editor">{{ _('rbac.group.editor') }}</option>
+                    <option value="user_admin">{{ _('rbac.group.admin') }}</option>
                 </select>
 
                 <label class="md-checkbox">
                     <input id="admin-user-is-admin" type="checkbox">
-                    <span>Global administrator</span>
+                    <span>{{ _('users.form.global_admin') }}</span>
                 </label>
 
               <label class="md-checkbox">
                 <input id="admin-user-active" type="checkbox" checked>
-                <span>Active</span>
+                <span>{{ _('users.form.active') }}</span>
               </label>
 
               <div id="admin-user-active-help" class="help-text"></div>
@@ -173,15 +173,15 @@
           <div class="card">
             <div class="card-header details-header">
               <div>
-                <h2>Contacts</h2>
+                <h2>{{ _('users.form.contacts') }}</h2>
                 <div class="card-subtitle">
-                  Used by notification channels and integrations.
+                  {{ _('users.form.contacts_help') }}
                 </div>
               </div>
             </div>
 
             <div class="form-body">
-              <label for="admin-user-email">Email</label>
+              <label for="admin-user-email">{{ _('users.form.email') }}</label>
               <input
                 id="admin-user-email"
                 class="input"
@@ -189,7 +189,7 @@
                 placeholder="ivan@example.com"
               >
 
-              <label for="admin-user-phone">Phone</label>
+              <label for="admin-user-phone">{{ _('users.form.phone') }}</label>
               <input
                 id="admin-user-phone"
                 class="input"
@@ -201,21 +201,21 @@
                 placeholder="+77001234567"
               >
 
-              <label for="admin-user-telegram">Telegram user ID</label>
+              <label for="admin-user-telegram">{{ _('users.form.telegram') }}</label>
               <input
                 id="admin-user-telegram"
                 class="input"
                 placeholder="123456789"
               >
 
-              <label for="admin-user-slack">Slack user ID</label>
+              <label for="admin-user-slack">{{ _('users.form.slack') }}</label>
               <input
                 id="admin-user-slack"
                 class="input"
                 placeholder="U012ABCDEF"
               >
 
-              <label for="admin-user-mattermost">Mattermost user ID</label>
+              <label for="admin-user-mattermost">{{ _('users.form.mattermost') }}</label>
               <input
                 id="admin-user-mattermost"
                 class="input"
@@ -228,33 +228,32 @@
         <div class="card admin-security-card">
           <div class="card-header details-header">
             <div>
-              <h2>Security note</h2>
+              <h2>{{ _('users.security.title') }}</h2>
               <div class="card-subtitle">
-                Password is write-only and is never shown after save.
+                {{ _('users.security.subtitle') }}
               </div>
             </div>
           </div>
 
           <div class="details-list">
             <div class="details-item">
-              <div class="details-label">Create user</div>
+              <div class="details-label">{{ _('users.security.create') }}</div>
               <div class="details-value">
-                Password is required by validation when creating a new user.
+                {{ _('users.security.create_help') }}
               </div>
             </div>
 
             <div class="details-item">
-              <div class="details-label">Update user</div>
+              <div class="details-label">{{ _('users.security.update') }}</div>
               <div class="details-value">
-                Leave password empty to keep the current password hash unchanged.
+                {{ _('users.security.update_help') }}
               </div>
             </div>
 
             <div class="details-item">
-              <div class="details-label">Disable user</div>
+              <div class="details-label">{{ _('users.security.disable') }}</div>
               <div class="details-value">
-                Disabled users stay visible in the admin workspace and can be enabled again.
-                A global administrator cannot disable or remove their own account.
+                {{ _('users.security.disable_help') }}
               </div>
             </div>
           </div>
@@ -263,15 +262,15 @@
 
       <div class="app-modal-footer">
         <button id="admin-save-user" type="button" class="btn btn-primary">
-          Save user
+          {{ _('users.actions.save') }}
         </button>
 
         <button id="admin-reset-user-form" type="button" class="btn">
-          Reset
+          {{ _('users.actions.reset') }}
         </button>
 
         <button id="close-admin-user-modal-footer" type="button" class="btn">
-          Close
+          {{ _('users.actions.close') }}
         </button>
       </div>
     </div>

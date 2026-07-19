@@ -3,36 +3,36 @@
     <div class="summary-card summary-primary">
       <div class="summary-icon">♥</div>
       <div>
-        <div class="summary-title">Heartbeats</div>
+        <div class="summary-title">{{ _('heartbeats.summary.title') }}</div>
         <div id="heartbeats-summary-total" class="summary-value">0</div>
-        <div class="summary-hint">Dead-man checks</div>
+        <div class="summary-hint">{{ _('heartbeats.summary.hint') }}</div>
       </div>
     </div>
 
     <div class="summary-card summary-success">
       <div class="summary-icon">✓</div>
       <div>
-        <div class="summary-title">OK</div>
+        <div class="summary-title">{{ _('heartbeats.summary.ok') }}</div>
         <div id="heartbeats-summary-ok" class="summary-value">0</div>
-        <div class="summary-hint">Pings are current</div>
+        <div class="summary-hint">{{ _('heartbeats.summary.ok_hint') }}</div>
       </div>
     </div>
 
     <div class="summary-card summary-danger">
       <div class="summary-icon">!</div>
       <div>
-        <div class="summary-title">Overdue</div>
+        <div class="summary-title">{{ _('heartbeats.summary.overdue') }}</div>
         <div id="heartbeats-summary-overdue" class="summary-value">0</div>
-        <div class="summary-hint">Paging or needs attention</div>
+        <div class="summary-hint">{{ _('heartbeats.summary.overdue_hint') }}</div>
       </div>
     </div>
 
     <div class="summary-card summary-muted">
       <div class="summary-icon">Ⅱ</div>
       <div>
-        <div class="summary-title">Paused</div>
+        <div class="summary-title">{{ _('heartbeats.summary.paused') }}</div>
         <div id="heartbeats-summary-paused" class="summary-value">0</div>
-        <div class="summary-hint">Overdue checks disabled</div>
+        <div class="summary-hint">{{ _('heartbeats.summary.paused_hint') }}</div>
       </div>
     </div>
   </div>
@@ -41,29 +41,29 @@
     <section class="card page-layout-main">
       <div class="card-header">
         <div>
-          <h2>Heartbeats</h2>
+          <h2>{{ _('heartbeats.list.title') }}</h2>
           <div class="card-subtitle">
-            Showing <span id="heartbeats-filtered-count">0</span> of <span id="heartbeats-total-count">0</span> checks
+            {{ _('heartbeats.list.showing') }} <span id="heartbeats-filtered-count">0</span> {{ _('heartbeats.list.of') }} <span id="heartbeats-total-count">0</span> {{ _('heartbeats.list.checks') }}
           </div>
         </div>
         <div class="card-header-actions">
-          <button id="open-heartbeat-create-modal" class="btn btn-primary" type="button">New heartbeat</button>
-          <button id="run-heartbeat-overdue-check" class="btn" type="button">Check overdue</button>
-          <button id="reload-heartbeats" class="btn" type="button">Reload</button>
+          <button id="open-heartbeat-create-modal" class="btn btn-primary" type="button">{{ _('heartbeats.actions.new') }}</button>
+          <button id="run-heartbeat-overdue-check" class="btn" type="button">{{ _('heartbeats.actions.check_overdue') }}</button>
+          <button id="reload-heartbeats" class="btn" type="button">{{ _('heartbeats.actions.reload') }}</button>
         </div>
       </div>
 
       <div class="page-toolbar is-flush-top">
         <div class="page-toolbar-search">
           <span class="page-toolbar-search-icon">⌕</span>
-          <input id="heartbeats-search" class="input" type="search" placeholder="Search heartbeats..." autocomplete="off">
+          <input id="heartbeats-search" class="input" type="search" placeholder="{{ _('heartbeats.search.placeholder') }}" autocomplete="off">
         </div>
         <select id="heartbeats-status-filter" class="input page-toolbar-filter">
-          <option value="">All statuses</option>
+          <option value="">{{ _('heartbeats.filters.all_statuses') }}</option>
           <option value="ok">OK</option>
-          <option value="new">New</option>
-          <option value="overdue">Overdue</option>
-          <option value="paused">Paused</option>
+          <option value="new">{{ _('heartbeats.status.new') }}</option>
+          <option value="overdue">{{ _('heartbeats.status.overdue') }}</option>
+          <option value="paused">{{ _('heartbeats.status.paused') }}</option>
         </select>
       </div>
 
@@ -71,20 +71,20 @@
         <table class="data-table sortable-table">
           <thead>
             <tr>
-              <th>Name</th>
-              <th>Team</th>
-              <th>Service</th>
-              <th>Status</th>
-              <th>Instances</th>
-              <th>Schedule</th>
-              <th>Last ping</th>
-              <th>Deadline</th>
-              <th>Priority</th>
-              <th class="actions-th">Actions</th>
+              <th>{{ _('heartbeats.table.name') }}</th>
+              <th>{{ _('heartbeats.table.team') }}</th>
+              <th>{{ _('heartbeats.table.service') }}</th>
+              <th>{{ _('heartbeats.table.status') }}</th>
+              <th>{{ _('heartbeats.table.instances') }}</th>
+              <th>{{ _('heartbeats.table.schedule') }}</th>
+              <th>{{ _('heartbeats.table.last_ping') }}</th>
+              <th>{{ _('heartbeats.table.deadline') }}</th>
+              <th>{{ _('heartbeats.table.priority') }}</th>
+              <th class="actions-th">{{ _('heartbeats.table.actions') }}</th>
             </tr>
           </thead>
           <tbody id="heartbeats-table">
-            <tr><td colspan="10" class="empty-cell">No heartbeats loaded</td></tr>
+            <tr><td colspan="10" class="empty-cell">{{ _('heartbeats.empty.loaded') }}</td></tr>
           </tbody>
         </table>
       </div>
@@ -95,37 +95,37 @@
     <div class="app-modal-dialog app-modal-dialog-wide">
       <div class="app-modal-header">
         <div>
-          <h2 id="heartbeat-details-title">Heartbeat details</h2>
-          <div id="heartbeat-details-subtitle" class="card-subtitle">Ping URL, recent pings and alert state.</div>
+          <h2 id="heartbeat-details-title">{{ _('heartbeats.details.title') }}</h2>
+          <div id="heartbeat-details-subtitle" class="card-subtitle">{{ _('heartbeats.details.subtitle') }}</div>
         </div>
         <button id="close-heartbeat-details-modal" type="button" class="app-modal-close" aria-label="Close">×</button>
       </div>
       <div class="app-modal-body">
         <div id="heartbeat-details-body" class="details-grid">
-          <div class="empty-state">No heartbeat selected.</div>
+          <div class="empty-state">{{ _('heartbeats.details.none') }}</div>
         </div>
         <section id="heartbeat-instances-section" class="card is-hidden">
           <div class="card-header">
             <div>
-              <h2>Instances</h2>
-              <div class="card-subtitle">Per-host or per-producer heartbeat state.</div>
+              <h2>{{ _('heartbeats.instances.title') }}</h2>
+              <div class="card-subtitle">{{ _('heartbeats.instances.subtitle') }}</div>
             </div>
           </div>
           <div class="table-wrapper">
             <table class="data-table">
               <thead>
                 <tr>
-                  <th>Instance</th>
-                  <th>Status</th>
-                  <th>Mode</th>
-                  <th>Enabled</th>
-                  <th>Last ping</th>
-                  <th>Deadline</th>
-                  <th class="actions-th">Actions</th>
+                  <th>{{ _('heartbeats.instances.instance') }}</th>
+                  <th>{{ _('heartbeats.table.status') }}</th>
+                  <th>{{ _('heartbeats.instances.mode') }}</th>
+                  <th>{{ _('heartbeats.instances.enabled') }}</th>
+                  <th>{{ _('heartbeats.table.last_ping') }}</th>
+                  <th>{{ _('heartbeats.table.deadline') }}</th>
+                  <th class="actions-th">{{ _('heartbeats.table.actions') }}</th>
                 </tr>
               </thead>
               <tbody id="heartbeat-instances-table">
-                <tr><td colspan="7" class="empty-cell">No instances</td></tr>
+                <tr><td colspan="7" class="empty-cell">{{ _('heartbeats.instances.none') }}</td></tr>
               </tbody>
             </table>
           </div>
@@ -134,33 +134,33 @@
         <section class="card">
           <div class="card-header">
             <div>
-              <h2>Recent events</h2>
-              <div class="card-subtitle">Pings, overdue transitions and recoveries.</div>
+              <h2>{{ _('heartbeats.events.title') }}</h2>
+              <div class="card-subtitle">{{ _('heartbeats.events.subtitle') }}</div>
             </div>
           </div>
           <div class="table-wrapper">
             <table class="data-table">
               <thead>
                 <tr>
-                  <th>Time</th>
-                  <th>Event</th>
-                  <th>Instance</th>
-                  <th>State</th>
-                  <th>Message</th>
+                  <th>{{ _('heartbeats.events.time') }}</th>
+                  <th>{{ _('heartbeats.events.event') }}</th>
+                  <th>{{ _('heartbeats.instances.instance') }}</th>
+                  <th>{{ _('heartbeats.events.state') }}</th>
+                  <th>{{ _('heartbeats.events.message') }}</th>
                 </tr>
               </thead>
               <tbody id="heartbeat-pings-table">
-                <tr><td colspan="5" class="empty-cell">No events</td></tr>
+                <tr><td colspan="5" class="empty-cell">{{ _('heartbeats.events.none') }}</td></tr>
               </tbody>
             </table>
           </div>
         </section>
       </div>
       <div class="app-modal-footer">
-        <button id="heartbeat-details-pause" type="button" class="btn">Pause</button>
-        <button id="heartbeat-details-resume" type="button" class="btn">Resume</button>
-        <button id="heartbeat-details-regenerate-token" type="button" class="btn btn-danger">Regenerate token</button>
-        <button id="heartbeat-details-edit" type="button" class="btn btn-primary">Edit</button>
+        <button id="heartbeat-details-pause" type="button" class="btn">{{ _('heartbeats.actions.pause') }}</button>
+        <button id="heartbeat-details-resume" type="button" class="btn">{{ _('heartbeats.actions.resume') }}</button>
+        <button id="heartbeat-details-regenerate-token" type="button" class="btn btn-danger">{{ _('heartbeats.actions.regenerate') }}</button>
+        <button id="heartbeat-details-edit" type="button" class="btn btn-primary">{{ _('heartbeats.actions.edit') }}</button>
       </div>
     </div>
   </div>
@@ -169,8 +169,8 @@
     <div class="app-modal-dialog app-modal-dialog-wide heartbeat-form-dialog">
       <div class="app-modal-header">
         <div>
-          <h2 id="heartbeat-form-title">New heartbeat</h2>
-          <div class="card-subtitle">Create a dead-man check that pages when expected pings stop.</div>
+          <h2 id="heartbeat-form-title">{{ _('heartbeats.form.new') }}</h2>
+          <div class="card-subtitle">{{ _('heartbeats.form.subtitle') }}</div>
         </div>
         <button id="close-heartbeat-form-modal" type="button" class="app-modal-close" aria-label="Close">×</button>
       </div>
@@ -178,55 +178,55 @@
         <input id="heartbeat-id" type="hidden">
         <div class="form-grid-2 heartbeat-form-grid">
           <div class="form-group">
-            <label for="heartbeat-team">Team</label>
+            <label for="heartbeat-team">{{ _('heartbeats.form.team') }}</label>
             <select id="heartbeat-team" class="input"></select>
           </div>
           <div class="form-group">
-            <label for="heartbeat-route">Heartbeat route</label>
+            <label for="heartbeat-route">{{ _('heartbeats.form.route') }}</label>
             <select id="heartbeat-route" class="input"></select>
-            <div class="help-text">Route source must be heartbeat. It controls escalation and notification delivery.</div>
+            <div class="help-text">{{ _('heartbeats.form.route_help') }}</div>
           </div>
           <div class="form-group">
-            <label for="heartbeat-name">Name</label>
+            <label for="heartbeat-name">{{ _('heartbeats.form.name') }}</label>
             <input id="heartbeat-name" class="input" type="text" placeholder="Prometheus Watchdog">
           </div>
           <div class="form-group">
-            <label for="heartbeat-slug">Slug</label>
+            <label for="heartbeat-slug">{{ _('heartbeats.form.slug') }}</label>
             <input id="heartbeat-slug" class="input" type="text" placeholder="prometheus-watchdog">
           </div>
           <div class="form-group">
-            <label for="heartbeat-service">Service</label>
+            <label for="heartbeat-service">{{ _('heartbeats.form.service') }}</label>
             <select id="heartbeat-service" class="input"></select>
           </div>
           <div class="form-group">
-            <label for="heartbeat-mode">Mode</label>
+            <label for="heartbeat-mode">{{ _('heartbeats.form.mode') }}</label>
             <select id="heartbeat-mode" class="input">
-              <option value="interval">Interval ping</option>
-              <option value="scheduled">Scheduled completion</option>
+              <option value="interval">{{ _('heartbeats.form.interval_ping') }}</option>
+              <option value="scheduled">{{ _('heartbeats.form.scheduled_completion') }}</option>
             </select>
           </div>
           <div class="form-group heartbeat-interval-field">
-            <label for="heartbeat-interval">Expected interval, seconds</label>
+            <label for="heartbeat-interval">{{ _('heartbeats.form.expected_interval') }}</label>
             <input id="heartbeat-interval" class="input" type="number" min="30" value="300">
           </div>
           <div class="form-group">
-            <label for="heartbeat-grace">Grace period, seconds</label>
+            <label for="heartbeat-grace">{{ _('heartbeats.form.grace') }}</label>
             <input id="heartbeat-grace" class="input" type="number" min="0" value="300">
           </div>
           <div class="form-group heartbeat-scheduled-field is-hidden">
-            <label for="heartbeat-schedule-kind">Schedule</label>
+            <label for="heartbeat-schedule-kind">{{ _('heartbeats.form.schedule') }}</label>
             <select id="heartbeat-schedule-kind" class="input">
-              <option value="daily">Daily</option>
-              <option value="weekly">Weekly</option>
-              <option value="monthly">Monthly</option>
+              <option value="daily">{{ _('heartbeats.form.daily') }}</option>
+              <option value="weekly">{{ _('heartbeats.form.weekly') }}</option>
+              <option value="monthly">{{ _('heartbeats.form.monthly') }}</option>
             </select>
           </div>
           <div class="form-group heartbeat-scheduled-field is-hidden">
-            <label for="heartbeat-schedule-time">Expected by</label>
+            <label for="heartbeat-schedule-time">{{ _('heartbeats.form.expected_by') }}</label>
             <input id="heartbeat-schedule-time" class="input" type="time" value="03:00">
           </div>
           <div class="form-group heartbeat-scheduled-field heartbeat-weekly-field is-hidden">
-            <label for="heartbeat-schedule-weekday">Weekday</label>
+            <label for="heartbeat-schedule-weekday">{{ _('heartbeats.form.weekday') }}</label>
             <select id="heartbeat-schedule-weekday" class="input">
               <option value="0">Monday</option>
               <option value="1">Tuesday</option>
@@ -238,15 +238,15 @@
             </select>
           </div>
           <div class="form-group heartbeat-scheduled-field heartbeat-monthly-field is-hidden">
-            <label for="heartbeat-schedule-monthday">Month day</label>
+            <label for="heartbeat-schedule-monthday">{{ _('heartbeats.form.month_day') }}</label>
             <input id="heartbeat-schedule-monthday" class="input" type="number" min="1" max="31" value="1">
           </div>
           <div class="form-group heartbeat-scheduled-field is-hidden">
-            <label for="heartbeat-timezone">Timezone</label>
+            <label for="heartbeat-timezone">{{ _('heartbeats.form.timezone') }}</label>
             <select id="heartbeat-timezone" class="input timezone-select"></select>
           </div>
           <div class="form-group">
-            <label for="heartbeat-severity">Severity</label>
+            <label for="heartbeat-severity">{{ _('heartbeats.form.severity') }}</label>
             <select id="heartbeat-severity" class="input">
               <option value="critical">critical</option>
               <option value="high">high</option>
@@ -257,7 +257,7 @@
             </select>
           </div>
           <div class="form-group">
-            <label for="heartbeat-priority">Priority</label>
+            <label for="heartbeat-priority">{{ _('heartbeats.form.priority') }}</label>
             <select id="heartbeat-priority" class="input">
               <option value="p1">P1</option>
               <option value="p2" selected>P2</option>
@@ -270,48 +270,48 @@
 
         <div class="form-stack heartbeat-form-stack">
           <div class="form-group">
-            <label for="heartbeat-description">Description</label>
-            <textarea id="heartbeat-description" class="input" rows="3" placeholder="What this heartbeat proves and what to check when it is overdue."></textarea>
+            <label for="heartbeat-description">{{ _('heartbeats.form.description') }}</label>
+            <textarea id="heartbeat-description" class="input" rows="3" placeholder="{{ _('heartbeats.form.description_placeholder') }}"></textarea>
           </div>
 
           <div class="form-row form-row-inline">
-            <label class="checkbox-label"><input id="heartbeat-enabled" type="checkbox" checked> Enabled</label>
-            <label class="checkbox-label"><input id="heartbeat-auto-resolve" type="checkbox" checked> Auto-resolve overdue alert when ping returns</label>
-            <label class="checkbox-label"><input id="heartbeat-instance-tracking" type="checkbox"> Track instances / auto-discovery</label>
+            <label class="checkbox-label"><input id="heartbeat-enabled" type="checkbox" checked> {{ _('heartbeats.form.enabled') }}</label>
+            <label class="checkbox-label"><input id="heartbeat-auto-resolve" type="checkbox" checked> {{ _('heartbeats.form.auto_resolve') }}</label>
+            <label class="checkbox-label"><input id="heartbeat-instance-tracking" type="checkbox"> {{ _('heartbeats.form.track_instances') }}</label>
           </div>
 
           <div class="form-grid-2 heartbeat-instance-field is-hidden">
             <div class="form-group">
-              <label for="heartbeat-instance-key">Instance field</label>
+              <label for="heartbeat-instance-key">{{ _('heartbeats.form.instance_field') }}</label>
               <input id="heartbeat-instance-key" class="input" type="text" value="instance" placeholder="instance">
-              <div class="help-text">Ping JSON field used as the producer key, for example instance=$(hostname -f).</div>
+              <div class="help-text">{{ _('heartbeats.form.instance_help') }}</div>
             </div>
             <div class="form-group">
-              <label for="heartbeat-expected-instances-mode">Expected instances</label>
+              <label for="heartbeat-expected-instances-mode">{{ _('heartbeats.form.expected_instances') }}</label>
               <select id="heartbeat-expected-instances-mode" class="input">
-                <option value="auto">Auto-discovery</option>
-                <option value="static">Static list</option>
+                <option value="auto">{{ _('heartbeats.form.auto_discovery') }}</option>
+                <option value="static">{{ _('heartbeats.form.static_list') }}</option>
               </select>
-              <div class="help-text">Auto-discovery adds new producers on first ping. Static accepts only listed producers.</div>
+              <div class="help-text">{{ _('heartbeats.form.instances_help') }}</div>
             </div>
             <div class="form-group heartbeat-auto-discovery-field">
-              <label for="heartbeat-auto-discovery-ttl">Auto-discovery TTL, days</label>
+              <label for="heartbeat-auto-discovery-ttl">{{ _('heartbeats.form.ttl') }}</label>
               <input id="heartbeat-auto-discovery-ttl" class="input" type="number" min="1" max="3650" value="30">
-              <div class="help-text">Healthy auto-discovered instances with no pings after this TTL are disabled.</div>
+              <div class="help-text">{{ _('heartbeats.form.ttl_help') }}</div>
             </div>
             <div class="form-group heartbeat-static-instances-field is-hidden">
-              <label for="heartbeat-expected-instances">Static instances</label>
+              <label for="heartbeat-expected-instances">{{ _('heartbeats.form.static_instances') }}</label>
               <textarea id="heartbeat-expected-instances" class="input monospace" rows="5" placeholder="server-1.example.com&#10;server-2.example.com"></textarea>
-              <div class="help-text">One instance per line or comma-separated.</div>
+              <div class="help-text">{{ _('heartbeats.form.static_help') }}</div>
             </div>
           </div>
 
           <div class="form-group">
-            <label for="heartbeat-labels">Labels JSON</label>
+            <label for="heartbeat-labels">{{ _('heartbeats.form.labels_json') }}</label>
             <div class="json-editor">
               <div class="json-editor-header">
                 <span>JSON</span>
-                <button id="format-heartbeat-labels" type="button" class="btn btn-small">Format</button>
+                <button id="format-heartbeat-labels" type="button" class="btn btn-small">{{ _('heartbeats.actions.format') }}</button>
               </div>
               <textarea id="heartbeat-labels" class="input code-textarea json-editor-textarea" rows="5" spellcheck="false" autocomplete="off">{}</textarea>
             </div>
@@ -319,9 +319,9 @@
         </div>
       </div>
       <div class="app-modal-footer">
-        <button id="delete-heartbeat" type="button" class="btn btn-danger is-hidden">Delete</button>
-        <button id="cancel-heartbeat-form" type="button" class="btn">Cancel</button>
-        <button id="save-heartbeat" type="button" class="btn btn-primary">Save</button>
+        <button id="delete-heartbeat" type="button" class="btn btn-danger is-hidden">{{ _('heartbeats.actions.delete') }}</button>
+        <button id="cancel-heartbeat-form" type="button" class="btn">{{ _('heartbeats.actions.cancel') }}</button>
+        <button id="save-heartbeat" type="button" class="btn btn-primary">{{ _('heartbeats.actions.save') }}</button>
       </div>
     </div>
   </div>
@@ -330,28 +330,28 @@
     <div class="app-modal-dialog app-modal-dialog-small">
       <div class="app-modal-header">
         <div>
-          <h2>Heartbeat token created</h2>
-          <div class="card-subtitle">Copy this URL now. The token is only shown once.</div>
+          <h2>{{ _('heartbeats.token.title') }}</h2>
+          <div class="card-subtitle">{{ _('heartbeats.token.subtitle') }}</div>
         </div>
         <button id="close-heartbeat-token-modal" type="button" class="app-modal-close" aria-label="Close">×</button>
       </div>
       <div class="app-modal-body">
         <div class="form-stack">
           <div class="form-group">
-            <label for="heartbeat-token-url">Ping URL</label>
+            <label for="heartbeat-token-url">{{ _('heartbeats.token.ping_url') }}</label>
             <textarea id="heartbeat-token-url" class="input monospace" rows="2" readonly></textarea>
-            <div class="help-text">Use this URL directly. The token is part of the path; do not add Authorization: Bearer.</div>
+            <div class="help-text">{{ _('heartbeats.token.url_help') }}</div>
           </div>
 
           <div class="form-group">
-            <label for="heartbeat-token-curl">Example curl</label>
+            <label for="heartbeat-token-curl">{{ _('heartbeats.token.example_curl') }}</label>
             <textarea id="heartbeat-token-curl" class="input monospace" rows="5" readonly></textarea>
           </div>
         </div>
       </div>
       <div class="app-modal-footer">
-        <button id="copy-heartbeat-token-url" type="button" class="btn">Copy URL</button>
-        <button id="copy-heartbeat-token-curl" type="button" class="btn btn-primary">Copy curl</button>
+        <button id="copy-heartbeat-token-url" type="button" class="btn">{{ _('heartbeats.actions.copy_url') }}</button>
+        <button id="copy-heartbeat-token-curl" type="button" class="btn btn-primary">{{ _('heartbeats.actions.copy_curl') }}</button>
       </div>
     </div>
   </div>

@@ -68,7 +68,7 @@ function fillGroupSelect(selector, includeAll, callback) {
     /* Fill a select element with groups ordered by id. */
     apiGet("/api/groups", function (groups) {
         const select = $(selector); select.empty();
-        if (includeAll) { select.append($("<option>").val("").text("All groups")); }
+        if (includeAll) { select.append($("<option>").val("").text(i18n.t("shared.select.all_groups"))); }
         groups = asArray(groups);
         groups.forEach(function (group) { select.append($("<option>").val(group.id).text("#" + group.id + " " + group.name + " (" + group.slug + ")")); });
         if (typeof callback === "function") { callback(groups); }
@@ -83,7 +83,7 @@ function fillTeamSelect(selector, includeAll, callback) {
         select.empty();
 
         if (includeAll) {
-            select.append($("<option>").val("").text("All teams"));
+            select.append($("<option>").val("").text(i18n.t("shared.select.all_teams")));
         }
 
         teams = asArray(teams);
@@ -160,7 +160,7 @@ function fillActiveGroupSelect() {
     /* Fill the active group selector in the topbar. */
     const select = $("#active-group-select");
     select.empty();
-    select.append($("<option>").val("").text("All my groups"));
+    select.append($("<option>").val("").text(i18n.t("shared.select.all_my_groups")));
 
     if (!currentUser || !currentUser.groups) {
         return;
@@ -226,7 +226,7 @@ function getUserOptionText(user) {
         user.name ||
         user.username ||
         user.email ||
-        ("User #" + userId);
+        i18n.t("shared.select.user", {id: userId});
 
     const secondary = [];
 
@@ -261,7 +261,7 @@ function initUserTomSelectIfNeeded(selectElement, options) {
         persist: false,
         allowEmptyOption: true,
         maxOptions: 300,
-        placeholder: selectElement.dataset.placeholder || "Select user...",
+        placeholder: selectElement.dataset.placeholder || i18n.t("shared.select.user_placeholder"),
         searchField: ["text"],
         sortField: {
             field: "text",
@@ -270,7 +270,7 @@ function initUserTomSelectIfNeeded(selectElement, options) {
         plugins: isMultiple ? ["remove_button"] : ["clear_button"],
         render: {
             no_results: function () {
-                return '<div class="no-results">No users found</div>';
+                return '<div class="no-results">' + i18n.t("shared.select.no_users") + '</div>';
             }
         }
     }, options || {}));

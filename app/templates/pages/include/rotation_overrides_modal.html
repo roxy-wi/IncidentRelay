@@ -2,9 +2,9 @@
     <div class="app-modal-dialog app-modal-dialog-wide">
       <div class="app-modal-header">
         <div>
-          <h2 id="overrides-title">Overrides</h2>
+          <h2 id="overrides-title">{{ _('rotations.overrides.title') }}</h2>
           <div class="card-subtitle">
-            Temporarily replace the calculated on-call user.
+            {{ _('rotations.overrides.subtitle') }}
           </div>
         </div>
 
@@ -12,7 +12,7 @@
           id="close-rotation-overrides-modal"
           type="button"
           class="app-modal-close"
-          aria-label="Close"
+          aria-label="{{ _('common.close') }}"
         >
           ×
         </button>
@@ -23,21 +23,21 @@
           <section class="card">
             <div class="card-header">
               <div>
-                <h2>Create override</h2>
+                <h2>{{ _('rotations.overrides.create_title') }}</h2>
                 <div class="card-subtitle">
-                  Pick a user and override window.
+                  {{ _('rotations.overrides.create_hint') }}
                 </div>
               </div>
             </div>
 
             <div class="form-body">
-              <label for="override-rotation">Rotation</label>
+              <label for="override-rotation">{{ _('rotations.overrides.rotation') }}</label>
               <select id="override-rotation" class="input"></select>
 
-              <label for="override-user">User</label>
+              <label for="override-user">{{ _('rotations.overrides.user') }}</label>
               <select id="override-user" class="input"></select>
 
-              <label for="override-starts-at">Starts at</label>
+              <label for="override-starts-at">{{ _('rotations.overrides.starts') }}</label>
               <input
                 id="override-starts-at"
                 class="input"
@@ -47,7 +47,7 @@
                 step="60"
               >
 
-              <label for="override-ends-at">Ends at</label>
+              <label for="override-ends-at">{{ _('rotations.overrides.ends') }}</label>
               <input
                 id="override-ends-at"
                 class="input"
@@ -57,20 +57,20 @@
                 step="60"
               >
 
-              <label for="override-reason">Reason</label>
+              <label for="override-reason">{{ _('rotations.overrides.reason') }}</label>
               <textarea
                 id="override-reason"
                 class="input"
-                placeholder="Vacation, sick leave, manual replacement..."
+                placeholder="{{ _('rotations.overrides.reason_placeholder') }}"
               ></textarea>
 
               <div class="form-actions-inline">
                 <button id="create-override" type="button" class="btn btn-primary">
-                  Create override
+                  {{ _('rotations.overrides.create') }}
                 </button>
 
                 <button id="reload-overrides" type="button" class="btn">
-                  Reload
+                  {{ _('rotations.actions.reload') }}
                 </button>
               </div>
             </div>
@@ -79,9 +79,9 @@
           <section class="card">
             <div class="card-header">
               <div>
-                <h2>Existing overrides</h2>
+                <h2>{{ _('rotations.overrides.existing') }}</h2>
                 <div class="card-subtitle">
-                  Active and scheduled manual replacements.
+                  {{ _('rotations.overrides.existing_hint') }}
                 </div>
               </div>
             </div>
@@ -91,17 +91,17 @@
                 <thead>
                   <tr>
                     <th>ID</th>
-                    <th>User</th>
-                    <th>Starts</th>
-                    <th>Ends</th>
-                    <th>Reason</th>
-                    <th class="actions-th">Actions</th>
+                    <th>{{ _('rotations.overrides.user') }}</th>
+                    <th>{{ _('rotations.overrides.table.starts') }}</th>
+                    <th>{{ _('rotations.overrides.table.ends') }}</th>
+                    <th>{{ _('rotations.overrides.reason') }}</th>
+                    <th class="actions-th">{{ _('rotations.table.actions') }}</th>
                   </tr>
                 </thead>
 
                 <tbody id="overrides-table">
                   <tr>
-                    <td colspan="6" class="empty-cell">No rotation selected</td>
+                    <td colspan="6" class="empty-cell">{{ _('rotations.empty.none_selected') }}</td>
                   </tr>
                 </tbody>
               </table>
@@ -112,7 +112,7 @@
 
       <div class="app-modal-footer">
         <button id="close-rotation-overrides-modal-footer" type="button" class="btn">
-          Close
+          {{ _('rotations.actions.close') }}
         </button>
       </div>
     </div>

@@ -46,28 +46,29 @@ function dashboardPrioritySlug(alert) {
 
 function dashboardPriorityLabel(priority) {
     const slug = normalizeAlertValue(priority);
+    const labels = {
+        p1: "alerts.priority.p1",
+        p2: "alerts.priority.p2",
+        p3: "alerts.priority.p3",
+        p4: "alerts.priority.p4",
+        p5: "alerts.priority.p5",
+    };
 
-    if (slug === "p1") {
-        return "P1 Critical";
+    return labels[slug]
+        ? i18n.t(labels[slug])
+        : (slug ? slug.toUpperCase() : i18n.t("alerts.priority.p3"));
+}
+
+function dashboardSeverityDisplayLabel(severity) {
+    const normalized = normalizeAlertValue(severity);
+    if (!normalized || normalized === "unknown") {
+        return i18n.t("overview.labels.unknown");
     }
+    return typeof severityLabel === "function" ? severityLabel(severity) : severity;
+}
 
-    if (slug === "p2") {
-        return "P2 High";
-    }
-
-    if (slug === "p3") {
-        return "P3 Medium";
-    }
-
-    if (slug === "p4") {
-        return "P4 Low";
-    }
-
-    if (slug === "p5") {
-        return "P5 Informational";
-    }
-
-    return slug ? slug.toUpperCase() : "P3 Medium";
+function dashboardAlertStatusLabel(status) {
+    return typeof statusLabel === "function" ? statusLabel(status) : (status || "-");
 }
 
 
@@ -95,13 +96,14 @@ function dashboardActiveAlerts(alerts) {
 function dashboardEscalationText(alert) {
     if (alert.escalation_policy_name) {
         const rule = alert.escalation_rule_position
-            ? " · rule #" + alert.escalation_rule_position
+            ? i18n.t("overview.escalation.rule", {position: alert.escalation_rule_position})
             : "";
-
-        return "Policy: " + alert.escalation_policy_name + rule;
+        return i18n.t("overview.escalation.policy", {
+            name: alert.escalation_policy_name,
+            rule: rule,
+        });
     }
-
-    return "Rotation: " + (alert.rotation_name || "-");
+    return i18n.t("overview.escalation.rotation", {name: alert.rotation_name || "-"});
 }
 function loadDashboard() {
     const params = [];
@@ -141,7 +143,7 @@ function renderDashboardAlertsTable(alerts) {
                 $("<td>")
                     .attr("colspan", "9")
                     .addClass("empty-table-cell")
-                    .text("No active incidents")
+                    .text(i18n.t("overview.empty.no_active_incidents"))
             )
         );
         return;
@@ -159,7 +161,7 @@ function renderDashboardAlertRow(alert) {
         $("<td>").append(
             $("<button>")
                 .attr("type", "button")
-                .attr("title", "Show alert details")
+                .attr("title", i18n.t("overview.alert.show_details"))
                 .addClass("overview-id-link")
                 .text("#" + alert.id)
                 .on("click", function () {
@@ -173,12 +175,12 @@ function renderDashboardAlertRow(alert) {
         $("<td>")
             .addClass("overview-alert-title-cell")
             .append($("<div>").addClass("overview-alert-title").text(alert.title || "-"))
-            .append($("<div>").addClass("overview-alert-meta").text((alert.source || alert.route_name || "Alert") + " · " + dashboardEscalationText(alert)))
+            .append($("<div>").addClass("overview-alert-meta").text((alert.source || alert.route_name || i18n.t("overview.alert.fallback")) + " · " + dashboardEscalationText(alert)))
     );
     row.append(
         $("<td>").append(
             makeAlertBadge(
-                severityLabel(alert.severity),
+                dashboardSeverityDisplayLabel(alert.severity),
                 severityBadgeClass(alert.severity)
             )
         )
@@ -195,7 +197,7 @@ function renderDashboardAlertRow(alert) {
 
     row.append(
         $("<td>").append(
-            makeAlertBadge(alert.status || "-", statusBadgeClass(alert.status))
+            makeAlertBadge(dashboardAlertStatusLabel(alert.status), statusBadgeClass(alert.status))
         )
     );
     row.append($("<td>").text(alert.team_name || alert.team_slug || "-"));
@@ -211,7 +213,7 @@ function renderDashboardAlertRow(alert) {
                 $("<button>")
                     .attr("type", "button")
                     .addClass("btn btn-warning btn-small")
-                    .text("Ack")
+                    .text(i18n.t("overview.actions.ack"))
                     .on("click", function () {
                         apiPost("/api/alerts/" + alert.id + "/ack", {}, loadDashboard);
                     })
@@ -222,7 +224,7 @@ function renderDashboardAlertRow(alert) {
                 $("<button>")
                     .attr("type", "button")
                     .addClass("btn btn-resolve btn-small")
-                    .text("Resolve")
+                    .text(i18n.t("overview.actions.resolve"))
                     .on("click", function () {
                         apiPost("/api/alerts/" + alert.id + "/resolve", {}, loadDashboard);
                     })
@@ -240,7 +242,7 @@ function renderDashboardRecentAlerts(alerts) {
     target.empty();
 
     if (!alerts.length) {
-        target.append($("<div>").addClass("overview-empty").text("No alerts yet"));
+        target.append($("<div>").addClass("overview-empty").text(i18n.t("overview.empty.no_alerts")));
         return;
     }
 
@@ -269,7 +271,7 @@ function renderDashboardRecentAlerts(alerts) {
                         .text(
                             (alert.team_name || alert.team_slug || "-")
                             + " · "
-                            + severityLabel(alert.severity)
+                            + dashboardSeverityDisplayLabel(alert.severity)
                             + " · "
                             + dashboardPriorityShortLabel(alert)
                             + " · "
@@ -291,11 +293,11 @@ function renderDashboardTeamsNow(activeAlerts) {
     target.empty();
 
     if (!activeAlerts.length) {
-        target.append($("<div>").addClass("overview-empty").text("No teams with active incidents"));
+        target.append($("<div>").addClass("overview-empty").text(i18n.t("overview.empty.no_teams")));
         return;
     }
 
-    const counts = dashboardGroupCount(activeAlerts, "team_slug", "Unknown team");
+    const counts = dashboardGroupCount(activeAlerts, "team_slug", i18n.t("overview.labels.unknown_team"));
     const items = Object.keys(counts)
         .map(function (team) {
             return { team: team, count: counts[team] };
@@ -317,7 +319,7 @@ function renderDashboardTeamsNow(activeAlerts) {
                     $("<span>")
                         .addClass("list-main")
                         .append($("<span>").addClass("list-title").text(item.team))
-                        .append($("<span>").addClass("list-subtitle").text("Active alerts"))
+                        .append($("<span>").addClass("list-subtitle").text(i18n.t("overview.teams.active_alerts")))
                 )
                 .append(
                     $("<span>")
@@ -333,7 +335,7 @@ function renderDashboardSeveritySplit(alerts) {
     target.empty();
     const counts = dashboardGroupCount(alerts, "severity", "unknown");
     const order = ["critical", "high", "medium", "low", "unknown"];
-    renderDashboardBars(target, counts, order, alerts.length, severityLabel);
+    renderDashboardBars(target, counts, order, alerts.length, dashboardSeverityDisplayLabel);
 }
 function renderDashboardPrioritySplit(alerts) {
     const target = $("#dashboard-priority-split");
@@ -354,7 +356,7 @@ function renderDashboardPrioritySplit(alerts) {
 function renderDashboardTeamSummary(alerts) {
     const target = $("#dashboard-team-summary");
     target.empty();
-    const counts = dashboardGroupCount(alerts, "team_slug", "Unknown team");
+    const counts = dashboardGroupCount(alerts, "team_slug", i18n.t("overview.labels.unknown_team"));
     const order = Object.keys(counts).sort(function (left, right) {
         return counts[right] - counts[left];
     });
@@ -365,7 +367,7 @@ function renderDashboardTeamSummary(alerts) {
 
 function renderDashboardBars(target, counts, order, total, labelFunction) {
     if (!total) {
-        target.append($("<div>").addClass("overview-empty").text("No data"));
+        target.append($("<div>").addClass("overview-empty").text(i18n.t("overview.empty.no_data")));
         return;
     }
 
@@ -404,18 +406,18 @@ function renderDashboardSystemStatus(alerts, activeAlerts) {
     }).length;
 
     if (!alerts.length) {
-        target.text("No alerts in the current selection.");
+        target.text(i18n.t("overview.system.no_alerts"));
         return;
     }
     if (firing > 0) {
-        target.text(firing + " firing alert" + (firing === 1 ? "" : "s") + " require attention.");
+        target.text(i18n.t("overview.system.firing", {count: firing}));
         return;
     }
     if (activeAlerts.length > 0) {
-        target.text(activeAlerts.length + " active alert" + (activeAlerts.length === 1 ? "" : "s") + " acknowledged.");
+        target.text(i18n.t("overview.system.acknowledged", {count: activeAlerts.length}));
         return;
     }
-    target.text("All tracked alerts are resolved.");
+    target.text(i18n.t("overview.system.resolved"));
 }
 
 $(document).on("click", "#reload-dashboard", loadDashboard);
@@ -446,7 +448,9 @@ function dashboardImpactStatusRank(status) {
 }
 
 function dashboardImpactStatusLabel(status) {
-    return String(status || "unknown").replace(/_/g, " ");
+    const normalized = String(status || "unknown").toLowerCase();
+    const key = "overview.impact.status." + normalized;
+    return i18n.t(key, {}, normalized.replace(/_/g, " "));
 }
 
 function dashboardImpactStatusCssClass(status) {
@@ -546,7 +550,7 @@ function renderDashboardServiceImpact(rows) {
         target.append(
             $("<div>")
                 .addClass("overview-empty")
-                .text("No impacted services")
+                .text(i18n.t("overview.impact.none"))
         );
         return;
     }
@@ -560,7 +564,7 @@ function renderDashboardServiceImpact(rows) {
             $("<button>")
                 .attr("type", "button")
                 .addClass("overview-list-item overview-list-button dashboard-impact-more")
-                .text("+" + (rows.length - 5) + " more impacted service" + (rows.length - 5 === 1 ? "" : "s"))
+                .text(i18n.t("overview.impact.more", {count: rows.length - 5}))
                 .on("click", function () {
                     navigate("/services", true);
                 })
@@ -572,7 +576,7 @@ function renderDashboardServiceImpactItem(row) {
     const serviceName = dashboardDisplayName(
         row.service_name,
         row.service_slug,
-        "Service #" + row.service_id
+        i18n.t("overview.impact.service_number", {id: row.service_id})
     );
 
     const teamName = dashboardDisplayName(row.team_name, row.team_slug);
@@ -605,11 +609,11 @@ function renderDashboardServiceImpactItem(row) {
 
     const subtitleParts = [
         teamName,
-        "open " + Number(row.open_alert_groups || 0),
+        i18n.t("overview.impact.open", {count: Number(row.open_alert_groups || 0)}),
     ];
 
     if (Number(row.critical_open_alert_groups || 0) > 0) {
-        subtitleParts.push("critical " + Number(row.critical_open_alert_groups || 0));
+        subtitleParts.push(i18n.t("overview.impact.critical", {count: Number(row.critical_open_alert_groups || 0)}));
     }
 
     main.append(
@@ -622,18 +626,16 @@ function renderDashboardServiceImpactItem(row) {
         main.append(
             $("<div>")
                 .addClass("dashboard-impact-root")
-                .text(
-                    "Root cause: "
-                    + dashboardImpactIssueRootCause(issue)
-                    + " · "
-                    + dashboardImpactIssuePath(issue)
-                )
+                .text(i18n.t("overview.impact.root_cause", {
+                    root: dashboardImpactIssueRootCause(issue),
+                    path: dashboardImpactIssuePath(issue),
+                }))
         );
     } else if (dashboardHasAlertImpact(row)) {
         main.append(
             $("<div>")
                 .addClass("dashboard-impact-root")
-                .text("Caused by open alerts")
+                .text(i18n.t("overview.impact.caused_by_alerts"))
         );
     }
 

@@ -36,11 +36,15 @@ function getRouteTeamLabel(route) {
 }
 function getRouteEscalationLabel(route) {
     if (route.escalation_policy_name) {
-        return "Policy: " + route.escalation_policy_name;
+        return i18n.t("routes.escalation.policy", {
+            name: route.escalation_policy_name,
+        });
     }
 
     if (route.rotation_name) {
-        return "Rotation: " + route.rotation_name;
+        return i18n.t("routes.escalation.rotation", {
+            name: route.rotation_name,
+        });
     }
 
     return "-";
@@ -63,14 +67,14 @@ function getRouteNotificationModeLabel(route) {
     const mode = route.notification_channel_mode || "route_only";
 
     if (mode === "service_policy") {
-        return "Service notification policy";
+        return i18n.t("routes.notification.service_policy");
     }
 
     if (mode === "service_policy_plus_route") {
-        return "Service policy + route channels";
+        return i18n.t("routes.notification.combined");
     }
 
-    return "Route channels only";
+    return i18n.t("routes.notification.route_only");
 }
 
 function updateRouteNotificationChannelModeUi() {
@@ -85,42 +89,34 @@ function updateRouteNotificationChannelModeUi() {
         .closest(".form-group")
         .toggleClass("is-muted", routeChannelsDisabled);
 
-    let helpText;
+    let helpKey = "routes.notification.route_only_help";
 
     if (mode === "service_policy") {
-        helpText = (
-            "Only channels selected by the matched service notification "
-            + "policy will receive shared notifications."
-        );
+        helpKey = "routes.notification.service_policy_help";
     } else if (mode === "service_policy_plus_route") {
-        helpText = (
-            "Channels selected by the service policy are combined with "
-            + "the channels configured on this route."
-        );
-    } else {
-        helpText = (
-            "Only channels configured directly on this route are used."
-        );
+        helpKey = "routes.notification.combined_help";
     }
 
-    $("#route-notification-channel-mode-help").text(helpText);
+    $("#route-notification-channel-mode-help").text(i18n.t(helpKey));
 }
 
 function getRouteTeamEscalationLabel(route) {
     if (route.escalation_policy_name) {
-        return "Ignored for policy mode";
+        return i18n.t("routes.escalation.ignored_policy");
     }
 
     if (route.team_escalation_enabled) {
-        return "After " + (route.team_escalation_after_reminders || 0) + " reminders";
+        return i18n.t("routes.escalation.after_reminders", {
+            count: route.team_escalation_after_reminders || 0,
+        });
     }
 
-    return "Disabled";
+    return i18n.t("routes.status.disabled");
 }
 function initializeRouteMatcherEditors() {
     enhanceMatcherEditor("#route-matchers", {
-        label: "Additional matchers JSON",
-        header: "Additional matchers",
+        label: i18n.t("routes.form.additional_matchers_json"),
+        header: i18n.t("routes.form.additional_matchers"),
         context: function () {
             return {
                 scope: "route",
@@ -132,7 +128,7 @@ function initializeRouteMatcherEditors() {
     });
 
     enhanceMatcherEditor("#service-rule-matchers", {
-        label: "Additional matchers",
+        label: i18n.t("routes.form.additional_matchers"),
         context: function () {
             const route = getSelectedRouteForServiceRules();
 
@@ -163,15 +159,15 @@ function loadRouteDependencies(callback, selectedMatcherPresetId) {
     const serviceSelect = $("#route-service");
     const matcherPresetSelect = $("#route-matcher-preset");
 
-    rotationSelect.empty().append($("<option>").val("").text("No rotation"));
+    rotationSelect.empty().append($("<option>").val("").text(i18n.t("routes.form.no_rotation")));
     channelSelect.empty();
 
     if (policySelect.length) {
-        policySelect.empty().append($("<option>").val("").text("No policy"));
+        policySelect.empty().append($("<option>").val("").text(i18n.t("routes.form.no_policy")));
     }
 
     if (serviceSelect.length) {
-        serviceSelect.empty().append($("<option>").val("").text("No default service"));
+        serviceSelect.empty().append($("<option>").val("").text(i18n.t("routes.form.no_default_service")));
     }
 
     if (!teamId) {
@@ -202,7 +198,7 @@ function loadRouteDependencies(callback, selectedMatcherPresetId) {
     }
 
     apiGet("/api/rotations?team_id=" + encodeURIComponent(teamId), function (rotations) {
-        rotationSelect.empty().append($("<option>").val("").text("No rotation"));
+        rotationSelect.empty().append($("<option>").val("").text(i18n.t("routes.form.no_rotation")));
 
         asArray(rotations).forEach(function (rotation) {
             if (!rotation.enabled) {
@@ -241,7 +237,7 @@ function loadRouteDependencies(callback, selectedMatcherPresetId) {
 
     if (policySelect.length) {
         apiGet("/api/escalation-policies?team_id=" + encodeURIComponent(teamId), function (policies) {
-            policySelect.empty().append($("<option>").val("").text("No policy"));
+            policySelect.empty().append($("<option>").val("").text(i18n.t("routes.form.no_policy")));
 
             asArray(policies).forEach(function (policy) {
                 if (!policy.enabled) {
@@ -262,7 +258,7 @@ function loadRouteDependencies(callback, selectedMatcherPresetId) {
 
     if (serviceSelect.length) {
         apiGet("/api/services?team_id=" + encodeURIComponent(teamId), function (services) {
-            serviceSelect.empty().append($("<option>").val("").text("No default service"));
+            serviceSelect.empty().append($("<option>").val("").text(i18n.t("routes.form.no_default_service")));
 
             asArray(services).forEach(function (service) {
                 if (!service.enabled) {
@@ -325,6 +321,7 @@ function fillRouteSourceFilter(routes) {
     const sources = {
         alertmanager: true,
         aws_sns: true,
+        datadog: true,
         grafana: true,
         rmon: true,
         heartbeat: true,
@@ -341,7 +338,7 @@ function fillRouteSourceFilter(routes) {
     });
 
     filter.empty();
-    filter.append($("<option>").val("").text("All sources"));
+    filter.append($("<option>").val("").text(i18n.t("routes.filters.all_sources")));
     Object.keys(sources).sort().forEach(function (source) {
         filter.append($("<option>").val(source).text(source));
     });
@@ -364,7 +361,7 @@ function getRouteSearchText(route) {
         route.rotation_name,
         route.escalation_policy_name,
         route.intake_token_prefix,
-        route.enabled ? "enabled" : "disabled",
+        route.enabled ? i18n.t("routes.status.enabled") : i18n.t("routes.status.disabled"),
         channels,
         route.service_name,
         route.service_slug,
@@ -390,7 +387,10 @@ function renderRoutesTable() {
     if (!routes.length) {
         tbody.append(
             $("<tr>").append(
-                $("<td>").attr("colspan", "8").addClass("empty-cell").text("No routes")
+                $("<td>")
+                    .attr("colspan", "8")
+                    .addClass("empty-cell")
+                    .text(i18n.t("routes.table.empty"))
             )
         );
         return;
@@ -415,7 +415,11 @@ function renderRouteRow(route) {
                         renderRouteDetails(route);
                     })
             )
-            .append($("<div>").addClass("row-subtitle").text("Route #" + route.id))
+            .append(
+                $("<div>")
+                    .addClass("row-subtitle")
+                    .text(i18n.t("routes.row.number", {id: route.id}))
+            )
     );
     row.append($("<td>").append($("<span>").addClass("route-pill").text(getRouteTeamLabel(route))));
     row.append($("<td>").text(route.source || "-"));
@@ -424,7 +428,11 @@ function renderRouteRow(route) {
     row.append($("<td>").append($("<span>").addClass("token-pill").text(route.intake_token_prefix || "-")));
     row.append(
         window.AppMaintenanceBadges.statusCell(
-            renderStatusBadge(route.enabled, "Enabled", "Disabled"),
+            renderStatusBadge(
+                route.enabled,
+                i18n.t("routes.status.enabled"),
+                i18n.t("routes.status.disabled")
+            ),
             route
         )
     );
@@ -441,7 +449,7 @@ function renderRouteChannels(route) {
         return wrapper.append(
             $("<span>")
                 .addClass("route-channel-chip")
-                .text("Service policy")
+                .text(i18n.t("routes.notification.service_policy"))
         );
     }
 
@@ -449,7 +457,7 @@ function renderRouteChannels(route) {
         wrapper.append(
             $("<span>")
                 .addClass("route-channel-chip")
-                .text("Service policy")
+                .text(i18n.t("routes.notification.service_policy"))
         );
     }
 
@@ -471,10 +479,10 @@ function renderRouteChannels(route) {
 function renderRouteActions(route) {
     const items = [
         {
-            label: "Edit",
+            label: i18n.t("routes.actions.edit"),
             icon: "fas fa-edit",
             required: "write",
-            denyMessage: "Team manager or group editor/admin role is required to edit this route.",
+            denyMessage: i18n.t("routes.permissions.edit"),
             onClick: function () {
                 editRoute(route.id);
             }
@@ -483,10 +491,10 @@ function renderRouteActions(route) {
 
     if (!["sentry", "aws_sns"].includes(route.source)) {
         items.push({
-            label: "Regenerate token",
+            label: i18n.t("routes.actions.regenerate_token"),
             icon: "fas fa-sync-alt",
             required: "write",
-            denyMessage: "Team manager or group editor/admin role is required to regenerate route tokens.",
+            denyMessage: i18n.t("routes.permissions.regenerate"),
             onClick: function () {
                 regenerateRouteToken(route.id);
             }
@@ -495,20 +503,22 @@ function renderRouteActions(route) {
 
     items.push(
         {
-            label: "Service rules",
+            label: i18n.t("routes.actions.service_rules"),
             icon: "fas fa-project-diagram",
             required: "write",
-            denyMessage: "Team manager or group editor/admin role is required to manage service rules.",
+            denyMessage: i18n.t("routes.permissions.rules"),
             onClick: function () {
                 openRouteServiceRules(route.id);
             }
         },
         {
-            label: route.enabled ? "Disable" : "Enable",
+            label: route.enabled
+                ? i18n.t("routes.actions.disable")
+                : i18n.t("routes.actions.enable"),
             icon: route.enabled ? "fas fa-pause" : "fas fa-play",
             required: "write",
             danger: route.enabled,
-            denyMessage: "Team manager or group editor/admin role is required to enable or disable this route.",
+            denyMessage: i18n.t("routes.permissions.toggle"),
             onClick: function () {
                 if (route.enabled) {
                     disableRoute(route);
@@ -518,11 +528,11 @@ function renderRouteActions(route) {
             }
         },
         {
-            label: "Delete",
+            label: i18n.t("routes.actions.delete"),
             icon: "fas fa-trash",
             required: "delete",
             danger: true,
-            denyMessage: "Delete permission is required to delete this route.",
+            denyMessage: i18n.t("routes.permissions.delete"),
             onClick: function () {
                 deleteRoute(route);
             }
@@ -554,13 +564,17 @@ function openRouteServiceRules(routeId) {
     }
 
     if (!canWriteObject(route)) {
-        showAppError("You do not have permission to manage service rules for this route.");
+        showAppError(i18n.t("routes.permissions.rules_denied"));
         return;
     }
 
     selectedRouteForServiceRules = route.id;
 
-    $("#route-service-rules-title").text("Service rules / " + (route.name || ("Route #" + route.id)));
+    $("#route-service-rules-title").text(
+        i18n.t("routes.rules.title_named", {
+            name: route.name || i18n.t("routes.row.number", {id: route.id}),
+        })
+    );
     $("#service-rule-team").val(route.team_id);
     $("#service-rule-route").val(route.id);
 
@@ -578,7 +592,7 @@ function loadServiceRuleServices(teamId, callback) {
     const select = $("#service-rule-service");
 
     select.empty();
-    select.append($("<option>").val("").text("Select service"));
+    select.append($("<option>").val("").text(i18n.t("routes.rules.select_service")));
 
     if (!teamId) {
         if (typeof callback === "function") {
@@ -589,7 +603,7 @@ function loadServiceRuleServices(teamId, callback) {
 
     apiGet("/api/services?team_id=" + encodeURIComponent(teamId), function (services) {
         select.empty();
-        select.append($("<option>").val("").text("Select service"));
+        select.append($("<option>").val("").text(i18n.t("routes.rules.select_service")));
 
         asArray(services).forEach(function (service) {
             if (!service.enabled) {
@@ -654,7 +668,7 @@ function renderRouteServiceRulesTable() {
                 $("<td>")
                     .attr("colspan", "6")
                     .addClass("empty-cell")
-                    .text("No service rules")
+                    .text(i18n.t("routes.rules.empty"))
             )
         );
         return;
@@ -691,7 +705,11 @@ function renderRouteServiceRuleRow(rule) {
         matchersCell.append(
             $("<div>")
                 .addClass("row-subtitle")
-                .text("Preset: " + formatMatcherPresetOption(matcherPreset))
+                .text(
+                    i18n.t("routes.rules.preset", {
+                        name: formatMatcherPresetOption(matcherPreset),
+                    })
+                )
         );
     }
 
@@ -705,7 +723,11 @@ function renderRouteServiceRuleRow(rule) {
 
     row.append(
         $("<td>").append(
-            renderStatusBadge(rule.enabled, "Enabled", "Disabled")
+            renderStatusBadge(
+                rule.enabled,
+                i18n.t("routes.status.enabled"),
+                i18n.t("routes.status.disabled")
+            )
         )
     );
 
@@ -717,7 +739,7 @@ function renderRouteServiceRuleRow(rule) {
                     object: getSelectedRouteForServiceRules(),
                     items: [
                         {
-                            label: "Edit",
+                            label: i18n.t("routes.actions.edit"),
                             icon: "fas fa-edit",
                             required: "write",
                             onClick: function () {
@@ -725,7 +747,7 @@ function renderRouteServiceRuleRow(rule) {
                             }
                         },
                         {
-                            label: "Delete",
+                            label: i18n.t("routes.actions.delete"),
                             icon: "fas fa-trash",
                             required: "write",
                             danger: true,
@@ -742,6 +764,7 @@ function renderRouteServiceRuleRow(rule) {
 }
 
 function resetServiceRuleForm() {
+    $("#service-rule-form-title").text(i18n.t("routes.rules.create"));
     $("#service-rule-id").val("");
     $("#service-rule-name").val("");
     $("#service-rule-service").val("");
@@ -755,6 +778,7 @@ function resetServiceRuleForm() {
 }
 
 function editRouteServiceRule(rule) {
+    $("#service-rule-form-title").text(i18n.t("routes.rules.edit"));
     $("#service-rule-id").val(rule.id);
     $("#service-rule-name").val(rule.name || "");
     $("#service-rule-service").val(rule.service_id || "");
@@ -788,12 +812,12 @@ function saveRouteServiceRule() {
     const payload = collectRouteServiceRulePayload();
 
     if (!payload.service_id) {
-        showAppError("Service is required.");
+        showAppError(i18n.t("routes.rules.service_required"));
         return;
     }
 
     if (!payload.matcher_preset_id && !Object.keys(payload.matchers || {}).length) {
-        showAppError("Select a matcher preset or define additional matchers.");
+        showAppError(i18n.t("routes.rules.matcher_required"));
         return;
     }
 
@@ -817,9 +841,11 @@ function saveRouteServiceRule() {
 
 function deleteRouteServiceRule(rule) {
     showAppConfirm({
-        title: "Delete this service rule?",
-        message: "Delete service rule \"" + (rule.name || ("#" + rule.id)) + "\"?",
-        confirmText: "Delete",
+        title: i18n.t("routes.rules.delete_title"),
+        message: i18n.t("routes.rules.delete_message", {
+            name: rule.name || ("#" + rule.id),
+        }),
+        confirmText: i18n.t("routes.actions.delete"),
         confirmClass: "btn-danger",
     }).done(function () {
         apiDelete("/api/services/match-rules/" + rule.id, function () {
@@ -844,35 +870,46 @@ function routeDetailsCode(label, value) {
 function renderRouteDetails(route) {
     selectedRouteDetailsId = route.id;
 
-    $("#route-details-subtitle").text(getRouteTeamLabel(route) + " / " + (route.enabled ? "Enabled" : "Disabled"));
+    $("#route-details-subtitle").text(
+        getRouteTeamLabel(route)
+        + " / "
+        + (
+            route.enabled
+                ? i18n.t("routes.status.enabled")
+                : i18n.t("routes.status.disabled")
+        )
+    );
 
     const body = $("#route-details-body");
     body.empty();
     body.append(
         $("<div>")
             .addClass("details-list")
-            .append(routeDetailsItem("Name", route.name))
-            .append(routeDetailsItem("Team", getRouteTeamLabel(route)))
-            .append(routeDetailsItem("Source", route.source))
-            .append(
-                route.source === "sentry"
-                    ? routeDetailsItem("Sentry webhook URL", getSentryWebhookUrl(route))
-                    : $()
-            )
+            .append(routeDetailsItem(i18n.t("routes.details.name"), route.name))
+            .append(routeDetailsItem(i18n.t("routes.details.team"), getRouteTeamLabel(route)))
+            .append(routeDetailsItem(i18n.t("routes.details.source"), route.source))
             .append(
                 route.source === "sentry"
                     ? routeDetailsItem(
-                        "Sentry secret",
-                        getRouteSentryConfig(route).has_webhook_secret
-                            ? "Configured"
-                            : "Not configured"
+                        i18n.t("routes.details.sentry_webhook"),
+                        getSentryWebhookUrl(route)
                     )
                     : $()
             )
             .append(
                 route.source === "sentry"
                     ? routeDetailsItem(
-                        "Sentry base URL",
+                        i18n.t("routes.details.sentry_secret"),
+                        getRouteSentryConfig(route).has_webhook_secret
+                            ? i18n.t("routes.details.configured")
+                            : i18n.t("routes.details.not_configured")
+                    )
+                    : $()
+            )
+            .append(
+                route.source === "sentry"
+                    ? routeDetailsItem(
+                        i18n.t("routes.details.sentry_base_url"),
                         getRouteSentryConfig(route).base_url || "-"
                     )
                     : $()
@@ -880,7 +917,7 @@ function renderRouteDetails(route) {
             .append(
                 route.source === "sentry"
                     ? routeDetailsItem(
-                        "Sentry organization",
+                        i18n.t("routes.details.sentry_org"),
                         getRouteSentryConfig(route).organization_slug || "-"
                     )
                     : $()
@@ -888,36 +925,50 @@ function renderRouteDetails(route) {
             .append(
                 routeDetailsItem(
                     route.source === "aws_sns"
-                        ? "SNS webhook URL"
-                        : "Webhook URL",
+                        ? i18n.t("routes.details.sns_webhook")
+                        : i18n.t("routes.details.webhook"),
                     getRouteIntakeUrl(route)
                 )
             )
-            .append(routeDetailsItem("Maintenance", window.AppMaintenanceBadges.text(route, "-")))
-            .append(routeDetailsItem("Escalation", getRouteEscalationLabel(route)))
-            .append(routeDetailsItem("Team escalation", getRouteTeamEscalationLabel(route)))
-            .append(routeDetailsItem("Notification channel source", getRouteNotificationModeLabel(route)))
-            .append(routeDetailsItem("Channels", asArray(route.channels).map(function (channel) {
+            .append(
+                routeDetailsItem(
+                    i18n.t("routes.details.maintenance"),
+                    window.AppMaintenanceBadges.text(route, "-")
+                )
+            )
+            .append(routeDetailsItem(i18n.t("routes.details.escalation"), getRouteEscalationLabel(route)))
+            .append(routeDetailsItem(i18n.t("routes.details.team_escalation"), getRouteTeamEscalationLabel(route)))
+            .append(routeDetailsItem(i18n.t("routes.details.notification_source"), getRouteNotificationModeLabel(route)))
+            .append(routeDetailsItem(i18n.t("routes.details.channels"), asArray(route.channels).map(function (channel) {
                 return channel.name;
             }).join(", ") || "-"))
             .append(
                 !["sentry", "aws_sns"].includes(route.source)
                     ? routeDetailsItem(
-                        "Token prefix",
+                        i18n.t("routes.details.token_prefix"),
                         route.intake_token_prefix
                     )
                     : $()
             )
-            .append(routeDetailsItem("Status", route.enabled ? "Enabled" : "Disabled"))
             .append(
                 routeDetailsItem(
-                    "Matcher preset",
-                    route.matcher_preset ? formatMatcherPresetOption(route.matcher_preset) : "No preset"
+                    i18n.t("routes.details.status"),
+                    route.enabled
+                        ? i18n.t("routes.status.enabled")
+                        : i18n.t("routes.status.disabled")
                 )
             )
-            .append(routeDetailsCode("Additional matchers", route.matchers || {}))
-            .append(routeDetailsCode("Group by", asArray(route.group_by)))
-            .append(routeDetailsItem("Service", route.service_name || route.service_slug || "-"))
+            .append(
+                routeDetailsItem(
+                    i18n.t("routes.details.matcher_preset"),
+                    route.matcher_preset
+                        ? formatMatcherPresetOption(route.matcher_preset)
+                        : i18n.t("routes.form.no_preset")
+                )
+            )
+            .append(routeDetailsCode(i18n.t("routes.details.additional_matchers"), route.matchers || {}))
+            .append(routeDetailsCode(i18n.t("routes.details.group_by"), asArray(route.group_by)))
+            .append(routeDetailsItem(i18n.t("routes.details.service"), route.service_name || route.service_slug || "-"))
     );
 
     if (route.source === "aws_sns") {
@@ -925,7 +976,7 @@ function renderRouteDetails(route) {
 
         body.find(".details-list").append(
             routeDetailsItem(
-                "SNS Topic ARN",
+                i18n.t("routes.details.sns_topic"),
                 awsSnsConfig.topic_arn
             )
         );
@@ -935,7 +986,7 @@ function renderRouteDetails(route) {
     appendIconActionIfAllowed(actions, route, {
         required: "write",
         icon: "fas fa-edit",
-        label: "Edit route",
+        label: i18n.t("routes.actions.edit_route"),
         onClick: function () {
             editRoute(route.id);
         },
@@ -944,7 +995,7 @@ function renderRouteDetails(route) {
         appendIconActionIfAllowed(actions, route, {
             required: "write",
             icon: "fas fa-sync-alt",
-            label: "Regenerate route token",
+            label: i18n.t("routes.actions.regenerate_route_token"),
             onClick: function () {
                 regenerateRouteToken(route.id);
             },
@@ -953,7 +1004,9 @@ function renderRouteDetails(route) {
     appendIconActionIfAllowed(actions, route, {
         required: "write",
         icon: route.enabled ? "fas fa-pause" : "fas fa-play",
-        label: route.enabled ? "Disable route" : "Enable route",
+        label: route.enabled
+            ? i18n.t("routes.actions.disable_route")
+            : i18n.t("routes.actions.enable_route"),
         className: route.enabled ? "btn-warning" : "btn-success",
         onClick: function () {
             if (route.enabled) {
@@ -966,7 +1019,7 @@ function renderRouteDetails(route) {
     appendIconActionIfAllowed(actions, route, {
         required: "delete",
         icon: "fas fa-trash-alt",
-        label: "Delete route",
+        label: i18n.t("routes.actions.delete_route"),
         className: "btn-danger",
         onClick: function () {
             deleteRoute(route);
@@ -980,8 +1033,14 @@ function renderRouteDetails(route) {
 
 function renderRouteDetailsEmpty() {
     selectedRouteDetailsId = null;
-    $("#route-details-subtitle").text("Select a route");
-    $("#route-details-body").html("<p class=\"muted\">Click a route name to inspect matchers, group by, channels and intake token prefix.</p>");
+    $("#route-details-subtitle").text(i18n.t("routes.details.select"));
+    $("#route-details-body")
+        .empty()
+        .append(
+            $("<p>")
+                .addClass("muted")
+                .text(i18n.t("routes.details.empty"))
+        );
 }
 
 function restoreRouteDetails() {
@@ -1038,8 +1097,18 @@ function updateRouteSourceUi() {
 
     const isSentry = source === "sentry";
     const isAwsSns = source === "aws_sns";
+    const isDatadog = source === "datadog";
+    const isWebhook = source === "webhook";
 
     $("#route-sentry-settings").toggleClass("is-hidden", !isSentry);
+    $("#route-webhook-compatibility-help").toggleClass(
+        "is-hidden",
+        !isWebhook
+    );
+    $("#route-datadog-help").toggleClass(
+        "is-hidden",
+        !isDatadog
+    );
 
     $("#route-aws-sns-settings").toggleClass("is-hidden", !isAwsSns);
 
@@ -1064,6 +1133,10 @@ function updateRouteSourceUi() {
         } else if (source === "grafana") {
             $("#route-group-by").val(
                 '["alertname","grafana_folder","instance"]'
+            );
+        } else if (source === "datadog") {
+            $("#route-group-by").val(
+                '["datadog_alert_id","datadog_scope"]'
             );
         } else if (source === "rmon") {
             $("#route-group-by").val(
@@ -1126,24 +1199,15 @@ function collectRouteIntegrationConfig() {
 
 function updateSentrySecretHelp(route) {
     const sentryConfig = getRouteSentryConfig(route);
+    let key = "routes.form.sentry_secret_new_help";
 
     if (route && sentryConfig.has_webhook_secret) {
-        $("#route-sentry-secret-help").text(
-            "Sentry webhook secret is configured. Leave empty to keep the existing secret."
-        );
-        return;
+        key = "routes.form.sentry_secret_configured_help";
+    } else if (route && route.id) {
+        key = "routes.form.sentry_secret_missing_help";
     }
 
-    if (route && route.id) {
-        $("#route-sentry-secret-help").text(
-            "Paste Sentry Client Secret here. Until it is configured, Sentry webhooks will be rejected."
-        );
-        return;
-    }
-
-    $("#route-sentry-secret-help").text(
-        "Create the route first to get the Sentry webhook URL. Then create a Sentry Internal Integration and paste its Client Secret here."
-    );
+    $("#route-sentry-secret-help").text(i18n.t(key));
 }
 
 function getRouteGroupByValue() {
@@ -1153,7 +1217,7 @@ function getRouteGroupByValue() {
     );
 
     if (!Array.isArray(value)) {
-        const message = "Route group by must be a JSON array, for example [\"alertname\", \"instance\"]. Use [] to disable cross-alert grouping.";
+        const message = i18n.t("routes.validation.group_by");
 
         if (typeof showAppError === "function") {
             showAppError(message);
@@ -1206,7 +1270,7 @@ function saveRoute() {
         return Number(item.id) === Number(id);
     }) : null;
     if (existing && !canWriteObject(existing)) {
-        showAppError("Team manager or group editor/admin role is required to edit this route.");
+        showAppError(i18n.t("routes.permissions.edit"));
         return;
     }
 
@@ -1228,7 +1292,7 @@ function saveRoute() {
 
         if (payload.source === "aws_sns") {
             showAppSuccess(
-                "AWS SNS route created. Copy the webhook URL from route details."
+                i18n.t("routes.success.sns_created")
             );
             return;
         }
@@ -1245,11 +1309,11 @@ function editRoute(id) {
         return;
     }
     if (!canWriteObject(route)) {
-        showAppError("You do not have permission to edit this route.");
+        showAppError(i18n.t("routes.permissions.edit_denied"));
         return;
     }
 
-    $("#route-form-title").text("Edit route #" + id);
+    $("#route-form-title").text(i18n.t("routes.form.edit", {id: id}));
     $("#route-id").val(route.id);
     $("#route-team").val(route.team_id);
     $("#route-name").val(route.name);
@@ -1322,15 +1386,17 @@ function editRoute(id) {
 
 function disableRoute(route) {
     if (!canWriteObject(route)) {
-        showAppError("You do not have permission to disable this route.");
+        showAppError(i18n.t("routes.permissions.disable_denied"));
         return;
     }
 
-    const routeName = route.name || ("Route #" + route.id);
+    const routeName = route.name || i18n.t("routes.row.number", {id: route.id});
     showAppConfirm({
-        title: "Disable this route?",
-        message: "Disable route \"" + routeName + "\"?\n\nThe route will stop accepting incoming alerts, but it will stay visible and can be enabled again.",
-        confirmText: "Disable",
+        title: i18n.t("routes.confirm.disable_title"),
+        message: i18n.t("routes.confirm.disable_message", {
+            name: routeName,
+        }),
+        confirmText: i18n.t("routes.actions.disable"),
         confirmClass: "btn-warning",
     }).done(function () {
         apiPost("/api/routes/" + route.id + "/disable", {}, function () {
@@ -1341,7 +1407,7 @@ function disableRoute(route) {
 
 function enableRoute(route) {
     if (!canWriteObject(route)) {
-        showAppError("You do not have permission to enable this route.");
+        showAppError(i18n.t("routes.permissions.enable_denied"));
         return;
     }
 
@@ -1352,15 +1418,17 @@ function enableRoute(route) {
 
 function deleteRoute(route) {
     if (!canDeleteObject(route)) {
-        showAppError("You do not have permission to delete this route.");
+        showAppError(i18n.t("routes.permissions.delete_denied"));
         return;
     }
 
-    const routeName = route.name || ("Route #" + route.id);
+    const routeName = route.name || i18n.t("routes.row.number", {id: route.id});
     showAppConfirm({
-        title: "Delete this route?",
-        message: "Delete route \"" + routeName + "\"?\n\nThis will remove the route from active route lists and stop alert intake for this route. Historical alerts will be preserved.",
-        confirmText: "Delete",
+        title: i18n.t("routes.confirm.delete_title"),
+        message: i18n.t("routes.confirm.delete_message", {
+            name: routeName,
+        }),
+        confirmText: i18n.t("routes.actions.delete"),
         confirmClass: "btn-danger",
     }).done(function () {
         apiDelete("/api/routes/" + route.id, function () {
@@ -1374,7 +1442,7 @@ function deleteRoute(route) {
 }
 
 function resetRouteForm() {
-    $("#route-form-title").text("Create route");
+    $("#route-form-title").text(i18n.t("routes.form.create"));
     $("#route-id").val("");
     $("#route-name").val("");
     $("#route-source").val("alertmanager");
@@ -1462,6 +1530,31 @@ function buildRouteIntakeCurl(route, token) {
         ].join("\n");
     }
 
+    if (source === "datadog") {
+        return [
+            "# " + i18n.t("routes.intake.datadog_example_comment"),
+            `curl -X POST '${url}' \\`,
+            "  -H 'Content-Type: application/json' \\",
+            `  -H 'Authorization: Bearer ${token || "<route-token>"}' \\`,
+            "  -d '{\"alert_title\":\"[Triggered] Example monitor\",\"text_only_msg\":\"Example Datadog alert\",\"alert_id\":\"1234\",\"alert_cycle_key\":\"cycle-example-1\",\"alert_transition\":\"Triggered\",\"alert_type\":\"error\",\"alert_priority\":\"P1\",\"alert_scope\":\"env:prod,service:api\",\"hostname\":\"api-01\",\"link\":\"https://app.datadoghq.com/monitors/1234\",\"tags\":\"env:prod,service:api\"}'"
+        ].join("\n");
+    }
+
+    if (source === "webhook") {
+        return [
+            "# " + i18n.t("routes.intake.generic_example_comment"),
+            "curl -X POST '" + url + "' \\",
+            "  -H 'Content-Type: application/json' \\",
+            "  -H 'Authorization: Bearer " + (token || "<route-token>") + "' \\",
+            "  -d '{\"title\":\"Example alert\",\"severity\":\"critical\",\"fingerprint\":\"example-1\"}'",
+            "",
+            "# " + i18n.t("routes.intake.pagerduty_example_comment"),
+            "curl -X POST '" + url + "' \\",
+            "  -H 'Content-Type: application/json' \\",
+            "  -d '{\"routing_key\":\"" + (token || "<route-token>") + "\",\"event_action\":\"trigger\",\"dedup_key\":\"example-1\",\"payload\":{\"summary\":\"Example alert\",\"source\":\"example-host\",\"severity\":\"critical\"}}'"
+        ].join("\n");
+    }
+
     return [
         "curl -X POST '" + url + "' \\",
         "  -H 'Content-Type: application/json' \\",
@@ -1475,21 +1568,32 @@ function showRouteIntakeDetails(route) {
     const token = route.intake_token || "";
     const isSentry = source === "sentry";
     const isHeartbeat = source === "heartbeat";
+    const isDatadog = source === "datadog";
+    const isWebhook = source === "webhook";
     const url = getRouteIntakeUrl(route);
 
-    $("#route-intake-title").text(
-        isSentry
-            ? "Sentry webhook URL"
-            : (isHeartbeat ? "Heartbeat ping URL pattern" : "Route intake details")
-    );
+    let titleKey = "routes.intake.title";
+    let subtitleKey = "routes.intake.route_subtitle";
+    let helpKey = "routes.intake.route_help";
 
-    $("#route-intake-subtitle").text(
-        isSentry
-            ? "Copy this URL to Sentry Internal Integration. Then paste Sentry Client Secret into this route settings."
-            : (isHeartbeat
-                ? "Heartbeat pings use a per-heartbeat token in the URL. Create or open a heartbeat to copy its real ping URL."
-                : "Copy this token now. It may not be shown again.")
-    );
+    if (isSentry) {
+        titleKey = "routes.intake.sentry_title";
+        subtitleKey = "routes.intake.sentry_subtitle";
+        helpKey = "routes.intake.sentry_help";
+    } else if (isHeartbeat) {
+        titleKey = "routes.intake.heartbeat_title";
+        subtitleKey = "routes.intake.heartbeat_subtitle";
+        helpKey = "routes.intake.heartbeat_help";
+    } else if (isDatadog) {
+        subtitleKey = "routes.intake.datadog_subtitle";
+        helpKey = "routes.intake.datadog_help";
+    } else if (isWebhook) {
+        subtitleKey = "routes.intake.webhook_subtitle";
+        helpKey = "routes.intake.webhook_help";
+    }
+
+    $("#route-intake-title").text(i18n.t(titleKey));
+    $("#route-intake-subtitle").text(i18n.t(subtitleKey));
 
     $("#route-intake-url").val(url);
     $("#route-intake-token").val(token);
@@ -1497,14 +1601,7 @@ function showRouteIntakeDetails(route) {
 
     $("#route-intake-token-group").toggleClass("is-hidden", isSentry || isHeartbeat);
     $("#copy-route-intake-token").toggleClass("is-hidden", isSentry || isHeartbeat);
-
-    $("#route-intake-url-help").text(
-        isSentry
-            ? "Use this URL as Webhook URL in Sentry Internal Integration."
-            : (isHeartbeat
-                ? "Replace <heartbeat-token> with the token from a heartbeat. Do not send Authorization: Bearer for heartbeat pings."
-                : "Send alerts to this URL and pass the token as Authorization: Bearer.")
-    );
+    $("#route-intake-url-help").text(i18n.t(helpKey));
 
     openAppModal("#route-token-box");
 }
@@ -1521,14 +1618,14 @@ function regenerateRouteToken(routeId) {
         return Number(item.id) === Number(routeId);
     });
     if (route && !canWriteObject(route)) {
-        showAppError("You do not have permission to regenerate this route token.");
+        showAppError(i18n.t("routes.permissions.regenerate_denied"));
         return;
     }
 
     showAppConfirm({
-        title: "Regenerate route intake token?",
-        message: "Regenerate route intake token? Existing token will stop working.",
-        confirmText: "Regenerate",
+        title: i18n.t("routes.confirm.regenerate_title"),
+        message: i18n.t("routes.confirm.regenerate_message"),
+        confirmText: i18n.t("routes.actions.regenerate"),
         confirmClass: "btn-warning",
     }).done(function () {
         apiPost("/api/routes/" + routeId + "/intake-token", {}, function (response) {
@@ -1540,7 +1637,7 @@ function regenerateRouteToken(routeId) {
 
 function openCreateRouteModal() {
     resetRouteForm();
-    $("#route-form-title").text("Create route");
+    $("#route-form-title").text(i18n.t("routes.form.create"));
     loadRouteDependencies();
     openAppModal("#route-form-modal");
 }

@@ -22,19 +22,19 @@
 
         if (enableBtn) {
             enableBtn.addEventListener("click", async () => {
-                await runWithButtonState(enableBtn, "Enabling...", enablePushOnCurrentDevice);
+                await runWithButtonState(enableBtn, i18n.t("profile.push.enabling"), enablePushOnCurrentDevice);
             });
         }
 
         if (testBtn) {
             testBtn.addEventListener("click", async () => {
-                await runWithButtonState(testBtn, "Sending...", sendTestPush);
+                await runWithButtonState(testBtn, i18n.t("profile.push.sending"), sendTestPush);
             });
         }
 
         if (reloadBtn) {
             reloadBtn.addEventListener("click", async () => {
-                await runWithButtonState(reloadBtn, "Reloading...", loadPushDevices);
+                await runWithButtonState(reloadBtn, i18n.t("profile.push.reloading"), loadPushDevices);
             });
         }
     }
@@ -48,7 +48,7 @@
         try {
             await callback();
         } catch (error) {
-            showPushStatus(error.message || "Browser push action failed", "error");
+            showPushStatus(error.message || i18n.t("profile.push.action_failed"), "error");
         } finally {
             button.disabled = false;
             button.textContent = originalText;
@@ -61,13 +61,13 @@
         const config = await getPushConfig();
 
         if (!config.enabled || !config.public_key) {
-            throw new Error("Browser push is disabled or VAPID public key is not configured.");
+            throw new Error(i18n.t("profile.push.not_configured"));
         }
 
         const permission = await Notification.requestPermission();
 
         if (permission !== "granted") {
-            throw new Error("Notification permission was not granted.");
+            throw new Error(i18n.t("profile.push.permission_denied"));
         }
 
         const registration = await navigator.serviceWorker.register(SERVICE_WORKER_URL);
@@ -95,10 +95,10 @@
 
         if (!response.ok) {
             const error = await readJsonSafe(response);
-            throw new Error(error.message || error.error || "Failed to save browser push subscription.");
+            throw new Error(error.message || error.error || i18n.t("profile.push.save_failed"));
         }
 
-        showPushStatus("Browser push notifications enabled for this device.", "success");
+        showPushStatus(i18n.t("profile.push.enabled_status"), "success");
         await loadPushDevices();
     }
 
@@ -112,17 +112,17 @@
 
         if (!response.ok) {
             const error = await readJsonSafe(response);
-            throw new Error(error.message || error.error || "Failed to send test push.");
+            throw new Error(error.message || error.error || i18n.t("profile.push.test_failed"));
         }
 
         const result = await response.json();
 
         if (!result.sent) {
-            showPushStatus("No active browser push devices found.", "warning");
+            showPushStatus(i18n.t("profile.push.no_devices"), "warning");
             return;
         }
 
-        showPushStatus(`Test push sent to ${result.sent} device(s).`, "success");
+        showPushStatus(i18n.t("profile.push.test_sent", {count: result.sent}), "success");
     }
 
     async function loadPushDevices() {
@@ -134,7 +134,7 @@
 
         tbody.innerHTML = `
             <tr>
-                <td colspan="5" class="muted">Loading devices...</td>
+                <td colspan="5" class="muted">${i18n.t("profile.push.loading")}</td>
             </tr>
         `;
 
@@ -143,7 +143,7 @@
         if (!response.ok) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="5" class="text-danger">Failed to load browser push devices.</td>
+                    <td colspan="5" class="text-danger">${i18n.t("profile.push.load_failed")}</td>
                 </tr>
             `;
             return;
@@ -154,7 +154,7 @@
         if (!devices.length) {
             tbody.innerHTML = `
                 <tr>
-                    <td colspan="5" class="muted">No browser push devices yet.</td>
+                    <td colspan="5" class="muted">${i18n.t("profile.push.no_devices_yet")}</td>
                 </tr>
             `;
             return;
@@ -166,7 +166,7 @@
             button.addEventListener("click", async () => {
                 const subscriptionId = button.getAttribute("data-disable-push-id");
 
-                await runWithButtonState(button, "Disabling...", async () => {
+                await runWithButtonState(button, i18n.t("profile.push.disabling"), async () => {
                     await disablePushDevice(subscriptionId);
                 });
             });
@@ -175,10 +175,10 @@
 
     function renderPushDeviceRow(device) {
         const status = device.enabled
-            ? `<span class="badge badge-success">Enabled</span>`
-            : `<span class="badge badge-muted">Disabled</span>`;
+            ? `<span class="badge badge-success">${i18n.t("profile.common.enabled")}</span>`
+            : `<span class="badge badge-muted">${i18n.t("profile.common.disabled")}</span>`;
 
-        const deviceName = escapeHtml(device.device_name || detectDeviceFromUserAgent(device.user_agent) || "Browser");
+        const deviceName = escapeHtml(device.device_name || detectDeviceFromUserAgent(device.user_agent) || i18n.t("profile.push.browser"));
         const userAgent = device.user_agent ? `<div class="muted small">${escapeHtml(device.user_agent)}</div>` : "";
 
         return `
@@ -196,7 +196,7 @@
                         class="btn btn-sm btn-danger"
                         data-disable-push-id="${device.id}"
                     >
-                        Disable
+                        ${i18n.t("profile.actions.disable")}
                     </button>
                 </td>
             </tr>
@@ -210,10 +210,10 @@
 
         if (!response.ok) {
             const error = await readJsonSafe(response);
-            throw new Error(error.message || error.error || "Failed to disable browser push device.");
+            throw new Error(error.message || error.error || i18n.t("profile.push.disable_failed"));
         }
 
-        showPushStatus("Browser push device disabled.", "success");
+        showPushStatus(i18n.t("profile.push.disabled_status"), "success");
         await loadPushDevices();
     }
 
@@ -221,7 +221,7 @@
         const response = await fetch(PUSH_CONFIG_URL);
 
         if (!response.ok) {
-            throw new Error("Failed to load browser push configuration.");
+            throw new Error(i18n.t("profile.push.config_failed"));
         }
 
         return response.json();
@@ -229,15 +229,15 @@
 
     function ensurePushSupported() {
         if (!("serviceWorker" in navigator)) {
-            throw new Error("Service workers are not supported by this browser.");
+            throw new Error(i18n.t("profile.push.no_service_worker"));
         }
 
         if (!("PushManager" in window)) {
-            throw new Error("Push notifications are not supported by this browser.");
+            throw new Error(i18n.t("profile.push.no_push"));
         }
 
         if (!("Notification" in window)) {
-            throw new Error("Notifications are not supported by this browser.");
+            throw new Error(i18n.t("profile.push.no_notifications"));
         }
     }
 
@@ -249,7 +249,7 @@
             return value;
         }
 
-        return detectDeviceFromUserAgent(navigator.userAgent) || "Browser";
+        return detectDeviceFromUserAgent(navigator.userAgent) || i18n.t("profile.push.browser");
     }
 
     function detectDeviceFromUserAgent(userAgent) {
@@ -264,22 +264,22 @@
         }
 
         if (/Android/i.test(ua)) {
-            return "Android device";
+            return i18n.t("profile.push.android");
         }
 
         if (/Macintosh|Mac OS X/i.test(ua)) {
-            return "Mac browser";
+            return i18n.t("profile.push.mac");
         }
 
         if (/Windows/i.test(ua)) {
-            return "Windows browser";
+            return i18n.t("profile.push.windows");
         }
 
         if (/Linux/i.test(ua)) {
-            return "Linux browser";
+            return i18n.t("profile.push.linux");
         }
 
-        return "Browser";
+        return i18n.t("profile.push.browser");
     }
 
     function urlBase64ToUint8Array(base64String) {
@@ -327,7 +327,7 @@
 
     function formatDateTime(value) {
         if (!value) {
-            return `<span class="muted">Never</span>`;
+            return `<span class="muted">${i18n.t("profile.tokens.never")}</span>`;
         }
 
         const date = new Date(value);

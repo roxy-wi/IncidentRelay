@@ -5,36 +5,36 @@
         <div class="summary-card summary-primary">
             <div class="summary-icon">◆</div>
             <div>
-                <div class="summary-title">Total</div>
+                <div class="summary-title">{{ _('business_services.summary.total') }}</div>
                 <div class="summary-value" id="business-services-total">0</div>
-                <div class="summary-hint">Business services in scope</div>
+                <div class="summary-hint">{{ _('business_services.summary.total_hint') }}</div>
             </div>
         </div>
 
         <div class="summary-card summary-success">
             <div class="summary-icon">✓</div>
             <div>
-                <div class="summary-title">Operational</div>
+                <div class="summary-title">{{ _('business_services.summary.operational') }}</div>
                 <div class="summary-value" id="business-services-operational">0</div>
-                <div class="summary-hint">Customer-facing healthy</div>
+                <div class="summary-hint">{{ _('business_services.summary.operational_hint') }}</div>
             </div>
         </div>
 
         <div class="summary-card summary-muted">
             <div class="summary-icon">!</div>
             <div>
-                <div class="summary-title">Affected</div>
+                <div class="summary-title">{{ _('business_services.summary.affected') }}</div>
                 <div class="summary-value" id="business-services-affected">0</div>
-                <div class="summary-hint">Not operational</div>
+                <div class="summary-hint">{{ _('business_services.summary.affected_hint') }}</div>
             </div>
         </div>
 
         <div class="summary-card summary-info">
             <div class="summary-icon">★</div>
             <div>
-                <div class="summary-title">Public</div>
+                <div class="summary-title">{{ _('business_services.summary.public') }}</div>
                 <div class="summary-value" id="business-services-public">0</div>
-                <div class="summary-hint">Visible on status page</div>
+                <div class="summary-hint">{{ _('business_services.summary.public_hint') }}</div>
             </div>
         </div>
     </div>
@@ -43,39 +43,39 @@
         <section class="card page-layout-main">
             <div class="card-header">
                 <div>
-                    <h2>Business Services</h2>
+                    <h2>{{ _('business_services.list.title') }}</h2>
                     <div class="card-subtitle">
-                        Showing <span id="business-services-filtered-count">0</span>
-                        of <span id="business-services-total-count">0</span> business services
+                        {{ _('business_services.list.showing') }} <span id="business-services-filtered-count">0</span>
+                        {{ _('business_services.list.of') }} <span id="business-services-total-count">0</span> {{ _('business_services.list.services') }}
                     </div>
                 </div>
 
                 <div class="card-header-actions">
-                    <button id="open-business-service-create-modal" type="button" class="btn btn-primary">New business service</button>
-                    <button id="reload-business-services" type="button" class="btn">Reload</button>
+                    <button id="open-business-service-create-modal" type="button" class="btn btn-primary">{{ _('business_services.actions.new') }}</button>
+                    <button id="reload-business-services" type="button" class="btn">{{ _('business_services.actions.reload') }}</button>
                 </div>
             </div>
 
             <div class="page-toolbar is-flush-top">
                 <div class="page-toolbar-search">
                     <span class="page-toolbar-search-icon">⌕</span>
-                    <input id="business-services-search" class="input" type="search" placeholder="Search business services..." autocomplete="off">
+                    <input id="business-services-search" class="input" type="search" placeholder="{{ _('business_services.search.placeholder') }}" autocomplete="off">
                 </div>
 
                 <select id="business-services-status-filter" class="input page-toolbar-filter">
-                    <option value="">All statuses</option>
-                    <option value="operational">Operational</option>
-                    <option value="degraded">Degraded</option>
-                    <option value="partial_outage">Partial outage</option>
-                    <option value="major_outage">Major outage</option>
-                    <option value="maintenance">Maintenance</option>
-                    <option value="unknown">Unknown</option>
+                    <option value="">{{ _('business_services.filters.all_statuses') }}</option>
+                    <option value="operational">{{ _('business_services.status.operational') }}</option>
+                    <option value="degraded">{{ _('business_services.status.degraded') }}</option>
+                    <option value="partial_outage">{{ _('business_services.status.partial_outage') }}</option>
+                    <option value="major_outage">{{ _('business_services.status.major_outage') }}</option>
+                    <option value="maintenance">{{ _('business_services.status.maintenance') }}</option>
+                    <option value="unknown">{{ _('business_services.status.unknown') }}</option>
                 </select>
 
                 <select id="business-services-public-filter" class="input page-toolbar-filter">
-                    <option value="">All visibility</option>
-                    <option value="public">Public</option>
-                    <option value="private">Private</option>
+                    <option value="">{{ _('business_services.filters.all_visibility') }}</option>
+                    <option value="public">{{ _('business_services.visibility.public') }}</option>
+                    <option value="private">{{ _('business_services.visibility.private') }}</option>
                 </select>
             </div>
 
@@ -83,20 +83,20 @@
                 <table id="business-services-table-view" class="data-table sortable-table">
                     <thead>
                         <tr>
-                            <th>Name</th>
-                            <th>Group</th>
-                            <th>Owner team</th>
-                            <th>Status</th>
-                            <th>Criticality</th>
-                            <th>Tier</th>
-                            <th>Components</th>
-                            <th>Visibility</th>
-                            <th class="actions-th">Actions</th>
+                            <th>{{ _('business_services.table.name') }}</th>
+                            <th>{{ _('business_services.table.group') }}</th>
+                            <th>{{ _('business_services.table.owner_team') }}</th>
+                            <th>{{ _('business_services.table.status') }}</th>
+                            <th>{{ _('business_services.table.criticality') }}</th>
+                            <th>{{ _('business_services.table.tier') }}</th>
+                            <th>{{ _('business_services.table.components') }}</th>
+                            <th>{{ _('business_services.table.visibility') }}</th>
+                            <th class="actions-th">{{ _('business_services.table.actions') }}</th>
                         </tr>
                     </thead>
                     <tbody id="business-services-table">
                         <tr>
-                            <td colspan="9" class="empty-cell">No business services loaded</td>
+                            <td colspan="9" class="empty-cell">{{ _('business_services.empty.loaded') }}</td>
                         </tr>
                     </tbody>
                 </table>
@@ -108,35 +108,35 @@
         <div class="app-modal-dialog app-modal-dialog-wide">
             <div class="app-modal-header">
                 <div>
-                    <h2 id="business-service-details-title">Business service details</h2>
+                    <h2 id="business-service-details-title">{{ _('business_services.details.title') }}</h2>
                     <div id="business-service-details-subtitle" class="card-subtitle">
-                        Select a business service to view components and status history.
+                        {{ _('business_services.details.select_help') }}
                     </div>
                 </div>
-                <button id="close-business-service-details-modal" type="button" class="app-modal-close" aria-label="Close">×</button>
+                <button id="close-business-service-details-modal" type="button" class="app-modal-close" aria-label="{{ _('business_services.actions.close') }}">×</button>
             </div>
 
             <div class="app-modal-body">
                 <div class="card-header">
                     <div>
-                        <h2>Business impact</h2>
-                        <div class="card-subtitle">Customer-facing status calculated from technical services.</div>
+                        <h2>{{ _('business_services.details.impact_title') }}</h2>
+                        <div class="card-subtitle">{{ _('business_services.details.impact_help') }}</div>
                     </div>
                     <div class="card-header-actions">
-                        <button id="business-service-recalculate" class="btn" type="button" disabled>Recalculate</button>
-                        <button id="open-business-service-component-modal" class="btn btn-primary" type="button" disabled>Add component</button>
+                        <button id="business-service-recalculate" class="btn" type="button" disabled>{{ _('business_services.actions.recalculate') }}</button>
+                        <button id="open-business-service-component-modal" class="btn btn-primary" type="button" disabled>{{ _('business_services.actions.add_component') }}</button>
                     </div>
                 </div>
 
                 <div id="business-service-details-body" class="details-grid">
-                    <div class="empty-state">No business service selected.</div>
+                    <div class="empty-state">{{ _('business_services.empty.selected') }}</div>
                 </div>
 
                 <section class="card">
                     <div class="card-header">
                         <div>
-                            <h2>Components</h2>
-                            <div class="card-subtitle">Technical services used to calculate business impact.</div>
+                            <h2>{{ _('business_services.components.title') }}</h2>
+                            <div class="card-subtitle">{{ _('business_services.components.help') }}</div>
                         </div>
                     </div>
 
@@ -144,18 +144,18 @@
                         <table class="data-table sortable-table">
                             <thead>
                                 <tr>
-                                    <th>Technical service</th>
-                                    <th>Team</th>
-                                    <th>Status</th>
-                                    <th>Criticality</th>
-                                    <th>Weight</th>
-                                    <th>Description</th>
-                                    <th class="actions-th">Actions</th>
+                                    <th>{{ _('business_services.table.technical_service') }}</th>
+                                    <th>{{ _('business_services.table.team') }}</th>
+                                    <th>{{ _('business_services.table.status') }}</th>
+                                    <th>{{ _('business_services.table.criticality') }}</th>
+                                    <th>{{ _('business_services.table.weight') }}</th>
+                                    <th>{{ _('business_services.table.description') }}</th>
+                                    <th class="actions-th">{{ _('business_services.table.actions') }}</th>
                                 </tr>
                             </thead>
                             <tbody id="business-service-components-table">
                                 <tr>
-                                    <td colspan="7" class="empty-cell">Select a business service</td>
+                                    <td colspan="7" class="empty-cell">{{ _('business_services.empty.select_service') }}</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -165,9 +165,9 @@
                 <section class="card">
                         <div class="card-header">
                             <div>
-                                <h3>Manual status override</h3>
+                                <h3>{{ _('business_services.manual.title') }}</h3>
                                 <div class="card-subtitle">
-                                    Override calculated business status during an incident or customer-facing degradation.
+                                    {{ _('business_services.manual.help') }}
                                 </div>
                             </div>
                         </div>
@@ -175,60 +175,60 @@
                         <div class="form-body">
                             <div class="grid-two">
                                 <div>
-                                    <label>Status source</label>
+                                    <label>{{ _('business_services.details.status_source') }}</label>
                                     <div id="business-service-details-status-source" class="text-muted">-</div>
                                 </div>
 
                                 <div>
-                                    <label>Manual override</label>
+                                    <label>{{ _('business_services.details.manual_override') }}</label>
                                     <div id="business-service-details-manual-status" class="text-muted">-</div>
                                 </div>
                             </div>
 
                             <div class="grid-two">
                                 <div>
-                                    <label>Manual message</label>
+                                    <label>{{ _('business_services.details.manual_message') }}</label>
                                     <div id="business-service-details-manual-message" class="text-muted">-</div>
                                 </div>
 
                                 <div>
-                                    <label>Manual until</label>
+                                    <label>{{ _('business_services.details.manual_until') }}</label>
                                     <div id="business-service-details-manual-until" class="text-muted">-</div>
                                 </div>
                             </div>
 
-                            <label for="business-service-manual-status">Set status</label>
+                            <label for="business-service-manual-status">{{ _('business_services.manual.set_status') }}</label>
                             <select id="business-service-manual-status" class="input">
-                                <option value="operational">Operational</option>
-                                <option value="degraded">Degraded</option>
-                                <option value="partial_outage">Partial outage</option>
-                                <option value="major_outage">Major outage</option>
-                                <option value="maintenance">Maintenance</option>
+                                <option value="operational">{{ _('business_services.status.operational') }}</option>
+                                <option value="degraded">{{ _('business_services.status.degraded') }}</option>
+                                <option value="partial_outage">{{ _('business_services.status.partial_outage') }}</option>
+                                <option value="major_outage">{{ _('business_services.status.major_outage') }}</option>
+                                <option value="maintenance">{{ _('business_services.status.maintenance') }}</option>
                             </select>
                             <div class="help-text">
-                                Manual status has priority over calculated status until it expires or is cleared.
+                                {{ _('business_services.manual.priority_help') }}
                             </div>
 
-                            <label for="business-service-manual-status-message">Message</label>
+                            <label for="business-service-manual-status-message">{{ _('business_services.manual.message') }}</label>
                             <textarea id="business-service-manual-status-message" class="input" rows="3"></textarea>
                             <div class="help-text">
-                                Optional operator note explaining why the business status is overridden.
+                                {{ _('business_services.manual.message_help') }}
                             </div>
 
-                            <label for="business-service-manual-status-until">Until</label>
+                            <label for="business-service-manual-status-until">{{ _('business_services.manual.until') }}</label>
                             <input id="business-service-manual-status-until" class="input" type="datetime-local">
                             <div class="help-text">
-                                Optional local expiration time. Leave empty to keep the override active until it is cleared manually.
+                                {{ _('business_services.manual.until_help') }}
                             </div>
 
                             <div id="business-service-manual-status-error" class="form-error" style="display: none;"></div>
 
                             <div class="form-actions">
                                 <button id="clear-business-service-manual-status" class="btn" type="button">
-                                    Clear override
+                                    {{ _('business_services.actions.clear_override') }}
                                 </button>
                                 <button id="set-business-service-manual-status" class="btn btn-primary" type="button">
-                                    Set manual status
+                                    {{ _('business_services.actions.set_manual') }}
                                 </button>
                             </div>
                         </div>
@@ -237,8 +237,8 @@
                 <section class="card">
                     <div class="card-header">
                         <div>
-                            <h2>Status history</h2>
-                            <div class="card-subtitle">Recent calculated business status changes.</div>
+                            <h2>{{ _('business_services.history.title') }}</h2>
+                            <div class="card-subtitle">{{ _('business_services.history.help') }}</div>
                         </div>
                     </div>
 
@@ -246,16 +246,16 @@
                         <table class="data-table sortable-table">
                             <thead>
                                 <tr>
-                                    <th>Time</th>
-                                    <th>Old status</th>
-                                    <th>New status</th>
-                                    <th>Score</th>
-                                    <th>Message</th>
+                                    <th>{{ _('business_services.table.time') }}</th>
+                                    <th>{{ _('business_services.table.old_status') }}</th>
+                                    <th>{{ _('business_services.table.new_status') }}</th>
+                                    <th>{{ _('business_services.table.score') }}</th>
+                                    <th>{{ _('business_services.table.message') }}</th>
                                 </tr>
                             </thead>
                             <tbody id="business-service-history-table">
                                 <tr>
-                                    <td colspan="5" class="empty-cell">Select a business service</td>
+                                    <td colspan="5" class="empty-cell">{{ _('business_services.empty.select_service') }}</td>
                                 </tr>
                             </tbody>
                         </table>
@@ -269,10 +269,10 @@
         <div class="app-modal-dialog app-modal-dialog-wide">
             <div class="app-modal-header">
                 <div>
-                    <h2 id="business-service-form-title">Create business service</h2>
-                    <div class="card-subtitle">Business-facing capability shown in impact views and status pages.</div>
+                    <h2 id="business-service-form-title">{{ _('business_services.form.create') }}</h2>
+                    <div class="card-subtitle">{{ _('business_services.form.subtitle') }}</div>
                 </div>
-                <button id="close-business-service-modal" type="button" class="app-modal-close" aria-label="Close">×</button>
+                <button id="close-business-service-modal" type="button" class="app-modal-close" aria-label="{{ _('business_services.actions.close') }}">×</button>
             </div>
 
             <div class="app-modal-body">
@@ -280,51 +280,51 @@
                     <section class="card">
                         <div class="card-header">
                             <div>
-                                <h2>Business service</h2>
-                                <div class="card-subtitle">Identity, ownership and classification.</div>
+                                <h2>{{ _('business_services.form.identity_title') }}</h2>
+                                <div class="card-subtitle">{{ _('business_services.form.identity_help') }}</div>
                             </div>
                         </div>
 
                         <div class="form-body">
                             <input id="business-service-id" type="hidden">
 
-                            <label for="business-service-group">Group</label>
+                            <label for="business-service-group">{{ _('business_services.form.group') }}</label>
                             <select id="business-service-group" class="input"></select>
 
-                            <label for="business-service-owner-team">Owner team</label>
+                            <label for="business-service-owner-team">{{ _('business_services.form.owner_team') }}</label>
                             <select id="business-service-owner-team" class="input"></select>
 
-                            <label for="business-service-name">Name</label>
+                            <label for="business-service-name">{{ _('business_services.form.name') }}</label>
                             <input id="business-service-name" class="input" type="text" maxlength="255">
 
-                            <label for="business-service-slug">Slug</label>
+                            <label for="business-service-slug">{{ _('business_services.form.slug') }}</label>
                             <input id="business-service-slug" class="input" type="text" maxlength="64">
 
-                            <label for="business-service-description">Description</label>
+                            <label for="business-service-description">{{ _('business_services.form.description') }}</label>
                             <textarea id="business-service-description" class="input" rows="3"></textarea>
 
                             <div class="form-grid-3">
                                 <div>
-                                    <label for="business-service-criticality">Criticality</label>
+                                    <label for="business-service-criticality">{{ _('business_services.form.criticality') }}</label>
                                     <select id="business-service-criticality" class="input">
-                                        <option value="critical">Critical</option>
-                                        <option value="important">Important</option>
-                                        <option value="optional">Optional</option>
+                                        <option value="critical">{{ _('business_services.criticality.critical') }}</option>
+                                        <option value="important">{{ _('business_services.criticality.important') }}</option>
+                                        <option value="optional">{{ _('business_services.criticality.optional') }}</option>
                                     </select>
                                 </div>
 
                                 <div>
-                                    <label for="business-service-tier">Tier</label>
+                                    <label for="business-service-tier">{{ _('business_services.form.tier') }}</label>
                                     <select id="business-service-tier" class="input">
-                                        <option value="tier_1">Tier 1</option>
-                                        <option value="tier_2">Tier 2</option>
-                                        <option value="tier_3">Tier 3</option>
-                                        <option value="tier_4">Tier 4</option>
+                                        <option value="tier_1">{{ _('business_services.tier.tier_1') }}</option>
+                                        <option value="tier_2">{{ _('business_services.tier.tier_2') }}</option>
+                                        <option value="tier_3">{{ _('business_services.tier.tier_3') }}</option>
+                                        <option value="tier_4">{{ _('business_services.tier.tier_4') }}</option>
                                     </select>
                                 </div>
 
                                 <div>
-                                    <label for="business-service-public-order">Public order</label>
+                                    <label for="business-service-public-order">{{ _('business_services.form.public_order') }}</label>
                                     <input id="business-service-public-order" class="input" type="number" min="0" value="100">
                                 </div>
                             </div>
@@ -334,31 +334,31 @@
                     <section class="card">
                         <div class="card-header">
                             <div>
-                                <h2>Status page</h2>
-                                <div class="card-subtitle">Customer-facing labels and visibility.</div>
+                                <h2>{{ _('business_services.form.status_page_title') }}</h2>
+                                <div class="card-subtitle">{{ _('business_services.form.status_page_help') }}</div>
                             </div>
                         </div>
 
                         <div class="form-body">
-                            <label for="business-service-public-name">Public name</label>
+                            <label for="business-service-public-name">{{ _('business_services.form.public_name') }}</label>
                             <input id="business-service-public-name" class="input" type="text" maxlength="255">
 
-                            <label for="business-service-public-description">Public description</label>
+                            <label for="business-service-public-description">{{ _('business_services.form.public_description') }}</label>
                             <textarea id="business-service-public-description" class="input" rows="3"></textarea>
 
                             <label class="md-checkbox">
                                 <input id="business-service-public" type="checkbox" checked>
-                                <span>Show on status page</span>
+                                <span>{{ _('business_services.form.show_public') }}</span>
                             </label>
 
                             <label class="md-checkbox">
                                 <input id="business-service-enabled" type="checkbox" checked>
-                                <span>Enabled</span>
+                                <span>{{ _('business_services.form.enabled') }}</span>
                             </label>
 
                             <div class="form-actions">
-                                <button id="reset-business-service-form" class="btn" type="button">Reset</button>
-                                <button id="save-business-service" class="btn btn-primary" type="button">Save business service</button>
+                                <button id="reset-business-service-form" class="btn" type="button">{{ _('business_services.actions.reset') }}</button>
+                                <button id="save-business-service" class="btn btn-primary" type="button">{{ _('business_services.actions.save') }}</button>
                             </div>
                         </div>
                     </section>
@@ -371,67 +371,63 @@
         <div class="app-modal-dialog">
             <div class="app-modal-header">
                 <div>
-                    <h2 id="business-service-component-form-title">Add component</h2>
-                    <div class="card-subtitle">Attach a technical service to the selected business service.</div>
+                    <h2 id="business-service-component-form-title">{{ _('business_services.component.add') }}</h2>
+                    <div class="card-subtitle">{{ _('business_services.component.subtitle') }}</div>
                 </div>
-                <button id="close-business-service-component-modal" type="button" class="app-modal-close" aria-label="Close">×</button>
+                <button id="close-business-service-component-modal" type="button" class="app-modal-close" aria-label="{{ _('business_services.actions.close') }}">×</button>
             </div>
 
             <div class="app-modal-body">
                 <div class="form-body">
                     <input id="business-service-component-id" type="hidden">
 
-                    <label for="business-service-component-service">Technical service</label>
+                    <label for="business-service-component-service">{{ _('business_services.component.technical_service') }}</label>
                     <select id="business-service-component-service" class="input"></select>
                     <div class="help-text">
-                        Technical service that participates in this business service status calculation.
+                        {{ _('business_services.component.service_help') }}
                     </div>
 
-                    <label for="business-service-component-criticality">Criticality</label>
+                    <label for="business-service-component-criticality">{{ _('business_services.component.criticality') }}</label>
                     <select id="business-service-component-criticality" class="input">
-                        <option value="required">Required</option>
-                        <option value="critical">Critical</option>
-                        <option value="important">Important</option>
-                        <option value="optional">Optional</option>
-                        <option value="informational">Informational</option>
+                        <option value="required">{{ _('business_services.criticality.required') }}</option>
+                        <option value="critical">{{ _('business_services.criticality.critical') }}</option>
+                        <option value="important">{{ _('business_services.criticality.important') }}</option>
+                        <option value="optional">{{ _('business_services.criticality.optional') }}</option>
+                        <option value="informational">{{ _('business_services.criticality.informational') }}</option>
                     </select>
                     <div class="help-text">
-                        Required and critical components have the strongest impact on business status.
-                        Optional and informational components have lower impact.
+                        {{ _('business_services.component.criticality_help') }}
                     </div>
 
                     <div class="form-grid-3">
                         <div>
-                            <label for="business-service-component-weight">Impact weight</label>
+                            <label for="business-service-component-weight">{{ _('business_services.component.weight') }}</label>
                             <input id="business-service-component-weight" class="input" type="number" min="0" max="100" value="100">
                             <div class="help-text">
-                                Weight from 0 to 100. Higher weight means this component contributes more to the business impact score.
+                                {{ _('business_services.component.weight_help') }}
                             </div>
                         </div>
 
                         <div>
-                            <label for="business-service-component-position">Position</label>
+                            <label for="business-service-component-position">{{ _('business_services.component.position') }}</label>
                             <input id="business-service-component-position" class="input" type="number" min="0" value="0">
                             <div class="help-text">
-                                Sort order inside the business service. Lower values are shown first.
+                                {{ _('business_services.component.position_help') }}
                             </div>
                         </div>
                     </div>
 
-                    <label for="business-service-component-description">Description</label>
-                    <textarea id="business-service-component-description" class="input" rows="3"></textarea>
-
-                    <label for="business-service-component-description">Description</label>
+                    <label for="business-service-component-description">{{ _('business_services.component.description') }}</label>
                     <textarea id="business-service-component-description" class="input" rows="3"></textarea>
 
                     <label class="md-checkbox">
                         <input id="business-service-component-enabled" type="checkbox" checked>
-                        <span>Enabled</span>
+                        <span>{{ _('business_services.form.enabled') }}</span>
                     </label>
 
                     <div class="form-actions">
-                        <button id="reset-business-service-component-form" class="btn" type="button">Reset</button>
-                        <button id="save-business-service-component" class="btn btn-primary" type="button">Save component</button>
+                        <button id="reset-business-service-component-form" class="btn" type="button">{{ _('business_services.actions.reset') }}</button>
+                        <button id="save-business-service-component" class="btn btn-primary" type="button">{{ _('business_services.actions.save_component') }}</button>
                     </div>
                 </div>
             </div>

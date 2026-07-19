@@ -1,3 +1,7 @@
+import json
+from pathlib import Path
+from urllib.parse import quote
+
 from flask import (
     Blueprint,
     abort,
@@ -8,8 +12,8 @@ from flask import (
     request,
     send_from_directory,
 )
-from urllib.parse import quote
 
+from app.i18n import get_current_locale, translate
 from app.login import normalize_auth_redirect_target
 from app.middleware import load_jwt_user
 
@@ -19,12 +23,43 @@ pages_bp = Blueprint("pages", __name__)
 
 @pages_bp.route("/manifest.webmanifest")
 def pwa_manifest():
-    """Serve PWA manifest with correct content type."""
-    return send_from_directory(
-        current_app.static_folder,
-        "manifest.webmanifest",
-        mimetype="application/manifest+json",
+    """Serve a locale-aware PWA manifest with the correct content type."""
+    manifest_path = Path(current_app.static_folder) / "manifest.webmanifest"
+    payload = json.loads(manifest_path.read_text(encoding="utf-8"))
+    locale = get_current_locale()
+
+    payload["lang"] = locale
+    payload["description"] = translate("pwa.manifest.description")
+
+    shortcut_keys = ("alerts", "calendar", "services")
+    for shortcut, shortcut_key in zip(
+        payload.get("shortcuts", []),
+        shortcut_keys,
+    ):
+        shortcut["name"] = translate(f"pwa.shortcut.{shortcut_key}.name")
+        shortcut["short_name"] = translate(
+            f"pwa.shortcut.{shortcut_key}.short_name"
+        )
+        shortcut["description"] = translate(
+            f"pwa.shortcut.{shortcut_key}.description"
+        )
+
+    screenshot_keys = ("desktop", "mobile")
+    for screenshot, screenshot_key in zip(
+        payload.get("screenshots", []),
+        screenshot_keys,
+    ):
+        screenshot["label"] = translate(
+            f"pwa.screenshot.{screenshot_key}"
+        )
+
+    response = make_response(
+        json.dumps(payload, ensure_ascii=False, separators=(",", ":"))
     )
+    response.mimetype = "application/manifest+json"
+    response.headers["Cache-Control"] = "no-cache"
+    response.headers["Vary"] = "Cookie, Accept-Language"
+    return response
 
 
 @pages_bp.route("/service-worker.js")

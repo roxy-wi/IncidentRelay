@@ -1,7 +1,8 @@
 import pytest
 from pydantic import ValidationError
 
-from app.api.schemas.channels import ChannelCreateSchema
+from app.api.schemas.channels import ChannelCreateSchema, ChannelUpdateSchema
+from app.services.channel_config import CHANNEL_SECRET_PLACEHOLDER
 
 
 def make_slack_schema(config):
@@ -17,6 +18,7 @@ def test_slack_bot_api_config_is_valid():
     schema = make_slack_schema(
         {
             "mode": "bot_api",
+            "connection_mode": "http",
             "bot_token": "xoxb-test-token",
             "channel_id": "C0123456789",
             "signing_secret": "test-signing-secret",
@@ -24,6 +26,7 @@ def test_slack_bot_api_config_is_valid():
     )
 
     assert schema.config["mode"] == "bot_api"
+    assert schema.config["connection_mode"] == "http"
     assert schema.config["bot_token"] == "xoxb-test-token"
     assert schema.config["channel_id"] == "C0123456789"
     assert schema.config["signing_secret"] == "test-signing-secret"
@@ -100,6 +103,65 @@ def test_slack_rejects_non_bot_token():
             {
                 "mode": "bot_api",
                 "bot_token": "invalid-token",
+                "channel_id": "C0123456789",
+            }
+        )
+
+
+def test_slack_socket_mode_config_is_valid():
+    schema = make_slack_schema(
+        {
+            "mode": "bot_api",
+            "connection_mode": "socket_mode",
+            "bot_token": "xoxb-test-token",
+            "app_token": "xapp-test-token",
+            "channel_id": "C0123456789",
+        }
+    )
+
+    assert schema.config["connection_mode"] == "socket_mode"
+    assert schema.config["app_token"] == "xapp-test-token"
+    assert "signing_secret" not in schema.config
+
+
+def test_slack_socket_mode_rejects_invalid_app_token():
+    with pytest.raises(ValidationError):
+        make_slack_schema(
+            {
+                "mode": "bot_api",
+                "connection_mode": "socket_mode",
+                "bot_token": "xoxb-test-token",
+                "app_token": "invalid",
+                "channel_id": "C0123456789",
+            }
+        )
+
+
+def test_slack_update_accepts_masked_socket_secrets():
+    schema = ChannelUpdateSchema(
+        name="Production Slack",
+        channel_type="slack",
+        config={
+            "mode": "bot_api",
+            "connection_mode": "socket_mode",
+            "bot_token": CHANNEL_SECRET_PLACEHOLDER,
+            "app_token": CHANNEL_SECRET_PLACEHOLDER,
+            "channel_id": "C0123456789",
+        },
+        enabled=True,
+    )
+    assert schema.config["bot_token"] == CHANNEL_SECRET_PLACEHOLDER
+    assert schema.config["app_token"] == CHANNEL_SECRET_PLACEHOLDER
+
+
+def test_slack_create_rejects_masked_socket_secrets():
+    with pytest.raises(ValidationError):
+        make_slack_schema(
+            {
+                "mode": "bot_api",
+                "connection_mode": "socket_mode",
+                "bot_token": CHANNEL_SECRET_PLACEHOLDER,
+                "app_token": CHANNEL_SECRET_PLACEHOLDER,
                 "channel_id": "C0123456789",
             }
         )

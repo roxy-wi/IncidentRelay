@@ -63,6 +63,7 @@ def test_slack_schema_accepts_bot_api_mode():
 
     assert channel.config == {
         "mode": "bot_api",
+        "connection_mode": "http",
         "bot_token": "xoxb-test-token",
         "channel_id": "C0123456789",
         "signing_secret": "signing-secret",
@@ -461,3 +462,67 @@ def test_slack_payload_contains_incident_priority():
     priority_field = next(field for field in fields if field["text"].startswith("*Priority*"))
 
     assert priority_field["text"] == "*Priority*\nP1 Critical"
+
+
+def test_slack_bot_message_without_action_transport_has_no_buttons(monkeypatch):
+    notifier = SlackNotifier()
+    include_actions = []
+
+    def fake_build(*args, **kwargs):
+        include_actions.append(kwargs["include_actions"])
+        return {"text": "Alert", "blocks": []}
+
+    monkeypatch.setattr(notifier, "_build_message_payload", fake_build)
+    monkeypatch.setattr(
+        "app.notifiers.slack.notifier.requests.post",
+        lambda *args, **kwargs: FakeResponse({
+            "ok": True,
+            "channel": "C0123456789",
+            "ts": "1710000000.000001",
+        }),
+    )
+
+    notifier.send(
+        make_channel({
+            "mode": "bot_api",
+            "bot_token": "xoxb-test-token",
+            "channel_id": "C0123456789",
+        }),
+        SimpleNamespace(),
+        "Alert",
+    )
+
+    assert include_actions == [False]
+
+
+def test_slack_socket_mode_message_has_buttons(monkeypatch):
+    notifier = SlackNotifier()
+    include_actions = []
+
+    def fake_build(*args, **kwargs):
+        include_actions.append(kwargs["include_actions"])
+        return {"text": "Alert", "blocks": []}
+
+    monkeypatch.setattr(notifier, "_build_message_payload", fake_build)
+    monkeypatch.setattr(
+        "app.notifiers.slack.notifier.requests.post",
+        lambda *args, **kwargs: FakeResponse({
+            "ok": True,
+            "channel": "C0123456789",
+            "ts": "1710000000.000001",
+        }),
+    )
+
+    notifier.send(
+        make_channel({
+            "mode": "bot_api",
+            "connection_mode": "socket_mode",
+            "bot_token": "xoxb-test-token",
+            "app_token": "xapp-test-token",
+            "channel_id": "C0123456789",
+        }),
+        SimpleNamespace(),
+        "Alert",
+    )
+
+    assert include_actions == [True]
