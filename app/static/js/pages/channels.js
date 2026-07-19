@@ -126,13 +126,29 @@ function buildSlackConfig(config) {
     config.mode = mode;
 
     if (mode === "bot_api") {
+        const connectionMode = (
+            $("#cfg-slack-connection-mode").val() || "http"
+        );
+
+        config.connection_mode = connectionMode;
         config.bot_token = String(
             $("#cfg-slack-bot-token").val() || ""
         ).trim();
-
         config.channel_id = String(
             $("#cfg-slack-channel-id").val() || ""
         ).trim();
+
+        if (connectionMode === "socket_mode") {
+            config.app_token = String(
+                $("#cfg-slack-app-token").val() || ""
+            ).trim();
+            delete config.signing_secret;
+        } else {
+            config.signing_secret = String(
+                $("#cfg-slack-signing-secret").val() || ""
+            ).trim();
+            delete config.app_token;
+        }
 
         delete config.webhook_url;
         return config;
@@ -144,6 +160,9 @@ function buildSlackConfig(config) {
 
     delete config.bot_token;
     delete config.channel_id;
+    delete config.connection_mode;
+    delete config.app_token;
+    delete config.signing_secret;
 
     return config;
 }
@@ -169,6 +188,19 @@ function showMattermostModeFields() {
     $("#cfg-mm-webhook-fields").hide();
 }
 
+function showSlackActionConnectionFields() {
+    const connectionMode = (
+        $("#cfg-slack-connection-mode").val() || "http"
+    );
+
+    $("#cfg-slack-http-action-fields").toggle(
+        connectionMode === "http"
+    );
+    $("#cfg-slack-socket-action-fields").toggle(
+        connectionMode === "socket_mode"
+    );
+}
+
 function showSlackModeFields() {
     const mode = $("#cfg-slack-mode").val() || "bot_api";
 
@@ -180,6 +212,7 @@ function showSlackModeFields() {
 
     $("#cfg-slack-bot-fields").show();
     $("#cfg-slack-webhook-fields").hide();
+    showSlackActionConnectionFields();
 }
 
 function getDefaultEmailHtmlTemplate() {
@@ -496,7 +529,10 @@ function stripVisibleChannelConfig(type, config) {
     }
     if (type === "slack") {
         delete config.mode;
+        delete config.connection_mode;
         delete config.bot_token;
+        delete config.app_token;
+        delete config.signing_secret;
         delete config.channel_id;
         delete config.webhook_url;
     }
@@ -542,6 +578,16 @@ function fillChannelFields(type, config) {
             config.channel_id || ""
         );
 
+        $("#cfg-slack-connection-mode").val(
+            config.connection_mode || "http"
+        );
+        $("#cfg-slack-signing-secret").val(
+            config.signing_secret || ""
+        );
+        $("#cfg-slack-app-token").val(
+            config.app_token || ""
+        );
+
         $("#cfg-slack-webhook-url").val(
             config.webhook_url || ""
         );
@@ -569,8 +615,11 @@ function clearChannelFields() {
     $("#cfg-mm-webhook-url").val("");
     $(".cfg-channel-severity").prop("checked", false);
     $("#cfg-slack-mode").val("bot_api");
+    $("#cfg-slack-connection-mode").val("http");
     $("#cfg-slack-bot-token").val("");
     $("#cfg-slack-channel-id").val("");
+    $("#cfg-slack-signing-secret").val("");
+    $("#cfg-slack-app-token").val("");
     $("#cfg-slack-webhook-url").val("");
 
     showSlackModeFields();
@@ -805,11 +854,19 @@ function getSafeChannelConfigSummary(channel) {
         const mode = getChannelModeLabel(channel);
 
         if (mode === "bot_api") {
-            return (
-                config.bot_token && config.channel_id
-                    ? i18n.t("channels.config.bot_ready")
-                    : i18n.t("channels.config.bot_incomplete")
-            );
+            if (!config.bot_token || !config.channel_id) {
+                return i18n.t("channels.config.bot_incomplete");
+            }
+            const connectionMode = config.connection_mode || "http";
+            const actionsReady = connectionMode === "socket_mode"
+                ? Boolean(config.app_token)
+                : Boolean(config.signing_secret);
+            if (!actionsReady) {
+                return i18n.t("channels.config.bot_incomplete");
+            }
+            return connectionMode === "socket_mode"
+                ? i18n.t("channels.config.bot_socket_ready")
+                : i18n.t("channels.config.bot_http_ready");
         }
 
         return (
@@ -947,6 +1004,7 @@ $(document).on("change", "#channel-group", function () {
 $(document).on("change", "#channel-type", showChannelFields);
 $(document).on("change", "#cfg-mm-mode", showMattermostModeFields);
 $(document).on("change", "#cfg-slack-mode", showSlackModeFields);
+$(document).on("change", "#cfg-slack-connection-mode", showSlackActionConnectionFields);
 $(document).on("click", "#save-channel", saveChannel);
 $(document).on("click", "#reset-channel-form", resetChannelForm);
 $(document).on("click", "#reload-channels", function () {

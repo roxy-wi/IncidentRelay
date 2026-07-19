@@ -18,33 +18,17 @@ SLACK_MAX_REQUEST_AGE_SECONDS = 300
 class SlackActionError(Exception):
     """Expected error while processing a Slack interaction."""
 
-    def __init__(
-        self,
-        error,
-        message,
-        status_code=400,
-    ):
+    def __init__(self, error, message, status_code=400):
         super().__init__(message)
-
         self.error = error
         self.message = message
         self.status_code = status_code
 
 
-def handle_slack_action(
-    *,
-    raw_body,
-    timestamp,
-    signature,
-):
-    """Validate and process one Slack Block Kit action."""
-    payload, context, action_item = parse_slack_action_payload(
-        raw_body
-    )
-
-    channel = _get_action_channel(
-        context["channel_id"]
-    )
+def handle_slack_action(*, raw_body, timestamp, signature):
+    """Validate and process one HTTP-delivered Slack Block Kit action."""
+    payload, context, action_item = parse_slack_action_payload(raw_body)
+    channel = _get_action_channel(context["channel_id"])
     config = channel.config or {}
 
     validate_slack_signature(
@@ -54,25 +38,57 @@ def handle_slack_action(
         signing_secret=config.get("signing_secret"),
     )
 
+    return _process_slack_action(
+        payload,
+        context,
+        action_item,
+        channel,
+        expected_connection_mode="http",
+    )
+
+
+def handle_slack_socket_action(*, payload, app_token):
+    """Process one pre-authenticated Socket Mode interaction payload."""
+    payload, context, action_item = parse_slack_action_payload_dict(payload)
+    channel = _get_action_channel(context["channel_id"])
+
+    return _process_slack_action(
+        payload,
+        context,
+        action_item,
+        channel,
+        expected_connection_mode="socket_mode",
+        expected_app_token=app_token,
+    )
+
+
+def _process_slack_action(
+    payload,
+    context,
+    action_item,
+    channel,
+    *,
+    expected_connection_mode,
+    expected_app_token=None,
+):
+    config = channel.config or {}
     _validate_channel_config(
         channel,
         config,
         payload,
+        expected_connection_mode=expected_connection_mode,
+        expected_app_token=expected_app_token,
     )
 
     action = context["action"]
     expected_action_id = f"incidentrelay_{action}"
-
     if action_item.get("action_id") != expected_action_id:
         raise SlackActionError(
             "invalid_action",
             "Slack action ID does not match its context.",
         )
 
-    alert = _get_action_alert(
-        context["alert_id"]
-    )
-
+    alert = _get_action_alert(context["alert_id"])
     if alert.team_id != channel.team_id:
         raise SlackActionError(
             "action_rejected",
@@ -80,24 +96,14 @@ def handle_slack_action(
             status_code=403,
         )
 
-    slack_user_id = (
-        (payload.get("user") or {}).get("id")
-    )
-    user = users_repo.get_user_by_slack_id(
-        slack_user_id
-    )
+    slack_user_id = (payload.get("user") or {}).get("id")
+    user = users_repo.get_user_by_slack_id(slack_user_id)
     user_id = user.id if user else None
 
     if action == "acknowledge":
-        alert = acknowledge_alert(
-            alert.id,
-            user_id=user_id,
-        )
+        alert = acknowledge_alert(alert.id, user_id=user_id)
     else:
-        alert = resolve_alert(
-            alert.id,
-            user_id=user_id,
-        )
+        alert = resolve_alert(alert.id, user_id=user_id)
 
     return {
         "ok": True,
@@ -108,7 +114,7 @@ def handle_slack_action(
 
 
 def parse_slack_action_payload(raw_body):
-    """Parse Slack's form-encoded interaction payload."""
+    """Parse Slack's form-encoded HTTP interaction payload."""
     if not raw_body:
         raise SlackActionError(
             "invalid_payload",
@@ -127,7 +133,6 @@ def parse_slack_action_payload(raw_body):
         ) from exc
 
     raw_payload_values = form_data.get("payload") or []
-
     if not raw_payload_values:
         raise SlackActionError(
             "invalid_payload",
@@ -142,6 +147,17 @@ def parse_slack_action_payload(raw_body):
             "Slack action payload is not valid JSON.",
         ) from exc
 
+    return parse_slack_action_payload_dict(payload)
+
+
+def parse_slack_action_payload_dict(payload):
+    """Validate one decoded Slack Block Kit action payload."""
+    if not isinstance(payload, dict):
+        raise SlackActionError(
+            "invalid_payload",
+            "Slack action payload must be an object.",
+        )
+
     if payload.get("type") != "block_actions":
         raise SlackActionError(
             "invalid_payload",
@@ -149,7 +165,6 @@ def parse_slack_action_payload(raw_body):
         )
 
     actions = payload.get("actions") or []
-
     if len(actions) != 1:
         raise SlackActionError(
             "invalid_payload",
@@ -158,7 +173,6 @@ def parse_slack_action_payload(raw_body):
 
     action_item = actions[0]
     raw_context = action_item.get("value")
-
     if not isinstance(raw_context, str):
         raise SlackActionError(
             "invalid_payload",
@@ -174,7 +188,6 @@ def parse_slack_action_payload(raw_body):
         ) from exc
 
     action = context.get("action")
-
     if action not in {"acknowledge", "resolve"}:
         raise SlackActionError(
             "invalid_action",
@@ -182,12 +195,8 @@ def parse_slack_action_payload(raw_body):
         )
 
     try:
-        context["alert_id"] = int(
-            context["alert_id"]
-        )
-        context["channel_id"] = int(
-            context["channel_id"]
-        )
+        context["alert_id"] = int(context["alert_id"])
+        context["channel_id"] = int(context["channel_id"])
     except (KeyError, TypeError, ValueError) as exc:
         raise SlackActionError(
             "invalid_payload",
@@ -195,17 +204,11 @@ def parse_slack_action_payload(raw_body):
         ) from exc
 
     context["action"] = action
-
     return payload, context, action_item
 
 
 def validate_slack_signature(
-    *,
-    raw_body,
-    timestamp,
-    signature,
-    signing_secret,
-    now=None,
+    *, raw_body, timestamp, signature, signing_secret, now=None
 ):
     """Verify Slack HMAC signature and request age."""
     if not signing_secret:
@@ -231,14 +234,8 @@ def validate_slack_signature(
             status_code=403,
         ) from exc
 
-    current_time = int(
-        time.time() if now is None else now
-    )
-
-    if (
-        abs(current_time - request_timestamp)
-        > SLACK_MAX_REQUEST_AGE_SECONDS
-    ):
+    current_time = int(time.time() if now is None else now)
+    if abs(current_time - request_timestamp) > SLACK_MAX_REQUEST_AGE_SECONDS:
         raise SlackActionError(
             "stale_request",
             "Slack action request has expired.",
@@ -246,24 +243,16 @@ def validate_slack_signature(
         )
 
     base_string = (
-        f"{SLACK_SIGNATURE_VERSION}:"
-        f"{timestamp}:"
+        f"{SLACK_SIGNATURE_VERSION}:{timestamp}:"
     ).encode("utf-8") + raw_body
-
     digest = hmac.new(
         str(signing_secret).encode("utf-8"),
         base_string,
         hashlib.sha256,
     ).hexdigest()
+    expected_signature = f"{SLACK_SIGNATURE_VERSION}={digest}"
 
-    expected_signature = (
-        f"{SLACK_SIGNATURE_VERSION}={digest}"
-    )
-
-    if not hmac.compare_digest(
-        expected_signature,
-        str(signature),
-    ):
+    if not hmac.compare_digest(expected_signature, str(signature)):
         raise SlackActionError(
             "invalid_signature",
             "Slack request signature is invalid.",
@@ -272,11 +261,8 @@ def validate_slack_signature(
 
 
 def _get_action_channel(channel_id):
-    """Load the local notification channel."""
     try:
-        channel = channels_repo.get_channel(
-            channel_id
-        )
+        channel = channels_repo.get_channel(channel_id)
     except (DoesNotExist, TypeError, ValueError) as exc:
         raise SlackActionError(
             "action_rejected",
@@ -290,23 +276,18 @@ def _get_action_channel(channel_id):
             "Action channel is not a Slack channel.",
             status_code=403,
         )
-
     if not channel.enabled:
         raise SlackActionError(
             "action_rejected",
             "Slack action channel is disabled.",
             status_code=403,
         )
-
     return channel
 
 
 def _get_action_alert(alert_id):
-    """Load an alert group referenced by a button."""
     try:
-        return alerts_repo.get_alert_group(
-            alert_id
-        )
+        return alerts_repo.get_alert_group(alert_id)
     except (DoesNotExist, TypeError, ValueError) as exc:
         raise SlackActionError(
             "alert_not_found",
@@ -315,12 +296,19 @@ def _get_action_alert(alert_id):
         ) from exc
 
 
+def _connection_mode(config):
+    return str(config.get("connection_mode") or "http").strip()
+
+
 def _validate_channel_config(
     channel,
     config,
     payload,
+    *,
+    expected_connection_mode,
+    expected_app_token=None,
 ):
-    """Validate Slack channel mode and external channel ID."""
+    """Validate Slack channel mode, transport and external channel ID."""
     if config.get("mode") != "bot_api":
         raise SlackActionError(
             "action_rejected",
@@ -328,20 +316,35 @@ def _validate_channel_config(
             status_code=403,
         )
 
-    configured_channel_id = str(
-        config.get("channel_id") or ""
-    ).strip()
+    if _connection_mode(config) != expected_connection_mode:
+        raise SlackActionError(
+            "action_rejected",
+            "Slack action transport does not match channel configuration.",
+            status_code=403,
+        )
 
+    if expected_connection_mode == "socket_mode":
+        configured_app_token = str(config.get("app_token") or "")
+        if (
+            not configured_app_token
+            or not expected_app_token
+            or not hmac.compare_digest(
+                configured_app_token,
+                str(expected_app_token),
+            )
+        ):
+            raise SlackActionError(
+                "action_rejected",
+                "Slack Socket Mode app does not match channel configuration.",
+                status_code=403,
+            )
+
+    configured_channel_id = str(config.get("channel_id") or "").strip()
     payload_channel_id = str(
-        (payload.get("channel") or {}).get("id")
-        or ""
+        (payload.get("channel") or {}).get("id") or ""
     ).strip()
 
-    if (
-        not configured_channel_id
-        or payload_channel_id
-        != configured_channel_id
-    ):
+    if not configured_channel_id or payload_channel_id != configured_channel_id:
         raise SlackActionError(
             "action_rejected",
             "Slack workspace channel does not match configuration.",

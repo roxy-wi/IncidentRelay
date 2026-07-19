@@ -378,6 +378,61 @@
                                         {{ _('channels.slack.channel_id_help') }}
                                     </div>
                                 </div>
+
+                                <div class="form-field form-field-full">
+                                    <label for="cfg-slack-connection-mode">
+                                        {{ _('channels.slack.action_connection') }}
+                                    </label>
+                                    <select id="cfg-slack-connection-mode" class="input">
+                                        <option value="http">
+                                            {{ _('channels.slack.http_mode') }}
+                                        </option>
+                                        <option value="socket_mode">
+                                            {{ _('channels.slack.socket_mode') }}
+                                        </option>
+                                    </select>
+                                    <div class="field-help">
+                                        {{ _('channels.slack.action_connection_help') }}
+                                    </div>
+                                </div>
+
+                                <div
+                                    id="cfg-slack-http-action-fields"
+                                    class="form-field form-field-full"
+                                >
+                                    <label for="cfg-slack-signing-secret">
+                                        {{ _('channels.slack.signing_secret') }}
+                                    </label>
+                                    <input
+                                        id="cfg-slack-signing-secret"
+                                        class="input"
+                                        type="password"
+                                        autocomplete="new-password"
+                                    >
+                                    <div class="field-help">
+                                        {{ _('channels.slack.signing_secret_help') }}
+                                    </div>
+                                </div>
+
+                                <div
+                                    id="cfg-slack-socket-action-fields"
+                                    class="form-field form-field-full"
+                                    style="display: none;"
+                                >
+                                    <label for="cfg-slack-app-token">
+                                        {{ _('channels.slack.app_token') }}
+                                    </label>
+                                    <input
+                                        id="cfg-slack-app-token"
+                                        class="input"
+                                        type="password"
+                                        autocomplete="new-password"
+                                        placeholder="xapp-..."
+                                    >
+                                    <div class="field-help">
+                                        {{ _('channels.slack.app_token_help') }}
+                                    </div>
+                                </div>
                             </div>
                         </div>
 

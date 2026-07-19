@@ -54,6 +54,20 @@ services:
       incidentrelay:
         condition: service_healthy
 
+  incidentrelay-slack:
+    image: *incidentrelay_image
+    container_name: incidentrelay-slack
+    restart: unless-stopped
+    environment:
+      INCIDENTRELAY_CONFIG_FILE: /etc/incidentrelay/incidentrelay.conf
+      INCIDENTRELAY_SERVICE: slack
+      INCIDENTRELAY_RUN_MIGRATIONS: "0"
+      PYTHONUNBUFFERED: "1"
+    volumes: *incidentrelay_common_volumes
+    depends_on:
+      incidentrelay:
+        condition: service_healthy
+
 volumes:
   incidentrelay-data:
   incidentrelay-logs:

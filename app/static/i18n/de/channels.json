@@ -142,5 +142,15 @@
   "channels.confirm.disable_title": "Den Kanal deaktivieren?",
   "channels.confirm.disable_message": "Kanal \"{name}\" deaktivieren?\n\nDer Kanal erhält keine Benachrichtigungen mehr, bleibt aber sichtbar und kann wieder aktiviert werden.",
   "channels.confirm.delete_title": "Löschen Sie diesen Kanal?",
-  "channels.confirm.delete_message": "Kanal „{name} löschen?\n\nDadurch wird der Kanal aus aktiven Kanallisten entfernt und von Routen getrennt.\nHistorische Warnungen bleiben erhalten."
+  "channels.confirm.delete_message": "Kanal „{name} löschen?\n\nDadurch wird der Kanal aus aktiven Kanallisten entfernt und von Routen getrennt.\nHistorische Warnungen bleiben erhalten.",
+  "channels.slack.action_connection": "Verbindung für interaktive Aktionen",
+  "channels.slack.action_connection_help": "HTTP benötigt eine öffentliche Request-URL und ein Signing Secret. Socket Mode nutzt eine ausgehende WebSocket-Verbindung und benötigt keinen öffentlichen Endpunkt.",
+  "channels.slack.http_mode": "HTTP Request URL",
+  "channels.slack.socket_mode": "Socket Mode",
+  "channels.slack.signing_secret": "Signing Secret",
+  "channels.slack.signing_secret_help": "Erforderlich für signierte Anfragen an /api/integrations/slack/actions. Gespeicherte Werte werden beim Bearbeiten maskiert.",
+  "channels.slack.app_token": "App-Level-Token",
+  "channels.slack.app_token_help": "Slack App-Level-Token mit Präfix xapp- und Scope connections:write. Der Slack-Worker muss laufen.",
+  "channels.config.bot_http_ready": "Bot API mit HTTP-Aktionen konfiguriert",
+  "channels.config.bot_socket_ready": "Bot API mit Socket Mode konfiguriert"
 }

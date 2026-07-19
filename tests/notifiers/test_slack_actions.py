@@ -380,3 +380,48 @@ def test_slack_action_rejects_wrong_slack_channel(
         response.get_json()["error"]
         == "action_rejected"
     )
+
+
+def make_action_payload(**kwargs):
+    body = make_action_body(**kwargs)
+    from urllib.parse import parse_qs
+    return json.loads(parse_qs(body.decode("utf-8"))["payload"][0])
+
+
+def test_slack_socket_action_acknowledges_alert(monkeypatch):
+    channel, alert, user = install_action_mocks(monkeypatch)
+    channel.config["connection_mode"] = "socket_mode"
+    channel.config["app_token"] = "xapp-test-token"
+    channel.config.pop("signing_secret", None)
+    calls = []
+
+    def fake_acknowledge(alert_id, user_id=None):
+        calls.append((alert_id, user_id))
+        return alert
+
+    monkeypatch.setattr(slack_actions, "acknowledge_alert", fake_acknowledge)
+
+    result = slack_actions.handle_slack_socket_action(
+        payload=make_action_payload(),
+        app_token="xapp-test-token",
+    )
+
+    assert result["ok"] is True
+    assert calls == [(alert.id, user.id)]
+
+
+def test_slack_socket_action_rejects_other_app(monkeypatch):
+    channel, _, _ = install_action_mocks(monkeypatch)
+    channel.config["connection_mode"] = "socket_mode"
+    channel.config["app_token"] = "xapp-test-token"
+    channel.config.pop("signing_secret", None)
+
+    try:
+        slack_actions.handle_slack_socket_action(
+            payload=make_action_payload(),
+            app_token="xapp-other-token",
+        )
+    except slack_actions.SlackActionError as exc:
+        assert exc.error == "action_rejected"
+    else:
+        raise AssertionError("expected SlackActionError")

@@ -14,6 +14,7 @@ from app.services.rbac import (
     get_allowed_team_or_group_resource_ids,
     require_team_or_group_resource_access,
 )
+from app.services.channel_config import merge_channel_config_secrets
 from app.services.serializers.channels import serialize_channel
 from app.services.validation import make_error_response, validate_body
 from app.services.service_catalog.reconciliation import reconcile_channel_services
@@ -225,11 +226,24 @@ def update_channel(channel_id):
     if existing_channel:
         return channel_name_conflict_response(payload.name)
 
+    try:
+        merged_config = merge_channel_config_secrets(
+            payload.channel_type,
+            payload.config,
+            current_channel.channel_type,
+            current_channel.config,
+        )
+    except ValueError as exc:
+        return jsonify({
+            "error": "validation_error",
+            "message": str(exc),
+        }), 400
+
     update_data = {
         "team": payload.team_id,
         "name": payload.name,
         "channel_type": payload.channel_type,
-        "config": payload.config,
+        "config": merged_config,
         "enabled": payload.enabled,
     }
 

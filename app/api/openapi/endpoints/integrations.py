@@ -2444,7 +2444,11 @@ def paths():
                     "IncidentRelay verifies the raw request body using the "
                     "Slack signing secret configured on the referenced channel. "
                     "Requests older than five minutes are rejected. "
-                    "This endpoint does not use IncidentRelay bearer tokens."
+                    "This endpoint is used only by Slack channels configured "
+                    "with connection_mode=http. Socket Mode interactions are "
+                    "received by the separate Slack worker and do not call this "
+                    "endpoint. This endpoint does not use IncidentRelay bearer "
+                    "tokens."
                 ),
                 "operationId": "handleSlackAlertAction",
                 "security": [],

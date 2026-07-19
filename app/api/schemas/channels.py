@@ -1,15 +1,21 @@
-from typing import Any, Dict
+from typing import Any, ClassVar, Dict
 
 from pydantic import Field, model_validator
 
 from app.api.schemas.base import ApiModel
 from app.notifiers.types import CHANNEL_TYPE_PATTERN, WEBHOOK_STYLE_CHANNELS, SLACK_CHANNEL
 from app.notifiers.email.email_templates import normalize_email_html_template
+from app.services.channel_config import (
+    CHANNEL_SECRET_PLACEHOLDER,
+    contains_channel_secret_placeholder,
+)
 from app.services.severity import normalize_severity_list
 
 
 class ChannelBaseSchema(ApiModel):
     """Base schema for notification channel input."""
+
+    allow_secret_placeholders: ClassVar[bool] = False
 
     team_id: int | None = Field(default=None, ge=1)
     name: str = Field(min_length=2, max_length=120)
@@ -65,21 +71,26 @@ class ChannelBaseSchema(ApiModel):
             config["mode"] = mode
 
             if mode == "bot_api":
-                bot_token = str(
-                    config.get("bot_token") or ""
+                connection_mode = str(
+                    config.get("connection_mode") or "http"
                 ).strip()
 
-                channel_id = str(
-                    config.get("channel_id") or ""
-                ).strip()
+                if connection_mode not in {"http", "socket_mode"}:
+                    raise ValueError(
+                        "slack connection_mode must be http or socket_mode"
+                    )
+
+                config["connection_mode"] = connection_mode
+
+                required = ["bot_token", "channel_id"]
+                if connection_mode == "socket_mode":
+                    required.append("app_token")
+                else:
+                    required.append("signing_secret")
 
                 missing = [
                     name
-                    for name in (
-                        "bot_token",
-                        "channel_id",
-                        "signing_secret",
-                    )
+                    for name in required
                     if not str(config.get(name) or "").strip()
                 ]
 
@@ -89,22 +100,37 @@ class ChannelBaseSchema(ApiModel):
                         + ", ".join(missing)
                     )
 
-                if not bot_token.startswith("xoxb-"):
+                bot_token = str(config["bot_token"]).strip()
+                if (
+                    bot_token != CHANNEL_SECRET_PLACEHOLDER
+                    and not bot_token.startswith("xoxb-")
+                ):
                     raise ValueError(
                         "slack bot_token must start with 'xoxb-'"
                     )
 
-                config["bot_token"] = str(
-                    config["bot_token"]
-                ).strip()
-
+                config["bot_token"] = bot_token
                 config["channel_id"] = str(
                     config["channel_id"]
                 ).strip()
 
-                config["signing_secret"] = str(
-                    config["signing_secret"]
-                ).strip()
+                if connection_mode == "socket_mode":
+                    app_token = str(config["app_token"]).strip()
+                    if (
+                        app_token != CHANNEL_SECRET_PLACEHOLDER
+                        and not app_token.startswith("xapp-")
+                    ):
+                        raise ValueError(
+                            "slack app_token must start with 'xapp-'"
+                        )
+                    config["app_token"] = app_token
+                    config.pop("signing_secret", None)
+                else:
+                    config["signing_secret"] = str(
+                        config["signing_secret"]
+                    ).strip()
+                    config.pop("app_token", None)
+
                 config.pop("webhook_url", None)
 
             else:
@@ -118,8 +144,25 @@ class ChannelBaseSchema(ApiModel):
                     )
 
                 config["webhook_url"] = webhook_url
-                config.pop("bot_token", None)
-                config.pop("channel_id", None)
+                for key in (
+                    "bot_token",
+                    "channel_id",
+                    "connection_mode",
+                    "app_token",
+                    "signing_secret",
+                ):
+                    config.pop(key, None)
+
+            if (
+                not self.allow_secret_placeholders
+                and contains_channel_secret_placeholder(
+                    self.channel_type,
+                    config,
+                )
+            ):
+                raise ValueError(
+                    "channel secret placeholders are only valid during updates"
+                )
 
         if self.channel_type in WEBHOOK_STYLE_CHANNELS and not config.get("webhook_url"):
             raise ValueError(f"{self.channel_type} channel requires webhook_url")
@@ -156,3 +199,5 @@ class ChannelCreateSchema(ChannelBaseSchema):
 
 class ChannelUpdateSchema(ChannelBaseSchema):
     """Validate notification channel update input."""
+
+    allow_secret_placeholders: ClassVar[bool] = True

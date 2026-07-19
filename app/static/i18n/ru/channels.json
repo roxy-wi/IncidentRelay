@@ -142,5 +142,15 @@
   "channels.confirm.disable_title": "Отключить этот канал?",
   "channels.confirm.disable_message": "Отключить канал «{name}»?\n\nКанал перестанет получать уведомления, но останется видимым и его можно будет включить снова.",
   "channels.confirm.delete_title": "Удалить этот канал?",
-  "channels.confirm.delete_message": "Удалить канал «{name}»?\n\nКанал будет удалён из активных списков и отвязан от маршрутов.\nИстория алертов сохранится."
+  "channels.confirm.delete_message": "Удалить канал «{name}»?\n\nКанал будет удалён из активных списков и отвязан от маршрутов.\nИстория алертов сохранится.",
+  "channels.slack.action_connection": "Подключение интерактивных действий",
+  "channels.slack.action_connection_help": "HTTP требует публичный Request URL и signing secret. Socket Mode использует исходящий WebSocket и не требует публичного endpoint.",
+  "channels.slack.http_mode": "HTTP Request URL",
+  "channels.slack.socket_mode": "Socket Mode",
+  "channels.slack.signing_secret": "Signing secret",
+  "channels.slack.signing_secret_help": "Нужен для подписанных запросов на /api/integrations/slack/actions. При редактировании сохранённое значение маскируется.",
+  "channels.slack.app_token": "App-level token",
+  "channels.slack.app_token_help": "App-level token Slack, начинающийся с xapp-, со scope connections:write. Slack worker должен быть запущен.",
+  "channels.config.bot_http_ready": "Bot API настроен с HTTP-действиями",
+  "channels.config.bot_socket_ready": "Bot API настроен с Socket Mode"
 }

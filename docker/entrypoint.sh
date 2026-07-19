@@ -40,13 +40,16 @@ case "$SERVICE" in
   telegram)
     exec python -m app.telegram_worker
     ;;
+  slack)
+    exec python -m app.slack_worker
+    ;;
   shell)
     exec /bin/bash
     ;;
 
   *)
     echo "Unknown INCIDENTRELAY_SERVICE: $SERVICE"
-    echo "Allowed values: web, scheduler, shell"
+    echo "Allowed values: web, scheduler, telegram, slack, shell"
     exit 1
     ;;
 esac

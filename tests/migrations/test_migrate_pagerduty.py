@@ -8,7 +8,18 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 
-SCRIPT = Path(__file__).with_name("migrate_pagerduty.py")
+def find_migration_script():
+    for root in Path(__file__).resolve().parents:
+        candidate = root / "tools" / "migrations" / "pagerduty" / "migrate_pagerduty.py"
+        if candidate.is_file():
+            return candidate
+    raise FileNotFoundError(
+        "PagerDuty migration tool was not found at "
+        "tools/migrations/pagerduty/migrate_pagerduty.py"
+    )
+
+
+SCRIPT = find_migration_script()
 spec = importlib.util.spec_from_file_location("migrate_pagerduty", SCRIPT)
 module = importlib.util.module_from_spec(spec)
 sys.modules[spec.name] = module
