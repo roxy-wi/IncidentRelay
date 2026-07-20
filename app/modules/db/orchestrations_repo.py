@@ -16,6 +16,10 @@ from app.modules.db.models import (
     Service,
 )
 from app.services.integrations.auth import hash_token
+from app.services.orchestration.validation import (
+    issues_to_messages,
+    validate_rule_definition,
+)
 
 
 VALID_SCOPES = {"global", "service"}
@@ -486,6 +490,18 @@ def validate_version(version_id: int) -> Dict[str, Any]:
             errors.append(f"{path}: condition_tree must be an object")
         if not isinstance(rule.actions_json, list):
             errors.append(f"{path}: actions must be a list")
+
+        # EVENT_ORCHESTRATION_WS2_VALIDATION
+        if isinstance(rule.condition_tree_json, dict) and isinstance(
+            rule.actions_json, list
+        ):
+            rule_validation = validate_rule_definition(
+                rule.condition_tree_json,
+                rule.actions_json,
+                path=path,
+            )
+            errors.extend(issues_to_messages(rule_validation["errors"]))
+            warnings.extend(issues_to_messages(rule_validation["warnings"]))
         if rule.parent_rule_id is not None:
             parent_version_id = (
                 EventOrchestrationRule.select(EventOrchestrationRule.version)
