@@ -1,6 +1,9 @@
 import re
 
 from app.db import init_database
+from app.migrations.introspection import (
+    get_columns as migration_get_columns,
+)
 from app.modules.db.models import MatcherPreset, ServiceRunbook
 
 
@@ -24,21 +27,8 @@ def _quote_identifier(value):
     return f"{quote}{value}{quote}"
 
 
-def _current_schema():
-    if not _is_postgres():
-        return None
-
-    row = db.execute_sql("SELECT current_schema()").fetchone()
-    return row[0] if row else None
-
-
 def _get_columns(table_name):
-    schema = _current_schema()
-
-    if schema:
-        return db.get_columns(table_name, schema=schema)
-
-    return db.get_columns(table_name)
+    return migration_get_columns(db, table_name)
 
 
 def _column_exists(table_name, column_name):

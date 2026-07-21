@@ -1,6 +1,10 @@
 import re
 
 from app.db import init_database
+from app.migrations.introspection import (
+    get_columns as migration_get_columns,
+    get_tables as migration_get_tables,
+)
 
 
 db = init_database()
@@ -15,25 +19,8 @@ def _is_mysql():
     return "mysql" in db.__class__.__name__.lower()
 
 
-def _current_schema():
-    if not _is_postgres():
-        return None
-
-    row = db.execute_sql("SELECT current_schema()").fetchone()
-
-    if not row or not row[0]:
-        raise RuntimeError("PostgreSQL current schema could not be determined")
-
-    return row[0]
-
-
 def _get_tables():
-    schema = _current_schema()
-
-    if schema:
-        return db.get_tables(schema=schema)
-
-    return db.get_tables()
+    return migration_get_tables(db)
 
 
 def _quote_identifier(value):
@@ -45,14 +32,10 @@ def _quote_identifier(value):
 
 
 def _table_columns(table_name):
-    schema = _current_schema()
-
-    if schema:
-        columns = db.get_columns(table_name, schema=schema)
-    else:
-        columns = db.get_columns(table_name)
-
-    return {column.name for column in columns}
+    return {
+        column.name
+        for column in migration_get_columns(db, table_name)
+    }
 
 
 def _find_table(label, preferred_names, required_columns):

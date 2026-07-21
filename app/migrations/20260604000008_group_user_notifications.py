@@ -1,6 +1,10 @@
 """Move user notification deliveries and browser push tokens to alert groups."""
 
 from app.db import init_database
+from app.migrations.introspection import (
+    get_columns as migration_get_columns,
+    get_tables as migration_get_tables,
+)
 
 
 db = init_database()
@@ -12,14 +16,14 @@ def _is_postgres():
 
 
 def _has_table(table_name):
-    return table_name in db.get_tables()
+    return table_name in migration_get_tables(db)
 
 
 def _has_column(table_name, column_name):
     if not _has_table(table_name):
         return False
 
-    return any(column.name == column_name for column in db.get_columns(table_name))
+    return any(column.name == column_name for column in migration_get_columns(db, table_name))
 
 
 def upgrade():

@@ -7,6 +7,10 @@ while production can run on PostgreSQL.
 from datetime import datetime
 
 from app.db import database_proxy as db
+from app.migrations.introspection import (
+    get_columns as migration_get_columns,
+    get_tables as migration_get_tables,
+)
 from app.modules.db.models import (
     IncidentPriority,
     IncidentResponder,
@@ -91,14 +95,14 @@ def _execute(sql, params=None):
 
 
 def _table_exists(table_name):
-    return table_name in _database().get_tables()
+    return table_name in migration_get_tables(_database())
 
 
 def _column_exists(table_name, column_name):
     if not _table_exists(table_name):
         return False
 
-    return any(column.name == column_name for column in _database().get_columns(table_name))
+    return any(column.name == column_name for column in migration_get_columns(_database(), table_name))
 
 
 def _add_column_if_missing(table_name, column_name, column_definition):
