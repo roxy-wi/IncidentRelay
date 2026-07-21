@@ -13,6 +13,7 @@ from app.services.serializers.users import serialize_user
 from app.services.serializers.tokens import serialize_api_token
 from app.services.validation import validate_body
 from app.services.user_oncall_status import get_user_oncall_status
+from app.modules.common import utc_now
 
 
 profile_bp = Blueprint("profile_api", __name__)
@@ -181,7 +182,7 @@ def create_profile_token():
         group = payload.group_id
 
     raw_token = create_raw_token()
-    expires_at = datetime.utcnow() + timedelta(days=payload.days) if payload.days else None
+    expires_at = utc_now() + timedelta(days=payload.days) if payload.days else None
 
     token = tokens_repo.create_token(
         name=payload.name,

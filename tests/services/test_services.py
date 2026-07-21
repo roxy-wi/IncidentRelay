@@ -27,6 +27,7 @@ from tests.factories import (
     create_impact_alert_group,
     create_service_dependency,
 )
+from app.modules.common import utc_now
 
 
 def service_payload(team, **overrides):
@@ -787,7 +788,7 @@ def create_service_alert_group(
     alertname="ServiceAlert",
     summary="Service alert",
 ):
-    now = datetime.utcnow()
+    now = utc_now()
 
     labels = {
         "alertname": alertname,

@@ -4,6 +4,7 @@ from peewee import JOIN
 
 from app.modules.db.models import Group, Heartbeat, HeartbeatInstance, HeartbeatPing, Service, Team
 from app.services.integrations.auth import hash_token
+from app.modules.common import utc_now
 
 
 def list_heartbeats(
@@ -192,13 +193,13 @@ def update_heartbeat(heartbeat, data):
     for key, value in data.items():
         setattr(heartbeat, key, value)
 
-    heartbeat.updated_at = datetime.utcnow()
+    heartbeat.updated_at = utc_now()
     heartbeat.save()
     return heartbeat
 
 
 def soft_delete_heartbeat(heartbeat):
-    now = datetime.utcnow()
+    now = utc_now()
     heartbeat.deleted = True
     heartbeat.deleted_at = now
     heartbeat.enabled = False
@@ -232,7 +233,7 @@ def record_ping(
         remote_addr=remote_addr,
         user_agent=user_agent,
         alert_group=alert_group_id,
-        received_at=received_at or datetime.utcnow(),
+        received_at=received_at or utc_now(),
     )
 
 
@@ -278,7 +279,7 @@ def create_heartbeat_instance(heartbeat, instance_key, **data):
 def update_heartbeat_instance(instance, data):
     for key, value in data.items():
         setattr(instance, key, value)
-    instance.updated_at = datetime.utcnow()
+    instance.updated_at = utc_now()
     instance.save()
     return instance
 
@@ -290,6 +291,6 @@ def delete_heartbeat_instance(instance):
 def disable_heartbeat_instance(instance, status="paused"):
     instance.enabled = False
     instance.status = status
-    instance.updated_at = datetime.utcnow()
+    instance.updated_at = utc_now()
     instance.save()
     return instance

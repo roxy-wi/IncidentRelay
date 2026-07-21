@@ -5,6 +5,7 @@ from app.modules.db import alerts_repo
 from app.services import escalation_policies as escalation_policy_service
 from app.services.notifications.delivery import has_matching_notification_channel, notify_alert
 from app.services.oncall import get_current_oncall_user, get_next_rotation_user
+from app.modules.common import utc_now
 
 logger = logging.getLogger("oncall.alerts")
 
@@ -36,7 +37,7 @@ def apply_initial_escalation_policy_assignment(policy, fallback_rotation):
     delay_seconds = escalation_policy_service.get_rule_delay_seconds(policy_rule)
 
     if delay_seconds:
-        next_escalation_at = datetime.utcnow() + timedelta(seconds=delay_seconds)
+        next_escalation_at = utc_now() + timedelta(seconds=delay_seconds)
 
     return policy_rule, rotation, assignee, next_escalation_at
 
@@ -71,7 +72,7 @@ def maybe_escalate_alert(group):
     if not next_user or (group.assignee and next_user.id == group.assignee.id):
         return False
 
-    now = datetime.utcnow()
+    now = utc_now()
 
     group.assignee = next_user.id
     group.escalation_level = (group.escalation_level or 0) + 1
@@ -97,7 +98,7 @@ def maybe_escalate_alert_by_policy(group):
     if not group.escalation_policy_id:
         return False
 
-    now = datetime.utcnow()
+    now = utc_now()
 
     if not group.next_escalation_at:
         return False

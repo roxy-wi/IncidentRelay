@@ -5,6 +5,7 @@ from app.modules.db import alerts_repo
 from app.services import escalation_policies as escalation_policy_service
 from app.services.alerts.escalation import maybe_escalate_alert
 from app.services.notifications.delivery import has_matching_notification_channel, notify_alert
+from app.modules.common import utc_now
 
 logger = logging.getLogger("oncall.alerts")
 
@@ -42,7 +43,7 @@ def send_unacked_reminders():
     policy escalation must work even when reminder interval is disabled.
     """
 
-    now = datetime.utcnow()
+    now = utc_now()
     count = 0
 
     for group in alerts_repo.list_firing_alert_groups():

@@ -16,6 +16,7 @@ from app.modules.db.models import (
     TeamUser,
     User
 )
+from app.modules.common import utc_now
 
 
 def _rotation_member_period_filter(model, at):
@@ -222,7 +223,7 @@ def list_rotation_overrides(rotation_id, start_at=None, end_at=None, include_exp
             & (RotationOverride.ends_at > start_at)
         )
     elif not include_expired:
-        query = query.where(RotationOverride.ends_at > datetime.utcnow())
+        query = query.where(RotationOverride.ends_at > utc_now())
 
     return list(query.order_by(RotationOverride.starts_at.asc(), RotationOverride.id.asc()))
 
@@ -232,7 +233,7 @@ def get_active_override(rotation_id, now=None):
     Return the active override for a rotation.
     """
 
-    now = now or datetime.utcnow()
+    now = now or utc_now()
     return (
         RotationOverride.select()
         .where(
@@ -315,7 +316,7 @@ def soft_delete_rotation(rotation_id):
             RotationLayer.update(
                 enabled=False,
                 deleted=True,
-                deleted_at=datetime.utcnow(),
+                deleted_at=utc_now(),
             ).where(
                 RotationLayer.id.in_(layer_ids)
             ).execute()
@@ -339,7 +340,7 @@ def soft_delete_rotation(rotation_id):
 
         rotation.enabled = False
         rotation.deleted = True
-        rotation.deleted_at = datetime.utcnow()
+        rotation.deleted_at = utc_now()
         rotation.save()
 
         return rotation
@@ -578,7 +579,7 @@ def soft_delete_rotation_layer(layer_id):
     layer = get_rotation_layer(layer_id)
     layer.enabled = False
     layer.deleted = True
-    layer.deleted_at = datetime.utcnow()
+    layer.deleted_at = utc_now()
     layer.save()
     return layer
 
@@ -675,7 +676,7 @@ def list_rotation_layer_member_periods(
 def add_rotation_layer_member(layer_id, user_id, position, starts_at=None):
     """Add user to layer as a new membership period."""
 
-    starts_at = starts_at or datetime.utcnow()
+    starts_at = starts_at or utc_now()
 
     with database_proxy.atomic():
         (
@@ -730,7 +731,7 @@ def update_rotation_layer_member(member_id, position, active=True):
     """Update layer member without rewriting historical schedule."""
 
     member = get_rotation_layer_member(member_id)
-    now = datetime.utcnow()
+    now = utc_now()
 
     if not active:
         member.active = False
@@ -777,7 +778,7 @@ def delete_rotation_layer_member(member_id):
 
     member.active = False
     if member.ends_at is None:
-        member.ends_at = datetime.utcnow()
+        member.ends_at = utc_now()
     member.save()
 
     return data

@@ -1,4 +1,5 @@
 from datetime import datetime
+from app.modules.common import utc_now
 
 
 def serialize_api_token(token):
@@ -8,7 +9,7 @@ def serialize_api_token(token):
     Never expose token_hash or full raw token.
     """
     expires_at = token.expires_at
-    expired = bool(expires_at and expires_at <= datetime.utcnow())
+    expired = bool(expires_at and expires_at <= utc_now())
 
     return {
         "id": token.id,

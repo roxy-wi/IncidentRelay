@@ -15,6 +15,7 @@ from tests.factories import (
     create_team,
     create_user,
 )
+from app.modules.common import utc_now
 
 
 def create_push_subscription(
@@ -24,7 +25,7 @@ def create_push_subscription(
     enabled=True,
     deleted=False,
 ):
-    now = datetime.utcnow()
+    now = utc_now()
 
     return BrowserPushSubscription.create(
         user=user.id,
@@ -500,7 +501,7 @@ def test_execute_push_action_rejects_expired_token(db):
         group=alert_group.id,
         action="ack",
         token_hash=browser_push._hash_token(token),
-        expires_at=datetime.utcnow() - timedelta(seconds=1),
+        expires_at=utc_now() - timedelta(seconds=1),
     )
 
     result = browser_push.execute_push_action(token, "ack")

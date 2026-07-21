@@ -9,6 +9,7 @@ from app.modules.db.models import AlertGroup, Heartbeat, HeartbeatInstance
 from app.services.alerts.actions import resolve_alert
 from app.services.alerts.lifecycle import upsert_alert
 from app.services.integrations.auth import create_raw_token, hash_token
+from app.modules.common import utc_now
 
 logger = logging.getLogger("oncall.heartbeats")
 
@@ -23,7 +24,7 @@ DEFAULT_GRACE_SECONDS = 300
 
 
 def _utcnow():
-    return datetime.utcnow().replace(microsecond=0)
+    return utc_now().replace(microsecond=0)
 
 
 def _as_naive_utc(value):

@@ -14,6 +14,7 @@ from app.modules.db.models import (
     UserGroup,
     UserRole,
 )
+from app.modules.common import utc_now
 
 
 DEFAULT_USERS_PAGE_SIZE = 25
@@ -283,7 +284,7 @@ def soft_delete_user(user_id):
     if not user:
         return None
 
-    now = datetime.utcnow()
+    now = utc_now()
     database = User._meta.database
 
     if user.is_admin and user.active and count_active_admins(exclude_user_id=user.id) == 0:

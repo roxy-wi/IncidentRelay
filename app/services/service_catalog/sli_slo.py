@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from app.modules.db import maintenance_repo, services_repo
 from app.modules.db.models import AlertGroup
 from app.services.serializers.services import serialize_utc_datetime
+from app.modules.common import utc_now
 
 
 SLI_TYPE_ACK_LATENCY = "alert_ack_latency"
@@ -51,7 +52,7 @@ def normalize_slo_window_days(days):
 
 def evaluate_service_slos(slos, *, now=None, persist=True):
     """Evaluate a list of SLOs and return a dict keyed by SLO id."""
-    now = now or datetime.utcnow()
+    now = now or utc_now()
     evaluations = {}
 
     for slo in slos:
@@ -62,7 +63,7 @@ def evaluate_service_slos(slos, *, now=None, persist=True):
 
 def evaluate_service_slo(slo, *, now=None, persist=True):
     """Evaluate one Service Level Objective."""
-    now = now or datetime.utcnow()
+    now = now or utc_now()
     window_days = normalize_slo_window_days(slo.window_days)
     since = now - timedelta(days=window_days)
     sli = slo.sli

@@ -2,6 +2,7 @@ from datetime import datetime, timedelta
 
 from app.services.service_catalog.timeline import build_next_cursor, list_service_events, publish_service_event, serialize_service_event
 from tests.factories import create_group, create_service, create_team
+from app.modules.common import utc_now
 
 
 def test_publish_service_event_uses_service_scope_snapshot():
@@ -32,7 +33,7 @@ def test_list_service_events_orders_newest_first():
     group = create_group()
     team = create_team(group)
     service = create_service(team)
-    now = datetime.utcnow()
+    now = utc_now()
 
     older = publish_service_event(service, category="configuration", event_type="service.created", title="Older", occurred_at=now - timedelta(minutes=5))
     newer = publish_service_event(service, category="status", event_type="service.status_changed", title="Newer", occurred_at=now)
@@ -59,7 +60,7 @@ def test_list_service_events_uses_stable_cursor():
     group = create_group()
     team = create_team(group)
     service = create_service(team)
-    occurred_at = datetime.utcnow()
+    occurred_at = utc_now()
 
     first = publish_service_event(service, category="configuration", event_type="service.updated", title="First", occurred_at=occurred_at)
     second = publish_service_event(service, category="configuration", event_type="service.updated", title="Second", occurred_at=occurred_at)

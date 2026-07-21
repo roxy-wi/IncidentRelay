@@ -12,13 +12,14 @@ from app.modules.db.models import (
     User,
 )
 from app.services.calendar_service import build_rotation_calendar
+from app.modules.common import utc_now
 
 
 DEFAULT_LOOKAHEAD_DAYS = 30
 
 
 def _utc_naive_now():
-    return datetime.utcnow()
+    return utc_now()
 
 
 def _parse_event_datetime(value):

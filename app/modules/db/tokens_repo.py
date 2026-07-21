@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from app.modules.db.models import ApiToken
+from app.modules.common import utc_now
 
 
 def create_api_token(name, token_prefix, token_hash, scopes, team_id=None, group_id=None, user_id=None, expires_at=None):
@@ -68,7 +69,7 @@ def revoke_user_token(token_id, user_id):
 
     token.active = False
     token.deleted = True
-    token.deleted_at = datetime.utcnow()
+    token.deleted_at = utc_now()
     token.save()
 
     return token
@@ -91,7 +92,7 @@ def mark_token_used(token):
     Update last token usage timestamp.
     """
 
-    token.last_used_at = datetime.utcnow()
+    token.last_used_at = utc_now()
     token.save()
     return token
 
@@ -104,7 +105,7 @@ def soft_delete_token(token_id):
     token = ApiToken.get_by_id(token_id)
     token.active = False
     token.deleted = True
-    token.deleted_at = datetime.utcnow()
+    token.deleted_at = utc_now()
     token.save()
     return token
 

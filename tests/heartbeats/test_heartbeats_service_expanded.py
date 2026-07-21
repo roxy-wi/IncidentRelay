@@ -4,6 +4,7 @@ from app.modules.db.models import AlertGroup, HeartbeatPing
 from app.services.heartbeats.service import process_overdue_heartbeats, receive_heartbeat_ping
 from app.services.integrations.auth import hash_token
 from tests.factories import create_group, create_heartbeat, create_route, create_service, create_team, create_user, add_user_to_team
+from app.modules.common import utc_now
 
 
 def _fixture():
@@ -23,13 +24,13 @@ def test_overdue_heartbeat_creates_regular_alert_group(db):
         route,
         service=service,
         token_hash=hash_token("hb-token"),
-        last_seen_at=datetime.utcnow() - timedelta(minutes=10),
-        next_expected_at=datetime.utcnow() - timedelta(minutes=5),
+        last_seen_at=utc_now() - timedelta(minutes=10),
+        next_expected_at=utc_now() - timedelta(minutes=5),
         expected_interval_seconds=60,
         grace_period_seconds=60,
     )
 
-    result = process_overdue_heartbeats(now=datetime.utcnow())
+    result = process_overdue_heartbeats(now=utc_now())
 
     assert result["processed"] >= 1
     assert result["overdue"] == 1
@@ -55,20 +56,20 @@ def test_ping_recovers_overdue_heartbeat_and_resolves_alert(db):
         route,
         service=service,
         token_hash=hash_token("hb-token"),
-        last_seen_at=datetime.utcnow() - timedelta(minutes=10),
-        next_expected_at=datetime.utcnow() - timedelta(minutes=5),
+        last_seen_at=utc_now() - timedelta(minutes=10),
+        next_expected_at=utc_now() - timedelta(minutes=5),
         expected_interval_seconds=60,
         grace_period_seconds=60,
     )
 
-    process_overdue_heartbeats(now=datetime.utcnow())
+    process_overdue_heartbeats(now=utc_now())
     heartbeat = heartbeat.__class__.get_by_id(heartbeat.id)
     group_id = heartbeat.current_alert_group_id
 
     recovered, error = receive_heartbeat_ping(
         "hb-token",
         payload={"status": "completed", "payload": {"rows_loaded": 10}},
-        now=datetime.utcnow(),
+        now=utc_now(),
     )
 
     assert error is None
@@ -141,7 +142,7 @@ def test_auto_discovered_instance_ping_creates_instance_state(db):
     item, error = receive_heartbeat_ping(
         "fleet-token",
         payload={"status": "completed", "instance": "server-1.example.com"},
-        now=datetime.utcnow(),
+        now=utc_now(),
     )
 
     assert error is None
@@ -169,7 +170,7 @@ def test_missing_auto_discovered_instance_pages_individually(db):
         instance_key="instance",
         expected_instances_mode="auto",
     )
-    now = datetime.utcnow()
+    now = utc_now()
     instance = HeartbeatInstance.create(
         heartbeat=heartbeat,
         instance_key="server-1.example.com",
@@ -211,7 +212,7 @@ def test_static_instance_rejects_unknown_producer(db):
     _, error = receive_heartbeat_ping(
         "static-token",
         payload={"status": "completed", "instance": "server-2.example.com"},
-        now=datetime.utcnow(),
+        now=utc_now(),
     )
 
     assert error is not None
@@ -221,7 +222,7 @@ def test_static_instance_rejects_unknown_producer(db):
 
 def test_interval_heartbeat_is_not_overdue_before_deadline(db):
     _, team, service, route = _fixture()
-    now = datetime.utcnow()
+    now = utc_now()
 
     heartbeat = create_heartbeat(
         team,
@@ -245,7 +246,7 @@ def test_interval_heartbeat_is_not_overdue_before_deadline(db):
 
 def test_overdue_check_does_not_duplicate_existing_alert_group(db):
     _, team, service, route = _fixture()
-    now = datetime.utcnow()
+    now = utc_now()
 
     heartbeat = create_heartbeat(
         team,
@@ -277,7 +278,7 @@ def test_overdue_check_does_not_duplicate_existing_alert_group(db):
 
 def test_ping_recovery_does_not_resolve_alert_when_auto_resolve_is_disabled(db):
     _, team, service, route = _fixture()
-    now = datetime.utcnow()
+    now = utc_now()
 
     heartbeat = create_heartbeat(
         team,
@@ -310,7 +311,7 @@ def test_ping_recovery_does_not_resolve_alert_when_auto_resolve_is_disabled(db):
 
 def test_ping_payload_persists_run_id_message_and_payload(db):
     _, team, service, route = _fixture()
-    now = datetime.utcnow()
+    now = utc_now()
 
     heartbeat = create_heartbeat(
         team,
@@ -521,7 +522,7 @@ def test_auto_discovered_instance_repeated_ping_updates_existing_state(db):
         expected_instances_mode="auto",
     )
 
-    first_seen = datetime.utcnow()
+    first_seen = utc_now()
     second_seen = first_seen + timedelta(minutes=1)
 
     _, error = receive_heartbeat_ping(
@@ -569,7 +570,7 @@ def test_instance_tracking_uses_custom_instance_key_field(db):
     _, error = receive_heartbeat_ping(
         "custom-instance-key-token",
         payload={"status": "completed", "host": "db-1.example.com"},
-        now=datetime.utcnow(),
+        now=utc_now(),
     )
 
     assert error is None
@@ -595,7 +596,7 @@ def test_instance_tracking_requires_instance_identifier(db):
     _, error = receive_heartbeat_ping(
         "missing-instance-token",
         payload={"status": "completed"},
-        now=datetime.utcnow(),
+        now=utc_now(),
     )
 
     assert error is not None
@@ -606,7 +607,7 @@ def test_static_expected_instance_without_prior_ping_pages_individually(db):
     from app.modules.db.models import HeartbeatInstance
 
     _, team, service, route = _fixture()
-    now = datetime.utcnow()
+    now = utc_now()
 
     heartbeat = create_heartbeat(
         team,
@@ -654,7 +655,7 @@ def test_one_healthy_static_instance_does_not_hide_missing_static_instance(db):
     from app.modules.db.models import HeartbeatInstance
 
     _, team, service, route = _fixture()
-    now = datetime.utcnow()
+    now = utc_now()
 
     heartbeat = create_heartbeat(
         team,
@@ -721,7 +722,7 @@ def test_ping_recovers_only_overdue_instance_alert(db):
     from app.modules.db.models import HeartbeatInstance
 
     _, team, service, route = _fixture()
-    now = datetime.utcnow()
+    now = utc_now()
 
     heartbeat = create_heartbeat(
         team,
@@ -766,7 +767,7 @@ def test_ping_recovers_only_overdue_instance_alert(db):
 
 def test_paused_heartbeat_does_not_create_overdue_alert(db):
     _, team, service, route = _fixture()
-    now = datetime.utcnow()
+    now = utc_now()
 
     heartbeat = create_heartbeat(
         team,
@@ -791,7 +792,7 @@ def test_paused_heartbeat_does_not_create_overdue_alert(db):
 
 def test_disabled_heartbeat_does_not_create_overdue_alert(db):
     _, team, service, route = _fixture()
-    now = datetime.utcnow()
+    now = utc_now()
 
     heartbeat = create_heartbeat(
         team,
@@ -826,7 +827,7 @@ def test_invalid_heartbeat_token_is_rejected(db):
     _, error = receive_heartbeat_ping(
         "wrong-token",
         payload={"status": "completed"},
-        now=datetime.utcnow(),
+        now=utc_now(),
     )
 
     assert error is not None

@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 
 from app.modules.db.models import Group, Silence, Team
+from app.modules.common import utc_now
 
 
 def list_silences(
@@ -40,7 +41,7 @@ def list_silences(
         )
 
     if not include_expired_history:
-        cutoff = (now or datetime.utcnow()) - timedelta(days=expired_retention_days)
+        cutoff = (now or utc_now()) - timedelta(days=expired_retention_days)
         query = query.where(Silence.ends_at >= cutoff)
 
     if team_id:
@@ -58,7 +59,7 @@ def list_active_silences(team_id, now=None):
     Return active silences for a team.
     """
 
-    now = now or datetime.utcnow()
+    now = now or utc_now()
     return list(
         Silence.select()
         .where(
@@ -137,6 +138,6 @@ def soft_delete_silence(silence_id):
     silence = get_silence(silence_id)
     silence.enabled = False
     silence.deleted = True
-    silence.deleted_at = datetime.utcnow()
+    silence.deleted_at = utc_now()
     silence.save()
     return silence

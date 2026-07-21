@@ -12,6 +12,7 @@ from app.modules.db.models import (
     Silence,
     ServiceRunbook,
 )
+from app.modules.common import utc_now
 
 
 def count_service_runbook_usages(preset_id):
@@ -164,8 +165,8 @@ def create_matcher_preset(
         matchers=matchers or {},
         enabled=enabled,
         version=1,
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
+        created_at=utc_now(),
+        updated_at=utc_now(),
     )
 
 
@@ -187,7 +188,7 @@ def restore_matcher_preset(
     preset.version = int(preset.version or 0) + 1
     preset.deleted = False
     preset.deleted_at = None
-    preset.updated_at = datetime.utcnow()
+    preset.updated_at = utc_now()
     preset.save()
 
     return preset
@@ -209,7 +210,7 @@ def update_matcher_preset(preset_id, data):
         if field in allowed_fields:
             setattr(preset, field, value)
 
-    preset.updated_at = datetime.utcnow()
+    preset.updated_at = utc_now()
     preset.save()
 
     return preset
@@ -315,7 +316,7 @@ def list_matcher_preset_usages(preset_id):
 def soft_delete_matcher_preset(preset_id):
     """Soft-delete a matcher preset."""
     preset = get_matcher_preset(preset_id)
-    now = datetime.utcnow()
+    now = utc_now()
 
     preset.enabled = False
     preset.deleted = True

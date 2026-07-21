@@ -12,6 +12,7 @@ from app.services.calendar_feeds import (
     get_calendar_feed_by_token,
     serialize_calendar_feed,
 )
+from app.modules.common import utc_now
 
 calendar_bp = Blueprint("calendar_api", __name__)
 
@@ -66,7 +67,7 @@ def get_calendar():
     if not team_id:
         return jsonify({"error": "team_id is required"}), 400
 
-    start_raw = request.args.get("start") or datetime.utcnow().date().isoformat()
+    start_raw = request.args.get("start") or utc_now().date().isoformat()
     end_raw = request.args.get("end")
 
     details = []

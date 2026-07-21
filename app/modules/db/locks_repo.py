@@ -3,6 +3,7 @@ from datetime import datetime, timedelta
 from peewee import IntegrityError
 
 from app.modules.db.models import AppLock
+from app.modules.common import utc_now
 
 
 def acquire_lock(name, owner, ttl_seconds):
@@ -10,7 +11,7 @@ def acquire_lock(name, owner, ttl_seconds):
     Acquire a database-backed lock.
     """
 
-    now = datetime.utcnow()
+    now = utc_now()
     expires_at = now + timedelta(seconds=ttl_seconds)
 
     try:

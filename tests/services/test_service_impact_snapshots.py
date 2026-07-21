@@ -14,6 +14,7 @@ from tests.factories import (
     create_service_dependency,
     create_team,
 )
+from app.modules.common import utc_now
 
 
 @pytest.fixture(autouse=True)
@@ -157,7 +158,7 @@ def test_list_service_impact_snapshots_filters_by_readable_items(db):
 
     visible_snapshot = _create_snapshot(
         team=catalog.team,
-        captured_at=datetime.utcnow(),
+        captured_at=utc_now(),
     )
     _create_snapshot_item(
         visible_snapshot,
@@ -168,7 +169,7 @@ def test_list_service_impact_snapshots_filters_by_readable_items(db):
 
     hidden_snapshot = _create_snapshot(
         team=other_team,
-        captured_at=datetime.utcnow(),
+        captured_at=utc_now(),
     )
     _create_snapshot_item(
         hidden_snapshot,
@@ -187,8 +188,8 @@ def test_list_service_impact_snapshots_filters_by_readable_items(db):
 
 def test_build_service_impact_history_aggregates_snapshots_and_top_services(db):
     catalog = _create_cloud_catalog()
-    first_captured_at = datetime.utcnow() - timedelta(hours=2)
-    second_captured_at = datetime.utcnow() - timedelta(hours=1)
+    first_captured_at = utc_now() - timedelta(hours=2)
+    second_captured_at = utc_now() - timedelta(hours=1)
 
     first = _create_snapshot(
         team=catalog.team,
@@ -263,7 +264,7 @@ def test_cleanup_service_impact_snapshots_deletes_old_rows(db):
 
     old_snapshot = _create_snapshot(
         team=catalog.team,
-        captured_at=datetime.utcnow() - timedelta(days=40),
+        captured_at=utc_now() - timedelta(days=40),
     )
     _create_snapshot_item(
         old_snapshot,
@@ -274,7 +275,7 @@ def test_cleanup_service_impact_snapshots_deletes_old_rows(db):
 
     fresh_snapshot = _create_snapshot(
         team=catalog.team,
-        captured_at=datetime.utcnow(),
+        captured_at=utc_now(),
         affected_services=0,
     )
     _create_snapshot_item(

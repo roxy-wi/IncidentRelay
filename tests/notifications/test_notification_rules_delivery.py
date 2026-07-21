@@ -4,6 +4,7 @@ from app.modules.db.models import UserNotificationDelivery
 from app.services.alerts.lifecycle import upsert_alert
 from app.services.notifications import rules
 from tests.factories import create_group, create_route, create_team, create_user
+from app.modules.common import utc_now
 
 
 class FakeDirectNotifier:
@@ -65,9 +66,9 @@ def _create_due_delivery(user, alert_group, rule, *, event_type="notification"):
         method=rule.method if rule else rules.NOTIFICATION_METHOD_EMAIL,
         event_type=event_type,
         status="pending",
-        scheduled_at=datetime.utcnow() - timedelta(seconds=1),
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
+        scheduled_at=utc_now() - timedelta(seconds=1),
+        created_at=utc_now(),
+        updated_at=utc_now(),
     )
 
 
@@ -146,9 +147,9 @@ def test_unsupported_user_notification_method_is_marked_failed(db):
         method="sms",
         event_type="notification",
         status="pending",
-        scheduled_at=datetime.utcnow() - timedelta(seconds=1),
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
+        scheduled_at=utc_now() - timedelta(seconds=1),
+        created_at=utc_now(),
+        updated_at=utc_now(),
     )
 
     assert rules.send_delivery(delivery) == 0

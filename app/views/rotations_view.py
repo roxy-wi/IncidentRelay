@@ -33,6 +33,7 @@ from app.services.validation import (
     validate_body,
 )
 from app.services.service_catalog.reconciliation import reconcile_rotation_services
+from app.modules.common import utc_now
 
 rotations_bp = Blueprint("rotations_api", __name__)
 
@@ -650,7 +651,7 @@ def list_rotation_overrides(rotation_id):
                 rotation,
             ).isoformat(timespec="minutes"),
             "reason": override.reason,
-            "expired": override.ends_at <= datetime.utcnow(),
+            "expired": override.ends_at <= utc_now(),
         }
         for override in rotations_repo.list_rotation_overrides(
             rotation.id,

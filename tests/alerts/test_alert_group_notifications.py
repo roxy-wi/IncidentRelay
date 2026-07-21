@@ -6,6 +6,7 @@ from app.settings import Config
 from app.services.alerts.lifecycle import upsert_alert
 import app.services.alerts.notification_queue as notification_queue
 from tests.factories import create_group, create_route, create_team
+from app.modules.common import utc_now
 
 
 def _route(group_by=None):
@@ -94,7 +95,7 @@ def test_due_group_notification_is_sent(db, monkeypatch):
     assert created is True
 
     alert_group.notification_pending = True
-    alert_group.notification_due_at = datetime.utcnow() - timedelta(seconds=1)
+    alert_group.notification_due_at = utc_now() - timedelta(seconds=1)
     alert_group.notification_reason = "notification"
     alert_group.save()
 

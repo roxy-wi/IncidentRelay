@@ -16,6 +16,7 @@ from app.modules.db.models import (
     Team,
     TeamUser,
 )
+from app.modules.common import utc_now
 
 
 def list_teams(active_only=False, group_ids=None, include_deleted=False):
@@ -177,7 +178,7 @@ def remove_team(team_id: int):
 
 def soft_delete_team(team_id: int):
     """Soft-delete a team and all resources under it."""
-    now = datetime.utcnow()
+    now = utc_now()
     team = get_team(team_id)
 
     with Team._meta.database.atomic():

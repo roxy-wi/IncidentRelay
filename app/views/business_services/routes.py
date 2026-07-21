@@ -23,6 +23,7 @@ from app.services.serializers.business_services import (
     serialize_business_service_component,
 )
 from app.services.validation import validate_body
+from app.modules.common import utc_now
 
 
 business_services_bp = Blueprint("business_services", __name__, url_prefix="/api/business-services")
@@ -425,7 +426,7 @@ def set_business_service_manual_status(business_service_id):
 
     until = normalize_optional_utc_datetime(payload.until)
 
-    if until is not None and until <= datetime.utcnow():
+    if until is not None and until <= utc_now():
         return jsonify({"error": "Manual status expiration must be in the future"}), 400
 
     item = business_services_repo.set_business_service_manual_status(

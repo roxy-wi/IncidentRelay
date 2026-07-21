@@ -15,6 +15,7 @@ from app.services.service_catalog.impact import build_single_service_impact_v2
 from app.services.service_catalog.sli_slo import evaluate_service_slos
 from app.services.service_catalog.timeline import list_service_events, serialize_service_event, build_next_cursor
 from app.services.validation import make_error_response
+from app.modules.common import utc_now
 
 
 class ServiceDetailsImpactQuery:
@@ -44,7 +45,7 @@ def _count_alert_groups(service_id, *conditions):
 
 
 def _service_alert_summary(service_id, *, days):
-    since = datetime.utcnow() - timedelta(days=days)
+    since = utc_now() - timedelta(days=days)
 
     base_query = _service_alert_group_query(service_id)
     recent_query = base_query.where(AlertGroup.last_seen_at >= since)
@@ -148,7 +149,7 @@ def _service_analytics_payload(
     timeline,
     impact=None,
 ):
-    until = datetime.utcnow()
+    until = utc_now()
     since = until - timedelta(days=days)
 
     impact = impact or {}

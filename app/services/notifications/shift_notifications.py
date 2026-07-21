@@ -14,6 +14,7 @@ from app.modules.db.models import (
 from app.notifiers.registry import get_notifier
 from app.notifiers.types import MATTERMOST_CHANNEL
 from app.services.calendar_service import build_rotation_calendar
+from app.modules.common import utc_now
 
 logger = logging.getLogger("oncall.shift_notifications")
 
@@ -184,8 +185,8 @@ def _get_or_create_log(user, rotation, event, event_type):
             "layer_id": event.get("layer_id"),
             "override_id": event.get("override_id"),
             "status": "pending",
-            "created_at": datetime.utcnow(),
-            "updated_at": datetime.utcnow(),
+            "created_at": utc_now(),
+            "updated_at": utc_now(),
         },
     )
 
@@ -195,10 +196,10 @@ def _get_or_create_log(user, rotation, event, event_type):
 def _mark_log(log, status, error=None):
     log.status = status
     log.last_error = error
-    log.updated_at = datetime.utcnow()
+    log.updated_at = utc_now()
 
     if status == "sent":
-        log.sent_at = datetime.utcnow()
+        log.sent_at = utc_now()
 
     log.save()
 
@@ -223,8 +224,8 @@ def _get_or_create_mattermost_log(user, rotation, event, event_type):
             "override_id": event.get("override_id"),
             "mattermost_user_id": mattermost_user_id,
             "status": "pending",
-            "created_at": datetime.utcnow(),
-            "updated_at": datetime.utcnow(),
+            "created_at": utc_now(),
+            "updated_at": utc_now(),
         },
     )
 
@@ -366,7 +367,7 @@ def send_due_oncall_shift_email_notifications(now=None, lookback_seconds=None):
     The scheduler runs periodically, so this job looks back a small window
     and uses OnCallShiftEmailNotification.fingerprint to avoid duplicates.
     """
-    now = now or datetime.utcnow()
+    now = now or utc_now()
 
     if lookback_seconds is None:
         lookback_seconds = int(
@@ -414,7 +415,7 @@ def send_due_oncall_shift_mattermost_notifications(now=None, lookback_seconds=No
     User.mattermost_user_id is set. End-of-shift messages are intentionally
     not sent to avoid noisy direct messages.
     """
-    now = now or datetime.utcnow()
+    now = now or utc_now()
 
     if lookback_seconds is None:
         lookback_seconds = int(

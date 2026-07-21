@@ -11,6 +11,7 @@ from app.modules.db import groups_repo, teams_repo, users_repo
 from app.modules.db.models import SsoGroupMapping, SsoIdentity, User, UserGroup
 from app.settings import Config
 from app.api.schemas.limits import normalize_phone
+from app.modules.common import utc_now
 
 
 class SsoLoginError(Exception):
@@ -253,7 +254,7 @@ def _resolve_sso_user(provider, claims):
         identity.email = email
         identity.username = username
         identity.raw_claims = raw_claims
-        identity.last_login_at = datetime.utcnow()
+        identity.last_login_at = utc_now()
         identity.save()
 
         return user
@@ -296,7 +297,7 @@ def _resolve_sso_user(provider, claims):
             email=email,
             username=username,
             raw_claims=raw_claims,
-            last_login_at=datetime.utcnow(),
+            last_login_at=utc_now(),
         )
     except IntegrityError:
         identity = SsoIdentity.get(

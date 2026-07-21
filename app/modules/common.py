@@ -1,3 +1,4 @@
+import datetime as dt
 from datetime import datetime, timezone as dt_timezone
 
 
@@ -70,3 +71,15 @@ def truncate_text(value, limit=500):
         return value
 
     return value[: limit - 1].rstrip() + "…"
+
+
+
+UTC = getattr(dt, "UTC", dt.timezone.utc)
+
+
+def utc_now() -> dt.datetime:
+    """Return current UTC time without tzinfo.
+
+    IncidentRelay stores timestamps as naive UTC values.
+    """
+    return dt.datetime.now(UTC).replace(tzinfo=None)

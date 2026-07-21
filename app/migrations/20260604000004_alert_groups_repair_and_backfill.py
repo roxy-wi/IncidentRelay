@@ -15,6 +15,7 @@ from app.modules.db.models import (
     AlertGroupMerge,
     AlertNotification,
 )
+from app.modules.common import utc_now
 
 
 db = init_database()
@@ -190,7 +191,7 @@ def _backfill_alert_groups():
 
     for alert in alerts:
         group_key = alert.group_key or alert.dedup_key or f"alert:{alert.id}"
-        now = datetime.utcnow()
+        now = utc_now()
         first_seen_at = alert.first_seen_at or now
         last_seen_at = alert.last_seen_at or first_seen_at
         status = alert.status or "firing"

@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from app.modules.db.models import ServiceStandard, ServiceStandardCheck
+from app.modules.common import utc_now
 
 
 APPLICABILITY_FIELDS = {
@@ -420,8 +421,8 @@ def create_service_standard(data, actor_user=None):
         values.get("applies_to")
     )
     values["created_by"] = actor_user.id if actor_user else None
-    values["created_at"] = datetime.utcnow()
-    values["updated_at"] = datetime.utcnow()
+    values["created_at"] = utc_now()
+    values["updated_at"] = utc_now()
 
     return ServiceStandard.create(**values)
 
@@ -437,7 +438,7 @@ def update_service_standard(standard, data):
     for field, value in values.items():
         setattr(standard, field, value)
 
-    standard.updated_at = datetime.utcnow()
+    standard.updated_at = utc_now()
     standard.save()
 
     return standard
@@ -445,7 +446,7 @@ def update_service_standard(standard, data):
 
 def delete_service_standard(standard):
     database = ServiceStandard._meta.database
-    now = datetime.utcnow()
+    now = utc_now()
 
     with database.atomic():
         ServiceStandardCheck.update(
@@ -497,8 +498,8 @@ def create_standard_check(standard, data):
         values.get("configuration"),
     )
     values["standard"] = standard.id
-    values["created_at"] = datetime.utcnow()
-    values["updated_at"] = datetime.utcnow()
+    values["created_at"] = utc_now()
+    values["updated_at"] = utc_now()
 
     return ServiceStandardCheck.create(**values)
 
@@ -516,7 +517,7 @@ def update_standard_check(check, data):
     for field, value in values.items():
         setattr(check, field, value)
 
-    check.updated_at = datetime.utcnow()
+    check.updated_at = utc_now()
     check.save()
 
     return check
@@ -525,7 +526,7 @@ def update_standard_check(check, data):
 def delete_standard_check(check):
     check.deleted = True
     check.enabled = False
-    check.updated_at = datetime.utcnow()
+    check.updated_at = utc_now()
     check.save()
 
     return check

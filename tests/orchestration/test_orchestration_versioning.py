@@ -74,7 +74,7 @@ def _rules(service_id=None):
                         "operator": "eq",
                         "value": "database",
                     },
-                    "actions": [{"type": "add_label", "key": "tier", "value": "data"}],
+                    "actions": [{"type": "set_label", "name": "tier", "value": "data"}],
                     "processing_mode": "stop",
                 }
             ],

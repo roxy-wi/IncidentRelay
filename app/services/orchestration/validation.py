@@ -4,6 +4,8 @@ from __future__ import annotations
 
 from typing import Any, Dict, List
 
+# EVENT ORCHESTRATION WS3 ACTION VALIDATION
+from .actions import validate_action_list
 from .conditions import validate_condition_tree
 from .errors import ValidationIssue
 from .templates import find_templates, validate_template
@@ -25,6 +27,8 @@ def validate_rule_definition(
             ValidationIssue(f"{path}.actions", "invalid_actions", "actions must be a list")
         )
         return {"errors": errors, "warnings": warnings}
+
+    errors.extend(validate_action_list(actions, path=f"{path}.actions"))
 
     for index, action in enumerate(actions):
         action_path = f"{path}.actions[{index}]"

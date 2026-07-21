@@ -18,6 +18,7 @@ from tests.factories import (
     create_team,
     create_user,
 )
+from app.modules.common import utc_now
 
 
 def _create_alert_route(*, rotation=None):
@@ -69,7 +70,7 @@ def test_due_group_notification_without_delivery_target_is_skipped(db, monkeypat
     )
 
     alert_group.notification_pending = True
-    alert_group.notification_due_at = datetime.utcnow() - timedelta(seconds=1)
+    alert_group.notification_due_at = utc_now() - timedelta(seconds=1)
     alert_group.notification_reason = "notification"
     alert_group.last_notification_at = None
     alert_group.status = "firing"
@@ -121,10 +122,10 @@ def test_due_group_update_without_delivery_target_does_not_change_last_notificat
         dedup_key="dedup-due-update-no-target",
     )
 
-    previous_notification_at = datetime.utcnow() - timedelta(minutes=10)
+    previous_notification_at = utc_now() - timedelta(minutes=10)
 
     alert_group.notification_pending = True
-    alert_group.notification_due_at = datetime.utcnow() - timedelta(seconds=1)
+    alert_group.notification_due_at = utc_now() - timedelta(seconds=1)
     alert_group.notification_reason = "update"
     alert_group.last_notification_at = previous_notification_at
     alert_group.status = "firing"
@@ -172,9 +173,9 @@ def test_send_unacked_reminders_skips_group_with_pending_notification(db, monkey
 
     alert_group.status = "firing"
     alert_group.notification_pending = True
-    alert_group.notification_due_at = datetime.utcnow() + timedelta(seconds=30)
+    alert_group.notification_due_at = utc_now() + timedelta(seconds=30)
     alert_group.notification_reason = "notification"
-    alert_group.last_notification_at = datetime.utcnow() - timedelta(minutes=10)
+    alert_group.last_notification_at = utc_now() - timedelta(minutes=10)
     alert_group.reminder_count = 0
     alert_group.save()
 
@@ -415,7 +416,7 @@ def test_due_route_less_group_notification_uses_service_policy(db, monkeypatch):
         alert_count=1,
         firing_count=1,
         notification_pending=True,
-        notification_due_at=datetime.utcnow() - timedelta(seconds=1),
+        notification_due_at=utc_now() - timedelta(seconds=1),
         notification_reason="notification",
         last_notification_at=None,
     )

@@ -10,6 +10,7 @@ from app.modules.db.models import (
     TeamUser,
     User,
 )
+from app.modules.common import utc_now
 
 
 def list_policies(team_id=None, team_ids=None, enabled_only=False, include_deleted=False):
@@ -74,7 +75,7 @@ def update_policy(policy_id, data):
         if field in data:
             setattr(policy, field, data[field])
 
-    policy.updated_at = datetime.utcnow()
+    policy.updated_at = utc_now()
     policy.save()
     return policy
 
@@ -84,8 +85,8 @@ def soft_delete_policy(policy_id):
     policy = get_policy(policy_id)
     policy.enabled = False
     policy.deleted = True
-    policy.deleted_at = datetime.utcnow()
-    policy.updated_at = datetime.utcnow()
+    policy.deleted_at = utc_now()
+    policy.updated_at = utc_now()
     policy.save()
     return policy
 
@@ -194,7 +195,7 @@ def update_rule(rule_id, data):
         elif rule.target_type == "user":
             rule.target_user = target_id
 
-    rule.updated_at = datetime.utcnow()
+    rule.updated_at = utc_now()
     rule.save()
     return rule
 

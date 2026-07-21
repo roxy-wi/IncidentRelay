@@ -8,6 +8,7 @@ from flask import jsonify, request
 from app.middleware import load_jwt_user
 from app.modules.db import routes_repo, tokens_repo
 from app.settings import Config
+from app.modules.common import utc_now
 
 
 def create_raw_token():
@@ -73,7 +74,7 @@ def authenticate_api_token(raw_token=None):
         request.current_api_token = None
         return None
 
-    if api_token.expires_at and api_token.expires_at <= datetime.utcnow():
+    if api_token.expires_at and api_token.expires_at <= utc_now():
         request.current_api_token = None
         return None
 

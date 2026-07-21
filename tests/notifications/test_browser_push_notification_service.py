@@ -11,10 +11,11 @@ from tests.factories import (
     create_team,
     create_user,
 )
+from app.modules.common import utc_now
 
 
 def create_push_subscription(user):
-    now = datetime.utcnow()
+    now = utc_now()
 
     return BrowserPushSubscription.create(
         user=user.id,

@@ -12,6 +12,7 @@ from tests.factories import (
     create_team,
     create_user,
 )
+from app.modules.common import utc_now
 
 
 def _fixture():
@@ -38,7 +39,7 @@ def _create_instance(heartbeat, instance_key, *, now, status="ok", enabled=True)
 
 def test_overdue_instance_check_does_not_duplicate_existing_alert_group(db):
     _, team, service, route = _fixture()
-    now = datetime.utcnow()
+    now = utc_now()
     heartbeat = create_heartbeat(
         team,
         route,
@@ -69,7 +70,7 @@ def test_overdue_instance_check_does_not_duplicate_existing_alert_group(db):
 
 def test_disabled_instance_does_not_create_overdue_alert(db):
     _, team, service, route = _fixture()
-    now = datetime.utcnow()
+    now = utc_now()
     heartbeat = create_heartbeat(
         team,
         route,
@@ -93,7 +94,7 @@ def test_disabled_instance_does_not_create_overdue_alert(db):
 
 def test_recovering_one_instance_does_not_hide_second_overdue_instance(db):
     _, team, service, route = _fixture()
-    now = datetime.utcnow()
+    now = utc_now()
     heartbeat = create_heartbeat(
         team,
         route,

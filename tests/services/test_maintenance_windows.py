@@ -17,6 +17,7 @@ from tests.factories import (
 )
 from app.modules.db.models import AuditLog
 from app.modules.common import as_naive_datetime, as_utc_aware
+from app.modules.common import utc_now
 
 
 def response_items(response):
@@ -172,7 +173,7 @@ def assert_no_pending_group_notification(incident):
 
 
 def create_window_payload(scope, *, behavior="suppress_notifications"):
-    now = datetime.utcnow()
+    now = utc_now()
 
     return {
         "name": "Payments deploy",
@@ -230,7 +231,7 @@ def test_create_maintenance_window_requires_scope(client, db):
 
 def test_create_maintenance_window_rejects_invalid_dates(client, db):
     group, team, route, service, user, headers = create_manager_context()
-    now = datetime.utcnow()
+    now = utc_now()
 
     response = client.post(
         "/api/maintenance-windows",
@@ -430,7 +431,7 @@ def create_active_service_maintenance_window(
     service,
     behavior="create_maintenance_incident",
 ):
-    now = datetime.utcnow()
+    now = utc_now()
 
     window = MaintenanceWindow.create(
         group=team.group,
@@ -947,7 +948,7 @@ def test_recurring_maintenance_window_api_returns_active_occurrence(client, db):
 
 
 def create_active_team_maintenance_window(*, team, behavior="suppress_notifications"):
-    now = datetime.utcnow()
+    now = utc_now()
 
     window = MaintenanceWindow.create(
         group=team.group,
@@ -1085,7 +1086,7 @@ def test_route_serializer_returns_active_team_maintenance(client, db):
 def test_service_serializer_does_not_return_finished_maintenance(client, db):
     group, team, route, service, user, headers = create_manager_context()
 
-    now = datetime.utcnow()
+    now = utc_now()
 
     window = MaintenanceWindow.create(
         group=team.group,

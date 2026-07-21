@@ -7,6 +7,7 @@ from flask import Response, g, request
 from app.modules.db import tokens_repo
 from app.modules.db.models import User
 from app.services.integrations.auth import hash_token, token_has_scope
+from app.modules.common import utc_now
 
 CALDAV_REQUIRED_SCOPES = ["calendar:read"]
 
@@ -63,7 +64,7 @@ def authenticate_caldav_user(username, token):
     if not api_token:
         return None
 
-    if api_token.expires_at and api_token.expires_at <= datetime.utcnow():
+    if api_token.expires_at and api_token.expires_at <= utc_now():
         return None
 
     if not api_token.user or api_token.user.id != user.id:

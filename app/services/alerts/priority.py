@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from app.modules.db import incidents_repo, alerts_repo
+from app.modules.common import utc_now
 
 PRIORITY_DISPLAY_LABELS = {
     "p1": "P1 Critical",
@@ -147,7 +148,7 @@ def _save_auto_priority(group, priority, *, event_type, message):
     group.priority_slug = priority.slug
     group.priority_order = priority.level
     group.priority_set_manually = False
-    group.updated_at = datetime.utcnow()
+    group.updated_at = utc_now()
 
     group.save(only=[
         group.__class__.priority,

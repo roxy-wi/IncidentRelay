@@ -6,6 +6,7 @@ from peewee import DoesNotExist
 
 from app.modules.db import channels_repo, rotations_repo, routes_repo, teams_repo
 from app.services.oncall import get_current_oncall_user
+from app.modules.common import utc_now
 
 DEFAULT_HEALTH_WINDOW_DAYS = 7
 DEFAULT_HEALTH_SAMPLE_MINUTES = 60
@@ -61,7 +62,7 @@ class HealthIssue:
 
 
 def utc_now_naive() -> datetime:
-    return datetime.utcnow().replace(microsecond=0)
+    return utc_now().replace(microsecond=0)
 
 
 def as_utc_naive(value: datetime | None) -> datetime | None:

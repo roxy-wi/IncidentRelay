@@ -13,10 +13,11 @@ from app.modules.db.models import (
 from app.services.business_services.impact import refresh_business_impacts_for_group
 from app.services.business_services.status import apply_business_service_status
 from tests.factories import create_group, create_impact_alert_group, create_service, create_team, unique
+from app.modules.common import utc_now
 
 
 def create_unmapped_alert_group(team, status="firing"):
-    now = datetime.utcnow()
+    now = utc_now()
     fingerprint = unique("business-impact-no-service")
 
     labels = {

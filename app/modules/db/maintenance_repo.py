@@ -9,6 +9,7 @@ from app.modules.db.models import (
     MaintenanceWindowScope,
 )
 from app.modules.common import as_naive_datetime
+from app.modules.common import utc_now
 
 
 ACTIVE_STATUSES = ("scheduled", "active")
@@ -364,7 +365,7 @@ def cancel_maintenance_window(window, *, cancelled_by=None, reason=None):
     window.status = "cancelled"
     window.enabled = False
     window.cancelled_by = cancelled_by
-    window.cancelled_at = datetime.utcnow()
+    window.cancelled_at = utc_now()
     window.cancel_reason = str(reason or "").strip() or None
     window.save()
 
@@ -390,7 +391,7 @@ def replace_maintenance_window_scopes(window_id, scopes):
                 team=scope.get("team_id"),
                 service=scope.get("service_id"),
                 route=scope.get("route_id"),
-                created_at=datetime.utcnow(),
+                created_at=utc_now(),
             )
         )
 

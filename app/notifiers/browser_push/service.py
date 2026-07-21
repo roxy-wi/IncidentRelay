@@ -21,6 +21,7 @@ from app.services.alerts.priority import (
     alert_priority_short_label,
     format_alert_title_with_priority,
 )
+from app.modules.common import utc_now
 
 
 logger = logging.getLogger("oncall.notifications")
@@ -72,7 +73,7 @@ def save_user_subscription(user, endpoint, keys, device_name=None, user_agent=No
         BrowserPushSubscription.endpoint == endpoint
     )
 
-    now = datetime.utcnow()
+    now = utc_now()
 
     if not subscription:
         return BrowserPushSubscription.create(
@@ -115,8 +116,8 @@ def disable_user_subscription(user, subscription_id):
 
     subscription.enabled = False
     subscription.deleted = True
-    subscription.deleted_at = datetime.utcnow()
-    subscription.updated_at = datetime.utcnow()
+    subscription.deleted_at = utc_now()
+    subscription.updated_at = utc_now()
     subscription.save()
 
     return subscription
@@ -135,7 +136,7 @@ def create_action_token(user, group, action):
         group=group.id,
         action=action,
         token_hash=_hash_token(raw_token),
-        expires_at=datetime.utcnow() + timedelta(seconds=ttl),
+        expires_at=utc_now() + timedelta(seconds=ttl),
     )
 
     return raw_token
@@ -243,7 +244,7 @@ def send_alert_push_to_user(user, group, event_type="notification"):
     for subscription in subscriptions:
         try:
             _webpush(subscription, payload)
-            subscription.last_seen_at = datetime.utcnow()
+            subscription.last_seen_at = utc_now()
             subscription.save()
             sent += 1
         except WebPushException as exc:
@@ -252,8 +253,8 @@ def send_alert_push_to_user(user, group, event_type="notification"):
             if status_code in {404, 410}:
                 subscription.enabled = False
                 subscription.deleted = True
-                subscription.deleted_at = datetime.utcnow()
-                subscription.updated_at = datetime.utcnow()
+                subscription.deleted_at = utc_now()
+                subscription.updated_at = utc_now()
                 subscription.save()
 
             logger.warning(
@@ -410,7 +411,7 @@ def send_stakeholder_push_to_user(
     for subscription in subscriptions:
         try:
             _webpush(subscription, payload)
-            subscription.last_seen_at = datetime.utcnow()
+            subscription.last_seen_at = utc_now()
             subscription.save()
             sent += 1
         except WebPushException as exc:
@@ -423,8 +424,8 @@ def send_stakeholder_push_to_user(
             if status_code in {404, 410}:
                 subscription.enabled = False
                 subscription.deleted = True
-                subscription.deleted_at = datetime.utcnow()
-                subscription.updated_at = datetime.utcnow()
+                subscription.deleted_at = utc_now()
+                subscription.updated_at = utc_now()
                 subscription.save()
 
             logger.warning(
@@ -460,7 +461,7 @@ def send_test_push(user):
     for subscription in _active_user_subscriptions(user.id):
         try:
             _webpush(subscription, payload)
-            subscription.last_seen_at = datetime.utcnow()
+            subscription.last_seen_at = utc_now()
             subscription.save()
             sent += 1
         except WebPushException as exc:
@@ -469,8 +470,8 @@ def send_test_push(user):
             if status_code in {404, 410}:
                 subscription.enabled = False
                 subscription.deleted = True
-                subscription.deleted_at = datetime.utcnow()
-                subscription.updated_at = datetime.utcnow()
+                subscription.deleted_at = utc_now()
+                subscription.updated_at = utc_now()
                 subscription.save()
 
             logger.warning(
@@ -497,7 +498,7 @@ def execute_push_action(token, action):
         return {"ok": False, "error": "missing_token"}
 
     token_hash = _hash_token(token)
-    now = datetime.utcnow()
+    now = utc_now()
 
     record = BrowserPushActionToken.get_or_none(
         BrowserPushActionToken.token_hash == token_hash

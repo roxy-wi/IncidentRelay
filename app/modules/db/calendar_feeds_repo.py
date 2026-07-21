@@ -3,6 +3,7 @@
 from datetime import datetime
 
 from app.modules.db.models import CalendarFeed
+from app.modules.common import utc_now
 
 
 def list_calendar_feeds(team_id):
@@ -62,13 +63,13 @@ def update_calendar_feed(feed, **fields):
 
 
 def mark_calendar_feed_used(feed):
-    feed.last_used_at = datetime.utcnow()
+    feed.last_used_at = utc_now()
     feed.save(only=[CalendarFeed.last_used_at])
 
 
 def soft_delete_calendar_feed(feed):
     feed.deleted = True
-    feed.deleted_at = datetime.utcnow()
+    feed.deleted_at = utc_now()
     feed.enabled = False
     feed.save(
         only=[

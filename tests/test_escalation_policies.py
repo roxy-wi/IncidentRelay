@@ -18,6 +18,7 @@ from tests.factories import (
     create_user,
     unique,
 )
+from app.modules.common import utc_now
 
 
 def normalized_alert(**overrides):
@@ -234,7 +235,7 @@ def test_policy_escalation_moves_alert_to_next_rule(monkeypatch, db):
     assert alert_group.escalation_rule.id == first_rule.id
     assert alert_group.assignee.id == first_user.id
 
-    alert_group.next_escalation_at = datetime.utcnow() - timedelta(seconds=1)
+    alert_group.next_escalation_at = utc_now() - timedelta(seconds=1)
     alert_group.save()
 
     calls = []
@@ -303,7 +304,7 @@ def test_policy_alert_ignores_team_escalation_after_reminders(monkeypatch, db):
     assert created is True
 
     alert_group.reminder_count = 10
-    alert_group.next_escalation_at = datetime.utcnow() + timedelta(minutes=30)
+    alert_group.next_escalation_at = utc_now() + timedelta(minutes=30)
     alert_group.save()
 
     assert maybe_escalate_alert(alert_group) is False
@@ -355,7 +356,7 @@ def test_policy_escalation_runs_when_reminder_interval_is_disabled(monkeypatch, 
 
     assert created is True
 
-    alert_group.next_escalation_at = datetime.utcnow() - timedelta(seconds=1)
+    alert_group.next_escalation_at = utc_now() - timedelta(seconds=1)
     alert_group.save()
 
     assert send_unacked_reminders() == 1

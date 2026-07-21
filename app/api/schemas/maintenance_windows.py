@@ -7,6 +7,7 @@ from pydantic import Field, field_validator, model_validator
 
 from app.api.schemas.base import ApiModel
 from app.modules.common import as_naive_datetime
+from app.modules.common import utc_now
 
 
 MAINTENANCE_WINDOW_NAME_MAX_LENGTH = 255
@@ -210,7 +211,7 @@ class MaintenanceWindowExtendSchema(ApiModel):
 
     @model_validator(mode="after")
     def validate_ends_at(self):
-        if self.ends_at <= datetime.utcnow():
+        if self.ends_at <= utc_now():
             raise ValueError("ends_at must be in the future")
 
         return self

@@ -9,6 +9,7 @@ from app.modules.db.models import (
     PriorityPolicyRule,
     Service,
 )
+from app.modules.common import utc_now
 
 
 def list_priority_policies(
@@ -129,8 +130,8 @@ def create_priority_policy(
         source_priority_mode=source_priority_mode,
         fallback_mode=fallback_mode,
         fallback_priority=fallback_priority_id,
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
+        created_at=utc_now(),
+        updated_at=utc_now(),
     )
 
 
@@ -159,7 +160,7 @@ def restore_priority_policy(
     policy.fallback_priority = fallback_priority_id
     policy.deleted = False
     policy.deleted_at = None
-    policy.updated_at = datetime.utcnow()
+    policy.updated_at = utc_now()
     policy.save()
 
     return policy
@@ -184,7 +185,7 @@ def update_priority_policy(policy_id, data):
         if field in allowed_fields:
             setattr(policy, field, value)
 
-    policy.updated_at = datetime.utcnow()
+    policy.updated_at = utc_now()
     policy.save()
 
     return policy
@@ -194,7 +195,7 @@ def clear_default_priority_policies(team_id, *, exclude_policy_id=None):
     """Clear the default flag from policies owned by a team."""
     query = PriorityPolicy.update(
         default_for_team=False,
-        updated_at=datetime.utcnow(),
+        updated_at=utc_now(),
     ).where(
         PriorityPolicy.team == team_id,
         PriorityPolicy.default_for_team == True,
@@ -210,7 +211,7 @@ def clear_default_priority_policies(team_id, *, exclude_policy_id=None):
 def soft_delete_priority_policy(policy_id):
     """Soft-delete a policy and all of its rules."""
     policy = get_priority_policy(policy_id)
-    now = datetime.utcnow()
+    now = utc_now()
 
     with database_proxy.atomic():
         rules = list_priority_policy_rules(policy.id)
@@ -369,8 +370,8 @@ def create_priority_policy_rule(
         matcher_preset=matcher_preset_id,
         priority=priority_id,
         enabled=enabled,
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
+        created_at=utc_now(),
+        updated_at=utc_now(),
     )
 
 
@@ -392,7 +393,7 @@ def update_priority_policy_rule(rule_id, data):
         if field in allowed_fields:
             setattr(rule, field, value)
 
-    rule.updated_at = datetime.utcnow()
+    rule.updated_at = utc_now()
     rule.save()
 
     return rule
@@ -401,7 +402,7 @@ def update_priority_policy_rule(rule_id, data):
 def soft_delete_priority_policy_rule(rule_id):
     """Soft-delete one priority policy rule."""
     rule = get_priority_policy_rule(rule_id)
-    now = datetime.utcnow()
+    now = utc_now()
 
     rule.enabled = False
     rule.deleted = True
@@ -427,7 +428,7 @@ def reorder_priority_policy_rules(policy_id, ordered_rule_ids):
             (
                 PriorityPolicyRule.update(
                     position=temporary_position + index,
-                    updated_at=datetime.utcnow(),
+                    updated_at=utc_now(),
                 )
                 .where(
                     PriorityPolicyRule.id == rule_id,
@@ -441,7 +442,7 @@ def reorder_priority_policy_rules(policy_id, ordered_rule_ids):
             (
                 PriorityPolicyRule.update(
                     position=position,
-                    updated_at=datetime.utcnow(),
+                    updated_at=utc_now(),
                 )
                 .where(
                     PriorityPolicyRule.id == rule_id,

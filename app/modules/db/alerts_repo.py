@@ -26,6 +26,7 @@ from app.modules.db.query_filters import (
     apply_field_values_filter,
     normalize_filter_values,
 )
+from app.modules.common import utc_now
 
 
 MAX_ALERTS_PAGE_SIZE = 100
@@ -524,7 +525,7 @@ def _collect_group_labels(alerts):
 def recalculate_alert_group(group):
     """Recalculate alert group counters, labels and effective status."""
 
-    now = datetime.utcnow()
+    now = utc_now()
 
     alerts = list(
         Alert
@@ -632,7 +633,7 @@ def acknowledge_alert_group(group_id, user_id=None):
     group.previous_status = group.status
     group.status = "acknowledged"
     group.acknowledged_by = user_id
-    group.acknowledged_at = datetime.utcnow()
+    group.acknowledged_at = utc_now()
     group.save()
     return group
 
@@ -640,7 +641,7 @@ def acknowledge_alert_group(group_id, user_id=None):
 def resolve_alert_group(group_id, user_id=None):
     """Resolve alert group and all child alerts."""
 
-    now = datetime.utcnow()
+    now = utc_now()
     group = AlertGroup.get_by_id(group_id)
 
     (
@@ -709,7 +710,7 @@ def merge_alert_groups(target_group_id, source_group_ids, user_id=None, reason=N
     """Merge source groups into target group."""
 
     target = AlertGroup.get_by_id(target_group_id)
-    now = datetime.utcnow()
+    now = utc_now()
 
     for source_id in source_group_ids:
         if int(source_id) == int(target_group_id):
@@ -836,12 +837,12 @@ def update_alert_from_payload(alert, alert_data, status, group_key):
     """
     Update an alert from normalized payload data.
     """
-    now = datetime.utcnow()
+    now = utc_now()
 
     alert.last_seen_at = now
     previous_status = alert.status
     alert.previous_status = previous_status
-    alert.last_seen_at = datetime.utcnow()
+    alert.last_seen_at = utc_now()
     alert.payload = alert_data.get("payload")
     alert.labels = alert_data.get("labels")
     alert.message = alert_data.get("message")
@@ -894,7 +895,7 @@ def schedule_alert_group_notification(group, due_at, reason="notification"):
     group.notification_pending = True
     group.notification_due_at = due_at
     group.notification_reason = reason
-    group.updated_at = datetime.utcnow()
+    group.updated_at = utc_now()
     group.save()
 
     return group
@@ -906,7 +907,7 @@ def clear_alert_group_notification(group):
     group.notification_pending = False
     group.notification_due_at = None
     group.notification_reason = None
-    group.updated_at = datetime.utcnow()
+    group.updated_at = utc_now()
     group.save()
 
     return group
@@ -915,7 +916,7 @@ def clear_alert_group_notification(group):
 def mark_alert_group_notification_sent(group, now=None):
     """Mark group notification as sent."""
 
-    now = now or datetime.utcnow()
+    now = now or utc_now()
 
     group.notification_pending = False
     group.notification_due_at = None
@@ -930,7 +931,7 @@ def mark_alert_group_notification_sent(group, now=None):
 def list_due_alert_group_notifications(now=None, limit=100):
     """Return groups with due pending notifications."""
 
-    now = now or datetime.utcnow()
+    now = now or utc_now()
 
     return list(
         AlertGroup
@@ -962,8 +963,8 @@ def create_alert_comment(
         alert=alert_id,
         user=user_id,
         body=body,
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
+        created_at=utc_now(),
+        updated_at=utc_now(),
     )
 
 
@@ -1016,8 +1017,8 @@ def soft_delete_alert_comment(comment_id: int) -> bool:
         AlertComment
         .update(
             deleted=True,
-            deleted_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
+            deleted_at=utc_now(),
+            updated_at=utc_now(),
         )
         .where(
             AlertComment.id == comment_id,
@@ -1043,7 +1044,7 @@ def update_alert_comment(
         return None
 
     comment.body = body
-    comment.updated_at = datetime.utcnow()
+    comment.updated_at = utc_now()
     comment.save(only=[
         AlertComment.body,
         AlertComment.updated_at,
@@ -1160,7 +1161,7 @@ def finish_alert_explain_trace(
     trace.outcome = outcome
     trace.reason = reason
     trace.result = result or {}
-    trace.finished_at = finished_at or datetime.utcnow()
+    trace.finished_at = finished_at or utc_now()
 
     trace.save(
         only=[

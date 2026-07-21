@@ -29,6 +29,7 @@ from app.modules.db.models import (
     MatcherPreset,
     Heartbeat,
 )
+from app.modules.common import utc_now
 
 _counter = 0
 
@@ -119,7 +120,7 @@ def create_rotation(
         team_id=team.id,
         name=name or unique("Rotation"),
         description=None,
-        start_at=start_at or datetime.utcnow().replace(microsecond=0),
+        start_at=start_at or utc_now().replace(microsecond=0),
         duration_seconds=duration_seconds,
         reminder_interval_seconds=300,
         rotation_type="daily",
@@ -156,8 +157,8 @@ def create_rotation_override(
     starts_at: datetime | None = None,
     ends_at: datetime | None = None,
 ) -> RotationOverride:
-    starts_at = starts_at or datetime.utcnow() - timedelta(minutes=5)
-    ends_at = ends_at or datetime.utcnow() + timedelta(minutes=5)
+    starts_at = starts_at or utc_now() - timedelta(minutes=5)
+    ends_at = ends_at or utc_now() + timedelta(minutes=5)
     return RotationOverride.create(
         rotation=rotation,
         user=user,
@@ -257,8 +258,8 @@ def create_silence(
         reason="test silence",
         matcher_preset=matcher_preset,
         matchers=matchers or {},
-        starts_at=starts_at or datetime.utcnow() - timedelta(minutes=5),
-        ends_at=ends_at or datetime.utcnow() + timedelta(minutes=5),
+        starts_at=starts_at or utc_now() - timedelta(minutes=5),
+        ends_at=ends_at or utc_now() + timedelta(minutes=5),
         enabled=True,
     )
 
@@ -350,7 +351,7 @@ def create_impact_alert_group(
     priority_order=None,
     priority_set_manually=False,
 ):
-    now = datetime.utcnow()
+    now = utc_now()
     alertname = alertname or (service.slug + "-alert")
     summary = summary or (service.name + " alert")
     fingerprint = fingerprint or unique(service.slug + "-alert-group")

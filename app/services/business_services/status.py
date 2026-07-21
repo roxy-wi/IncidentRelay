@@ -11,6 +11,7 @@ from app.services.service_catalog.impact_scoring import (
     combined_impact_score,
     status_from_impact_score,
 )
+from app.modules.common import utc_now
 
 logger = logging.getLogger("oncall.business_services")
 
@@ -50,7 +51,7 @@ def is_business_service_manual_status_active(business_service, now=None):
     if until is None:
         return True
 
-    now = now or datetime.utcnow()
+    now = now or utc_now()
 
     return until > now
 
@@ -64,7 +65,7 @@ def clear_expired_business_service_manual_status(business_service, now=None):
     if until is None:
         return False
 
-    now = now or datetime.utcnow()
+    now = now or utc_now()
 
     if until > now:
         return False
@@ -331,7 +332,7 @@ def apply_business_service_status(business_service):
         or old_message != new_message
     )
 
-    now = datetime.utcnow()
+    now = utc_now()
 
     business_service.status = new_status
     business_service.status_source = new_source

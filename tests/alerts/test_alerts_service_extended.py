@@ -22,6 +22,7 @@ from tests.factories import (
     create_team,
     create_user,
 )
+from app.modules.common import utc_now
 
 
 def normalized_alert(**overrides):
@@ -172,7 +173,7 @@ def test_upsert_alert_resolves_existing_alert_and_notifies(monkeypatch, db):
 
     assert created is True
 
-    alert_group.last_notification_at = datetime.utcnow()
+    alert_group.last_notification_at = utc_now()
     alert_group.save()
 
     calls = []
@@ -323,7 +324,7 @@ def test_reminder_interval_uses_rotation_before_global_config(db, monkeypatch):
         instance="host1",
     )
 
-    now = datetime.utcnow()
+    now = utc_now()
     alert_group.last_notification_at = now - timedelta(seconds=31)
     alert_group.notification_pending = False
     alert_group.notification_due_at = None
@@ -372,7 +373,7 @@ def test_send_unacked_reminders_counts_only_successful_sends(monkeypatch, db):
 
     assert successful_group.id != failed_group.id
 
-    now = datetime.utcnow()
+    now = utc_now()
     for alert_group in (successful_group, failed_group):
         alert_group = AlertGroup.get_by_id(alert_group.id)
         alert_group.rotation = rotation.id
@@ -457,7 +458,7 @@ def test_zero_reminder_interval_disables_reminders(db):
     alert_group.last_notification_at = None
 
     assert get_alert_reminder_interval(alert_group) == 0
-    assert should_send_reminder(alert_group, datetime.utcnow()) is False
+    assert should_send_reminder(alert_group, utc_now()) is False
 
 
 def test_send_unacked_reminders_does_not_increment_when_no_notification_was_sent(

@@ -48,6 +48,7 @@ from app.notifiers.slack.actions import (
     SlackActionError,
     handle_slack_action,
 )
+from app.modules.common import utc_now
 
 integrations_bp = Blueprint("integrations_api", __name__)
 
@@ -625,7 +626,7 @@ def voice_rule_callback(delivery_id, secret):
 def _process_voice_rule_callback_event(delivery, event):
     delivery.provider_status = event.status
     delivery.provider_payload = event.raw
-    delivery.updated_at = datetime.utcnow()
+    delivery.updated_at = utc_now()
     delivery.save()
 
     alert = delivery.alert

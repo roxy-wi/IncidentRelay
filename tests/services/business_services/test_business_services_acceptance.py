@@ -9,6 +9,7 @@ from app.modules.db.models import (
 from app.services.business_services.impact import refresh_business_impacts_for_group
 from app.services.business_services.status import apply_business_service_status
 from tests.factories import create_group, create_impact_alert_group, create_service, create_team, unique
+from app.modules.common import utc_now
 
 
 def create_business_service_with_component():
@@ -142,7 +143,7 @@ def test_manual_status_set_and_clear_return_details_payload(client, db, auth_hea
         json={
             "status": "degraded",
             "message": "Limited customer impact",
-            "until": (datetime.utcnow() + timedelta(hours=1)).isoformat(),
+            "until": (utc_now() + timedelta(hours=1)).isoformat(),
         },
         headers=auth_headers,
     )

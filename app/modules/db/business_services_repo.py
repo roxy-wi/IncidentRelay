@@ -9,6 +9,7 @@ from app.modules.db.models import (
     BusinessServiceStatusHistory,
     Service,
 )
+from app.modules.common import utc_now
 
 
 def set_business_service_manual_status(
@@ -18,7 +19,7 @@ def set_business_service_manual_status(
     until=None,
     user_id=None,
 ):
-    now = datetime.utcnow()
+    now = utc_now()
 
     BusinessService.update(
         manual_status=manual_status,
@@ -33,7 +34,7 @@ def set_business_service_manual_status(
 
 
 def clear_business_service_manual_status(business_service_id):
-    now = datetime.utcnow()
+    now = utc_now()
 
     BusinessService.update(
         manual_status=None,
@@ -91,7 +92,7 @@ def list_business_services(group_id=None, public_only=False, active_only=True):
 
 def create_business_service(data):
     data = dict(data)
-    now = datetime.utcnow()
+    now = utc_now()
     data.setdefault("status", "unknown")
     data.setdefault("status_source", "calculated")
     data.setdefault("created_at", now)
@@ -105,7 +106,7 @@ def update_business_service(business_service_id, data):
     for field, value in data.items():
         setattr(business_service, field, value)
 
-    business_service.updated_at = datetime.utcnow()
+    business_service.updated_at = utc_now()
     business_service.save()
 
     return business_service
@@ -113,7 +114,7 @@ def update_business_service(business_service_id, data):
 
 def soft_delete_business_service(business_service_id):
     business_service = get_business_service(business_service_id)
-    now = datetime.utcnow()
+    now = utc_now()
     business_service.deleted = True
     business_service.deleted_at = now
     business_service.enabled = False
@@ -192,7 +193,7 @@ def list_components_for_service(service_id, active_only=True):
 
 def create_business_service_component(business_service_id, data):
     data = dict(data)
-    now = datetime.utcnow()
+    now = utc_now()
     data["business_service"] = business_service_id
     data.setdefault("created_at", now)
     data["updated_at"] = now
@@ -205,7 +206,7 @@ def update_business_service_component(component_id, data):
     for field, value in data.items():
         setattr(component, field, value)
 
-    component.updated_at = datetime.utcnow()
+    component.updated_at = utc_now()
     component.save()
 
     return component
@@ -254,7 +255,7 @@ def count_components_by_business_service_ids(business_service_ids, active_only=T
 
 def soft_delete_business_service_component(component_id):
     component = BusinessServiceComponent.get_by_id(component_id)
-    now = datetime.utcnow()
+    now = utc_now()
     component.deleted = True
     component.deleted_at = now
     component.enabled = False
@@ -313,7 +314,7 @@ def upsert_incident_impact(
     reason=None,
     component_snapshot=None,
 ):
-    now = datetime.utcnow()
+    now = utc_now()
 
     impact, created = BusinessServiceIncidentImpact.get_or_create(
         business_service=business_service.id,
@@ -349,7 +350,7 @@ def upsert_incident_impact(
 
 
 def deactivate_incident_impacts_for_group(group_id):
-    now = datetime.utcnow()
+    now = utc_now()
 
     return (
         BusinessServiceIncidentImpact

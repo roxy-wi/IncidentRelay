@@ -20,6 +20,7 @@ from app.services.orchestration.validation import (
     issues_to_messages,
     validate_rule_definition,
 )
+from app.modules.common import utc_now
 
 
 VALID_SCOPES = {"global", "service"}
@@ -88,7 +89,7 @@ def definition_hash(definition: Dict[str, Any]) -> str:
 
 
 def _utcnow() -> datetime:
-    return datetime.utcnow()
+    return utc_now()
 
 
 def _get_orchestration(orchestration_id: int) -> EventOrchestration:

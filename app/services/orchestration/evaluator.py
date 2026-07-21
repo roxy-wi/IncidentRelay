@@ -66,3 +66,16 @@ __all__ = [
     "extract_variables",
     "render_template",
 ]
+
+# BEGIN EVENT ORCHESTRATION WS3 EXPORTS
+from .actions import ActionExecutionResult, EventActionState, execute_actions
+from .engine import OrchestrationExecutionResult, execute_rule_tree
+
+__all__ += [
+    "ActionExecutionResult",
+    "EventActionState",
+    "OrchestrationExecutionResult",
+    "execute_actions",
+    "execute_rule_tree",
+]
+# END EVENT ORCHESTRATION WS3 EXPORTS

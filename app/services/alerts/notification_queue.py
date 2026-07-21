@@ -4,6 +4,7 @@ from datetime import datetime, timedelta
 from app import Config
 from app.modules.db import alerts_repo
 from app.services.notifications.delivery import notify_alert
+from app.modules.common import utc_now
 
 logger = logging.getLogger("oncall.alerts")
 
@@ -19,7 +20,7 @@ def _alert_group_interval_seconds():
 def schedule_group_notification(group, reason="notification", now=None):
     """Schedule group notification according to group_wait/group_interval."""
 
-    now = now or datetime.utcnow()
+    now = now or utc_now()
 
     if group.status != "firing":
         alerts_repo.clear_alert_group_notification(group)
@@ -45,7 +46,7 @@ def schedule_group_notification(group, reason="notification", now=None):
 def process_due_alert_group_notifications(limit=100):
     """Send due alert group notifications."""
 
-    now = datetime.utcnow()
+    now = utc_now()
     sent = 0
     skipped = 0
     failed = 0

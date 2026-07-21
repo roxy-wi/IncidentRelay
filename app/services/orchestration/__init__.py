@@ -22,3 +22,33 @@ __all__ = [
     "validate_extractors",
     "validate_template",
 ]
+
+# BEGIN EVENT ORCHESTRATION WS3 EXPORTS
+from .actions import (
+    ActionExecutionResult,
+    ActionStepResult,
+    ActionValidationError,
+    EventActionState,
+    execute_actions,
+    validate_action,
+    validate_action_list,
+)
+from .engine import (
+    OrchestrationExecutionResult,
+    RuleExecutionResult,
+    execute_rule_tree,
+)
+
+__all__ += [
+    "ActionExecutionResult",
+    "ActionStepResult",
+    "ActionValidationError",
+    "EventActionState",
+    "OrchestrationExecutionResult",
+    "RuleExecutionResult",
+    "execute_actions",
+    "execute_rule_tree",
+    "validate_action",
+    "validate_action_list",
+]
+# END EVENT ORCHESTRATION WS3 EXPORTS

@@ -18,6 +18,7 @@ from app.services.incidents.responders import expire_due_incident_responders
 from app.services.alerts.explain_cleanup import cleanup_alert_explain_traces
 from app.services.service_catalog.impact_snapshots import capture_scheduled_service_impact_snapshot
 from app.services.heartbeats.service import process_overdue_heartbeats
+from app.modules.common import utc_now
 
 logger = logging.getLogger("oncall.scheduler")
 _scheduler = None
@@ -493,7 +494,7 @@ def start_scheduler():
         seconds=Config.REMINDER_INTERVAL_SECONDS,
         max_instances=1,
         coalesce=True,
-        next_run_time=datetime.utcnow(),
+        next_run_time=utc_now(),
         id="reminder_job",
         replace_existing=True,
     )
@@ -510,7 +511,7 @@ def start_scheduler():
         ),
         max_instances=1,
         coalesce=True,
-        next_run_time=datetime.utcnow(),
+        next_run_time=utc_now(),
         id="oncall_shift_email_job",
         replace_existing=True,
     )
@@ -528,7 +529,7 @@ def start_scheduler():
             ),
             max_instances=1,
             coalesce=True,
-            next_run_time=datetime.utcnow(),
+            next_run_time=utc_now(),
             id="oncall_shift_mattermost_job",
             replace_existing=True,
         )
@@ -545,7 +546,7 @@ def start_scheduler():
         ),
         max_instances=1,
         coalesce=True,
-        next_run_time=datetime.utcnow(),
+        next_run_time=utc_now(),
         id="user_notification_rules_job",
         replace_existing=True,
     )
@@ -556,7 +557,7 @@ def start_scheduler():
         seconds=int(getattr(Config, "ALERT_GROUP_NOTIFICATION_CHECK_INTERVAL_SECONDS", 10)),
         max_instances=1,
         coalesce=True,
-        next_run_time=datetime.utcnow(),
+        next_run_time=utc_now(),
         id="alert_group_notification_job",
         replace_existing=True,
     )
@@ -573,7 +574,7 @@ def start_scheduler():
         ),
         max_instances=1,
         coalesce=True,
-        next_run_time=datetime.utcnow(),
+        next_run_time=utc_now(),
         id="incident_responder_expire_job",
         replace_existing=True,
     )
@@ -590,7 +591,7 @@ def start_scheduler():
         ),
         max_instances=1,
         coalesce=True,
-        next_run_time=datetime.utcnow(),
+        next_run_time=utc_now(),
         id="alert_explain_trace_cleanup_job",
         replace_existing=True,
     )
@@ -602,7 +603,7 @@ def start_scheduler():
             seconds=int(getattr(Config, "HEARTBEAT_CHECK_INTERVAL_SECONDS", 30)),
             max_instances=1,
             coalesce=True,
-            next_run_time=datetime.utcnow(),
+            next_run_time=utc_now(),
             id="heartbeat_overdue_job",
             replace_existing=True,
         )
@@ -614,7 +615,7 @@ def start_scheduler():
             seconds=int(getattr(Config, "SERVICE_IMPACT_SNAPSHOT_INTERVAL_SECONDS", 300)),
             max_instances=1,
             coalesce=True,
-            next_run_time=datetime.utcnow(),
+            next_run_time=utc_now(),
             id="service_impact_snapshot_job",
             replace_existing=True,
         )

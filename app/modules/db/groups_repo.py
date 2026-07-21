@@ -23,6 +23,7 @@ from app.modules.db.models import (
     User,
     UserGroup,
 )
+from app.modules.common import utc_now
 
 
 def list_groups(active_only=False, include_deleted=False):
@@ -172,7 +173,7 @@ def soft_delete_group(group_id):
     - users are not deleted;
     - group memberships are disabled.
     """
-    now = datetime.utcnow()
+    now = utc_now()
     with db.atomic():
         group = get_group(group_id)
         group.deleted = True

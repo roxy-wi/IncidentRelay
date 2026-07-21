@@ -13,6 +13,7 @@ from app.services.integrations.auth import hash_token
 from app.services.alerts.lifecycle import upsert_alert
 from tests.conftest import admin_headers
 from tests.factories import create_group, create_route, create_team, create_user, unique
+from app.modules.common import utc_now
 
 
 def make_alert_payload(route, **overrides):
@@ -527,7 +528,7 @@ def test_cleanup_alert_explain_traces_deletes_old_traces(db):
     old_trace = alerts_repo.get_alert_explain_trace(old_result.trace_id)
     fresh_trace = alerts_repo.get_alert_explain_trace(fresh_result.trace_id)
 
-    old_trace.started_at = datetime.utcnow() - timedelta(days=40)
+    old_trace.started_at = utc_now() - timedelta(days=40)
     old_trace.save()
 
     cleanup_result = cleanup_alert_explain_traces(retention_days=30)

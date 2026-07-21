@@ -2,6 +2,7 @@ from datetime import datetime, timezone as dt_timezone
 from zoneinfo import ZoneInfo
 
 from app.modules.db import rotations_repo
+from app.modules.common import utc_now
 
 
 def _effective_layer_value(layer, field_name):
@@ -93,7 +94,7 @@ def is_layer_active_now(layer, now):
 def get_scheduled_oncall_user_for_layer(layer, now=None):
     """Return scheduled user for one layer."""
 
-    now = _as_utc_naive(now or datetime.utcnow())
+    now = _as_utc_naive(now or utc_now())
 
     members = rotations_repo.list_rotation_layer_members(
         layer.id,
@@ -126,7 +127,7 @@ def get_active_rotation_layer(rotation, now=None):
     if not rotation or not rotation.enabled or rotation.deleted:
         return None
 
-    now = _as_utc_naive(now or datetime.utcnow())
+    now = _as_utc_naive(now or utc_now())
 
     layers = rotations_repo.list_rotation_layers(
         rotation.id,
@@ -148,7 +149,7 @@ def get_scheduled_oncall_user(rotation, now=None):
     if not rotation or not rotation.enabled or rotation.deleted:
         return None
 
-    now = _as_utc_naive(now or datetime.utcnow())
+    now = _as_utc_naive(now or utc_now())
 
     layer = get_active_rotation_layer(rotation, now)
     if not layer:
@@ -165,7 +166,7 @@ def get_current_oncall_user(rotation, now=None):
     if not rotation or not rotation.enabled or rotation.deleted:
         return None
 
-    now = _as_utc_naive(now or datetime.utcnow())
+    now = _as_utc_naive(now or utc_now())
 
     override = rotations_repo.get_active_override(rotation.id, now)
 
@@ -181,7 +182,7 @@ def get_next_rotation_user(rotation, current_user=None, now=None):
     if not rotation or not rotation.enabled or rotation.deleted:
         return None
 
-    now = _as_utc_naive(now or datetime.utcnow())
+    now = _as_utc_naive(now or utc_now())
 
     layer = get_active_rotation_layer(rotation, now)
     if not layer:

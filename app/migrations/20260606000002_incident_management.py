@@ -13,6 +13,7 @@ from app.modules.db.models import (
     IncidentStakeholder,
     MaintenanceWindowScope,
 )
+from app.modules.common import utc_now
 
 
 INCIDENT_TABLE_MODELS = [
@@ -232,7 +233,7 @@ def _seed_default_priorities():
     if not _table_exists("incident_priority"):
         return
 
-    now = datetime.utcnow()
+    now = utc_now()
     placeholder = _placeholder()
 
     select_sql = (
