@@ -83,6 +83,7 @@ def create_migration(name: str) -> str:
 from playhouse.migrate import migrate
 
 from app.db import init_database
+from app.migrations.introspection import column_exists, index_exists, table_exists
 from app.modules.db.migrator import get_migrator
 
 
@@ -145,8 +146,17 @@ def apply_migration(filepath: str) -> None:
 
     try:
         print(f"Applying migration {migration_name}...")
-        upgrade_func()
-        Migration.create(name=migration_name)
+
+        db = init_database()
+
+        # PostgreSQL DDL is transactional. Keep the schema change and the
+        # migration record in the same transaction so a process restart cannot
+        # leave an applied migration recorded as pending. On backends that
+        # auto-commit DDL, migration helpers still need to remain idempotent.
+        with db.atomic():
+            upgrade_func()
+            Migration.create(name=migration_name)
+
         print(f"Migration {migration_name} applied successfully")
     except Exception as exc:
         raise MigrationError(f"Failed to apply migration {migration_name}: {exc}") from exc
@@ -175,8 +185,13 @@ def rollback_migration(migration_name: str) -> None:
 
     try:
         print(f"Rolling back migration {migration_name}...")
-        downgrade_func()
-        migration_record.delete_instance()
+
+        db = init_database()
+
+        with db.atomic():
+            downgrade_func()
+            migration_record.delete_instance()
+
         print(f"Migration {migration_name} rolled back successfully")
     except Exception as exc:
         raise MigrationError(f"Failed to rollback migration {migration_name}: {exc}") from exc

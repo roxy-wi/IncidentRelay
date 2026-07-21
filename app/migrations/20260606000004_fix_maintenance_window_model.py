@@ -1,4 +1,7 @@
 from app.db import database_proxy as db
+from app.migrations.introspection import (
+    get_columns as migration_get_columns,
+)
 
 
 def _database():
@@ -16,7 +19,7 @@ def _is_sqlite():
 def _has_column(table_name, column_name):
     return any(
         column.name == column_name
-        for column in db.get_columns(table_name)
+        for column in migration_get_columns(db, table_name)
     )
 
 

@@ -1,6 +1,10 @@
 """Add delayed notification scheduling to alert groups."""
 
 from app.db import init_database
+from app.migrations.introspection import (
+    get_columns as migration_get_columns,
+    get_tables as migration_get_tables,
+)
 
 
 db = init_database()
@@ -12,10 +16,10 @@ def _is_postgres():
 
 
 def _has_column(table_name: str, column_name: str) -> bool:
-    if table_name not in db.get_tables():
+    if table_name not in migration_get_tables(db):
         return False
 
-    return any(column.name == column_name for column in db.get_columns(table_name))
+    return any(column.name == column_name for column in migration_get_columns(db, table_name))
 
 
 def upgrade():

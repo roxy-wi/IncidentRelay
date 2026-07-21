@@ -4,13 +4,16 @@ from peewee import CharField, DateTimeField, IntegerField, TextField
 from playhouse.migrate import SchemaMigrator, migrate
 
 from app.db import init_database
+from app.migrations.introspection import (
+    get_columns as migration_get_columns,
+)
 
 
 db = init_database()
 
 
 def _column_names(table_name):
-    return {column.name for column in db.get_columns(table_name)}
+    return {column.name for column in migration_get_columns(db, table_name)}
 
 
 def _has_column(table_name, column_name):
