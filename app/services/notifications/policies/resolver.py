@@ -71,34 +71,56 @@ def _add_route_channels(result, route):
         _add_channel(result, link.channel, "route")
 
 
-def _add_service_policy_channels(result, group, event_type):
-    service = getattr(group, "service", None)
+def _selected_notification_policy(result, subject):
+    override_id = getattr(subject, "notification_policy_id", None)
+    if override_id:
+        policy = notification_policies_repo.get_notification_policy_or_none(
+            override_id,
+            include_deleted=True,
+        )
+        result.policy_id = override_id
+        if not policy:
+            result.notes.append("orchestration_notification_policy_missing")
+            return None, "orchestration_policy"
+        if policy.deleted:
+            result.notes.append("orchestration_notification_policy_deleted")
+            return None, "orchestration_policy"
+        if not policy.enabled:
+            result.notes.append("orchestration_notification_policy_disabled")
+            return None, "orchestration_policy"
+        if policy.team_id != getattr(subject, "team_id", None):
+            result.notes.append("orchestration_notification_policy_team_mismatch")
+            return None, "orchestration_policy"
+        return policy, "orchestration_policy"
 
+    service = getattr(subject, "service", None)
     if not service:
         result.notes.append("service_missing")
-        return
+        return None, "service_policy"
 
     result.service_id = service.id
-
     policy_id = getattr(service, "notification_policy_id", None)
-
     if not policy_id:
         result.notes.append("service_notification_policy_missing")
-        return
+        return None, "service_policy"
 
     policy = service.notification_policy
     result.policy_id = policy.id
-
     if policy.deleted:
         result.notes.append("service_notification_policy_deleted")
-        return
-
+        return None, "service_policy"
     if not policy.enabled:
         result.notes.append("service_notification_policy_disabled")
-        return
-
-    if policy.team_id != getattr(group, "team_id", None):
+        return None, "service_policy"
+    if policy.team_id != getattr(subject, "team_id", None):
         result.notes.append("service_notification_policy_team_mismatch")
+        return None, "service_policy"
+    return policy, "service_policy"
+
+
+def _add_service_policy_channels(result, group, event_type):
+    policy, source = _selected_notification_policy(result, group)
+    if policy is None:
         return
 
     matched = False
@@ -129,7 +151,7 @@ def _add_service_policy_channels(result, group, event_type):
         )
 
         for channel in channels:
-            _add_channel(result, channel, "service_policy", rule.id)
+            _add_channel(result, channel, source, rule.id)
 
         if not rule.continue_matching:
             break
@@ -160,15 +182,26 @@ def resolve_notification_channels(group, event_type="notification"):
         getattr(route, "notification_channel_mode", None)
         or ROUTE_ONLY
     )
+    has_orchestration_policy = bool(
+        getattr(group, "notification_policy_id", None)
+    )
 
-    if configured_mode in NOTIFICATION_CHANNEL_MODES:
+    if has_orchestration_policy:
+        mode = (
+            SERVICE_POLICY_PLUS_ROUTE
+            if configured_mode == SERVICE_POLICY_PLUS_ROUTE
+            else SERVICE_POLICY
+        )
+    elif configured_mode in NOTIFICATION_CHANNEL_MODES:
         mode = configured_mode
     else:
         mode = ROUTE_ONLY
 
     result = NotificationChannelResolution(mode=mode)
 
-    if configured_mode != mode:
+    if has_orchestration_policy:
+        result.notes.append("orchestration_notification_policy_override")
+    elif configured_mode != mode:
         result.notes.append("unknown_channel_mode_fallback_to_route_only")
 
     if mode in {SERVICE_POLICY, SERVICE_POLICY_PLUS_ROUTE}:

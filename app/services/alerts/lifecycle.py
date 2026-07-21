@@ -21,6 +21,11 @@ from app.services.alerts.priority import (
 )
 from app.services.incidents.priority_policies.resolver import resolve_incident_priority
 from app.services.alerts.result import AlertProcessingResult
+from app.services.orchestration.runtime import (
+    attach_runtime_executions,
+    run_event_orchestration,
+    run_service_orchestration,
+)
 from app.services.incidents.stakeholders import notify_stakeholders
 from app.services.maintenance import get_maintenance_decision
 from app.services.notifications.delivery import notify_alert
@@ -37,6 +42,22 @@ from app.services.business_services.status import refresh_business_services_safe
 from app.modules.common import utc_now
 
 logger = logging.getLogger("oncall.alerts")
+
+
+def _route_for_runtime(alert_data, runtime, *, current_route=None):
+    if runtime is None:
+        return find_route_for_alert(alert_data)
+
+    if runtime.route_selected_by_orchestration:
+        return runtime.route
+
+    if runtime.route is None:
+        return find_route_for_alert(alert_data)
+
+    if current_route is None:
+        return find_route_for_alert(alert_data)
+
+    return current_route
 
 
 def _add_service_stakeholders_for_new_group(group):
@@ -66,9 +87,20 @@ def upsert_alert(alert_data):
         AlertProcessingResult
     """
     trace = AlertExplainTrace.start(alert_data)
+    runtime = None
 
     try:
-        return _upsert_alert(alert_data, trace)
+        runtime = run_event_orchestration(alert_data, trace=trace)
+        if runtime.blocked:
+            return _stopped_result(
+                trace=trace,
+                outcome="orchestration_blocked",
+                reason=runtime.reason or "Event orchestration blocked processing.",
+                result={"created": False, "group_id": None, "alert_id": None},
+            )
+        result = _upsert_alert(alert_data, trace, runtime=runtime)
+        attach_runtime_executions(runtime, group=result.group, alert=result.alert)
+        return result
     except Exception as exc:
         trace.fail(exc)
         raise
@@ -103,8 +135,10 @@ def _completed_result(*, trace, group, alert, created_group, outcome):
     )
 
 
-def _resolve_policy_assignment(route, service, rotation, maintenance_decision, trace):
-    policy = get_effective_escalation_policy(route, service)
+def _resolve_policy_assignment(
+    route, service, rotation, maintenance_decision, trace, *, policy_override=None
+):
+    policy = policy_override or get_effective_escalation_policy(route, service)
 
     policy_rule, rotation, assignee, next_escalation_at = (
         apply_initial_escalation_policy_assignment(policy, rotation)
@@ -132,6 +166,7 @@ def _create_group(
     rotation,
     policy,
     policy_rule,
+    notification_policy,
     assignee,
     next_escalation_at,
     group_key,
@@ -149,6 +184,9 @@ def _create_group(
         rotation=rotation.id if rotation else None,
         escalation_policy=policy.id if policy else None,
         escalation_rule=policy_rule.id if policy_rule else None,
+        notification_policy=(
+            notification_policy.id if notification_policy else None
+        ),
         next_escalation_at=next_escalation_at,
         assignee=assignee.id if assignee else None,
         source=alert_data["source"],
@@ -173,12 +211,16 @@ def _set_alert_routing_fields(
     route,
     service,
     rotation,
+    notification_policy,
     group,
 ):
     alert.team = team.id if team else None
     alert.route = route.id if route else None
     alert.service = service.id if service else None
     alert.rotation = rotation.id if rotation else None
+    alert.notification_policy = (
+        notification_policy.id if notification_policy else None
+    )
     alert.group = group.id
 
 
@@ -199,6 +241,8 @@ def _handle_existing_alert(
     maintenance_decision,
     maintenance_kwargs,
     now,
+    policy_override=None,
+    notification_policy_override=None,
 ):
     group = existing_alert.group or existing_group
     priority = priority_resolution.priority
@@ -213,6 +257,7 @@ def _handle_existing_alert(
                 rotation,
                 maintenance_decision,
                 trace,
+                policy_override=policy_override,
             )
         )
 
@@ -224,6 +269,7 @@ def _handle_existing_alert(
             rotation=rotation,
             policy=policy,
             policy_rule=policy_rule,
+            notification_policy=notification_policy_override,
             assignee=assignee,
             next_escalation_at=next_escalation_at,
             group_key=group_key,
@@ -279,8 +325,14 @@ def _handle_existing_alert(
         route=route,
         service=service,
         rotation=rotation,
+        notification_policy=notification_policy_override,
         group=group,
     )
+
+    group.notification_policy = (
+        notification_policy_override.id if notification_policy_override else None
+    )
+    group.save(only=[group.__class__.notification_policy])
 
     if maintenance_decision.pause_escalation_only:
         existing_alert.next_escalation_at = None
@@ -405,8 +457,8 @@ def _handle_existing_alert(
     )
 
 
-def _upsert_alert(alert_data, trace):
-    route = find_route_for_alert(alert_data)
+def _upsert_alert(alert_data, trace, runtime=None):
+    route = _route_for_runtime(alert_data, runtime)
 
     if not route:
         trace.route_not_matched(alert_data)
@@ -436,7 +488,52 @@ def _upsert_alert(alert_data, trace):
         )
 
     team = route.team
-    service = resolve_alert_service(route, alert_data)
+    service = (
+        runtime.service
+        if runtime and runtime.service
+        else resolve_alert_service(route, alert_data)
+    )
+
+    if runtime is not None and service is not None:
+        runtime = run_service_orchestration(
+            alert_data,
+            runtime,
+            route=route,
+            team=team,
+            service=service,
+            trace=trace,
+        )
+
+        if runtime.blocked:
+            return _stopped_result(
+                trace=trace,
+                outcome="orchestration_blocked",
+                reason=runtime.reason or "Service orchestration blocked processing.",
+                result={"created": False, "group_id": None, "alert_id": None},
+            )
+
+        route = _route_for_runtime(
+            alert_data,
+            runtime,
+            current_route=route,
+        )
+
+        if not route:
+            trace.route_not_matched(alert_data)
+
+            return _stopped_result(
+                trace=trace,
+                outcome="routing_failed",
+                reason="Service orchestration did not leave an active route.",
+                result={"created": False, "group_id": None, "alert_id": None},
+            )
+        team = route.team
+        service = (
+            runtime.service
+            if runtime.service
+            else resolve_alert_service(route, alert_data)
+        )
+
     rotation = get_effective_route_rotation(route, service)
 
     trace.route_matched(route, team)
@@ -459,10 +556,10 @@ def _upsert_alert(alert_data, trace):
         severity=alert_data.get("severity"),
     )
 
-    group_key = build_group_key(
-        route,
-        alert_data,
-        service=service,
+    group_key = (
+        runtime.group_key
+        if runtime and runtime.group_key
+        else build_group_key(route, alert_data, service=service)
     )
 
     trace.group_key_built(group_key)
@@ -484,10 +581,15 @@ def _upsert_alert(alert_data, trace):
 
     trace.maintenance_resolved(maintenance_decision)
 
+    grouping_window_seconds = (
+        runtime.grouping_window_seconds
+        if runtime and runtime.grouping_window_seconds is not None
+        else Config.ALERT_GROUP_WINDOW_SECONDS
+    )
     existing_alert = alerts_repo.find_existing_alert(
         alert_data["source"],
         alert_data["dedup_key"],
-        Config.ALERT_GROUP_WINDOW_SECONDS,
+        grouping_window_seconds,
     )
 
     existing_group = alerts_repo.find_open_alert_group(
@@ -539,6 +641,10 @@ def _upsert_alert(alert_data, trace):
             maintenance_decision=maintenance_decision,
             maintenance_kwargs=maintenance_kwargs,
             now=now,
+            policy_override=(runtime.escalation_policy if runtime else None),
+            notification_policy_override=(
+                runtime.notification_policy if runtime else None
+            ),
         )
 
     if status == "resolved":
@@ -574,6 +680,7 @@ def _upsert_alert(alert_data, trace):
             rotation,
             maintenance_decision,
             trace,
+            policy_override=(runtime.escalation_policy if runtime else None),
         )
     )
 
@@ -599,6 +706,7 @@ def _upsert_alert(alert_data, trace):
             rotation=rotation,
             policy=policy,
             policy_rule=policy_rule,
+            notification_policy=(runtime.notification_policy if runtime else None),
             assignee=assignee,
             next_escalation_at=next_escalation_at,
             group_key=group_key,
@@ -643,6 +751,10 @@ def _upsert_alert(alert_data, trace):
     else:
         trace.group_reused(group)
 
+    if runtime is not None and runtime.notification_policy is not None:
+        group.notification_policy = runtime.notification_policy.id
+        group.save(only=[group.__class__.notification_policy])
+
     priority_state_before_recalculate = group_priority_state(group)
 
     previous_priority_slug = (
@@ -666,6 +778,11 @@ def _upsert_alert(alert_data, trace):
         rotation=rotation.id if rotation else None,
         escalation_policy=policy.id if policy else None,
         escalation_rule=policy_rule.id if policy_rule else None,
+        notification_policy=(
+            runtime.notification_policy.id
+            if runtime and runtime.notification_policy
+            else getattr(group, "notification_policy_id", None)
+        ),
         next_escalation_at=next_escalation_at,
         assignee=assignee.id if assignee else None,
         source=alert_data["source"],

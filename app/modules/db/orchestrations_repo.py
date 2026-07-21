@@ -25,6 +25,7 @@ from app.modules.common import utc_now
 
 VALID_SCOPES = {"global", "service"}
 VALID_MODES = {"active", "shadow", "disabled"}
+VALID_COMPATIBILITY_MODES = {"legacy", "hybrid", "orchestration"}
 VALID_VERSION_STATUSES = {"draft", "published", "archived"}
 VALID_PROCESSING_MODES = {
     "continue",
@@ -173,12 +174,15 @@ def create_orchestration(
     service_id: Optional[int] = None,
     description: Optional[str] = None,
     created_by_id: Optional[int] = None,
+    compatibility_mode: str = "legacy",
 ) -> EventOrchestration:
     name = (name or "").strip()
     if not name:
         raise OrchestrationValidationError(["name is required"])
     if scope not in VALID_SCOPES:
         raise OrchestrationValidationError(["scope must be global or service"])
+    if compatibility_mode not in VALID_COMPATIBILITY_MODES:
+        raise OrchestrationValidationError(["invalid compatibility_mode"])
     if scope == "global" and service_id is not None:
         raise OrchestrationValidationError(
             ["global orchestration cannot reference a service"]
@@ -202,6 +206,7 @@ def create_orchestration(
             service=service_id,
             enabled=False,
             mode="disabled",
+            compatibility_mode=compatibility_mode,
             created_by=created_by_id,
         )
     except IntegrityError as exc:
@@ -465,6 +470,8 @@ def validate_version(version_id: int) -> Dict[str, Any]:
         errors.append("invalid orchestration scope")
     if orchestration.mode not in VALID_MODES:
         errors.append("invalid orchestration mode")
+    if orchestration.compatibility_mode not in VALID_COMPATIBILITY_MODES:
+        errors.append("invalid orchestration compatibility mode")
 
     if orchestration.scope == "global" and orchestration.service_id is not None:
         errors.append("global orchestration cannot reference a service")
@@ -676,6 +683,68 @@ def archive_draft(version_id: int) -> EventOrchestrationVersion:
             & (EventOrchestrationVersion.status == "draft")
         ).execute()
     return _get_version(version_id)
+
+
+def set_runtime_state(
+    orchestration_id: int,
+    *,
+    enabled: bool,
+    mode: str,
+    compatibility_mode: str,
+) -> EventOrchestration:
+    """Enable or disable one orchestration runtime atomically."""
+    if mode not in VALID_MODES:
+        raise OrchestrationValidationError(["invalid orchestration mode"])
+    if compatibility_mode not in VALID_COMPATIBILITY_MODES:
+        raise OrchestrationValidationError(["invalid compatibility_mode"])
+    if bool(enabled) != (mode != "disabled"):
+        raise OrchestrationValidationError([
+            "enabled must be true for active/shadow mode and false for disabled mode"
+        ])
+    with database_proxy.atomic():
+        orchestration = _locked_orchestration(orchestration_id)
+        if enabled and mode != "disabled" and orchestration.active_version_id is None:
+            raise OrchestrationConflict("Published version is required before enabling runtime")
+        EventOrchestration.update(
+            enabled=bool(enabled),
+            mode=mode,
+            compatibility_mode=compatibility_mode,
+            updated_at=_utcnow(),
+        ).where(EventOrchestration.id == orchestration.id).execute()
+    return _get_orchestration(orchestration_id)
+
+
+def list_runtime_orchestrations(
+    *,
+    group_id: int,
+    scope: str,
+    service_id: Optional[int] = None,
+) -> List[EventOrchestration]:
+    """Return enabled runtime orchestrations in deterministic order."""
+    if scope not in VALID_SCOPES:
+        raise OrchestrationValidationError(["scope must be global or service"])
+    query = EventOrchestration.select().where(
+        (EventOrchestration.group == group_id)
+        & (EventOrchestration.scope == scope)
+        & (EventOrchestration.enabled == True)  # noqa: E712
+        & (EventOrchestration.mode.in_(("active", "shadow")))
+        & EventOrchestration.active_version_id.is_null(False)
+        & (EventOrchestration.deleted == False)  # noqa: E712
+        & EventOrchestration.deleted_at.is_null(True)
+    )
+    if scope == "service":
+        query = query.where(EventOrchestration.service == service_id)
+    return list(query.order_by(EventOrchestration.id.asc()))
+
+
+def get_published_runtime_version(orchestration: EventOrchestration) -> EventOrchestrationVersion:
+    """Return and verify the exact published version selected for runtime."""
+    if orchestration.active_version_id is None:
+        raise OrchestrationConflict("Orchestration has no active version")
+    version = _get_version(orchestration.active_version_id)
+    if version.orchestration_id != orchestration.id or version.status != "published":
+        raise OrchestrationConflict("Active orchestration version is not published")
+    return version
 
 
 def archive_orchestration(orchestration_id: int) -> EventOrchestration:

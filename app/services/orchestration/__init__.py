@@ -52,3 +52,23 @@ __all__ += [
     "validate_action_list",
 ]
 # END EVENT ORCHESTRATION WS3 EXPORTS
+
+# BEGIN EVENT ORCHESTRATION WS4 EXPORTS
+from .runtime import (
+    RuntimeOrchestrationError,
+    RuntimeResult,
+    RuntimeStep,
+    attach_runtime_executions,
+    run_event_orchestration,
+    run_service_orchestration,
+)
+
+__all__ += [
+    "RuntimeOrchestrationError",
+    "RuntimeResult",
+    "RuntimeStep",
+    "attach_runtime_executions",
+    "run_event_orchestration",
+    "run_service_orchestration",
+]
+# END EVENT ORCHESTRATION WS4 EXPORTS
