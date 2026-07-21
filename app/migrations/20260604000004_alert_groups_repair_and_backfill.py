@@ -7,6 +7,10 @@ from peewee import IntegerField
 from playhouse.migrate import migrate
 
 from app.db import init_database
+from app.migrations.introspection import (
+    get_columns as migration_get_columns,
+    get_tables as migration_get_tables,
+)
 from app.modules.db.migrator import get_migrator
 from app.modules.db.models import (
     Alert,
@@ -32,7 +36,7 @@ def _table(model):
 
 
 def _tables():
-    return set(db.get_tables())
+    return set(migration_get_tables(db))
 
 
 def _has_table(table_name):
@@ -43,7 +47,7 @@ def _has_column(table_name, column_name):
     if not _has_table(table_name):
         return False
 
-    return any(column.name == column_name for column in db.get_columns(table_name))
+    return any(column.name == column_name for column in migration_get_columns(db, table_name))
 
 
 def _quote(name):

@@ -1,4 +1,7 @@
 from app.db import init_database
+from app.migrations.introspection import (
+    get_columns as migration_get_columns,
+)
 from app.modules.db.models import MatcherPreset
 
 
@@ -6,7 +9,7 @@ db = init_database()
 
 
 def _column_exists(table_name, column_name):
-    return any(column.name == column_name for column in db.get_columns(table_name))
+    return any(column.name == column_name for column in migration_get_columns(db, table_name))
 
 
 def _is_postgres():

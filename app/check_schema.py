@@ -2,6 +2,7 @@ import inspect
 import sys
 
 from app.db import init_database
+from app.migrations.introspection import get_columns, get_tables
 from app.modules.db.models import BaseModel
 import app.modules.db.models as models
 
@@ -42,7 +43,7 @@ def main():
     """
     db = init_database()
     db.connect(reuse_if_open=True)
-    tables = set(db.get_tables())
+    tables = set(get_tables(db))
     ok = True
 
     for model in model_classes():
@@ -53,7 +54,7 @@ def main():
             ok = False
             continue
 
-        db_columns = {column.name for column in db.get_columns(table)}
+        db_columns = {column.name for column in get_columns(db, table)}
         model_columns = {field.column_name for field in model._meta.sorted_fields}
         missing_columns = sorted(model_columns - db_columns)
 
