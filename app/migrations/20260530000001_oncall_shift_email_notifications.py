@@ -12,6 +12,10 @@ from peewee import (
 from playhouse.migrate import migrate
 
 from app.db import init_database
+from app.migrations.introspection import (
+    get_columns as migration_get_columns,
+    get_tables as migration_get_tables,
+)
 from app.modules.db.migrator import get_migrator
 from app.modules.db.models import BaseModel, Rotation, User
 from app.modules.common import utc_now
@@ -22,11 +26,11 @@ migrator = get_migrator(db)
 
 
 def table_has_column(table_name, column_name):
-    return any(column.name == column_name for column in db.get_columns(table_name))
+    return any(column.name == column_name for column in migration_get_columns(db, table_name))
 
 
 def table_exists(table_name):
-    return table_name in db.get_tables()
+    return table_name in migration_get_tables(db)
 
 
 class OnCallShiftEmailNotificationMigration(BaseModel):

@@ -1,6 +1,10 @@
 """Allow group-level alert events and notifications."""
 
 from app.db import init_database
+from app.migrations.introspection import (
+    get_columns as migration_get_columns,
+    get_tables as migration_get_tables,
+)
 from app.modules.db.models import AlertEvent, AlertNotification
 
 
@@ -17,14 +21,14 @@ def _table_name(model):
 
 
 def _has_table(table_name: str) -> bool:
-    return table_name in db.get_tables()
+    return table_name in migration_get_tables(db)
 
 
 def _has_column(table_name: str, column_name: str) -> bool:
     if not _has_table(table_name):
         return False
 
-    return any(column.name == column_name for column in db.get_columns(table_name))
+    return any(column.name == column_name for column in migration_get_columns(db, table_name))
 
 
 def _quote(name: str) -> str:

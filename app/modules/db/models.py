@@ -1717,6 +1717,13 @@ class AlertGroup(BaseModel):
         backref="alert_groups",
         on_delete="SET NULL",
     )
+    notification_policy = ForeignKeyField(
+        NotificationPolicy,
+        null=True,
+        backref="alert_groups",
+        on_delete="SET NULL",
+        index=True,
+    )
 
     next_escalation_at = DateTimeField(null=True, index=True)
     last_escalated_at = DateTimeField(null=True)
@@ -1849,6 +1856,13 @@ class Alert(BaseModel):
         null=True,
         backref="alerts",
         on_delete="SET NULL",
+    )
+    notification_policy = ForeignKeyField(
+        NotificationPolicy,
+        null=True,
+        backref="alerts",
+        on_delete="SET NULL",
+        index=True,
     )
     next_escalation_at = DateTimeField(null=True, index=True)
     last_escalated_at = DateTimeField(null=True)
@@ -2721,6 +2735,7 @@ class CalendarFeed(SoftDeleteModel):
 
 EVENT_ORCHESTRATION_SCOPES = ("global", "service")
 EVENT_ORCHESTRATION_MODES = ("active", "shadow", "disabled")
+EVENT_ORCHESTRATION_COMPATIBILITY_MODES = ("legacy", "hybrid", "orchestration")
 EVENT_ORCHESTRATION_VERSION_STATUSES = ("draft", "published", "archived")
 EVENT_ORCHESTRATION_PROCESSING_MODES = (
     "continue",
@@ -2753,6 +2768,7 @@ class EventOrchestration(SoftDeleteModel):
     )
     enabled = BooleanField(default=False, index=True)
     mode = CharField(max_length=32, default="disabled", index=True)
+    compatibility_mode = CharField(max_length=32, default="legacy", index=True)
     # Kept as an integer to avoid a circular DDL dependency between the
     # orchestration and orchestration-version tables. Repository code verifies
     # that the selected version belongs to this orchestration.
@@ -2772,6 +2788,7 @@ class EventOrchestration(SoftDeleteModel):
             (("group", "name"), True),
             (("group", "scope"), False),
             (("group", "mode", "enabled"), False),
+            (("group", "compatibility_mode", "enabled"), False),
             (("service", "enabled"), False),
         )
 
@@ -2780,6 +2797,8 @@ class EventOrchestration(SoftDeleteModel):
             raise ValueError("Invalid orchestration scope")
         if self.mode not in EVENT_ORCHESTRATION_MODES:
             raise ValueError("Invalid orchestration mode")
+        if self.compatibility_mode not in EVENT_ORCHESTRATION_COMPATIBILITY_MODES:
+            raise ValueError("Invalid orchestration compatibility mode")
 
         if self.scope == "global" and self.service_id is not None:
             raise ValueError("Global orchestration cannot reference a service")

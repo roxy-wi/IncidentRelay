@@ -263,6 +263,7 @@ def test_new_orchestration_is_disabled_and_preserves_legacy_behavior(db):
 
     assert orchestration.enabled is False
     assert orchestration.mode == "disabled"
+    assert orchestration.compatibility_mode == "legacy"
     assert orchestration.active_version_id is None
 
 

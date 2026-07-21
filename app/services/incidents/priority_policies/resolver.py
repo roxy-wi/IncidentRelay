@@ -126,40 +126,53 @@ def resolve_incident_priority(
     team_id = team.id if team else None
 
     explicit_source_value = _source_priority_value(alert_data)
-    if alert_data.get("priority_set_manually") and explicit_source_value:
+    explicit_priority_requested = (
+        alert_data.get("priority_set_manually")
+        or alert_data.get("priority_set_by_orchestration")
+    )
+    if explicit_priority_requested and explicit_source_value:
         explicit_priority = _priority_from_source_value(explicit_source_value)
         if explicit_priority:
             return PriorityResolution(
                 priority=explicit_priority,
-                source="explicit_source_priority",
+                source=(
+                    "orchestration"
+                    if alert_data.get("priority_set_by_orchestration")
+                    else "explicit_source_priority"
+                ),
                 source_priority_value=explicit_source_value,
             )
 
-    policy = policy_service.get_effective_policy(
-        team_id=team_id,
-        service=service,
-    )
+    orchestration_policy_id = alert_data.get("orchestration_priority_policy_id")
+    if orchestration_policy_id:
+        policy = priority_policies_repo.get_priority_policy_or_none(
+            orchestration_policy_id
+        )
+        if policy and (not policy.enabled or policy.team_id != team_id):
+            policy = None
+    else:
+        policy = policy_service.get_effective_policy(
+            team_id=team_id,
+            service=service,
+        )
 
     if not policy:
-        update_mode = (
-                getattr(policy, "update_mode", None)
-                or "raise_only"
-        )
         return PriorityResolution(
             priority=_severity_fallback(alert_data),
             source="severity_mapping",
-            update_mode=update_mode,
+            update_mode="raise_only",
         )
 
-    policy_source = "team_default"
+    policy_source = "orchestration" if orchestration_policy_id else "team_default"
 
-    if service and getattr(service, "priority_policy_id", None) == policy.id:
+    if (
+        not orchestration_policy_id
+        and service
+        and getattr(service, "priority_policy_id", None) == policy.id
+    ):
         policy_source = "service"
 
-    update_mode = (
-            getattr(policy, "update_mode", None)
-            or "raise_only"
-    )
+    update_mode = getattr(policy, "update_mode", None) or "raise_only"
 
     result = PriorityResolution(
         priority=None,
