@@ -114,6 +114,8 @@ def _add_optional_incident_alert_fields(data, alert):
         "maintenance_window_id",
         "maintenance_behavior",
         "maintenance_suppressed",
+        "orchestration_suppressed",
+        "orchestration_suppress_reason",
     )
 
     for field_name in optional_fields:
@@ -128,6 +130,11 @@ def _add_optional_incident_alert_fields(data, alert):
 
     if "maintenance_suppressed" in data:
         data["maintenance_suppressed"] = bool(data["maintenance_suppressed"])
+
+    if "orchestration_suppressed" in data:
+        data["orchestration_suppressed"] = bool(
+            data["orchestration_suppressed"]
+        )
 
 
 def serialize_incident_alert(alert):

@@ -5,10 +5,12 @@ from __future__ import annotations
 import copy
 import logging
 import time
+from datetime import timedelta
 from dataclasses import dataclass, field, replace
 from typing import Any, Dict, List, Mapping, Optional
 
 from app.modules.common import utc_now
+from app.settings import Config
 from app.modules.db import orchestrations_repo
 from app.modules.db.models import (
     AlertRoute,
@@ -28,7 +30,6 @@ from app.modules.redaction import redact_secrets
 logger = logging.getLogger("oncall.orchestration.runtime")
 
 _COMPATIBILITY_ORDER = {"legacy": 0, "hybrid": 1, "orchestration": 2}
-_UNSUPPORTED_RUNTIME_DISPOSITIONS = {"suppress", "pause", "drop"}
 
 
 class RuntimeOrchestrationError(RuntimeError):
@@ -81,7 +82,12 @@ class RuntimeResult:
     steps: List[RuntimeStep] = field(default_factory=list)
     blocked: bool = False
     reason: Optional[str] = None
-    deferred_disposition: Optional[str] = None
+    disposition: str = "process"
+    disposition_reason: Optional[str] = None
+    pause_seconds: Optional[int] = None
+    pause_retrigger: str = "preserve"
+    disposition_orchestration_id: Optional[int] = None
+    disposition_version_id: Optional[int] = None
     evaluated_service_ids: List[int] = field(default_factory=list, repr=False)
     _context: Dict[str, Any] = field(default_factory=dict, repr=False)
 
@@ -103,7 +109,13 @@ class RuntimeResult:
             "grouping_window_seconds": self.grouping_window_seconds,
             "blocked": self.blocked,
             "reason": self.reason,
-            "deferred_disposition": self.deferred_disposition,
+            "disposition": self.disposition,
+            "disposition_reason": self.disposition_reason,
+            "pause_seconds": self.pause_seconds,
+            "pause_retrigger": self.pause_retrigger,
+            "disposition_orchestration_id": self.disposition_orchestration_id,
+            "disposition_version_id": self.disposition_version_id,
+            "evaluated_service_ids": list(self.evaluated_service_ids),
             "steps": [step.to_dict() for step in self.steps],
         }
 
@@ -305,6 +317,12 @@ def _record_execution(
     if result is not None:
         disposition = result.context.get("result", {}).get("disposition")
         matched = result.matched_rule_count
+    expires_at = None
+    if disposition == "drop":
+        expires_at = utc_now() + timedelta(
+            days=int(getattr(Config, "ORCHESTRATION_DROPPED_TRACE_RETENTION_DAYS", 7))
+        )
+
     row = OrchestrationExecution.create(
         group=orchestration.group_id,
         orchestration=orchestration.id,
@@ -319,6 +337,7 @@ def _record_execution(
         matched_rule_count=matched,
         duration_ms=duration_ms,
         trace_json=trace,
+        expires_at=expires_at,
     )
     return row.id
 
@@ -617,9 +636,20 @@ def _evaluate_orchestrations(
         if "window_seconds" in grouping:
             runtime.grouping_window_seconds = grouping.get("window_seconds")
 
-        disposition = (context.get("result") or {}).get("disposition")
-        if disposition in _UNSUPPORTED_RUNTIME_DISPOSITIONS:
-            runtime.deferred_disposition = disposition
+        result_state = context.get("result") or {}
+        disposition = result_state.get("disposition") or "process"
+        if disposition in {"suppress", "pause", "drop"}:
+            runtime.disposition = disposition
+            runtime.disposition_orchestration_id = orchestration.id
+            runtime.disposition_version_id = step.version_id
+            if disposition == "suppress":
+                runtime.disposition_reason = result_state.get("suppress_reason")
+            elif disposition == "pause":
+                runtime.disposition_reason = result_state.get("pause_reason")
+                runtime.pause_seconds = result_state.get("pause_seconds")
+                runtime.pause_retrigger = result_state.get("pause_retrigger") or "preserve"
+            else:
+                runtime.disposition_reason = result_state.get("drop_reason")
 
     runtime._context = copy.deepcopy(context)
     return context, route, team, service
@@ -879,11 +909,80 @@ def attach_runtime_executions(
 ):
     if runtime is None or not runtime.execution_ids:
         return
+    execution_ids = list(runtime.execution_ids)
     OrchestrationExecution.update(
         alert_group_id=getattr(group, "id", None),
         alert_id=getattr(alert, "id", None),
-    ).where(OrchestrationExecution.id.in_(runtime.execution_ids)).execute()
+    ).where(OrchestrationExecution.id.in_(execution_ids)).execute()
 
+    # Queue outbound automation only after the orchestration decision and the
+    # lifecycle outcome have been persisted. The queue function is idempotent.
+    from app.services.orchestration.webhooks import enqueue_execution_webhooks
+
+    for execution_id in execution_ids:
+        try:
+            enqueue_execution_webhooks(
+                execution_id,
+                alert_group_id=getattr(group, "id", None),
+            )
+        except Exception:
+            logger.exception(
+                "failed to enqueue orchestration webhook actions",
+                extra={"extra": {"execution_id": execution_id}},
+            )
+
+
+
+
+def restore_runtime_result(data: Mapping[str, Any]) -> RuntimeResult:
+    """Restore trusted runtime metadata stored with a paused event."""
+    payload = dict(data or {})
+    steps = []
+    for item in payload.get("steps") or []:
+        try:
+            steps.append(RuntimeStep(**item))
+        except (TypeError, ValueError):
+            continue
+
+    runtime = RuntimeResult(
+        group_id=payload.get("group_id"),
+        compatibility_mode=payload.get("compatibility_mode") or "legacy",
+        route=AlertRoute.get_or_none(AlertRoute.id == payload.get("route_id"))
+        if payload.get("route_id") else None,
+        team=Team.get_or_none(Team.id == payload.get("team_id"))
+        if payload.get("team_id") else None,
+        service=Service.get_or_none(Service.id == payload.get("service_id"))
+        if payload.get("service_id") else None,
+        escalation_policy=EscalationPolicy.get_or_none(
+            EscalationPolicy.id == payload.get("escalation_policy_id")
+        ) if payload.get("escalation_policy_id") else None,
+        priority_policy=PriorityPolicy.get_or_none(
+            PriorityPolicy.id == payload.get("priority_policy_id")
+        ) if payload.get("priority_policy_id") else None,
+        notification_policy=NotificationPolicy.get_or_none(
+            NotificationPolicy.id == payload.get("notification_policy_id")
+        ) if payload.get("notification_policy_id") else None,
+        group_key=payload.get("group_key"),
+        grouping_window_seconds=payload.get("grouping_window_seconds"),
+        route_selected_by_orchestration=bool(
+            payload.get("route_selected_by_orchestration")
+        ),
+        steps=steps,
+        blocked=bool(payload.get("blocked")),
+        reason=payload.get("reason"),
+        disposition=payload.get("disposition") or "process",
+        disposition_reason=payload.get("disposition_reason"),
+        pause_seconds=payload.get("pause_seconds"),
+        pause_retrigger=payload.get("pause_retrigger") or "preserve",
+        disposition_orchestration_id=payload.get("disposition_orchestration_id"),
+        disposition_version_id=payload.get("disposition_version_id"),
+        evaluated_service_ids=[
+            int(value) for value in payload.get("evaluated_service_ids") or []
+        ],
+    )
+    if runtime.team is None and runtime.route is not None:
+        runtime.team = runtime.route.team
+    return runtime
 
 __all__ = [
     "RuntimeOrchestrationError",
@@ -892,4 +991,5 @@ __all__ = [
     "attach_runtime_executions",
     "run_event_orchestration",
     "run_service_orchestration",
+    "restore_runtime_result",
 ]

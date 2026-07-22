@@ -9,6 +9,7 @@ from app.modules.db.models import (
     EventOrchestrationVersion,
     OrchestrationExecution,
     OrchestrationIntakeToken,
+    PendingOrchestratedEvent,
     ServiceMatchRule,
 )
 from app.modules.db.orchestrations_repo import (
@@ -55,9 +56,11 @@ def orchestration_tables(db):
             EventOrchestrationRule,
             OrchestrationIntakeToken,
             OrchestrationExecution,
+            PendingOrchestratedEvent,
         ],
         safe=True,
     )
+    PendingOrchestratedEvent.delete().execute()
     OrchestrationExecution.delete().execute()
     EventOrchestrationRule.delete().execute()
     EventOrchestrationVersion.delete().execute()

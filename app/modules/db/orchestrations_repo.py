@@ -70,6 +70,10 @@ _REFERENCE_ACTIONS: Dict[str, Tuple[str, Tuple[str, ...]]] = {
         "PriorityPolicy",
         ("priority_policy_id", "policy_id", "value"),
     ),
+    "enqueue_webhook": (
+        "OrchestrationWebhookAction",
+        ("action_id", "webhook_action_id"),
+    ),
 }
 
 
@@ -444,6 +448,13 @@ def _validate_action_references(
         if entity is None:
             errors.append(f"{rule_path}: referenced {model_name} does not exist")
             continue
+        if action_type == "enqueue_webhook" and (
+            not bool(getattr(entity, "enabled", False))
+            or bool(getattr(entity, "deleted", False))
+            or getattr(entity, "deleted_at", None) is not None
+        ):
+            errors.append(f"{rule_path}: referenced webhook action is disabled")
+            continue
 
         entity_group_id = _entity_group_id(entity)
         if entity_group_id is None:
@@ -543,12 +554,71 @@ def validate_version(version_id: int) -> Dict[str, Any]:
     }
 
 
+
+def _constant_condition_value(condition: Any) -> Optional[bool]:
+    """Return True/False for statically constant condition trees."""
+    if not isinstance(condition, dict):
+        return None
+    if not condition:
+        return True
+
+    logical = [key for key in ("all", "any", "none") if key in condition]
+    if len(logical) != 1 or len(condition) != 1:
+        return None
+
+    key = logical[0]
+    children = condition.get(key)
+    if not isinstance(children, list):
+        return None
+    values = [_constant_condition_value(child) for child in children]
+
+    if key == "all":
+        if any(value is False for value in values):
+            return False
+        if all(value is True for value in values):
+            return True
+        return None
+
+    if key == "any":
+        if any(value is True for value in values):
+            return True
+        if all(value is False for value in values):
+            return False
+        return None
+
+    # none is the negation of any(children).
+    if any(value is True for value in values):
+        return False
+    if all(value is False for value in values):
+        return True
+    return None
+
+
+def _definition_has_catch_all_drop(definition: Dict[str, Any]) -> bool:
+    def walk(rules):
+        for rule in rules or []:
+            if not isinstance(rule, dict) or not bool(rule.get("enabled", True)):
+                continue
+            actions = rule.get("actions") or []
+            if _constant_condition_value(rule.get("condition_tree") or {}) is True and any(
+                isinstance(action, dict)
+                and (action.get("type") or action.get("action")) == "drop"
+                for action in actions
+            ):
+                return True
+            if walk(rule.get("children") or []):
+                return True
+        return False
+
+    return walk(definition.get("rules") or [])
+
 def _publish_version_locked(
     orchestration: EventOrchestration,
     draft: EventOrchestrationVersion,
     *,
     actor_id: Optional[int],
     comment: Optional[str],
+    confirm_catch_all_drop: bool = False,
 ) -> EventOrchestrationVersion:
     if draft.orchestration_id != orchestration.id:
         raise OrchestrationConflict("Draft belongs to another orchestration")
@@ -558,6 +628,14 @@ def _publish_version_locked(
     if not validation["valid"]:
         raise OrchestrationValidationError(
             validation["errors"],
+            validation["warnings"],
+        )
+    if (
+        _definition_has_catch_all_drop(validation["definition"])
+        and not confirm_catch_all_drop
+    ):
+        raise OrchestrationValidationError(
+            ["catch-all drop requires explicit publish confirmation"],
             validation["warnings"],
         )
 
@@ -606,6 +684,7 @@ def publish_draft(
     *,
     actor_id: Optional[int] = None,
     comment: Optional[str] = None,
+    confirm_catch_all_drop: bool = False,
 ) -> EventOrchestrationVersion:
     """Validate and atomically activate the current draft."""
 
@@ -623,6 +702,7 @@ def publish_draft(
             draft,
             actor_id=actor_id,
             comment=comment,
+            confirm_catch_all_drop=confirm_catch_all_drop,
         )
 
 
@@ -632,6 +712,7 @@ def rollback_to_version(
     *,
     actor_id: Optional[int] = None,
     comment: Optional[str] = None,
+    confirm_catch_all_drop: bool = False,
 ) -> EventOrchestrationVersion:
     """Publish a new immutable version copied from an earlier version."""
 
@@ -665,6 +746,7 @@ def rollback_to_version(
             draft,
             actor_id=actor_id,
             comment=draft.comment,
+            confirm_catch_all_drop=confirm_catch_all_drop,
         )
 
 

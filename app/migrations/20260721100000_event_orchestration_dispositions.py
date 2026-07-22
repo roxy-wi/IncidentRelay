@@ -1,31 +1,27 @@
-"""Add runtime rollout state and persisted notification-policy overrides."""
+"""Add suppress/drop/pause persistence for Event Orchestration."""
 
-from peewee import CharField, IntegerField, SqliteDatabase
+from peewee import BooleanField, TextField, SqliteDatabase
 from playhouse.migrate import SchemaMigrator, migrate
 
 from app.db import init_database
 from app.migrations.introspection import get_columns, get_indexes, table_exists
+from app.modules.db.models import PendingOrchestratedEvent
 
 
 db = init_database()
-RUNTIME_COLUMNS = {
-    "event_orchestration": {
-        "compatibility_mode": lambda: CharField(
-            max_length=32,
-            default="legacy",
-        ),
-    },
+COLUMNS = {
     "alert_group": {
-        "notification_policy_id": lambda: IntegerField(null=True),
+        "orchestration_suppressed": lambda: BooleanField(default=False),
+        "orchestration_suppress_reason": lambda: TextField(null=True),
     },
     "alert": {
-        "notification_policy_id": lambda: IntegerField(null=True),
+        "orchestration_suppressed": lambda: BooleanField(default=False),
+        "orchestration_suppress_reason": lambda: TextField(null=True),
     },
 }
-RUNTIME_INDEXES = (
-    ("event_orchestration", ("group_id", "compatibility_mode", "enabled")),
-    ("alert_group", ("notification_policy_id",)),
-    ("alert", ("notification_policy_id",)),
+INDEXES = (
+    ("alert_group", ("orchestration_suppressed",)),
+    ("alert", ("orchestration_suppressed",)),
 )
 
 
@@ -49,47 +45,43 @@ def _has_index(table, columns):
 def upgrade():
     migrator = SchemaMigrator.from_database(db)
     operations = []
-
-    for table, columns in RUNTIME_COLUMNS.items():
+    for table, columns in COLUMNS.items():
         if not table_exists(db, table):
             continue
         existing = _columns(table)
-        for name, field_factory in columns.items():
+        for name, factory in columns.items():
             if name not in existing:
-                operations.append(
-                    migrator.add_column(table, name, field_factory())
-                )
-
+                operations.append(migrator.add_column(table, name, factory()))
     if operations:
         migrate(*operations)
 
-    for table, columns in RUNTIME_INDEXES:
+    for table, columns in INDEXES:
         if table_exists(db, table) and not _has_index(table, columns):
             migrate(migrator.add_index(table, columns, unique=False))
 
+    db.create_tables([PendingOrchestratedEvent], safe=True)
+
 
 def downgrade():
-    migrator = SchemaMigrator.from_database(db)
+    if table_exists(db, PendingOrchestratedEvent._meta.table_name):
+        db.drop_tables([PendingOrchestratedEvent], safe=True)
 
-    for table, columns in reversed(tuple(RUNTIME_COLUMNS.items())):
+    migrator = SchemaMigrator.from_database(db)
+    for table, columns in reversed(tuple(COLUMNS.items())):
         if not table_exists(db, table):
             continue
-        removed_columns = set(columns)
+        removed = set(columns)
         for index in _indexes(table):
-            if removed_columns.intersection(index.columns):
+            if removed.intersection(index.columns):
                 migrate(migrator.drop_index(table, index.name))
 
-    for table, columns in reversed(tuple(RUNTIME_COLUMNS.items())):
+    for table, columns in reversed(tuple(COLUMNS.items())):
         existing = _columns(table)
         for name in reversed(tuple(columns)):
             if name not in existing:
                 continue
             if isinstance(db, SqliteDatabase):
-                operation = migrator.drop_column(
-                    table,
-                    name,
-                    legacy=True,
-                )
+                operation = migrator.drop_column(table, name, legacy=True)
             else:
                 operation = migrator.drop_column(table, name)
             migrate(operation)

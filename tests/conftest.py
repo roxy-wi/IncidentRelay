@@ -91,10 +91,16 @@ from app.modules.db.models import (  # noqa: E402
     BusinessServiceStatusHistory,
     Heartbeat,
     HeartbeatPing,
+    PendingOrchestratedEvent,
+    OrchestrationWebhookAction,
+    AutomationExecution,
 )
 
 
 CLEANUP_MODELS = [
+    AutomationExecution,
+    OrchestrationWebhookAction,
+    PendingOrchestratedEvent,
     HeartbeatPing,
     AlertNotificationEvent,
     AlertNotification,

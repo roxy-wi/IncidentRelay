@@ -586,6 +586,12 @@ def serialize_alert_group(
         "team_escalation_enabled": group.team.escalation_enabled if group.team else None,
         "maintenance_window_id": group.maintenance_window_id,
         "maintenance_suppressed": group.maintenance_suppressed,
+        "orchestration_suppressed": bool(
+            getattr(group, "orchestration_suppressed", False)
+        ),
+        "orchestration_suppress_reason": getattr(
+            group, "orchestration_suppress_reason", None
+        ),
         "correlation_summary": serialize_alert_group_correlation_summary(group),
         "business_impact_summary": serialize_alert_group_business_impact_summary(group),
     }

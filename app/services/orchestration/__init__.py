@@ -72,3 +72,27 @@ __all__ += [
     "run_service_orchestration",
 ]
 # END EVENT ORCHESTRATION WS4 EXPORTS
+
+# BEGIN EVENT ORCHESTRATION WS6 EXPORTS
+from .webhooks import (
+    WebhookDeliveryError,
+    WebhookSecurityError,
+    WebhookValidationError,
+    create_webhook_action,
+    process_due_webhooks,
+    retry_failed_webhook,
+    serialize_webhook_action,
+    update_webhook_action,
+)
+
+__all__ += [
+    "WebhookDeliveryError",
+    "WebhookSecurityError",
+    "WebhookValidationError",
+    "create_webhook_action",
+    "process_due_webhooks",
+    "retry_failed_webhook",
+    "serialize_webhook_action",
+    "update_webhook_action",
+]
+# END EVENT ORCHESTRATION WS6 EXPORTS

@@ -197,3 +197,51 @@ def test_invalid_static_reference_is_rejected_before_execution():
 def test_unknown_action_is_rejected():
     issues = validate_action_list([{"type": "run_python", "value": "print(1)"}])
     assert issues[0].code == "unsupported_action"
+
+
+def test_disposition_reasons_are_templated_and_pause_retrigger_is_explicit():
+    context = build_context(
+        event={"title": "Database unavailable"},
+        labels={"environment": "prod"},
+    )
+
+    suppressed = execute_actions(
+        [
+            {
+                "type": "suppress",
+                "reason": "{{ event.title }} in {{ labels.environment }}",
+            }
+        ],
+        context,
+    )
+    assert suppressed.context["result"]["suppress_reason"] == (
+        "Database unavailable in prod"
+    )
+
+    paused = execute_actions(
+        [
+            {
+                "type": "pause",
+                "seconds": 90,
+                "retrigger": "reset",
+                "reason": "waiting for recovery",
+            }
+        ],
+        context,
+    )
+    assert paused.context["result"]["pause_retrigger"] == "reset"
+    assert paused.context["result"]["pause_reason"] == "waiting for recovery"
+
+    dropped = execute_actions(
+        [{"type": "drop", "reason": "irrelevant"}],
+        context,
+    )
+    assert dropped.context["result"]["drop_reason"] == "irrelevant"
+
+
+def test_pause_rejects_unknown_retrigger_mode():
+    issues = validate_action_list(
+        [{"type": "pause", "seconds": 30, "retrigger": "extend"}]
+    )
+
+    assert any(issue.code == "invalid_pause_retrigger" for issue in issues)

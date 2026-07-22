@@ -19,6 +19,11 @@ from app.services.alerts.explain_cleanup import cleanup_alert_explain_traces
 from app.services.service_catalog.impact_snapshots import capture_scheduled_service_impact_snapshot
 from app.services.heartbeats.service import process_overdue_heartbeats
 from app.modules.common import utc_now
+from app.services.orchestration.pending import (
+    cleanup_orchestration_retention,
+    process_due_pending_events,
+)
+from app.services.orchestration.webhooks import process_due_webhooks
 
 logger = logging.getLogger("oncall.scheduler")
 _scheduler = None
@@ -474,6 +479,99 @@ def service_impact_snapshot_job():
             db.close()
 
 
+
+def orchestration_pending_event_job():
+    """Activate due paused orchestration events under a database lock."""
+    if db.is_closed():
+        db.connect(reuse_if_open=True)
+    owner = None
+    try:
+        owner = acquire_db_lock("orchestration_pending_event_job")
+        if not owner:
+            logger.debug("orchestration pending event job skipped because lock is busy")
+            return {"processed": 0, "activated": 0, "failed": 0, "requeued": 0}
+        result = process_due_pending_events(
+            limit=int(getattr(Config, "ORCHESTRATION_PENDING_BATCH_SIZE", 100))
+        )
+        logger.info(
+            "orchestration pending event job finished",
+            extra={"extra": {"event_type": "scheduler", **result}},
+        )
+        return result
+    except Exception:
+        logger.exception("orchestration pending event job failed")
+        return {"processed": 0, "activated": 0, "failed": 1, "requeued": 0}
+    finally:
+        if owner:
+            release_db_lock("orchestration_pending_event_job", owner)
+        if not db.is_closed():
+            db.close()
+
+
+def orchestration_webhook_job():
+    """Deliver queued orchestration webhook actions under a database lock."""
+    if db.is_closed():
+        db.connect(reuse_if_open=True)
+    owner = None
+    try:
+        owner = acquire_db_lock("orchestration_webhook_job")
+        if not owner:
+            logger.debug("orchestration webhook job skipped because lock is busy")
+            return {
+                "processed": 0,
+                "succeeded": 0,
+                "failed": 0,
+                "cancelled": 0,
+                "requeued": 0,
+            }
+        result = process_due_webhooks(
+            limit=int(getattr(Config, "ORCHESTRATION_WEBHOOK_BATCH_SIZE", 50))
+        )
+        logger.info(
+            "orchestration webhook job finished",
+            extra={"extra": {"event_type": "scheduler", **result}},
+        )
+        return result
+    except Exception:
+        logger.exception("orchestration webhook job failed")
+        return {
+            "processed": 0,
+            "succeeded": 0,
+            "failed": 1,
+            "cancelled": 0,
+            "requeued": 0,
+        }
+    finally:
+        if owner:
+            release_db_lock("orchestration_webhook_job", owner)
+        if not db.is_closed():
+            db.close()
+
+
+def orchestration_retention_cleanup_job():
+    """Prune expired dropped traces and terminal pending rows."""
+    if db.is_closed():
+        db.connect(reuse_if_open=True)
+    owner = None
+    try:
+        owner = acquire_db_lock("orchestration_retention_cleanup_job")
+        if not owner:
+            return {"executions_deleted": 0, "pending_events_deleted": 0}
+        result = cleanup_orchestration_retention()
+        logger.info(
+            "orchestration retention cleanup job finished",
+            extra={"extra": {"event_type": "scheduler", **result}},
+        )
+        return result
+    except Exception:
+        logger.exception("orchestration retention cleanup job failed")
+        return {"executions_deleted": 0, "pending_events_deleted": 0}
+    finally:
+        if owner:
+            release_db_lock("orchestration_retention_cleanup_job", owner)
+        if not db.is_closed():
+            db.close()
+
 def start_scheduler():
     """
     Start the background scheduler.
@@ -619,6 +717,39 @@ def start_scheduler():
             id="service_impact_snapshot_job",
             replace_existing=True,
         )
+
+    _scheduler.add_job(
+        orchestration_pending_event_job,
+        "interval",
+        seconds=int(getattr(Config, "ORCHESTRATION_PENDING_CHECK_INTERVAL_SECONDS", 10)),
+        max_instances=1,
+        coalesce=True,
+        next_run_time=utc_now(),
+        id="orchestration_pending_event_job",
+        replace_existing=True,
+    )
+
+    _scheduler.add_job(
+        orchestration_webhook_job,
+        "interval",
+        seconds=int(getattr(Config, "ORCHESTRATION_WEBHOOK_CHECK_INTERVAL_SECONDS", 5)),
+        max_instances=1,
+        coalesce=True,
+        next_run_time=utc_now(),
+        id="orchestration_webhook_job",
+        replace_existing=True,
+    )
+
+    _scheduler.add_job(
+        orchestration_retention_cleanup_job,
+        "interval",
+        seconds=int(getattr(Config, "ORCHESTRATION_RETENTION_CLEANUP_INTERVAL_SECONDS", 86400)),
+        max_instances=1,
+        coalesce=True,
+        next_run_time=utc_now(),
+        id="orchestration_retention_cleanup_job",
+        replace_existing=True,
+    )
 
     try:
         _scheduler.start()

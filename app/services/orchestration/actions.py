@@ -70,6 +70,7 @@ SUPPORTED_ACTION_TYPES = frozenset(
         "suppress",
         "drop",
         "pause",
+        "enqueue_webhook",
     }
 )
 
@@ -107,10 +108,15 @@ class EventActionState:
         result.setdefault("suppress_notifications", False)
         result.setdefault("dropped", False)
         result.setdefault("pause_seconds", None)
+        result.setdefault("pause_retrigger", "preserve")
+        result.setdefault("suppress_reason", None)
+        result.setdefault("pause_reason", None)
+        result.setdefault("drop_reason", None)
         result.setdefault("routing", {})
         result.setdefault("policies", {})
         result.setdefault("grouping", {})
         result.setdefault("notes", [])
+        result.setdefault("webhooks", [])
 
         if result["disposition"] not in PROCESS_DISPOSITIONS:
             raise ActionValidationError("result.disposition is invalid", path="result.disposition")
@@ -122,6 +128,8 @@ class EventActionState:
             raise ActionValidationError("result.grouping must be an object", path="result.grouping")
         if not isinstance(result["notes"], list):
             raise ActionValidationError("result.notes must be a list", path="result.notes")
+        if not isinstance(result["webhooks"], list):
+            raise ActionValidationError("result.webhooks must be a list", path="result.webhooks")
 
         return cls(
             event=event,
@@ -447,6 +455,25 @@ def validate_action(action: Any, *, path: str = "action") -> List[ValidationIssu
         seconds = action.get("seconds")
         if isinstance(seconds, bool) or not isinstance(seconds, int) or not 1 <= seconds <= MAX_PAUSE_SECONDS:
             issues.append(ValidationIssue(f"{path}.seconds", "invalid_pause_duration", "pause duration must be between 1 and 604800 seconds"))
+        retrigger = action.get("retrigger", "preserve")
+        if retrigger not in {"preserve", "reset"}:
+            issues.append(ValidationIssue(f"{path}.retrigger", "invalid_pause_retrigger", "pause retrigger must be preserve or reset"))
+
+    elif action_type == "enqueue_webhook":
+        action_id = action.get("action_id", action.get("webhook_action_id"))
+        if isinstance(action_id, bool) or not isinstance(action_id, int) or action_id <= 0:
+            issues.append(ValidationIssue(
+                f"{path}.action_id",
+                "invalid_webhook_action",
+                "enqueue_webhook requires a positive integer action_id",
+            ))
+
+    if action_type in {"suppress", "pause", "drop"}:
+        reason = action.get("reason")
+        if reason is not None and not isinstance(reason, str):
+            issues.append(ValidationIssue(f"{path}.reason", "invalid_disposition_reason", "disposition reason must be a string"))
+        elif isinstance(reason, str) and ("{{" in reason or "}}" in reason):
+            issues.extend(validate_template(reason, path=f"{path}.reason"))
 
     return issues
 
@@ -487,6 +514,29 @@ def _execute_grouping(action: Mapping[str, Any], state: EventActionState, *, pat
         grouping["window_seconds"] = seconds
 
     return before, copy.deepcopy(grouping), tuple(references)
+
+
+def _disposition_reason(
+    action: Mapping[str, Any],
+    state: EventActionState,
+    *,
+    path: str,
+) -> Tuple[Optional[str], Tuple[str, ...]]:
+    reason = action.get("reason")
+    if reason in (None, ""):
+        return None, ()
+    references: Tuple[str, ...] = ()
+    if "{{" in reason or "}}" in reason:
+        rendered = render_template(reason, state.context())
+        reason = rendered.value
+        references = rendered.references
+    reason = _scalar_text(reason, path=f"{path}.reason", allow_empty=True)
+    if len(reason) > MAX_NOTE_LENGTH:
+        raise ActionValidationError(
+            "disposition reason exceeds the size limit",
+            path=f"{path}.reason",
+        )
+    return reason or None, references
 
 
 def _execute_action(action: Mapping[str, Any], state: EventActionState, *, path: str) -> Tuple[Any, Any, Tuple[str, ...], str]:
@@ -578,36 +628,76 @@ def _execute_action(action: Mapping[str, Any], state: EventActionState, *, path:
         state.result["notes"].append(note)
         return before, list(state.result["notes"]), references, "continue"
 
+    if action_type == "enqueue_webhook":
+        action_id = action.get("action_id", action.get("webhook_action_id"))
+        if isinstance(action_id, bool) or not isinstance(action_id, int) or action_id <= 0:
+            raise ActionValidationError(
+                "enqueue_webhook requires a positive integer action_id",
+                path=f"{path}.action_id",
+            )
+        webhooks = state.result.setdefault("webhooks", [])
+        before = list(webhooks)
+        request = {"action_id": action_id}
+        webhooks.append(request)
+        return before, request, (), "continue"
+
     if action_type == "suppress":
+        reason, references = _disposition_reason(action, state, path=path)
         before = {
             "disposition": state.result.get("disposition"),
             "suppress_notifications": state.result.get("suppress_notifications"),
+            "suppress_reason": state.result.get("suppress_reason"),
         }
         state.result["disposition"] = "suppress"
         state.result["suppress_notifications"] = True
-        return before, {"disposition": "suppress", "suppress_notifications": True}, (), "continue"
+        state.result["suppress_reason"] = reason
+        return before, {
+            "disposition": "suppress",
+            "suppress_notifications": True,
+            "reason": reason,
+        }, references, "continue"
 
     if action_type == "pause":
         seconds = action.get("seconds")
         if isinstance(seconds, bool) or not isinstance(seconds, int) or not 1 <= seconds <= MAX_PAUSE_SECONDS:
             raise ActionValidationError("pause duration must be between 1 and 604800 seconds", path=f"{path}.seconds")
+        retrigger = action.get("retrigger", "preserve")
+        if retrigger not in {"preserve", "reset"}:
+            raise ActionValidationError("pause retrigger must be preserve or reset", path=f"{path}.retrigger")
+        reason, references = _disposition_reason(action, state, path=path)
         before = {
             "disposition": state.result.get("disposition"),
             "pause_seconds": state.result.get("pause_seconds"),
+            "pause_retrigger": state.result.get("pause_retrigger"),
+            "pause_reason": state.result.get("pause_reason"),
         }
         state.result["disposition"] = "pause"
         state.result["pause_seconds"] = seconds
-        return before, {"disposition": "pause", "pause_seconds": seconds}, (), "continue"
+        state.result["pause_retrigger"] = retrigger
+        state.result["pause_reason"] = reason
+        return before, {
+            "disposition": "pause",
+            "pause_seconds": seconds,
+            "retrigger": retrigger,
+            "reason": reason,
+        }, references, "continue"
 
     if action_type == "drop":
+        reason, references = _disposition_reason(action, state, path=path)
         before = {
             "disposition": state.result.get("disposition"),
             "dropped": state.result.get("dropped"),
+            "drop_reason": state.result.get("drop_reason"),
         }
         state.result["disposition"] = "drop"
         state.result["dropped"] = True
         state.result["suppress_notifications"] = True
-        return before, {"disposition": "drop", "dropped": True}, (), "stop_orchestration"
+        state.result["drop_reason"] = reason
+        return before, {
+            "disposition": "drop",
+            "dropped": True,
+            "reason": reason,
+        }, references, "stop_orchestration"
 
     raise ActionValidationError(f"unsupported action {action_type!r}", path=f"{path}.type")
 

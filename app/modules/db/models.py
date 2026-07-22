@@ -1826,6 +1826,8 @@ class AlertGroup(BaseModel):
 
     maintenance_behavior = CharField(null=True)
     maintenance_suppressed = BooleanField(default=False, index=True)
+    orchestration_suppressed = BooleanField(default=False, index=True)
+    orchestration_suppress_reason = TextField(null=True)
 
     class Meta:
         table_name = "alert_group"
@@ -1894,6 +1896,8 @@ class Alert(BaseModel):
 
     maintenance_behavior = CharField(null=True)
     maintenance_suppressed = BooleanField(default=False, index=True)
+    orchestration_suppressed = BooleanField(default=False, index=True)
+    orchestration_suppress_reason = TextField(null=True)
     labels = JSONTextField(null=True)
     payload = JSONTextField(null=True)
     status = CharField(default="firing")
@@ -3044,5 +3048,186 @@ class OrchestrationExecution(BaseModel):
             (("event_fingerprint", "created_at"), False),
         )
 
+
+class PendingOrchestratedEvent(BaseModel):
+    """A paused normalized event waiting to enter the normal alert lifecycle."""
+
+    id = AutoField()
+    uid = UUIDField(default=uuid.uuid4, unique=True, index=True)
+    group = ForeignKeyField(
+        Group,
+        backref="pending_orchestrated_events",
+        on_delete="CASCADE",
+        index=True,
+    )
+    orchestration = ForeignKeyField(
+        EventOrchestration,
+        backref="pending_events",
+        on_delete="CASCADE",
+        index=True,
+    )
+    version = ForeignKeyField(
+        EventOrchestrationVersion,
+        backref="pending_events",
+        on_delete="RESTRICT",
+        index=True,
+    )
+    route = ForeignKeyField(
+        AlertRoute,
+        null=True,
+        backref="pending_orchestrated_events",
+        on_delete="SET NULL",
+        index=True,
+    )
+    service = ForeignKeyField(
+        Service,
+        null=True,
+        backref="pending_orchestrated_events",
+        on_delete="SET NULL",
+        index=True,
+    )
+    source = CharField(max_length=128, index=True)
+    integration_name = CharField(max_length=255, null=True)
+    dedup_key = CharField(max_length=255, index=True)
+    active_key = CharField(max_length=64, null=True, unique=True, index=True)
+    normalized_event_json = JSONTextField(default=dict)
+    context_json = JSONTextField(default=dict)
+    activation_at = DateTimeField(index=True)
+    status = CharField(max_length=32, default="pending", index=True)
+    attempts = IntegerField(default=0)
+    last_error = TextField(null=True)
+    claim_token = CharField(max_length=64, null=True, index=True)
+    claimed_at = DateTimeField(null=True, index=True)
+    next_attempt_at = DateTimeField(null=True, index=True)
+    created_at = DateTimeField(default=utc_now, index=True)
+    updated_at = DateTimeField(default=utc_now)
+    resolved_at = DateTimeField(null=True, index=True)
+    activated_at = DateTimeField(null=True, index=True)
+
+    class Meta:
+        table_name = "pending_orchestrated_event"
+        indexes = (
+            (("status", "activation_at"), False),
+            (("group", "source", "dedup_key"), False),
+            (("status", "next_attempt_at"), False),
+        )
+
+
+
+ORCHESTRATION_WEBHOOK_METHODS = ("GET", "POST", "PUT", "PATCH", "DELETE")
+ORCHESTRATION_WEBHOOK_PRIVATE_NETWORK_POLICIES = ("deny", "allowlist")
+AUTOMATION_EXECUTION_STATUSES = (
+    "pending",
+    "running",
+    "succeeded",
+    "failed",
+    "cancelled",
+)
+
+
+class OrchestrationWebhookAction(SoftDeleteModel):
+    """Reusable group-owned outbound webhook action configuration."""
+
+    id = AutoField()
+    uid = UUIDField(default=uuid.uuid4, unique=True, index=True)
+    group = ForeignKeyField(
+        Group,
+        backref="orchestration_webhook_actions",
+        on_delete="CASCADE",
+        index=True,
+    )
+    name = CharField(max_length=255)
+    description = TextField(null=True)
+    url = TextField()
+    method = CharField(max_length=16, default="POST")
+    headers_encrypted = TextField(null=True)
+    body_template = TextField(null=True)
+    timeout_seconds = IntegerField(default=10)
+    retry_count = IntegerField(default=2)
+    private_network_policy = CharField(max_length=32, default="deny")
+    enabled = BooleanField(default=True, index=True)
+    created_by = ForeignKeyField(
+        User,
+        backref="created_orchestration_webhook_actions",
+        null=True,
+        on_delete="SET NULL",
+    )
+    created_at = DateTimeField(default=utc_now, index=True)
+    updated_at = DateTimeField(default=utc_now)
+
+    class Meta:
+        table_name = "orchestration_webhook_action"
+        indexes = (
+            (("group", "name"), True),
+            (("group", "enabled"), False),
+        )
+
+    def save(self, *args, **kwargs):
+        self.method = str(self.method or "POST").upper()
+        if self.method not in ORCHESTRATION_WEBHOOK_METHODS:
+            raise ValueError("Invalid orchestration webhook method")
+        if self.private_network_policy not in ORCHESTRATION_WEBHOOK_PRIVATE_NETWORK_POLICIES:
+            raise ValueError("Invalid orchestration webhook private network policy")
+        if isinstance(self.timeout_seconds, bool) or not 1 <= int(self.timeout_seconds) <= 60:
+            raise ValueError("Webhook timeout must be between 1 and 60 seconds")
+        if isinstance(self.retry_count, bool) or not 0 <= int(self.retry_count) <= 10:
+            raise ValueError("Webhook retry count must be between 0 and 10")
+        self.updated_at = utc_now()
+        return super().save(*args, **kwargs)
+
+
+class AutomationExecution(BaseModel):
+    """Queued and audited execution of one orchestration webhook action."""
+
+    id = AutoField()
+    uid = UUIDField(default=uuid.uuid4, unique=True, index=True)
+    action = ForeignKeyField(
+        OrchestrationWebhookAction,
+        backref="executions",
+        on_delete="RESTRICT",
+        index=True,
+    )
+    orchestration_execution = ForeignKeyField(
+        OrchestrationExecution,
+        backref="automation_executions",
+        on_delete="CASCADE",
+        index=True,
+    )
+    group = ForeignKeyField(
+        Group,
+        backref="automation_executions",
+        on_delete="CASCADE",
+        index=True,
+    )
+    alert_group_id = IntegerField(null=True, index=True)
+    rule_path = CharField(max_length=512, null=True)
+    status = CharField(max_length=32, default="pending", index=True)
+    attempts = IntegerField(default=0)
+    idempotency_key = CharField(max_length=128, unique=True, index=True)
+    request_metadata_json = JSONTextField(default=dict)
+    request_headers_encrypted = TextField(null=True)
+    request_body_encrypted = TextField(null=True)
+    response_status = IntegerField(null=True)
+    response_excerpt_safe = TextField(null=True)
+    error_safe = TextField(null=True)
+    next_attempt_at = DateTimeField(null=True, index=True)
+    claim_token = CharField(max_length=64, null=True, index=True)
+    claimed_at = DateTimeField(null=True, index=True)
+    created_at = DateTimeField(default=utc_now, index=True)
+    started_at = DateTimeField(null=True, index=True)
+    finished_at = DateTimeField(null=True, index=True)
+
+    class Meta:
+        table_name = "automation_execution"
+        indexes = (
+            (("status", "next_attempt_at"), False),
+            (("group", "status", "created_at"), False),
+            (("orchestration_execution", "created_at"), False),
+        )
+
+    def save(self, *args, **kwargs):
+        if self.status not in AUTOMATION_EXECUTION_STATUSES:
+            raise ValueError("Invalid automation execution status")
+        return super().save(*args, **kwargs)
 
 # END EVENT ORCHESTRATION V1 MODELS
