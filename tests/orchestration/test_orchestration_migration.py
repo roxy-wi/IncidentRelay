@@ -36,10 +36,13 @@ def test_event_orchestration_migration_upgrade_and_downgrade(db):
     )
     upgrade, downgrade = load_migration_module(path)
 
-    # Dependent tables and columns must be removed before the base models.
+    # Roll back in reverse dependency order.
     webhooks_downgrade()
     dispositions_downgrade()
     runtime_downgrade()
+    downgrade()
+
+    assert TABLES.isdisjoint(set(db.get_tables()))
 
     upgrade()
     assert TABLES.issubset(set(db.get_tables()))
@@ -47,7 +50,7 @@ def test_event_orchestration_migration_upgrade_and_downgrade(db):
     downgrade()
     assert TABLES.isdisjoint(set(db.get_tables()))
 
-    # Restore the current schema for the shared migrated test database.
+    # Restore the current schema for the shared test database.
     upgrade()
     runtime_upgrade()
     dispositions_upgrade()
