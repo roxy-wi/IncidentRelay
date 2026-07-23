@@ -235,5 +235,5 @@ def test_simulate_api_rejects_unauthenticated_request(client, db):
         },
     )
 
-    assert response.status_code == 403
-    assert response.get_json()["error"] == "forbidden"
+    assert response.status_code == 401
+    assert response.get_json()["error"] == "JWT or API token authentication is required"
