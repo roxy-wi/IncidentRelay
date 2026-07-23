@@ -194,6 +194,30 @@ class Config:
     ORCHESTRATION_WEBHOOK_EXECUTION_RETENTION_DAYS = settings.get_int(
         "orchestration", "webhook_execution_retention_days", 30
     )
+    ORCHESTRATION_REPLAY_MAX_EVENTS = settings.get_int(
+        "orchestration", "replay_max_events", 100
+    )
+    ORCHESTRATION_REPLAY_DROP_WARNING_PERCENT = settings.get_int(
+        "orchestration", "replay_drop_warning_percent", 20
+    )
+    ORCHESTRATION_TRACE_MAX_DEPTH = settings.get_int(
+        "orchestration", "trace_max_depth", 12
+    )
+    ORCHESTRATION_TRACE_MAX_STRING_CHARS = settings.get_int(
+        "orchestration", "trace_max_string_chars", 2048
+    )
+    ORCHESTRATION_TRACE_MAX_ITEMS = settings.get_int(
+        "orchestration", "trace_max_items", 512
+    )
+    ORCHESTRATION_SIMULATION_MAX_PAYLOAD_BYTES = settings.get_int(
+        "orchestration", "simulation_max_payload_bytes", 1048576
+    )
+    ORCHESTRATION_SIMULATION_MAX_DIFFS = settings.get_int(
+        "orchestration", "simulation_max_diffs", 512
+    )
+    ORCHESTRATION_SHADOW_METRICS_MAX_EXECUTIONS = settings.get_int(
+        "orchestration", "shadow_metrics_max_executions", 5000
+    )
     USER_NOTIFICATION_RULES_CHECK_INTERVAL_SECONDS = settings.get_int(
         "scheduler",
         "user_notification_rules_check_interval_seconds",

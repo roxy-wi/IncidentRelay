@@ -25,7 +25,7 @@ from app.modules.db.models import (
 from app.services.orchestration.cache import published_definition_cache
 from app.services.orchestration.engine import execute_rule_tree
 from app.services.orchestration.fields import build_context
-from app.modules.redaction import redact_secrets
+from app.services.orchestration.safety import safe_trace_value
 
 logger = logging.getLogger("oncall.orchestration.runtime")
 
@@ -119,39 +119,6 @@ class RuntimeResult:
             "steps": [step.to_dict() for step in self.steps],
         }
 
-
-def _bounded_trace_value(value: Any, *, depth: int = 0) -> Any:
-    """Return a bounded, JSON-compatible value for execution traces."""
-    if depth > 12:
-        return "<truncated>"
-
-    if isinstance(value, str):
-        return value if len(value) <= 2048 else value[:2048] + "…"
-
-    if value is None or isinstance(value, (int, float, bool)):
-        return value
-
-    if isinstance(value, Mapping):
-        return {
-            str(key): _bounded_trace_value(item, depth=depth + 1)
-            for key, item in list(value.items())[:512]
-        }
-
-    if isinstance(value, (list, tuple, set)):
-        return [
-            _bounded_trace_value(item, depth=depth + 1)
-            for item in list(value)[:512]
-        ]
-
-    if isinstance(value, BaseException):
-        return str(value)
-
-    return str(value)
-
-
-def _safe_trace_value(value: Any) -> Any:
-    """Bound trace data and redact secrets using the project-wide helper."""
-    return redact_secrets(_bounded_trace_value(value))
 
 
 def _entity_context(entity) -> Dict[str, Any]:
@@ -308,9 +275,9 @@ def _record_execution(
         "applied": bool(applied),
         "mode": orchestration.mode,
         "compatibility_mode": orchestration.compatibility_mode,
-        "initial_context": _safe_trace_value(initial_context or {}),
-        "result": _safe_trace_value(result.to_dict()) if result else None,
-        "error": _safe_trace_value(error),
+        "initial_context": safe_trace_value(initial_context or {}),
+        "result": safe_trace_value(result.to_dict()) if result else None,
+        "error": safe_trace_value(error),
     }
     disposition = None
     matched = 0
@@ -430,7 +397,7 @@ def _mark_execution_rejected(step: RuntimeStep, reason: str) -> RuntimeStep:
             execution = OrchestrationExecution.get_by_id(step.execution_id)
             trace_json = copy.deepcopy(execution.trace_json or {})
             trace_json["applied"] = False
-            trace_json["rejected_reason"] = _safe_trace_value(reason)
+            trace_json["rejected_reason"] = safe_trace_value(reason)
             execution.trace_json = trace_json
             execution.save(only=[OrchestrationExecution.trace_json])
         except Exception:
@@ -707,6 +674,40 @@ def _apply_runtime_to_alert_data(
         alert_data["priority_set_by_orchestration"] = True
 
 
+def _runtime_explain_payload(result: RuntimeResult) -> Dict[str, Any]:
+    """Return runtime summary plus full redacted rule traces for Explain."""
+    payload = result.to_dict()
+    execution_ids = result.execution_ids
+    if not execution_ids:
+        payload["executions"] = []
+        return payload
+
+    rows = {
+        row.id: row
+        for row in OrchestrationExecution.select().where(
+            OrchestrationExecution.id.in_(execution_ids)
+        )
+    }
+    executions = []
+    for step in result.steps:
+        row = rows.get(step.execution_id)
+        if row is None:
+            continue
+        executions.append(
+            {
+                "execution_id": row.id,
+                "orchestration_id": row.orchestration_id,
+                "version_id": row.version_id,
+                "duration_ms": row.duration_ms,
+                "matched_rule_count": row.matched_rule_count,
+                "disposition": row.disposition,
+                "trace": safe_trace_value(row.trace_json or {}),
+            }
+        )
+    payload["executions"] = executions
+    return payload
+
+
 def _trace_runtime(trace, result: RuntimeResult, *, phase="global"):
     if trace is None:
         return
@@ -726,7 +727,7 @@ def _trace_runtime(trace, result: RuntimeResult, *, phase="global"):
         ),
         result.reason,
         phase=phase,
-        orchestration=result.to_dict(),
+        orchestration=_runtime_explain_payload(result),
     )
 
 
@@ -901,6 +902,32 @@ def run_service_orchestration(
     return runtime
 
 
+def _actual_result_snapshot(*, group=None, alert=None) -> Dict[str, Any]:
+    """Capture the lifecycle result used to compare a shadow candidate."""
+    route_id = getattr(alert, "route_id", None) or getattr(group, "route_id", None)
+    team_id = getattr(alert, "team_id", None) or getattr(group, "team_id", None)
+    service_id = getattr(alert, "service_id", None) or getattr(group, "service_id", None)
+    suppressed = bool(
+        getattr(alert, "orchestration_suppressed", False)
+        or getattr(group, "orchestration_suppressed", False)
+    )
+    return {
+        "route_id": route_id,
+        "team_id": team_id,
+        "service_id": service_id,
+        "severity": getattr(alert, "severity", None),
+        "title": getattr(alert, "title", None),
+        "group_key": (
+            getattr(alert, "group_key", None)
+            or getattr(group, "group_key", None)
+        ),
+        "status": getattr(alert, "status", None) or getattr(group, "status", None),
+        "disposition": "suppress" if suppressed else "process",
+        "alert_id": getattr(alert, "id", None),
+        "alert_group_id": getattr(group, "id", None),
+    }
+
+
 def attach_runtime_executions(
     runtime: Optional[RuntimeResult],
     *,
@@ -914,6 +941,17 @@ def attach_runtime_executions(
         alert_group_id=getattr(group, "id", None),
         alert_id=getattr(alert, "id", None),
     ).where(OrchestrationExecution.id.in_(execution_ids)).execute()
+
+    actual_result = safe_trace_value(
+        _actual_result_snapshot(group=group, alert=alert)
+    )
+    for execution in OrchestrationExecution.select().where(
+        OrchestrationExecution.id.in_(execution_ids)
+    ):
+        trace_json = copy.deepcopy(execution.trace_json or {})
+        trace_json["actual_result"] = actual_result
+        execution.trace_json = trace_json
+        execution.save(only=[OrchestrationExecution.trace_json])
 
     # Queue outbound automation only after the orchestration decision and the
     # lifecycle outcome have been persisted. The queue function is idempotent.
