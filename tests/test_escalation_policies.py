@@ -492,7 +492,13 @@ def test_policy_escalation_moves_to_next_rule_without_notification_target(
 
     monkeypatch.setattr(notification_queue, "notify_alert", lambda *args, **kwargs: 1)
 
-    result = upsert_alert(normalized_alert())
+    result = upsert_alert(
+        normalized_alert(team_slug=team.slug)
+    )
+
+    assert result.group is not None
+    assert result.created_group is True
+
     alert_group = result.group
 
     assert alert_group.escalation_rule.id == first_rule.id
