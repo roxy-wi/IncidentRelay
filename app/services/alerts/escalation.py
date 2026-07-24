@@ -10,6 +10,64 @@ from app.modules.common import utc_now
 logger = logging.getLogger("oncall.alerts")
 
 
+def _deliver_escalation_notification(group):
+    """Attempt escalation delivery without affecting the state transition."""
+    has_target = False
+    resolution_error = None
+
+    try:
+        has_target = has_matching_notification_channel(
+            group,
+            event_type="escalation",
+        )
+    except Exception as exc:
+        resolution_error = exc
+        logger.exception(
+            "escalation notification target resolution failed",
+            extra={
+                "extra": {
+                    "alert_group_id": group.id,
+                    "route_id": group.route.id if group.route else None,
+                }
+            },
+        )
+
+    try:
+        sent_count = notify_alert(group, event_type="escalation")
+    except Exception as exc:
+        sent_count = 0
+        resolution_error = resolution_error or exc
+        logger.exception(
+            "escalation notification delivery failed",
+            extra={
+                "extra": {
+                    "alert_group_id": group.id,
+                    "route_id": group.route.id if group.route else None,
+                }
+            },
+        )
+
+    if sent_count:
+        return sent_count
+
+    if has_target or resolution_error is not None:
+        event_type = "escalation_notification_failed"
+        message = "Escalation completed, but notification delivery did not succeed."
+    else:
+        event_type = "escalation_notification_skipped"
+        message = (
+            "Escalation completed, but no matching notification target was found."
+        )
+
+    alerts_repo.create_alert_event(
+        group_id=group.id,
+        event_type=event_type,
+        message=message,
+    )
+
+    return 0
+
+
 def apply_initial_escalation_policy_assignment(policy, fallback_rotation):
     """Return initial policy rule, rotation, assignee and next escalation time."""
     policy_rule = None
@@ -51,19 +109,6 @@ def maybe_escalate_alert(group):
     if not group.team or not group.team.escalation_enabled:
         return False
 
-    if not has_matching_notification_channel(group, event_type="escalation"):
-        logger.debug(
-            "escalation skipped because no channel matches alert group severity",
-            extra={
-                "extra": {
-                    "alert_group_id": group.id,
-                    "severity": group.severity,
-                    "route_id": group.route.id if group.route else None,
-                }
-            },
-        )
-        return False
-
     if group.reminder_count < group.team.escalation_after_reminders:
         return False
 
@@ -87,7 +132,7 @@ def maybe_escalate_alert(group):
         message=f"Escalated to {next_user.username}",
     )
 
-    notify_alert(group, event_type="escalation")
+    _deliver_escalation_notification(group)
 
     return True
 
@@ -104,20 +149,6 @@ def maybe_escalate_alert_by_policy(group):
         return False
 
     if group.next_escalation_at > now:
-        return False
-
-    if not has_matching_notification_channel(group, event_type="escalation"):
-        logger.debug(
-            "policy escalation skipped because no channel matches alert group severity",
-            extra={
-                "extra": {
-                    "alert_group_id": group.id,
-                    "severity": group.severity,
-                    "route_id": group.route.id if group.route else None,
-                    "escalation_policy_id": group.escalation_policy_id,
-                }
-            },
-        )
         return False
 
     next_rule, repeat_count = escalation_policy_service.get_next_rule_for_alert(group)
@@ -163,6 +194,6 @@ def maybe_escalate_alert_by_policy(group):
         message=f"Escalated by policy rule #{next_rule.position} to {target}",
     )
 
-    notify_alert(group, event_type="escalation")
+    _deliver_escalation_notification(group)
 
     return True

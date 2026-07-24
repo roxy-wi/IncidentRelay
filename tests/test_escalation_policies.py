@@ -459,3 +459,67 @@ def test_policy_exhausted_alert_does_not_send_more_reminders(monkeypatch, db):
 
     assert send_unacked_reminders() == 0
     assert calls == []
+
+
+def test_policy_escalation_moves_to_next_rule_without_notification_target(
+    monkeypatch,
+    db,
+):
+    group = create_group(slug="infra-policy-no-target")
+    team = create_team(group, slug="sre-policy-no-target")
+    first_user = create_user("alice-policy-no-target", group)
+    second_user = create_user("bob-policy-no-target", group)
+    add_user_to_team(team, first_user)
+    add_user_to_team(team, second_user)
+    first_rotation = create_rotation(team, name="Primary no target", users=[first_user])
+    second_rotation = create_rotation(team, name="Backup no target", users=[second_user])
+    policy = create_escalation_policy(team)
+    first_rule = create_escalation_policy_rule(
+        policy,
+        position=1,
+        delay_seconds=60,
+        target_type="rotation",
+        rotation=first_rotation,
+    )
+    second_rule = create_escalation_policy_rule(
+        policy,
+        position=2,
+        delay_seconds=120,
+        target_type="rotation",
+        rotation=second_rotation,
+    )
+    create_route(team, escalation_policy=policy)
+
+    monkeypatch.setattr(notification_queue, "notify_alert", lambda *args, **kwargs: 1)
+
+    result = upsert_alert(normalized_alert())
+    alert_group = result.group
+
+    assert alert_group.escalation_rule.id == first_rule.id
+
+    alert_group.next_escalation_at = utc_now() - timedelta(seconds=1)
+    alert_group.save()
+
+    monkeypatch.setattr(
+        alert_escalation,
+        "has_matching_notification_channel",
+        lambda *args, **kwargs: False,
+    )
+    monkeypatch.setattr(
+        alert_escalation,
+        "notify_alert",
+        lambda *args, **kwargs: 0,
+    )
+
+    assert maybe_escalate_alert(alert_group) is True
+
+    stored = AlertGroup.get_by_id(alert_group.id)
+
+    assert stored.escalation_rule.id == second_rule.id
+    assert stored.rotation.id == second_rotation.id
+    assert stored.assignee.id == second_user.id
+    assert stored.escalation_level == 1
+    assert AlertEvent.select().where(
+        (AlertEvent.group == stored.id)
+        & (AlertEvent.event_type == "escalation_notification_skipped")
+    ).exists()

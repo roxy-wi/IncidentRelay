@@ -49,3 +49,26 @@ def test_match_alert_supports_top_level_labels_title_regex_and_fields():
     assert not match_alert(ALERT, {"severity": "warning"})
     assert not match_alert(ALERT, {"source": "zabbix"})
     assert not match_alert(ALERT, {"title_regex": "^CPU"})
+
+
+def test_match_value_supports_canonical_operator_value_format():
+    assert match_value("DB", {"op": "regex", "value": "^(Listener|DB)$"})
+    assert match_value("critical", {"op": "equals", "value": "critical"})
+    assert match_value("critical", {"op": "eq", "value": "critical"})
+    assert match_value("critical", {"op": "not_equals", "value": "warning"})
+    assert match_value("critical", {"op": "neq", "value": "warning"})
+    assert match_value("database-primary", {"op": "contains", "value": "database"})
+    assert match_value("database-primary", {"op": "not_contains", "value": "cache"})
+
+    assert not match_value("API", {"op": "regex", "value": "^(Listener|DB)$"})
+    assert not match_value("critical", {"op": "equals", "value": "warning"})
+    assert not match_value("critical", {"op": "not_equals", "value": "critical"})
+    assert not match_value("database-primary", {"op": "contains", "value": "cache"})
+    assert not match_value(
+        "database-primary",
+        {"op": "not_contains", "value": "database"},
+    )
+
+
+def test_match_value_rejects_unknown_operator():
+    assert not match_value("critical", {"op": "unknown", "value": "critical"})

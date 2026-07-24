@@ -701,3 +701,88 @@ def test_policy_alert_assigns_rotation_when_first_rule_was_deleted_and_second_is
     assert alert_group.rotation_id == rotation.id
     assert alert_group.assignee_id == alice.id
     assert alert_group.next_escalation_at is not None
+
+
+def test_maybe_escalate_alert_updates_state_without_notification_target(
+    monkeypatch,
+    db,
+):
+    group = create_group(slug="infra-no-escalation-target")
+    team = create_team(group, slug="sre-no-escalation-target")
+    team.escalation_after_reminders = 0
+    team.save()
+    first = create_user("alice-no-target", group)
+    second = create_user("bob-no-target", group)
+    add_user_to_team(team, first)
+    add_user_to_team(team, second)
+    rotation = create_rotation(team, users=[first, second])
+    route = create_route(team, rotation=rotation)
+    alert_group = create_alert_group_for_route(route)
+    alert_group.assignee = first
+    alert_group.reminder_count = 1
+    alert_group.save()
+
+    monkeypatch.setattr(
+        alert_escalation,
+        "has_matching_notification_channel",
+        lambda *args, **kwargs: False,
+    )
+    monkeypatch.setattr(
+        alert_escalation,
+        "notify_alert",
+        lambda *args, **kwargs: 0,
+    )
+
+    assert maybe_escalate_alert(alert_group) is True
+
+    stored = AlertGroup.get_by_id(alert_group.id)
+
+    assert stored.assignee == second
+    assert stored.escalation_level == 1
+    assert stored.reminder_count == 0
+    assert AlertEvent.select().where(
+        (AlertEvent.group == stored.id)
+        & (AlertEvent.event_type == "escalation_notification_skipped")
+    ).exists()
+
+
+def test_maybe_escalate_alert_records_notification_failure_after_transition(
+    monkeypatch,
+    db,
+):
+    group = create_group(slug="infra-escalation-failure")
+    team = create_team(group, slug="sre-escalation-failure")
+    team.escalation_after_reminders = 0
+    team.save()
+    first = create_user("alice-delivery-failure", group)
+    second = create_user("bob-delivery-failure", group)
+    add_user_to_team(team, first)
+    add_user_to_team(team, second)
+    rotation = create_rotation(team, users=[first, second])
+    route = create_route(team, rotation=rotation)
+    alert_group = create_alert_group_for_route(route)
+    alert_group.assignee = first
+    alert_group.reminder_count = 1
+    alert_group.save()
+
+    monkeypatch.setattr(
+        alert_escalation,
+        "has_matching_notification_channel",
+        lambda *args, **kwargs: True,
+    )
+
+    def fail_delivery(*args, **kwargs):
+        raise RuntimeError("provider unavailable")
+
+    monkeypatch.setattr(alert_escalation, "notify_alert", fail_delivery)
+
+    assert maybe_escalate_alert(alert_group) is True
+
+    stored = AlertGroup.get_by_id(alert_group.id)
+
+    assert stored.assignee == second
+    assert stored.escalation_level == 1
+    assert AlertEvent.select().where(
+        (AlertEvent.group == stored.id)
+        & (AlertEvent.event_type == "escalation_notification_failed")
+    ).exists()

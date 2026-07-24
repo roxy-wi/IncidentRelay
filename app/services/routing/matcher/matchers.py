@@ -84,6 +84,38 @@ def match_value(actual_value, expected_value):
         return actual_value in expected_value
 
     if isinstance(expected_value, dict):
+        operator = expected_value.get("op")
+
+        if operator is not None:
+            operator = {
+                "eq": "equals",
+                "ne": "not_equals",
+                "neq": "not_equals",
+            }.get(str(operator).strip().lower(), str(operator).strip().lower())
+            operator_value = expected_value.get("value")
+            actual_text = str(actual_value)
+            expected_text = str(operator_value)
+
+            if operator == "regex":
+                return re.search(
+                    str(operator_value or ""),
+                    str(actual_value or ""),
+                ) is not None
+
+            if operator == "equals":
+                return actual_text == expected_text
+
+            if operator == "not_equals":
+                return actual_text != expected_text
+
+            if operator == "contains":
+                return str(operator_value or "") in str(actual_value or "")
+
+            if operator == "not_contains":
+                return str(operator_value or "") not in str(actual_value or "")
+
+            return False
+
         if "regex" in expected_value:
             return re.search(
                 expected_value["regex"],

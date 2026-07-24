@@ -291,3 +291,52 @@ def test_disabled_policy_channel_is_ignored():
     resolution = resolve_notification_channels(alert_group)
 
     assert resolution.channels == []
+
+
+def test_service_policy_matches_ui_operator_value_regex():
+    group = create_group()
+    team = create_team(group)
+    service = create_service(team)
+    database_channel = create_channel(group, team)
+    default_channel = create_channel(group, team)
+
+    policy = create_notification_policy(team)
+    database_rule = create_notification_policy_rule(
+        policy,
+        position=1,
+        matchers={
+            "labels": {
+                "Application": {
+                    "op": "regex",
+                    "value": "^(Listener|DB)$",
+                }
+            }
+        },
+        channels=[database_channel],
+    )
+    create_notification_policy_rule(
+        policy,
+        position=2,
+        matchers={},
+        channels=[default_channel],
+    )
+
+    service.notification_policy = policy
+    service.save()
+
+    route = create_route(
+        team,
+        service=service,
+        notification_channel_mode="service_policy",
+    )
+
+    alert_group = _create_group(team, route, service)
+    labels = dict(alert_group.common_labels or {})
+    labels["Application"] = "DB"
+    alert_group.common_labels = labels
+    alert_group.save()
+
+    resolution = resolve_notification_channels(alert_group)
+
+    assert _channel_ids(resolution) == [database_channel.id]
+    assert resolution.matched_rule_ids == [database_rule.id]
