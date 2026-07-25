@@ -21,6 +21,7 @@
     <link rel="stylesheet" href="/static/css/oncall.css">
     <link rel="stylesheet" href="/static/css/material.css">
     <link rel="stylesheet" href="/static/css/table_pages.css">
+    <link rel="stylesheet" href="/static/css/orchestrations.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/vendor/tom-select/tom-select.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/table_filters.css') }}">
     <link rel="stylesheet" href="/static/css/vendor/select2/select2.min.css">
@@ -137,6 +138,11 @@
                </a>
           </div>
         </div>
+
+        <a href="/event-orchestration" data-page="orchestrations" class="menu-link" title="{{ _('nav.event_orchestration') }}">
+            <span class="menu-icon">⇄</span>
+            <span class="menu-text">{{ _('nav.event_orchestration') }}</span>
+        </a>
 
         <a href="/escalation-policies" data-page="escalation-policies" class="menu-link" title="{{ _('nav.escalation_policies') }}">
           <svg class="menu-icon"><use href="#icon-escalation-policies"></use></svg>
@@ -257,6 +263,7 @@
             {% include "pages/business_services.html" %}
             {% include "pages/heartbeats.html" %}
             <div id="view-maintenance-windows" class="view">{% include "pages/maintenance_windows.html" %}</div>
+            <div id="view-orchestrations" class="view">{% include "pages/orchestrations.html" %}</div>
             <div id="view-escalation-policies" class="view">{% include "pages/escalation_policies.html" %}</div>
             <div id="view-notification-policies" class="view">{% include "pages/notification_policies.html" %}</div>
             <div id="view-matcher-presets" class="view">{% include "pages/matcher_presets.html" %}</div>
@@ -354,6 +361,7 @@
 <script src="{{ url_for('static', filename='js/pages/business_services.js') }}"></script>
 <script src="{{ url_for('static', filename='js/pages/heartbeats.js') }}"></script>
 <script src="{{ url_for('static', filename='js/pages/maintenance_windows.js') }}"></script>
+<script src="{{ url_for('static', filename='js/pages/orchestrations.js') }}"></script>
 <script src="{{ url_for('static', filename='js/pages/escalation_policies.js') }}"></script>
 <script src="{{ url_for('static', filename='js/pages/notification_policies.js') }}"></script>
 <script src="{{ url_for('static', filename='js/pages/priority_policies.js') }}"></script>

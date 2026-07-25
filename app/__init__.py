@@ -41,7 +41,10 @@ from app.views.priority_policies_view import priority_policies_bp
 from app.views.matchers_view import matchers_bp
 from app.views.business_services.routes import business_services_bp
 from app.views.heartbeats_view import heartbeats_bp
-from app.views.orchestrations_view import orchestrations_bp
+from app.views.orchestrations_view import (
+    orchestrations_bp,
+    orchestration_webhook_actions_bp,
+)
 
 
 def create_app(log_role=None):
@@ -132,3 +135,7 @@ def register_blueprints(flask_app):
     flask_app.register_blueprint(business_services_bp)
     flask_app.register_blueprint(heartbeats_bp, url_prefix="/api/heartbeats")
     flask_app.register_blueprint(orchestrations_bp, url_prefix="/api/event-orchestrations")
+    flask_app.register_blueprint(
+        orchestration_webhook_actions_bp,
+        url_prefix="/api/orchestration-webhook-actions",
+    )

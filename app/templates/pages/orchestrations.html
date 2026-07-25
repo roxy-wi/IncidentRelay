@@ -1,0 +1,139 @@
+<div class="first-div-page-layout page-stack orchestration-page">
+  <div class="summary-grid">
+    <div class="summary-card summary-primary"><div class="summary-icon">⇄</div><div><div class="summary-title">{{ _('orchestrations.summary.total') }}</div><div id="orchestration-summary-total" class="summary-value">0</div><div class="summary-hint">{{ _('orchestrations.summary.total_hint') }}</div></div></div>
+    <div class="summary-card summary-success"><div class="summary-icon">▶</div><div><div class="summary-title">{{ _('orchestrations.summary.active') }}</div><div id="orchestration-summary-active" class="summary-value">0</div><div class="summary-hint">{{ _('orchestrations.summary.active_hint') }}</div></div></div>
+    <div class="summary-card summary-info"><div class="summary-icon">◐</div><div><div class="summary-title">{{ _('orchestrations.summary.shadow') }}</div><div id="orchestration-summary-shadow" class="summary-value">0</div><div class="summary-hint">{{ _('orchestrations.summary.shadow_hint') }}</div></div></div>
+    <div class="summary-card summary-muted"><div class="summary-icon">✎</div><div><div class="summary-title">{{ _('orchestrations.summary.drafts') }}</div><div id="orchestration-summary-drafts" class="summary-value">0</div><div class="summary-hint">{{ _('orchestrations.summary.drafts_hint') }}</div></div></div>
+  </div>
+
+  <section id="orchestration-list-card" class="card">
+    <div class="card-header">
+      <div><h2>{{ _('orchestrations.list.title') }}</h2><div class="card-subtitle"><span id="orchestration-filtered-count">0</span> / <span id="orchestration-total-count">0</span> {{ _('orchestrations.list.items') }}</div></div>
+      <div class="card-header-actions"><button id="create-orchestration" class="btn btn-primary" type="button">{{ _('orchestrations.actions.create') }}</button><button id="reload-orchestrations" class="btn" type="button">{{ _('orchestrations.actions.reload') }}</button></div>
+    </div>
+    <div class="page-toolbar is-flush-top">
+      <div class="page-toolbar-search"><span class="page-toolbar-search-icon">⌕</span><input id="orchestration-search" class="input" type="search" placeholder="{{ _('orchestrations.search.placeholder') }}"></div>
+      <select id="orchestration-mode-filter" class="input page-toolbar-filter"><option value="">{{ _('orchestrations.filters.all_modes') }}</option><option value="active">{{ _('orchestrations.mode.active') }}</option><option value="shadow">{{ _('orchestrations.mode.shadow') }}</option><option value="disabled">{{ _('orchestrations.mode.disabled') }}</option></select>
+      <select id="orchestration-scope-filter" class="input page-toolbar-filter"><option value="">{{ _('orchestrations.filters.all_scopes') }}</option><option value="global">{{ _('orchestrations.scope.global') }}</option><option value="service">{{ _('orchestrations.scope.service') }}</option></select>
+    </div>
+    <div class="table-wrapper"><table class="data-table"><thead><tr><th>{{ _('orchestrations.table.name') }}</th><th>{{ _('orchestrations.table.scope') }}</th><th>{{ _('orchestrations.table.mode') }}</th><th>{{ _('orchestrations.table.compatibility') }}</th><th>{{ _('orchestrations.table.version') }}</th><th>{{ _('orchestrations.table.updated') }}</th><th class="actions-th">{{ _('orchestrations.table.actions') }}</th></tr></thead><tbody id="orchestration-table"><tr><td colspan="7" class="empty-cell">{{ _('orchestrations.empty.loading') }}</td></tr></tbody></table></div>
+  </section>
+
+  <section id="orchestration-workspace" class="card orchestration-workspace is-hidden">
+    <div class="card-header orchestration-workspace-header">
+      <div><button id="orchestration-back" class="btn btn-compact" type="button">← {{ _('orchestrations.actions.back') }}</button><h2 id="orchestration-workspace-title">—</h2><div id="orchestration-workspace-subtitle" class="card-subtitle"></div></div>
+      <div class="card-header-actions"><span id="orchestration-draft-status" class="status-badge"></span><button id="orchestration-save-draft" class="btn btn-primary" type="button">{{ _('orchestrations.actions.save_draft') }}</button><button id="orchestration-validate" class="btn" type="button">{{ _('orchestrations.actions.validate') }}</button><button id="orchestration-publish" class="btn btn-success" type="button">{{ _('orchestrations.actions.publish') }}</button></div>
+    </div>
+    <div class="page-tabs orchestration-tabs">
+      <button class="page-tab is-active" data-orchestration-tab="rules" type="button">{{ _('orchestrations.tabs.rules') }}</button>
+      <button class="page-tab" data-orchestration-tab="simulator" type="button">{{ _('orchestrations.tabs.simulator') }}</button>
+      <button class="page-tab" data-orchestration-tab="versions" type="button">{{ _('orchestrations.tabs.versions') }}</button>
+      <button class="page-tab" data-orchestration-tab="executions" type="button">{{ _('orchestrations.tabs.executions') }}</button>
+      <button class="page-tab" data-orchestration-tab="webhooks" type="button">{{ _('orchestrations.tabs.webhooks') }}</button>
+      <button class="page-tab" data-orchestration-tab="settings" type="button">{{ _('orchestrations.tabs.settings') }}</button>
+    </div>
+
+    <div class="orchestration-tab-panel" data-orchestration-panel="rules">
+      <div class="page-toolbar is-flush-top"><div><strong>{{ _('orchestrations.rules.title') }}</strong><div class="help-text">{{ _('orchestrations.rules.help') }}</div></div><div class="card-header-actions"><button id="orchestration-add-rule" class="btn btn-primary" type="button">{{ _('orchestrations.actions.add_rule') }}</button><button id="orchestration-toggle-json" class="btn" type="button">{{ _('orchestrations.actions.json_view') }}</button></div></div>
+      <div id="orchestration-validation-result" class="orchestration-message is-hidden"></div>
+      <div id="orchestration-rule-list" class="orchestration-rule-list"></div>
+      <div id="orchestration-json-panel" class="is-hidden orchestration-json-panel">
+        <div class="json-editor">
+          <div class="json-editor-header">
+            <span>{{ _('orchestrations.rules.definition_json') }}</span>
+            <div class="card-header-actions">
+              <button id="orchestration-format-json" class="btn btn-small" type="button">{{ _('orchestrations.actions.format_json') }}</button>
+              <button id="orchestration-back-to-builder" class="btn btn-small" type="button">{{ _('orchestrations.actions.builder_view') }}</button>
+            </div>
+          </div>
+          <textarea id="orchestration-definition-json" class="input code-textarea json-editor-textarea orchestration-code" rows="24" spellcheck="false" autocomplete="off"></textarea>
+        </div>
+        <div class="card-header-actions orchestration-json-actions">
+          <button id="orchestration-apply-json" class="btn btn-primary" type="button">{{ _('orchestrations.actions.apply_json') }}</button>
+        </div>
+      </div>
+    </div>
+
+    <div class="orchestration-tab-panel is-hidden" data-orchestration-panel="simulator">
+      <div class="grid-two orchestration-simulator-grid"><section class="card"><div class="card-header"><div><h2>{{ _('orchestrations.simulator.input') }}</h2><div class="card-subtitle">{{ _('orchestrations.simulator.help') }}</div></div></div><div class="form-body">
+        <label for="orchestration-simulation-source">{{ _('orchestrations.simulator.source') }}</label><select id="orchestration-simulation-source" class="input"><option value="normalized">{{ _('orchestrations.simulator.normalized') }}</option></select>
+        <label for="orchestration-simulation-payload">{{ _('orchestrations.simulator.payload') }}</label><textarea id="orchestration-simulation-payload" class="input orchestration-code" rows="18">{
+  "source": "webhook",
+  "dedup_key": "example-1",
+  "title": "Example alert",
+  "severity": "critical",
+  "labels": {"environment": "production"}
+}</textarea>
+        <label class="md-checkbox"><input id="orchestration-compare-active" type="checkbox"><span>{{ _('orchestrations.simulator.compare_active') }}</span></label>
+        <button id="orchestration-run-simulation" class="btn btn-primary" type="button">{{ _('orchestrations.actions.run_simulation') }}</button>
+      </div></section><section class="card"><div class="card-header"><div><h2>{{ _('orchestrations.simulator.result') }}</h2><div class="card-subtitle">{{ _('orchestrations.simulator.result_help') }}</div></div></div><pre id="orchestration-simulation-result" class="orchestration-output">{{ _('orchestrations.simulator.no_result') }}</pre></section></div>
+    </div>
+
+    <div class="orchestration-tab-panel is-hidden" data-orchestration-panel="versions"><div class="page-toolbar is-flush-top"><div><strong>{{ _('orchestrations.versions.title') }}</strong></div><button id="reload-orchestration-versions" class="btn" type="button">{{ _('orchestrations.actions.reload') }}</button></div><div class="table-wrapper"><table class="data-table"><thead><tr><th>#</th><th>{{ _('orchestrations.versions.status') }}</th><th>{{ _('orchestrations.versions.comment') }}</th><th>{{ _('orchestrations.versions.hash') }}</th><th>{{ _('orchestrations.versions.published') }}</th><th class="actions-th">{{ _('orchestrations.table.actions') }}</th></tr></thead><tbody id="orchestration-version-table"></tbody></table></div><div class="grid-two orchestration-diff-grid"><section><h3>{{ _('orchestrations.versions.selected_definition') }}</h3><pre id="orchestration-version-definition" class="orchestration-output"></pre></section><section><h3>{{ _('orchestrations.versions.active_diff') }}</h3><pre id="orchestration-version-diff" class="orchestration-output"></pre></section></div></div>
+
+    <div class="orchestration-tab-panel is-hidden" data-orchestration-panel="executions"><div class="page-toolbar is-flush-top"><div><strong>{{ _('orchestrations.executions.title') }}</strong></div><button id="reload-orchestration-executions" class="btn" type="button">{{ _('orchestrations.actions.reload') }}</button></div><div id="orchestration-shadow-metrics" class="orchestration-metrics"></div><div class="table-wrapper"><table class="data-table"><thead><tr><th>ID</th><th>{{ _('orchestrations.executions.source') }}</th><th>{{ _('orchestrations.executions.disposition') }}</th><th>{{ _('orchestrations.executions.matches') }}</th><th>{{ _('orchestrations.executions.duration') }}</th><th>{{ _('orchestrations.executions.created') }}</th><th class="actions-th">{{ _('orchestrations.table.actions') }}</th></tr></thead><tbody id="orchestration-execution-table"></tbody></table></div><pre id="orchestration-execution-trace" class="orchestration-output"></pre></div>
+
+    <div class="orchestration-tab-panel is-hidden" data-orchestration-panel="webhooks"><div class="page-toolbar is-flush-top"><div><strong>{{ _('orchestrations.webhooks.title') }}</strong><div class="help-text">{{ _('orchestrations.webhooks.help') }}</div></div><button id="orchestration-add-webhook" class="btn btn-primary" type="button">{{ _('orchestrations.actions.add_webhook') }}</button></div><div class="table-wrapper"><table class="data-table"><thead><tr><th>{{ _('orchestrations.webhooks.name') }}</th><th>URL</th><th>{{ _('orchestrations.webhooks.method') }}</th><th>{{ _('orchestrations.webhooks.retry') }}</th><th>{{ _('orchestrations.webhooks.status') }}</th><th class="actions-th">{{ _('orchestrations.table.actions') }}</th></tr></thead><tbody id="orchestration-webhook-table"></tbody></table></div></div>
+
+    <div class="orchestration-tab-panel is-hidden" data-orchestration-panel="settings"><div class="grid-two"><section class="card"><div class="card-header"><h2>{{ _('orchestrations.settings.metadata') }}</h2></div><div class="form-body"><label for="orchestration-settings-name">{{ _('orchestrations.form.name') }}</label><input id="orchestration-settings-name" class="input"><label for="orchestration-settings-description">{{ _('orchestrations.form.description') }}</label><textarea id="orchestration-settings-description" class="input" rows="6"></textarea><button id="orchestration-save-settings" class="btn btn-primary" type="button">{{ _('orchestrations.actions.save') }}</button></div></section><section class="card"><div class="card-header"><h2>{{ _('orchestrations.settings.runtime') }}</h2></div><div class="form-body"><label for="orchestration-runtime-mode">{{ _('orchestrations.form.mode') }}</label><select id="orchestration-runtime-mode" class="input"><option value="disabled">{{ _('orchestrations.mode.disabled') }}</option><option value="shadow">{{ _('orchestrations.mode.shadow') }}</option><option value="active">{{ _('orchestrations.mode.active') }}</option></select><label for="orchestration-runtime-compatibility">{{ _('orchestrations.form.compatibility') }}</label><select id="orchestration-runtime-compatibility" class="input"><option value="legacy">legacy</option><option value="hybrid">hybrid</option><option value="orchestration">orchestration</option></select><div class="help-text">{{ _('orchestrations.settings.runtime_help') }}</div><button id="orchestration-save-runtime" class="btn btn-primary" type="button">{{ _('orchestrations.actions.save_runtime') }}</button><button id="orchestration-delete" class="btn btn-danger" type="button">{{ _('orchestrations.actions.delete') }}</button></div></section></div></div>
+  </section>
+</div>
+
+<datalist id="orchestration-field-options">
+  <option value="event.source"></option><option value="event.title"></option><option value="event.message"></option><option value="event.description"></option><option value="event.severity"></option><option value="event.status"></option><option value="event.dedup_key"></option><option value="event.group_key"></option><option value="labels.environment"></option><option value="labels.service"></option><option value="labels.instance"></option><option value="labels.job"></option><option value="variables."></option><option value="raw."></option><option value="route.id"></option><option value="service.id"></option><option value="team.id"></option>
+</datalist>
+
+<div id="orchestration-create-modal" class="app-modal" style="display:none"><div class="app-modal-dialog"><div class="app-modal-header"><div><h2>{{ _('orchestrations.create.title') }}</h2><div class="card-subtitle">{{ _('orchestrations.create.help') }}</div></div><button class="app-modal-close" data-close-modal="orchestration-create-modal">×</button></div><div class="app-modal-body"><div class="form-body"><label for="orchestration-create-name">{{ _('orchestrations.form.name') }}</label><input id="orchestration-create-name" class="input"><label for="orchestration-create-description">{{ _('orchestrations.form.description') }}</label><textarea id="orchestration-create-description" class="input" rows="4"></textarea><label for="orchestration-create-scope">{{ _('orchestrations.form.scope') }}</label><select id="orchestration-create-scope" class="input"><option value="global">{{ _('orchestrations.scope.global') }}</option><option value="service">{{ _('orchestrations.scope.service') }}</option></select><div id="orchestration-create-service-row" class="is-hidden"><label for="orchestration-create-service">{{ _('orchestrations.form.service') }}</label><select id="orchestration-create-service" class="input"></select></div><label for="orchestration-create-compatibility">{{ _('orchestrations.form.compatibility') }}</label><select id="orchestration-create-compatibility" class="input"><option value="legacy">legacy</option><option value="hybrid">hybrid</option><option value="orchestration">orchestration</option></select></div></div><div class="app-modal-footer"><button class="btn" data-close-modal="orchestration-create-modal">{{ _('common.cancel') }}</button><button id="orchestration-create-submit" class="btn btn-primary">{{ _('orchestrations.actions.create') }}</button></div></div></div>
+
+<div id="orchestration-rule-modal" class="app-modal" style="display:none"><div class="app-modal-dialog app-modal-dialog-wide"><div class="app-modal-header"><div><h2 id="orchestration-rule-modal-title">{{ _('orchestrations.rule_editor.title') }}</h2><div class="card-subtitle">{{ _('orchestrations.rule_editor.help') }}</div></div><button class="app-modal-close" data-close-modal="orchestration-rule-modal">×</button></div><div class="app-modal-body"><div class="grid-two orchestration-rule-editor-grid"><section class="card"><div class="form-body"><input id="orchestration-rule-index" type="hidden"><label for="orchestration-rule-name">{{ _('orchestrations.form.name') }}</label><input id="orchestration-rule-name" class="input"><label for="orchestration-rule-description">{{ _('orchestrations.form.description') }}</label><textarea id="orchestration-rule-description" class="input" rows="3"></textarea><label for="orchestration-rule-processing-mode">{{ _('orchestrations.rule_editor.processing_mode') }}</label><select id="orchestration-rule-processing-mode" class="input"><option value="continue">continue</option><option value="stop">stop</option><option value="evaluate_children">evaluate_children</option><option value="children_then_continue">children_then_continue</option></select><label class="md-checkbox"><input id="orchestration-rule-enabled" type="checkbox" checked><span>{{ _('orchestrations.rule_editor.enabled') }}</span></label></div></section><section class="card"><div class="card-header"><div><h2>{{ _('orchestrations.rule_editor.conditions') }}</h2></div><div class="card-header-actions"><button id="orchestration-condition-add" class="btn btn-compact" type="button">+ {{ _('orchestrations.rule_editor.condition') }}</button><button id="orchestration-condition-group-add" class="btn btn-compact" type="button">+ {{ _('orchestrations.rule_editor.group') }}</button></div></div><div id="orchestration-condition-editor" class="orchestration-condition-editor"></div></section></div><section class="card"><div class="card-header"><div><h2>{{ _('orchestrations.rule_editor.actions') }}</h2></div><button id="orchestration-action-add" class="btn btn-compact" type="button">+ {{ _('orchestrations.rule_editor.action') }}</button></div><div id="orchestration-action-editor" class="orchestration-action-editor"></div></section></div><div class="app-modal-footer"><button class="btn" data-close-modal="orchestration-rule-modal">{{ _('common.cancel') }}</button><button id="orchestration-rule-save" class="btn btn-primary">{{ _('orchestrations.actions.save_rule') }}</button></div></div></div>
+
+<div id="orchestration-webhook-modal" class="app-modal" style="display:none">
+  <div class="app-modal-dialog app-modal-dialog-wide">
+    <div class="app-modal-header">
+      <div><h2>{{ _('orchestrations.webhooks.editor_title') }}</h2><div class="card-subtitle">{{ _('orchestrations.webhooks.secret_help') }}</div></div>
+      <button class="app-modal-close" data-close-modal="orchestration-webhook-modal">×</button>
+    </div>
+    <div class="app-modal-body">
+      <input id="orchestration-webhook-id" type="hidden">
+      <div class="orchestration-webhook-grid">
+        <section class="card orchestration-webhook-section">
+          <div class="form-body">
+            <label for="orchestration-webhook-name">{{ _('orchestrations.webhooks.name') }}</label>
+            <input id="orchestration-webhook-name" class="input">
+            <label for="orchestration-webhook-description">{{ _('orchestrations.form.description') }}</label>
+            <textarea id="orchestration-webhook-description" class="input" rows="3"></textarea>
+            <label for="orchestration-webhook-url">URL</label>
+            <input id="orchestration-webhook-url" class="input" type="url" autocomplete="off">
+            <label for="orchestration-webhook-method">{{ _('orchestrations.webhooks.method') }}</label>
+            <select id="orchestration-webhook-method" class="input"><option>POST</option><option>GET</option><option>PUT</option><option>PATCH</option><option>DELETE</option></select>
+            <label class="md-checkbox"><input id="orchestration-webhook-enabled" type="checkbox" checked><span>{{ _('orchestrations.rule_editor.enabled') }}</span></label>
+          </div>
+        </section>
+        <section class="card orchestration-webhook-section">
+          <div class="form-body">
+            <label for="orchestration-webhook-headers">{{ _('orchestrations.webhooks.headers') }}</label>
+            <div class="json-editor">
+              <div class="json-editor-header">
+                <span>JSON</span>
+                <button id="orchestration-webhook-format-headers" class="btn btn-small" type="button">{{ _('orchestrations.actions.format_json') }}</button>
+              </div>
+              <textarea id="orchestration-webhook-headers" class="input code-textarea json-editor-textarea orchestration-code" rows="6" spellcheck="false" autocomplete="off">{}</textarea>
+            </div>
+            <label for="orchestration-webhook-body">{{ _('orchestrations.webhooks.body') }}</label>
+            <textarea id="orchestration-webhook-body" class="input orchestration-code" rows="7"></textarea>
+            <div class="orchestration-webhook-options">
+              <div><label for="orchestration-webhook-timeout">{{ _('orchestrations.webhooks.timeout') }}</label><input id="orchestration-webhook-timeout" class="input" type="number" min="1" max="60" value="10"></div>
+              <div><label for="orchestration-webhook-retries">{{ _('orchestrations.webhooks.retry') }}</label><input id="orchestration-webhook-retries" class="input" type="number" min="0" max="10" value="2"></div>
+            </div>
+            <label for="orchestration-webhook-private-policy">{{ _('orchestrations.webhooks.private_network_policy') }}</label>
+            <select id="orchestration-webhook-private-policy" class="input"><option value="deny">deny</option><option value="allowlist">allowlist</option></select>
+          </div>
+        </section>
+      </div>
+    </div>
+    <div class="app-modal-footer">
+      <button class="btn" data-close-modal="orchestration-webhook-modal">{{ _('common.cancel') }}</button>
+      <button id="orchestration-webhook-save" class="btn btn-primary">{{ _('orchestrations.actions.save') }}</button>
+    </div>
+  </div>
+</div>

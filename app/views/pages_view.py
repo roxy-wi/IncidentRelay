@@ -95,6 +95,8 @@ def pwa_service_worker():
 @pages_bp.route("/heartbeats/")
 @pages_bp.route("/maintenance-windows")
 @pages_bp.route("/maintenance-windows/")
+@pages_bp.route("/event-orchestration")
+@pages_bp.route("/event-orchestration/")
 @pages_bp.route("/escalation-policies")
 @pages_bp.route("/escalation-policies/")
 @pages_bp.route("/notification-policies")

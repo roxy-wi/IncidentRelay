@@ -219,6 +219,93 @@ def create_orchestration(
         ) from exc
 
 
+
+
+def get_orchestration(orchestration_id: int) -> EventOrchestration:
+    """Return a non-deleted orchestration by id."""
+    orchestration = _get_orchestration(orchestration_id)
+    if bool(getattr(orchestration, "deleted", False)) or getattr(
+        orchestration, "deleted_at", None
+    ) is not None:
+        raise OrchestrationNotFound("Event orchestration not found")
+    return orchestration
+
+
+def list_orchestrations(
+    *,
+    group_ids: Optional[Sequence[int]] = None,
+    group_id: Optional[int] = None,
+) -> List[EventOrchestration]:
+    """List non-deleted orchestrations visible in the requested groups."""
+    query = EventOrchestration.select().where(
+        (EventOrchestration.deleted == False)  # noqa: E712
+        & EventOrchestration.deleted_at.is_null(True)
+    )
+    if group_id is not None:
+        query = query.where(EventOrchestration.group == int(group_id))
+    elif group_ids is not None:
+        normalized = sorted({int(value) for value in group_ids})
+        if not normalized:
+            return []
+        query = query.where(EventOrchestration.group.in_(normalized))
+    return list(
+        query.order_by(
+            EventOrchestration.group.asc(),
+            EventOrchestration.name.asc(),
+            EventOrchestration.id.asc(),
+        )
+    )
+
+
+def update_orchestration(
+    orchestration_id: int,
+    *,
+    name: Optional[str] = None,
+    description: Optional[str] = None,
+    description_provided: bool = False,
+) -> EventOrchestration:
+    """Update editable orchestration metadata without changing runtime state."""
+    with database_proxy.atomic():
+        orchestration = _locked_orchestration(orchestration_id)
+        if name is not None:
+            normalized_name = str(name or "").strip()
+            if not normalized_name:
+                raise OrchestrationValidationError(["name is required"])
+            orchestration.name = normalized_name
+        if description_provided:
+            orchestration.description = description
+        try:
+            orchestration.save()
+        except IntegrityError as exc:
+            raise OrchestrationConflict(
+                "An orchestration with this name already exists in the group"
+            ) from exc
+    return get_orchestration(orchestration_id)
+
+
+def list_versions(orchestration_id: int) -> List[EventOrchestrationVersion]:
+    orchestration = get_orchestration(orchestration_id)
+    return list(
+        EventOrchestrationVersion.select()
+        .where(EventOrchestrationVersion.orchestration == orchestration.id)
+        .order_by(
+            EventOrchestrationVersion.version_number.desc(),
+            EventOrchestrationVersion.id.desc(),
+        )
+    )
+
+
+def get_version(
+    orchestration_id: int,
+    version_id: int,
+) -> EventOrchestrationVersion:
+    orchestration = get_orchestration(orchestration_id)
+    version = _get_version(version_id)
+    if version.orchestration_id != orchestration.id:
+        raise OrchestrationNotFound("Orchestration version not found")
+    return version
+
+
 def get_draft(orchestration_id: int) -> Optional[EventOrchestrationVersion]:
     return (
         EventOrchestrationVersion.select()
@@ -318,6 +405,32 @@ def replace_draft_rules(
             EventOrchestrationVersion.id == version.id
         ).execute()
     return _get_version(version_id)
+
+
+def save_draft_definition(
+    orchestration_id: int,
+    rules: Sequence[Dict[str, Any]],
+    *,
+    actor_id: Optional[int] = None,
+    comment: Optional[str] = None,
+) -> EventOrchestrationVersion:
+    """Create/update one draft definition and its metadata atomically."""
+    with database_proxy.atomic():
+        draft = get_or_create_draft(
+            orchestration_id,
+            actor_id=actor_id,
+            comment=comment,
+        )
+        draft = replace_draft_rules(draft.id, rules)
+        if comment is not None:
+            EventOrchestrationVersion.update(
+                comment=comment,
+                updated_at=_utcnow(),
+            ).where(
+                EventOrchestrationVersion.id == draft.id
+            ).execute()
+            draft = _get_version(draft.id)
+        return draft
 
 
 def _clone_version_rules(
