@@ -37,7 +37,7 @@ For each channel IncidentRelay checks:
 | `mattermost` | Webhook URL or Bot API settings | Optional Mattermost user ID for user attribution | `public_base_url` for buttons |
 | `telegram` | `bot_token`, `chat_id` | Telegram user ID for actions | Optional Telegram proxy |
 | `email` | Optional `html_template` | Assigned user must have `email` | SMTP settings |
-| `slack` | `webhook_url` | None | None |
+| `slack` | Webhook mode: `webhook_url`; Bot API: `bot_token`, `channel_id`, and either `signing_secret` or `app_token` | Optional Slack user ID for action attribution | Public HTTPS endpoint for HTTP actions, or Slack worker for Socket Mode |
 | `discord` | `webhook_url` | None | None |
 | `teams` | `webhook_url` | None | None |
 | `webhook` | `webhook_url` | None | None |
@@ -86,14 +86,16 @@ Some channels can update an existing notification after ACK or Resolve.
 | Channel | Supports updates | Notes |
 |---|---:|---|
 | Mattermost Bot API | Yes | Requires Bot API mode |
+| Slack Bot API | Yes | Requires stored Slack channel/message metadata |
 | Telegram | Yes | Requires stored Telegram message metadata and polling for actions |
 | Email | No | New email can be sent for notification events |
 | Voice call | No | Calls are one-way notifications |
-| Slack/Discord/Teams/webhook | Usually no | Incoming webhooks usually create new messages only |
+| Slack incoming webhook, Discord, Teams, generic webhook | No | Webhook delivery creates new messages and cannot update the original notification |
 
 ## Channel-specific pages
 
 - [Mattermost](mattermost.md)
+- [Slack](slack.md)
 - [Telegram](telegram.md)
 - [Email](email.md)
 - [Email templates](email-channel-templates.md)

@@ -5,7 +5,7 @@ from peewee import DoesNotExist
 
 from app.views.services.blueprint import services_bp
 from app.modules.db import maintenance_repo, services_repo
-from app.modules.db.models import AlertGroup
+from app.modules.db.models import AlertGroup, EventOrchestration
 from app.services.rbac import require_team_read, current_user
 from app.services.serializers.services import serialize_utc_datetime, serialize_maintenance_window, serialize_service, \
     serialize_service_readiness_state, serialize_service_link, serialize_service_runbook, serialize_service_dependency, \
@@ -197,6 +197,31 @@ def _service_analytics_payload(
     }
 
 
+def _service_orchestration_summaries(service):
+    rows = (
+        EventOrchestration.select()
+        .where(
+            (EventOrchestration.group == service.group_id)
+            & (EventOrchestration.scope == "service")
+            & (EventOrchestration.service == service.id)
+            & (EventOrchestration.deleted == False)  # noqa: E712
+            & EventOrchestration.deleted_at.is_null(True)
+        )
+        .order_by(EventOrchestration.name.asc(), EventOrchestration.id.asc())
+    )
+    return [
+        {
+            "id": row.id,
+            "name": row.name,
+            "mode": row.mode,
+            "enabled": bool(row.enabled),
+            "compatibility_mode": row.compatibility_mode,
+            "active_version_id": row.active_version_id,
+        }
+        for row in rows
+    ]
+
+
 def _service_details_payload(service, *, days):
     alert_summary = _service_alert_summary(service.id, days=days)
     timeline = list_service_events(service.id, limit=50)
@@ -237,6 +262,7 @@ def _service_details_payload(service, *, days):
             current_user(),
             readiness_state=readiness_state,
         ),
+        "event_orchestrations": _service_orchestration_summaries(service),
         "summary": {
             "alerts": alert_summary,
             "maintenance_windows": len(_service_maintenance_windows(service)),

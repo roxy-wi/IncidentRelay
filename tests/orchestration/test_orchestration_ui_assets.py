@@ -74,3 +74,20 @@ def test_orchestration_ui_supports_deep_links_and_stable_webhook_layout():
     assert 'class="orchestration-webhook-grid"' in template
     assert 'id="orchestration-webhook-format-headers"' in template
     assert '.orchestration-webhook-grid' in stylesheet
+
+
+def test_orchestration_list_supports_editing_links_and_shared_action_menu():
+    javascript = (
+        ROOT / "app" / "static" / "js" / "pages" / "orchestrations.js"
+    ).read_text(encoding="utf-8")
+    template = (
+        ROOT / "app" / "templates" / "pages" / "orchestrations.html"
+    ).read_text(encoding="utf-8")
+
+    assert "renderOrchestrationActions" in javascript
+    assert "window.makeActionMenu" in javascript
+    assert "openOrchestrationEditModal" in javascript
+    assert 'url.searchParams.set("orchestration_id"' in javascript
+    assert 'id="orchestration-create-modal-title"' in template
+    assert 'id="orchestration-settings-scope"' in template
+    assert 'id="orchestration-settings-service"' in template

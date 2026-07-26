@@ -30,6 +30,8 @@ class OrchestrationCreateSchema(ApiModel):
 class OrchestrationUpdateSchema(ApiModel):
     name: str | None = Field(default=None, min_length=1, max_length=255)
     description: str | None = Field(default=None, max_length=8192)
+    scope: Literal["global", "service"] | None = None
+    service_id: int | None = Field(default=None, ge=1)
 
 
 class OrchestrationDraftSchema(ApiModel):

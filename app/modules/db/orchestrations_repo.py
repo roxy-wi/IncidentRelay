@@ -263,6 +263,10 @@ def update_orchestration(
     name: Optional[str] = None,
     description: Optional[str] = None,
     description_provided: bool = False,
+    scope: Optional[str] = None,
+    scope_provided: bool = False,
+    service_id: Optional[int] = None,
+    service_provided: bool = False,
 ) -> EventOrchestration:
     """Update editable orchestration metadata without changing runtime state."""
     with database_proxy.atomic():
@@ -274,6 +278,34 @@ def update_orchestration(
             orchestration.name = normalized_name
         if description_provided:
             orchestration.description = description
+
+        next_scope = scope if scope_provided else orchestration.scope
+        next_service_id = (
+            service_id if service_provided else orchestration.service_id
+        )
+
+        if next_scope not in VALID_SCOPES:
+            raise OrchestrationValidationError(
+                ["scope must be global or service"]
+            )
+        if next_scope == "global":
+            if service_provided and service_id is not None:
+                raise OrchestrationValidationError(
+                    ["global orchestration cannot reference a service"]
+                )
+            next_service_id = None
+        else:
+            if next_service_id is None:
+                raise OrchestrationValidationError(
+                    ["service-scoped orchestration requires service_id"]
+                )
+            if _service_group_id(next_service_id) != int(orchestration.group_id):
+                raise OrchestrationValidationError(
+                    ["referenced service belongs to another group"]
+                )
+
+        orchestration.scope = next_scope
+        orchestration.service = next_service_id
         try:
             orchestration.save()
         except IntegrityError as exc:

@@ -297,6 +297,10 @@ def update_orchestration(orchestration_id):
             name=values.get("name"),
             description=values.get("description"),
             description_provided="description" in values,
+            scope=values.get("scope"),
+            scope_provided="scope" in values,
+            service_id=values.get("service_id"),
+            service_provided="service_id" in values,
         )
     except orchestrations_repo.OrchestrationError as exc:
         return _repo_error_response(exc)

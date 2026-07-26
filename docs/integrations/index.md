@@ -40,7 +40,7 @@ Notification channels deliver alerts after a route has matched an incoming alert
 | Mattermost      | Chat notifications, optional ACK/Resolve buttons, message updates              | [Mattermost channel](mattermost.md)           |
 | Telegram        | Telegram Bot API notifications, optional inline actions                        | [Telegram channel](telegram.md)               |
 | Email           | Sends email to the assigned user's profile email                               | [Email channel](email.md)                     |
-| Slack           | Sends notifications to a Slack incoming webhook                                | [Webhook-based channels](webhook-channels.md) |
+| Slack           | Incoming webhook or Bot API notifications with ACK/Resolve actions and updates   | [Slack channel](slack.md)                      |
 | Discord         | Sends notifications to a Discord webhook                                       | [Webhook-based channels](webhook-channels.md) |
 | Microsoft Teams | Sends notifications to a Teams webhook                                         | [Webhook-based channels](webhook-channels.md) |
 | Webhook         | Sends notification payloads to a custom HTTP endpoint                          | [Webhook-based channels](webhook-channels.md) |

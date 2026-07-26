@@ -7,6 +7,8 @@ let orchestrationRuleIndex = null;
 let orchestrationVersions = [];
 let orchestrationExecutions = [];
 let orchestrationRulesView = "builder";
+let orchestrationEditorId = null;
+let orchestrationEditorItem = null;
 
 const ORCHESTRATION_CONDITION_OPERATORS = [
     "equals", "not_equals", "contains", "not_contains", "starts_with",
@@ -148,6 +150,42 @@ function renderOrchestrationSummary() {
     $("#orchestration-summary-drafts").text(orchestrationItems.filter(function (item) { return !!item.draft; }).length);
 }
 
+function orchestrationItemCan(item, permission) {
+    return !!(item && item.permissions && item.permissions[permission]);
+}
+
+function orchestrationLink(id) {
+    const url = new URL(window.location.href);
+    url.searchParams.set("orchestration_id", String(id));
+    return url.pathname + url.search + url.hash;
+}
+
+function renderOrchestrationActions(item) {
+    return window.makeActionMenu({
+        object: item,
+        items: [
+            {
+                label: i18n.t("orchestrations.actions.open"),
+                icon: "fas fa-folder-open",
+                onClick: function () { openOrchestration(item.id); }
+            },
+            {
+                label: i18n.t("orchestrations.actions.edit"),
+                icon: "fas fa-edit",
+                visible: function () { return orchestrationItemCan(item, "edit"); },
+                onClick: function () { openOrchestrationEditModal(item); }
+            },
+            {
+                label: i18n.t("orchestrations.actions.delete"),
+                icon: "fas fa-trash",
+                danger: true,
+                visible: function () { return orchestrationItemCan(item, "delete"); },
+                onClick: function () { deleteOrchestrationItem(item); }
+            }
+        ]
+    });
+}
+
 function renderOrchestrationTable() {
     const tbody = $("#orchestration-table").empty();
     const items = orchestrationFilteredItems();
@@ -158,12 +196,18 @@ function renderOrchestrationTable() {
         return;
     }
     items.forEach(function (item) {
+        const nameLink = $("<a>")
+            .addClass("link-button item-title")
+            .attr("href", orchestrationLink(item.id))
+            .text(item.name)
+            .on("click", function (event) {
+                event.preventDefault();
+                openOrchestration(item.id);
+            });
         const name = $("<div>").append(
-            $("<strong>").text(item.name),
+            $("<strong>").append(nameLink),
             $("<div>").addClass("row-subtitle").text(item.description || "")
         );
-        const actions = $("<div>").addClass("table-actions");
-        actions.append($("<button>").addClass("btn btn-compact").attr("data-open-orchestration", item.id).text(i18n.t("orchestrations.actions.open")));
         const row = $("<tr>").append(
             $("<td>").append(name),
             $("<td>").text(orchestrationScopeLabel(item)),
@@ -171,7 +215,7 @@ function renderOrchestrationTable() {
             $("<td>").text(item.compatibility_mode),
             $("<td>").text(item.active_version ? "v" + item.active_version.version_number : "—"),
             $("<td>").text(item.updated_at ? formatDateTimeMinutes(item.updated_at) : "—"),
-            $("<td>").addClass("actions-td").append(actions)
+            $("<td>").addClass("actions-td").append(renderOrchestrationActions(item))
         );
         tbody.append(row);
     });
@@ -215,11 +259,36 @@ function loadOrchestrations() {
     });
 }
 
-function populateOrchestrationCreateServices() {
-    const select = $("#orchestration-create-service").empty();
+function populateOrchestrationServiceSelect(selector, selectedId) {
+    const select = $(selector).empty();
     asArray(orchestrationCatalogCache && orchestrationCatalogCache.services).forEach(function (item) {
         select.append($("<option>").val(item.id).text(item.name));
     });
+    if (selectedId) {
+        select.val(String(selectedId));
+    }
+}
+
+function populateOrchestrationCreateServices() {
+    populateOrchestrationServiceSelect("#orchestration-create-service");
+    populateOrchestrationServiceSelect(
+        "#orchestration-settings-service",
+        orchestrationCurrent && orchestrationCurrent.service_id
+    );
+}
+
+function setOrchestrationEditorScopeVisibility() {
+    $("#orchestration-create-service-row").toggleClass(
+        "is-hidden",
+        $("#orchestration-create-scope").val() !== "service"
+    );
+}
+
+function setOrchestrationSettingsScopeVisibility() {
+    $("#orchestration-settings-service-row").toggleClass(
+        "is-hidden",
+        $("#orchestration-settings-scope").val() !== "service"
+    );
 }
 
 function populateOrchestrationSimulationSources() {
@@ -230,29 +299,113 @@ function populateOrchestrationSimulationSources() {
     });
 }
 
+function configureOrchestrationEditor(item) {
+    orchestrationEditorItem = item || null;
+    orchestrationEditorId = item ? Number(item.id) : null;
+    const editing = !!orchestrationEditorId;
+    const canPublish = !editing || orchestrationItemCan(item, "publish");
+
+    $("#orchestration-create-modal-title").text(
+        i18n.t(editing ? "orchestrations.edit.title" : "orchestrations.create.title")
+    );
+    $("#orchestration-create-modal-help").text(
+        i18n.t(editing ? "orchestrations.edit.help" : "orchestrations.create.help")
+    );
+    $("#orchestration-create-submit").text(
+        i18n.t(editing ? "orchestrations.actions.save" : "orchestrations.actions.create")
+    );
+
+    $("#orchestration-create-name").val(item ? item.name : "");
+    $("#orchestration-create-description").val(item ? (item.description || "") : "");
+    $("#orchestration-create-scope").val(item ? item.scope : "global");
+    populateOrchestrationServiceSelect(
+        "#orchestration-create-service",
+        item && item.service_id
+    );
+    $("#orchestration-create-compatibility").val(
+        item ? item.compatibility_mode : "legacy"
+    );
+    $("#orchestration-create-mode").val(item ? item.mode : "disabled");
+    $("#orchestration-create-compatibility, #orchestration-create-mode")
+        .prop("disabled", editing && !canPublish);
+    $("#orchestration-create-mode-row").toggleClass("is-hidden", !editing);
+    setOrchestrationEditorScopeVisibility();
+}
+
 function openOrchestrationCreateModal() {
-    $("#orchestration-create-name, #orchestration-create-description").val("");
-    $("#orchestration-create-scope").val("global");
-    $("#orchestration-create-service-row").addClass("is-hidden");
-    $("#orchestration-create-compatibility").val("legacy");
+    configureOrchestrationEditor(null);
     orchestrationOpenModal("orchestration-create-modal");
+}
+
+function openOrchestrationEditModal(item) {
+    if (!item) { return; }
+    configureOrchestrationEditor(item);
+    orchestrationOpenModal("orchestration-create-modal");
+}
+
+function finishOrchestrationEditor(item) {
+    orchestrationCloseModal("orchestration-create-modal");
+    orchestrationEditorId = null;
+    orchestrationEditorItem = null;
+    loadOrchestrations();
+    if (item && orchestrationCurrent && Number(orchestrationCurrent.id) === Number(item.id)) {
+        openOrchestration(item.id);
+    }
 }
 
 function submitOrchestrationCreate() {
     const groupId = orchestrationGroupId();
     const scope = $("#orchestration-create-scope").val();
-    const payload = {
-        group_id: groupId,
+    const metadata = {
         name: $("#orchestration-create-name").val(),
         description: $("#orchestration-create-description").val() || null,
         scope: scope,
-        service_id: scope === "service" ? Number($("#orchestration-create-service").val()) : null,
-        compatibility_mode: $("#orchestration-create-compatibility").val()
+        service_id: scope === "service" ? Number($("#orchestration-create-service").val()) : null
     };
-    apiPost("/api/event-orchestrations", payload, function (item) {
-        orchestrationCloseModal("orchestration-create-modal");
-        loadOrchestrations();
-        openOrchestration(item.id);
+
+    if (!orchestrationEditorId) {
+        apiPost("/api/event-orchestrations", $.extend({
+            group_id: groupId,
+            compatibility_mode: $("#orchestration-create-compatibility").val()
+        }, metadata), function (item) {
+            finishOrchestrationEditor(item);
+            openOrchestration(item.id);
+        });
+        return;
+    }
+
+    const editingId = orchestrationEditorId;
+    const canPublish = orchestrationItemCan(orchestrationEditorItem, "publish");
+    apiRequest("PATCH", "/api/event-orchestrations/" + editingId, metadata, function (item) {
+        if (!canPublish) {
+            finishOrchestrationEditor(item);
+            return;
+        }
+        apiRequest(
+            "PATCH",
+            "/api/event-orchestrations/" + editingId + "/runtime",
+            {
+                mode: $("#orchestration-create-mode").val(),
+                compatibility_mode: $("#orchestration-create-compatibility").val()
+            },
+            function (updated) { finishOrchestrationEditor(updated || item); }
+        );
+    });
+}
+
+function deleteOrchestrationItem(item) {
+    showAppConfirm({
+        title: i18n.t("orchestrations.delete.title"),
+        message: i18n.t("orchestrations.delete.message"),
+        confirmText: i18n.t("orchestrations.actions.delete")
+    }).done(function () {
+        apiDelete("/api/event-orchestrations/" + item.id, function () {
+            if (orchestrationCurrent && Number(orchestrationCurrent.id) === Number(item.id)) {
+                closeOrchestrationWorkspace();
+            } else {
+                loadOrchestrations();
+            }
+        });
     });
 }
 
@@ -274,6 +427,9 @@ function openOrchestration(id, options) {
             $("#orchestration-draft-status").text(item.draft ? "Draft v" + item.draft.version_number : i18n.t("orchestrations.rules.no_draft"));
             $("#orchestration-settings-name").val(item.name);
             $("#orchestration-settings-description").val(item.description || "");
+            $("#orchestration-settings-scope").val(item.scope);
+            populateOrchestrationServiceSelect("#orchestration-settings-service", item.service_id);
+            setOrchestrationSettingsScopeVisibility();
             $("#orchestration-runtime-mode").val(item.mode);
             $("#orchestration-runtime-compatibility").val(item.compatibility_mode);
             $("#orchestration-definition-json").val(orchestrationJson(orchestrationDefinition));
@@ -825,7 +981,20 @@ function deleteOrchestrationWebhook(id) {
 }
 
 function saveOrchestrationSettings() {
-    apiRequest("PATCH", "/api/event-orchestrations/" + orchestrationCurrent.id, {name: $("#orchestration-settings-name").val(), description: $("#orchestration-settings-description").val() || null}, function () { openOrchestration(orchestrationCurrent.id); });
+    const scope = $("#orchestration-settings-scope").val();
+    apiRequest(
+        "PATCH",
+        "/api/event-orchestrations/" + orchestrationCurrent.id,
+        {
+            name: $("#orchestration-settings-name").val(),
+            description: $("#orchestration-settings-description").val() || null,
+            scope: scope,
+            service_id: scope === "service"
+                ? Number($("#orchestration-settings-service").val())
+                : null
+        },
+        function () { openOrchestration(orchestrationCurrent.id); }
+    );
 }
 
 function saveOrchestrationRuntime() {
@@ -841,7 +1010,8 @@ function deleteCurrentOrchestration() {
 $(document).on("click", "#reload-orchestrations", loadOrchestrations);
 $(document).on("input change", "#orchestration-search, #orchestration-mode-filter, #orchestration-scope-filter", renderOrchestrationTable);
 $(document).on("click", "#create-orchestration", openOrchestrationCreateModal);
-$(document).on("change", "#orchestration-create-scope", function () { $("#orchestration-create-service-row").toggleClass("is-hidden", $(this).val() !== "service"); });
+$(document).on("change", "#orchestration-create-scope", setOrchestrationEditorScopeVisibility);
+$(document).on("change", "#orchestration-settings-scope", setOrchestrationSettingsScopeVisibility);
 $(document).on("click", "#orchestration-create-submit", submitOrchestrationCreate);
 $(document).on("click", "[data-close-modal]", function () { orchestrationCloseModal($(this).attr("data-close-modal")); });
 $(document).on("click", "[data-open-orchestration]", function () { openOrchestration($(this).attr("data-open-orchestration")); });

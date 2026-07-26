@@ -131,5 +131,7 @@
   "orchestrations.delete.message": "Отключить и архивировать эту оркестрацию?",
   "orchestrations.errors.invalid_json": "Некорректный JSON",
   "orchestrations.errors.rules_required": "Определение должно содержать массив rules",
-  "orchestrations.webhooks.private_network_policy": "Политика приватных сетей"
+  "orchestrations.webhooks.private_network_policy": "Политика приватных сетей",
+  "orchestrations.edit.title": "Редактирование оркестрации событий",
+  "orchestrations.edit.help": "Измените метаданные, область применения и настройки выполнения."
 }

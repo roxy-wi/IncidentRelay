@@ -58,13 +58,34 @@ function refreshTeams() {
      */
     apiGet("/api/teams?include_inactive=1", function (teams) {
         teamsCache = asArray(teams);
-        renderTeamsSummary(teamsCache);
-        fillTeamsGroupFilter(teamsCache);
+        const scopedTeams = getGlobalTeamScopedTeams();
+        renderTeamsSummary(scopedTeams);
+        fillTeamsGroupFilter(scopedTeams);
         renderTeamsTable();
-        restoreTeamDetails();
+        restoreTeamDetails(scopedTeams);
+
         if ($("#team-members-modal").hasClass("is-open") && selectedTeamForMembers) {
             loadTeamMembers(selectedTeamForMembers, selectedTeamNameForMembers);
         }
+    });
+}
+
+function getGlobalTeamScopedTeams() {
+    /*
+     * Apply the global team selector to the teams page.
+     */
+    const selectedId = (
+        typeof selectedTeamNumber === "function"
+            ? selectedTeamNumber()
+            : Number($("#global-team-filter").val() || 0) || null
+    );
+
+    if (!selectedId) {
+        return teamsCache.slice();
+    }
+
+    return teamsCache.filter(function (team) {
+        return Number(team.id) === Number(selectedId);
     });
 }
 
@@ -135,8 +156,12 @@ function getFilteredTeams() {
     const query = String($("#teams-search").val() || "").trim().toLowerCase();
     const group = String($("#teams-group-filter").val() || "");
     const status = String($("#teams-status-filter").val() || "");
+    const scopedTeams = getGlobalTeamScopedTeams();
 
-    return teamsCache.filter(function (team) {
+    return scopedTeams.filter(function (team) {
+        if (group && team.group_slug !== group) {
+            return false;
+        }
         if (group && team.group_slug !== group) {
             return false;
         }
@@ -168,10 +193,11 @@ function renderTeamsTable() {
      * Render filtered teams table.
      */
     const tbody = $("#teams-table");
+    const scopedTeams = getGlobalTeamScopedTeams();
     const teams = getFilteredTeams();
 
     tbody.empty();
-    renderTeamsCounter(teams, teamsCache);
+    renderTeamsCounter(teams, scopedTeams);
 
     if (!teams.length) {
         tbody.append(
@@ -361,17 +387,23 @@ function renderTeamDetails(team) {
     }
 }
 
-function restoreTeamDetails() {
+function restoreTeamDetails(teams) {
     /*
      * Restore details panel after reload.
      */
-    if (!teamsCache.length) {
+    teams = asArray(
+        teams === undefined
+            ? getGlobalTeamScopedTeams()
+            : teams
+    );
+
+    if (!teams.length) {
         renderTeamDetailsEmpty();
         return;
     }
 
     if (selectedTeamDetailsId) {
-        const selected = teamsCache.find(function (team) {
+        const selected = teams.find(function (team) {
             return Number(team.id) === Number(selectedTeamDetailsId);
         });
         if (selected) {
@@ -380,7 +412,7 @@ function restoreTeamDetails() {
         }
     }
 
-    renderTeamDetails(teamsCache[0]);
+    renderTeamDetails(teams[0]);
 }
 
 function renderTeamDetailsEmpty() {

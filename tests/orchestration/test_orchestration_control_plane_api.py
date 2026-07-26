@@ -12,7 +12,7 @@ from app.modules.db.models import (
     OrchestrationWebhookAction,
     PendingOrchestratedEvent,
 )
-from tests.factories import create_group, create_user
+from tests.factories import create_group, create_service, create_team, create_user
 
 
 @pytest.fixture(autouse=True)
@@ -157,6 +157,49 @@ def test_admin_can_manage_full_orchestration_lifecycle(client, db, admin_headers
         headers=admin_headers,
     )
     assert missing.status_code == 404
+
+
+def test_editor_can_update_orchestration_scope_and_service(client, db):
+    group = create_group(slug="editable-orchestration")
+    team = create_team(group)
+    service = create_service(team, slug="editable-service")
+    editor = create_user(group=group, group_role="editor")
+    headers = _headers(editor)
+
+    created = client.post(
+        "/api/event-orchestrations",
+        headers=headers,
+        json={"group_id": group.id, "name": "Editable", "scope": "global"},
+    )
+    assert created.status_code == 201
+    orchestration_id = created.get_json()["id"]
+
+    updated = client.patch(
+        f"/api/event-orchestrations/{orchestration_id}",
+        headers=headers,
+        json={
+            "name": "Service routing",
+            "description": "Assigned from the edit form",
+            "scope": "service",
+            "service_id": service.id,
+        },
+    )
+
+    assert updated.status_code == 200, updated.get_json()
+    body = updated.get_json()
+    assert body["name"] == "Service routing"
+    assert body["scope"] == "service"
+    assert body["service_id"] == service.id
+
+    global_update = client.patch(
+        f"/api/event-orchestrations/{orchestration_id}",
+        headers=headers,
+        json={"scope": "global", "service_id": None},
+    )
+
+    assert global_update.status_code == 200, global_update.get_json()
+    assert global_update.get_json()["scope"] == "global"
+    assert global_update.get_json()["service_id"] is None
 
 
 def test_editor_can_edit_but_cannot_publish(client, db):

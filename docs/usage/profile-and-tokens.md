@@ -23,7 +23,7 @@ Fill contact fields used by notification channels.
 | Phone | Voice call channel |
 | Mattermost user ID | Mattermost action attribution |
 | Telegram user ID | Telegram actions |
-| Slack user ID | Future or external Slack workflows |
+| Slack user ID | Attribution of Slack ACK/Resolve actions; also used by Slack usergroup admin sync |
 
 Email and voice call channels send to the assigned user's profile contact data, not to channel-level recipient lists.
 

@@ -95,7 +95,10 @@ PROFILE_SCHEMA = {
         "slack_user_id": {
             "type": "string",
             "nullable": True,
-            "description": "Slack user id used for direct notifications.",
+            "description": (
+                "Slack user ID used to attribute interactive Slack "
+                "ACK/Resolve actions to an IncidentRelay user."
+            ),
             "example": "U012ABCDEF",
         },
         "mattermost_user_id": {

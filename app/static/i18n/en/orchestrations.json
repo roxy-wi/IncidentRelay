@@ -131,5 +131,7 @@
   "orchestrations.delete.message": "Disable and archive this orchestration?",
   "orchestrations.errors.invalid_json": "Invalid JSON",
   "orchestrations.errors.rules_required": "Definition must contain a rules array",
-  "orchestrations.webhooks.private_network_policy": "Private network policy"
+  "orchestrations.webhooks.private_network_policy": "Private network policy",
+  "orchestrations.edit.title": "Edit event orchestration",
+  "orchestrations.edit.help": "Update metadata, scope and runtime settings."
 }
