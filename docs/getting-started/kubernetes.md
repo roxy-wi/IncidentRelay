@@ -23,6 +23,7 @@ a StorageClass, if you keep the default SQLite setup
 Deployment  <release>-web        Gunicorn + Flask application
 Deployment  <release>-scheduler  reminders, escalations, periodic jobs
 Deployment  <release>-telegram   Telegram callback worker (optional)
+Deployment  <release>-slack      Slack Socket Mode worker (optional)
 Service     <release>            ClusterIP on port 8080
 Secret      <release>-config     rendered incidentrelay.conf
 PersistentVolumeClaim <release>-data   /var/lib/incidentrelay
@@ -241,6 +242,15 @@ The Telegram worker processes callback buttons. It idles harmlessly without a co
 telegram:
   enabled: true
 ```
+
+The Slack worker holds the Socket Mode WebSocket that carries interactive `Acknowledge` and `Resolve` buttons. Slack messages themselves are sent by the web component, so without this worker notifications still arrive — only their buttons do nothing:
+
+```yaml
+slack:
+  enabled: true
+```
+
+It idles without a configured Slack channel, and picks up channel configuration from the database on its own, so no pod restart is needed after adding one. Socket Mode needs no public Request URL, which makes it the usual choice for clusters that are not exposed to the internet. See [Slack](../integrations/slack.md) for the Slack app setup.
 
 Each component accepts the usual placement and sizing knobs:
 
