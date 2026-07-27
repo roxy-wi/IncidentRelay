@@ -26,6 +26,7 @@ nav:
       - Overview: getting-started/index.md
       - Installation: getting-started/installation.md
       - Docker Installation: getting-started/docker.md
+      - Kubernetes Installation: getting-started/kubernetes.md
       - RPM Installation: getting-started/rpm-installation.md
       - Manual systemd Installation: getting-started/systemd.md
       - Configuration: getting-started/configuration.md
