@@ -11,6 +11,7 @@ from app.api.openapi.endpoints import (
     incidents,
     integrations,
     notification_center,
+    orchestrations,
     notification_rules,
     notification_policies,
     oncall_health,
@@ -52,6 +53,7 @@ ENDPOINT_MODULES = [
     browser_push,
     notification_rules,
     notification_center,
+    orchestrations,
     groups,
     sso,
     services,
@@ -65,10 +67,14 @@ def build_openapi_spec():
     """Build the OpenAPI specification from endpoint modules."""
     paths = {}
     tags = []
+    schemas = {}
 
     for module in ENDPOINT_MODULES:
         paths.update(module.paths())
         tags.extend(module.tags())
+        component_builder = getattr(module, "components", None)
+        if component_builder is not None:
+            schemas.update(component_builder())
 
     return {
         "openapi": "3.0.3",
@@ -85,6 +91,7 @@ def build_openapi_spec():
         "tags": tags,
         "paths": paths,
         "components": {
+            "schemas": schemas,
             "securitySchemes": {
                 "bearerAuth": {
                     "type": "http",

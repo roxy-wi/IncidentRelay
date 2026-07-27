@@ -884,35 +884,41 @@ Every final field should optionally store provenance:
 
 ## 20. API surface
 
-Suggested endpoints:
+Implemented control-plane endpoints:
 
 ```text
 GET    /api/event-orchestrations
 POST   /api/event-orchestrations
-GET    /api/event-orchestrations/{id}
-PATCH  /api/event-orchestrations/{id}
-DELETE /api/event-orchestrations/{id}
+GET    /api/event-orchestrations/catalog
+GET    /api/event-orchestrations/{orchestration_id}
+PATCH  /api/event-orchestrations/{orchestration_id}
+DELETE /api/event-orchestrations/{orchestration_id}
 
-POST   /api/event-orchestrations/{id}/draft
-POST   /api/event-orchestrations/{id}/validate
-POST   /api/event-orchestrations/{id}/publish
-POST   /api/event-orchestrations/{id}/rollback
-POST   /api/event-orchestrations/{id}/simulate
-POST   /api/event-orchestrations/{id}/replay
+POST   /api/event-orchestrations/{orchestration_id}/draft
+PUT    /api/event-orchestrations/{orchestration_id}/draft
+POST   /api/event-orchestrations/{orchestration_id}/validate
+POST   /api/event-orchestrations/{orchestration_id}/publish
+POST   /api/event-orchestrations/{orchestration_id}/rollback
+PATCH  /api/event-orchestrations/{orchestration_id}/runtime
+POST   /api/event-orchestrations/{orchestration_id}/simulate
+POST   /api/event-orchestrations/{orchestration_id}/replay
 
-GET    /api/event-orchestrations/{id}/versions
-GET    /api/event-orchestrations/{id}/versions/{version_id}
-GET    /api/event-orchestrations/{id}/executions
+GET    /api/event-orchestrations/{orchestration_id}/versions
+GET    /api/event-orchestrations/{orchestration_id}/versions/{version_id}
+GET    /api/event-orchestrations/{orchestration_id}/executions
+GET    /api/event-orchestrations/{orchestration_id}/shadow-metrics
 
 GET    /api/orchestration-webhook-actions
 POST   /api/orchestration-webhook-actions
-PATCH  /api/orchestration-webhook-actions/{id}
-DELETE /api/orchestration-webhook-actions/{id}
-
-POST   /api/integrations/orchestration
+PATCH  /api/orchestration-webhook-actions/{action_id}
+DELETE /api/orchestration-webhook-actions/{action_id}
+GET    /api/orchestration-webhook-actions/{action_id}/executions
 ```
 
-All condition and action schemas must be documented in OpenAPI.
+The generated OpenAPI document includes recursive condition-tree schemas, the
+safe built-in action enum, draft/version author metadata and write-only webhook
+secret headers. The dedicated public API guide is in
+[`docs/api/event-orchestration.md`](../api/event-orchestration.md).
 
 ## 21. UI
 

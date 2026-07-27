@@ -81,6 +81,7 @@ nav:
           - Voice Call: integrations/voice-call.md
   - User Guide:
       - Overview: usage/index.md
+      - Event Orchestration: usage/event-orchestration.md
       - Profile and Personal API Tokens: usage/profile-and-tokens.md
       - Browser Push Notifications: usage/browser-push.md
   - Voice Providers:
@@ -92,6 +93,7 @@ nav:
       - Troubleshooting: voice-providers/troubleshooting.md
   - API:
       - Overview: api/index.md
+      - Event Orchestration API: api/event-orchestration.md
       - Services API: api/services.md
       - Escalation Policies API: api/escalation-policies.md
       - Matcher Suggestions API: api/matchers.md

@@ -85,6 +85,7 @@ Read more:
 - [Channels](concepts/channels.md)
 - [Browser Push Notifications](usage/browser-push.md)
 - [Reminders and Escalations](concepts/reminders-and-escalations.md)
+- [Event Orchestration](usage/event-orchestration.md)
 
 ## RBAC summary
 
