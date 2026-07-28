@@ -163,7 +163,7 @@ Read more: [Docker installation](docs/getting-started/docker.md)
 
 ### Kubernetes (Helm)
 
-A Helm chart lives in `helm/incidentrelay`. It deploys the web UI plus the scheduler and Telegram workers, renders the application config from values into a Secret, and wires up the `/healthz` and `/readyz` probes.
+A Helm chart lives in `helm/incidentrelay`. It deploys the web UI plus the scheduler, Telegram and Slack workers, renders the application config from values into a Secret, and wires up the `/healthz` and `/readyz` probes.
 
 ```bash
 helm install incidentrelay ./helm/incidentrelay \

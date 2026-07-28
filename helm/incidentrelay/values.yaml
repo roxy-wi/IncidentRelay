@@ -131,6 +131,20 @@ telegram:
   affinity: {}
   extraEnv: []
 
+# Socket Mode worker for Slack interactive buttons. Harmless without a
+# configured Slack app (it idles), disable it if you do not use Slack.
+slack:
+  enabled: true
+  strategy:
+    type: Recreate
+  resources: {}
+  podAnnotations: {}
+  podLabels: {}
+  nodeSelector: {}
+  tolerations: []
+  affinity: {}
+  extraEnv: []
+
 service:
   type: ClusterIP
   port: 8080
