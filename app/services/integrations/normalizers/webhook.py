@@ -1,11 +1,12 @@
-import json
 from copy import deepcopy
 
 from app.services.integrations.normalizers.common import (
     add_event_link_label,
+    clean_string,
     first_event_link,
     first_non_empty,
     make_dedup_key,
+    normalize_label_value,
 )
 from app.services.severity import normalize_severity
 
@@ -21,29 +22,6 @@ def is_pagerduty_events_v2(payload):
 
     action = str(payload.get("event_action") or "").strip().lower()
     return action in PAGERDUTY_EVENT_ACTIONS
-
-
-def _clean_string(value):
-    if value is None:
-        return None
-
-    value = str(value).strip()
-    return value or None
-
-
-def _label_value(value):
-    """Convert custom detail values into matcher-friendly label values."""
-
-    if value is None:
-        return None
-
-    if isinstance(value, (str, int, float, bool)):
-        return value
-
-    try:
-        return json.dumps(value, ensure_ascii=False, sort_keys=True)
-    except (TypeError, ValueError):
-        return str(value)
 
 
 def _sanitized_payload(payload):
@@ -63,7 +41,7 @@ def _pagerduty_labels(payload, event_payload, action):
     labels.setdefault("pagerduty_format", "events_api_v2")
 
     for key in ("source", "component", "group", "class"):
-        value = _clean_string(event_payload.get(key))
+        value = clean_string(event_payload.get(key))
 
         if value is not None:
             labels.setdefault(key, value)
@@ -72,17 +50,17 @@ def _pagerduty_labels(payload, event_payload, action):
 
     if isinstance(custom_details, dict):
         for key, value in custom_details.items():
-            key = _clean_string(key)
+            key = clean_string(key)
 
             if not key or key in labels:
                 continue
 
-            value = _label_value(value)
+            value = normalize_label_value(value)
 
             if value is not None:
                 labels[key] = value
 
-    client = _clean_string(payload.get("client"))
+    client = clean_string(payload.get("client"))
 
     if client:
         labels.setdefault("pagerduty_client", client)
@@ -116,9 +94,9 @@ def _normalize_pagerduty_events_v2(payload):
     event_link = _pagerduty_event_link(payload)
     add_event_link_label(labels, event_link)
 
-    dedup_key = _clean_string(payload.get("dedup_key"))
-    summary = _clean_string(event_payload.get("summary"))
-    source = _clean_string(event_payload.get("source"))
+    dedup_key = clean_string(payload.get("dedup_key"))
+    summary = clean_string(event_payload.get("summary"))
+    source = clean_string(event_payload.get("source"))
 
     title = summary or (
         f"PagerDuty event {dedup_key}"

@@ -13,6 +13,7 @@ from app.api.schemas.integrations import (
     LibreNMSWebhookSchema,
     RmonWebhookSchema,
     SentryWebhookSchema,
+    UptimeKumaWebhookSchema,
     ZabbixWebhookSchema,
 )
 from app.services.serializers.alerts import serialize_alert_processing_result
@@ -342,6 +343,32 @@ def generic_webhook():
         return _process_pagerduty_events_v2(normalized_alerts[0])
 
     return process_incoming_alerts(normalized_alerts)
+
+
+@integrations_bp.route("/uptime-kuma", methods=["POST"])
+@require_alert_token()
+def uptime_kuma_webhook():
+    """Receive standard Uptime Kuma Webhook notifications."""
+
+    intake_route = getattr(request, "current_intake_route", None)
+
+    if intake_route and intake_route.source != "uptime_kuma":
+        return make_error_response(
+            error="route_source_mismatch",
+            message="Route source must be uptime_kuma.",
+            status_code=400,
+        )
+
+    payload, error = validate_body(UptimeKumaWebhookSchema)
+    if error:
+        return error
+
+    return process_incoming_alerts(
+        normalize_for_source(
+            "uptime_kuma",
+            payload.model_dump(exclude_none=True),
+        )
+    )
 
 
 @integrations_bp.route("/sentry/<int:route_id>", methods=["POST"])

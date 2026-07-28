@@ -61,7 +61,7 @@ def response(description, schema=None):
 
 SOURCE_SCHEMA_WITH_SENTRY = {
     "type": "string",
-    "enum": ["alertmanager", "aws_sns", "grafana", "rmon", "zabbix", "webhook", "sentry", "librenms", "heartbeat"],
+    "enum": ["alertmanager", "aws_sns", "datadog", "grafana", "rmon", "zabbix", "webhook", "sentry", "librenms", "uptime_kuma", "heartbeat"],
     "description": "Incoming alert source type.",
 }
 

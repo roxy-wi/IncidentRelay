@@ -20,7 +20,7 @@ class RouteBaseSchema(ApiModel):
 
     team_id: int = Field(ge=1)
     name: str = Field(min_length=2, max_length=120)
-    source: str = Field(pattern=r"^(alertmanager|aws_sns|datadog|grafana|zabbix|webhook|sentry|librenms|rmon|heartbeat)$")
+    source: str = Field(pattern=r"^(alertmanager|aws_sns|datadog|grafana|zabbix|webhook|sentry|librenms|rmon|uptime_kuma|heartbeat)$")
     rotation_id: int | None = Field(default=None, ge=1)
     channel_ids: List[int] = Field(default_factory=list)
     notification_channel_mode: str = Field(default=ROUTE_ONLY, pattern=NOTIFICATION_CHANNEL_MODE_PATTERN)

@@ -182,6 +182,7 @@
                   <option value="zabbix">Zabbix</option>
                   <option value="sentry">Sentry</option>
                   <option value="librenms">LibreNMS</option>
+                  <option value="uptime_kuma">Uptime Kuma</option>
                   <option value="webhook">Webhook / PagerDuty Events API v2</option>
               </select>
               <div id="route-webhook-compatibility-help" class="help-text is-hidden">
@@ -189,6 +190,9 @@
               </div>
               <div id="route-datadog-help" class="help-text is-hidden">
                 {{ _("routes.form.datadog_help") }}
+              </div>
+              <div id="route-uptime-kuma-help" class="help-text is-hidden">
+                {{ _("routes.form.uptime_kuma_help") }}
               </div>
                 <div id="route-sentry-settings" class="form-group is-hidden">
                     <label for="route-sentry-webhook-secret">{{ _("routes.form.sentry_secret") }}</label>

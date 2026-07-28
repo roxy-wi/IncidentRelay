@@ -2,6 +2,7 @@ import json
 import re
 
 from app.services.integrations.normalizers.common import (
+    clean_string,
     first_non_empty,
     make_dedup_key,
 )
@@ -17,15 +18,6 @@ CLOUDWATCH_FIRING_STATES = {
 }
 
 
-def _clean(value):
-    if value is None:
-        return None
-
-    value = str(value).strip()
-
-    return value or None
-
-
 def _label_key(value):
     value = str(value or "").strip().lower()
     value = re.sub(r"[^a-z0-9_]+", "_", value)
@@ -34,7 +26,7 @@ def _label_key(value):
 
 def _set_label(labels, key, value):
     key = _label_key(key)
-    value = _clean(value)
+    value = clean_string(value)
 
     if key and value is not None:
         labels.setdefault(key, value)
@@ -62,7 +54,7 @@ def _message_attribute_value(
             item.get("StringValue"),
         )
 
-    return _clean(item)
+    return clean_string(item)
 
 
 def _sns_labels(envelope):
@@ -157,14 +149,14 @@ def _normalize_cloudwatch_alarm(
         "CloudWatch alarm",
     )
 
-    alarm_arn = _clean(
+    alarm_arn = clean_string(
         message.get("AlarmArn")
     )
 
-    account_id = _clean(
+    account_id = clean_string(
         message.get("AWSAccountId")
     )
-    region = _clean(
+    region = clean_string(
         message.get("Region")
     )
 
@@ -389,7 +381,7 @@ def _normalize_generic_sns(
             sort_keys=True,
         )
 
-    external_id = _clean(
+    external_id = clean_string(
         envelope.get("MessageId")
     )
 

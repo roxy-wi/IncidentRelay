@@ -23,6 +23,7 @@ Incoming integrations create or update alerts in IncidentRelay. They are selecte
 | AWS SNS/Cloud watch | `POST /api/integrations/aws-sns`           | [AWS SNS/Cloud watch](integrations/aws-sns-cloudwatch.md) |
 | Grafana             | `POST /api/integrations/grafana`           | [Grafana](grafana.md)                                     |
 | Datadog             | `POST /api/integrations/datadog`           | [Datadog](datadog.md)                                     |
+| Uptime Kuma         | `POST /api/integrations/uptime-kuma`       | [Uptime Kuma](uptime-kuma.md)                             |
 | RMON                | `POST /api/integrations/rmon`              | [Grafana](rmon.md)                                        |
 | Zabbix              | `POST /api/integrations/zabbix`            | [Zabbix](zabbix.md)                                       |
 | Sentry              | `POST /api/integrations/sentry/<route_id>` | [Sentry](sentry.md)                                       |

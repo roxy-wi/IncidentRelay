@@ -231,6 +231,44 @@ class DatadogWebhookSchema(ApiModel):
         return self
 
 
+class UptimeKumaWebhookSchema(ApiModel):
+    """Validate the standard Uptime Kuma Webhook payload."""
+
+    model_config = ConfigDict(extra="allow")
+
+    heartbeat: Dict[str, Any] | None = None
+    monitor: Dict[str, Any] | None = None
+    msg: str | None = None
+
+    # Optional IncidentRelay extensions for custom Uptime Kuma webhook bodies.
+    title: str | None = None
+    message: str | None = None
+    severity: str | None = None
+    status: str | int | None = None
+    team: str | None = None
+    labels: Dict[str, Any] = Field(default_factory=dict)
+    event_link: str | None = None
+    monitor_url: str | None = None
+    monitor_id: str | int | None = None
+    monitor_type: str | None = None
+    name: str | None = None
+
+    @model_validator(mode="after")
+    def validate_not_empty(self):
+        if not (
+            self.heartbeat
+            or self.monitor
+            or str(self.msg or "").strip()
+            or str(self.message or "").strip()
+            or str(self.title or "").strip()
+        ):
+            raise ValueError(
+                "Uptime Kuma webhook payload must contain heartbeat, monitor or msg"
+            )
+
+        return self
+
+
 class GenericWebhookSchema(ApiModel):
     """Validate generic or PagerDuty Events API v2-compatible payloads."""
 

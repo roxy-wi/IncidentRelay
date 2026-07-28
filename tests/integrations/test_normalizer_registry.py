@@ -19,6 +19,7 @@ def test_registry_contains_all_supported_integration_normalizers():
         "librenms",
         "rmon",
         "sentry",
+        "uptime_kuma",
         "webhook",
         "zabbix",
     }

@@ -328,7 +328,8 @@ function fillRouteSourceFilter(routes) {
         zabbix: true,
         webhook: true,
         sentry: true,
-        librenms: true
+        librenms: true,
+        uptime_kuma: true
     };
 
     asArray(routes).forEach(function (route) {
@@ -1098,6 +1099,7 @@ function updateRouteSourceUi() {
     const isSentry = source === "sentry";
     const isAwsSns = source === "aws_sns";
     const isDatadog = source === "datadog";
+    const isUptimeKuma = source === "uptime_kuma";
     const isWebhook = source === "webhook";
 
     $("#route-sentry-settings").toggleClass("is-hidden", !isSentry);
@@ -1108,6 +1110,10 @@ function updateRouteSourceUi() {
     $("#route-datadog-help").toggleClass(
         "is-hidden",
         !isDatadog
+    );
+    $("#route-uptime-kuma-help").toggleClass(
+        "is-hidden",
+        !isUptimeKuma
     );
 
     $("#route-aws-sns-settings").toggleClass("is-hidden", !isAwsSns);
@@ -1141,6 +1147,10 @@ function updateRouteSourceUi() {
         } else if (source === "rmon") {
             $("#route-group-by").val(
                 '["rmon_check_id","rmon_check_type"]'
+            );
+        } else if (source === "uptime_kuma") {
+            $("#route-group-by").val(
+                '["uptime_kuma_monitor_id"]'
             );
         } else if (source === "aws_sns") {
             $("#route-group-by").val(
@@ -1497,6 +1507,10 @@ function getRouteIntakePath(route) {
         return "/api/integrations/zabbix";
     }
 
+    if (source === "uptime_kuma") {
+        return "/api/integrations/uptime-kuma";
+    }
+
     if (source === "webhook") {
         return "/api/integrations/webhook";
     }
@@ -1540,6 +1554,16 @@ function buildRouteIntakeCurl(route, token) {
         ].join("\n");
     }
 
+    if (source === "uptime_kuma") {
+        return [
+            "# " + i18n.t("routes.intake.uptime_kuma_example_comment"),
+            `curl -X POST '${url}' \\`,
+            "  -H 'Content-Type: application/json' \\",
+            `  -H 'Authorization: Bearer ${token || "<route-token>"}' \\`,
+            "  -d '{\"heartbeat\":{\"monitorID\":42,\"status\":0,\"msg\":\"Connection refused\",\"ping\":null},\"monitor\":{\"id\":42,\"name\":\"Production API\",\"type\":\"http\",\"url\":\"https://api.example.com\",\"tags\":[{\"name\":\"team\",\"value\":\"sre\"}]},\"msg\":\"Production API is DOWN\"}'"
+        ].join("\n");
+    }
+
     if (source === "webhook") {
         return [
             "# " + i18n.t("routes.intake.generic_example_comment"),
@@ -1569,6 +1593,7 @@ function showRouteIntakeDetails(route) {
     const isSentry = source === "sentry";
     const isHeartbeat = source === "heartbeat";
     const isDatadog = source === "datadog";
+    const isUptimeKuma = source === "uptime_kuma";
     const isWebhook = source === "webhook";
     const url = getRouteIntakeUrl(route);
 
@@ -1587,6 +1612,9 @@ function showRouteIntakeDetails(route) {
     } else if (isDatadog) {
         subtitleKey = "routes.intake.datadog_subtitle";
         helpKey = "routes.intake.datadog_help";
+    } else if (isUptimeKuma) {
+        subtitleKey = "routes.intake.uptime_kuma_subtitle";
+        helpKey = "routes.intake.uptime_kuma_help";
     } else if (isWebhook) {
         subtitleKey = "routes.intake.webhook_subtitle";
         helpKey = "routes.intake.webhook_help";

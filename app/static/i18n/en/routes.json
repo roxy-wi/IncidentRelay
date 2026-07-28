@@ -198,7 +198,11 @@
   "routes.intake.webhook_subtitle": "Use this token as Authorization: Bearer for generic payloads or as routing_key for PagerDuty Events API v2-compatible payloads.",
   "routes.intake.webhook_help": "Generic payloads use Authorization: Bearer. PagerDuty Events API v2-compatible payloads put the same token in routing_key.",
   "routes.form.datadog_help": "Create a Datadog Webhooks integration that sends the recommended custom payload to this route. Add the route intake token as an Authorization: Bearer custom header.",
+  "routes.form.uptime_kuma_help": "Uptime Kuma sends its standard Webhook JSON payload to this route. Add the route intake token as an Authorization: Bearer header. DOWN opens an alert and UP or maintenance resolves it.",
   "routes.intake.datadog_example_comment": "Datadog Webhooks custom payload example",
   "routes.intake.datadog_subtitle": "Use this endpoint in the Datadog Webhooks integration and add the route token as an Authorization: Bearer custom header.",
-  "routes.intake.datadog_help": "Configure a JSON custom payload with ALERT_CYCLE_KEY and ALERT_TRANSITION so recovery updates the same IncidentRelay alert."
+  "routes.intake.datadog_help": "Configure a JSON custom payload with ALERT_CYCLE_KEY and ALERT_TRANSITION so recovery updates the same IncidentRelay alert.",
+  "routes.intake.uptime_kuma_example_comment": "Standard Uptime Kuma Webhook payload example",
+  "routes.intake.uptime_kuma_subtitle": "Use this endpoint and route token in an Uptime Kuma Webhook notification.",
+  "routes.intake.uptime_kuma_help": "In Uptime Kuma, create a Webhook notification with POST, application/json, the route intake URL, and an additional Authorization header. Keep the default request body."
 }

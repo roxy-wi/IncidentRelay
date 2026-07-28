@@ -16,6 +16,7 @@ from app.services.integrations.normalizers.grafana import normalize_grafana
 from app.services.integrations.normalizers.librenms import normalize_librenms
 from app.services.integrations.normalizers.rmon import normalize_rmon
 from app.services.integrations.normalizers.sentry import normalize_sentry
+from app.services.integrations.normalizers.uptime_kuma import normalize_uptime_kuma
 from app.services.integrations.normalizers.webhook import normalize_webhook
 from app.services.integrations.normalizers.zabbix import normalize_zabbix
 
@@ -62,6 +63,7 @@ _NORMALIZERS: Dict[str, Normalizer] = {
     "librenms": _payload_only(normalize_librenms),
     "rmon": _payload_only(normalize_rmon),
     "sentry": _normalize_sentry,
+    "uptime_kuma": _payload_only(normalize_uptime_kuma),
     "webhook": _payload_only(normalize_webhook),
     "zabbix": _payload_only(normalize_zabbix),
 }

@@ -67,6 +67,7 @@ nav:
           - Sentry: integrations/sentry.md
           - Sentry Troubleshooting: integrations/sentry-troubleshooting.md
           - LibreNMS: integrations/librenms.md
+          - Uptime Kuma: integrations/uptime-kuma.md
           - Generic Webhook: integrations/generic-webhook.md
       - Calendar sync:
           - CalDAV Calendar Sync: integrations/caldav.md
