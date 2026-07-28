@@ -12,6 +12,7 @@ Choose the installation method that matches your environment.
 | Method | Use when | Guide |
 |---|---|---|
 | Docker Compose | You want the quickest start or a container-based deployment | [Docker Installation](docker.md) |
+| Kubernetes with Helm | You already run a cluster and want IncidentRelay managed the same way | [Kubernetes Installation](kubernetes.md) |
 | RPM package | You use RHEL, Rocky Linux, AlmaLinux or CentOS Stream | [RPM Installation](rpm-installation.md) |
 | Manual systemd | You want to run from source code or manage the Python environment yourself | [Manual systemd Installation](systemd.md) |
 

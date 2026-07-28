@@ -187,6 +187,8 @@ helm upgrade --install incidentrelay ./helm/incidentrelay \
 
 All settings from `incidentrelay.conf` are available under `config.*` in [values.yaml](helm/incidentrelay/values.yaml); you can also bring a pre-rendered config via `existingConfigSecret`.
 
+Read more: [Kubernetes installation](docs/getting-started/kubernetes.md)
+
 ### RedHat-like distributions from RPM repository
 
 Recommended for RHEL, Rocky Linux, AlmaLinux, and CentOS Stream.
