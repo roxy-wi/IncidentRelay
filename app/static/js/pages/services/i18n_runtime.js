@@ -554,6 +554,18 @@
             [/^Edit SLO #(\d+)$/i, "SLO Nr. $1 bearbeiten"],
         ];
 
+        const numberedFrench = [
+            [/^Service #(\d+)$/i, "Service n° $1"],
+            [/^Runbook #(\d+)$/i, "Procédure n° $1"],
+            [/^Link #(\d+)$/i, "Lien n° $1"],
+            [/^Window #(\d+)$/i, "Fenêtre n° $1"],
+            [/^User #(\d+)$/i, "Utilisateur n° $1"],
+            [/^SLI #(\d+)$/i, "SLI n° $1"],
+            [/^SLO #(\d+)$/i, "SLO n° $1"],
+            [/^Edit SLI #(\d+)$/i, "Modifier le SLI n° $1"],
+            [/^Edit SLO #(\d+)$/i, "Modifier le SLO n° $1"],
+        ];
+
         if (window.i18n && i18n.locale === "ru") {
             for (const pair of numbered) {
                 if (pair[0].test(normalized)) {
@@ -623,6 +635,78 @@
             match = normalized.match(/^([0-9]+) \/ ([0-9]+) upstream \/ downstream$/i);
             if (match) {
                 return "Вышестоящих: " + match[1] + " / нижестоящих: " + match[2];
+            }
+        }
+
+        if (window.i18n && i18n.locale === "fr") {
+            for (const pair of numberedFrench) {
+                if (pair[0].test(normalized)) {
+                    return normalized.replace(pair[0], pair[1]);
+                }
+            }
+
+            match = normalized.match(/^Correlation (\d+)s$/i);
+            if (match) {
+                return "Corrélation : " + match[1] + " s";
+            }
+
+            match = normalized.match(/^(\d+) day window$/i);
+            if (match) {
+                return "Fenêtre : " + match[1] + " jours";
+            }
+
+            match = normalized.match(/^Loading service details for\s+(.+?)(?:\.\.\.)?$/i);
+            if (match) {
+                return "Chargement des détails du service « " + match[1] + " »...";
+            }
+
+            match = normalized.match(/^(\d+) more path\(s\)$/i);
+            if (match) {
+                return match[1] + " autre(s) chemin(s)";
+            }
+
+            match = normalized.match(/^(\d+) more downstream path\(s\)$/i);
+            if (match) {
+                return match[1] + " autre(s) chemin(s) en aval";
+            }
+
+            match = normalized.match(/^Budget used:\s*(.+)$/i);
+            if (match) {
+                return "Budget utilisé : " + match[1];
+            }
+
+            match = normalized.match(/^Delete SLI [“\"]?(.+?)[”\"]?\? SLOs attached to it will be deleted by the database\.$/i);
+            if (match) {
+                return "Supprimer le SLI « " + match[1] + " » ? Les SLO associés seront supprimés par la base de données.";
+            }
+
+            match = normalized.match(/^Delete (service|link|runbook|dependency|SLI|SLO|default stakeholder) [“\"]?(.+?)[”\"]?\?$/i);
+            if (match) {
+                const names = {
+                    service: "le service",
+                    link: "le lien",
+                    runbook: "la procédure",
+                    dependency: "la dépendance",
+                    sli: "le SLI",
+                    slo: "le SLO",
+                    "default stakeholder": "la partie prenante par défaut",
+                };
+                return "Supprimer " + names[match[1].toLowerCase()] + " « " + match[2] + " » ?";
+            }
+
+            match = normalized.match(/^Delete dependency on [“\"]?(.+?)[”\"]?\?$/i);
+            if (match) {
+                return "Supprimer la dépendance envers « " + match[1] + " » ?";
+            }
+
+            match = normalized.match(/^([0-9]+) upstream \/ ([0-9]+) downstream$/i);
+            if (match) {
+                return "En amont : " + match[1] + " / en aval : " + match[2];
+            }
+
+            match = normalized.match(/^([0-9]+) \/ ([0-9]+) upstream \/ downstream$/i);
+            if (match) {
+                return "En amont : " + match[1] + " / en aval : " + match[2];
             }
         }
 

@@ -1,0 +1,21 @@
+{
+  "notification_center.notifications": "Notifications",
+  "notification_center.title": "Demandes d’intervention",
+  "notification_center.empty": "Aucune demande en attente",
+  "notification_center.notification": "Notification",
+  "notification_center.responder_requested": "Intervenant demandé",
+  "notification_center.help_requested": "{requester} a demandé votre aide pour cet incident.",
+  "notification_center.accept": "Accepter",
+  "notification_center.decline": "Refuser",
+  "notification_center.open_incident": "Ouvrir l’incident",
+  "notification_center.unknown_user": "Utilisateur inconnu",
+  "notification_center.user_id": "Utilisateur n° {id}",
+  "notification_center.no_team": "Aucune équipe",
+  "notification_center.no_service": "Aucun service",
+  "notification_center.status.firing": "Déclenché",
+  "notification_center.status.acknowledged": "Acquitté",
+  "notification_center.status.resolved": "Résolu",
+  "notification_center.status.maintenance": "Maintenance",
+  "notification_center.status.open": "Ouvert",
+  "notification_center.status.closed": "Fermé"
+}

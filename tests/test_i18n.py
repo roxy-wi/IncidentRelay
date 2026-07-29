@@ -33,10 +33,11 @@ def test_normalize_locale_accepts_region_variants():
     assert normalize_locale("ru-RU") == "ru"
     assert normalize_locale("en_US") == "en"
     assert normalize_locale("de-DE") == "de"
+    assert normalize_locale("fr-FR") == "fr"
 
 
 def test_normalize_locale_rejects_unsupported_values():
-    assert normalize_locale("fr") is None
+    assert normalize_locale("es") is None
     assert normalize_locale("../../ru") is None
 
 
@@ -73,11 +74,21 @@ def test_accept_language_selects_german_locale():
     assert response.get_data(as_text=True) == "Anmelden|de"
 
 
+def test_accept_language_selects_french_locale():
+    app = create_test_app()
+    response = app.test_client().get(
+        "/",
+        headers={"Accept-Language": "fr-FR,fr;q=0.9,en;q=0.8"},
+    )
+
+    assert response.get_data(as_text=True) == "Se connecter|fr"
+
+
 def test_unsupported_language_falls_back_to_english():
     app = create_test_app()
 
     with app.test_request_context(
         "/",
-        headers={"Accept-Language": "fr-FR,fr;q=0.9"},
+        headers={"Accept-Language": "es-ES,es;q=0.9"},
     ):
         assert get_current_locale() == DEFAULT_LOCALE

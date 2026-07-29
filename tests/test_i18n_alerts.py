@@ -21,6 +21,7 @@ def test_alert_catalogs_have_matching_keys():
 
     assert english_keys == set(load_catalog("ru"))
     assert english_keys == set(load_catalog("de"))
+    assert english_keys == set(load_catalog("fr"))
 
 
 def test_alert_templates_reference_existing_keys():

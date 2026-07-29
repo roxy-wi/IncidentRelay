@@ -7,11 +7,11 @@ ROOT = Path(__file__).resolve().parents[2]
 
 def test_orchestration_catalogs_have_matching_keys():
     catalogs = []
-    for locale in ("en", "ru", "de"):
+    for locale in ("en", "ru", "de", "fr"):
         path = ROOT / "app" / "static" / "i18n" / locale / "orchestrations.json"
         catalogs.append(json.loads(path.read_text(encoding="utf-8")))
 
-    assert set(catalogs[0]) == set(catalogs[1]) == set(catalogs[2])
+    assert set(catalogs[0]) == set(catalogs[1]) == set(catalogs[2]) == set(catalogs[3])
     assert "orchestrations.webhooks.private_network_policy" in catalogs[0]
 
 

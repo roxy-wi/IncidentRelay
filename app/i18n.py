@@ -15,6 +15,7 @@ LOCALE_COOKIE_NAME = "incidentrelay_locale"
 SUPPORTED_LOCALES = {
     "en": "English",
     "de": "Deutsch",
+    "fr": "Français",
     "ru": "Русский",
 }
 
