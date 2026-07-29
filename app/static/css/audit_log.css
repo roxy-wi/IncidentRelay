@@ -1,0 +1,102 @@
+.audit-log-header {
+    align-items: flex-start;
+    gap: 16px;
+}
+
+.audit-log-filters {
+    display: grid;
+    grid-template-columns: minmax(240px, 2fr) repeat(6, minmax(150px, 1fr));
+    gap: 12px;
+    padding: 16px;
+    border-top: 1px solid var(--md-border, #dfe3e8);
+    border-bottom: 1px solid var(--md-border, #dfe3e8);
+}
+
+.audit-filter {
+    min-width: 0;
+}
+
+.audit-filter label {
+    display: block;
+    margin-bottom: 6px;
+    font-size: 12px;
+    font-weight: 600;
+}
+
+.audit-log-table td {
+    vertical-align: top;
+}
+
+.audit-log-action {
+    display: inline-flex;
+    max-width: 280px;
+    overflow-wrap: anywhere;
+}
+
+.audit-log-message {
+    max-width: 360px;
+    white-space: normal;
+    overflow-wrap: anywhere;
+}
+
+.audit-log-scope,
+.audit-log-object,
+.audit-log-actor {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+}
+
+.audit-log-secondary {
+    color: var(--md-text-muted, #667085);
+    font-size: 12px;
+}
+
+.audit-log-json-card {
+    margin-top: 16px;
+}
+
+.audit-log-json {
+    max-height: 480px;
+    margin: 0;
+    padding: 16px;
+    overflow: auto;
+    border-radius: 0 0 10px 10px;
+    background: var(--md-code-bg, #111827);
+    color: var(--md-code-text, #e5e7eb);
+    font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+    font-size: 13px;
+    line-height: 1.55;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+@media (max-width: 1500px) {
+    .audit-log-filters {
+        grid-template-columns: repeat(4, minmax(170px, 1fr));
+    }
+
+    .audit-filter-search {
+        grid-column: span 2;
+    }
+}
+
+@media (max-width: 900px) {
+    .audit-log-filters {
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+    }
+
+    .audit-filter-search {
+        grid-column: span 2;
+    }
+}
+
+@media (max-width: 600px) {
+    .audit-log-filters {
+        grid-template-columns: 1fr;
+    }
+
+    .audit-filter-search {
+        grid-column: auto;
+    }
+}

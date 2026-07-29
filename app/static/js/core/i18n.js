@@ -99,6 +99,7 @@
             "teams": "nav.teams",
             "groups": "nav.groups",
             "admin-users": "nav.users",
+            "audit-log": "nav.audit_log",
             "sso": "nav.sso",
         };
 

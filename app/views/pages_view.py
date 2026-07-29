@@ -16,6 +16,7 @@ from flask import (
 from app.i18n import get_current_locale, translate
 from app.login import normalize_auth_redirect_target
 from app.middleware import load_jwt_user
+from app.services.rbac import can_read_audit_logs
 
 
 pages_bp = Blueprint("pages", __name__)
@@ -117,6 +118,8 @@ def pwa_service_worker():
 @pages_bp.route("/profile/")
 @pages_bp.route("/admin/users")
 @pages_bp.route("/admin/users/")
+@pages_bp.route("/admin/audit-log")
+@pages_bp.route("/admin/audit-log/")
 @pages_bp.route("/admin/sso")
 @pages_bp.route("/admin/sso/")
 @pages_bp.route("/login")
@@ -136,7 +139,12 @@ def app_page(alert_id=None):
         target = normalize_auth_redirect_target(request.full_path.rstrip("?"))
         return redirect(f"/login?next={quote(target, safe='')}")
 
-    if request.path in ("/admin/users", "/groups", "/admin/sso") and not user.is_admin:
+    normalized_path = request.path.rstrip("/") or "/"
+
+    if normalized_path in ("/admin/users", "/groups", "/admin/sso") and not user.is_admin:
+        abort(403)
+
+    if normalized_path == "/admin/audit-log" and not can_read_audit_logs(user):
         abort(403)
 
     return render_template("index.html", initial_page=request.path)

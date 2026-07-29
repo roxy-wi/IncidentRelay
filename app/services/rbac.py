@@ -9,6 +9,7 @@ from app.api.schemas.roles import (
     TEAM_VIEWER_ROLE,
 )
 from app.modules.db import groups_repo, teams_repo
+from app.modules.db.models import Group, UserGroup
 
 GROUP_READ_ROLES = {GROUP_VIEWER_ROLE, GROUP_EDITOR_ROLE, GROUP_USER_ADMIN_ROLE}
 GROUP_WRITE_ROLES = {
@@ -372,6 +373,55 @@ def require_team_or_group_resource_access(team_id, write_required=False):
     return jsonify({
         "error": "team_or_group_access_denied",
         "message": "Access to this team resource is denied",
+    }), 403
+
+
+def get_audit_log_group_ids(user=None):
+    """Return group ids whose audit records may be read by a group editor.
+
+    ``None`` represents unrestricted global-admin scope. A group user-admin or
+    viewer does not gain audit-log access unless the same user is an editor in
+    another group.
+    """
+
+    user = user or current_user()
+    if not user:
+        return []
+
+    if user.is_admin:
+        return None
+
+    memberships = (
+        UserGroup
+        .select(UserGroup.group)
+        .join(Group)
+        .where(
+            (UserGroup.user == user.id)
+            & (UserGroup.role == GROUP_EDITOR_ROLE)
+            & (UserGroup.active == True)
+            & (Group.active == True)
+            & (Group.deleted == False)
+        )
+    )
+    return sorted({membership.group_id for membership in memberships})
+
+
+def can_read_audit_logs(user=None):
+    """Return True for global admins and users editing at least one group."""
+
+    scope = get_audit_log_group_ids(user=user)
+    return scope is None or bool(scope)
+
+
+def require_audit_log_access():
+    """Return an error response when current user cannot read audit logs."""
+
+    if can_read_audit_logs():
+        return None
+
+    return jsonify({
+        "error": "audit_log_access_denied",
+        "message": "Global admin or group editor role is required",
     }), 403
 
 

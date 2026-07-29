@@ -22,6 +22,7 @@
     <link rel="stylesheet" href="/static/css/material.css">
     <link rel="stylesheet" href="/static/css/table_pages.css">
     <link rel="stylesheet" href="/static/css/orchestrations.css">
+    <link rel="stylesheet" href="/static/css/audit_log.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/vendor/tom-select/tom-select.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/table_filters.css') }}">
     <link rel="stylesheet" href="/static/css/vendor/select2/select2.min.css">
@@ -176,6 +177,10 @@
                 <svg class="menu-icon"><use href="#icon-users"></use></svg>
                 <span class="menu-text">{{ _('nav.users') }}</span>
             </a>
+            <a href="/admin/audit-log" data-page="audit-log" class="menu-link menu-sub-link menu-link-audit is-hidden" title="{{ _('nav.audit_log') }}">
+                <svg class="menu-icon"><use href="#icon-audit-log"></use></svg>
+                <span class="menu-text">{{ _('nav.audit_log') }}</span>
+            </a>
             <a href="/admin/sso" data-page="sso" class="menu-link menu-sub-link menu-link-global-admin is-hidden" title="{{ _('nav.sso') }}">
                 <svg class="menu-icon"><use href="#icon-sso"></use></svg>
                 <span class="menu-text">{{ _('nav.sso') }}</span>
@@ -272,6 +277,7 @@
             <div id="view-silences" class="view">{% include "pages/silences.html" %}</div>
             <div id="view-teams" class="view">{% include "pages/teams.html" %}</div>
             <div id="view-admin-users" class="view">{% include "pages/admin_users.html" %}</div>
+            <div id="view-audit-log" class="view">{% include "pages/audit_log.html" %}</div>
             <div id="view-sso" class="view">{% include "pages/sso.html" %}</div>
             <div id="view-groups" class="view">{% include "pages/groups.html" %}</div>
             <div id="view-profile" class="view">{% include "pages/profile.html" %}</div>
@@ -370,6 +376,7 @@
 <script src="/static/js/pages/silences.js"></script>
 <script src="/static/js/pages/teams.js"></script>
 <script src="/static/js/pages/admin_users.js"></script>
+<script src="/static/js/pages/audit_log.js"></script>
 <script src="/static/js/pages/groups.js"></script>
 <script src="/static/js/pages/profile.js"></script>
 <script src="/static/js/pages/sso.js"></script>

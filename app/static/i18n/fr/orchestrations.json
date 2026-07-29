@@ -76,8 +76,6 @@
   "orchestrations.simulator.no_result": "Lancez une simulation pour afficher le résultat.",
   "orchestrations.versions.title": "Historique des versions",
   "orchestrations.versions.status": "Statut",
-  "orchestrations.versions.changed_by": "Modifiée par",
-  "orchestrations.versions.published_by": "Publiée par",
   "orchestrations.versions.comment": "Commentaire",
   "orchestrations.versions.hash": "Empreinte de la définition",
   "orchestrations.versions.published": "Publiée",

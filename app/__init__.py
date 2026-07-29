@@ -7,6 +7,7 @@ from app.modules.logger import setup_json_logging
 from app.i18n import register_i18n
 from app.middleware import enforce_api_authentication
 from app.views.admin_users_view import admin_users_bp
+from app.views.audit_logs_view import audit_logs_bp
 from app.views.alerts_view import alerts_bp
 from app.views.auth_view import auth_bp
 from app.views.calendar_view import calendar_bp
@@ -111,6 +112,7 @@ def register_blueprints(flask_app):
     flask_app.register_blueprint(teams_bp, url_prefix="/api/teams")
     flask_app.register_blueprint(users_bp, url_prefix="/api/users")
     flask_app.register_blueprint(admin_users_bp, url_prefix="/api/admin/users")
+    flask_app.register_blueprint(audit_logs_bp, url_prefix="/api/admin/audit-logs")
     flask_app.register_blueprint(rotations_bp, url_prefix="/api/rotations")
     flask_app.register_blueprint(oncall_health_bp, url_prefix="/api/oncall-health")
     flask_app.register_blueprint(calendar_bp, url_prefix="/api/calendar")

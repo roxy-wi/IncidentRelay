@@ -21,6 +21,7 @@ const routes = {
     "/groups": { page: "groups", title: "Groups", subtitle: "Access boundaries and user roles", load: function () { loadGroups(); } },
     "/profile": { page: "profile", title: "Profile", subtitle: "User profile and personal API token", load: function () { loadProfile(); } },
     "/admin/users": { page: "admin-users", title: "Admin users", subtitle: "Admin-only user workspace", load: function () { loadAdminUsers(); } },
+    "/admin/audit-log": { page: "audit-log", title: "Audit log", subtitle: "Administrative activity and security history", load: function () { loadAuditLog(); } },
     "/admin/sso": { page: "sso", title: "SSO", subtitle: "OIDC and SAML login providers", load: function () {  loadSsoAdmin(); } },
     "/login": { page: "login", title: "Login", subtitle: "JWT authentication", load: function () { loadLogin(); } }
 };
