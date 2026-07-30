@@ -832,3 +832,162 @@ def test_invalid_heartbeat_token_is_rejected(db):
 
     assert error is not None
     assert error["error"] == "heartbeat_not_found"
+
+
+def test_ping_recovery_sends_resolved_notification_without_double_update(
+    monkeypatch,
+    db,
+):
+    _, team, service, route = _fixture()
+    now = utc_now()
+
+    heartbeat = create_heartbeat(
+        team,
+        route,
+        service=service,
+        token_hash=hash_token("resolved-notification-token"),
+        last_seen_at=now - timedelta(minutes=10),
+        next_expected_at=now - timedelta(minutes=5),
+        expected_interval_seconds=60,
+        grace_period_seconds=60,
+    )
+
+    process_overdue_heartbeats(now=now)
+    heartbeat = heartbeat.__class__.get_by_id(heartbeat.id)
+    group = AlertGroup.get_by_id(heartbeat.current_alert_group_id)
+
+    group.last_notification_at = now - timedelta(minutes=1)
+    group.notification_pending = True
+    group.notification_due_at = now + timedelta(minutes=1)
+    group.notification_reason = "update"
+    group.save()
+
+    deliveries = []
+    message_updates = []
+
+    monkeypatch.setattr(
+        "app.services.heartbeats.service.notify_alert",
+        lambda current_group, event_type="notification": deliveries.append(
+            (current_group.id, event_type)
+        )
+        or 1,
+    )
+    monkeypatch.setattr(
+        "app.services.alerts.actions.update_alert_messages",
+        lambda current_group, event_type: message_updates.append(
+            (current_group.id, event_type)
+        )
+        or 1,
+    )
+
+    recovered, error = receive_heartbeat_ping(
+        "resolved-notification-token",
+        payload={"status": "completed"},
+        now=now + timedelta(minutes=1),
+    )
+
+    assert error is None
+    assert recovered.status == "ok"
+    assert deliveries == [(group.id, "resolved")]
+    assert message_updates == []
+
+    group = AlertGroup.get_by_id(group.id)
+    assert group.status == "resolved"
+    assert group.notification_pending is False
+    assert group.notification_due_at is None
+    assert group.notification_reason is None
+
+
+def test_ping_recovery_does_not_send_resolved_without_initial_notification(
+    monkeypatch,
+    db,
+):
+    _, team, service, route = _fixture()
+    now = utc_now()
+
+    heartbeat = create_heartbeat(
+        team,
+        route,
+        service=service,
+        token_hash=hash_token("no-resolved-notification-token"),
+        last_seen_at=now - timedelta(minutes=10),
+        next_expected_at=now - timedelta(minutes=5),
+        expected_interval_seconds=60,
+        grace_period_seconds=60,
+    )
+
+    process_overdue_heartbeats(now=now)
+
+    deliveries = []
+    monkeypatch.setattr(
+        "app.services.heartbeats.service.notify_alert",
+        lambda current_group, event_type="notification": deliveries.append(
+            (current_group.id, event_type)
+        )
+        or 1,
+    )
+
+    recovered, error = receive_heartbeat_ping(
+        "no-resolved-notification-token",
+        payload={"status": "completed"},
+        now=now + timedelta(minutes=1),
+    )
+
+    assert error is None
+    assert recovered.status == "ok"
+    assert deliveries == []
+
+
+def test_instance_ping_recovery_sends_resolved_notification(
+    monkeypatch,
+    db,
+):
+    from app.modules.db.models import HeartbeatInstance
+
+    _, team, service, route = _fixture()
+    now = utc_now()
+
+    heartbeat = create_heartbeat(
+        team,
+        route,
+        service=service,
+        token_hash=hash_token("instance-resolved-notification-token"),
+        instance_tracking_enabled=True,
+        instance_key="instance",
+        expected_instances_mode="auto",
+    )
+
+    instance = HeartbeatInstance.create(
+        heartbeat=heartbeat,
+        instance_key="server-1.example.com",
+        status="ok",
+        enabled=True,
+        auto_discovered=True,
+        last_seen_at=now - timedelta(minutes=10),
+        next_expected_at=now - timedelta(minutes=5),
+    )
+
+    process_overdue_heartbeats(now=now)
+    instance = HeartbeatInstance.get_by_id(instance.id)
+    group = AlertGroup.get_by_id(instance.current_alert_group_id)
+    group.last_notification_at = now - timedelta(minutes=1)
+    group.save(only=[AlertGroup.last_notification_at])
+
+    deliveries = []
+    monkeypatch.setattr(
+        "app.services.heartbeats.service.notify_alert",
+        lambda current_group, event_type="notification": deliveries.append(
+            (current_group.id, event_type)
+        )
+        or 1,
+    )
+
+    recovered, error = receive_heartbeat_ping(
+        "instance-resolved-notification-token",
+        payload={"status": "completed", "instance": "server-1.example.com"},
+        now=now + timedelta(minutes=1),
+    )
+
+    assert error is None
+    assert recovered.status == "ok"
+    assert deliveries == [(group.id, "resolved")]

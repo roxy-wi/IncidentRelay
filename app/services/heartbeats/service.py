@@ -9,6 +9,7 @@ from app.modules.db.models import AlertGroup, Heartbeat, HeartbeatInstance
 from app.services.alerts.actions import resolve_alert
 from app.services.alerts.lifecycle import upsert_alert
 from app.services.integrations.auth import create_raw_token, hash_token
+from app.services.notifications.delivery import notify_alert
 from app.modules.common import utc_now
 
 logger = logging.getLogger("oncall.heartbeats")
@@ -665,7 +666,41 @@ def mark_heartbeat_instance_overdue(instance, now=None):
     return instance, group
 
 
-def _resolve_current_instance_overdue_alert(instance, now):
+def _resolve_heartbeat_alert(
+    group: AlertGroup,
+    *,
+    recovery_event_type: str,
+    recovery_message: str,
+) -> AlertGroup:
+    """Resolve a heartbeat alert and complete the resolved delivery flow."""
+    had_notification = bool(group.last_notification_at)
+
+    resolved = resolve_alert(
+        group.id,
+        user_id=None,
+        update_messages=False,
+    )
+
+    alerts_repo.clear_alert_group_notification(resolved)
+
+    alerts_repo.create_alert_event(
+        group_id=resolved.id,
+        event_type=recovery_event_type,
+        message=recovery_message,
+    )
+
+    if had_notification:
+        notify_alert(
+            resolved,
+            event_type="resolved",
+        )
+
+    return resolved
+
+
+def _resolve_current_instance_overdue_alert(
+    instance: HeartbeatInstance,
+) -> AlertGroup | None:
     if not instance.current_alert_group_id:
         return None
 
@@ -674,16 +709,19 @@ def _resolve_current_instance_overdue_alert(instance, now):
     if not group or group.status == "resolved":
         return group
 
-    resolved = resolve_alert(group.id, user_id=None)
-    alerts_repo.create_alert_event(
-        group_id=resolved.id,
-        event_type="heartbeat_instance_recovered",
-        message=f"Heartbeat recovered: {instance.heartbeat.name} / {instance.instance_key}",
+    return _resolve_heartbeat_alert(
+        group,
+        recovery_event_type="heartbeat_instance_recovered",
+        recovery_message=(
+            f"Heartbeat recovered: "
+            f"{instance.heartbeat.name} / {instance.instance_key}"
+        ),
     )
-    return resolved
 
 
-def _resolve_current_overdue_alert(heartbeat, now):
+def _resolve_current_overdue_alert(
+    heartbeat: Heartbeat,
+) -> AlertGroup | None:
     if not heartbeat.current_alert_group_id:
         return None
 
@@ -692,13 +730,11 @@ def _resolve_current_overdue_alert(heartbeat, now):
     if not group or group.status == "resolved":
         return group
 
-    resolved = resolve_alert(group.id, user_id=None)
-    alerts_repo.create_alert_event(
-        group_id=resolved.id,
-        event_type="heartbeat_recovered",
-        message=f"Heartbeat recovered: {heartbeat.name}",
+    return _resolve_heartbeat_alert(
+        group,
+        recovery_event_type="heartbeat_recovered",
+        recovery_message=f"Heartbeat recovered: {heartbeat.name}",
     )
-    return resolved
 
 
 def receive_heartbeat_ping(
@@ -797,7 +833,7 @@ def receive_heartbeat_ping(
 
         if instance.status == "overdue":
             if heartbeat.auto_resolve:
-                recovered_group = _resolve_current_instance_overdue_alert(instance, now)
+                recovered_group = _resolve_current_instance_overdue_alert(instance)
             instance.status = "ok"
             instance.overdue_since = None
             instance.last_recovered_at = now
@@ -855,7 +891,7 @@ def receive_heartbeat_ping(
 
     if heartbeat.status == "overdue":
         if heartbeat.auto_resolve:
-            recovered_group = _resolve_current_overdue_alert(heartbeat, now)
+            recovered_group = _resolve_current_overdue_alert(heartbeat)
         heartbeat.status = "ok"
         heartbeat.overdue_since = None
         heartbeat.last_recovered_at = now
