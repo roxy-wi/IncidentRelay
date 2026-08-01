@@ -1,7 +1,7 @@
 from peewee import DoesNotExist
 
 from app.modules.db import matcher_presets_repo, teams_repo
-from app.services.serializers.common import attach_team_permissions
+from app.services.serializers.common import attach_team_permissions, serialize_utc_datetime
 
 
 class MatcherPresetError(ValueError):
@@ -246,8 +246,8 @@ def serialize_preset(preset, current_user=None, *, include_usages=False):
                     "id": silence.id,
                     "name": silence.name,
                     "team_id": silence.team_id,
-                    "starts_at": silence.starts_at.isoformat() if silence.starts_at else None,
-                    "ends_at": silence.ends_at.isoformat() if silence.ends_at else None,
+                    "starts_at": serialize_utc_datetime(silence.starts_at),
+                    "ends_at": serialize_utc_datetime(silence.ends_at),
                     "enabled": silence.enabled,
                 }
                 for silence in usages["silences"]

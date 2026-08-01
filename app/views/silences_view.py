@@ -1,14 +1,17 @@
+from typing import Any
+
 from flask import Blueprint, jsonify, request
 
 from app.api.schemas.silences import SilenceCreateSchema, SilenceUpdateSchema
 from app.modules.db import silences_repo
+from app.modules.db.models import Silence, User
 from app.services.audit import write_audit
 from app.services.rbac import (
     current_user,
     get_allowed_team_or_group_resource_ids,
     require_team_or_group_resource_access,
 )
-from app.services.serializers.common import attach_team_permissions
+from app.services.serializers.common import attach_team_permissions, serialize_utc_datetime
 from app.services.routing.matcher import service as matcher_preset_service
 from app.services.validation import make_error_response, validate_body
 
@@ -188,7 +191,10 @@ def delete_silence(silence_id):
     return jsonify(serialize_silence(silence, current_user=current_user()))
 
 
-def serialize_silence(silence, current_user=None):
+def serialize_silence(
+    silence: Silence,
+    current_user: User | None = None,
+) -> dict[str, Any]:
     """Serialize a silence rule."""
     matcher_preset = (
         silence.matcher_preset
@@ -210,8 +216,8 @@ def serialize_silence(silence, current_user=None):
             "enabled": matcher_preset.enabled,
         } if matcher_preset else None,
         "matchers": silence.matchers or {},
-        "starts_at": silence.starts_at.isoformat(),
-        "ends_at": silence.ends_at.isoformat(),
+        "starts_at": serialize_utc_datetime(silence.starts_at),
+        "ends_at": serialize_utc_datetime(silence.ends_at),
         "created_by": silence.created_by.username if silence.created_by else None,
         "enabled": silence.enabled,
     }

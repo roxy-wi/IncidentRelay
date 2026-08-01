@@ -205,8 +205,47 @@ function formatDateTime24(value, options) {
 
     return formatDateTime(value);
 }
+
+
+function datetimeLocalToUtcIso(value) {
+    /* Convert a browser-local datetime-local value to an explicit UTC ISO string. */
+    const text = String(value || "").trim();
+
+    if (!text) {
+        return "";
+    }
+
+    const date = new Date(text);
+
+    if (Number.isNaN(date.getTime())) {
+        return text;
+    }
+
+    return date.toISOString();
+}
+
+
+function utcIsoToDatetimeLocal(value) {
+    /* Convert an API UTC instant to browser-local datetime-local format. */
+    const date = parseDisplayDate(value);
+
+    if (!date) {
+        return "";
+    }
+
+    return [
+        date.getFullYear(),
+        padDateTimePart(date.getMonth() + 1),
+        padDateTimePart(date.getDate()),
+    ].join("-") + "T" + [
+        padDateTimePart(date.getHours()),
+        padDateTimePart(date.getMinutes()),
+    ].join(":");
+}
+
+
 function isoToDatetimeLocal(value) {
-    /* Convert an ISO date string to datetime-local format. */
+    /* Convert an offset-free wall-clock ISO string to datetime-local format. */
     if (!value) { return ""; }
     return value.slice(0, 16);
 }

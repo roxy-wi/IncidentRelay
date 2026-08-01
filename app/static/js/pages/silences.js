@@ -127,7 +127,7 @@ function getSilenceStatus(silence) {
     if (startsAt && now < startsAt) {
         return "scheduled";
     }
-    if (endsAt && now > endsAt) {
+    if (endsAt && now >= endsAt) {
         return "expired";
     }
     return "active";
@@ -442,8 +442,8 @@ function collectSilencePayload() {
         team_id: Number($("#silence-team").val()),
         name: $("#silence-name").val(),
         reason: $("#silence-reason").val(),
-        starts_at: $("#silence-starts-at").val(),
-        ends_at: $("#silence-ends-at").val(),
+        starts_at: datetimeLocalToUtcIso($("#silence-starts-at").val()),
+        ends_at: datetimeLocalToUtcIso($("#silence-ends-at").val()),
         matcher_preset_id: $("#silence-matcher-preset").val()
             ? Number($("#silence-matcher-preset").val())
             : null,
@@ -498,8 +498,8 @@ function editSilence(id) {
     $("#silence-team").val(String(silence.team_id));
     $("#silence-name").val(silence.name);
     $("#silence-reason").val(silence.reason || "");
-    $("#silence-starts-at").val(isoToDatetimeLocal(silence.starts_at));
-    $("#silence-ends-at").val(isoToDatetimeLocal(silence.ends_at));
+    $("#silence-starts-at").val(utcIsoToDatetimeLocal(silence.starts_at));
+    $("#silence-ends-at").val(utcIsoToDatetimeLocal(silence.ends_at));
     setMatcherEditorValue("#silence-matchers", silence.matchers || {});
 
     loadSilenceMatcherPresets(
