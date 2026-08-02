@@ -78,5 +78,10 @@
   "silences.permissions.disable_denied": "You do not have permission to disable this silence.",
   "silences.confirm.disable_title": "Disable this silence?",
   "silences.confirm.disable_message": "Disabled silences no longer suppress matching alerts.",
-  "silences.confirm.disable": "Disable"
+  "silences.confirm.disable": "Disable",
+  "silences.details.apply_to_existing": "Existing alerts",
+  "silences.details.apply_to_existing_enabled": "Apply to matching unresolved alerts",
+  "silences.details.apply_to_existing_disabled": "New alerts only",
+  "silences.form.apply_to_existing": "Apply to existing unresolved alerts",
+  "silences.form.apply_to_existing_help": "Optional. Matching firing alerts will be silenced immediately. Already delivered notifications remain in history."
 }

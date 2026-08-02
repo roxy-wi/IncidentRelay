@@ -39,7 +39,7 @@ from app.services.routing.service_resolution import (
     get_effective_route_rotation,
     resolve_alert_service,
 )
-from app.services.silences import find_active_silence
+from app.services.silences import find_active_silences, record_new_alert_silences
 from app.services.alerts.correlation import refresh_alert_group_correlations, refresh_alert_group_correlations_safely
 from app.services.business_services.impact import refresh_business_impacts_safely_for_group
 from app.services.business_services.status import refresh_business_services_safely_for_technical_service
@@ -804,14 +804,16 @@ def _upsert_alert(alert_data, trace, runtime=None):
         )
     )
 
-    silence = find_active_silence(
+    silences = find_active_silences(
         team.id if team else None,
         alert_data,
+        now=now,
     )
+    silence = silences[0] if silences else None
 
     trace.silence_resolved(silence)
 
-    if silence and status == "firing":
+    if silences and status == "firing":
         status = "silenced"
 
     group = existing_group
@@ -938,6 +940,9 @@ def _upsert_alert(alert_data, trace, runtime=None):
 
     trace.alert_created(alert, group)
 
+    if silences:
+        record_new_alert_silences(alert, silences, now=now)
+
     alerts_repo.create_alert_event(
         alert_id=alert.id,
         group_id=group.id,
@@ -962,12 +967,12 @@ def _upsert_alert(alert_data, trace, runtime=None):
 
         trace.routing_warning_recorded(alert_data["routing_error"])
 
-    if silence:
+    for matched_silence in silences:
         alerts_repo.create_alert_event(
             alert_id=alert.id,
             group_id=group.id,
             event_type="silenced",
-            message=f"Matched silence: {silence.name}",
+            message=f"Matched silence: {matched_silence.name}",
         )
 
     group = alerts_repo.recalculate_alert_group(group)

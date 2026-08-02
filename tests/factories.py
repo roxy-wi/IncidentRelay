@@ -251,6 +251,7 @@ def create_silence(
     matchers: dict | None = None,
     starts_at: datetime | None = None,
     ends_at: datetime | None = None,
+    apply_to_existing: bool = False,
 ) -> Silence:
     return Silence.create(
         team=team,
@@ -260,6 +261,7 @@ def create_silence(
         matchers=matchers or {},
         starts_at=starts_at or utc_now() - timedelta(minutes=5),
         ends_at=ends_at or utc_now() + timedelta(minutes=5),
+        apply_to_existing=apply_to_existing,
         enabled=True,
     )
 

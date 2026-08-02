@@ -18,6 +18,7 @@ from app.services.incidents.responders import expire_due_incident_responders
 from app.services.alerts.explain_cleanup import cleanup_alert_explain_traces
 from app.services.service_catalog.impact_snapshots import capture_scheduled_service_impact_snapshot
 from app.services.heartbeats.service import process_overdue_heartbeats
+from app.services.silences import process_silence_lifecycle
 from app.modules.common import utc_now
 from app.services.orchestration.pending import (
     cleanup_orchestration_retention,
@@ -380,6 +381,47 @@ def alert_explain_trace_cleanup_job():
             db.close()
 
 
+def silence_lifecycle_job():
+    """Apply scheduled Silences and reactivate alerts after Silence expiry."""
+    if db.is_closed():
+        db.connect(reuse_if_open=True)
+
+    owner = None
+
+    try:
+        owner = acquire_db_lock("silence_lifecycle_job")
+        if not owner:
+            logger.debug("silence lifecycle job skipped because lock is busy")
+            return {
+                "silences_started": 0,
+                "silences_released": 0,
+                "alerts_silenced": 0,
+                "alerts_reactivated": 0,
+                "legacy_alerts_backfilled": 0,
+            }
+
+        result = process_silence_lifecycle()
+        logger.info(
+            "silence lifecycle job finished",
+            extra={"extra": {"event_type": "scheduler", **result}},
+        )
+        return result
+    except Exception:
+        logger.exception("silence lifecycle job failed")
+        return {
+            "silences_started": 0,
+            "silences_released": 0,
+            "alerts_silenced": 0,
+            "alerts_reactivated": 0,
+            "legacy_alerts_backfilled": 0,
+            "failed": 1,
+        }
+    finally:
+        if owner:
+            release_db_lock("silence_lifecycle_job", owner)
+        if not db.is_closed():
+            db.close()
+
 def heartbeat_overdue_job():
     """Open incidents for overdue heartbeat/dead-man checks under a database lock."""
     if db.is_closed():
@@ -657,6 +699,23 @@ def start_scheduler():
         coalesce=True,
         next_run_time=utc_now(),
         id="alert_group_notification_job",
+        replace_existing=True,
+    )
+
+    _scheduler.add_job(
+        silence_lifecycle_job,
+        "interval",
+        seconds=int(
+            getattr(
+                Config,
+                "SILENCE_LIFECYCLE_CHECK_INTERVAL_SECONDS",
+                30,
+            )
+        ),
+        max_instances=1,
+        coalesce=True,
+        next_run_time=utc_now(),
+        id="silence_lifecycle_job",
         replace_existing=True,
     )
 

@@ -322,6 +322,13 @@ class Config:
         100,
     )
 
+
+    SILENCE_LIFECYCLE_CHECK_INTERVAL_SECONDS = settings.get_int(
+        "alerts",
+        "silence_lifecycle_check_interval_seconds",
+        30,
+    )
+
     ALERT_EXPLAIN_TRACE_RETENTION_DAYS = settings.get_int(
         "alerts",
         "alert_explain_trace_retention_days",

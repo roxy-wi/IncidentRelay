@@ -7,11 +7,11 @@
 
 ## 1. Purpose
 
-Incident Management v2 introduces an optional operational incident workflow on top of the existing IncidentRelay alert lifecycle.
+Incident Management v2 separates the operational Incident workflow from the existing IncidentRelay alert lifecycle.
 
-The goal is to preserve the current alert ingestion, grouping, escalation, notification, responder, stakeholder, comment, correlation and service-impact behavior while adding a first-class record for problems that require coordinated investigation, external ticketing, classification, reporting and closure.
+The goal is to preserve the current alert ingestion, grouping, escalation, notification, responder, stakeholder, comment, correlation and service-impact behavior while adding a first-class `Incident` record for problems that require coordinated investigation, external ticketing, classification, reporting and closure.
 
-The implementation must not create a second competing alert lifecycle.
+The implementation must not create a second competing alert lifecycle. `AlertGroup` remains the technical aggregate, while `Incident` becomes a separate operational entity.
 
 ## 2. Current state
 
@@ -29,7 +29,7 @@ IncidentRelay already provides most of the technical foundation:
 - audit events are already written for many incident actions;
 - `/api/incidents` currently exposes alert groups as incidents.
 
-The missing part is an optional managed workflow that distinguishes a technical alert group from an operational incident record.
+The missing part is a separate operational Incident entity. The current manual incident workflow must remain available as manual Alert Group creation, while manual Incident creation must create an actual Incident.
 
 ## 3. Architectural decision
 
@@ -45,25 +45,45 @@ The missing part is an optional managed workflow that distinguishes a technical 
 - child alerts;
 - existing responders, stakeholders, comments and timeline.
 
-This avoids a high-risk migration of the current lifecycle.
+This avoids a high-risk migration of the current technical lifecycle.
 
-### 3.2 Add an optional `ManagedIncident`
+### 3.2 Add a separate `Incident`
 
-A `ManagedIncident` is created only when an alert group is promoted into a coordinated operational incident.
+An `Incident` is a first-class operational record that may exist without Alert Groups or link one or more related Alert Groups.
 
 Creation methods:
 
-- manual incident creation;
-- operator action: **Declare incident**;
+- manual Incident creation;
+- operator action: **Create Incident** from an Alert Group;
 - alert classification: `Incident`;
 - later: Event Orchestration action;
 - later: duration, escalation or correlation automation.
 
-Not every alert group must have a `ManagedIncident`.
+Not every Alert Group must have an Incident.
 
-### 3.3 Keep alert classification separate
+### 3.3 Keep both manual creation workflows
 
-Classification describes the operational outcome of an alert group and must not replace its lifecycle status.
+The current manual creation behavior remains available under the correct name:
+
+```text
+Create Alert Group
+  -> AlertGroup
+  -> one manual child Alert
+```
+
+A separate action creates an Incident:
+
+```text
+Create Incident
+  -> standalone Incident
+  -> optionally linked Alert Groups
+```
+
+Creating an Alert Group must not create an Incident. Creating an Incident must not create a hidden Alert Group or Alert.
+
+### 3.4 Keep alert classification separate
+
+Classification describes the operational outcome of an Alert Group and must not replace its lifecycle status.
 
 Examples:
 
@@ -88,13 +108,13 @@ Alert Group
   A technical aggregation of one or more Alerts. It owns the current alert,
   notification and escalation lifecycle.
 
-Managed Incident
-  An optional operational record attached to a primary Alert Group and, later,
-  to additional related Alert Groups.
+Incident
+  A separate operational record that may exist without Alert Groups or link
+  one or more related Alert Groups.
 
 Classification
   The reviewed outcome of an Alert Group. It is independent from alert status
-  and managed-incident status.
+  and incident status.
 ```
 
 ## 5. Goals
@@ -103,9 +123,9 @@ The staged implementation should provide:
 
 1. Optional alert-group classification.
 2. Optional requirement to classify before manual closure.
-3. Manual promotion of an alert group to a managed incident.
-4. Automatic creation of a managed incident for manual incidents.
-5. A dedicated managed-incident list and workspace.
+3. Separate `AlertGroup` and `Incident` entities.
+4. Manual Alert Group creation with one child Alert.
+5. Manual standalone Incident creation and optional linking from Alert Groups.
 6. Operational workflow status separate from alert status.
 7. Related alert-group linking without requiring destructive merge.
 8. Duplicate classification linked to a canonical incident.
@@ -143,7 +163,7 @@ classification                 nullable slug
 classification_note            nullable text
 classified_by_id               nullable user
 classified_at                  nullable datetime
-classification_incident_id     nullable managed incident
+classification_incident_id     nullable incident
 ```
 
 Recommended built-in slugs:
@@ -163,22 +183,25 @@ Rules:
 
 - classification is optional by default;
 - changing classification creates timeline and audit events;
-- `incident` may create or link a `ManagedIncident`;
-- `duplicate` should require a canonical alert group or managed incident;
+- `incident` may create or link an `Incident`;
+- `duplicate` should require a canonical Alert Group or Incident;
 - automatic source resolution must not fail because classification is missing;
 - a team may require classification before manual close, not before automatic resolve.
 
-### 7.2 ManagedIncident
+### 7.2 Incident
 
 Suggested fields:
 
 ```text
 id
-primary_group_id               unique alert group
 team_id
 service_id                     nullable
 workflow_status                declared | investigating | identified |
                                monitoring | resolved | closed | cancelled
+title
+description                    nullable text
+priority                       nullable
+assignee_id                    nullable user
 summary                        nullable text
 root_cause                     nullable text
 resolution_summary             nullable text
@@ -194,18 +217,19 @@ created_at
 updated_at
 ```
 
-Priority, assignee, responders, stakeholders and notification state remain on the primary `AlertGroup` in the first version.
+Responders, stakeholders, comments and operational timeline belong to the Incident. Notification and escalation state remain on `AlertGroup`.
 
 Rules:
 
-- one alert group may be the primary group of at most one managed incident;
-- manual incidents create a managed incident automatically;
-- closing a managed incident does not delete or archive its alerts;
-- alert-group resolution may move the managed incident to `resolved`, but never automatically to `closed`;
-- an unresolved linked group may reopen an incident from `resolved` or `monitoring`;
+- an Incident may exist without an Alert Group;
+- an Incident may link one or more Alert Groups;
+- manual Incident creation creates only an Incident;
+- closing an Incident does not delete, archive or resolve linked Alert Groups;
+- Alert Group resolution may move the Incident to `resolved`, but never automatically to `closed`;
+- an unresolved linked group may reopen an Incident from `resolved` or `monitoring`;
 - `closed` is an explicit operational action.
 
-### 7.3 ManagedIncidentGroupLink
+### 7.3 IncidentAlertGroupLink
 
 Use a relation rather than destructive merge when groups must remain independently traceable.
 
@@ -224,10 +248,10 @@ removed_at                     nullable
 
 Rules:
 
-- the primary group has relation type `primary`;
-- one group cannot be actively linked twice to the same incident;
+- an Incident may have no linked Alert Groups;
+- one Alert Group cannot be actively linked twice to the same incident;
 - adding or removing a group creates timeline and audit events;
-- linked groups keep their own source, deduplication and timeline;
+- linked Alert Groups keep their own source, deduplication and timeline;
 - existing manual merge remains available for cases where groups truly should become one technical aggregate.
 
 ### 7.4 IncidentExternalReference
@@ -287,7 +311,7 @@ resolved
 
 This state controls notifications, escalation and technical impact.
 
-### 8.2 Managed-incident workflow
+### 8.2 Incident workflow
 
 ```text
 declared
@@ -310,11 +334,13 @@ closed -> investigating       explicit reopen action
 
 Recommended first-version defaults:
 
-- declaring an incident does not change the alert-group status;
-- acknowledging the primary group may optionally move `declared` to `investigating`;
-- when all actively linked groups resolve, the incident may move to `resolved`;
-- a managed incident is never auto-closed;
-- if any linked group becomes unresolved again, a resolved incident reopens to `investigating`;
+- creating or linking an Incident does not change Alert Group status;
+- creating a manual Alert Group does not create an Incident;
+- creating a manual Incident does not create an Alert Group;
+- acknowledging an Alert Group does not automatically change Incident status;
+- when all actively linked groups resolve, the Incident may move to `resolved`;
+- an Incident is never auto-closed;
+- if any linked group becomes unresolved again, a resolved Incident reopens to `investigating`;
 - classification remains unchanged when status changes;
 - closing may require classification according to group settings.
 
@@ -340,10 +366,10 @@ Suggested classification actions:
 
 ```text
 Incident
-  Offer to create or open the managed incident.
+  Offer to create an Incident or link the Alert Group to an existing Incident.
 
 Duplicate
-  Require selection of a canonical group or managed incident.
+  Require selection of a canonical Alert Group or Incident.
 
 Known Issue
   Allow an optional problem/ticket reference.
@@ -378,36 +404,52 @@ Allowed for:
 
 ### Cross-group linking
 
-A user must have read access to both groups and write/respond access to the managed incident team. Cross-group links must not expose data from an inaccessible group.
+A user must have read access to both groups and write/respond access to the incident team. Cross-group links must not expose data from an inaccessible group.
 
 ## 11. API strategy
 
-The existing `/api/incidents` path currently represents `AlertGroup` and must remain backward compatible.
+This release changes the API semantics directly without introducing an intermediate API.
 
-Recommended additive API:
+The current Alert Group behavior moves from `/api/incidents` to `/api/alert-groups`.
 
 ```text
-GET    /api/managed-incidents
-POST   /api/managed-incidents
-GET    /api/managed-incidents/{id}
-PATCH  /api/managed-incidents/{id}
-POST   /api/managed-incidents/{id}/status
-POST   /api/managed-incidents/{id}/close
-POST   /api/managed-incidents/{id}/reopen
-GET    /api/managed-incidents/{id}/groups
-POST   /api/managed-incidents/{id}/groups
-DELETE /api/managed-incidents/{id}/groups/{group_id}
-GET    /api/managed-incidents/{id}/external-references
-POST   /api/managed-incidents/{id}/external-references
-PATCH  /api/managed-incidents/{id}/external-references/{reference_id}
-DELETE /api/managed-incidents/{id}/external-references/{reference_id}
-
-PUT    /api/incidents/{group_id}/classification
-DELETE /api/incidents/{group_id}/classification
-POST   /api/incidents/{group_id}/declare
+GET    /api/alert-groups
+POST   /api/alert-groups
+GET    /api/alert-groups/{id}
+PATCH  /api/alert-groups/{id}
+POST   /api/alert-groups/{id}/acknowledge
+POST   /api/alert-groups/{id}/resolve
+POST   /api/alert-groups/{id}/reopen
+POST   /api/alert-groups/{id}/merge
+PUT    /api/alert-groups/{id}/classification
+DELETE /api/alert-groups/{id}/classification
+POST   /api/alert-groups/{id}/create-incident
 ```
 
-A later major API version may rename concepts after a deprecation period.
+`POST /api/alert-groups` preserves the current manual creation behavior and creates an `AlertGroup` with one manual child `Alert` in one transaction.
+
+`/api/incidents` becomes the actual Incident API:
+
+```text
+GET    /api/incidents
+POST   /api/incidents
+GET    /api/incidents/{id}
+PATCH  /api/incidents/{id}
+POST   /api/incidents/{id}/status
+POST   /api/incidents/{id}/close
+POST   /api/incidents/{id}/reopen
+GET    /api/incidents/{id}/alert-groups
+POST   /api/incidents/{id}/alert-groups
+DELETE /api/incidents/{id}/alert-groups/{group_id}
+GET    /api/incidents/{id}/external-references
+POST   /api/incidents/{id}/external-references
+PATCH  /api/incidents/{id}/external-references/{reference_id}
+DELETE /api/incidents/{id}/external-references/{reference_id}
+```
+
+`POST /api/incidents` creates only an Incident and may optionally link existing Alert Groups. It must not create a hidden Alert Group or Alert.
+
+This is a documented breaking API change. OpenAPI, frontend calls, tests and integration documentation must be updated in the same release.
 
 ## 12. UI architecture
 
@@ -417,16 +459,19 @@ Keep the current Alerts page for all alert groups.
 
 Add:
 
+- **Create Alert Group** action that creates an AlertGroup and one manual child Alert;
 - classification badge and filter;
 - **Classify** action;
-- **Declare incident** action;
+- **Create Incident** action;
 - **Link to incident** action;
 - review-required filter;
 - canonical incident link for duplicates.
 
-### 12.2 Managed Incidents page
+### 12.2 Incidents page
 
 Add a dedicated top-level page, not an Administration page.
+
+Add a separate **Create Incident** action. It creates only an Incident and may optionally link existing Alert Groups.
 
 List filters:
 
@@ -439,12 +484,12 @@ List filters:
 - open/resolved/closed period;
 - search.
 
-### 12.3 Managed Incident workspace
+### 12.3 Incident workspace
 
 Sections:
 
 - summary and current status;
-- primary and related alert groups;
+- related Alert Groups;
 - active alerts and source state;
 - priority, assignee and service;
 - responders and stakeholders;
@@ -462,6 +507,7 @@ Add actions only after manual workflows are stable.
 Suggested actions:
 
 ```text
+create_alert_group
 declare_incident
 set_alert_classification
 attach_to_open_incident
@@ -511,8 +557,10 @@ Recommended rollout:
 
 Initial metrics:
 
-- managed incidents created;
-- conversion rate from alert group to managed incident;
+- Incidents created;
+- manually created Alert Groups;
+- manually created Incidents;
+- conversion rate from Alert Group to Incident;
 - incidents by service, team and priority;
 - classification distribution;
 - false-positive rate;
@@ -561,14 +609,18 @@ Every mutation must write both:
 Recommended migration strategy:
 
 - add nullable classification fields;
-- add new managed-incident tables;
+- add new Incident and Incident-to-AlertGroup relation tables;
 - do not rename or rebuild `AlertGroup`;
-- do not backfill managed incidents for every historical group;
-- create a managed incident automatically for new manual incidents;
-- optionally backfill existing unresolved manual incidents;
-- keep all new API fields nullable and additive;
-- keep existing `/api/incidents` behavior;
-- use feature flags for the managed-incident page and automatic synchronization.
+- preserve every existing Alert Group and child Alert;
+- move current Alert Group API behavior to `/api/alert-groups`;
+- replace `/api/incidents` with the actual Incident API in the same release;
+- rename the current manual incident action to **Create Alert Group** without changing its behavior;
+- keep records created by the old manual action as manual Alert Groups with their child Alerts;
+- make **Create Incident** create only an Incident;
+- do not backfill Incidents for every historical Alert Group;
+- create or link historical Incidents only through an explicit migration rule or administrator action;
+- update OpenAPI, frontend calls, tests and documentation as part of the breaking release;
+- use feature flags only for automatic synchronization, not for preserving conflicting API semantics.
 
 ## 18. Delivery phases
 
@@ -582,20 +634,22 @@ Recommended migration strategy:
 - reporting counts;
 - OpenAPI and documentation.
 
-### Phase 2: Managed incident core
+### Phase 2: Incident core
 
-- `ManagedIncident` model;
-- manual declaration from an alert group;
-- automatic record for manual incidents;
+- separate `Incident` model;
+- `IncidentAlertGroupLink` relation;
+- manual standalone Incident creation;
+- creation or linking from an Alert Group;
 - workflow statuses;
 - root cause and resolution fields;
-- dedicated API;
 - lifecycle synchronization hooks.
 
-### Phase 3: Incident workspace
+### Phase 3: API and workspace
 
-- managed-incident list;
-- details workspace;
+- move current Alert Group API to `/api/alert-groups`;
+- preserve manual Alert Group creation with one child Alert;
+- replace `/api/incidents` with the Incident API;
+- add separate Alert Group and Incident workspaces;
 - responders, stakeholders and comments reuse;
 - service/runbook/dashboard context;
 - close and reopen flows;
@@ -650,8 +704,12 @@ Recommended migration strategy:
 The first production release should include Phases 1-3 and the non-destructive part of Phase 4:
 
 - optional classification;
-- managed incident declaration;
-- dedicated incident page;
+- separate Incident entity;
+- manual Alert Group creation with one child Alert;
+- manual standalone Incident creation;
+- Incident creation or linking from an Alert Group;
+- `/api/alert-groups` and the replaced `/api/incidents` API;
+- dedicated Alert Group and Incident pages;
 - workflow status;
 - root cause and resolution summary;
 - manual related-group links;
@@ -664,10 +722,14 @@ It should not wait for full automatic correlation or bidirectional ITSM synchron
 
 The architecture is successful when:
 
-- teams can continue using IncidentRelay exactly as before without enabling the feature;
-- operators can distinguish a technical alert group from a managed operational incident;
+- existing technical Alert Group processing remains stable;
+- operators can distinguish a technical Alert Group from an operational Incident;
+- manual Alert Group creation produces an AlertGroup and one child Alert;
+- manual Incident creation produces only an Incident;
+- Alert Groups can exist without Incidents;
+- Incidents can exist without Alert Groups;
 - classification provides reliable alert-quality data;
-- manual incidents and promoted alert groups use one consistent workspace;
+- one Incident can link one or more independent Alert Groups;
 - related alerts can be attached without destroying their original lifecycle;
 - external ticketing can be added without provider-specific fields in the core model;
 - the current notification and escalation lifecycle remains stable;

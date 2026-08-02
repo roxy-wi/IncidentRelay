@@ -78,5 +78,10 @@
   "silences.permissions.disable_denied": "Vous n’êtes pas autorisé à désactiver ce silence.",
   "silences.confirm.disable_title": "Désactiver ce silence ?",
   "silences.confirm.disable_message": "Les silences désactivés ne suppriment plus les alertes correspondantes.",
-  "silences.confirm.disable": "Désactiver"
+  "silences.confirm.disable": "Désactiver",
+  "silences.details.apply_to_existing": "Alertes existantes",
+  "silences.details.apply_to_existing_enabled": "Appliquer aux alertes non résolues correspondantes",
+  "silences.details.apply_to_existing_disabled": "Nouvelles alertes uniquement",
+  "silences.form.apply_to_existing": "Appliquer aux alertes non résolues existantes",
+  "silences.form.apply_to_existing_help": "Facultatif. Les alertes actives correspondantes seront immédiatement mises en silence. Les notifications déjà envoyées restent dans l’historique."
 }

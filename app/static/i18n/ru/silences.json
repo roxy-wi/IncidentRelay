@@ -78,5 +78,10 @@
   "silences.permissions.disable_denied": "У вас нет права отключать это подавление.",
   "silences.confirm.disable_title": "Отключить это подавление?",
   "silences.confirm.disable_message": "После отключения совпадающие алерты больше не будут подавляться.",
-  "silences.confirm.disable": "Отключить"
+  "silences.confirm.disable": "Отключить",
+  "silences.details.apply_to_existing": "Существующие алерты",
+  "silences.details.apply_to_existing_enabled": "Применять к подходящим незакрытым алертам",
+  "silences.details.apply_to_existing_disabled": "Только новые алерты",
+  "silences.form.apply_to_existing": "Применить к существующим незакрытым алертам",
+  "silences.form.apply_to_existing_help": "Необязательно. Подходящие firing-алерты будут заглушены сразу. Уже отправленные уведомления останутся в истории."
 }

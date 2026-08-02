@@ -2326,9 +2326,47 @@ class Silence(SoftDeleteModel):
     matchers = JSONTextField(null=True)
     starts_at = DateTimeField()
     ends_at = DateTimeField()
+    apply_to_existing = BooleanField(default=False)
+    reconciled_at = DateTimeField(null=True, index=True)
     created_by = ForeignKeyField(User, null=True, backref="created_silences", on_delete="SET NULL")
     created_at = DateTimeField(default=utc_now)
+    updated_at = DateTimeField(default=utc_now)
     enabled = BooleanField(default=True)
+
+
+class SilenceAlertApplication(BaseModel):
+    """Track which Silence currently suppresses a concrete alert."""
+
+    id = AutoField()
+    silence = ForeignKeyField(
+        Silence,
+        backref="alert_applications",
+        on_delete="CASCADE",
+    )
+    alert = ForeignKeyField(
+        Alert,
+        backref="silence_applications",
+        on_delete="CASCADE",
+    )
+    group = ForeignKeyField(
+        AlertGroup,
+        backref="silence_applications",
+        on_delete="CASCADE",
+    )
+    previous_status = CharField(default="firing")
+    source = CharField(default="new_alert")
+    active = BooleanField(default=True, index=True)
+    applied_at = DateTimeField(default=utc_now)
+    released_at = DateTimeField(null=True)
+    release_reason = CharField(null=True)
+
+    class Meta:
+        table_name = "silence_alert_application"
+        indexes = (
+            (("silence", "alert"), True),
+            (("alert", "active"), False),
+            (("group", "active"), False),
+        )
 
 
 class ApiToken(SoftDeleteModel):

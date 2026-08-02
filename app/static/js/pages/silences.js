@@ -349,6 +349,14 @@ function renderSilenceDetails(silence) {
             .append(silenceDetailsItem(i18n.t("silences.details.status"), getSilenceStatusLabel(status)))
             .append(
                 silenceDetailsItem(
+                    i18n.t("silences.details.apply_to_existing"),
+                    silence.apply_to_existing
+                        ? i18n.t("silences.details.apply_to_existing_enabled")
+                        : i18n.t("silences.details.apply_to_existing_disabled")
+                )
+            )
+            .append(
+                silenceDetailsItem(
                     i18n.t("silences.details.matcher_preset"),
                     silence.matcher_preset
                         ? formatMatcherPresetOption(silence.matcher_preset)
@@ -444,6 +452,7 @@ function collectSilencePayload() {
         reason: $("#silence-reason").val(),
         starts_at: datetimeLocalToUtcIso($("#silence-starts-at").val()),
         ends_at: datetimeLocalToUtcIso($("#silence-ends-at").val()),
+        apply_to_existing: $("#silence-apply-to-existing").is(":checked"),
         matcher_preset_id: $("#silence-matcher-preset").val()
             ? Number($("#silence-matcher-preset").val())
             : null,
@@ -500,6 +509,7 @@ function editSilence(id) {
     $("#silence-reason").val(silence.reason || "");
     $("#silence-starts-at").val(utcIsoToDatetimeLocal(silence.starts_at));
     $("#silence-ends-at").val(utcIsoToDatetimeLocal(silence.ends_at));
+    $("#silence-apply-to-existing").prop("checked", Boolean(silence.apply_to_existing));
     setMatcherEditorValue("#silence-matchers", silence.matchers || {});
 
     loadSilenceMatcherPresets(
@@ -509,6 +519,18 @@ function editSilence(id) {
             openAppModal("#silence-form-modal");
         }
     );
+}
+
+function enableSilence(id) {
+    const silence = silencesCache.find(function (item) {
+        return Number(item.id) === Number(id);
+    });
+    if (silence && !canWriteObject(silence)) {
+        showAppError(i18n.t("silences.permissions.disable_denied"));
+        return;
+    }
+
+    apiPost("/api/silences/" + id + "/enable", {}, refreshSilences);
 }
 
 function disableSilence(id) {
@@ -537,6 +559,7 @@ function resetSilenceForm() {
     $("#silence-reason").val("");
     $("#silence-starts-at").val("");
     $("#silence-ends-at").val("");
+    $("#silence-apply-to-existing").prop("checked", false);
 
     fillMatcherPresetSelect(
         "#silence-matcher-preset",

@@ -68,7 +68,12 @@ def _deliver_escalation_notification(group):
     return 0
 
 
-def apply_initial_escalation_policy_assignment(policy, fallback_rotation):
+def apply_initial_escalation_policy_assignment(
+    policy,
+    fallback_rotation,
+    *,
+    now: datetime | None = None,
+):
     """Return initial policy rule, rotation, assignee and next escalation time."""
     policy_rule = None
     rotation = fallback_rotation
@@ -95,7 +100,7 @@ def apply_initial_escalation_policy_assignment(policy, fallback_rotation):
     delay_seconds = escalation_policy_service.get_rule_delay_seconds(policy_rule)
 
     if delay_seconds:
-        next_escalation_at = utc_now() + timedelta(seconds=delay_seconds)
+        next_escalation_at = (now or utc_now()) + timedelta(seconds=delay_seconds)
 
     return policy_rule, rotation, assignee, next_escalation_at
 

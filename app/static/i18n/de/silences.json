@@ -78,5 +78,10 @@
   "silences.permissions.disable_denied": "Sie haben keine Erlaubnis, dieses Stummschaltung zu deaktivieren.",
   "silences.confirm.disable_title": "Deaktivieren Sie dieses Stummschaltung?",
   "silences.confirm.disable_message": "Deaktivierte Stillschweigen unterdrücken nicht mehr übereinstimmende Warnungen.",
-  "silences.confirm.disable": "Deaktivieren"
+  "silences.confirm.disable": "Deaktivieren",
+  "silences.details.apply_to_existing": "Bestehende Alarme",
+  "silences.details.apply_to_existing_enabled": "Auf passende ungelöste Alarme anwenden",
+  "silences.details.apply_to_existing_disabled": "Nur neue Alarme",
+  "silences.form.apply_to_existing": "Auf bestehende ungelöste Alarme anwenden",
+  "silences.form.apply_to_existing_help": "Optional. Passende aktive Alarme werden sofort stummgeschaltet. Bereits gesendete Benachrichtigungen bleiben im Verlauf erhalten."
 }

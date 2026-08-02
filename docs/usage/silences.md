@@ -110,6 +110,16 @@ Suggestions help avoid spelling mistakes, but they do not save the silence or gu
 | Expired | The silence ended. Expired silences are hidden after the retention window by default. |
 | Disabled | The silence was manually disabled and remains visible for review. |
 
+## Existing unresolved alerts
+
+By default, a Silence affects only alert occurrences received while the Silence is active. Alerts that were already firing continue their current notification and escalation flow.
+
+Enable **Apply to existing unresolved alerts** only when the Silence should also suppress matching firing alerts immediately. This is useful for emergency alert storms, but it is intentionally disabled by default because responders may already be working on an existing incident.
+
+When the final matching Silence ends or is disabled, alerts that were created or retroactively suppressed by that Silence become active again. IncidentRelay then starts the normal notification flow for alerts that were never notified, or sends an update for alerts that had already produced notifications. Acknowledged alert groups keep their acknowledged state.
+
+Overlapping Silences are handled independently: an alert remains silenced until no active matching Silence remains.
+
 ## Expired silence history
 
 Expired silences are hidden after they are older than the configured retention window. By default, expired silences disappear from the normal list 30 days after `ends_at`.

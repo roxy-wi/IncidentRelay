@@ -13,6 +13,7 @@ from app.services.rbac import (
 )
 from app.services.serializers.common import attach_team_permissions, serialize_utc_datetime
 from app.services.routing.matcher import service as matcher_preset_service
+from app.services.silences import reconcile_silence
 from app.services.validation import make_error_response, validate_body
 
 
@@ -119,8 +120,16 @@ def create_silence():
         starts_at=payload.starts_at,
         ends_at=payload.ends_at,
         created_by=payload.created_by,
+        apply_to_existing=payload.apply_to_existing,
     )
-    write_audit("silence.create", object_type="silence", object_id=silence.id, team_id=silence.team.id, data=payload.model_dump(mode="json"))
+    write_audit(
+        "silence.create",
+        object_type="silence",
+        object_id=silence.id,
+        team_id=silence.team.id,
+        data=payload.model_dump(mode="json"),
+    )
+    reconcile_silence(silence, trigger_source="api")
     return jsonify(serialize_silence(silence, current_user=current_user())), 201
 
 
@@ -167,9 +176,39 @@ def update_silence(silence_id):
             "starts_at": payload.starts_at,
             "ends_at": payload.ends_at,
             "created_by": payload.created_by,
+            "apply_to_existing": payload.apply_to_existing,
         },
     )
-    write_audit("silence.update", object_type="silence", object_id=silence.id, team_id=silence.team.id, data=payload.model_dump(mode="json"))
+    write_audit(
+        "silence.update",
+        object_type="silence",
+        object_id=silence.id,
+        team_id=silence.team.id,
+        data=payload.model_dump(mode="json"),
+    )
+    reconcile_silence(silence, trigger_source="api")
+    return jsonify(serialize_silence(silence, current_user=current_user()))
+
+
+@silences_bp.route("/<int:silence_id>/enable", methods=["POST"])
+def enable_silence(silence_id: int):
+    """Enable a silence rule."""
+    current_silence = silences_repo.get_silence(silence_id)
+    error = require_team_or_group_resource_access(
+        current_silence.team_id,
+        write_required=True,
+    )
+    if error:
+        return error
+
+    silence = silences_repo.enable_silence(silence_id)
+    write_audit(
+        "silence.enable",
+        object_type="silence",
+        object_id=silence.id,
+        team_id=silence.team.id,
+    )
+    reconcile_silence(silence, trigger_source="api")
     return jsonify(serialize_silence(silence, current_user=current_user()))
 
 
@@ -187,7 +226,13 @@ def delete_silence(silence_id):
     if error:
         return error
     silence = silences_repo.disable_silence(silence_id)
-    write_audit("silence.disable", object_type="silence", object_id=silence.id, team_id=silence.team.id)
+    write_audit(
+        "silence.disable",
+        object_type="silence",
+        object_id=silence.id,
+        team_id=silence.team.id,
+    )
+    reconcile_silence(silence, trigger_source="api")
     return jsonify(serialize_silence(silence, current_user=current_user()))
 
 
@@ -219,6 +264,7 @@ def serialize_silence(
         "starts_at": serialize_utc_datetime(silence.starts_at),
         "ends_at": serialize_utc_datetime(silence.ends_at),
         "created_by": silence.created_by.username if silence.created_by else None,
+        "apply_to_existing": bool(silence.apply_to_existing),
         "enabled": silence.enabled,
     }
 
