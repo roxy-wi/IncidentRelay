@@ -34,14 +34,24 @@ Maintenance behavior controls what happens when a matching alert arrives during 
 
 | Behavior | Incident created | Incident status | Notifications | Escalation | `maintenance_suppressed` |
 | --- | --- | --- | --- | --- | --- |
-| `suppress_notifications` | Yes | Incoming alert status | Suppressed | Normal unless otherwise configured | `true` |
+| `suppress_notifications` | Yes | Incoming alert status | Suppressed | Paused | `true` |
 | `suppress_incident` | No | Not applicable | Not applicable | Not applicable | Not applicable |
 | `create_maintenance_incident` | Yes | `maintenance` | Not suppressed by the maintenance flag | Normal unless otherwise configured | `false` |
 | `pause_escalation_only` | Yes | Incoming alert status | Normal | Paused | `false` |
 
 ### `suppress_notifications`
 
-Creates the alert group and child alert, attaches the maintenance window, and clears pending group notification state.
+Creates the alert group and child alert, attaches the maintenance window, and pauses the complete notification lifecycle while the window is active. This includes:
+
+- the initial notification;
+- queued group updates;
+- reminders and repeats;
+- user-level delayed deliveries;
+- future escalation steps and escalation notifications.
+
+Already delivered notifications remain in history and are not retracted. Missed reminders and escalation steps are not replayed after maintenance.
+
+When the maintenance occurrence ends, a still-firing alert group schedules one normal notification or update. The reminder counter is reset, and policy escalation timing resumes from the end of maintenance using the current escalation rule.
 
 Use this when alerts should still be visible in IncidentRelay, but responders should not be paged during planned work.
 
@@ -411,6 +421,10 @@ suppress_notifications:
   incident is created
   maintenance_suppressed = true
   notification queue is cleared
+  reminders and user-level delayed deliveries are suppressed
+  escalation is paused
+  after maintenance, one normal notification/update is scheduled
+  missed reminders and escalation steps are not replayed
 
 suppress_incident:
   new incident is not created

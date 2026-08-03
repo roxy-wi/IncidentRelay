@@ -11,7 +11,8 @@ It provides the core building blocks of an on-call system:
 - access groups and RBAC-style group roles;
 - teams and on-call rotations;
 - alert intake routes with per-route tokens;
-- Alertmanager, AWS SNS/Cloud watch, Grafana, Zabbix, Sentry, LibreNMS, Datalog, RMON and generic webhook/PagerDuty Event API v2 integrations;
+- Alertmanager, AWS SNS/Cloud watch, Grafana, Zabbix, Sentry, LibreNMS, Datadog, RMON,
+Uptime Kuma and generic webhook/PagerDuty Event API v2 integrations;
 - Mattermost, Slack, Telegram, Discord, Microsoft Teams, email, webhook, and voice-call notifications;
 - profile-level browser/PWA push notifications;
 - profile notification rules for browser push, email, and voice-call follow-up;
@@ -111,12 +112,13 @@ IncidentRelay includes Swagger/OpenAPI documentation and personal API tokens wit
 | Source          | Endpoint                                   |
 |-----------------|--------------------------------------------|
 | Alertmanager    | `POST /api/integrations/alertmanager`      |
-| Datalog         | `POST /api/integrations/datalog`           |
+| Datadog         | `POST /api/integrations/datadog`           |
 | Grafana         | `POST /api/integrations/grafana`           |
 | RMON            | `POST /api/integrations/rmon`              |
 | Zabbix          | `POST /api/integrations/zabbix`            |
 | Sentry          | `POST /api/integrations/sentry/<route_id>` |
 | LibreNMS        | `POST /api/integrations/librenms`          |
+| Uptime Kuma     | `POST /api/integrations/uptime-kuma`       |
 | Generic webhook | `POST /api/integrations/webhook`           |
 
 ### Notification channels
@@ -404,12 +406,14 @@ More examples:
 
 - [Alertmanager integration](docs/integrations/alertmanager.md)
 - [AWS SNS/Cloud watch](integrations/aws-sns-cloudwatch.md)
+- [Datadog integration](docs/integrations/datadog.md)
 - [Grafana integration](docs/integrations/grafana.md)
 - [Datalog integration](docs/integrations/datadog.md)
 - [RMON integration](docs/integrations/rmon.md)
 - [Sentry integration](docs/integrations/sentry.md)
 - [LibreNMS integration](docs/integrations/librenms.md)
 - [Zabbix integration](docs/integrations/zabbix.md)
+- [Uptime Kuma integration](docs/integrations/uptime-kuma.md)
 - [Generic webhook integration](docs/integrations/generic-webhook.md)
 
 ---

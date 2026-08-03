@@ -14,6 +14,7 @@ from app.notifiers.voice.notifier import VoiceCallNotifier
 from app.services.severity import normalize_severity, normalize_severity_list
 from app.modules.db import alerts_repo
 from app.modules.common import utc_now
+from app.services.alerts.maintenance_state import is_notification_lifecycle_suppressed
 
 
 logger = logging.getLogger("oncall.notification_rules")
@@ -63,6 +64,9 @@ def should_skip_delivery_for_group_status(delivery):
         return False
 
     group = AlertGroup.get_by_id(delivery.group_id)
+
+    if is_notification_lifecycle_suppressed(group):
+        return True
 
     return group.status != "firing"
 
@@ -290,6 +294,12 @@ def enqueue_user_notifications(group, event_type="notification"):
 
     group = _ensure_alert_group(group)
 
+    if (
+        event_type in SKIP_IF_NOT_FIRING_EVENT_TYPES
+        and is_notification_lifecycle_suppressed(group)
+    ):
+        return 0
+
     assignee = getattr(group, "assignee", None)
     assignee_id = getattr(group, "assignee_id", None)
 
@@ -395,6 +405,18 @@ def process_due_user_notifications(limit=100):
 
         delivery = UserNotificationDelivery.get_by_id(due_delivery.id)
 
+        group = AlertGroup.get_by_id(delivery.group_id)
+
+        if (
+            delivery.event_type in SKIP_IF_NOT_FIRING_EVENT_TYPES
+            and is_notification_lifecycle_suppressed(group)
+        ):
+            mark_delivery_skipped(
+                delivery,
+                "maintenance_suppressed",
+            )
+            continue
+
         if should_skip_delivery_for_group_status(delivery):
             mark_delivery_skipped(
                 delivery,
@@ -472,6 +494,10 @@ def send_delivery(delivery):
         return 0
 
     if delivery.event_type in SKIP_IF_NOT_FIRING_EVENT_TYPES:
+        if is_notification_lifecycle_suppressed(group):
+            mark_delivery_skipped(delivery, "maintenance_suppressed")
+            return 0
+
         if group.status != "firing":
             mark_delivery_skipped(delivery, "alert_not_firing")
             return 0

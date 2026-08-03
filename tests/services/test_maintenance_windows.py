@@ -1712,3 +1712,260 @@ def test_cancel_maintenance_window_allows_empty_body(client, auth_headers):
     assert response.status_code == 200, response.get_json()
     assert response.get_json()["status"] == "cancelled"
 
+
+
+def test_maintenance_suppress_notifications_pauses_reminders_and_escalation(
+    client,
+    db,
+    monkeypatch,
+):
+    from app.services.alerts import reminders
+
+    group, team, route, service, user, headers = create_manager_context()
+
+    create_active_team_maintenance_window(
+        team=team,
+        behavior="suppress_notifications",
+    )
+
+    alert_group = create_test_alert_group(
+        route=route,
+        service=service,
+        suffix=unique_slug("paused-lifecycle"),
+    )
+
+    alert_group.last_notification_at = utc_now() - timedelta(hours=1)
+    alert_group.reminder_count = 10
+    alert_group.next_escalation_at = utc_now() - timedelta(minutes=1)
+    alert_group.save()
+
+    calls = {
+        "escalation": 0,
+        "notification": 0,
+    }
+
+    def fake_escalate(group):
+        calls["escalation"] += 1
+        return True
+
+    def fake_notify(group, event_type):
+        calls["notification"] += 1
+        return 1
+
+    monkeypatch.setattr(reminders, "maybe_escalate_alert", fake_escalate)
+    monkeypatch.setattr(reminders, "notify_alert", fake_notify)
+
+    assert reminders.send_unacked_reminders() == 0
+    assert calls == {
+        "escalation": 0,
+        "notification": 0,
+    }
+
+    alert_group = reload_alert_group(alert_group)
+
+    assert alert_group.notification_pending is False
+    assert alert_group.next_escalation_at is None
+    assert alert_group.reminder_count == 10
+
+
+def test_due_group_notification_is_cancelled_during_maintenance(
+    client,
+    db,
+    monkeypatch,
+):
+    from app.services.alerts import notification_queue
+
+    group, team, route, service, user, headers = create_manager_context()
+
+    create_active_team_maintenance_window(
+        team=team,
+        behavior="suppress_notifications",
+    )
+
+    alert_group = create_test_alert_group(
+        route=route,
+        service=service,
+        suffix=unique_slug("due-notification"),
+    )
+
+    alert_group.notification_pending = True
+    alert_group.notification_due_at = utc_now() - timedelta(seconds=1)
+    alert_group.notification_reason = "notification"
+    alert_group.save()
+
+    sent = []
+
+    monkeypatch.setattr(
+        notification_queue,
+        "notify_alert",
+        lambda group, event_type: sent.append((group.id, event_type)) or 1,
+    )
+
+    result = notification_queue.process_due_alert_group_notifications()
+
+    assert result["sent"] == 0
+    assert result["skipped"] == 1
+    assert sent == []
+
+    assert_group_notification_not_queued(alert_group)
+
+
+def test_expired_maintenance_resumes_with_one_scheduled_notification(
+    client,
+    db,
+    monkeypatch,
+):
+    from app.services.alerts import reminders
+
+    group, team, route, service, user, headers = create_manager_context()
+
+    window = create_active_team_maintenance_window(
+        team=team,
+        behavior="suppress_notifications",
+    )
+
+    alert_group = create_test_alert_group(
+        route=route,
+        service=service,
+        suffix=unique_slug("resume-lifecycle"),
+    )
+
+    alert_group.last_notification_at = utc_now() - timedelta(hours=1)
+    alert_group.reminder_count = 4
+    alert_group.next_escalation_at = None
+    alert_group.save()
+
+    window.ends_at = utc_now() - timedelta(seconds=1)
+    window.save()
+
+    monkeypatch.setattr(
+        reminders,
+        "notify_alert",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("notification must be queued, not sent by reminder job")
+        ),
+    )
+
+    assert reminders.send_unacked_reminders() == 0
+    assert reminders.send_unacked_reminders() == 0
+
+    alert_group = reload_alert_group(alert_group)
+
+    assert alert_group.maintenance_suppressed is False
+    assert alert_group.notification_pending is True
+    assert alert_group.notification_reason == "maintenance_ended"
+    assert alert_group.notification_due_at is not None
+    assert alert_group.reminder_count == 0
+
+    resumed_event = (
+        AlertEvent
+        .select()
+        .where(
+            AlertEvent.group == alert_group.id,
+            AlertEvent.event_type == "maintenance_notifications_resumed",
+        )
+        .order_by(AlertEvent.id.desc())
+        .first()
+    )
+
+    assert resumed_event is not None
+    assert (
+        AlertEvent
+        .select()
+        .where(
+            AlertEvent.group == alert_group.id,
+            AlertEvent.event_type == "maintenance_notifications_resumed",
+        )
+        .count()
+    ) == 1
+
+
+def test_delayed_user_notification_is_skipped_during_maintenance(
+    client,
+    db,
+):
+    from app.modules.db.models import UserNotificationDelivery
+    from app.services.notifications.rules import process_due_user_notifications
+
+    group, team, route, service, user, headers = create_manager_context()
+
+    create_active_team_maintenance_window(
+        team=team,
+        behavior="suppress_notifications",
+    )
+
+    alert_group = create_test_alert_group(
+        route=route,
+        service=service,
+        suffix=unique_slug("delayed-user-notification"),
+    )
+
+    delivery = UserNotificationDelivery.create(
+        group=alert_group.id,
+        user=user.id,
+        method="email",
+        event_type="reminder",
+        status="pending",
+        scheduled_at=utc_now() - timedelta(seconds=1),
+        created_at=utc_now(),
+        updated_at=utc_now(),
+    )
+
+    assert process_due_user_notifications() == 0
+
+    delivery = UserNotificationDelivery.get_by_id(delivery.id)
+
+    assert delivery.status == "skipped"
+    assert delivery.last_error == "maintenance_suppressed"
+
+
+def test_expired_maintenance_restarts_policy_escalation_from_resume_time(
+    client,
+    db,
+):
+    from app.services.alerts import reminders
+    from tests.factories import (
+        create_escalation_policy,
+        create_escalation_policy_rule,
+    )
+
+    group, team, route, service, user, headers = create_manager_context()
+
+    window = create_active_team_maintenance_window(
+        team=team,
+        behavior="suppress_notifications",
+    )
+
+    alert_group = create_test_alert_group(
+        route=route,
+        service=service,
+        suffix=unique_slug("resume-policy"),
+    )
+
+    policy = create_escalation_policy(team, repeat_count=1)
+    rule = create_escalation_policy_rule(
+        policy,
+        position=1,
+        delay_seconds=120,
+        target_type="user",
+        user=user,
+    )
+
+    alert_group.escalation_policy = policy
+    alert_group.escalation_rule = rule
+    alert_group.next_escalation_at = None
+    alert_group.save()
+
+    window.ends_at = utc_now() - timedelta(seconds=1)
+    window.save()
+
+    before = utc_now()
+
+    assert reminders.send_unacked_reminders() == 0
+
+    after = utc_now()
+    alert_group = reload_alert_group(alert_group)
+
+    assert alert_group.next_escalation_at is not None
+    assert before + timedelta(seconds=120) <= alert_group.next_escalation_at
+    assert alert_group.next_escalation_at <= after + timedelta(seconds=120)

@@ -4,6 +4,11 @@ from datetime import datetime, timedelta
 from app.modules.db import alerts_repo
 from app.services import escalation_policies as escalation_policy_service
 from app.services.notifications.delivery import has_matching_notification_channel, notify_alert
+from app.services.alerts.maintenance_state import (
+    is_notification_lifecycle_suppressed,
+    pause_notification_lifecycle,
+    resume_notification_lifecycle,
+)
 from app.services.oncall import get_current_oncall_user, get_next_rotation_user
 from app.modules.common import utc_now
 
@@ -108,6 +113,13 @@ def apply_initial_escalation_policy_assignment(
 def maybe_escalate_alert(group):
     """Escalate an alert group according to route escalation mode."""
 
+    if is_notification_lifecycle_suppressed(group):
+        pause_notification_lifecycle(group)
+        return False
+
+    if resume_notification_lifecycle(group):
+        return False
+
     if group.escalation_policy_id:
         return maybe_escalate_alert_by_policy(group)
 
@@ -144,6 +156,13 @@ def maybe_escalate_alert(group):
 
 def maybe_escalate_alert_by_policy(group):
     """Escalate an alert group according to its escalation policy."""
+
+    if is_notification_lifecycle_suppressed(group):
+        pause_notification_lifecycle(group)
+        return False
+
+    if resume_notification_lifecycle(group):
+        return False
 
     if not group.escalation_policy_id:
         return False
