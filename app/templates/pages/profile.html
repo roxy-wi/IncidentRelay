@@ -41,7 +41,7 @@
     >
         <div class="page-layout-grid">
             <section class="page-layout-main">
-                <div class="grid-two">
+                <div class="grid-two profile-settings-grid">
                     <section class="card">
                         <div class="card-header">
                             <div>
@@ -87,14 +87,6 @@
                                 placeholder="+77001234567"
                             >
                             
-                            <label class="form-field">
-                                <span>{{ _('profile.fields.timezone') }}</span>
-                                <select id="profile-timezone" class="input"></select>
-                                <span class="field-hint">
-                                    {{ _('profile.fields.timezone_help') }}
-                                </span>
-                            </label>
-
                             <div class="form-actions-inline">
                                 <button id="save-profile" type="button" class="btn btn-primary">
                                     {{ _('profile.actions.save') }}
@@ -141,6 +133,51 @@
                                 autocomplete="off"
                                 placeholder="9x8y7z6abc"
                             >
+                        </div>
+                    </section>
+
+                    <section class="card">
+                        <div class="card-header">
+                            <div>
+                                <h2>{{ _('profile.interface.title') }}</h2>
+                                <div class="card-subtitle">
+                                    {{ _('profile.interface.subtitle') }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div class="form-body profile-interface-fields">
+                            <label class="form-field">
+                                <span>{{ _('profile.fields.language') }}</span>
+                                <select id="profile-language" class="input">
+                                    {% for locale_code, locale_name in supported_locales.items() %}
+                                    <option value="{{ locale_code }}"{% if locale_code == current_locale %} selected{% endif %}>{{ locale_name }}</option>
+                                    {% endfor %}
+                                </select>
+                                <span class="field-hint">
+                                    {{ _('profile.fields.language_help') }}
+                                </span>
+                            </label>
+
+                            <label class="form-field">
+                                <span>{{ _('profile.fields.theme') }}</span>
+                                <select id="profile-theme" class="input">
+                                    <option value="system">{{ _('profile.theme.system') }}</option>
+                                    <option value="light">{{ _('profile.theme.light') }}</option>
+                                    <option value="dark">{{ _('profile.theme.dark') }}</option>
+                                </select>
+                                <span class="field-hint">
+                                    {{ _('profile.fields.theme_help') }}
+                                </span>
+                            </label>
+
+                            <label class="form-field">
+                                <span>{{ _('profile.fields.timezone') }}</span>
+                                <select id="profile-timezone" class="input"></select>
+                                <span class="field-hint">
+                                    {{ _('profile.fields.timezone_help') }}
+                                </span>
+                            </label>
                         </div>
                     </section>
                 </div>

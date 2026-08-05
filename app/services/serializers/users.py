@@ -25,6 +25,8 @@ def serialize_user(user, groups=None):
         "email": user.email,
         "phone": user.phone,
         "timezone": user.timezone,
+        "locale": getattr(user, "locale", None),
+        "theme": getattr(user, "theme", "system") or "system",
         "telegram_user_id": user.telegram_user_id,
         "slack_user_id": user.slack_user_id,
         "mattermost_user_id": user.mattermost_user_id,

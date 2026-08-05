@@ -92,3 +92,21 @@ def test_unsupported_language_falls_back_to_english():
         headers={"Accept-Language": "es-ES,es;q=0.9"},
     ):
         assert get_current_locale() == DEFAULT_LOCALE
+
+
+def test_authenticated_user_locale_has_priority_over_cookie():
+    from types import SimpleNamespace
+
+    from flask import request
+
+    app = create_test_app()
+
+    with app.test_request_context(
+        "/",
+        headers={
+            "Cookie": "incidentrelay_locale=en",
+            "Accept-Language": "en",
+        },
+    ):
+        request.current_user = SimpleNamespace(locale="de")
+        assert get_current_locale() == "de"

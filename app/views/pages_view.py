@@ -17,6 +17,7 @@ from app.i18n import get_current_locale, translate
 from app.login import normalize_auth_redirect_target
 from app.middleware import load_jwt_user
 from app.services.rbac import can_read_audit_logs
+from app.ui_preferences import get_current_theme
 
 
 pages_bp = Blueprint("pages", __name__)
@@ -147,4 +148,8 @@ def app_page(alert_id=None):
     if normalized_path == "/admin/audit-log" and not can_read_audit_logs(user):
         abort(403)
 
-    return render_template("index.html", initial_page=request.path)
+    return render_template(
+        "index.html",
+        initial_page=request.path,
+        current_theme=get_current_theme(),
+    )

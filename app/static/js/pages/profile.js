@@ -120,11 +120,14 @@ function loadProfile() {
      * Load current user profile and render all profile sections.
      */
     apiGet("/api/profile", function (profile) {
+        currentProfileData = profile;
         $("#profile-username").val(profile.username || "");
         $("#profile-display-name").val(profile.display_name || "");
         $("#profile-email").val(profile.email || "");
         $("#profile-phone").val(profile.phone || "");
         $("#profile-timezone").val(profile.timezone || "");
+        $("#profile-language").val(profile.locale || i18n.locale || "en");
+        $("#profile-theme").val(profile.theme || "system");
         $("#profile-telegram").val(profile.telegram_user_id || "");
         $("#profile-slack").val(profile.slack_user_id || "");
         $("#profile-mattermost").val(profile.mattermost_user_id || "");
@@ -159,8 +162,14 @@ function loadProfile() {
 
 function saveProfile() {
     /*
-     * Save the current user profile.
+     * Save the current user profile. Interface preference changes reload the
+     * shell so every page and chart is rebuilt with the selected locale/theme.
      */
+    const previousLocale = i18n.locale;
+    const previousTheme = window.AppTheme
+        ? AppTheme.getPreference()
+        : "system";
+
     setProfileStatus("#profile-save-status", i18n.t("profile.status.saving"), false);
     apiPut(
         "/api/profile",
@@ -171,6 +180,8 @@ function saveProfile() {
             timezone: window.AppTimezones
                 ? AppTimezones.getOptionalSelectValue("#profile-timezone")
                 : ($("#profile-timezone").val() || null),
+            locale: $("#profile-language").val() || previousLocale,
+            theme: $("#profile-theme").val() || "system",
             telegram_user_id: $("#profile-telegram").val() || null,
             slack_user_id: $("#profile-slack").val() || null,
             mattermost_user_id: $("#profile-mattermost").val() || null,
@@ -179,8 +190,24 @@ function saveProfile() {
             notify_oncall_shift_start_mattermost: $("#profile-notify-shift-start-mattermost").is(":checked")
         },
         function (profile) {
+            currentProfileData = profile;
             setProfileStatus("#profile-save-status", i18n.t("profile.status.saved"), false);
             renderProfileHeader(profile);
+
+            if (window.AppTheme) {
+                AppTheme.apply(profile.theme || "system");
+            }
+
+            if (profile.locale && profile.locale !== previousLocale) {
+                i18n.setLocale(profile.locale);
+                return;
+            }
+
+            if ((profile.theme || "system") !== previousTheme) {
+                window.location.reload();
+                return;
+            }
+
             loadProfile();
         }
     );

@@ -240,6 +240,8 @@ def update_user(user_id, data):
         "email",
         "phone",
         "timezone",
+        "locale",
+        "theme",
         "telegram_user_id",
         "slack_user_id",
         "mattermost_user_id",

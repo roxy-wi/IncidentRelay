@@ -37,7 +37,12 @@ def normalize_locale(value: str | None) -> str | None:
 
 
 def get_current_locale() -> str:
-    """Resolve locale from cookie, then Accept-Language, then fallback."""
+    """Resolve locale from user preference, cookie, browser, then fallback."""
+    user = getattr(request, "current_user", None)
+    user_locale = normalize_locale(getattr(user, "locale", None))
+    if user_locale:
+        return user_locale
+
     cookie_locale = normalize_locale(request.cookies.get(LOCALE_COOKIE_NAME))
     if cookie_locale:
         return cookie_locale

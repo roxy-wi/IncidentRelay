@@ -86,6 +86,25 @@ PROFILE_SCHEMA = {
             "description": "Phone number for voice or SMS integrations.",
             "example": "+77001234567",
         },
+        "timezone": {
+            "type": "string",
+            "nullable": True,
+            "description": "Preferred IANA timezone for calendar display.",
+            "example": "Asia/Almaty",
+        },
+        "locale": {
+            "type": "string",
+            "nullable": True,
+            "enum": ["en", "de", "fr", "ru"],
+            "description": "Preferred interface language.",
+            "example": "ru",
+        },
+        "theme": {
+            "type": "string",
+            "enum": ["system", "light", "dark"],
+            "description": "Preferred interface color theme.",
+            "example": "dark",
+        },
         "telegram_user_id": {
             "type": "string",
             "nullable": True,
@@ -161,6 +180,22 @@ PROFILE_UPDATE_SCHEMA = {
             "type": "string",
             "nullable": True,
             "example": "+77001234567",
+        },
+        "timezone": {
+            "type": "string",
+            "nullable": True,
+            "example": "Asia/Almaty",
+        },
+        "locale": {
+            "type": "string",
+            "nullable": True,
+            "enum": ["en", "de", "fr", "ru"],
+            "example": "ru",
+        },
+        "theme": {
+            "type": "string",
+            "enum": ["system", "light", "dark"],
+            "example": "dark",
         },
         "telegram_user_id": {
             "type": "string",

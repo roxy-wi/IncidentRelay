@@ -1,9 +1,8 @@
 <!doctype html>
-<html lang="{{ current_locale }}">
+<html lang="{{ current_locale }}" data-theme="{{ current_theme }}">
 <head>
     <link rel="manifest" href="/manifest.webmanifest?v=1.0.3">
 
-    <meta name="theme-color" content="#1570ef">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="IncidentRelay">
@@ -13,10 +12,16 @@
     <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='images/favicon/favicon-32x32.png') }}">
     <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='images/favicon/favicon-16x16.png') }}">
     <link rel="shortcut icon" href="{{ url_for('static', filename='images/favicon/favicon.ico') }}">
-    <meta name="theme-color" content="#0b5cff">
+    <meta id="app-theme-color" name="theme-color" content="#0b5cff">
     <meta charset="utf-8">
     <title>IncidentRelay</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script>
+    window.__INCIDENTRELAY_UI__ = {
+      theme: {{ current_theme | tojson }}
+    };
+    </script>
+    <script src="{{ url_for('static', filename='js/core/theme.js') }}"></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='/css/vendor/fontawesome/all.min.css') }}">
     <link rel="stylesheet" href="/static/css/oncall.css">
     <link rel="stylesheet" href="/static/css/material.css">
@@ -27,6 +32,7 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/table_filters.css') }}">
     <link rel="stylesheet" href="/static/css/vendor/select2/select2.min.css">
     <link rel="stylesheet" href="/static/css/vendor/select2/override-select2.css">
+    <link rel="stylesheet" href="/static/css/theme_dark.css">
 
  <script>
  window.__INCIDENTRELAY_I18N__ = {
@@ -40,6 +46,7 @@
     <script src="/static/js/vendor/select2.min.js"></script>
     <script src="{{ url_for('static', filename='js/vendor/tom-select.complete.min.js') }}"></script>
     <script src="{{ url_for('static', filename='js/vendor/chart.min.js') }}"></script>
+    <script>window.AppTheme && window.AppTheme.applyChartDefaults();</script>
     <script src="{{ url_for('static', filename='/js/vendor/cytoscape.min.js') }}"></script>
 </head>
 <body class="md-theme">
@@ -204,15 +211,6 @@
                 </div>
 
                 <div class="topbar-actions">
-
- <div class="topbar-select-group">
-  <label class="topbar-select-label" for="global-language-filter">{{ _('common.language') }}</label>
-  <select id="global-language-filter" class="input topbar-select" data-locale-select>
-  {% for locale_code, locale_name in supported_locales.items() %}
-  <option value="{{ locale_code }}"{% if locale_code == current_locale %} selected{% endif %}>{{ locale_name }}</option>
-  {% endfor %}
-  </select>
- </div>
 
                     <div class="topbar-select-group">
                         <label class="topbar-select-label" for="global-team-filter">{{ _('common.team') }}</label>

@@ -136,6 +136,8 @@ class User(SoftDeleteModel):
     email = CharField(null=True)
     phone = CharField(null=True)
     timezone = CharField(null=True)
+    locale = CharField(null=True)
+    theme = CharField(default="system")
     telegram_user_id = CharField(null=True)
     slack_user_id = CharField(null=True)
     mattermost_user_id = CharField(null=True)

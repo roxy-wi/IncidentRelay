@@ -3192,3 +3192,43 @@ body.md-theme .ui-status-badge-muted {
     color: var(--md-muted);
     border-color: var(--md-border);
 }
+
+/* Profile interface settings layout */
+body.md-theme .profile-settings-grid {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+body.md-theme .profile-interface-fields .form-field {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr);
+  gap: 6px;
+  min-width: 0;
+}
+
+body.md-theme .profile-interface-fields .form-field > span:first-child {
+  display: block;
+}
+
+body.md-theme .profile-interface-fields .input,
+body.md-theme .profile-interface-fields .ts-wrapper {
+  width: 100%;
+  min-width: 0;
+}
+
+body.md-theme .profile-interface-fields .field-hint {
+  display: block;
+  font-weight: 600;
+  line-height: 1.45;
+}
+
+@media (max-width: 1300px) {
+  body.md-theme .profile-settings-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 760px) {
+  body.md-theme .profile-settings-grid {
+    grid-template-columns: 1fr;
+  }
+}
