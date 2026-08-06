@@ -82,6 +82,12 @@
   "silences.details.apply_to_existing": "Alertes existantes",
   "silences.details.apply_to_existing_enabled": "Appliquer aux alertes non résolues correspondantes",
   "silences.details.apply_to_existing_disabled": "Nouvelles alertes uniquement",
+  "silences.details.reactivate_on_end": "Après la fin du silence",
+  "silences.details.reactivate_on_end_enabled": "Réactiver les alertes concernées",
+  "silences.details.reactivate_on_end_disabled": "Conserver les alertes concernées en silence",
   "silences.form.apply_to_existing": "Appliquer aux alertes non résolues existantes",
-  "silences.form.apply_to_existing_help": "Facultatif. Les alertes actives correspondantes seront immédiatement mises en silence. Les notifications déjà envoyées restent dans l’historique."
+  "silences.form.apply_to_existing_help": "Facultatif. Les alertes actives correspondantes seront immédiatement mises en silence. Les notifications déjà envoyées restent dans l’historique.",
+  "silences.form.reactivate_on_end": "Réactiver les alertes mises en silence à la fin de ce silence",
+  "silences.form.reactivate_on_end_help": "Activé par défaut. Les alertes ne sont réactivées qu’après la fin du dernier silence correspondant.",
+  "silences.form.reactivate_on_end_warning": "Les alertes concernées resteront en silence après la fin de ce silence. Activez cette option plus tard et enregistrez le silence pour les libérer."
 }

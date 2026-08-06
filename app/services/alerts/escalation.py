@@ -5,6 +5,7 @@ from app.modules.db import alerts_repo
 from app.services import escalation_policies as escalation_policy_service
 from app.services.notifications.delivery import has_matching_notification_channel, notify_alert
 from app.services.alerts.maintenance_state import (
+    is_escalation_lifecycle_paused,
     is_notification_lifecycle_suppressed,
     pause_notification_lifecycle,
     resume_notification_lifecycle,
@@ -117,6 +118,11 @@ def maybe_escalate_alert(group):
         pause_notification_lifecycle(group)
         return False
 
+    if is_escalation_lifecycle_paused(group):
+        group.next_escalation_at = None
+        group.save(only=[group.__class__.next_escalation_at])
+        return False
+
     if resume_notification_lifecycle(group):
         return False
 
@@ -159,6 +165,11 @@ def maybe_escalate_alert_by_policy(group):
 
     if is_notification_lifecycle_suppressed(group):
         pause_notification_lifecycle(group)
+        return False
+
+    if is_escalation_lifecycle_paused(group):
+        group.next_escalation_at = None
+        group.save(only=[group.__class__.next_escalation_at])
         return False
 
     if resume_notification_lifecycle(group):

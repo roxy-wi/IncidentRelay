@@ -220,6 +220,23 @@
               <span>{{ _('maintenance.form.enabled') }}</span>
             </label>
 
+            <label class="md-checkbox">
+              <input id="maintenance-apply-to-existing" type="checkbox">
+              <span>{{ _('maintenance.form.apply_to_existing') }}</span>
+            </label>
+            <div id="maintenance-apply-to-existing-help" class="help-text">
+              {{ _('maintenance.form.apply_to_existing_help') }}
+            </div>
+
+            <label class="md-checkbox">
+              <input id="maintenance-reactivate-on-end" type="checkbox" checked>
+              <span>{{ _('maintenance.form.reactivate_on_end') }}</span>
+            </label>
+            <div class="help-text">{{ _('maintenance.form.reactivate_on_end_help') }}</div>
+            <div id="maintenance-reactivate-warning" class="alert alert-warning is-hidden">
+              {{ _('maintenance.form.reactivate_on_end_warning') }}
+            </div>
+
             <div class="form-actions">
               <button id="reset-maintenance-window-form" type="button" class="btn">{{ _('maintenance.actions.reset') }}</button>
               <button id="save-maintenance-window" type="button" class="btn btn-primary">{{ _('maintenance.actions.save') }}</button>

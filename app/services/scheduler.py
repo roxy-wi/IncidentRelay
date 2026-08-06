@@ -7,6 +7,7 @@ from apscheduler.schedulers.base import SchedulerAlreadyRunningError, SchedulerN
 from app.db import database_proxy as db
 from app.settings import Config
 from app.services.alerts.notification_queue import process_due_alert_group_notifications
+from app.services.alerts.maintenance_state import process_maintenance_lifecycle
 from app.services.alerts.reminders import send_unacked_reminders
 from app.services.db_lock import acquire_db_lock, release_db_lock
 from app.services.notifications.shift_notifications import (
@@ -250,6 +251,33 @@ def alert_group_notification_job():
         if owner:
             release_db_lock("alert_group_notification_job", owner)
 
+        if not db.is_closed():
+            db.close()
+
+
+def maintenance_lifecycle_job():
+    """Re-evaluate maintenance starts, ends and retained effects."""
+    if db.is_closed():
+        db.connect(reuse_if_open=True)
+    owner = None
+    try:
+        owner = acquire_db_lock("maintenance_lifecycle_job")
+        if not owner:
+            return {"windows": 0, "applied": 0, "released": 0, "retained": 0}
+        result = process_maintenance_lifecycle(
+            limit=int(getattr(Config, "MAINTENANCE_LIFECYCLE_BATCH_SIZE", 500))
+        )
+        logger.info(
+            "maintenance lifecycle job finished",
+            extra={"extra": {"event_type": "scheduler", **result}},
+        )
+        return result
+    except Exception:
+        logger.exception("maintenance lifecycle job failed")
+        return {"windows": 0, "applied": 0, "released": 0, "retained": 0, "failed": 1}
+    finally:
+        if owner:
+            release_db_lock("maintenance_lifecycle_job", owner)
         if not db.is_closed():
             db.close()
 
@@ -716,6 +744,17 @@ def start_scheduler():
         coalesce=True,
         next_run_time=utc_now(),
         id="silence_lifecycle_job",
+        replace_existing=True,
+    )
+
+    _scheduler.add_job(
+        maintenance_lifecycle_job,
+        "interval",
+        seconds=int(getattr(Config, "MAINTENANCE_LIFECYCLE_CHECK_INTERVAL_SECONDS", 30)),
+        max_instances=1,
+        coalesce=True,
+        next_run_time=utc_now(),
+        id="maintenance_lifecycle_job",
         replace_existing=True,
     )
 

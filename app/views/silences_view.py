@@ -121,6 +121,7 @@ def create_silence():
         ends_at=payload.ends_at,
         created_by=payload.created_by,
         apply_to_existing=payload.apply_to_existing,
+        reactivate_on_end=payload.reactivate_on_end,
     )
     write_audit(
         "silence.create",
@@ -177,6 +178,7 @@ def update_silence(silence_id):
             "ends_at": payload.ends_at,
             "created_by": payload.created_by,
             "apply_to_existing": payload.apply_to_existing,
+            "reactivate_on_end": payload.reactivate_on_end,
         },
     )
     write_audit(
@@ -265,6 +267,7 @@ def serialize_silence(
         "ends_at": serialize_utc_datetime(silence.ends_at),
         "created_by": silence.created_by.username if silence.created_by else None,
         "apply_to_existing": bool(silence.apply_to_existing),
+        "reactivate_on_end": bool(silence.reactivate_on_end),
         "enabled": silence.enabled,
     }
 

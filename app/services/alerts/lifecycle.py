@@ -9,7 +9,9 @@ from app.services.alerts.maintenance_state import (
     apply_maintenance_to_existing_alert,
     maintenance_create_kwargs,
     maybe_apply_maintenance_to_group,
+    reconcile_alert_group_maintenance,
     record_maintenance_match,
+    should_apply_window_to_group,
 )
 from app.services.alerts.notification_queue import schedule_group_notification
 from app.services.alerts.priority import (
@@ -691,9 +693,7 @@ def _upsert_alert(alert_data, trace, runtime=None):
         now=now,
     )
 
-    if maintenance_decision.incident_status:
-        status = maintenance_decision.incident_status
-
+    maintenance_incident_status = maintenance_decision.incident_status
     maintenance_kwargs = maintenance_create_kwargs(maintenance_decision)
 
     trace.maintenance_resolved(maintenance_decision)
@@ -721,6 +721,20 @@ def _upsert_alert(alert_data, trace, runtime=None):
         existing_alert=existing_alert,
         existing_group=existing_group,
     )
+
+    target_group = existing_alert.group if existing_alert and existing_alert.group else existing_group
+    if target_group and maintenance_decision.window and not should_apply_window_to_group(
+        maintenance_decision.window,
+        target_group,
+        now=now,
+    ):
+        from app.services.maintenance import MaintenanceDecision
+        maintenance_decision = MaintenanceDecision()
+        maintenance_kwargs = {}
+        maintenance_incident_status = None
+
+    if maintenance_incident_status:
+        status = maintenance_incident_status
 
     if maintenance_decision.suppress_incident and not existing_alert and not existing_group:
         trace.incident_suppressed(maintenance_decision)
@@ -956,6 +970,12 @@ def _upsert_alert(alert_data, trace, runtime=None):
             maintenance_decision,
             alert_id=alert.id,
         )
+
+    reconcile_alert_group_maintenance(
+        group,
+        now=now,
+        trigger_source="intake",
+    )
 
     if alert_data.get("routing_error"):
         alerts_repo.create_alert_event(

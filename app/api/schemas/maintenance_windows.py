@@ -108,6 +108,8 @@ class MaintenanceWindowBaseSchema(ApiModel):
     ends_at: datetime
 
     enabled: bool = True
+    apply_to_existing: bool = False
+    reactivate_on_end: bool = True
 
     scopes: list[MaintenanceWindowScopeSchema] = Field(min_length=1)
 
@@ -144,6 +146,11 @@ class MaintenanceWindowBaseSchema(ApiModel):
         if self.ends_at <= local_now:
             raise ValueError("ends_at must be in the future")
 
+        if self.behavior == "suppress_incident" and self.apply_to_existing:
+            raise ValueError(
+                "apply_to_existing is not supported for suppress_incident behavior"
+            )
+
         return self
 
 
@@ -160,6 +167,8 @@ class MaintenanceWindowUpdateSchema(ApiModel):
     starts_at: datetime | None = None
     ends_at: datetime | None = None
     enabled: bool | None = None
+    apply_to_existing: bool | None = None
+    reactivate_on_end: bool | None = None
     scopes: list[MaintenanceWindowScopeSchema] | None = Field(default=None, min_length=1)
 
     @field_validator("starts_at", "ends_at")
@@ -182,6 +191,11 @@ class MaintenanceWindowUpdateSchema(ApiModel):
         if self.starts_at is not None and self.ends_at is not None:
             if self.ends_at <= self.starts_at:
                 raise ValueError("ends_at must be greater than starts_at")
+
+        if self.behavior == "suppress_incident" and self.apply_to_existing:
+            raise ValueError(
+                "apply_to_existing is not supported for suppress_incident behavior"
+            )
 
         if self.ends_at is not None:
             zone_name = self.timezone or "UTC"

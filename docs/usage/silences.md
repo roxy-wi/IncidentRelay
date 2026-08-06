@@ -116,9 +116,11 @@ By default, a Silence affects only alert occurrences received while the Silence 
 
 Enable **Apply to existing unresolved alerts** only when the Silence should also suppress matching firing alerts immediately. This is useful for emergency alert storms, but it is intentionally disabled by default because responders may already be working on an existing incident.
 
-When the final matching Silence ends or is disabled, alerts that were created or retroactively suppressed by that Silence become active again. IncidentRelay then starts the normal notification flow for alerts that were never notified, or sends an update for alerts that had already produced notifications. Acknowledged alert groups keep their acknowledged state.
+By default, **Reactivate silenced alerts when this Silence ends** is enabled. When the final matching Silence ends or is disabled, alerts that were created or retroactively suppressed by that Silence become active again. IncidentRelay then starts the normal notification flow for alerts that were never notified, or sends an update for alerts that had already produced notifications. Acknowledged alert groups keep their acknowledged state.
 
-Overlapping Silences are handled independently: an alert remains silenced until no active matching Silence remains.
+Disable this option only when affected alerts should remain silenced after the Silence ends. Those alerts will not be reactivated automatically. To release them later, edit the Silence, enable this option and save it. The setting applies independently to each Silence.
+
+Overlapping Silences are handled independently. An alert remains silenced while another matching Silence application still holds it, including a Silence configured not to reactivate affected alerts automatically.
 
 ## Expired silence history
 

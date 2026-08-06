@@ -82,6 +82,12 @@
   "silences.details.apply_to_existing": "Existing alerts",
   "silences.details.apply_to_existing_enabled": "Apply to matching unresolved alerts",
   "silences.details.apply_to_existing_disabled": "New alerts only",
+  "silences.details.reactivate_on_end": "After Silence ends",
+  "silences.details.reactivate_on_end_enabled": "Reactivate affected alerts",
+  "silences.details.reactivate_on_end_disabled": "Keep affected alerts silenced",
   "silences.form.apply_to_existing": "Apply to existing unresolved alerts",
-  "silences.form.apply_to_existing_help": "Optional. Matching firing alerts will be silenced immediately. Already delivered notifications remain in history."
+  "silences.form.apply_to_existing_help": "Optional. Matching firing alerts will be silenced immediately. Already delivered notifications remain in history.",
+  "silences.form.reactivate_on_end": "Reactivate silenced alerts when this Silence ends",
+  "silences.form.reactivate_on_end_help": "Enabled by default. Alerts are reactivated only after the final matching Silence no longer applies.",
+  "silences.form.reactivate_on_end_warning": "Affected alerts will remain silenced after this Silence ends. Enable this option later and save the Silence to release them."
 }

@@ -5,8 +5,11 @@ from peewee import JOIN
 from dateutil.rrule import rrulestr
 
 from app.modules.db.models import (
+    AlertGroup,
     MaintenanceWindow,
+    MaintenanceWindowAlertApplication,
     MaintenanceWindowScope,
+    Team,
 )
 from app.modules.common import as_naive_datetime
 from app.modules.common import utc_now
@@ -306,6 +309,8 @@ def create_maintenance_window(
     description=None,
     rrule=None,
     enabled=True,
+    apply_to_existing=False,
+    reactivate_on_end=True,
     status="scheduled",
     group=None,
     team=None,
@@ -321,6 +326,8 @@ def create_maintenance_window(
         timezone=timezone,
         rrule=rrule,
         enabled=enabled,
+        apply_to_existing=apply_to_existing,
+        reactivate_on_end=reactivate_on_end,
         status=status,
     )
 
@@ -337,6 +344,9 @@ def update_maintenance_window(window, **fields):
         "timezone",
         "rrule",
         "enabled",
+        "apply_to_existing",
+        "reactivate_on_end",
+        "reconciled_at",
         "status",
     }
 
@@ -407,50 +417,44 @@ def list_maintenance_window_scopes(window_id):
     )
 
 
-def find_active_maintenance_window(
+def list_active_maintenance_windows(
     *,
-    group_id=None,
-    team_id=None,
-    service_id=None,
-    route_id=None,
-    now=None,
-):
+    group_id: int | None = None,
+    team_id: int | None = None,
+    service_id: int | None = None,
+    route_id: int | None = None,
+    now: datetime | None = None,
+) -> list[MaintenanceWindow]:
+    """Return every active window matching the supplied routing scope."""
     query = (
         MaintenanceWindow
         .select(MaintenanceWindow)
         .distinct()
         .join(MaintenanceWindowScope)
         .where(
-            MaintenanceWindow.deleted == False,
-            MaintenanceWindow.enabled == True,
+            MaintenanceWindow.deleted == False,  # noqa: E712
+            MaintenanceWindow.enabled == True,  # noqa: E712
             MaintenanceWindow.status.in_(ACTIVE_STATUSES),
         )
-        .order_by(
-            MaintenanceWindow.starts_at.desc(),
-            MaintenanceWindow.id.desc(),
-        )
+        .order_by(MaintenanceWindow.starts_at.desc(), MaintenanceWindow.id.desc())
     )
 
     conditions = []
-
     if group_id:
         conditions.append(
             (MaintenanceWindowScope.scope_type == "group")
             & (MaintenanceWindowScope.group == group_id)
         )
-
     if team_id:
         conditions.append(
             (MaintenanceWindowScope.scope_type == "team")
             & (MaintenanceWindowScope.team == team_id)
         )
-
     if service_id:
         conditions.append(
             (MaintenanceWindowScope.scope_type == "service")
             & (MaintenanceWindowScope.service == service_id)
         )
-
     if route_id:
         conditions.append(
             (MaintenanceWindowScope.scope_type == "route")
@@ -458,15 +462,129 @@ def find_active_maintenance_window(
         )
 
     if not conditions:
-        return None
+        return []
 
     combined = conditions[0]
-
     for condition in conditions[1:]:
         combined = combined | condition
 
-    for window in query.where(combined):
-        if is_window_active_now(window, now=now):
-            return window
+    return [
+        window
+        for window in query.where(combined)
+        if is_window_active_now(window, now=now)
+    ]
 
-    return None
+
+def list_unresolved_alert_groups_for_window(
+    window: MaintenanceWindow,
+    *,
+    limit: int | None = None,
+) -> list[AlertGroup]:
+    """Return unresolved alert groups in any scope of one maintenance window."""
+    conditions = []
+    for scope in list_maintenance_window_scopes(window):
+        if scope.scope_type == "group" and scope.group_id:
+            team_ids = Team.select(Team.id).where(Team.group == scope.group_id)
+            conditions.append(AlertGroup.team.in_(team_ids))
+        elif scope.scope_type == "team" and scope.team_id:
+            conditions.append(AlertGroup.team == scope.team_id)
+        elif scope.scope_type == "service" and scope.service_id:
+            conditions.append(AlertGroup.service == scope.service_id)
+        elif scope.scope_type == "route" and scope.route_id:
+            conditions.append(AlertGroup.route == scope.route_id)
+
+    if not conditions:
+        return []
+
+    combined = conditions[0]
+    for condition in conditions[1:]:
+        combined = combined | condition
+
+    query = (
+        AlertGroup
+        .select()
+        .where(
+            combined,
+            AlertGroup.status != "resolved",
+            AlertGroup.merged_into.is_null(True),
+        )
+        .distinct()
+        .order_by(AlertGroup.id.asc())
+    )
+    if limit:
+        query = query.limit(limit)
+    return list(query)
+
+
+def list_window_applications(
+    window: MaintenanceWindow,
+    *,
+    active_only: bool = False,
+) -> list[MaintenanceWindowAlertApplication]:
+    query = (
+        MaintenanceWindowAlertApplication
+        .select()
+        .where(MaintenanceWindowAlertApplication.maintenance_window == window.id)
+        .order_by(MaintenanceWindowAlertApplication.id.asc())
+    )
+    if active_only:
+        query = query.where(MaintenanceWindowAlertApplication.active == True)  # noqa: E712
+    return list(query)
+
+
+def list_group_applications(
+    group: AlertGroup,
+    *,
+    active_only: bool = False,
+) -> list[MaintenanceWindowAlertApplication]:
+    query = (
+        MaintenanceWindowAlertApplication
+        .select()
+        .where(MaintenanceWindowAlertApplication.alert_group == group.id)
+        .order_by(MaintenanceWindowAlertApplication.applied_at.desc())
+    )
+    if active_only:
+        query = query.where(MaintenanceWindowAlertApplication.active == True)  # noqa: E712
+    return list(query)
+
+
+def get_window_group_application(
+    window: MaintenanceWindow,
+    group: AlertGroup,
+) -> MaintenanceWindowAlertApplication | None:
+    return MaintenanceWindowAlertApplication.get_or_none(
+        MaintenanceWindowAlertApplication.maintenance_window == window.id,
+        MaintenanceWindowAlertApplication.alert_group == group.id,
+    )
+
+
+def find_active_maintenance_window(
+    *,
+    group_id: int | None = None,
+    team_id: int | None = None,
+    service_id: int | None = None,
+    route_id: int | None = None,
+    now: datetime | None = None,
+) -> MaintenanceWindow | None:
+    """Return the highest-priority active window for intake-time behavior."""
+    windows = list_active_maintenance_windows(
+        group_id=group_id,
+        team_id=team_id,
+        service_id=service_id,
+        route_id=route_id,
+        now=now,
+    )
+
+    if not windows:
+        return None
+
+    behavior_priority = {
+        "suppress_incident": 0,
+        "create_maintenance_incident": 1,
+        "suppress_notifications": 2,
+        "pause_escalation_only": 3,
+    }
+    return sorted(
+        windows,
+        key=lambda item: (behavior_priority.get(item.behavior, 99), -item.id),
+    )[0]

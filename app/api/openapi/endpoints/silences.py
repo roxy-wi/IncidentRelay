@@ -24,6 +24,14 @@ SILENCE_SCHEMA = {
                 "when this Silence becomes active."
             ),
         },
+        "reactivate_on_end": {
+            "type": "boolean",
+            "default": True,
+            "description": (
+                "When true, alerts affected by this Silence are reactivated "
+                "after it expires or is disabled, unless another Silence applies."
+            ),
+        },
         "enabled": {"type": "boolean", "default": True},
     },
 }
@@ -68,7 +76,8 @@ def paths():
                 "summary": "Create silence",
                 "description": (
                     "Creates a silence rule for a team. New matching alerts are stored as silenced. "
-                    "Set apply_to_existing=true to also silence matching unresolved firing alerts."
+                    "Set apply_to_existing=true to also silence matching unresolved firing alerts. "
+                    "Set reactivate_on_end=false to keep affected alerts silenced after the Silence ends."
                 ),
                 "operationId": "createSilence",
                 "requestBody": json_body("Silence properties.", SILENCE_SCHEMA),
@@ -87,7 +96,7 @@ def paths():
             "put": {
                 "tags": ["silences"],
                 "summary": "Update silence",
-                "description": "Updates Silence scope, time range, matchers and retroactive behavior.",
+                "description": "Updates Silence scope, time range, matchers and lifecycle behavior.",
                 "operationId": "updateSilence",
                 "parameters": [path_param("silence_id", "Silence id.")],
                 "requestBody": json_body("Updated silence properties.", SILENCE_SCHEMA),
@@ -96,7 +105,10 @@ def paths():
             "delete": {
                 "tags": ["silences"],
                 "summary": "Disable silence",
-                "description": "Disables a Silence and reactivates affected alerts when no other Silence applies.",
+                "description": (
+                    "Disables a Silence. Affected alerts are reactivated when "
+                    "reactivate_on_end is enabled and no other Silence applies."
+                ),
                 "operationId": "disableSilence",
                 "parameters": [path_param("silence_id", "Silence id.")],
                 "responses": {"200": response("Silence disabled.")},

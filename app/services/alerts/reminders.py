@@ -5,6 +5,7 @@ from app.modules.db import alerts_repo
 from app.services import escalation_policies as escalation_policy_service
 from app.services.alerts.escalation import maybe_escalate_alert
 from app.services.alerts.maintenance_state import (
+    is_escalation_lifecycle_paused,
     is_notification_lifecycle_suppressed,
     pause_notification_lifecycle,
     resume_notification_lifecycle,
@@ -68,7 +69,9 @@ def send_unacked_reminders():
                 now=now,
             )
             continue
-        if group.escalation_policy_id:
+        escalation_paused = is_escalation_lifecycle_paused(group, now=now)
+
+        if group.escalation_policy_id and not escalation_paused:
             if maybe_escalate_alert(group):
                 count += 1
                 continue
@@ -146,7 +149,11 @@ def send_unacked_reminders():
         if not should_send_reminder(group, now):
             continue
 
-        if not group.escalation_policy_id and maybe_escalate_alert(group):
+        if (
+            not group.escalation_policy_id
+            and not escalation_paused
+            and maybe_escalate_alert(group)
+        ):
             count += 1
             continue
 

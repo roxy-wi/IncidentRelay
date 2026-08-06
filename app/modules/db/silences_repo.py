@@ -108,6 +108,7 @@ def list_silences_with_due_releases(
         .join(SilenceAlertApplication)
         .where(
             (SilenceAlertApplication.active == True)
+            & (Silence.reactivate_on_end == True)
             & (
                 (Silence.enabled == False)
                 | (Silence.deleted == True)
@@ -129,6 +130,7 @@ def create_silence(
     matchers: dict | None = None,
     created_by: int | None = None,
     apply_to_existing: bool = False,
+    reactivate_on_end: bool = True,
 ) -> Silence:
     """Create a silence rule."""
     return Silence.create(
@@ -141,6 +143,7 @@ def create_silence(
         ends_at=ends_at,
         created_by=created_by,
         apply_to_existing=apply_to_existing,
+        reactivate_on_end=reactivate_on_end,
         reconciled_at=None,
         updated_at=utc_now(),
     )
@@ -173,6 +176,7 @@ def update_silence(silence_id: int, data: dict) -> Silence:
         "created_by",
         "enabled",
         "apply_to_existing",
+        "reactivate_on_end",
     ]:
         if field in data:
             setattr(silence, field, data[field])

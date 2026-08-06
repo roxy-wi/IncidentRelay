@@ -403,6 +403,7 @@ def release_silence_applications(
     now: datetime | None = None,
     trigger_source: str = "scheduler",
     applications: list[SilenceAlertApplication] | None = None,
+    respect_reactivate_on_end: bool = True,
 ) -> dict[str, int]:
     """Release alerts no longer covered by one Silence."""
     now = now or utc_now()
@@ -410,7 +411,39 @@ def release_silence_applications(
         applications = silences_repo.list_active_applications_for_silence(
             silence.id
         )
-    result = {"released": 0, "reactivated": 0, "groups_changed": 0}
+    result = {
+        "released": 0,
+        "reactivated": 0,
+        "groups_changed": 0,
+        "retained": 0,
+    }
+
+    if respect_reactivate_on_end and not silence.reactivate_on_end:
+        result["retained"] = len(applications)
+        silence.reconciled_at = now
+        silence.updated_at = now
+        silence.save()
+        if applications:
+            audit_repo.create_audit_log(
+                action="silence.alerts_retained",
+                object_type="silence",
+                object_id=silence.id,
+                group_id=silence.team.group_id if silence.team else None,
+                team_id=silence.team_id,
+                message=(
+                    f"Silence {silence.name} ended with automatic "
+                    "reactivation disabled"
+                ),
+                data={
+                    "silence_id": silence.id,
+                    "silence_name": silence.name,
+                    "retained_alerts": len(applications),
+                    "reason": reason,
+                    "trigger_source": trigger_source,
+                },
+            )
+        return result
+
     changed_group_ids: set[int] = set()
 
     with database_proxy.atomic():
@@ -464,6 +497,7 @@ def reconcile_silence(
                 reason=RELEASE_REASON_UPDATED,
                 now=now,
                 trigger_source=trigger_source,
+                respect_reactivate_on_end=False,
             )
             silence.reconciled_at = None
             silence.updated_at = now
@@ -506,6 +540,7 @@ def reconcile_silence(
             now=now,
             trigger_source=trigger_source,
             applications=invalid_applications,
+            respect_reactivate_on_end=False,
         )
 
     return apply_silence_to_existing_alerts(

@@ -135,6 +135,12 @@ class Config:
 
     REMINDER_INTERVAL_SECONDS = settings.get_int("alerts", "reminder_interval_seconds", 60)
     ALERT_GROUP_WINDOW_SECONDS = settings.get_int("alerts", "alert_group_window_seconds", 3600)
+    MAINTENANCE_LIFECYCLE_CHECK_INTERVAL_SECONDS = settings.get_int(
+        "maintenance", "lifecycle_check_interval_seconds", 30
+    )
+    MAINTENANCE_LIFECYCLE_BATCH_SIZE = settings.get_int(
+        "maintenance", "lifecycle_batch_size", 500
+    )
 
     SCHEDULER_LOCK_TTL_SECONDS = settings.get_int("scheduler", "lock_ttl_seconds", 120)
     ORCHESTRATION_PENDING_CHECK_INTERVAL_SECONDS = settings.get_int(

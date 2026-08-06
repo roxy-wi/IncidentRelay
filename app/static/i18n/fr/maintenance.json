@@ -134,5 +134,13 @@
   "maintenance.permissions.duplicate": "Le rôle de responsable d’équipe est requis pour dupliquer cette fenêtre de maintenance.",
   "maintenance.permissions.cancel": "Le rôle de responsable d’équipe est requis pour annuler cette fenêtre de maintenance.",
   "maintenance.permissions.delete": "L’autorisation de suppression est requise pour supprimer cette fenêtre de maintenance.",
-  "maintenance.badge.default": "Maintenance"
+  "maintenance.badge.default": "Maintenance",
+  "maintenance.form.apply_to_existing": "Appliquer aux alertes non résolues existantes",
+  "maintenance.form.apply_to_existing_help": "Facultatif. Les groupes d’alertes non résolus déjà présents au début de la fenêtre sont affectés immédiatement.",
+  "maintenance.form.apply_to_existing_unavailable": "La suppression de l’incident empêche la création d’un nouveau groupe et ne peut pas être appliquée rétroactivement.",
+  "maintenance.form.reactivate_on_end": "Réactiver les alertes concernées à la fin de la maintenance",
+  "maintenance.form.reactivate_on_end_help": "Activé par défaut. Les effets sont retirés après la dernière fenêtre de maintenance applicable.",
+  "maintenance.form.reactivate_on_end_warning": "Les alertes concernées conserveront l’effet de maintenance après la fin de cette fenêtre. Activez ensuite cette option et enregistrez la fenêtre pour les libérer.",
+  "maintenance.details.apply_to_existing": "Alertes existantes",
+  "maintenance.details.reactivate_on_end": "Réactiver après la fin"
 }

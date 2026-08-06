@@ -141,6 +141,78 @@ def test_alert_created_during_silence_reactivates_after_expiry(db):
     assert application.release_reason == "expired"
 
 
+def test_silence_can_keep_alert_silenced_after_expiry(db):
+    _, team, _ = _fixture()
+    now = utc_now()
+    silence = create_silence(
+        team,
+        matchers={"labels": {"alertname": "DiskFull"}},
+        starts_at=now - timedelta(minutes=1),
+        ends_at=now + timedelta(minutes=1),
+        reactivate_on_end=False,
+    )
+    result = upsert_alert(_alert_payload(team.slug))
+
+    processed = process_silence_lifecycle(now=silence.ends_at)
+
+    alert = Alert.get_by_id(result.alert.id)
+    group = AlertGroup.get_by_id(result.group.id)
+    application = SilenceAlertApplication.get()
+
+    assert processed["alerts_reactivated"] == 0
+    assert alert.status == "silenced"
+    assert alert.silenced is True
+    assert group.status == "silenced"
+    assert application.active is True
+    assert application.released_at is None
+
+
+def test_disabling_silence_can_retain_affected_alerts(db):
+    _, team, _ = _fixture()
+    silence = create_silence(
+        team,
+        matchers={"labels": {"alertname": "DiskFull"}},
+        reactivate_on_end=False,
+    )
+    result = upsert_alert(_alert_payload(team.slug))
+
+    silence = silences_repo.disable_silence(silence.id)
+    released = reconcile_silence(silence)
+
+    assert released["retained"] == 1
+    assert released["reactivated"] == 0
+    assert Alert.get_by_id(result.alert.id).status == "silenced"
+    assert SilenceAlertApplication.get().active is True
+    assert AuditLog.select().where(
+        (AuditLog.object_type == "silence")
+        & (AuditLog.object_id == silence.id)
+        & (AuditLog.action == "silence.alerts_retained")
+    ).exists()
+
+
+def test_enabling_reactivation_releases_retained_alerts(db):
+    _, team, _ = _fixture()
+    silence = create_silence(
+        team,
+        matchers={"labels": {"alertname": "DiskFull"}},
+        reactivate_on_end=False,
+    )
+    result = upsert_alert(_alert_payload(team.slug))
+
+    silence = silences_repo.disable_silence(silence.id)
+    reconcile_silence(silence)
+    silence = silences_repo.update_silence(
+        silence.id,
+        {"reactivate_on_end": True},
+    )
+    released = reconcile_silence(silence)
+
+    assert released["reactivated"] == 1
+    assert Alert.get_by_id(result.alert.id).status == "firing"
+    assert AlertGroup.get_by_id(result.group.id).status == "firing"
+    assert SilenceAlertApplication.get().active is False
+
+
 def test_overlapping_silences_keep_alert_silenced_until_last_release(db):
     _, team, _ = _fixture()
     first = create_silence(
@@ -250,11 +322,13 @@ def test_silence_api_exposes_apply_to_existing(client, admin_headers, db):
             "ends_at": (now + timedelta(minutes=10)).isoformat() + "Z",
             "matchers": {"labels": {"alertname": "DiskFull"}},
             "apply_to_existing": True,
+            "reactivate_on_end": False,
         },
     )
 
     assert response.status_code == 201, response.get_json()
     assert response.get_json()["apply_to_existing"] is True
+    assert response.get_json()["reactivate_on_end"] is False
 
 
 def test_legacy_silenced_alert_without_application_is_reactivated(db):
@@ -312,8 +386,11 @@ def test_silence_ui_exposes_retroactive_option():
     )
 
     assert 'id="silence-apply-to-existing"' in template
+    assert 'id="silence-reactivate-on-end"' in template
     assert "apply_to_existing:" in source
+    assert "reactivate_on_end:" in source
     assert '.prop("checked", Boolean(silence.apply_to_existing))' in source
+    assert '$("#silence-reactivate-on-end").prop("checked", true)' in source
 
 
 def test_later_retroactive_silence_attaches_to_already_silenced_alert(db):

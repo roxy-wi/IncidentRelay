@@ -1542,6 +1542,9 @@ class MaintenanceWindow(SoftDeleteModel):
     status = CharField(default="scheduled", index=True)
 
     enabled = BooleanField(default=True, index=True)
+    apply_to_existing = BooleanField(default=False)
+    reactivate_on_end = BooleanField(default=True)
+    reconciled_at = DateTimeField(null=True)
 
     created_by = ForeignKeyField(
         User,
@@ -1681,6 +1684,39 @@ class ServiceMatchRule(SoftDeleteModel):
             (("route", "position"), False),
             (("team", "position"), False),
             (("service", "enabled"), False),
+        )
+
+
+class MaintenanceWindowAlertApplication(BaseModel):
+    """One maintenance effect applied to an unresolved alert group."""
+
+    id = AutoField()
+    maintenance_window = ForeignKeyField(
+        MaintenanceWindow,
+        backref="alert_applications",
+        on_delete="CASCADE",
+    )
+    alert_group = DeferredForeignKey(
+        "AlertGroup",
+        backref="maintenance_applications",
+        on_delete="CASCADE",
+    )
+    behavior = CharField(index=True)
+    application_source = CharField(default="new")
+    previous_status = CharField(null=True)
+    occurrence_started_at = DateTimeField(null=True)
+    active = BooleanField(default=True, index=True)
+    applied_at = DateTimeField(default=utc_now)
+    retained_at = DateTimeField(null=True)
+    released_at = DateTimeField(null=True)
+    release_reason = CharField(null=True)
+
+    class Meta:
+        table_name = "maintenance_window_alert_application"
+        indexes = (
+            (("maintenance_window", "alert_group"), True),
+            (("alert_group", "active"), False),
+            (("maintenance_window", "active"), False),
         )
 
 
@@ -2329,6 +2365,7 @@ class Silence(SoftDeleteModel):
     starts_at = DateTimeField()
     ends_at = DateTimeField()
     apply_to_existing = BooleanField(default=False)
+    reactivate_on_end = BooleanField(default=True)
     reconciled_at = DateTimeField(null=True, index=True)
     created_by = ForeignKeyField(User, null=True, backref="created_silences", on_delete="SET NULL")
     created_at = DateTimeField(default=utc_now)

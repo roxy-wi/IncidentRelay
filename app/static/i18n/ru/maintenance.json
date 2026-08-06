@@ -134,5 +134,13 @@
   "maintenance.permissions.duplicate": "Для дублирования окна требуется роль менеджера команды.",
   "maintenance.permissions.cancel": "Для отмены окна требуется роль менеджера команды.",
   "maintenance.permissions.delete": "Для удаления окна требуется разрешение на удаление.",
-  "maintenance.badge.default": "Технические работы"
+  "maintenance.badge.default": "Технические работы",
+  "maintenance.form.apply_to_existing": "Применить к существующим незакрытым алертам",
+  "maintenance.form.apply_to_existing_help": "Необязательно. Подходящие незакрытые группы алертов, существовавшие до начала окна, будут затронуты сразу.",
+  "maintenance.form.apply_to_existing_unavailable": "Suppress incident предотвращает создание новой группы и не может применяться задним числом.",
+  "maintenance.form.reactivate_on_end": "Повторно активировать затронутые алерты после завершения обслуживания",
+  "maintenance.form.reactivate_on_end_help": "Включено по умолчанию. Эффект снимается только после завершения последнего применимого окна обслуживания.",
+  "maintenance.form.reactivate_on_end_warning": "После завершения окна затронутые алерты сохранят эффект обслуживания. Чтобы освободить их позже, включите эту опцию и сохраните окно.",
+  "maintenance.details.apply_to_existing": "Существующие алерты",
+  "maintenance.details.reactivate_on_end": "Активация после завершения"
 }

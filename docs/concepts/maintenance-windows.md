@@ -441,3 +441,13 @@ pause_escalation_only:
   maintenance_suppressed = false
 ```
 
+
+
+## Retroactive re-evaluation
+
+Each maintenance window has two independent lifecycle options:
+
+- **Apply to existing unresolved alerts** is disabled by default. When enabled, the active window immediately affects matching unresolved alert groups that existed before the occurrence started. It is unavailable for **Suppress incident**, because an already-created group cannot be retroactively prevented from existing.
+- **Reactivate affected alerts when this maintenance ends** is enabled by default. When disabled, the applied effect remains after the window ends, is disabled, or is cancelled. Enabling the option later and saving the window releases retained effects. Deleting the window, removing a group from its scope, or changing to an incompatible behavior always releases effects that no longer belong to the window.
+
+Explicit API changes are reconciled immediately. A scheduler job handles scheduled starts, expiration and recurring occurrences. Processing is idempotent and overlapping windows are tracked independently. A group resumes only after the final active or retained effect no longer applies. Missed reminders and escalation steps are not replayed.

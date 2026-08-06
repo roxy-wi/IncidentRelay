@@ -21,6 +21,7 @@ class SilenceCreateSchema(ApiModel):
     ends_at: datetime
     created_by: int | None = Field(default=None, ge=1)
     apply_to_existing: bool = False
+    reactivate_on_end: bool = True
 
     @field_validator("starts_at", "ends_at")
     @classmethod

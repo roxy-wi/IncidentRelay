@@ -54,6 +54,8 @@ def _maintenance_audit_data(window, payload=None):
         "starts_at": serialize_utc_datetime(window.starts_at),
         "ends_at": serialize_utc_datetime(window.ends_at),
         "enabled": window.enabled,
+        "apply_to_existing": bool(window.apply_to_existing),
+        "reactivate_on_end": bool(window.reactivate_on_end),
         "deleted": window.deleted,
     }
 

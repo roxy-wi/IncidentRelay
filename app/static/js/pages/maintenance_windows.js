@@ -424,6 +424,14 @@ function renderMaintenanceDetails(item) {
             .append(maintenanceDetailsItem(i18n.t("maintenance.details.timezone"), item.timezone || "UTC"))
             .append(maintenanceDetailsItem(i18n.t("maintenance.details.rrule"), item.rrule))
             .append(maintenanceDetailsItem(i18n.t("maintenance.details.enabled"), item.enabled !== false ? i18n.t("maintenance.values.yes") : i18n.t("maintenance.values.no")))
+            .append(maintenanceDetailsItem(
+                i18n.t("maintenance.details.apply_to_existing"),
+                item.apply_to_existing ? i18n.t("maintenance.values.yes") : i18n.t("maintenance.values.no")
+            ))
+            .append(maintenanceDetailsItem(
+                i18n.t("maintenance.details.reactivate_on_end"),
+                item.reactivate_on_end !== false ? i18n.t("maintenance.values.yes") : i18n.t("maintenance.values.no")
+            ))
     );
 
     const actions = $("<div>").addClass("details-actions");
@@ -568,6 +576,8 @@ function buildMaintenancePayload() {
         starts_at: window.AppTimezones.normalizeDatetimeLocal(startsAt),
         ends_at: window.AppTimezones.normalizeDatetimeLocal(endsAt),
         enabled: $("#maintenance-enabled").is(":checked"),
+        apply_to_existing: $("#maintenance-apply-to-existing").is(":checked"),
+        reactivate_on_end: $("#maintenance-reactivate-on-end").is(":checked"),
         scopes: [
             buildMaintenanceScope(scopeType, scopeTargetId),
         ],
@@ -594,7 +604,10 @@ function resetMaintenanceForm() {
     $("#maintenance-ends-at").val("");
     $("#maintenance-scope-type").val("service");
     $("#maintenance-enabled").prop("checked", true);
+    $("#maintenance-apply-to-existing").prop("checked", false);
+    $("#maintenance-reactivate-on-end").prop("checked", true);
 
+    updateMaintenanceLifecycleOptions();
     updateMaintenanceTimeWarning();
     fillMaintenanceRepeatFields(null);
     clearMaintenanceFormError();
@@ -618,6 +631,9 @@ function fillMaintenanceForm(item) {
         window.AppTimezones.toDatetimeLocalInput(item.ends_at)
     );
     $("#maintenance-enabled").prop("checked", item.enabled !== false);
+    $("#maintenance-apply-to-existing").prop("checked", Boolean(item.apply_to_existing));
+    $("#maintenance-reactivate-on-end").prop("checked", item.reactivate_on_end !== false);
+    updateMaintenanceLifecycleOptions();
 
     if (scope) {
         $("#maintenance-scope-type").val(scope.scope_type || "service");
@@ -1147,6 +1163,8 @@ function duplicateMaintenanceWindow(item) {
         starts_at: window.AppTimezones.normalizeDatetimeLocal(startsAt),
         ends_at: window.AppTimezones.normalizeDatetimeLocal(endsAt),
         enabled: false,
+        apply_to_existing: Boolean(source.apply_to_existing),
+        reactivate_on_end: source.reactivate_on_end !== false,
         scopes: normalizeMaintenanceScopesForPayload(source.scopes || []),
     };
 
@@ -1363,3 +1381,34 @@ $(document).on("change", "#maintenance-scope-type", function () {
         .next(".field-error-text")
         .remove();
 });
+
+
+function updateMaintenanceLifecycleOptions() {
+    const suppressIncident = $("#maintenance-behavior").val() === "suppress_incident";
+    const applyCheckbox = $("#maintenance-apply-to-existing");
+
+    applyCheckbox.prop("disabled", suppressIncident);
+    if (suppressIncident) {
+        applyCheckbox.prop("checked", false);
+        $("#maintenance-apply-to-existing-help").text(
+            i18n.t("maintenance.form.apply_to_existing_unavailable")
+        );
+    } else {
+        $("#maintenance-apply-to-existing-help").text(
+            i18n.t("maintenance.form.apply_to_existing_help")
+        );
+    }
+
+    $("#maintenance-reactivate-warning").toggleClass(
+        "is-hidden",
+        $("#maintenance-reactivate-on-end").is(":checked")
+    );
+}
+
+$(document)
+    .off("change.maintenanceLifecycle", "#maintenance-behavior, #maintenance-reactivate-on-end")
+    .on(
+        "change.maintenanceLifecycle",
+        "#maintenance-behavior, #maintenance-reactivate-on-end",
+        updateMaintenanceLifecycleOptions
+    );

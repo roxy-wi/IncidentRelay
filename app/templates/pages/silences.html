@@ -212,6 +212,17 @@
               <div class="help-text">
                 {{ _('silences.form.apply_to_existing_help') }}
               </div>
+
+              <label class="checkbox-label" for="silence-reactivate-on-end">
+                <input id="silence-reactivate-on-end" type="checkbox" checked>
+                {{ _('silences.form.reactivate_on_end') }}
+              </label>
+              <div class="help-text">
+                {{ _('silences.form.reactivate_on_end_help') }}
+              </div>
+              <div id="silence-reactivate-on-end-warning" class="help-text" hidden>
+                {{ _('silences.form.reactivate_on_end_warning') }}
+              </div>
             </div>
           </section>
 

@@ -82,6 +82,12 @@
   "silences.details.apply_to_existing": "Bestehende Alarme",
   "silences.details.apply_to_existing_enabled": "Auf passende ungelöste Alarme anwenden",
   "silences.details.apply_to_existing_disabled": "Nur neue Alarme",
+  "silences.details.reactivate_on_end": "Nach Ende des Silence",
+  "silences.details.reactivate_on_end_enabled": "Betroffene Alarme reaktivieren",
+  "silences.details.reactivate_on_end_disabled": "Betroffene Alarme stummgeschaltet lassen",
   "silences.form.apply_to_existing": "Auf bestehende ungelöste Alarme anwenden",
-  "silences.form.apply_to_existing_help": "Optional. Passende aktive Alarme werden sofort stummgeschaltet. Bereits gesendete Benachrichtigungen bleiben im Verlauf erhalten."
+  "silences.form.apply_to_existing_help": "Optional. Passende aktive Alarme werden sofort stummgeschaltet. Bereits gesendete Benachrichtigungen bleiben im Verlauf erhalten.",
+  "silences.form.reactivate_on_end": "Stummgeschaltete Alarme nach Ende dieses Silence reaktivieren",
+  "silences.form.reactivate_on_end_help": "Standardmäßig aktiviert. Alarme werden erst reaktiviert, wenn kein weiteres passendes Silence mehr gilt.",
+  "silences.form.reactivate_on_end_warning": "Betroffene Alarme bleiben nach Ende dieses Silence stummgeschaltet. Aktivieren Sie diese Option später und speichern Sie das Silence, um sie freizugeben."
 }
