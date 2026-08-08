@@ -133,20 +133,6 @@ def _scheduled_next_due_local(heartbeat, latest_due_local, now_local):
     return candidate
 
 
-def _scheduled_window_start_local(heartbeat, due_local):
-    kind = heartbeat.schedule_kind or "daily"
-
-    if kind == "weekly":
-        return due_local - timedelta(days=7)
-
-    if kind == "monthly":
-        year, month = _previous_month(due_local.year, due_local.month)
-        day = _monthly_date(year, month, heartbeat.schedule_monthday or 1)
-        return due_local.replace(year=year, month=month, day=day)
-
-    return due_local - timedelta(days=1)
-
-
 def compute_next_expected_at(heartbeat, now=None):
     """Return the next expected ping deadline before grace is applied."""
     now = _as_naive_utc(now or _utcnow())

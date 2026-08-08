@@ -1,5 +1,3 @@
-from datetime import datetime
-
 from peewee import IntegrityError, prefetch
 
 from app.db import database_proxy
@@ -17,13 +15,6 @@ from app.modules.db.models import (
     User
 )
 from app.modules.common import utc_now
-
-
-def _rotation_member_period_filter(model, at):
-    return (
-        ((model.starts_at.is_null(True)) | (model.starts_at <= at))
-        & ((model.ends_at.is_null(True)) | (model.ends_at > at))
-    )
 
 
 def list_rotations(

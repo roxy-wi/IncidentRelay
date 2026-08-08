@@ -961,3 +961,28 @@ def test_complete_sso_login_denies_user_without_matching_group_mapping():
         (SsoIdentity.provider == provider.id)
         & (SsoIdentity.subject == "orphan-sso-user")
     ).exists()
+
+
+def test_sso_json_loader_does_not_expose_network_exception(monkeypatch):
+    from urllib.error import URLError
+
+    import app.views.sso_auth_view as sso_auth_view
+
+    def fail_urlopen(*_args, **_kwargs):
+        raise URLError("internal-idp-secret-detail")
+
+    monkeypatch.setattr(sso_auth_view, "urlopen", fail_urlopen)
+
+    with pytest.raises(SsoLoginError) as exc_info:
+        sso_auth_view._load_json_url(
+            "https://idp.example.com/metadata",
+            "sso_oidc_metadata_error",
+            "Could not load OIDC metadata",
+        )
+
+    error = exc_info.value
+
+    assert error.error == "sso_oidc_metadata_error"
+    assert error.message == "Could not load OIDC metadata"
+    assert error.status_code == 502
+    assert "internal-idp-secret-detail" not in str(error)

@@ -62,26 +62,6 @@ def public_sso_providers():
     return jsonify([_safe_provider(provider) for provider in providers])
 
 
-def _load_oidc_metadata(provider):
-    """Load OIDC metadata document."""
-    if not provider.oidc_metadata_url:
-        return {}
-
-    try:
-        req = UrlRequest(
-            provider.oidc_metadata_url,
-            headers={"Accept": "application/json"},
-        )
-        with urlopen(req, timeout=10) as response:
-            return json.loads(response.read().decode("utf-8"))
-    except (HTTPError, URLError, TimeoutError, json.JSONDecodeError) as exc:
-        raise SsoLoginError(
-            "sso_oidc_metadata_error",
-            f"Could not load OIDC metadata: {exc}",
-            502,
-        ) from exc
-
-
 def _load_json_url(url, error_code, error_message):
     """Load JSON document from URL."""
     try:

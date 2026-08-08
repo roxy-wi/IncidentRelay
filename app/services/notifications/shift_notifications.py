@@ -78,30 +78,6 @@ def _mattermost_notification_fingerprint(event, event_type, mattermost_user_id):
     )
 
 
-def _event_contains_time(event, at):
-    start_at = _event_dt(event["start"])
-    end_at = _event_dt(event["end"])
-
-    return start_at <= at < end_at
-
-
-def _same_user_event_at(rotation, user_id, at):
-    events = build_rotation_calendar(
-        rotation,
-        at - timedelta(seconds=1),
-        at + timedelta(seconds=1),
-    )
-
-    for event in events:
-        if int(event.get("user_id") or 0) != int(user_id):
-            continue
-
-        if _event_contains_time(event, at):
-            return event
-
-    return None
-
-
 def _send_plain_email(to_email, subject, body):
     smtp_host = Config.SMTP_HOST
     smtp_port = int(Config.SMTP_PORT)
