@@ -18,6 +18,8 @@ const ORCHESTRATION_CONDITION_OPERATORS = [
 ];
 
 const ORCHESTRATION_ACTION_TYPES = [
+    "extract_regex", "copy_field", "copy_to_variable", "json_path", "split",
+    "set_variable", "static", "lowercase", "uppercase", "trim",
     "set_title", "set_message", "set_description", "set_severity",
     "set_priority", "set_dedup_key", "set_group_key", "set_event_action",
     "set_label", "remove_label", "set_custom_field", "remove_custom_field",
@@ -704,7 +706,75 @@ function orchestrationActionParamEditor(action, index) {
     const container = $("<div>").addClass("orchestration-action-params");
     const textActions = ["set_title", "set_message", "set_description", "set_severity", "set_priority", "set_dedup_key", "set_group_key", "add_note"];
     const referenceActions = ["set_team", "set_route", "set_service", "set_escalation_policy", "set_notification_policy", "set_priority_policy", "enqueue_webhook"];
-    if (textActions.includes(type)) {
+    if (type === "extract_regex") {
+        container.append(
+            $("<input>").addClass("input orchestration-action-source")
+                .attr({placeholder: "event.title", list: "orchestration-field-options"})
+                .val(action.source || ""),
+            $("<input>").addClass("input orchestration-action-pattern")
+                .attr("placeholder", "regex pattern")
+                .val(action.pattern || ""),
+            $("<input>").addClass("input orchestration-action-variable")
+                .attr("placeholder", "variable name (optional)")
+                .val(action.name || action.target || ""),
+            $("<input>").addClass("input orchestration-action-regex-group")
+                .attr("placeholder", "group (optional)")
+                .val(action.group === undefined || action.group === null ? "" : action.group)
+        );
+    } else if (["copy_field", "copy_to_variable", "lowercase", "uppercase", "trim"].includes(type)) {
+        container.append(
+            $("<input>").addClass("input orchestration-action-source")
+                .attr({placeholder: "labels.service", list: "orchestration-field-options"})
+                .val(action.source || ""),
+            $("<input>").addClass("input orchestration-action-variable")
+                .attr("placeholder", "variable name")
+                .val(action.name || action.target || "")
+        );
+    } else if (type === "json_path") {
+        container.append(
+            $("<input>").addClass("input orchestration-action-source")
+                .attr({placeholder: "raw", list: "orchestration-field-options"})
+                .val(action.source || "raw"),
+            $("<input>").addClass("input orchestration-action-json-path")
+                .attr("placeholder", "$.payload.service")
+                .val(action.path || ""),
+            $("<input>").addClass("input orchestration-action-variable")
+                .attr("placeholder", "variable name")
+                .val(action.name || action.target || "")
+        );
+    } else if (type === "split") {
+        container.append(
+            $("<input>").addClass("input orchestration-action-source")
+                .attr({placeholder: "labels.instance", list: "orchestration-field-options"})
+                .val(action.source || ""),
+            $("<input>").addClass("input orchestration-action-delimiter")
+                .attr("placeholder", "delimiter")
+                .val(action.delimiter || ""),
+            $("<input>").addClass("input orchestration-action-split-targets")
+                .attr("placeholder", "targets: host,port OR variable name")
+                .val(
+                    Array.isArray(action.targets)
+                        ? action.targets.join(",")
+                        : (action.name || action.target || "")
+                ),
+            $("<input>").addClass("input orchestration-action-split-index")
+                .attr({type: "number", min: 0, placeholder: "index (single target)"})
+                .val(action.index === undefined || action.index === null ? "" : action.index)
+        );
+    } else if (["set_variable", "static"].includes(type)) {
+        container.append(
+            $("<input>").addClass("input orchestration-action-variable")
+                .attr("placeholder", "variable name")
+                .val(action.name || action.target || ""),
+            $("<input>").addClass("input orchestration-action-value")
+                .attr("placeholder", "value or {{ template }}")
+                .val(
+                    action.value === undefined
+                        ? ""
+                        : (typeof action.value === "string" ? action.value : JSON.stringify(action.value))
+                )
+        );
+    } else if (textActions.includes(type)) {
         container.append($("<input>").addClass("input orchestration-action-value").attr("placeholder", "value or {{ template }}").val(action.template !== undefined ? action.template : (action.value !== undefined ? action.value : "")));
     } else if (type === "set_event_action") {
         container.append($("<select>").addClass("input orchestration-action-value").append($("<option>").val("trigger").text("trigger"), $("<option>").val("resolve").text("resolve")).val(action.value || "trigger"));
@@ -763,10 +833,46 @@ function syncOrchestrationActionEditor() {
         const action = {type: type};
         const value = row.find(".orchestration-action-value").val();
         if (value !== undefined) {
-            if (String(value).includes("{{")) { action.template = value; } else { action.value = value; }
+            if (["set_variable", "static"].includes(type)) {
+                action.value = value;
+            } else if (String(value).includes("{{")) {
+                action.template = value;
+            } else {
+                action.value = value;
+            }
         }
         const name = row.find(".orchestration-action-name").val();
         if (name !== undefined) { action.name = name; }
+        const variable = row.find(".orchestration-action-variable").val();
+        if (variable) { action.name = variable; }
+        const source = row.find(".orchestration-action-source").val();
+        if (source !== undefined && source !== "") { action.source = source; }
+        if (type === "extract_regex") {
+            action.pattern = row.find(".orchestration-action-pattern").val() || "";
+            const regexGroup = row.find(".orchestration-action-regex-group").val();
+            if (regexGroup !== undefined && regexGroup !== "") {
+                action.group = /^\d+$/.test(String(regexGroup))
+                    ? Number(regexGroup)
+                    : regexGroup;
+            }
+        }
+        if (type === "json_path") {
+            action.path = row.find(".orchestration-action-json-path").val() || "";
+        }
+        if (type === "split") {
+            action.delimiter = row.find(".orchestration-action-delimiter").val() || "";
+            const rawTargets = String(row.find(".orchestration-action-split-targets").val() || "").trim();
+            const rawIndex = row.find(".orchestration-action-split-index").val();
+            if (rawTargets.includes(",")) {
+                action.targets = rawTargets.split(",")
+                    .map(function (item) { return item.trim(); })
+                    .filter(Boolean);
+                delete action.name;
+            } else if (rawTargets) {
+                action.name = rawTargets;
+                action.index = Number(rawIndex || 0);
+            }
+        }
         const ref = Number(row.find(".orchestration-action-reference").val() || 0);
         const refKeys = {set_team: "team_id", set_route: "route_id", set_service: "service_id", set_escalation_policy: "escalation_policy_id", set_notification_policy: "notification_policy_id", set_priority_policy: "priority_policy_id", enqueue_webhook: "action_id"};
         if (refKeys[type] && ref) { action[refKeys[type]] = ref; }
