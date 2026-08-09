@@ -8,6 +8,7 @@ from app.modules.db import (
 )
 from app.services.serializers.common import attach_team_permissions
 from app.services.routing.matcher import service as matcher_preset_service
+from app.services.payloads import payload_to_dict
 
 
 class NotificationPolicyError(ValueError):
@@ -24,14 +25,6 @@ class NotificationPolicyConflictError(NotificationPolicyError):
 
 class NotificationPolicyInUseError(NotificationPolicyConflictError):
     """Policy cannot be deleted because services use it."""
-
-
-def _payload_dict(payload):
-    """Convert Pydantic schema or mapping to a mutable dict."""
-    if hasattr(payload, "model_dump"):
-        return payload.model_dump(exclude_unset=True)
-
-    return dict(payload or {})
 
 
 def _clean_name(value):
@@ -248,7 +241,7 @@ def list_policies(
 
 def create_policy(payload):
     """Create or restore a notification policy."""
-    data = _payload_dict(payload)
+    data = payload_to_dict(payload)
     team = _require_team(data.get("team_id"))
     name = _clean_name(data.get("name"))
     existing = (
@@ -292,7 +285,7 @@ def create_policy(payload):
 def update_policy(policy_id, payload):
     """Update notification policy."""
     policy = get_policy(policy_id)
-    data = _payload_dict(payload)
+    data = payload_to_dict(payload)
 
     if "name" in data:
         name = _clean_name(data["name"])
@@ -364,7 +357,7 @@ def validate_policy_assignment(
 def create_rule(policy_id, payload):
     """Create rule and its channel links atomically."""
     policy = get_policy(policy_id)
-    data = _payload_dict(payload)
+    data = payload_to_dict(payload)
 
     preset = matcher_preset_service.validate_preset_assignment(
         data.get("matcher_preset_id"),
@@ -430,7 +423,7 @@ def update_rule(rule_id, payload):
     """Update rule, channel links and position atomically."""
     rule = get_rule(rule_id)
     policy = get_policy(rule.policy_id)
-    data = _payload_dict(payload)
+    data = payload_to_dict(payload)
 
     current_channel_ids = notification_policies_repo.list_rule_channel_ids(rule.id)
 

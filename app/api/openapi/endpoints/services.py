@@ -1,3 +1,4 @@
+from app.api.openapi.common import json_body, path_param, query_param, response
 from app.api.openapi.endpoints.service_catalog import (
     READINESS_STATE_SCHEMA,
     SERVICE_READINESS_RESPONSE_SCHEMA,
@@ -127,55 +128,6 @@ SERVICE_ANALYTICS_SORTS = [
 # ---------------------------------------------------------------------------
 # Shared OpenAPI helpers
 # ---------------------------------------------------------------------------
-
-
-def path_param(name, description):
-    """Build an integer path parameter."""
-    return {
-        "name": name,
-        "in": "path",
-        "required": True,
-        "description": description,
-        "schema": {"type": "integer", "minimum": 1},
-    }
-
-
-def query_param(name, description, schema=None, required=False):
-    """Build a query parameter."""
-    return {
-        "name": name,
-        "in": "query",
-        "required": required,
-        "description": description,
-        "schema": schema or {"type": "string"},
-    }
-
-
-def json_body(description, schema, required=True):
-    """Build a JSON request body."""
-    return {
-        "required": required,
-        "description": description,
-        "content": {
-            "application/json": {
-                "schema": schema,
-            },
-        },
-    }
-
-
-def response(description, schema=None):
-    """Build a JSON response."""
-    item = {"description": description}
-
-    if schema:
-        item["content"] = {
-            "application/json": {
-                "schema": schema,
-            },
-        }
-
-    return item
 
 
 ERROR_SCHEMA = {

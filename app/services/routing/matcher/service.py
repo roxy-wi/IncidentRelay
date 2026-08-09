@@ -2,6 +2,7 @@ from peewee import DoesNotExist
 
 from app.modules.db import matcher_presets_repo, teams_repo
 from app.services.serializers.common import attach_team_permissions, serialize_utc_datetime
+from app.services.payloads import payload_to_dict
 
 
 class MatcherPresetError(ValueError):
@@ -18,13 +19,6 @@ class MatcherPresetConflictError(MatcherPresetError):
 
 class MatcherPresetInUseError(MatcherPresetConflictError):
     """Matcher preset is still used by policy rules."""
-
-
-def _payload_dict(payload):
-    if hasattr(payload, "model_dump"):
-        return payload.model_dump(exclude_unset=True)
-
-    return dict(payload or {})
 
 
 def _clean_name(value):
@@ -63,7 +57,7 @@ def get_preset(preset_id):
 
 def create_preset(payload):
     """Create or restore a matcher preset."""
-    data = _payload_dict(payload)
+    data = payload_to_dict(payload)
     team = _require_team(data.get("team_id"))
     name = _clean_name(data.get("name"))
 
@@ -99,7 +93,7 @@ def create_preset(payload):
 def update_preset(preset_id, payload):
     """Update a matcher preset and increment its version."""
     preset = get_preset(preset_id)
-    data = _payload_dict(payload)
+    data = payload_to_dict(payload)
 
     if "name" in data:
         name = _clean_name(data["name"])

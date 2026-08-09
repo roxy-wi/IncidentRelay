@@ -1,15 +1,5 @@
+from app.api.openapi.common import json_body, path_param, response
 from app.api.schemas.roles import GROUP_ROLE_VALUES, GROUP_VIEWER_ROLE, TEAM_ROLE_VALUES, TEAM_VIEWER_ROLE
-
-
-def path_param(name, description):
-    """Build integer path parameter."""
-    return {
-        "name": name,
-        "in": "path",
-        "required": True,
-        "description": description,
-        "schema": {"type": "integer", "minimum": 1},
-    }
 
 
 def slug_param():
@@ -26,23 +16,6 @@ def slug_param():
             "pattern": "^[a-z0-9][a-z0-9_-]*$",
         },
     }
-
-
-def json_body(description, schema, required=True):
-    """Build JSON request body."""
-    return {
-        "required": required,
-        "description": description,
-        "content": {"application/json": {"schema": schema}},
-    }
-
-
-def response(description, schema=None):
-    """Build OpenAPI response."""
-    item = {"description": description}
-    if schema:
-        item["content"] = {"application/json": {"schema": schema}}
-    return item
 
 
 ERROR_SCHEMA = {
