@@ -1,5 +1,4 @@
-from datetime import datetime, timezone as dt_timezone
-from zoneinfo import ZoneInfo
+from datetime import datetime
 
 from peewee import DoesNotExist
 from flask import Blueprint, jsonify, request
@@ -33,7 +32,11 @@ from app.services.validation import (
     validate_body,
 )
 from app.services.service_catalog.reconciliation import reconcile_rotation_services
-from app.modules.common import utc_now
+from app.modules.common import (
+    local_datetime_to_utc_naive,
+    utc_datetime_to_local_naive,
+    utc_now,
+)
 
 rotations_bp = Blueprint("rotations_api", __name__)
 
@@ -46,72 +49,30 @@ def _not_found(resource):
     )
 
 
-def _rotation_timezone(rotation):
-    """Return ZoneInfo for rotation timezone."""
-    timezone_name = getattr(rotation, "timezone", None) or "UTC"
-    try:
-        return ZoneInfo(timezone_name)
-    except Exception:
-        return ZoneInfo("UTC")
-
-
-def _layer_timezone(layer):
-    """Return ZoneInfo for layer timezone."""
+def _layer_local_to_utc_naive(value, layer):
+    """Convert layer-local wall-clock datetime to naive UTC."""
     timezone_name = (
         getattr(layer, "timezone", None)
         or getattr(layer.rotation, "timezone", None)
         or "UTC"
     )
-    try:
-        return ZoneInfo(timezone_name)
-    except Exception:
-        return ZoneInfo("UTC")
-
-
-def _layer_local_to_utc_naive(value, layer):
-    """
-    Convert datetime from layer timezone to UTC naive.
-
-    datetime-local from browser comes without tzinfo, so we treat it as
-    local time in layer.timezone.
-    """
-    if value is None:
-        return None
-
-    zone = _layer_timezone(layer)
-    if value.tzinfo is None:
-        value = value.replace(tzinfo=zone)
-
-    return value.astimezone(dt_timezone.utc).replace(tzinfo=None)
+    return local_datetime_to_utc_naive(value, timezone_name)
 
 
 def _rotation_local_to_utc_naive(value, rotation):
-    """
-    Convert datetime from rotation timezone to UTC naive.
-
-    datetime-local from browser comes without tzinfo, so we treat it as
-    local time in rotation.timezone.
-    """
-    if value is None:
-        return None
-
-    zone = _rotation_timezone(rotation)
-    if value.tzinfo is None:
-        value = value.replace(tzinfo=zone)
-
-    return value.astimezone(dt_timezone.utc).replace(tzinfo=None)
+    """Convert rotation-local wall-clock datetime to naive UTC."""
+    return local_datetime_to_utc_naive(
+        value,
+        getattr(rotation, "timezone", None) or "UTC",
+    )
 
 
 def _utc_naive_to_rotation_local(value, rotation):
-    """Convert stored UTC naive datetime to rotation-local ISO datetime."""
-    if value is None:
-        return None
-
-    zone = _rotation_timezone(rotation)
-    if value.tzinfo is None:
-        value = value.replace(tzinfo=dt_timezone.utc)
-
-    return value.astimezone(zone).replace(tzinfo=None)
+    """Convert stored UTC datetime to rotation-local wall-clock time."""
+    return utc_datetime_to_local_naive(
+        value,
+        getattr(rotation, "timezone", None) or "UTC",
+    )
 
 
 def _get_rotation_or_404(rotation_id):

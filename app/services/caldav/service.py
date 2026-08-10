@@ -1,8 +1,9 @@
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 
 from app.modules.db.models import Team, TeamUser
 from app.services.calendar_service import build_team_calendar
 from app.services.caldav.ics import event_uid
+from app.modules.common import utc_now
 
 DEFAULT_PAST_DAYS = 7
 DEFAULT_FUTURE_DAYS = 90
@@ -53,7 +54,7 @@ def get_user_team_or_none(user, team_id):
 
 
 def list_team_caldav_events(team):
-    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    now = utc_now()
     start_at = now - timedelta(days=DEFAULT_PAST_DAYS)
     end_at = now + timedelta(days=DEFAULT_FUTURE_DAYS)
 

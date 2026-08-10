@@ -1,32 +1,14 @@
-from datetime import timezone as dt_timezone
-from zoneinfo import ZoneInfo
-
 from app.modules.db import rotations_repo
-from app.modules.common import as_utc_naive, utc_now
-
-
-def _effective_layer_value(layer, field_name):
-    value = getattr(layer, field_name, None)
-    if value is not None:
-        return value
-    return getattr(layer.rotation, field_name)
+from app.modules.common import as_utc_aware, as_utc_naive, utc_now
+from app.services.rotation_schedule import (
+    effective_layer_value as _effective_layer_value,
+    layer_slot_index,
+    layer_timezone,
+)
 
 
 def _to_layer_local(now, layer):
-    timezone_name = _effective_layer_value(layer, "timezone") or "UTC"
-
-    try:
-        zone = ZoneInfo(timezone_name)
-    except Exception:
-        zone = ZoneInfo("UTC")
-
-    now_utc = now
-    if now_utc.tzinfo is None:
-        now_utc = now_utc.replace(tzinfo=dt_timezone.utc)
-    else:
-        now_utc = now_utc.astimezone(dt_timezone.utc)
-
-    return now_utc.astimezone(zone)
+    return as_utc_aware(now).astimezone(layer_timezone(layer))
 
 
 def _parse_hhmm(value):
@@ -99,19 +81,10 @@ def get_scheduled_oncall_user_for_layer(layer, now=None):
     if not members:
         return None
 
-    start_at = _effective_layer_value(layer, "start_at")
-    duration_seconds = _effective_layer_value(layer, "duration_seconds")
-
-    if not start_at or not duration_seconds:
-        return members[0].user
-
-    start_at = as_utc_naive(start_at)
-    elapsed = int((now - start_at).total_seconds())
-
-    if elapsed < 0:
+    slot = layer_slot_index(layer, now)
+    if slot is None:
         return None
 
-    slot = elapsed // int(duration_seconds)
     return members[slot % len(members)].user
 
 

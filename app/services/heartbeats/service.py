@@ -1,15 +1,16 @@
 import calendar
 import logging
-from datetime import datetime, time, timedelta, timezone
+from datetime import datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
-from app.modules.common import as_utc_naive_seconds, utc_now_seconds
+from app.modules.common import as_utc_aware, as_utc_naive_seconds, utc_now_seconds
 from app.modules.db import alerts_repo, heartbeats_repo
 from app.modules.db.models import AlertGroup, Heartbeat, HeartbeatInstance
 from app.services.alerts.actions import resolve_alert
 from app.services.alerts.lifecycle import upsert_alert
 from app.services.integrations.auth import create_raw_token, hash_token
 from app.services.notifications.delivery import notify_alert
+from app.services.serializers.common import serialize_utc_datetime
 
 logger = logging.getLogger("oncall.heartbeats")
 
@@ -39,7 +40,7 @@ def _parse_schedule_time(value):
 
 
 def _local_to_naive_utc(local_dt):
-    return local_dt.astimezone(timezone.utc).replace(tzinfo=None, microsecond=0)
+    return as_utc_naive_seconds(local_dt)
 
 
 def _monthly_date(year, month, day):
@@ -125,7 +126,7 @@ def compute_next_expected_at(heartbeat, now=None):
 
     if heartbeat.mode == "scheduled":
         zone = _zone(heartbeat.timezone)
-        now_local = now.replace(tzinfo=timezone.utc).astimezone(zone)
+        now_local = as_utc_aware(now).astimezone(zone)
         latest_due = _scheduled_due_local(heartbeat, now_local)
         next_due = _scheduled_next_due_local(heartbeat, latest_due, now_local)
         return _local_to_naive_utc(next_due)
@@ -152,7 +153,7 @@ def heartbeat_is_overdue(heartbeat, now=None):
 
     if heartbeat.mode == "scheduled":
         zone = _zone(heartbeat.timezone)
-        now_local = now.replace(tzinfo=timezone.utc).astimezone(zone)
+        now_local = as_utc_aware(now).astimezone(zone)
         due_local = _scheduled_due_local(heartbeat, now_local)
         deadline = _local_to_naive_utc(due_local) + timedelta(seconds=int(heartbeat.grace_period_seconds or 0))
 
@@ -265,7 +266,7 @@ def heartbeat_instance_is_overdue(heartbeat, instance, now=None):
 
     if heartbeat.mode == "scheduled":
         zone = _zone(heartbeat.timezone)
-        now_local = now.replace(tzinfo=timezone.utc).astimezone(zone)
+        now_local = as_utc_aware(now).astimezone(zone)
         due_local = _scheduled_due_local(heartbeat, now_local)
         due_at = _local_to_naive_utc(due_local)
         deadline = due_at + timedelta(seconds=int(heartbeat.grace_period_seconds or 0))
@@ -365,9 +366,9 @@ def heartbeat_expected_instances_from_metadata(heartbeat):
 
 
 def _heartbeat_alert_payload(heartbeat, now):
-    last_seen = heartbeat.last_seen_at.isoformat() + "Z" if heartbeat.last_seen_at else None
-    next_expected = heartbeat.next_expected_at.isoformat() + "Z" if heartbeat.next_expected_at else None
-    overdue_since = heartbeat.overdue_since.isoformat() + "Z" if heartbeat.overdue_since else now.isoformat() + "Z"
+    last_seen = serialize_utc_datetime(heartbeat.last_seen_at)
+    next_expected = serialize_utc_datetime(heartbeat.next_expected_at)
+    overdue_since = serialize_utc_datetime(heartbeat.overdue_since or now)
 
     labels = dict(heartbeat.labels or {})
     labels.update({
@@ -425,35 +426,39 @@ def _heartbeat_alert_payload(heartbeat, now):
 
 
 def _heartbeat_overdue_message(heartbeat, now):
-    last_seen = heartbeat.last_seen_at.isoformat() + "Z" if heartbeat.last_seen_at else "never"
-    expected = heartbeat.next_expected_at.isoformat() + "Z" if heartbeat.next_expected_at else "unknown"
-    deadline = heartbeat_deadline_at(heartbeat).isoformat() + "Z" if heartbeat.next_expected_at else "unknown"
+    last_seen = serialize_utc_datetime(heartbeat.last_seen_at) or "never"
+    expected = serialize_utc_datetime(heartbeat.next_expected_at) or "unknown"
+    deadline = (
+        serialize_utc_datetime(heartbeat_deadline_at(heartbeat))
+        if heartbeat.next_expected_at
+        else "unknown"
+    )
     return (
         f"Expected heartbeat ping did not arrive. "
         f"Last seen: {last_seen}. Expected at: {expected}. "
-        f"Deadline with grace: {deadline}. Detected at: {now.isoformat()}Z."
+        f"Deadline with grace: {deadline}. Detected at: {serialize_utc_datetime(now)}."
     )
 
 
 def _heartbeat_instance_overdue_message(heartbeat, instance, now):
-    last_seen = instance.last_seen_at.isoformat() + "Z" if instance.last_seen_at else "never"
-    expected = instance.next_expected_at.isoformat() + "Z" if instance.next_expected_at else "unknown"
+    last_seen = serialize_utc_datetime(instance.last_seen_at) or "never"
+    expected = serialize_utc_datetime(instance.next_expected_at) or "unknown"
     deadline = (
-        heartbeat_instance_deadline_at(heartbeat, instance).isoformat() + "Z"
+        serialize_utc_datetime(heartbeat_instance_deadline_at(heartbeat, instance))
         if instance.next_expected_at
         else "unknown"
     )
     return (
         f"Expected heartbeat ping did not arrive for instance {instance.instance_key}. "
         f"Last seen: {last_seen}. Expected at: {expected}. "
-        f"Deadline with grace: {deadline}. Detected at: {now.isoformat()}Z."
+        f"Deadline with grace: {deadline}. Detected at: {serialize_utc_datetime(now)}."
     )
 
 
 def _heartbeat_instance_alert_payload(heartbeat, instance, now):
-    last_seen = instance.last_seen_at.isoformat() + "Z" if instance.last_seen_at else None
-    next_expected = instance.next_expected_at.isoformat() + "Z" if instance.next_expected_at else None
-    overdue_since = instance.overdue_since.isoformat() + "Z" if instance.overdue_since else now.isoformat() + "Z"
+    last_seen = serialize_utc_datetime(instance.last_seen_at)
+    next_expected = serialize_utc_datetime(instance.next_expected_at)
+    overdue_since = serialize_utc_datetime(instance.overdue_since or now)
 
     labels = dict(heartbeat.labels or {})
     labels.update({

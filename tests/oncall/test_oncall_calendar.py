@@ -150,3 +150,73 @@ def test_moscow_midnight_rotation_is_not_shifted_to_03(db):
 
     assert first_start_moscow.hour == 0
     assert first_start_moscow.minute == 0
+
+
+def test_moscow_rotation_start_is_interpreted_in_rotation_timezone(db):
+    group = create_group(slug="infra-moscow-runtime")
+    team = create_team(group, slug="sre-moscow-runtime")
+    alice = create_user("alice-moscow-runtime", group)
+    bob = create_user("bob-moscow-runtime", group)
+    add_user_to_team(team, alice)
+    add_user_to_team(team, bob)
+
+    rotation = create_rotation(
+        team,
+        users=[alice, bob],
+        start_at=datetime(2026, 6, 1, 0, 0, 0),
+        duration_seconds=86400,
+        timezone="Europe/Moscow",
+        handoff_time="00:00",
+    )
+
+    assert get_current_oncall_user(
+        rotation, datetime(2026, 5, 31, 20, 59, 59)
+    ) is None
+    assert get_current_oncall_user(
+        rotation, datetime(2026, 5, 31, 21, 0, 0)
+    ).username == "alice-moscow-runtime"
+    assert get_current_oncall_user(
+        rotation, datetime(2026, 6, 1, 21, 0, 0)
+    ).username == "bob-moscow-runtime"
+
+
+def test_daily_rotation_keeps_local_handoff_across_berlin_dst(db):
+    berlin = ZoneInfo("Europe/Berlin")
+    group = create_group(slug="infra-berlin-dst")
+    team = create_team(group, slug="sre-berlin-dst")
+    alice = create_user("alice-berlin-dst", group)
+    bob = create_user("bob-berlin-dst", group)
+    add_user_to_team(team, alice)
+    add_user_to_team(team, bob)
+
+    rotation = create_rotation(
+        team,
+        users=[alice, bob],
+        start_at=datetime(2026, 3, 28, 9, 0, 0),
+        duration_seconds=86400,
+        timezone="Europe/Berlin",
+        handoff_time="09:00",
+    )
+
+    # DST starts on 2026-03-29. 09:00 Berlin moves from 08:00 UTC to
+    # 07:00 UTC, but remains 09:00 in the rotation timezone.
+    assert get_current_oncall_user(
+        rotation, datetime(2026, 3, 29, 6, 59, 59)
+    ).username == "alice-berlin-dst"
+    assert get_current_oncall_user(
+        rotation, datetime(2026, 3, 29, 7, 0, 0)
+    ).username == "bob-berlin-dst"
+
+    events = build_rotation_calendar(
+        rotation,
+        datetime(2026, 3, 28, 8, 0, 0),
+        datetime(2026, 3, 30, 7, 0, 0),
+    )
+    boundaries = [parse_calendar_event_datetime(item["start"]) for item in events]
+
+    assert boundaries[0].astimezone(berlin).replace(tzinfo=None) == datetime(
+        2026, 3, 28, 9, 0, 0
+    )
+    assert boundaries[1].astimezone(berlin).replace(tzinfo=None) == datetime(
+        2026, 3, 29, 9, 0, 0
+    )

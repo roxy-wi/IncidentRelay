@@ -1,5 +1,5 @@
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone as dt_timezone
+from datetime import datetime, timedelta
 from typing import Iterable
 
 from peewee import DoesNotExist
@@ -7,6 +7,7 @@ from peewee import DoesNotExist
 from app.modules.db import channels_repo, rotations_repo, routes_repo, teams_repo
 from app.services.oncall import get_current_oncall_user
 from app.modules.common import as_utc_naive_seconds, utc_now_seconds
+from app.services.serializers.common import serialize_utc_datetime
 
 DEFAULT_HEALTH_WINDOW_DAYS = 7
 DEFAULT_HEALTH_SAMPLE_MINUTES = 60
@@ -65,7 +66,7 @@ def serialize_health_datetime(value: datetime | None) -> str | None:
     value = as_utc_naive_seconds(value)
     if value is None:
         return None
-    return value.replace(tzinfo=dt_timezone.utc).isoformat().replace("+00:00", "Z")
+    return serialize_utc_datetime(value)
 
 
 def default_window(

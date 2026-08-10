@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 
 from flask import jsonify, request
 from peewee import DoesNotExist
@@ -15,7 +15,7 @@ from app.services.service_catalog.impact import build_single_service_impact_v2
 from app.services.service_catalog.sli_slo import evaluate_service_slos
 from app.services.service_catalog.timeline import list_service_events, serialize_service_event, build_next_cursor
 from app.services.validation import make_error_response
-from app.modules.common import utc_now
+from app.modules.common import as_utc_naive, utc_now
 
 
 class ServiceDetailsImpactQuery:
@@ -391,12 +391,9 @@ def _parse_service_timeline_datetime(value):
         return None, None
 
     try:
-        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        parsed = as_utc_naive(value)
     except ValueError:
         return None, make_error_response("timeline_before_invalid", "Timeline before must be a valid ISO 8601 datetime", 400)
-
-    if parsed.tzinfo is not None:
-        parsed = parsed.astimezone(timezone.utc).replace(tzinfo=None)
 
     return parsed, None
 

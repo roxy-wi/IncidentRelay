@@ -3,6 +3,8 @@ from datetime import datetime, timedelta, timezone
 from app.modules.common import (
     as_utc_naive,
     as_utc_naive_seconds,
+    local_datetime_to_utc_naive,
+    utc_datetime_to_local_naive,
     utc_now_seconds,
 )
 
@@ -87,3 +89,19 @@ def test_utc_now_seconds_returns_naive_utc_whole_seconds():
     assert before <= result <= after
     assert result.tzinfo is None
     assert result.microsecond == 0
+
+
+def test_local_datetime_to_utc_naive_uses_named_timezone():
+    value = datetime(2026, 6, 1, 0, 0, 0)
+
+    assert local_datetime_to_utc_naive(value, "Europe/Moscow") == datetime(
+        2026, 5, 31, 21, 0, 0
+    )
+
+
+def test_utc_datetime_to_local_naive_uses_named_timezone():
+    value = datetime(2026, 5, 31, 21, 0, 0)
+
+    assert utc_datetime_to_local_naive(value, "Europe/Moscow") == datetime(
+        2026, 6, 1, 0, 0, 0
+    )

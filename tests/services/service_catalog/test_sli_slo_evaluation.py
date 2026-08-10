@@ -436,3 +436,36 @@ def test_incident_count_ignores_non_matching_priority_scope():
     assert evaluation["threshold_count"] == 1
     assert evaluation["good_count"] == 1
     assert evaluation["bad_count"] == 0
+
+
+def test_persist_measurement_normalizes_offset_window_to_naive_utc(monkeypatch):
+    from types import SimpleNamespace
+    from app.services.service_catalog import sli_slo as sli_slo_service
+
+    captured = {}
+    marker = object()
+
+    def create_measurement(payload):
+        captured.update(payload)
+        return marker
+
+    monkeypatch.setattr(
+        sli_slo_service.services_repo,
+        "create_service_slo_measurement",
+        create_measurement,
+    )
+
+    slo = SimpleNamespace(service_id=11, sli_id=22, id=33)
+    evaluation = {
+        "window": {
+            "since": "2026-08-10T12:00:00+03:00",
+            "until": "2026-08-10T13:30:00+03:00",
+        },
+        "status": STATUS_MET,
+    }
+
+    result = sli_slo_service._persist_measurement(slo, evaluation)
+
+    assert result is marker
+    assert captured["window_start"] == datetime(2026, 8, 10, 9, 0, 0)
+    assert captured["window_end"] == datetime(2026, 8, 10, 10, 30, 0)

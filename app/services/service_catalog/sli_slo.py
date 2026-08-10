@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from app.modules.db import maintenance_repo, services_repo
 from app.modules.db.models import AlertGroup
 from app.services.serializers.services import serialize_utc_datetime
-from app.modules.common import utc_now
+from app.modules.common import as_utc_naive, utc_now
 
 
 SLI_TYPE_ACK_LATENCY = "alert_ack_latency"
@@ -344,8 +344,8 @@ def _persist_measurement(slo, evaluation):
             "service": slo.service_id,
             "sli": slo.sli_id,
             "slo": slo.id,
-            "window_start": datetime.fromisoformat(evaluation["window"]["since"].replace("Z", "+00:00")).replace(tzinfo=None),
-            "window_end": datetime.fromisoformat(evaluation["window"]["until"].replace("Z", "+00:00")).replace(tzinfo=None),
+            "window_start": as_utc_naive(evaluation["window"]["since"]),
+            "window_end": as_utc_naive(evaluation["window"]["until"]),
             "status": evaluation["status"],
             "value_basis_points": evaluation.get("value_basis_points"),
             "value_count": evaluation.get("value_count"),

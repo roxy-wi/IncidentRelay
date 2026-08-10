@@ -1,5 +1,6 @@
 import datetime as dt
 from datetime import datetime, timezone as dt_timezone
+from zoneinfo import ZoneInfo
 
 
 class SafeFormatDict(dict):
@@ -69,6 +70,42 @@ def as_utc_naive_seconds(value):
         return None
 
     return value.replace(microsecond=0)
+
+
+def timezone_or_utc(timezone_name):
+    """Return requested IANA timezone, falling back to UTC."""
+    try:
+        return ZoneInfo(str(timezone_name or "UTC"))
+    except Exception:
+        return ZoneInfo("UTC")
+
+
+def local_datetime_to_utc_naive(value, timezone_name):
+    """Convert a local wall-clock datetime to IncidentRelay naive UTC.
+
+    Naive values are interpreted in ``timezone_name``. Aware values already
+    represent an absolute instant and are converted directly to UTC.
+    """
+    value = parse_datetime(value)
+
+    if value is None:
+        return None
+
+    if value.tzinfo is not None:
+        return value.astimezone(dt_timezone.utc).replace(tzinfo=None)
+
+    zone = timezone_or_utc(timezone_name)
+    return value.replace(tzinfo=zone).astimezone(dt_timezone.utc).replace(tzinfo=None)
+
+
+def utc_datetime_to_local_naive(value, timezone_name):
+    """Convert an absolute UTC datetime to naive local wall-clock time."""
+    value = as_utc_aware(value)
+
+    if value is None:
+        return None
+
+    return value.astimezone(timezone_or_utc(timezone_name)).replace(tzinfo=None)
 
 
 def as_naive_datetime(value):

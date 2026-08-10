@@ -1,4 +1,5 @@
 from app.modules.sso.saml_security import get_saml_security
+from app.services.serializers.common import serialize_utc_datetime
 
 
 def serialize_sso_provider(provider):
@@ -53,8 +54,8 @@ def serialize_sso_provider(provider):
         "extra_config": provider.extra_config or {},
         "saml_security": get_saml_security(provider.extra_config),
 
-        "created_at": provider.created_at.isoformat() if provider.created_at else None,
-        "updated_at": provider.updated_at.isoformat() if provider.updated_at else None,
+        "created_at": serialize_utc_datetime(provider.created_at),
+        "updated_at": serialize_utc_datetime(provider.updated_at),
     }
 
 
@@ -77,6 +78,6 @@ def serialize_sso_group_mapping(mapping):
         "team_role": mapping.team_role if team else None,
         "active": mapping.active,
         "priority": mapping.priority,
-        "created_at": mapping.created_at.isoformat() if mapping.created_at else None,
-        "updated_at": mapping.updated_at.isoformat() if mapping.updated_at else None,
+        "created_at": serialize_utc_datetime(mapping.created_at),
+        "updated_at": serialize_utc_datetime(mapping.updated_at),
     }
