@@ -1,10 +1,11 @@
-from datetime import datetime, timezone
+from datetime import datetime
 from typing import Any, Dict
 
 from pydantic import Field, field_validator, model_validator
 
 from app.api.schemas.base import ApiModel
 from app.api.schemas.limits import DESCRIPTION_MAX_LENGTH
+from app.modules.common import as_utc_naive
 
 
 class SilenceCreateSchema(ApiModel):
@@ -27,12 +28,7 @@ class SilenceCreateSchema(ApiModel):
     @classmethod
     def normalize_utc_datetime(cls, value: datetime) -> datetime:
         """Normalize API timestamps to the naive UTC storage convention."""
-        if value.tzinfo is None:
-            # Backward compatibility for existing API clients: offset-free
-            # timestamps have historically represented UTC.
-            return value
-
-        return value.astimezone(timezone.utc).replace(tzinfo=None)
+        return as_utc_naive(value)
 
     @model_validator(mode="after")
     def validate_range(self):

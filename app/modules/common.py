@@ -47,6 +47,30 @@ def as_utc_aware(value):
     return value.astimezone(dt_timezone.utc)
 
 
+def as_utc_naive(value):
+    """Return naive UTC datetime from datetime or ISO string.
+
+    IncidentRelay stores timestamps as naive UTC values. Naive inputs are
+    therefore interpreted as UTC for backward compatibility.
+    """
+    value = as_utc_aware(value)
+
+    if value is None:
+        return None
+
+    return value.replace(tzinfo=None)
+
+
+def as_utc_naive_seconds(value):
+    """Return naive UTC datetime normalized to whole seconds."""
+    value = as_utc_naive(value)
+
+    if value is None:
+        return None
+
+    return value.replace(microsecond=0)
+
+
 def as_naive_datetime(value):
     """Return naive wall-clock datetime.
 
@@ -83,3 +107,8 @@ def utc_now() -> dt.datetime:
     IncidentRelay stores timestamps as naive UTC values.
     """
     return dt.datetime.now(UTC).replace(tzinfo=None)
+
+
+def utc_now_seconds() -> dt.datetime:
+    """Return current naive UTC time normalized to whole seconds."""
+    return utc_now().replace(microsecond=0)

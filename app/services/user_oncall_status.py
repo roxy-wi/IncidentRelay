@@ -18,10 +18,6 @@ from app.modules.common import utc_now
 DEFAULT_LOOKAHEAD_DAYS = 30
 
 
-def _utc_naive_now():
-    return utc_now()
-
-
 def _parse_event_datetime(value):
     if isinstance(value, datetime):
         return value
@@ -415,7 +411,7 @@ def get_user_oncall_status(
     This uses the same calendar calculation as the calendar UI and future
     shift email notifications, so UI and scheduler stay consistent.
     """
-    now = now or _utc_naive_now()
+    now = now or utc_now()
     lookahead_days = max(1, min(int(lookahead_days or DEFAULT_LOOKAHEAD_DAYS), 90))
 
     lookbehind_days = max(lookahead_days, 7)

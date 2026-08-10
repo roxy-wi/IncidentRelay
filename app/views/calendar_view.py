@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone as dt_timezone
+from datetime import timedelta
 
 from flask import Blueprint, jsonify, request, Response
 from peewee import DoesNotExist
@@ -12,7 +12,7 @@ from app.services.calendar_feeds import (
     get_calendar_feed_by_token,
     serialize_calendar_feed,
 )
-from app.modules.common import utc_now
+from app.modules.common import as_utc_naive, utc_now
 
 calendar_bp = Blueprint("calendar_api", __name__)
 
@@ -246,27 +246,11 @@ def export_calendar_feed(token):
     return response
 
 
-def _as_utc_naive(value):
-    if value.tzinfo is None:
-        return value
-
-    return value.astimezone(dt_timezone.utc).replace(tzinfo=None)
-
-
 def _parse_calendar_event_datetime(value):
     if not value:
         return None
 
-    value = str(value)
-
-    # Python 3.10 datetime.fromisoformat() does not parse "Z",
-    # so convert it to a regular UTC offset.
-    if value.endswith("Z"):
-        value = value[:-1] + "+00:00"
-
-    parsed = datetime.fromisoformat(value)
-
-    return _as_utc_naive(parsed)
+    return as_utc_naive(value)
 
 
 def event_overlaps_range(event, start_at, end_at):
@@ -276,7 +260,7 @@ def event_overlaps_range(event, start_at, end_at):
     if not event_start or not event_end:
         return False
 
-    start_at = _as_utc_naive(start_at)
-    end_at = _as_utc_naive(end_at)
+    start_at = as_utc_naive(start_at)
+    end_at = as_utc_naive(end_at)
 
     return event_start < end_at and event_end > start_at

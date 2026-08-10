@@ -1,5 +1,4 @@
 from flask import Blueprint, jsonify, request
-from datetime import datetime, timezone
 
 from app.api.schemas.business_services import (
     BusinessServiceComponentCreateSchema,
@@ -23,20 +22,10 @@ from app.services.serializers.business_services import (
     serialize_business_service_component,
 )
 from app.services.validation import validate_body
-from app.modules.common import utc_now
+from app.modules.common import as_utc_naive, utc_now
 
 
 business_services_bp = Blueprint("business_services", __name__, url_prefix="/api/business-services")
-
-
-def normalize_optional_utc_datetime(value):
-    if value is None:
-        return None
-
-    if value.tzinfo is None:
-        return value
-
-    return value.astimezone(timezone.utc).replace(tzinfo=None)
 
 
 def require_business_group_read(group_id):
@@ -424,7 +413,7 @@ def set_business_service_manual_status(business_service_id):
     if error:
         return error
 
-    until = normalize_optional_utc_datetime(payload.until)
+    until = as_utc_naive(payload.until)
 
     if until is not None and until <= utc_now():
         return jsonify({"error": "Manual status expiration must be in the future"}), 400

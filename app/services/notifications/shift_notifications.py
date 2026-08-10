@@ -1,7 +1,7 @@
 import logging
 import smtplib
 
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 from email.message import EmailMessage
 
 from app import Config
@@ -14,7 +14,7 @@ from app.modules.db.models import (
 from app.notifiers.registry import get_notifier
 from app.notifiers.types import MATTERMOST_CHANNEL
 from app.services.calendar_service import build_rotation_calendar
-from app.modules.common import utc_now
+from app.modules.common import as_utc_naive, utc_now
 
 logger = logging.getLogger("oncall.shift_notifications")
 
@@ -29,19 +29,6 @@ def _display_name(user):
 
 def _team_display_name(event):
     return event.get("team_name") or event.get("team_slug") or "-"
-
-
-def _event_dt(value):
-    """Parse calendar event datetime and return naive UTC datetime."""
-    if isinstance(value, datetime):
-        parsed = value
-    else:
-        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
-
-    if parsed.tzinfo is not None:
-        return parsed.astimezone(timezone.utc).replace(tzinfo=None)
-
-    return parsed
 
 
 def _format_dt(value):
@@ -110,8 +97,8 @@ def _build_shift_email(user, event, event_type):
     rotation_name = event.get("rotation_name") or f"Rotation #{event.get('rotation_id')}"
     team_name = _team_display_name(event)
     layer_name = event.get("layer_name") or "Override" if event.get("type") == "override" else "-"
-    start_at = _event_dt(event["start"])
-    end_at = _event_dt(event["end"])
+    start_at = as_utc_naive(event["start"])
+    end_at = as_utc_naive(event["end"])
 
     if event_type == SHIFT_START:
         subject = f"[On-call] Your shift has started: {rotation_name}"
@@ -156,8 +143,8 @@ def _get_or_create_log(user, rotation, event, event_type):
             "user": user,
             "rotation": rotation,
             "event_type": event_type,
-            "slot_start_at": _event_dt(event["start"]),
-            "slot_end_at": _event_dt(event["end"]),
+            "slot_start_at": as_utc_naive(event["start"]),
+            "slot_end_at": as_utc_naive(event["end"]),
             "layer_id": event.get("layer_id"),
             "override_id": event.get("override_id"),
             "status": "pending",
@@ -194,8 +181,8 @@ def _get_or_create_mattermost_log(user, rotation, event, event_type):
             "user": user,
             "rotation": rotation,
             "event_type": event_type,
-            "slot_start_at": _event_dt(event["start"]),
-            "slot_end_at": _event_dt(event["end"]),
+            "slot_start_at": as_utc_naive(event["start"]),
+            "slot_end_at": as_utc_naive(event["end"]),
             "layer_id": event.get("layer_id"),
             "override_id": event.get("override_id"),
             "mattermost_user_id": mattermost_user_id,
@@ -324,8 +311,8 @@ def _send_shift_event(event, event_type):
 
 
 def _event_due(event, event_type, window_start, now):
-    start_at = _event_dt(event["start"])
-    end_at = _event_dt(event["end"])
+    start_at = as_utc_naive(event["start"])
+    end_at = as_utc_naive(event["end"])
 
     if event_type == SHIFT_START:
         return window_start < start_at <= now

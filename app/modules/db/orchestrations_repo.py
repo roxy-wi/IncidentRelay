@@ -1,7 +1,6 @@
 import hashlib
 import json
 import secrets
-from datetime import datetime
 from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
 
 from peewee import IntegrityError, fn
@@ -91,10 +90,6 @@ def canonical_json(value: Any) -> str:
 
 def definition_hash(definition: Dict[str, Any]) -> str:
     return hashlib.sha256(canonical_json(definition).encode("utf-8")).hexdigest()
-
-
-def _utcnow() -> datetime:
-    return utc_now()
 
 
 def _get_orchestration(orchestration_id: int) -> EventOrchestration:
@@ -433,7 +428,7 @@ def replace_draft_rules(
             EventOrchestrationRule.version == version.id
         ).execute()
         _create_rule_tree(version, rules)
-        EventOrchestrationVersion.update(updated_at=_utcnow()).where(
+        EventOrchestrationVersion.update(updated_at=utc_now()).where(
             EventOrchestrationVersion.id == version.id
         ).execute()
     return _get_version(version_id)
@@ -457,7 +452,7 @@ def save_draft_definition(
         if comment is not None:
             EventOrchestrationVersion.update(
                 comment=comment,
-                updated_at=_utcnow(),
+                updated_at=utc_now(),
             ).where(
                 EventOrchestrationVersion.id == draft.id
             ).execute()
@@ -784,7 +779,7 @@ def _publish_version_locked(
             validation["warnings"],
         )
 
-    now = _utcnow()
+    now = utc_now()
     EventOrchestrationVersion.update(
         status="archived",
         updated_at=now,
@@ -904,7 +899,7 @@ def archive_draft(version_id: int) -> EventOrchestrationVersion:
         ).execute()
         EventOrchestrationVersion.update(
             status="archived",
-            updated_at=_utcnow(),
+            updated_at=utc_now(),
         ).where(
             (EventOrchestrationVersion.id == version.id)
             & (EventOrchestrationVersion.status == "draft")
@@ -936,7 +931,7 @@ def set_runtime_state(
             enabled=bool(enabled),
             mode=mode,
             compatibility_mode=compatibility_mode,
-            updated_at=_utcnow(),
+            updated_at=utc_now(),
         ).where(EventOrchestration.id == orchestration.id).execute()
     return _get_orchestration(orchestration_id)
 
@@ -977,7 +972,7 @@ def get_published_runtime_version(orchestration: EventOrchestration) -> EventOrc
 def archive_orchestration(orchestration_id: int) -> EventOrchestration:
     with database_proxy.atomic():
         orchestration = _locked_orchestration(orchestration_id)
-        now = _utcnow()
+        now = utc_now()
         EventOrchestration.update(
             enabled=False,
             mode="disabled",
@@ -1031,14 +1026,14 @@ def authenticate_intake_token(plaintext: str) -> Optional[OrchestrationIntakeTok
     )
     if token is None:
         return None
-    OrchestrationIntakeToken.update(last_used_at=_utcnow()).where(
+    OrchestrationIntakeToken.update(last_used_at=utc_now()).where(
         OrchestrationIntakeToken.id == token.id
     ).execute()
     return token
 
 
 def revoke_intake_token(token_id: int) -> OrchestrationIntakeToken:
-    now = _utcnow()
+    now = utc_now()
     updated = OrchestrationIntakeToken.update(
         enabled=False,
         revoked_at=now,

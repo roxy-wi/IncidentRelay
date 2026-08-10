@@ -3,14 +3,13 @@ import logging
 from datetime import datetime, time, timedelta, timezone
 from zoneinfo import ZoneInfo
 
-from app.modules.common import as_utc_aware
+from app.modules.common import as_utc_naive_seconds, utc_now_seconds
 from app.modules.db import alerts_repo, heartbeats_repo
 from app.modules.db.models import AlertGroup, Heartbeat, HeartbeatInstance
 from app.services.alerts.actions import resolve_alert
 from app.services.alerts.lifecycle import upsert_alert
 from app.services.integrations.auth import create_raw_token, hash_token
 from app.services.notifications.delivery import notify_alert
-from app.modules.common import utc_now
 
 logger = logging.getLogger("oncall.heartbeats")
 
@@ -22,19 +21,6 @@ EXPECTED_INSTANCES_MODES = {"none", "static", "auto"}
 
 DEFAULT_INTERVAL_SECONDS = 300
 DEFAULT_GRACE_SECONDS = 300
-
-
-def _utcnow():
-    return utc_now().replace(microsecond=0)
-
-
-def _as_naive_utc(value):
-    aware = as_utc_aware(value)
-
-    if aware is None:
-        return None
-
-    return aware.replace(tzinfo=None, microsecond=0)
 
 
 def _zone(name):
@@ -135,7 +121,7 @@ def _scheduled_next_due_local(heartbeat, latest_due_local, now_local):
 
 def compute_next_expected_at(heartbeat, now=None):
     """Return the next expected ping deadline before grace is applied."""
-    now = _as_naive_utc(now or _utcnow())
+    now = as_utc_naive_seconds(now or utc_now_seconds())
 
     if heartbeat.mode == "scheduled":
         zone = _zone(heartbeat.timezone)
@@ -146,7 +132,7 @@ def compute_next_expected_at(heartbeat, now=None):
 
     interval = int(heartbeat.expected_interval_seconds or DEFAULT_INTERVAL_SECONDS)
     anchor = heartbeat.last_seen_at or heartbeat.created_at or now
-    return _as_naive_utc(anchor) + timedelta(seconds=interval)
+    return as_utc_naive_seconds(anchor) + timedelta(seconds=interval)
 
 
 def heartbeat_deadline_at(heartbeat, expected_at=None):
@@ -156,7 +142,7 @@ def heartbeat_deadline_at(heartbeat, expected_at=None):
 
 
 def heartbeat_is_overdue(heartbeat, now=None):
-    now = _as_naive_utc(now or _utcnow())
+    now = as_utc_naive_seconds(now or utc_now_seconds())
 
     if heartbeat_tracks_instances(heartbeat):
         return False
@@ -174,7 +160,7 @@ def heartbeat_is_overdue(heartbeat, now=None):
             return False
 
         due_at = _local_to_naive_utc(due_local)
-        last_seen_at = _as_naive_utc(heartbeat.last_seen_at)
+        last_seen_at = as_utc_naive_seconds(heartbeat.last_seen_at)
 
         return not last_seen_at or last_seen_at < due_at
 
@@ -253,14 +239,14 @@ def extract_heartbeat_instance_key(heartbeat, payload):
 
 
 def compute_instance_next_expected_at(heartbeat, instance, now=None):
-    now = _as_naive_utc(now or _utcnow())
+    now = as_utc_naive_seconds(now or utc_now_seconds())
 
     if heartbeat.mode == "scheduled":
         return compute_next_expected_at(heartbeat, now=now)
 
     interval = int(heartbeat.expected_interval_seconds or DEFAULT_INTERVAL_SECONDS)
     anchor = instance.last_seen_at or instance.created_at or now
-    return _as_naive_utc(anchor) + timedelta(seconds=interval)
+    return as_utc_naive_seconds(anchor) + timedelta(seconds=interval)
 
 
 def heartbeat_instance_deadline_at(heartbeat, instance, expected_at=None):
@@ -270,7 +256,7 @@ def heartbeat_instance_deadline_at(heartbeat, instance, expected_at=None):
 
 
 def heartbeat_instance_is_overdue(heartbeat, instance, now=None):
-    now = _as_naive_utc(now or _utcnow())
+    now = as_utc_naive_seconds(now or utc_now_seconds())
 
     if heartbeat.status == "paused" or not heartbeat.enabled or heartbeat.deleted:
         return False
@@ -287,7 +273,7 @@ def heartbeat_instance_is_overdue(heartbeat, instance, now=None):
         if now < deadline:
             return False
 
-        last_seen_at = _as_naive_utc(instance.last_seen_at)
+        last_seen_at = as_utc_naive_seconds(instance.last_seen_at)
 
         return not last_seen_at or last_seen_at < due_at
 
@@ -296,7 +282,7 @@ def heartbeat_instance_is_overdue(heartbeat, instance, now=None):
 
 
 def refresh_heartbeat_instance_rollup(heartbeat, now=None):
-    now = _as_naive_utc(now or _utcnow())
+    now = as_utc_naive_seconds(now or utc_now_seconds())
     instances = heartbeats_repo.list_heartbeat_instances(heartbeat.id, enabled_only=True)
 
     if not heartbeat_tracks_instances(heartbeat):
@@ -323,7 +309,7 @@ def refresh_heartbeat_instance_rollup(heartbeat, now=None):
 
 
 def sync_heartbeat_static_instances(heartbeat, expected_instances, now=None):
-    now = _as_naive_utc(now or _utcnow())
+    now = as_utc_naive_seconds(now or utc_now_seconds())
     desired = []
     seen = set()
 
@@ -534,17 +520,19 @@ def _heartbeat_instance_alert_payload(heartbeat, instance, now):
 
 def mark_heartbeat_overdue(heartbeat, now=None):
     """Create or keep the current overdue alert for a heartbeat."""
-    now = _as_naive_utc(now or _utcnow())
+    now = as_utc_naive_seconds(now or utc_now_seconds())
     status_before = heartbeat.status
+    transitioned_to_overdue = status_before != "overdue"
 
-    if status_before == "overdue" and heartbeat.current_alert_group_id:
+    if not transitioned_to_overdue and heartbeat.current_alert_group_id:
         group = AlertGroup.get_or_none(AlertGroup.id == heartbeat.current_alert_group_id)
         if group and group.status != "resolved":
             return heartbeat, None
 
     heartbeat.status = "overdue"
     heartbeat.overdue_since = heartbeat.overdue_since or now
-    heartbeat.last_overdue_at = now
+    if transitioned_to_overdue:
+        heartbeat.last_overdue_at = now
     heartbeat.updated_at = now
     heartbeat.next_expected_at = compute_next_expected_at(heartbeat, now=now)
     heartbeat.save()
@@ -561,41 +549,43 @@ def mark_heartbeat_overdue(heartbeat, now=None):
             message=f"Heartbeat overdue: {heartbeat.name}",
         )
 
-    heartbeats_repo.record_ping(
-        heartbeat,
-        event_type="overdue",
-        status_before=status_before,
-        status_after=heartbeat.status,
-        message="Heartbeat became overdue",
-        alert_group_id=group.id if group else None,
-        received_at=now,
-    )
+    if transitioned_to_overdue:
+        heartbeats_repo.record_ping(
+            heartbeat,
+            event_type="overdue",
+            status_before=status_before,
+            status_after=heartbeat.status,
+            message="Heartbeat became overdue",
+            alert_group_id=group.id if group else None,
+            received_at=now,
+        )
 
-    logger.warning(
-        "heartbeat became overdue",
-        extra={
-            "extra": {
-                "event_type": "heartbeat_overdue",
-                "heartbeat_id": heartbeat.id,
-                "heartbeat_uid": str(heartbeat.uid),
-                "team_id": heartbeat.team_id,
-                "route_id": heartbeat.route_id,
-                "service_id": heartbeat.service_id,
-                "alert_group_id": group.id if group else None,
-            }
-        },
-    )
+        logger.warning(
+            "heartbeat became overdue",
+            extra={
+                "extra": {
+                    "event_type": "heartbeat_overdue",
+                    "heartbeat_id": heartbeat.id,
+                    "heartbeat_uid": str(heartbeat.uid),
+                    "team_id": heartbeat.team_id,
+                    "route_id": heartbeat.route_id,
+                    "service_id": heartbeat.service_id,
+                    "alert_group_id": group.id if group else None,
+                }
+            },
+        )
 
     return heartbeat, group
 
 
 def mark_heartbeat_instance_overdue(instance, now=None):
     """Create or keep the current overdue alert for one heartbeat producer."""
-    now = _as_naive_utc(now or _utcnow())
+    now = as_utc_naive_seconds(now or utc_now_seconds())
     heartbeat = instance.heartbeat
     status_before = instance.status
+    transitioned_to_overdue = status_before != "overdue"
 
-    if status_before == "overdue" and instance.current_alert_group_id:
+    if not transitioned_to_overdue and instance.current_alert_group_id:
         group = AlertGroup.get_or_none(AlertGroup.id == instance.current_alert_group_id)
         if group and group.status != "resolved":
             refresh_heartbeat_instance_rollup(heartbeat, now=now)
@@ -603,7 +593,8 @@ def mark_heartbeat_instance_overdue(instance, now=None):
 
     instance.status = "overdue"
     instance.overdue_since = instance.overdue_since or now
-    instance.last_overdue_at = now
+    if transitioned_to_overdue:
+        instance.last_overdue_at = now
     instance.next_expected_at = compute_instance_next_expected_at(heartbeat, instance, now=now)
     instance.updated_at = now
     instance.save()
@@ -620,34 +611,36 @@ def mark_heartbeat_instance_overdue(instance, now=None):
             message=f"Heartbeat overdue: {heartbeat.name} / {instance.instance_key}",
         )
 
-    heartbeats_repo.record_ping(
-        heartbeat,
-        event_type="instance_overdue",
-        instance_key=instance.instance_key,
-        status_before=status_before,
-        status_after=instance.status,
-        message=f"Heartbeat instance became overdue: {instance.instance_key}",
-        alert_group_id=group.id if group else None,
-        received_at=now,
-    )
+    if transitioned_to_overdue:
+        heartbeats_repo.record_ping(
+            heartbeat,
+            event_type="instance_overdue",
+            instance_key=instance.instance_key,
+            status_before=status_before,
+            status_after=instance.status,
+            message=f"Heartbeat instance became overdue: {instance.instance_key}",
+            alert_group_id=group.id if group else None,
+            received_at=now,
+        )
 
     refresh_heartbeat_instance_rollup(heartbeat, now=now)
 
-    logger.warning(
-        "heartbeat instance became overdue",
-        extra={
-            "extra": {
-                "event_type": "heartbeat_instance_overdue",
-                "heartbeat_id": heartbeat.id,
-                "heartbeat_uid": str(heartbeat.uid),
-                "heartbeat_instance": instance.instance_key,
-                "team_id": heartbeat.team_id,
-                "route_id": heartbeat.route_id,
-                "service_id": heartbeat.service_id,
-                "alert_group_id": group.id if group else None,
-            }
-        },
-    )
+    if transitioned_to_overdue:
+        logger.warning(
+            "heartbeat instance became overdue",
+            extra={
+                "extra": {
+                    "event_type": "heartbeat_instance_overdue",
+                    "heartbeat_id": heartbeat.id,
+                    "heartbeat_uid": str(heartbeat.uid),
+                    "heartbeat_instance": instance.instance_key,
+                    "team_id": heartbeat.team_id,
+                    "route_id": heartbeat.route_id,
+                    "service_id": heartbeat.service_id,
+                    "alert_group_id": group.id if group else None,
+                }
+            },
+        )
 
     return instance, group
 
@@ -732,7 +725,7 @@ def receive_heartbeat_ping(
     now=None,
 ):
     """Record a heartbeat ping and auto-resolve overdue incidents if needed."""
-    now = _as_naive_utc(now or _utcnow())
+    now = as_utc_naive_seconds(now or utc_now_seconds())
     heartbeat = heartbeats_repo.get_heartbeat_by_token(raw_token)
 
     if not heartbeat:
@@ -922,7 +915,7 @@ def receive_heartbeat_ping(
 
 def process_overdue_heartbeats(now=None, limit=100, team_ids=None):
     """Check due heartbeat candidates and open overdue alerts."""
-    now = _as_naive_utc(now or _utcnow())
+    now = as_utc_naive_seconds(now or utc_now_seconds())
     result = {
         "processed": 0,
         "overdue": 0,
@@ -996,7 +989,7 @@ def process_overdue_heartbeats(now=None, limit=100, team_ids=None):
 
 
 def expire_auto_discovered_instances(now=None, team_ids=None):
-    now = _as_naive_utc(now or _utcnow())
+    now = as_utc_naive_seconds(now or utc_now_seconds())
     candidates = heartbeats_repo.list_heartbeats(team_ids=team_ids, enabled_only=True)
     expired = 0
 
@@ -1037,7 +1030,7 @@ def expire_auto_discovered_instances(now=None, team_ids=None):
     return expired
 
 def pause_heartbeat(heartbeat, now=None):
-    now = _as_naive_utc(now or _utcnow())
+    now = as_utc_naive_seconds(now or utc_now_seconds())
     before = heartbeat.status
     heartbeat.status = "paused"
     heartbeat.updated_at = now
@@ -1061,7 +1054,7 @@ def pause_heartbeat(heartbeat, now=None):
 
 
 def resume_heartbeat(heartbeat, now=None):
-    now = _as_naive_utc(now or _utcnow())
+    now = as_utc_naive_seconds(now or utc_now_seconds())
     before = heartbeat.status
 
     if heartbeat_tracks_instances(heartbeat):
