@@ -9,6 +9,7 @@ from app.middleware import load_jwt_user
 from app.modules.db import routes_repo, tokens_repo
 from app.settings import Config
 from app.modules.common import utc_now
+from app.services.api_token_scopes import token_has_scopes
 
 
 def create_raw_token():
@@ -134,19 +135,8 @@ def authenticate_request():
 
 
 def token_has_scope(api_token, required_scopes):
-    """
-    Return True when an API token has all required scopes.
-    """
-
-    if not required_scopes:
-        return True
-
-    token_scopes = api_token.scopes or []
-
-    if "*" in token_scopes:
-        return True
-
-    return all(scope in token_scopes for scope in required_scopes)
+    """Return True when an API token has all required effective scopes."""
+    return token_has_scopes(api_token.scopes or [], required_scopes)
 
 
 def require_api_token(scopes=None, required=None):

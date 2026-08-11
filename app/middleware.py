@@ -6,19 +6,11 @@ from flask import jsonify, request
 from app.login import decode_access_token
 from app.modules.db import users_repo
 from app.settings import Config
-
-
-PUBLIC_API_PATHS = {
-    "/api/auth/login",
-    "/api/auth/logout",
-    "/api/push/actions",
-}
-
-PUBLIC_API_PREFIXES = (
-    "/api/auth/sso/",
-    "/api/integrations/",
-    "/api/heartbeats/ping/",
-    "/api/version",
+from app.services.api_token_scopes import (
+    is_public_api_request,
+    is_public_calendar_feed_path as is_public_calendar_feed_request,
+    required_scopes_for_path,
+    token_has_scopes,
 )
 
 
@@ -80,100 +72,32 @@ def jwt_required(func):
     return wrapper
 
 
-def api_auth_required_for_path(path):
-    """Return True when the API path must be protected."""
+def api_auth_required_for_path(path, method=None):
+    """Return True when global API authentication must protect the path."""
     if not path.startswith("/api/"):
         return False
 
-    if path in PUBLIC_API_PATHS:
-        return False
-
-    if is_public_calendar_feed_path(path):
-        return False
-
-    for prefix in PUBLIC_API_PREFIXES:
-        if path.startswith(prefix):
-            return False
-
-    return True
+    method = method or request.method
+    return not is_public_api_request(path, method)
 
 
-PUBLIC_CALENDAR_FEED_PREFIX = "/api/calendar/feeds/"
-
-
-def is_public_calendar_feed_path(path):
-    """Return True for tokenized public ICS subscription URLs only.
-
-    Management endpoints stay protected:
-    - /api/calendar/feeds
-    - /api/calendar/feeds/<feed_id>/token
-
-    Public endpoint:
-    - /api/calendar/feeds/<secret-token>.ics
-    """
-    if request.method not in {"GET", "HEAD"}:
-        return False
-
-    if not path.startswith(PUBLIC_CALENDAR_FEED_PREFIX):
-        return False
-
-    rest = path[len(PUBLIC_CALENDAR_FEED_PREFIX):]
-
-    return bool(rest) and rest.endswith(".ics") and "/" not in rest
+def is_public_calendar_feed_path(path, method=None):
+    """Compatibility wrapper for the tokenized public ICS feed check."""
+    return is_public_calendar_feed_request(path, method or request.method)
 
 
 def required_scopes_for_request():
+    """Return configured API-token scopes for the current request.
+
+    None means the endpoint has no scope mapping and must fail closed for an
+    API-token principal. JWT users are unaffected by this mapping.
     """
-    Return required API token scopes for the current request.
-
-    JWT users do not use this. It is only checked for personal/API tokens.
-    """
-
-    path = request.path
-    method = request.method
-
-    if path.startswith("/api/alerts"):
-        return ["alerts:read"] if method == "GET" else ["alerts:write"]
-
-    if path.startswith("/api/profile"):
-        return ["profile:read"] if method == "GET" else ["profile:write"]
-
-    if path.startswith("/api/calendar"):
-        return ["resources:read"]
-
-    if path.startswith("/api/heartbeats"):
-        return ["resources:read"] if method == "GET" else ["resources:write"]
-
-    if (
-        path.startswith("/api/groups")
-        or path.startswith("/api/teams")
-        or path.startswith("/api/rotations")
-        or path.startswith("/api/routes")
-        or path.startswith("/api/channels")
-        or path.startswith("/api/silences")
-        or path.startswith("/api/users")
-        or path.startswith("/api/admin/users")
-    ):
-        return ["resources:read"] if method == "GET" else ["resources:write"]
-
-    return []
+    return required_scopes_for_path(request.path, request.method)
 
 
 def api_token_has_scopes(api_token, required_scopes):
-    """
-    Return True when an API token has the required scopes.
-    """
-
-    if not required_scopes:
-        return True
-
-    scopes = api_token.scopes or []
-
-    if "*" in scopes:
-        return True
-
-    return all(scope in scopes for scope in required_scopes)
-
+    """Return True when an API token has the required effective scopes."""
+    return token_has_scopes(api_token.scopes or [], required_scopes)
 
 def load_api_token_principal():
     """
@@ -196,8 +120,16 @@ def load_api_token_principal():
 
     required_scopes = required_scopes_for_request()
 
+    if required_scopes is None:
+        return jsonify({
+            "error": "API token access is not configured for this endpoint",
+        }), 403
+
     if not api_token_has_scopes(api_token, required_scopes):
-        return jsonify({"error": "Missing API token scope", "missing_scopes": required_scopes}), 403
+        return jsonify({
+            "error": "Missing API token scope",
+            "missing_scopes": required_scopes,
+        }), 403
 
     return api_token
 

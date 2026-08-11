@@ -115,6 +115,95 @@ function fillProfileGroupSelects(profile) {
     }
 }
 
+function getProfileTokenScopeValues() {
+    const element = document.getElementById("profile-token-scopes");
+
+    if (!element) {
+        return [];
+    }
+
+    const value = element.tomselect
+        ? element.tomselect.getValue()
+        : $(element).val();
+
+    if (Array.isArray(value)) {
+        return value;
+    }
+
+    return value ? [value] : [];
+}
+
+function setProfileTokenScopeValues(values) {
+    const element = document.getElementById("profile-token-scopes");
+    const normalized = (values || []).map(String);
+
+    if (!element) {
+        return;
+    }
+
+    if (element.tomselect) {
+        element.tomselect.setValue(normalized, true);
+        return;
+    }
+
+    $(element).val(normalized);
+}
+
+function renderProfileTokenScopes(profile) {
+    const element = document.getElementById("profile-token-scopes");
+
+    if (!element) {
+        return;
+    }
+
+    const selected = getProfileTokenScopeValues();
+    let scopes = asArray(profile.available_token_scopes);
+
+    if (!scopes.length) {
+        scopes = $(element).find("option").map(function () {
+            return String($(this).val());
+        }).get();
+
+        if (!profile.is_admin) {
+            scopes = scopes.filter(function (scope) { return scope !== "*"; });
+        }
+    }
+
+    if (element.tomselect) {
+        element.tomselect.destroy();
+    }
+
+    const select = $(element);
+    select.empty();
+
+    scopes.forEach(function (scope) {
+        select.append($("<option>").val(scope).text(scope));
+    });
+
+    const allowed = new Set(scopes);
+    let nextSelected = selected.filter(function (scope) {
+        return allowed.has(scope);
+    });
+
+    if (!nextSelected.length && allowed.has("alerts:read")) {
+        nextSelected = ["alerts:read"];
+    }
+
+    select.val(nextSelected);
+
+    if (typeof window.TomSelect !== "undefined") {
+        new TomSelect(element, {
+            create: false,
+            persist: false,
+            closeAfterSelect: false,
+            maxOptions: 200,
+            plugins: ["remove_button"],
+            searchField: ["text", "value"]
+        });
+        setProfileTokenScopeValues(nextSelected);
+    }
+}
+
 function loadProfile() {
     /*
      * Load current user profile and render all profile sections.
@@ -151,9 +240,7 @@ function loadProfile() {
             AppTimezones.setOptionalSelectValue("#profile-timezone", profile.timezone);
         }
 
-        if (!profile.is_admin) {
-            $('#profile-token-scopes option[value="*"]').remove();
-        }
+        renderProfileTokenScopes(profile);
         renderProfileCaldav(profile);
         renderProfileHeader(profile);
         fillProfileGroupSelects(profile);
@@ -345,6 +432,7 @@ function createProfileToken() {
     const groupId = $("#profile-token-group").val();
     const days = Number($("#profile-token-days").val() || 0);
     const name = $("#profile-token-name").val().trim() || "personal-api-token";
+    const scopes = getProfileTokenScopeValues();
 
     if (days < 0) {
         setProfileInlineStatus("#profile-token-status", i18n.t("profile.tokens.days_negative"), true);
@@ -356,7 +444,7 @@ function createProfileToken() {
         {
             name: name,
             group_id: groupId ? Number(groupId) : null,
-            scopes: $("#profile-token-scopes").val() || ["alerts:read"],
+            scopes: scopes.length ? scopes : ["alerts:read"],
             days: days,
         },
         function (data) {
@@ -440,6 +528,7 @@ function saveActiveGroup() {
 
 $(document).on("click", "#open-profile-token-modal", function () {
     resetProfileTokenModal();
+    setProfileTokenScopeValues(["alerts:read"]);
     openAppModal("#profile-token-modal");
 });
 $(document).on("click", "#close-profile-token-modal, #close-profile-token-modal-footer", function () {
@@ -667,11 +756,9 @@ function openCreateCaldavTokenModal() {
     $("#profile-token-days").val("");
     $("#profile-token-group").val("");
 
-    const scopes = $("#profile-token-scopes");
+    setProfileTokenScopeValues(["calendar:read"]);
 
-    scopes.val(["calendar:read"]);
-
-    if (!scopes.val() || scopes.val().indexOf("calendar:read") === -1) {
+    if (getProfileTokenScopeValues().indexOf("calendar:read") === -1) {
         setProfileInlineStatus(
             "#profile-caldav-status",
             i18n.t("profile.caldav.scope_missing"),

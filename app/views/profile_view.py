@@ -7,6 +7,11 @@ from app.api.schemas.profile import ActiveGroupSchema, ProfileTokenCreateSchema,
 from app.login import hash_password, verify_password
 from app.modules.db import groups_repo, tokens_repo, users_repo
 from app.services.integrations.auth import create_raw_token, hash_token
+from app.services.api_token_scopes import (
+    ALLOWED_PROFILE_TOKEN_SCOPES,
+    PROFILE_TOKEN_SCOPE_OPTIONS,
+    token_can_grant_scopes,
+)
 from app.services.audit import write_audit
 from app.services.rbac import can_read_group
 from app.services.serializers.users import serialize_user
@@ -17,18 +22,6 @@ from app.modules.common import utc_now
 
 
 profile_bp = Blueprint("profile_api", __name__)
-
-ALLOWED_PROFILE_TOKEN_SCOPES = {
-    "alerts:read",
-    "alerts:write",
-    "resources:read",
-    "resources:write",
-    "profile:read",
-    "profile:write",
-    "calendar:read",
-    "*",
-}
-
 
 def get_profile_groups(user):
     """Return groups visible in the profile page."""
@@ -64,6 +57,17 @@ def get_profile_groups(user):
     return result
 
 
+def serialize_profile(user):
+    """Serialize profile data with token scopes selectable by this user."""
+    data = serialize_user(user, groups=get_profile_groups(user))
+    data["available_token_scopes"] = [
+        scope
+        for scope in PROFILE_TOKEN_SCOPE_OPTIONS
+        if scope != "*" or user.is_admin
+    ]
+    return data
+
+
 def validate_profile_token_scopes(requested_scopes):
     """
     Validate scopes for a newly created personal API token.
@@ -92,7 +96,7 @@ def validate_profile_token_scopes(requested_scopes):
     if current_api_token:
         current_scopes = set(current_api_token.scopes or [])
 
-        if "*" not in current_scopes and not requested.issubset(current_scopes):
+        if not token_can_grant_scopes(current_scopes, requested):
             return None, jsonify({
                 "error": "Cannot create a token with broader scopes than the current token",
                 "allowed_scopes": sorted(current_scopes),
@@ -108,8 +112,7 @@ def get_profile():
     Return the current user profile.
     """
 
-    memberships = get_profile_groups(request.current_user)
-    return jsonify(serialize_user(request.current_user, groups=memberships))
+    return jsonify(serialize_profile(request.current_user))
 
 
 @profile_bp.route("", methods=["PUT"])
@@ -126,7 +129,7 @@ def update_profile():
     user = users_repo.update_user(request.current_user.id, data)
     write_audit("profile.update", object_type="user", object_id=user.id, user_id=user.id, data=data)
 
-    return jsonify(serialize_user(user, groups=get_profile_groups(user)))
+    return jsonify(serialize_profile(user))
 
 
 @profile_bp.route("/change-password", methods=["POST"])
@@ -255,7 +258,7 @@ def set_active_group():
         user_id=user.id,
     )
 
-    return jsonify(serialize_user(user, groups=get_profile_groups(user)))
+    return jsonify(serialize_profile(user))
 
 
 @profile_bp.route("/oncall", methods=["GET"])

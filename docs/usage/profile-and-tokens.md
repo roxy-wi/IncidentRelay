@@ -59,3 +59,51 @@ Recommended practices:
 - restrict token usage to the needed group when the UI/API supports it;
 - rotate tokens after exposure;
 - delete unused tokens.
+
+### Token scopes
+
+A token can contain any combination of granular scopes. Use `:read` scopes for
+reporting and read-only integrations, and add the corresponding `:write` scope
+only when the integration must modify that resource.
+
+| Resource | Read | Write |
+|---|---|---|
+| Alerts | `alerts:read` | `alerts:write` |
+| Incidents | `incidents:read` | `incidents:write` |
+| Services, including Business Services | `services:read` | `services:write` |
+| Teams | `teams:read` | `teams:write` |
+| Groups | `groups:read` | `groups:write` |
+| Users | `users:read` | `users:write` |
+| Rotations and on-call health | `rotations:read` | `rotations:write` |
+| Calendar | `calendar:read` | `calendar:write` |
+| Routes | `routes:read` | `routes:write` |
+| Channels | `channels:read` | `channels:write` |
+| Maintenance windows and silences | `maintenance:read` | `maintenance:write` |
+| Heartbeats | `heartbeats:read` | `heartbeats:write` |
+| Escalation, notification, priority and matcher policies | `policies:read` | `policies:write` |
+| Event orchestrations | `orchestrations:read` | `orchestrations:write` |
+| Audit log | `audit:read` | — |
+| SSO administration | `sso:read` | `sso:write` |
+| Current profile and personal notification settings | `profile:read` | `profile:write` |
+
+For example, a read-only reporting token that joins alerts with service,
+incident and team metadata can use:
+
+```text
+alerts:read
+services:read
+incidents:read
+teams:read
+```
+
+`resources:read` and `resources:write` are legacy aggregate scopes. They remain
+supported for existing clients and imply the corresponding granular resource
+scopes, but new integrations should prefer granular scopes.
+
+`*` grants every configured scope and is available to global admins only.
+Write scopes do not automatically imply read scopes; select both when a client
+needs both operations.
+
+API-token scope enforcement is fail closed. A protected `/api/...` endpoint
+must be mapped to a scope before an API token can access it. This prevents new
+API endpoints from silently becoming available to existing tokens.

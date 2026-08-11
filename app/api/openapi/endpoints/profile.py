@@ -1,5 +1,6 @@
 from app.api.schemas.roles import TEAM_ROLE_VALUES
 from app.api.openapi.common import response, path_param, json_body
+from app.services.api_token_scopes import PROFILE_TOKEN_SCOPE_OPTIONS
 
 
 ERROR_SCHEMA = {
@@ -158,6 +159,18 @@ PROFILE_SCHEMA = {
             "description": "Groups available to the current user.",
             "items": GROUP_MEMBERSHIP_SCHEMA,
         },
+        "available_token_scopes": {
+            "type": "array",
+            "readOnly": True,
+            "description": (
+                "Personal API token scopes selectable by the current user. "
+                "Wildcard is returned for global admins only."
+            ),
+            "items": {
+                "type": "string",
+                "enum": list(PROFILE_TOKEN_SCOPE_OPTIONS),
+            },
+        },
     },
 }
 
@@ -280,9 +293,17 @@ PROFILE_TOKEN_SCHEMA = {
         },
         "scopes": {
             "type": "array",
-            "description": "Token scopes.",
-            "items": {"type": "string"},
-            "example": ["alerts:read", "resources:read", "calendar:read"],
+            "description": "Token scopes. Multiple granular scopes can be combined.",
+            "items": {
+                "type": "string",
+                "enum": list(PROFILE_TOKEN_SCOPE_OPTIONS),
+            },
+            "example": [
+                "alerts:read",
+                "services:read",
+                "incidents:read",
+                "teams:read",
+            ],
         },
         "group_id": {
             "type": "integer",
@@ -371,10 +392,21 @@ PROFILE_TOKEN_CREATE_SCHEMA = {
         },
         "scopes": {
             "type": "array",
-            "description": "Token scopes.",
-            "items": {"type": "string"},
+            "description": (
+                "One or more token scopes. Prefer granular entity scopes; "
+                "resources:read/write are legacy aggregate scopes."
+            ),
+            "items": {
+                "type": "string",
+                "enum": list(PROFILE_TOKEN_SCOPE_OPTIONS),
+            },
             "default": ["alerts:read"],
-            "example": ["alerts:read", "resources:read"],
+            "example": [
+                "alerts:read",
+                "services:read",
+                "incidents:read",
+                "teams:read",
+            ],
         },
         "days": {
             "type": "integer",
