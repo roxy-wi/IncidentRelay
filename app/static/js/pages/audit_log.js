@@ -96,7 +96,7 @@ function fillAuditLogSelect(selector, items, getValue, getLabel, emptyKey) {
         );
     });
 
-    if (selected && select.find('option[value="' + selected.replace(/"/g, '\\"') + '"]').length) {
+    if (selected && select.find('option[value="' + $.escapeSelector(selected) + '"]').length) {
         select.val(selected);
     }
 }
