@@ -178,7 +178,7 @@ In IncidentRelay:
 7. Attach the channel to the required route.
 8. Send a test notification or a real test alert.
 
-For HTTP interactive actions, configure `public_base_url` and ensure Slack can reach `POST /api/integrations/slack/actions` over HTTPS. Socket Mode does not require this endpoint to be publicly reachable.
+For HTTP interactive actions, ensure Slack can reach `POST /api/integrations/slack/actions` over public HTTPS. `public_base_url` is recommended for the **Open alert in IncidentRelay** link, but it is not used to validate or process Slack button actions. Socket Mode does not require the action endpoint to be publicly reachable.
 
 ## User attribution
 
@@ -244,15 +244,20 @@ Invite the bot to the configured Slack channel.
 
 ### Messages are sent but buttons do not work
 
-Check that:
+For both transports, check that Bot API mode is selected and **Interactivity & Shortcuts** is enabled in the Slack app.
 
-- Bot API mode is selected;
-- Interactivity is enabled in the Slack app;
-- the Request URL is correct;
-- `public_base_url` is correct;
+For HTTP actions, also check that:
+
+- the Request URL points to `/api/integrations/slack/actions`;
 - the IncidentRelay endpoint is publicly reachable over HTTPS;
 - the signing secret matches the Slack app;
-- reverse proxies preserve the request body and Slack signature headers.
+- reverse proxies preserve the raw request body and Slack signature headers.
+
+For Socket Mode, also check that:
+
+- Socket Mode is enabled;
+- the app-level token starts with `xapp-` and has `connections:write`;
+- the Slack worker is running and has outbound HTTPS/WebSocket access.
 
 ### Slack action is rejected as stale
 
@@ -279,9 +284,9 @@ Incoming webhook deliveries cannot be updated.
 
 ## Security notes
 
-- Keep the bot token and signing secret private.
-- Do not include either value in logs, screenshots or support requests.
-- Rotate the bot token and signing secret if they are exposed.
+- Keep the bot token, app-level token and signing secret private.
+- Do not include these values in logs, screenshots or support requests.
+- Rotate any exposed bot token, app-level token or signing secret.
 - Expose only the required IncidentRelay HTTPS endpoints.
 - Keep server time synchronized so timestamp validation works correctly.
 

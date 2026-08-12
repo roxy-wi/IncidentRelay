@@ -624,3 +624,27 @@ button.impact-path-node {
 .impact-history-toolbar {
     justify-content: flex-end;
 }
+
+.service-orchestration-list {
+    display: flex;
+    flex-direction: column;
+    gap: 0.4rem;
+    min-width: 0;
+}
+
+.service-orchestration-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 0.65rem;
+    min-width: 0;
+}
+
+.service-orchestration-link {
+    min-width: 0;
+    overflow: hidden;
+    color: var(--link-color, #2563eb);
+    font-weight: 600;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}

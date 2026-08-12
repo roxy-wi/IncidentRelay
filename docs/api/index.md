@@ -41,11 +41,12 @@ Read more: [Browser Push](../usage/browser-push.md).
 
 ## More API documentation
 
-1. [Services API](services.md)
-2. [Escalation Policies API](escalation-policies.md)
-3. [Matcher Suggestions API](matchers.md)
-4. [Sentry Integration API](sentry-integration.md)
-5. [Voice Call OpenAPI Notes](voice-call-openapi.md)
-6. [Business services](business-services.md)
+1. [Event Orchestration API](event-orchestration.md)
+2. [Services API](services.md)
+3. [Escalation Policies API](escalation-policies.md)
+4. [Matcher Suggestions API](matchers.md)
+5. [Sentry Integration API](sentry-integration.md)
+6. [Voice Call OpenAPI Notes](voice-call-openapi.md)
+7. [Business services](business-services.md)
 
 - [Heartbeats API](heartbeats.md)

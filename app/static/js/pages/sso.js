@@ -766,10 +766,10 @@ function openExistingSsoMappingModal(mapping) {
   $("#sso-mapping-external-group").val(mapping.external_group || "");
   fillSsoGroupSelect(mapping.group_id);
   fillSsoTeamSelect(mapping.team_id);
-  $("#sso-mapping-role").valssoRoleLabel(mapping.group_role || "viewer", "group");
-  $("#sso-mapping-team-role").valssoRoleLabel(mapping.team_role || "viewer", "team");
+  $("#sso-mapping-role").val(mapping.group_role || "viewer");
+  $("#sso-mapping-team-role").val(mapping.team_role || "viewer");
   $("#sso-mapping-team-role").prop("disabled", !mapping.team_id);
-  $("#sso-mapping-priority").val(mapping.priority || 100);
+  $("#sso-mapping-priority").val(mapping.priority ?? 100);
   $("#sso-mapping-active").prop("checked", !!mapping.active);
 
   $("#sso-mapping-modal-title").text(i18n.t("sso.mappings.edit"));

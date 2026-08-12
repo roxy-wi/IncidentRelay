@@ -20,6 +20,7 @@ from app.services.service_catalog.sli_slo import (
     validate_slo_for_sli,
 )
 from tests.factories import create_group, create_service, create_team
+from app.modules.common import utc_now
 
 
 def _alert_group(service, *, first_seen_at, acknowledged_at=None, resolved_at=None, severity="critical", priority_slug="p1", priority_order=1, status="resolved", key="1"):
@@ -75,7 +76,7 @@ def test_ack_latency_slo_calculates_percent_good_and_persists_measurement():
     group = create_group()
     team = create_team(group)
     service = create_service(team)
-    now = datetime.utcnow()
+    now = utc_now()
 
     sli = _sli(service, SLI_TYPE_ACK_LATENCY, severity="critical")
     slo = _slo(service, sli, target_percent_basis_points=5000, threshold_seconds=900)
@@ -116,7 +117,7 @@ def test_ack_latency_slo_marks_breached_when_percent_is_below_target():
     group = create_group()
     team = create_team(group)
     service = create_service(team)
-    now = datetime.utcnow()
+    now = utc_now()
 
     sli = _sli(service, SLI_TYPE_ACK_LATENCY, severity="critical")
     slo = _slo(service, sli, target_percent_basis_points=9500, threshold_seconds=900)
@@ -139,7 +140,7 @@ def test_incident_availability_merges_overlapping_intervals_and_calculates_budge
     group = create_group()
     team = create_team(group)
     service = create_service(team)
-    now = datetime.utcnow()
+    now = utc_now()
 
     sli = _sli(service, SLI_TYPE_INCIDENT_AVAILABILITY, configuration={"priority_scope": ["p1", "p2"]})
     slo = _slo(
@@ -179,7 +180,7 @@ def test_incident_availability_uses_priority_scope_instead_of_severity():
     group = create_group()
     team = create_team(group)
     service = create_service(team)
-    now = datetime.utcnow()
+    now = utc_now()
 
     sli = _sli(
         service,
@@ -222,7 +223,7 @@ def test_incident_count_slo_uses_value_lte_comparison():
     group = create_group()
     team = create_team(group)
     service = create_service(team)
-    now = datetime.utcnow()
+    now = utc_now()
 
     sli = _sli(service, SLI_TYPE_INCIDENT_COUNT, configuration={"priority_scope": ["p1", "p2"]})
     slo = _slo(
@@ -265,7 +266,7 @@ def test_resolve_latency_slo_calculates_good_bad_counts():
     group = create_group()
     team = create_team(group)
     service = create_service(team)
-    now = datetime.utcnow()
+    now = utc_now()
 
     sli = _sli(service, SLI_TYPE_RESOLVE_LATENCY, severity="critical")
     slo = _slo(service, sli, target_percent_basis_points=5000, threshold_seconds=900)
@@ -297,7 +298,7 @@ def test_ack_latency_pending_open_alert_marks_slo_at_risk():
     group = create_group()
     team = create_team(group)
     service = create_service(team)
-    now = datetime.utcnow()
+    now = utc_now()
 
     sli = _sli(service, SLI_TYPE_ACK_LATENCY, severity="critical")
     slo = _slo(
@@ -338,7 +339,7 @@ def test_incident_availability_subtracts_service_maintenance_window():
     group = create_group()
     team = create_team(group)
     service = create_service(team)
-    now = datetime.utcnow()
+    now = utc_now()
 
     sli = _sli(
         service,
@@ -394,7 +395,7 @@ def test_incident_count_ignores_non_matching_priority_scope():
     group = create_group()
     team = create_team(group)
     service = create_service(team)
-    now = datetime.utcnow()
+    now = utc_now()
 
     sli = _sli(
         service,
@@ -435,3 +436,36 @@ def test_incident_count_ignores_non_matching_priority_scope():
     assert evaluation["threshold_count"] == 1
     assert evaluation["good_count"] == 1
     assert evaluation["bad_count"] == 0
+
+
+def test_persist_measurement_normalizes_offset_window_to_naive_utc(monkeypatch):
+    from types import SimpleNamespace
+    from app.services.service_catalog import sli_slo as sli_slo_service
+
+    captured = {}
+    marker = object()
+
+    def create_measurement(payload):
+        captured.update(payload)
+        return marker
+
+    monkeypatch.setattr(
+        sli_slo_service.services_repo,
+        "create_service_slo_measurement",
+        create_measurement,
+    )
+
+    slo = SimpleNamespace(service_id=11, sli_id=22, id=33)
+    evaluation = {
+        "window": {
+            "since": "2026-08-10T12:00:00+03:00",
+            "until": "2026-08-10T13:30:00+03:00",
+        },
+        "status": STATUS_MET,
+    }
+
+    result = sli_slo_service._persist_measurement(slo, evaluation)
+
+    assert result is marker
+    assert captured["window_start"] == datetime(2026, 8, 10, 9, 0, 0)
+    assert captured["window_end"] == datetime(2026, 8, 10, 10, 30, 0)

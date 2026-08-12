@@ -6,6 +6,7 @@ from app.modules.db.models import AlertGroup, BrowserPushActionToken
 from app.notifiers.browser_push import service as browser_push
 from app.services.alerts.lifecycle import upsert_alert
 from tests.factories import add_user_to_team, create_group, create_route, create_team, create_user
+from app.modules.common import utc_now
 
 
 @pytest.fixture(autouse=True)
@@ -181,7 +182,7 @@ def test_execute_push_action_rejects_expired_token(db):
     token_value = payload["action_tokens"]["ack"]
 
     token = BrowserPushActionToken.get(BrowserPushActionToken.action == "ack")
-    token.expires_at = datetime.utcnow() - timedelta(seconds=1)
+    token.expires_at = utc_now() - timedelta(seconds=1)
     token.save()
 
     result = browser_push.execute_push_action(token_value, "ack")

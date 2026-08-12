@@ -10,6 +10,7 @@ from app.modules.db.models import (
 )
 from app.services.serializers.services import serialize_utc_datetime
 from app.services.service_catalog.impact import build_service_impact_v2
+from app.modules.common import utc_now
 
 IMPACTFUL_STATUSES = {"degraded", "partial_outage", "major_outage", "maintenance", "unknown"}
 STATUS_RANK = {
@@ -45,7 +46,7 @@ def capture_service_impact_snapshot(query=None, *, team_ids=None, source="manual
     query = _normalize_snapshot_query(query)
     payload = build_service_impact_v2(query, team_ids=team_ids)
     items = list(payload.get("items") or [])
-    captured_at = datetime.utcnow()
+    captured_at = utc_now()
     summary = _build_snapshot_summary(items, payload.get("summary") or {})
     scope = _snapshot_scope(query, team_ids=team_ids)
 
@@ -114,7 +115,7 @@ def list_service_impact_snapshots(query, *, team_ids=None):
     """Return recent snapshots visible in the requested scope."""
     days = int(getattr(query, "days", 7) or 7)
     limit = int(getattr(query, "limit", 50) or 50)
-    since = datetime.utcnow() - timedelta(days=days)
+    since = utc_now() - timedelta(days=days)
 
     snapshots = _snapshot_query(
         since=since,
@@ -129,7 +130,7 @@ def list_service_impact_snapshots(query, *, team_ids=None):
         "window": {
             "days": days,
             "since": serialize_utc_datetime(since),
-            "until": serialize_utc_datetime(datetime.utcnow()),
+            "until": serialize_utc_datetime(utc_now()),
         },
         "filters": {
             "team_id": getattr(query, "team_id", None),
@@ -144,8 +145,8 @@ def build_service_impact_history(query, *, team_ids=None):
     days = int(getattr(query, "days", 30) or 30)
     limit = int(getattr(query, "limit", 25) or 25)
     bucket = getattr(query, "bucket", "day") or "day"
-    since = datetime.utcnow() - timedelta(days=days)
-    until = datetime.utcnow()
+    since = utc_now() - timedelta(days=days)
+    until = utc_now()
 
     snapshots = list(_snapshot_query(
         since=since,
@@ -191,7 +192,7 @@ def build_service_impact_history(query, *, team_ids=None):
 
 
 def cleanup_service_impact_snapshots(*, retention_days):
-    cutoff = datetime.utcnow() - timedelta(days=int(retention_days))
+    cutoff = utc_now() - timedelta(days=int(retention_days))
     old_ids = [
         snapshot.id
         for snapshot in ServiceImpactSnapshot

@@ -16,6 +16,7 @@ from peewee import (
 )
 
 from app.db import database_proxy
+from app.modules.common import utc_now
 
 
 class JSONTextField(TextField):
@@ -56,7 +57,7 @@ class Migration(BaseModel):
 
     id = AutoField()
     name = CharField(unique=True)
-    applied_at = DateTimeField(default=datetime.utcnow)
+    applied_at = DateTimeField(default=utc_now)
 
 
 class MigrationState(BaseModel):
@@ -66,7 +67,7 @@ class MigrationState(BaseModel):
     version = IntegerField(unique=True)
     name = CharField()
     service_version = CharField(null=True)
-    applied_at = DateTimeField(default=datetime.utcnow)
+    applied_at = DateTimeField(default=utc_now)
 
 
 class Group(SoftDeleteModel):
@@ -77,7 +78,7 @@ class Group(SoftDeleteModel):
     name = CharField()
     description = TextField(null=True)
     active = BooleanField(default=True)
-    created_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
 
     class Meta:
         table_name = "oncall_group"
@@ -94,7 +95,7 @@ class Team(SoftDeleteModel):
     escalation_enabled = BooleanField(default=True)
     escalation_after_reminders = IntegerField(default=2)
     active = BooleanField(default=True)
-    created_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
 
 
 class MatcherPreset(SoftDeleteModel):
@@ -115,8 +116,8 @@ class MatcherPreset(SoftDeleteModel):
     enabled = BooleanField(default=True, index=True)
     version = IntegerField(default=1)
 
-    created_at = DateTimeField(default=datetime.utcnow)
-    updated_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
+    updated_at = DateTimeField(default=utc_now)
 
     class Meta:
         table_name = "matcher_preset"
@@ -135,6 +136,8 @@ class User(SoftDeleteModel):
     email = CharField(null=True)
     phone = CharField(null=True)
     timezone = CharField(null=True)
+    locale = CharField(null=True)
+    theme = CharField(default="system")
     telegram_user_id = CharField(null=True)
     slack_user_id = CharField(null=True)
     mattermost_user_id = CharField(null=True)
@@ -145,7 +148,7 @@ class User(SoftDeleteModel):
     active = BooleanField(default=True)
     is_admin = BooleanField(default=False)
     active_group = ForeignKeyField(Group, null=True, backref="active_users", on_delete="SET NULL")
-    created_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
 
 
 class UserGroup(BaseModel):
@@ -162,7 +165,7 @@ class UserGroup(BaseModel):
     group = ForeignKeyField(Group, backref="user_memberships", on_delete="CASCADE")
     role = CharField(default="viewer")
     active = BooleanField(default=True)
-    created_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
 
     class Meta:
         indexes = (
@@ -177,7 +180,7 @@ class Role(BaseModel):
     name = CharField(unique=True)
     description = TextField(null=True)
     permissions = JSONTextField(null=True)
-    created_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
 
 
 class UserRole(BaseModel):
@@ -187,7 +190,7 @@ class UserRole(BaseModel):
     user = ForeignKeyField(User, backref="role_assignments", on_delete="CASCADE")
     role = ForeignKeyField(Role, backref="user_assignments", on_delete="CASCADE")
     team = ForeignKeyField(Team, null=True, backref="role_assignments", on_delete="CASCADE")
-    created_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
 
     class Meta:
         indexes = (
@@ -209,7 +212,7 @@ class TeamUser(BaseModel):
     user = ForeignKeyField(User, backref="team_memberships", on_delete="CASCADE")
     role = CharField(default="viewer")
     active = BooleanField(default=True)
-    created_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
 
     class Meta:
         indexes = (
@@ -234,7 +237,7 @@ class Rotation(SoftDeleteModel):
     handoff_weekday = IntegerField(null=True)
     timezone = CharField(default="UTC")
     enabled = BooleanField(default=True)
-    created_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
 
     class Meta:
         table_name = "rotation"
@@ -265,7 +268,7 @@ class RotationOverride(BaseModel):
     starts_at = DateTimeField()
     ends_at = DateTimeField()
     reason = TextField(null=True)
-    created_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
 
 
 class NotificationChannel(SoftDeleteModel):
@@ -278,7 +281,7 @@ class NotificationChannel(SoftDeleteModel):
     channel_type = CharField()
     config = JSONTextField(null=True)
     enabled = BooleanField(default=True)
-    created_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
 
     class Meta:
         indexes = (
@@ -295,8 +298,8 @@ class EscalationPolicy(SoftDeleteModel):
     description = TextField(null=True)
     enabled = BooleanField(default=True)
     repeat_count = IntegerField(default=0)
-    created_at = DateTimeField(default=datetime.utcnow)
-    updated_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
+    updated_at = DateTimeField(default=utc_now)
 
     class Meta:
         table_name = "escalation_policy"
@@ -326,8 +329,8 @@ class EscalationPolicyRule(BaseModel):
         on_delete="SET NULL",
     )
     enabled = BooleanField(default=True)
-    created_at = DateTimeField(default=datetime.utcnow)
-    updated_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
+    updated_at = DateTimeField(default=utc_now)
 
     class Meta:
         table_name = "escalation_policy_rule"
@@ -352,8 +355,8 @@ class NotificationPolicy(SoftDeleteModel):
     description = TextField(null=True)
     enabled = BooleanField(default=True)
 
-    created_at = DateTimeField(default=datetime.utcnow)
-    updated_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
+    updated_at = DateTimeField(default=utc_now)
 
     class Meta:
         table_name = "notification_policy"
@@ -391,8 +394,8 @@ class NotificationPolicyRule(SoftDeleteModel):
     continue_matching = BooleanField(default=False)
     enabled = BooleanField(default=True)
 
-    created_at = DateTimeField(default=datetime.utcnow)
-    updated_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
+    updated_at = DateTimeField(default=utc_now)
 
     class Meta:
         table_name = "notification_policy_rule"
@@ -419,7 +422,7 @@ class NotificationPolicyRuleChannel(BaseModel):
         on_delete="CASCADE",
     )
 
-    created_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
 
     class Meta:
         table_name = "notification_policy_rule_channel"
@@ -494,8 +497,8 @@ class Service(SoftDeleteModel):
     public_description = TextField(null=True)
     public_order = IntegerField(default=100)
 
-    created_at = DateTimeField(default=datetime.utcnow)
-    updated_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
+    updated_at = DateTimeField(default=utc_now)
 
     class Meta:
         table_name = "service"
@@ -518,7 +521,7 @@ class ServiceChannel(BaseModel):
     )
     purpose = CharField(default="default")
     enabled = BooleanField(default=True)
-    created_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
 
     class Meta:
         table_name = "service_channel"
@@ -540,8 +543,8 @@ class ServiceDependency(SoftDeleteModel):
     description = TextField(null=True)
     metadata = JSONTextField(default=dict)
     enabled = BooleanField(default=True)
-    created_at = DateTimeField(default=datetime.utcnow)
-    updated_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
+    updated_at = DateTimeField(default=utc_now)
 
     class Meta:
         table_name = "service_dependency"
@@ -585,8 +588,8 @@ class BusinessService(SoftDeleteModel):
     metadata = JSONTextField(default=dict)
 
     enabled = BooleanField(default=True, index=True)
-    created_at = DateTimeField(default=datetime.utcnow)
-    updated_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
+    updated_at = DateTimeField(default=utc_now)
 
     class Meta:
         table_name = "business_service"
@@ -615,8 +618,8 @@ class BusinessServiceComponent(SoftDeleteModel):
     description = TextField(null=True)
 
     enabled = BooleanField(default=True, index=True)
-    created_at = DateTimeField(default=datetime.utcnow)
-    updated_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
+    updated_at = DateTimeField(default=utc_now)
 
     class Meta:
         table_name = "business_service_component"
@@ -639,7 +642,7 @@ class BusinessServiceStatusHistory(BaseModel):
     message = TextField(null=True)
     impact_score = IntegerField(default=0)
     component_snapshot = JSONTextField(default=list)
-    created_at = DateTimeField(default=datetime.utcnow, index=True)
+    created_at = DateTimeField(default=utc_now, index=True)
 
     class Meta:
         table_name = "business_service_status_history"
@@ -665,9 +668,9 @@ class BusinessServiceIncidentImpact(BaseModel):
 
     component_snapshot = JSONTextField(default=list)
 
-    first_seen_at = DateTimeField(default=datetime.utcnow, index=True)
-    last_seen_at = DateTimeField(default=datetime.utcnow, index=True)
-    updated_at = DateTimeField(default=datetime.utcnow)
+    first_seen_at = DateTimeField(default=utc_now, index=True)
+    last_seen_at = DateTimeField(default=utc_now, index=True)
+    updated_at = DateTimeField(default=utc_now)
 
     class Meta:
         table_name = "business_service_incident_impact"
@@ -736,10 +739,10 @@ class AlertGroupCorrelation(BaseModel):
     reason = TextField(null=True)
     active = BooleanField(default=True, index=True)
 
-    first_seen_at = DateTimeField(default=datetime.utcnow, index=True)
-    last_seen_at = DateTimeField(default=datetime.utcnow, index=True)
-    updated_at = DateTimeField(default=datetime.utcnow)
-    created_at = DateTimeField(default=datetime.utcnow)
+    first_seen_at = DateTimeField(default=utc_now, index=True)
+    last_seen_at = DateTimeField(default=utc_now, index=True)
+    updated_at = DateTimeField(default=utc_now)
+    created_at = DateTimeField(default=utc_now)
 
     context = JSONTextField(default=dict)
 
@@ -776,8 +779,8 @@ class ServiceEvent(BaseModel):
     actor_label = CharField(null=True)
     severity = CharField(max_length=32, null=True)
     status = CharField(max_length=32, null=True)
-    occurred_at = DateTimeField(default=datetime.utcnow, index=True)
-    recorded_at = DateTimeField(default=datetime.utcnow)
+    occurred_at = DateTimeField(default=utc_now, index=True)
+    recorded_at = DateTimeField(default=utc_now)
     schema_version = IntegerField(default=1)
     payload = JSONTextField(default=dict)
 
@@ -806,7 +809,7 @@ class ServiceImpactSnapshot(BaseModel):
 
     source = CharField(default="manual", index=True)
     scope = CharField(default="all", index=True)
-    captured_at = DateTimeField(default=datetime.utcnow, index=True)
+    captured_at = DateTimeField(default=utc_now, index=True)
 
     max_depth = IntegerField(default=5)
     include_disabled = BooleanField(default=False)
@@ -835,7 +838,7 @@ class ServiceImpactSnapshot(BaseModel):
     filters = JSONTextField(default=dict)
     payload = JSONTextField(default=dict)
 
-    created_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
 
     class Meta:
         table_name = "service_impact_snapshot"
@@ -889,7 +892,7 @@ class ServiceImpactSnapshotItem(BaseModel):
     blast_radius = JSONTextField(null=True)
     payload = JSONTextField(default=dict)
 
-    created_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
 
     class Meta:
         table_name = "service_impact_snapshot_item"
@@ -914,8 +917,8 @@ class ServiceStandard(SoftDeleteModel):
     applies_to = JSONTextField(default=dict)
     enabled = BooleanField(default=True)
     created_by = ForeignKeyField(User, null=True, backref="created_service_standards", on_delete="SET NULL")
-    created_at = DateTimeField(default=datetime.utcnow)
-    updated_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
+    updated_at = DateTimeField(default=utc_now)
 
     class Meta:
         table_name = "service_standard"
@@ -941,8 +944,8 @@ class ServiceStandardCheck(SoftDeleteModel):
     required = BooleanField(default=True)
     enabled = BooleanField(default=True)
     position = IntegerField(default=0)
-    created_at = DateTimeField(default=datetime.utcnow)
-    updated_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
+    updated_at = DateTimeField(default=utc_now)
 
     class Meta:
         table_name = "service_standard_check"
@@ -972,7 +975,7 @@ class ServiceReadinessEvaluation(BaseModel):
     trigger = CharField(default="system")
     actor_user = ForeignKeyField(User, null=True, backref="service_readiness_evaluations", on_delete="SET NULL")
     content_hash = CharField(null=True, index=True)
-    evaluated_at = DateTimeField(default=datetime.utcnow, index=True)
+    evaluated_at = DateTimeField(default=utc_now, index=True)
 
     class Meta:
         table_name = "service_readiness_evaluation"
@@ -1000,7 +1003,7 @@ class ServiceReadinessCheckResult(BaseModel):
     required = BooleanField(default=True)
     message = TextField(null=True)
     details = JSONTextField(default=dict)
-    evaluated_at = DateTimeField(default=datetime.utcnow)
+    evaluated_at = DateTimeField(default=utc_now)
 
     class Meta:
         table_name = "service_readiness_check_result"
@@ -1024,7 +1027,7 @@ class ServiceReadinessState(BaseModel):
     failed_required_count = IntegerField(default=0)
     failed_critical_count = IntegerField(default=0)
     content_hash = CharField(null=True, index=True)
-    evaluated_at = DateTimeField(default=datetime.utcnow, index=True)
+    evaluated_at = DateTimeField(default=utc_now, index=True)
 
     class Meta:
         table_name = "service_readiness_state"
@@ -1055,8 +1058,8 @@ class ServiceRunbook(SoftDeleteModel):
     priority = IntegerField(default=100)
 
     enabled = BooleanField(default=True)
-    created_at = DateTimeField(default=datetime.utcnow)
-    updated_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
+    updated_at = DateTimeField(default=utc_now)
 
     class Meta:
         table_name = "service_runbook"
@@ -1079,8 +1082,8 @@ class ServiceLink(SoftDeleteModel):
     priority = IntegerField(default=100)
 
     enabled = BooleanField(default=True)
-    created_at = DateTimeField(default=datetime.utcnow)
-    updated_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
+    updated_at = DateTimeField(default=utc_now)
 
     class Meta:
         table_name = "service_link"
@@ -1105,8 +1108,8 @@ class IncidentPriority(BaseModel):
     enabled = BooleanField(default=True, index=True)
     default = BooleanField(default=False, index=True)
 
-    created_at = DateTimeField(default=datetime.utcnow)
-    updated_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
+    updated_at = DateTimeField(default=utc_now)
 
     class Meta:
         table_name = "incident_priority"
@@ -1143,8 +1146,8 @@ class PriorityPolicy(SoftDeleteModel):
         on_delete="SET NULL",
     )
 
-    created_at = DateTimeField(default=datetime.utcnow)
-    updated_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
+    updated_at = DateTimeField(default=utc_now)
 
     class Meta:
         table_name = "priority_policy"
@@ -1186,8 +1189,8 @@ class PriorityPolicyRule(SoftDeleteModel):
 
     enabled = BooleanField(default=True, index=True)
 
-    created_at = DateTimeField(default=datetime.utcnow)
-    updated_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
+    updated_at = DateTimeField(default=utc_now)
 
     class Meta:
         table_name = "priority_policy_rule"
@@ -1210,7 +1213,7 @@ class ServiceOwner(BaseModel):
     notify_on_status_change = BooleanField(default=True)
     notify_on_resolved = BooleanField(default=True)
     notify_on_comment = BooleanField(default=True)
-    created_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
 
     class Meta:
         table_name = "service_owner"
@@ -1237,8 +1240,8 @@ class ServiceSli(SoftDeleteModel):
     priority = CharField(null=True, index=True)
 
     enabled = BooleanField(default=True, index=True)
-    created_at = DateTimeField(default=datetime.utcnow)
-    updated_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
+    updated_at = DateTimeField(default=utc_now)
 
     class Meta:
         table_name = "service_sli"
@@ -1269,8 +1272,8 @@ class ServiceSlo(SoftDeleteModel):
     include_open_alerts = BooleanField(default=True)
 
     enabled = BooleanField(default=True, index=True)
-    created_at = DateTimeField(default=datetime.utcnow)
-    updated_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
+    updated_at = DateTimeField(default=utc_now)
 
     class Meta:
         table_name = "service_slo"
@@ -1309,7 +1312,7 @@ class ServiceSloMeasurement(BaseModel):
     budget_consumed_seconds = IntegerField(null=True)
     budget_remaining_seconds = IntegerField(null=True)
 
-    calculated_at = DateTimeField(default=datetime.utcnow, index=True)
+    calculated_at = DateTimeField(default=utc_now, index=True)
     details = JSONTextField(default=dict)
 
     class Meta:
@@ -1382,8 +1385,8 @@ class Heartbeat(SoftDeleteModel):
     metadata = JSONTextField(default=dict)
 
     created_by = ForeignKeyField(User, null=True, backref="created_heartbeats", on_delete="SET NULL")
-    created_at = DateTimeField(default=datetime.utcnow)
-    updated_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
+    updated_at = DateTimeField(default=utc_now)
 
     class Meta:
         table_name = "heartbeat"
@@ -1427,8 +1430,8 @@ class HeartbeatInstance(BaseModel):
     )
 
     metadata = JSONTextField(default=dict)
-    created_at = DateTimeField(default=datetime.utcnow)
-    updated_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
+    updated_at = DateTimeField(default=utc_now)
 
     class Meta:
         table_name = "heartbeat_instance"
@@ -1445,7 +1448,7 @@ class HeartbeatPing(BaseModel):
 
     id = AutoField()
     heartbeat = ForeignKeyField(Heartbeat, backref="pings", on_delete="CASCADE")
-    received_at = DateTimeField(default=datetime.utcnow, index=True)
+    received_at = DateTimeField(default=utc_now, index=True)
     event_type = CharField(default="ping", index=True)
     instance_key = CharField(null=True, index=True)
     status_before = CharField(null=True)
@@ -1494,7 +1497,7 @@ class AlertRoute(SoftDeleteModel):
     intake_token_prefix = CharField(null=True, index=True)
     intake_token_hash = CharField(null=True)
     enabled = BooleanField(default=True)
-    created_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
     service = ForeignKeyField(
         Service,
         null=True,
@@ -1539,6 +1542,9 @@ class MaintenanceWindow(SoftDeleteModel):
     status = CharField(default="scheduled", index=True)
 
     enabled = BooleanField(default=True, index=True)
+    apply_to_existing = BooleanField(default=False)
+    reactivate_on_end = BooleanField(default=True)
+    reconciled_at = DateTimeField(null=True)
 
     created_by = ForeignKeyField(
         User,
@@ -1556,8 +1562,8 @@ class MaintenanceWindow(SoftDeleteModel):
     cancelled_at = DateTimeField(null=True)
     cancel_reason = TextField(null=True)
 
-    created_at = DateTimeField(default=datetime.utcnow)
-    updated_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
+    updated_at = DateTimeField(default=utc_now)
 
     class Meta:
         table_name = "maintenance_window"
@@ -1585,7 +1591,7 @@ class MaintenanceWindowService(BaseModel):
         on_delete="CASCADE",
     )
 
-    created_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
 
     class Meta:
         table_name = "maintenance_window_service"
@@ -1631,7 +1637,7 @@ class MaintenanceWindowScope(BaseModel):
         on_delete="CASCADE",
     )
 
-    created_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
 
     class Meta:
         table_name = "maintenance_window_scope"
@@ -1669,8 +1675,8 @@ class ServiceMatchRule(SoftDeleteModel):
     matchers = JSONTextField(null=True)
 
     enabled = BooleanField(default=True)
-    created_at = DateTimeField(default=datetime.utcnow)
-    updated_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
+    updated_at = DateTimeField(default=utc_now)
 
     class Meta:
         table_name = "service_match_rule"
@@ -1678,6 +1684,39 @@ class ServiceMatchRule(SoftDeleteModel):
             (("route", "position"), False),
             (("team", "position"), False),
             (("service", "enabled"), False),
+        )
+
+
+class MaintenanceWindowAlertApplication(BaseModel):
+    """One maintenance effect applied to an unresolved alert group."""
+
+    id = AutoField()
+    maintenance_window = ForeignKeyField(
+        MaintenanceWindow,
+        backref="alert_applications",
+        on_delete="CASCADE",
+    )
+    alert_group = DeferredForeignKey(
+        "AlertGroup",
+        backref="maintenance_applications",
+        on_delete="CASCADE",
+    )
+    behavior = CharField(index=True)
+    application_source = CharField(default="new")
+    previous_status = CharField(null=True)
+    occurrence_started_at = DateTimeField(null=True)
+    active = BooleanField(default=True, index=True)
+    applied_at = DateTimeField(default=utc_now)
+    retained_at = DateTimeField(null=True)
+    released_at = DateTimeField(null=True)
+    release_reason = CharField(null=True)
+
+    class Meta:
+        table_name = "maintenance_window_alert_application"
+        indexes = (
+            (("maintenance_window", "alert_group"), True),
+            (("alert_group", "active"), False),
+            (("maintenance_window", "active"), False),
         )
 
 
@@ -1715,6 +1754,13 @@ class AlertGroup(BaseModel):
         null=True,
         backref="alert_groups",
         on_delete="SET NULL",
+    )
+    notification_policy = ForeignKeyField(
+        NotificationPolicy,
+        null=True,
+        backref="alert_groups",
+        on_delete="SET NULL",
+        index=True,
     )
 
     next_escalation_at = DateTimeField(null=True, index=True)
@@ -1755,8 +1801,8 @@ class AlertGroup(BaseModel):
     )
     resolved_at = DateTimeField(null=True)
 
-    first_seen_at = DateTimeField(default=datetime.utcnow)
-    last_seen_at = DateTimeField(default=datetime.utcnow)
+    first_seen_at = DateTimeField(default=utc_now)
+    last_seen_at = DateTimeField(default=utc_now)
     last_notification_at = DateTimeField(null=True)
     notification_due_at = DateTimeField(null=True, index=True)
     notification_pending = BooleanField(default=False, index=True)
@@ -1786,8 +1832,8 @@ class AlertGroup(BaseModel):
     merged_at = DateTimeField(null=True)
     merge_reason = TextField(null=True)
 
-    created_at = DateTimeField(default=datetime.utcnow)
-    updated_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
+    updated_at = DateTimeField(default=utc_now)
 
     priority = ForeignKeyField(
         IncidentPriority,
@@ -1818,6 +1864,8 @@ class AlertGroup(BaseModel):
 
     maintenance_behavior = CharField(null=True)
     maintenance_suppressed = BooleanField(default=False, index=True)
+    orchestration_suppressed = BooleanField(default=False, index=True)
+    orchestration_suppress_reason = TextField(null=True)
 
     class Meta:
         table_name = "alert_group"
@@ -1849,6 +1897,13 @@ class Alert(BaseModel):
         backref="alerts",
         on_delete="SET NULL",
     )
+    notification_policy = ForeignKeyField(
+        NotificationPolicy,
+        null=True,
+        backref="alerts",
+        on_delete="SET NULL",
+        index=True,
+    )
     next_escalation_at = DateTimeField(null=True, index=True)
     last_escalated_at = DateTimeField(null=True)
     escalation_repeat_count = IntegerField(default=0)
@@ -1879,14 +1934,16 @@ class Alert(BaseModel):
 
     maintenance_behavior = CharField(null=True)
     maintenance_suppressed = BooleanField(default=False, index=True)
+    orchestration_suppressed = BooleanField(default=False, index=True)
+    orchestration_suppress_reason = TextField(null=True)
     labels = JSONTextField(null=True)
     payload = JSONTextField(null=True)
     status = CharField(default="firing")
     previous_status = CharField(null=True)
     acknowledged_by = ForeignKeyField(User, null=True, backref="acknowledged_alerts", on_delete="SET NULL")
     acknowledged_at = DateTimeField(null=True)
-    first_seen_at = DateTimeField(default=datetime.utcnow)
-    last_seen_at = DateTimeField(default=datetime.utcnow)
+    first_seen_at = DateTimeField(default=utc_now)
+    last_seen_at = DateTimeField(default=utc_now)
     last_notification_at = DateTimeField(null=True)
     reminder_count = IntegerField(default=0)
     escalation_level = IntegerField(default=0)
@@ -1935,8 +1992,8 @@ class AlertComment(BaseModel):
 
     body = TextField()
 
-    created_at = DateTimeField(default=datetime.utcnow)
-    updated_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
+    updated_at = DateTimeField(default=utc_now)
 
     deleted = BooleanField(default=False, index=True)
     deleted_at = DateTimeField(null=True)
@@ -2017,12 +2074,12 @@ class IncidentResponder(BaseModel):
     notification_status = CharField(default="pending", index=True)
     notification_error = TextField(null=True)
 
-    requested_at = DateTimeField(default=datetime.utcnow)
+    requested_at = DateTimeField(default=utc_now)
     responded_at = DateTimeField(null=True)
     expires_at = DateTimeField(null=True)
 
-    created_at = DateTimeField(default=datetime.utcnow)
-    updated_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
+    updated_at = DateTimeField(default=utc_now)
 
     class Meta:
         table_name = "incident_responder"
@@ -2074,8 +2131,8 @@ class IncidentStakeholder(BaseModel):
         on_delete="SET NULL",
     )
 
-    created_at = DateTimeField(default=datetime.utcnow)
-    updated_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
+    updated_at = DateTimeField(default=utc_now)
 
     class Meta:
         table_name = "incident_stakeholder"
@@ -2096,7 +2153,7 @@ class AlertEvent(BaseModel):
     event_type = CharField()
     message = TextField(null=True)
     user = ForeignKeyField(User, null=True, backref="alert_events", on_delete="SET NULL")
-    created_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
 
 
 class AlertExplainTrace(BaseModel):
@@ -2129,7 +2186,7 @@ class AlertExplainTrace(BaseModel):
     input_summary = JSONTextField(null=True)
     result = JSONTextField(null=True)
 
-    started_at = DateTimeField(default=datetime.utcnow, index=True)
+    started_at = DateTimeField(default=utc_now, index=True)
     finished_at = DateTimeField(null=True, index=True)
 
 
@@ -2154,7 +2211,7 @@ class AlertExplainStep(BaseModel):
     message = TextField(null=True)
 
     data = JSONTextField(null=True)
-    created_at = DateTimeField(default=datetime.utcnow, index=True)
+    created_at = DateTimeField(default=utc_now, index=True)
 
 
 class AlertGroupMerge(BaseModel):
@@ -2165,7 +2222,7 @@ class AlertGroupMerge(BaseModel):
     target_group = ForeignKeyField(AlertGroup, backref="target_merges", on_delete="CASCADE")
     merged_by = ForeignKeyField(User, null=True, backref="alert_group_merges", on_delete="SET NULL")
     reason = TextField(null=True)
-    created_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
 
     class Meta:
         table_name = "alert_group_merge"
@@ -2190,8 +2247,8 @@ class AlertNotification(BaseModel):
     provider_payload = JSONTextField(null=True)
     last_callback_at = DateTimeField(null=True)
     callback_count = IntegerField(default=0)
-    created_at = DateTimeField(default=datetime.utcnow)
-    updated_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
+    updated_at = DateTimeField(default=utc_now)
 
     class Meta:
         indexes = (
@@ -2215,7 +2272,7 @@ class AlertNotificationEvent(BaseModel):
     action = CharField(null=True)
     message = TextField(null=True)
     payload = JSONTextField(null=True)
-    created_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
 
     class Meta:
         indexes = (
@@ -2244,9 +2301,9 @@ class OnCallShiftEmailNotification(BaseModel):
     status = CharField(default="pending", index=True)  # pending | sent | failed | skipped
     last_error = TextField(null=True)
 
-    created_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
     sent_at = DateTimeField(null=True)
-    updated_at = DateTimeField(default=datetime.utcnow)
+    updated_at = DateTimeField(default=utc_now)
 
     class Meta:
         table_name = "oncall_shift_email_notification"
@@ -2278,9 +2335,9 @@ class OnCallShiftMattermostNotification(BaseModel):
     status = CharField(default="pending", index=True)  # pending | sent | failed | skipped
     last_error = TextField(null=True)
 
-    created_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
     sent_at = DateTimeField(null=True)
-    updated_at = DateTimeField(default=datetime.utcnow)
+    updated_at = DateTimeField(default=utc_now)
 
     class Meta:
         table_name = "oncall_shift_mattermost_notification"
@@ -2307,9 +2364,48 @@ class Silence(SoftDeleteModel):
     matchers = JSONTextField(null=True)
     starts_at = DateTimeField()
     ends_at = DateTimeField()
+    apply_to_existing = BooleanField(default=False)
+    reactivate_on_end = BooleanField(default=True)
+    reconciled_at = DateTimeField(null=True, index=True)
     created_by = ForeignKeyField(User, null=True, backref="created_silences", on_delete="SET NULL")
-    created_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
+    updated_at = DateTimeField(default=utc_now)
     enabled = BooleanField(default=True)
+
+
+class SilenceAlertApplication(BaseModel):
+    """Track which Silence currently suppresses a concrete alert."""
+
+    id = AutoField()
+    silence = ForeignKeyField(
+        Silence,
+        backref="alert_applications",
+        on_delete="CASCADE",
+    )
+    alert = ForeignKeyField(
+        Alert,
+        backref="silence_applications",
+        on_delete="CASCADE",
+    )
+    group = ForeignKeyField(
+        AlertGroup,
+        backref="silence_applications",
+        on_delete="CASCADE",
+    )
+    previous_status = CharField(default="firing")
+    source = CharField(default="new_alert")
+    active = BooleanField(default=True, index=True)
+    applied_at = DateTimeField(default=utc_now)
+    released_at = DateTimeField(null=True)
+    release_reason = CharField(null=True)
+
+    class Meta:
+        table_name = "silence_alert_application"
+        indexes = (
+            (("silence", "alert"), True),
+            (("alert", "active"), False),
+            (("group", "active"), False),
+        )
 
 
 class ApiToken(SoftDeleteModel):
@@ -2325,7 +2421,7 @@ class ApiToken(SoftDeleteModel):
     scopes = JSONTextField(null=True)
     expires_at = DateTimeField(null=True)
     active = BooleanField(default=True)
-    created_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
     last_used_at = DateTimeField(null=True)
 
 
@@ -2385,8 +2481,8 @@ class SsoProvider(SoftDeleteModel):
 
     extra_config = JSONTextField(null=True)
 
-    created_at = DateTimeField(default=datetime.utcnow)
-    updated_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
+    updated_at = DateTimeField(default=utc_now)
 
     class Meta:
         table_name = "sso_provider"
@@ -2405,7 +2501,7 @@ class SsoIdentity(BaseModel):
 
     raw_claims = JSONTextField(null=True)
 
-    created_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
     last_login_at = DateTimeField(null=True)
 
     class Meta:
@@ -2439,8 +2535,8 @@ class SsoGroupMapping(BaseModel):
     active = BooleanField(default=True)
     priority = IntegerField(default=100)
 
-    created_at = DateTimeField(default=datetime.utcnow)
-    updated_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
+    updated_at = DateTimeField(default=utc_now)
 
     class Meta:
         table_name = "sso_group_mapping"
@@ -2462,7 +2558,7 @@ class AuditLog(BaseModel):
     object_id = IntegerField(null=True)
     message = TextField(null=True)
     data = JSONTextField(null=True)
-    created_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
 
 
 class AppLock(BaseModel):
@@ -2472,7 +2568,7 @@ class AppLock(BaseModel):
     name = CharField(unique=True)
     owner = CharField()
     expires_at = DateTimeField()
-    updated_at = DateTimeField(default=datetime.utcnow)
+    updated_at = DateTimeField(default=utc_now)
 
 
 class RotationLayer(SoftDeleteModel):
@@ -2501,7 +2597,7 @@ class RotationLayer(SoftDeleteModel):
     timezone = CharField(null=True)
 
     enabled = BooleanField(default=True)
-    created_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
 
     class Meta:
         table_name = "rotation_layer"
@@ -2522,7 +2618,7 @@ class RotationLayerMember(BaseModel):
     # Period of this membership.
     # Removing a user closes the period.
     # Re-adding the same user creates a new row.
-    starts_at = DateTimeField(default=datetime.utcnow, index=True)
+    starts_at = DateTimeField(default=utc_now, index=True)
     ends_at = DateTimeField(null=True, index=True)
 
     class Meta:
@@ -2546,7 +2642,7 @@ class RotationLayerRestriction(BaseModel):
     weekday = IntegerField(null=True)
     start_time = CharField()
     end_time = CharField()
-    created_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
 
     class Meta:
         table_name = "rotation_layer_restriction"
@@ -2576,8 +2672,8 @@ class BrowserPushSubscription(BaseModel):
     deleted_at = DateTimeField(null=True)
 
     last_seen_at = DateTimeField(null=True)
-    created_at = DateTimeField(default=datetime.utcnow)
-    updated_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
+    updated_at = DateTimeField(default=utc_now)
 
     class Meta:
         table_name = "browser_push_subscription"
@@ -2605,7 +2701,7 @@ class BrowserPushActionToken(BaseModel):
     token_hash = CharField(max_length=128, unique=True)
     used_at = DateTimeField(null=True)
     expires_at = DateTimeField()
-    created_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
 
     class Meta:
         table_name = "browser_push_action_token"
@@ -2633,8 +2729,8 @@ class UserNotificationRule(SoftDeleteModel):
     severities = JSONTextField(null=True)
     event_types = JSONTextField(null=True)
 
-    created_at = DateTimeField(default=datetime.utcnow)
-    updated_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
+    updated_at = DateTimeField(default=utc_now)
 
     class Meta:
         table_name = "user_notification_rule"
@@ -2684,8 +2780,8 @@ class UserNotificationDelivery(BaseModel):
 
     last_error = TextField(null=True)
 
-    created_at = DateTimeField(default=datetime.utcnow)
-    updated_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
+    updated_at = DateTimeField(default=utc_now)
 
     class Meta:
         table_name = "user_notification_delivery"
@@ -2713,5 +2809,502 @@ class CalendarFeed(SoftDeleteModel):
         backref="calendar_feeds",
         on_delete="SET NULL",
     )
-    created_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
     last_used_at = DateTimeField(null=True)
+
+# BEGIN EVENT ORCHESTRATION V1 MODELS
+
+EVENT_ORCHESTRATION_SCOPES = ("global", "service")
+EVENT_ORCHESTRATION_MODES = ("active", "shadow", "disabled")
+EVENT_ORCHESTRATION_COMPATIBILITY_MODES = ("legacy", "hybrid", "orchestration")
+EVENT_ORCHESTRATION_VERSION_STATUSES = ("draft", "published", "archived")
+EVENT_ORCHESTRATION_PROCESSING_MODES = (
+    "continue",
+    "stop",
+    "evaluate_children",
+    "children_then_continue",
+)
+
+
+class EventOrchestration(SoftDeleteModel):
+    """A group-owned orchestration with one atomically selected active version."""
+
+    id = AutoField()
+    uid = UUIDField(default=uuid.uuid4, unique=True, index=True)
+    group = ForeignKeyField(
+        Group,
+        backref="event_orchestrations",
+        on_delete="CASCADE",
+        index=True,
+    )
+    name = CharField(max_length=255)
+    description = TextField(null=True)
+    scope = CharField(max_length=32, default="global", index=True)
+    service = ForeignKeyField(
+        Service,
+        backref="event_orchestrations",
+        null=True,
+        on_delete="SET NULL",
+        index=True,
+    )
+    enabled = BooleanField(default=False, index=True)
+    mode = CharField(max_length=32, default="disabled", index=True)
+    compatibility_mode = CharField(max_length=32, default="legacy", index=True)
+    # Kept as an integer to avoid a circular DDL dependency between the
+    # orchestration and orchestration-version tables. Repository code verifies
+    # that the selected version belongs to this orchestration.
+    active_version_id = IntegerField(null=True, index=True)
+    created_by = ForeignKeyField(
+        User,
+        backref="created_event_orchestrations",
+        null=True,
+        on_delete="SET NULL",
+    )
+    created_at = DateTimeField(default=utc_now, index=True)
+    updated_at = DateTimeField(default=utc_now)
+
+    class Meta:
+        table_name = "event_orchestration"
+        indexes = (
+            (("group", "name"), True),
+            (("group", "scope"), False),
+            (("group", "mode", "enabled"), False),
+            (("group", "compatibility_mode", "enabled"), False),
+            (("service", "enabled"), False),
+        )
+
+    def save(self, *args, **kwargs):
+        if self.scope not in EVENT_ORCHESTRATION_SCOPES:
+            raise ValueError("Invalid orchestration scope")
+        if self.mode not in EVENT_ORCHESTRATION_MODES:
+            raise ValueError("Invalid orchestration mode")
+        if self.compatibility_mode not in EVENT_ORCHESTRATION_COMPATIBILITY_MODES:
+            raise ValueError("Invalid orchestration compatibility mode")
+
+        if self.scope == "global" and self.service_id is not None:
+            raise ValueError("Global orchestration cannot reference a service")
+        if self.scope == "service" and self.service_id is None:
+            raise ValueError("Service-scoped orchestration requires a service")
+
+        if self.service_id is not None:
+            service_group_id = (
+                Service.select(Service.group)
+                .where(Service.id == self.service_id)
+                .scalar()
+            )
+            if service_group_id is None:
+                raise ValueError("Referenced service does not exist")
+            if int(service_group_id) != int(self.group_id):
+                raise ValueError("Referenced service belongs to another group")
+
+        self.updated_at = utc_now()
+        return super().save(*args, **kwargs)
+
+
+class EventOrchestrationVersion(BaseModel):
+    """An immutable published orchestration definition."""
+
+    id = AutoField()
+    orchestration = ForeignKeyField(
+        EventOrchestration,
+        backref="versions",
+        on_delete="CASCADE",
+        index=True,
+    )
+    version_number = IntegerField()
+    status = CharField(max_length=32, default="draft", index=True)
+    definition_hash = CharField(max_length=64, null=True, index=True)
+    definition_json = JSONTextField(default=dict)
+    comment = TextField(null=True)
+    created_by = ForeignKeyField(
+        User,
+        backref="created_event_orchestration_versions",
+        null=True,
+        on_delete="SET NULL",
+    )
+    published_by = ForeignKeyField(
+        User,
+        backref="published_event_orchestration_versions",
+        null=True,
+        on_delete="SET NULL",
+    )
+    created_at = DateTimeField(default=utc_now, index=True)
+    updated_at = DateTimeField(default=utc_now)
+    published_at = DateTimeField(null=True, index=True)
+
+    class Meta:
+        table_name = "event_orchestration_version"
+        indexes = (
+            (("orchestration", "version_number"), True),
+            (("orchestration", "status"), False),
+        )
+
+    def save(self, *args, **kwargs):
+        if self.status not in EVENT_ORCHESTRATION_VERSION_STATUSES:
+            raise ValueError("Invalid orchestration version status")
+
+        if self.id is None and self.status != "draft":
+            raise ValueError("New orchestration versions must start as drafts")
+
+        if self.id is not None:
+            current = (
+                EventOrchestrationVersion.select(
+                    EventOrchestrationVersion.status,
+                )
+                .where(EventOrchestrationVersion.id == self.id)
+                .dicts()
+                .get()
+            )
+            dirty = {field.name for field in self.dirty_fields}
+            current_status = current["status"]
+
+            # A published version may only be archived. All other changes are
+            # rejected. Repository publication uses an atomic UPDATE for this
+            # narrowly allowed state transition.
+            archive_only = (
+                current_status == "published"
+                and self.status == "archived"
+                and dirty.issubset({"status", "updated_at"})
+            )
+            if current_status in ("published", "archived") and not archive_only:
+                raise ValueError("Published orchestration versions are immutable")
+
+        self.updated_at = utc_now()
+        return super().save(*args, **kwargs)
+
+    def delete_instance(self, *args, **kwargs):
+        if self.status != "draft":
+            raise ValueError("Published orchestration versions cannot be deleted")
+        return super().delete_instance(*args, **kwargs)
+
+
+class EventOrchestrationRule(BaseModel):
+    """A deterministic ordered rule tree belonging to one draft/version."""
+
+    id = AutoField()
+    version = ForeignKeyField(
+        EventOrchestrationVersion,
+        backref="rules",
+        on_delete="CASCADE",
+        index=True,
+    )
+    parent_rule = ForeignKeyField(
+        "self",
+        backref="children",
+        null=True,
+        on_delete="CASCADE",
+        index=True,
+    )
+    position = IntegerField(default=0)
+    name = CharField(max_length=255)
+    description = TextField(null=True)
+    enabled = BooleanField(default=True, index=True)
+    condition_tree_json = JSONTextField(default=dict)
+    actions_json = JSONTextField(default=list)
+    processing_mode = CharField(max_length=32, default="continue")
+    created_at = DateTimeField(default=utc_now, index=True)
+    updated_at = DateTimeField(default=utc_now)
+
+    class Meta:
+        table_name = "event_orchestration_rule"
+        indexes = (
+            (("version", "parent_rule", "position"), True),
+            (("version", "enabled"), False),
+        )
+
+    def _assert_draft(self):
+        version_status = (
+            EventOrchestrationVersion.select(EventOrchestrationVersion.status)
+            .where(EventOrchestrationVersion.id == self.version_id)
+            .scalar()
+        )
+        if version_status != "draft":
+            raise ValueError("Rules of published orchestration versions are immutable")
+
+    def save(self, *args, **kwargs):
+        if self.processing_mode not in EVENT_ORCHESTRATION_PROCESSING_MODES:
+            raise ValueError("Invalid orchestration rule processing mode")
+        if self.version_id is None:
+            raise ValueError("Orchestration rule requires a version")
+        self._assert_draft()
+
+        if self.parent_rule_id is not None:
+            parent_version_id = (
+                EventOrchestrationRule.select(EventOrchestrationRule.version)
+                .where(EventOrchestrationRule.id == self.parent_rule_id)
+                .scalar()
+            )
+            if parent_version_id is None:
+                raise ValueError("Parent orchestration rule does not exist")
+            if int(parent_version_id) != int(self.version_id):
+                raise ValueError("Parent rule belongs to another version")
+
+        self.updated_at = utc_now()
+        return super().save(*args, **kwargs)
+
+    def delete_instance(self, *args, **kwargs):
+        self._assert_draft()
+        return super().delete_instance(*args, **kwargs)
+
+
+class OrchestrationIntakeToken(BaseModel):
+    """Hashed intake credential scoped to a single orchestration."""
+
+    id = AutoField()
+    orchestration = ForeignKeyField(
+        EventOrchestration,
+        backref="intake_tokens",
+        on_delete="CASCADE",
+        index=True,
+    )
+    name = CharField(max_length=255)
+    token_hash = CharField(max_length=255, unique=True, index=True)
+    token_prefix = CharField(max_length=24, null=True, index=True)
+    enabled = BooleanField(default=True, index=True)
+    created_by = ForeignKeyField(
+        User,
+        backref="created_orchestration_intake_tokens",
+        null=True,
+        on_delete="SET NULL",
+    )
+    created_at = DateTimeField(default=utc_now, index=True)
+    last_used_at = DateTimeField(null=True)
+    revoked_at = DateTimeField(null=True, index=True)
+
+    class Meta:
+        table_name = "orchestration_intake_token"
+        indexes = (
+            (("orchestration", "name"), True),
+            (("orchestration", "enabled"), False),
+        )
+
+
+class OrchestrationExecution(BaseModel):
+    """Immutable execution audit record for explainability and retention."""
+
+    id = AutoField()
+    uid = UUIDField(default=uuid.uuid4, unique=True, index=True)
+    group = ForeignKeyField(
+        Group,
+        backref="orchestration_executions",
+        on_delete="CASCADE",
+        index=True,
+    )
+    orchestration = ForeignKeyField(
+        EventOrchestration,
+        backref="executions",
+        on_delete="CASCADE",
+        index=True,
+    )
+    version = ForeignKeyField(
+        EventOrchestrationVersion,
+        backref="executions",
+        on_delete="RESTRICT",
+        index=True,
+    )
+    source = CharField(max_length=128, null=True, index=True)
+    integration_name = CharField(max_length=255, null=True)
+    event_fingerprint = CharField(max_length=255, null=True, index=True)
+    disposition = CharField(max_length=64, null=True, index=True)
+    matched_rule_count = IntegerField(default=0)
+    duration_ms = IntegerField(null=True)
+    trace_json = JSONTextField(default=dict)
+    # Deliberately retained as scalar IDs: execution history must remain
+    # readable even if an alert or alert group is later removed.
+    alert_id = IntegerField(null=True, index=True)
+    alert_group_id = IntegerField(null=True, index=True)
+    created_at = DateTimeField(default=utc_now, index=True)
+    expires_at = DateTimeField(null=True, index=True)
+
+    class Meta:
+        table_name = "orchestration_execution"
+        indexes = (
+            (("group", "created_at"), False),
+            (("orchestration", "created_at"), False),
+            (("version", "created_at"), False),
+            (("event_fingerprint", "created_at"), False),
+        )
+
+
+class PendingOrchestratedEvent(BaseModel):
+    """A paused normalized event waiting to enter the normal alert lifecycle."""
+
+    id = AutoField()
+    uid = UUIDField(default=uuid.uuid4, unique=True, index=True)
+    group = ForeignKeyField(
+        Group,
+        backref="pending_orchestrated_events",
+        on_delete="CASCADE",
+        index=True,
+    )
+    orchestration = ForeignKeyField(
+        EventOrchestration,
+        backref="pending_events",
+        on_delete="CASCADE",
+        index=True,
+    )
+    version = ForeignKeyField(
+        EventOrchestrationVersion,
+        backref="pending_events",
+        on_delete="RESTRICT",
+        index=True,
+    )
+    route = ForeignKeyField(
+        AlertRoute,
+        null=True,
+        backref="pending_orchestrated_events",
+        on_delete="SET NULL",
+        index=True,
+    )
+    service = ForeignKeyField(
+        Service,
+        null=True,
+        backref="pending_orchestrated_events",
+        on_delete="SET NULL",
+        index=True,
+    )
+    source = CharField(max_length=128, index=True)
+    integration_name = CharField(max_length=255, null=True)
+    dedup_key = CharField(max_length=255, index=True)
+    active_key = CharField(max_length=64, null=True, unique=True, index=True)
+    normalized_event_json = JSONTextField(default=dict)
+    context_json = JSONTextField(default=dict)
+    activation_at = DateTimeField(index=True)
+    status = CharField(max_length=32, default="pending", index=True)
+    attempts = IntegerField(default=0)
+    last_error = TextField(null=True)
+    claim_token = CharField(max_length=64, null=True, index=True)
+    claimed_at = DateTimeField(null=True, index=True)
+    next_attempt_at = DateTimeField(null=True, index=True)
+    created_at = DateTimeField(default=utc_now, index=True)
+    updated_at = DateTimeField(default=utc_now)
+    resolved_at = DateTimeField(null=True, index=True)
+    activated_at = DateTimeField(null=True, index=True)
+
+    class Meta:
+        table_name = "pending_orchestrated_event"
+        indexes = (
+            (("status", "activation_at"), False),
+            (("group", "source", "dedup_key"), False),
+            (("status", "next_attempt_at"), False),
+        )
+
+
+
+ORCHESTRATION_WEBHOOK_METHODS = ("GET", "POST", "PUT", "PATCH", "DELETE")
+ORCHESTRATION_WEBHOOK_PRIVATE_NETWORK_POLICIES = ("deny", "allowlist")
+AUTOMATION_EXECUTION_STATUSES = (
+    "pending",
+    "running",
+    "succeeded",
+    "failed",
+    "cancelled",
+)
+
+
+class OrchestrationWebhookAction(SoftDeleteModel):
+    """Reusable group-owned outbound webhook action configuration."""
+
+    id = AutoField()
+    uid = UUIDField(default=uuid.uuid4, unique=True, index=True)
+    group = ForeignKeyField(
+        Group,
+        backref="orchestration_webhook_actions",
+        on_delete="CASCADE",
+        index=True,
+    )
+    name = CharField(max_length=255)
+    description = TextField(null=True)
+    url = TextField()
+    method = CharField(max_length=16, default="POST")
+    headers_encrypted = TextField(null=True)
+    body_template = TextField(null=True)
+    timeout_seconds = IntegerField(default=10)
+    retry_count = IntegerField(default=2)
+    private_network_policy = CharField(max_length=32, default="deny")
+    enabled = BooleanField(default=True, index=True)
+    created_by = ForeignKeyField(
+        User,
+        backref="created_orchestration_webhook_actions",
+        null=True,
+        on_delete="SET NULL",
+    )
+    created_at = DateTimeField(default=utc_now, index=True)
+    updated_at = DateTimeField(default=utc_now)
+
+    class Meta:
+        table_name = "orchestration_webhook_action"
+        indexes = (
+            (("group", "name"), True),
+            (("group", "enabled"), False),
+        )
+
+    def save(self, *args, **kwargs):
+        self.method = str(self.method or "POST").upper()
+        if self.method not in ORCHESTRATION_WEBHOOK_METHODS:
+            raise ValueError("Invalid orchestration webhook method")
+        if self.private_network_policy not in ORCHESTRATION_WEBHOOK_PRIVATE_NETWORK_POLICIES:
+            raise ValueError("Invalid orchestration webhook private network policy")
+        if isinstance(self.timeout_seconds, bool) or not 1 <= int(self.timeout_seconds) <= 60:
+            raise ValueError("Webhook timeout must be between 1 and 60 seconds")
+        if isinstance(self.retry_count, bool) or not 0 <= int(self.retry_count) <= 10:
+            raise ValueError("Webhook retry count must be between 0 and 10")
+        self.updated_at = utc_now()
+        return super().save(*args, **kwargs)
+
+
+class AutomationExecution(BaseModel):
+    """Queued and audited execution of one orchestration webhook action."""
+
+    id = AutoField()
+    uid = UUIDField(default=uuid.uuid4, unique=True, index=True)
+    action = ForeignKeyField(
+        OrchestrationWebhookAction,
+        backref="executions",
+        on_delete="RESTRICT",
+        index=True,
+    )
+    orchestration_execution = ForeignKeyField(
+        OrchestrationExecution,
+        backref="automation_executions",
+        on_delete="CASCADE",
+        index=True,
+    )
+    group = ForeignKeyField(
+        Group,
+        backref="automation_executions",
+        on_delete="CASCADE",
+        index=True,
+    )
+    alert_group_id = IntegerField(null=True, index=True)
+    rule_path = CharField(max_length=512, null=True)
+    status = CharField(max_length=32, default="pending", index=True)
+    attempts = IntegerField(default=0)
+    idempotency_key = CharField(max_length=128, unique=True, index=True)
+    request_metadata_json = JSONTextField(default=dict)
+    request_headers_encrypted = TextField(null=True)
+    request_body_encrypted = TextField(null=True)
+    response_status = IntegerField(null=True)
+    response_excerpt_safe = TextField(null=True)
+    error_safe = TextField(null=True)
+    next_attempt_at = DateTimeField(null=True, index=True)
+    claim_token = CharField(max_length=64, null=True, index=True)
+    claimed_at = DateTimeField(null=True, index=True)
+    created_at = DateTimeField(default=utc_now, index=True)
+    started_at = DateTimeField(null=True, index=True)
+    finished_at = DateTimeField(null=True, index=True)
+
+    class Meta:
+        table_name = "automation_execution"
+        indexes = (
+            (("status", "next_attempt_at"), False),
+            (("group", "status", "created_at"), False),
+            (("orchestration_execution", "created_at"), False),
+        )
+
+    def save(self, *args, **kwargs):
+        if self.status not in AUTOMATION_EXECUTION_STATUSES:
+            raise ValueError("Invalid automation execution status")
+        return super().save(*args, **kwargs)
+
+# END EVENT ORCHESTRATION V1 MODELS

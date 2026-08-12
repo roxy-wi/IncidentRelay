@@ -18,7 +18,7 @@ USER_RESPONSE_SCHEMA = {
         "email": {"type": "string", "format": "email", "nullable": True, "description": "User email address.", "example": "ivan@example.com"},
         "phone": {"type": "string", "nullable": True, "description": "Phone number for voice integrations.", "example": "+77001234567"},
         "telegram_user_id": {"type": "string", "nullable": True, "description": "Telegram user ID used for direct notifications.", "example": "123456789"},
-        "slack_user_id": {"type": "string", "nullable": True, "description": "Slack user id used for direct notifications.", "example": "U012ABCDEF"},
+        "slack_user_id": {"type": "string", "nullable": True, "description": "Slack user ID used to attribute interactive Slack ACK/Resolve actions to an IncidentRelay user.", "example": "U012ABCDEF"},
         "mattermost_user_id": {
             "type": "string",
             "nullable": True,
@@ -53,7 +53,7 @@ USER_BASE_PROPERTIES = {
     "email": {"type": "string", "format": "email", "nullable": True, "description": "User email address.", "example": "ivan@example.com"},
     "phone": {"type": "string", "nullable": True, "maxLength": PHONE_MAX_LENGTH, "description": "Phone number for voice integrations.", "example": "+77001234567"},
     "telegram_user_id": {"type": "string", "nullable": True, "maxLength": CONTACT_ID_MAX_LENGTH, "description": "Telegram user ID used for direct notifications.", "example": "123456789"},
-    "slack_user_id": {"type": "string", "nullable": True, "maxLength": CONTACT_ID_MAX_LENGTH, "description": "Slack user id used for direct notifications.", "example": "U012ABCDEF"},
+    "slack_user_id": {"type": "string", "nullable": True, "maxLength": CONTACT_ID_MAX_LENGTH, "description": "Slack user ID used to attribute interactive Slack ACK/Resolve actions to an IncidentRelay user.", "example": "U012ABCDEF"},
     "mattermost_user_id": {
         "type": "string",
         "nullable": True,

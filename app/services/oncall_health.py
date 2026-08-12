@@ -1,11 +1,13 @@
 from dataclasses import dataclass
-from datetime import datetime, timedelta, timezone as dt_timezone
+from datetime import datetime, timedelta
 from typing import Iterable
 
 from peewee import DoesNotExist
 
 from app.modules.db import channels_repo, rotations_repo, routes_repo, teams_repo
 from app.services.oncall import get_current_oncall_user
+from app.modules.common import as_utc_naive_seconds, utc_now_seconds
+from app.services.serializers.common import serialize_utc_datetime
 
 DEFAULT_HEALTH_WINDOW_DAYS = 7
 DEFAULT_HEALTH_SAMPLE_MINUTES = 60
@@ -60,31 +62,19 @@ class HealthIssue:
         }
 
 
-def utc_now_naive() -> datetime:
-    return datetime.utcnow().replace(microsecond=0)
-
-
-def as_utc_naive(value: datetime | None) -> datetime | None:
-    if value is None:
-        return None
-    if value.tzinfo is None:
-        return value.replace(microsecond=0)
-    return value.astimezone(dt_timezone.utc).replace(tzinfo=None, microsecond=0)
-
-
 def serialize_health_datetime(value: datetime | None) -> str | None:
-    value = as_utc_naive(value)
+    value = as_utc_naive_seconds(value)
     if value is None:
         return None
-    return value.replace(tzinfo=dt_timezone.utc).isoformat().replace("+00:00", "Z")
+    return serialize_utc_datetime(value)
 
 
 def default_window(
     starts_at: datetime | None = None,
     ends_at: datetime | None = None,
 ) -> tuple[datetime, datetime]:
-    start = as_utc_naive(starts_at) or utc_now_naive()
-    end = as_utc_naive(ends_at) or (start + timedelta(days=DEFAULT_HEALTH_WINDOW_DAYS))
+    start = as_utc_naive_seconds(starts_at) or utc_now_seconds()
+    end = as_utc_naive_seconds(ends_at) or (start + timedelta(days=DEFAULT_HEALTH_WINDOW_DAYS))
     if end <= start:
         end = start + timedelta(days=DEFAULT_HEALTH_WINDOW_DAYS)
     return start, end

@@ -127,5 +127,9 @@
   "services.dependencies.hard": "hart",
   "services.dependencies.soft": "Weich",
   "services.dependencies.external": "Außen",
-  "services.dependencies.informational": "Informativ"
+  "services.dependencies.informational": "Informativ",
+  "services.details.event_orchestrations": "Ereignis-Orchestrierungen",
+  "services.details.orchestration_disabled": "Deaktiviert",
+  "services.details.orchestration_active": "Aktiv",
+  "services.details.orchestration_shadow": "Schattenmodus"
 }

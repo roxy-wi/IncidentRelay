@@ -7,6 +7,7 @@ from app.modules.logger import setup_json_logging
 from app.i18n import register_i18n
 from app.middleware import enforce_api_authentication
 from app.views.admin_users_view import admin_users_bp
+from app.views.audit_logs_view import audit_logs_bp
 from app.views.alerts_view import alerts_bp
 from app.views.auth_view import auth_bp
 from app.views.calendar_view import calendar_bp
@@ -41,6 +42,10 @@ from app.views.priority_policies_view import priority_policies_bp
 from app.views.matchers_view import matchers_bp
 from app.views.business_services.routes import business_services_bp
 from app.views.heartbeats_view import heartbeats_bp
+from app.views.orchestrations_view import (
+    orchestrations_bp,
+    orchestration_webhook_actions_bp,
+)
 
 
 def create_app(log_role=None):
@@ -107,6 +112,7 @@ def register_blueprints(flask_app):
     flask_app.register_blueprint(teams_bp, url_prefix="/api/teams")
     flask_app.register_blueprint(users_bp, url_prefix="/api/users")
     flask_app.register_blueprint(admin_users_bp, url_prefix="/api/admin/users")
+    flask_app.register_blueprint(audit_logs_bp, url_prefix="/api/admin/audit-logs")
     flask_app.register_blueprint(rotations_bp, url_prefix="/api/rotations")
     flask_app.register_blueprint(oncall_health_bp, url_prefix="/api/oncall-health")
     flask_app.register_blueprint(calendar_bp, url_prefix="/api/calendar")
@@ -130,3 +136,8 @@ def register_blueprints(flask_app):
     flask_app.register_blueprint(priority_policies_bp, url_prefix="/api/priority-policies")
     flask_app.register_blueprint(business_services_bp)
     flask_app.register_blueprint(heartbeats_bp, url_prefix="/api/heartbeats")
+    flask_app.register_blueprint(orchestrations_bp, url_prefix="/api/event-orchestrations")
+    flask_app.register_blueprint(
+        orchestration_webhook_actions_bp,
+        url_prefix="/api/orchestration-webhook-actions",
+    )

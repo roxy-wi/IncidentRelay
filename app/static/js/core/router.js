@@ -38,6 +38,10 @@ function navigate(path, pushState) {
         showAppError(i18n.t("errors.admin_role_required"));
         path = "/";
     }
+    if (routePath === "/admin/audit-log" && !hasAuditLogAccess()) {
+        showAppError(i18n.t("audit.errors.access_denied"));
+        path = "/";
+    }
     if (routePath === "/admin/users" && !hasGroupUserAdminAccess()) {
         showAppError(i18n.t("errors.group_admin_role_required"));
         path = "/";
@@ -110,12 +114,19 @@ function updateAuthUi() {
      */
     const isGlobalAdmin = !!(currentUser && currentUser.is_admin);
     const canManageUsers = hasGroupUserAdminAccess();
+    const canViewAuditLog = hasAuditLogAccess();
     const adminSection = $(".menu-section-admin, .menu-link-admin");
 
     adminSection.addClass("is-hidden");
     $(".menu-link-users").addClass("is-hidden");
     $(".menu-link-groups").addClass("is-hidden");
     $(".menu-link-global-admin").addClass("is-hidden");
+    $(".menu-link-audit").addClass("is-hidden");
+
+    if (canViewAuditLog) {
+        adminSection.removeClass("is-hidden");
+        $(".menu-link-audit").removeClass("is-hidden");
+    }
 
     if (canManageUsers) {
         adminSection.removeClass("is-hidden");
@@ -128,6 +139,7 @@ function updateAuthUi() {
         $(".menu-link-users").removeClass("is-hidden");
         $(".menu-link-groups").removeClass("is-hidden");
         $(".menu-link-global-admin").removeClass("is-hidden");
+        $(".menu-link-audit").removeClass("is-hidden");
     }
 
     if (currentUser) {
@@ -240,6 +252,22 @@ function currentAppUrl() {
      */
     return window.location.pathname + window.location.search + window.location.hash;
 }
+
+function hasAuditLogAccess() {
+    /*
+     * Audit logs are visible to global admins and group editors only.
+     */
+    if (!currentUser) {
+        return false;
+    }
+    if (currentUser.is_admin) {
+        return true;
+    }
+    return asArray(currentUser.groups).some(function (group) {
+        return group.role === GROUP_EDITOR_ROLE || group.role === "editor";
+    });
+}
+
 
 function hasGroupUserAdminAccess() {
     /*

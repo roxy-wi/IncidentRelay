@@ -14,6 +14,7 @@ from app.modules.db.models import (
     AlertGroup,
     BusinessService,
     BusinessServiceComponent,
+    EventOrchestration,
     ServiceDependency,
     ServiceLink,
     ServiceMatchRule,
@@ -27,6 +28,7 @@ from tests.factories import (
     create_impact_alert_group,
     create_service_dependency,
 )
+from app.modules.common import utc_now
 
 
 def service_payload(team, **overrides):
@@ -787,7 +789,7 @@ def create_service_alert_group(
     alertname="ServiceAlert",
     summary="Service alert",
 ):
-    now = datetime.utcnow()
+    now = utc_now()
 
     labels = {
         "alertname": alertname,
@@ -847,6 +849,17 @@ def test_service_details_returns_aggregated_context(client, admin_headers):
     )
     route = create_route(team, service=service)
 
+    orchestration = EventOrchestration.create(
+        group=group,
+        name="Billing orchestration",
+        description="Service-scoped routing",
+        scope="service",
+        service=service,
+        enabled=True,
+        mode="shadow",
+        compatibility_mode="hybrid",
+    )
+
     ServiceLink.create(
         service=service,
         link_type="dashboard",
@@ -903,6 +916,16 @@ def test_service_details_returns_aggregated_context(client, admin_headers):
 
     assert data["service"]["id"] == service.id
     assert data["service"]["slug"] == "billing-api"
+    assert data["event_orchestrations"] == [
+        {
+            "id": orchestration.id,
+            "name": "Billing orchestration",
+            "mode": "shadow",
+            "enabled": True,
+            "compatibility_mode": "hybrid",
+            "active_version_id": None,
+        }
+    ]
 
     assert data["summary"]["links"] == 1
     assert data["summary"]["runbooks"] == 1

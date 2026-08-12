@@ -134,5 +134,13 @@
   "maintenance.permissions.duplicate": "Die Rolle des Teammanagers ist erforderlich, um dieses Wartungsfenster zu duplizieren.",
   "maintenance.permissions.cancel": "Die Rolle des Teammanagers ist erforderlich, um dieses Wartungsfenster abzubrechen.",
   "maintenance.permissions.delete": "Die Löschberechtigung ist erforderlich, um dieses Wartungsfenster zu löschen.",
-  "maintenance.badge.default": "Wartung"
+  "maintenance.badge.default": "Wartung",
+  "maintenance.form.apply_to_existing": "Auf bestehende ungelöste Alarme anwenden",
+  "maintenance.form.apply_to_existing_help": "Optional. Passende ungelöste Alarmgruppen, die beim Start bereits bestanden, werden sofort berücksichtigt.",
+  "maintenance.form.apply_to_existing_unavailable": "„Vorfall unterdrücken“ verhindert die Erstellung neuer Alarmgruppen und kann nicht rückwirkend angewendet werden.",
+  "maintenance.form.reactivate_on_end": "Betroffene Alarme nach Ende der Wartung reaktivieren",
+  "maintenance.form.reactivate_on_end_help": "Standardmäßig aktiviert. Effekte werden erst nach dem letzten anwendbaren Wartungsfenster aufgehoben.",
+  "maintenance.form.reactivate_on_end_warning": "Betroffene Alarme behalten den Wartungseffekt nach Ende dieses Fensters bei. Aktivieren Sie die Option später und speichern Sie das Fenster, um sie freizugeben.",
+  "maintenance.details.apply_to_existing": "Bestehende Alarme",
+  "maintenance.details.reactivate_on_end": "Nach Ende reaktivieren"
 }

@@ -13,6 +13,8 @@ from app.notifiers.email.notifier import EmailNotifier
 from app.notifiers.voice.notifier import VoiceCallNotifier
 from app.services.severity import normalize_severity, normalize_severity_list
 from app.modules.db import alerts_repo
+from app.modules.common import utc_now
+from app.services.alerts.maintenance_state import is_notification_lifecycle_suppressed
 
 
 logger = logging.getLogger("oncall.notification_rules")
@@ -62,6 +64,9 @@ def should_skip_delivery_for_group_status(delivery):
         return False
 
     group = AlertGroup.get_by_id(delivery.group_id)
+
+    if is_notification_lifecycle_suppressed(group):
+        return True
 
     return group.status != "firing"
 
@@ -123,8 +128,8 @@ def create_user_rule(
         severities=severities or [],
         event_types=event_types or [],
         enabled=enabled,
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
+        created_at=utc_now(),
+        updated_at=utc_now(),
     )
 
 
@@ -143,7 +148,7 @@ def update_user_rule(user, rule_id, payload):
     rule.severities = severities or []
     rule.event_types = event_types or []
     rule.enabled = bool(payload.get("enabled", rule.enabled))
-    rule.updated_at = datetime.utcnow()
+    rule.updated_at = utc_now()
     rule.save()
 
     return rule
@@ -153,9 +158,9 @@ def delete_user_rule(user, rule_id):
     rule = get_user_rule(user, rule_id)
 
     rule.deleted = True
-    rule.deleted_at = datetime.utcnow()
+    rule.deleted_at = utc_now()
     rule.enabled = False
-    rule.updated_at = datetime.utcnow()
+    rule.updated_at = utc_now()
     rule.save()
 
     return rule
@@ -289,6 +294,12 @@ def enqueue_user_notifications(group, event_type="notification"):
 
     group = _ensure_alert_group(group)
 
+    if (
+        event_type in SKIP_IF_NOT_FIRING_EVENT_TYPES
+        and is_notification_lifecycle_suppressed(group)
+    ):
+        return 0
+
     assignee = getattr(group, "assignee", None)
     assignee_id = getattr(group, "assignee_id", None)
 
@@ -301,7 +312,7 @@ def enqueue_user_notifications(group, event_type="notification"):
         except User.DoesNotExist:
             return 0
 
-    now = datetime.utcnow()
+    now = utc_now()
 
     # Default profile browser push when the user has no custom rules.
     if not has_custom_user_rules(assignee.id):
@@ -354,14 +365,14 @@ def create_delivery(group, user, rule, method, event_type, scheduled_at):
         event_type=event_type,
         status="pending",
         scheduled_at=scheduled_at,
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
+        created_at=utc_now(),
+        updated_at=utc_now(),
     )
 
 
 def process_due_user_notifications(limit=100):
     """Process due user notification deliveries and return sent count."""
-    now = datetime.utcnow()
+    now = utc_now()
     processed = 0
 
     due_deliveries = (
@@ -380,7 +391,7 @@ def process_due_user_notifications(limit=100):
             UserNotificationDelivery
             .update(
                 status="processing",
-                updated_at=datetime.utcnow(),
+                updated_at=utc_now(),
             )
             .where(
                 (UserNotificationDelivery.id == due_delivery.id)
@@ -393,6 +404,18 @@ def process_due_user_notifications(limit=100):
             continue
 
         delivery = UserNotificationDelivery.get_by_id(due_delivery.id)
+
+        group = AlertGroup.get_by_id(delivery.group_id)
+
+        if (
+            delivery.event_type in SKIP_IF_NOT_FIRING_EVENT_TYPES
+            and is_notification_lifecycle_suppressed(group)
+        ):
+            mark_delivery_skipped(
+                delivery,
+                "maintenance_suppressed",
+            )
+            continue
 
         if should_skip_delivery_for_group_status(delivery):
             mark_delivery_skipped(
@@ -408,7 +431,7 @@ def process_due_user_notifications(limit=100):
 
 def send_browser_push_delivery(delivery):
     """Send browser push delivery and update delivery history."""
-    now = datetime.utcnow()
+    now = utc_now()
     group = delivery.group
 
     try:
@@ -471,6 +494,10 @@ def send_delivery(delivery):
         return 0
 
     if delivery.event_type in SKIP_IF_NOT_FIRING_EVENT_TYPES:
+        if is_notification_lifecycle_suppressed(group):
+            mark_delivery_skipped(delivery, "maintenance_suppressed")
+            return 0
+
         if group.status != "firing":
             mark_delivery_skipped(delivery, "alert_not_firing")
             return 0
@@ -493,14 +520,14 @@ def send_delivery(delivery):
         return 0
 
     delivery.status = "sent"
-    delivery.sent_at = datetime.utcnow()
+    delivery.sent_at = utc_now()
     delivery.provider = result.get("provider") or delivery.method
     delivery.external_message_id = result.get("external_message_id")
     delivery.external_channel_id = result.get("external_channel_id")
     delivery.provider_status = result.get("provider_status")
     delivery.provider_payload = result.get("provider_payload")
     delivery.last_error = None
-    delivery.updated_at = datetime.utcnow()
+    delivery.updated_at = utc_now()
     delivery.save()
 
     return 1
@@ -555,7 +582,7 @@ def build_voice_rule_callback_url(delivery):
 
 def mark_delivery_skipped(delivery, reason):
     """Mark user notification delivery as skipped."""
-    now = datetime.utcnow()
+    now = utc_now()
 
     (
         UserNotificationDelivery
@@ -573,5 +600,5 @@ def mark_delivery_skipped(delivery, reason):
 def mark_delivery_failed(delivery, error):
     delivery.status = "failed"
     delivery.last_error = str(error)
-    delivery.updated_at = datetime.utcnow()
+    delivery.updated_at = utc_now()
     delivery.save()

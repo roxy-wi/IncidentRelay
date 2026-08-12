@@ -1,6 +1,6 @@
 ---
 title: Webhook-Based Notification Channels
-description: Slack, Discord, Microsoft Teams and generic webhook channels.
+description: Discord, Microsoft Teams and generic webhook channels.
 ---
 
 # Webhook-based notification channels
@@ -10,7 +10,6 @@ Webhook-based notification channels send outgoing HTTP requests to external serv
 This page covers:
 
 ```text
-slack
 discord
 teams
 webhook
@@ -18,17 +17,7 @@ webhook
 
 Do not confuse outgoing webhook channels with the incoming [Generic webhook integration](generic-webhook.md).
 
-## Slack
-
-Slack channel uses an incoming webhook URL.
-
-Typical config:
-
-```json
-{
-  "webhook_url": "https://hooks.slack.com/services/..."
-}
-```
+Slack also has an incoming-webhook delivery mode, but Slack configuration, Bot API actions and Socket Mode are documented separately: [Slack channel](slack.md).
 
 ## Discord
 

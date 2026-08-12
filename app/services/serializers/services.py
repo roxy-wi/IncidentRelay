@@ -369,9 +369,7 @@ def serialize_service_owner(owner, current_user=None):
         "notify_on_status_change": bool(getattr(owner, "notify_on_status_change", True)),
         "notify_on_resolved": bool(getattr(owner, "notify_on_resolved", True)),
         "notify_on_comment": bool(getattr(owner, "notify_on_comment", True)),
-        "created_at": owner.created_at.isoformat()
-        if owner.created_at
-        else None,
+        "created_at": serialize_utc_datetime(owner.created_at),
     }
 
 
@@ -570,7 +568,7 @@ def serialize_maintenance_window_scope(scope):
         "team_id": scope.team_id,
         "service_id": scope.service_id,
         "route_id": scope.route_id,
-        "created_at": scope.created_at.isoformat() if scope.created_at else None,
+        "created_at": serialize_utc_datetime(scope.created_at),
     }
 
 
@@ -592,12 +590,15 @@ def serialize_maintenance_window(window, include_scopes=True):
         "ends_at": serialize_local_datetime(window.ends_at),
         "occurrence": serialize_maintenance_window_occurrence(window),
         "enabled": window.enabled,
+        "apply_to_existing": bool(window.apply_to_existing),
+        "reactivate_on_end": bool(window.reactivate_on_end),
+        "reconciled_at": serialize_utc_datetime(window.reconciled_at),
         "deleted": window.deleted,
         "cancelled_by_id": window.cancelled_by_id,
-        "cancelled_at": window.cancelled_at.isoformat() if window.cancelled_at else None,
+        "cancelled_at": serialize_utc_datetime(window.cancelled_at),
         "cancel_reason": window.cancel_reason,
-        "created_at": window.created_at.isoformat() if getattr(window, "created_at", None) else None,
-        "updated_at": window.updated_at.isoformat() if getattr(window, "updated_at", None) else None,
+        "created_at": serialize_utc_datetime(getattr(window, "created_at", None)),
+        "updated_at": serialize_utc_datetime(getattr(window, "updated_at", None)),
     }
 
     if include_scopes:

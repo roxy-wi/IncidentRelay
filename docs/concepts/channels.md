@@ -71,10 +71,11 @@ Some channels can support ACK/Resolve actions from the message itself.
 | Channel | Action support |
 |---|---|
 | Mattermost Bot API | ACK/Resolve buttons and message updates |
+| Slack Bot API | ACK/Resolve buttons and message updates through HTTP actions or Socket Mode |
 | Telegram | Inline actions and message updates |
 | Voice call | DTMF actions if provider supports callbacks |
 | Email | No interactive actions |
-| Slack/Discord/Teams/webhook | Usually one-way notification only |
+| Slack incoming webhook, Discord, Teams, generic webhook | One-way notification only |
 
 Browser push notifications can also include ACK/Resolve actions, but browser push is profile-level and is not configured as a channel.
 

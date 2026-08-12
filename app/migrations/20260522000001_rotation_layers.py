@@ -8,6 +8,7 @@ from app.modules.db.models import (
     RotationLayerMember,
     RotationLayerRestriction,
 )
+from app.modules.common import utc_now
 
 db = init_database()
 
@@ -40,7 +41,7 @@ def upgrade():
                 "handoff_weekday": rotation.handoff_weekday,
                 "timezone": rotation.timezone,
                 "enabled": rotation.enabled,
-                "created_at": datetime.utcnow(),
+                "created_at": utc_now(),
             },
         )
 

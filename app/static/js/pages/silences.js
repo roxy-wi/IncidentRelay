@@ -127,7 +127,7 @@ function getSilenceStatus(silence) {
     if (startsAt && now < startsAt) {
         return "scheduled";
     }
-    if (endsAt && now > endsAt) {
+    if (endsAt && now >= endsAt) {
         return "expired";
     }
     return "active";
@@ -349,6 +349,22 @@ function renderSilenceDetails(silence) {
             .append(silenceDetailsItem(i18n.t("silences.details.status"), getSilenceStatusLabel(status)))
             .append(
                 silenceDetailsItem(
+                    i18n.t("silences.details.apply_to_existing"),
+                    silence.apply_to_existing
+                        ? i18n.t("silences.details.apply_to_existing_enabled")
+                        : i18n.t("silences.details.apply_to_existing_disabled")
+                )
+            )
+            .append(
+                silenceDetailsItem(
+                    i18n.t("silences.details.reactivate_on_end"),
+                    silence.reactivate_on_end !== false
+                        ? i18n.t("silences.details.reactivate_on_end_enabled")
+                        : i18n.t("silences.details.reactivate_on_end_disabled")
+                )
+            )
+            .append(
+                silenceDetailsItem(
                     i18n.t("silences.details.matcher_preset"),
                     silence.matcher_preset
                         ? formatMatcherPresetOption(silence.matcher_preset)
@@ -437,13 +453,22 @@ function renderSilenceDetailsEmpty() {
         );
 }
 
+function updateSilenceReactivationWarning() {
+    $("#silence-reactivate-on-end-warning").prop(
+        "hidden",
+        $("#silence-reactivate-on-end").is(":checked")
+    );
+}
+
 function collectSilencePayload() {
     return {
         team_id: Number($("#silence-team").val()),
         name: $("#silence-name").val(),
         reason: $("#silence-reason").val(),
-        starts_at: $("#silence-starts-at").val(),
-        ends_at: $("#silence-ends-at").val(),
+        starts_at: datetimeLocalToUtcIso($("#silence-starts-at").val()),
+        ends_at: datetimeLocalToUtcIso($("#silence-ends-at").val()),
+        apply_to_existing: $("#silence-apply-to-existing").is(":checked"),
+        reactivate_on_end: $("#silence-reactivate-on-end").is(":checked"),
         matcher_preset_id: $("#silence-matcher-preset").val()
             ? Number($("#silence-matcher-preset").val())
             : null,
@@ -498,8 +523,14 @@ function editSilence(id) {
     $("#silence-team").val(String(silence.team_id));
     $("#silence-name").val(silence.name);
     $("#silence-reason").val(silence.reason || "");
-    $("#silence-starts-at").val(isoToDatetimeLocal(silence.starts_at));
-    $("#silence-ends-at").val(isoToDatetimeLocal(silence.ends_at));
+    $("#silence-starts-at").val(utcIsoToDatetimeLocal(silence.starts_at));
+    $("#silence-ends-at").val(utcIsoToDatetimeLocal(silence.ends_at));
+    $("#silence-apply-to-existing").prop("checked", Boolean(silence.apply_to_existing));
+    $("#silence-reactivate-on-end").prop(
+        "checked",
+        silence.reactivate_on_end !== false
+    );
+    updateSilenceReactivationWarning();
     setMatcherEditorValue("#silence-matchers", silence.matchers || {});
 
     loadSilenceMatcherPresets(
@@ -509,6 +540,18 @@ function editSilence(id) {
             openAppModal("#silence-form-modal");
         }
     );
+}
+
+function enableSilence(id) {
+    const silence = silencesCache.find(function (item) {
+        return Number(item.id) === Number(id);
+    });
+    if (silence && !canWriteObject(silence)) {
+        showAppError(i18n.t("silences.permissions.disable_denied"));
+        return;
+    }
+
+    apiPost("/api/silences/" + id + "/enable", {}, refreshSilences);
 }
 
 function disableSilence(id) {
@@ -537,6 +580,9 @@ function resetSilenceForm() {
     $("#silence-reason").val("");
     $("#silence-starts-at").val("");
     $("#silence-ends-at").val("");
+    $("#silence-apply-to-existing").prop("checked", false);
+    $("#silence-reactivate-on-end").prop("checked", true);
+    updateSilenceReactivationWarning();
 
     fillMatcherPresetSelect(
         "#silence-matcher-preset",
@@ -574,6 +620,11 @@ $(document).on("change", "#silences-status-filter", function () {
     applySilenceFilters();
 });
 $(document).on("change", "#silences-include-expired-history", refreshSilences);
+$(document).on(
+    "change",
+    "#silence-reactivate-on-end",
+    updateSilenceReactivationWarning
+);
 $(document).on("click", "[data-silences-summary-filter]", function () {
     applySilenceSummaryFilter($(this).data("silences-summary-filter"));
 });

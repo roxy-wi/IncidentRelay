@@ -28,18 +28,19 @@ def list_enabled_rules(policy):
 
 
 def get_first_enabled_rule(policy):
-    """Return first enabled rule for a policy."""
-    rules = list_enabled_rules(policy)
+    """Return the first enabled rule for an enabled policy."""
+    if not policy or not policy.enabled:
+        return None
 
-    return rules[0] if rules else None
+    return escalation_policies_repo.get_first_rule(policy.id)
 
 
 def get_rule_delay_seconds(rule):
-    """Return normalized rule delay in seconds."""
+    """Return a safe non-negative delay for a rule."""
     if not rule:
         return 0
 
-    return max(0, int(rule.delay_seconds or 0))
+    return max(int(rule.delay_seconds or 0), 0)
 
 
 def get_next_escalation_at(rule, now):
@@ -51,15 +52,15 @@ def get_next_escalation_at(rule, now):
 
 
 def resolve_rule_user(rule):
-    """Resolve policy rule target to a user."""
-    if not rule:
+    """Resolve the active user that should receive the rule notification."""
+    if not rule or not rule.enabled:
         return None
 
     if rule.target_type == "user":
-        return rule.target_user
+        return rule.target_user if rule.target_user and rule.target_user.active else None
 
-    if rule.target_type == "rotation" and rule.target_rotation:
-        return get_current_oncall_user(rule.target_rotation)
+    if rule.target_type == "rotation":
+        return get_current_oncall_user(rule.target_rotation) if rule.target_rotation else None
 
     return None
 
@@ -155,36 +156,6 @@ def serialize_rule(rule):
     }
 
 
-def get_first_enabled_rule(policy):
-    """Return the first enabled rule for a policy object."""
-    if not policy or not policy.enabled:
-        return None
-
-    return escalation_policies_repo.get_first_rule(policy.id)
-
-
-def resolve_rule_user(rule):
-    """Resolve the user that should receive the rule notification."""
-    if not rule or not rule.enabled:
-        return None
-
-    if rule.target_type == "user":
-        return rule.target_user if rule.target_user and rule.target_user.active else None
-
-    if rule.target_type == "rotation":
-        return get_current_oncall_user(rule.target_rotation) if rule.target_rotation else None
-
-    return None
-
-
-def get_rule_delay_seconds(rule):
-    """Return a safe delay for the rule."""
-    if not rule:
-        return 0
-
-    return max(int(rule.delay_seconds or 0), 0)
-
-
 def get_policy_reminder_interval(alert):
     """Return reminder interval for a policy-driven alert."""
     if not alert.escalation_policy:
@@ -195,25 +166,3 @@ def get_policy_reminder_interval(alert):
 
     first_rule = get_first_enabled_rule(alert.escalation_policy)
     return max(get_rule_delay_seconds(first_rule), 60) if first_rule else 0
-
-
-def _next_rule_for_alert(alert):
-    policy = alert.escalation_policy
-
-    if not policy or not policy.enabled:
-        return None, False
-
-    current_rule = alert.escalation_rule
-
-    if not current_rule:
-        return get_first_enabled_rule(policy), False
-
-    next_rule = escalation_policies_repo.get_next_rule(policy.id, current_rule.position)
-
-    if next_rule:
-        return next_rule, False
-
-    if alert.escalation_repeat_count < policy.repeat_count:
-        return get_first_enabled_rule(policy), True
-
-    return None, False

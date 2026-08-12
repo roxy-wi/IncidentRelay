@@ -127,5 +127,9 @@
   "services.dependencies.hard": "Жёсткая",
   "services.dependencies.soft": "Мягкая",
   "services.dependencies.external": "Внешняя",
-  "services.dependencies.informational": "Информационная"
+  "services.dependencies.informational": "Информационная",
+  "services.details.event_orchestrations": "Оркестрации событий",
+  "services.details.orchestration_disabled": "Отключена",
+  "services.details.orchestration_active": "Активна",
+  "services.details.orchestration_shadow": "Теневой режим"
 }

@@ -18,6 +18,7 @@ from app.migrations.introspection import (
 )
 from app.modules.db.migrator import get_migrator
 from app.modules.db.models import BaseModel, Rotation, User
+from app.modules.common import utc_now
 
 
 db = init_database()
@@ -59,9 +60,9 @@ class OnCallShiftEmailNotificationMigration(BaseModel):
     status = CharField(default="pending", index=True)
     last_error = TextField(null=True)
 
-    created_at = DateTimeField(default=datetime.utcnow)
+    created_at = DateTimeField(default=utc_now)
     sent_at = DateTimeField(null=True)
-    updated_at = DateTimeField(default=datetime.utcnow)
+    updated_at = DateTimeField(default=utc_now)
 
     class Meta:
         table_name = "oncall_shift_email_notification"

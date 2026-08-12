@@ -1,6 +1,7 @@
 from datetime import datetime, timedelta
 
 from app.modules.db import alerts_repo
+from app.modules.common import utc_now
 
 
 DEFAULT_ALERT_EXPLAIN_RETENTION_DAYS = 30
@@ -16,7 +17,7 @@ def cleanup_alert_explain_traces(*, retention_days=None, now=None):
         raise ValueError("retention_days must be greater than 0")
 
     if now is None:
-        now = datetime.utcnow()
+        now = utc_now()
 
     cutoff = now - timedelta(days=retention_days)
 

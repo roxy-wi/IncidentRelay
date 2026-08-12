@@ -1,0 +1,1043 @@
+import hashlib
+import json
+import secrets
+from typing import Any, Dict, Iterable, List, Optional, Sequence, Tuple
+
+from peewee import IntegrityError, fn
+
+from app.modules.db import models as db_models
+from app.db import database_proxy
+from app.modules.db.models import (
+    EventOrchestration,
+    EventOrchestrationRule,
+    EventOrchestrationVersion,
+    OrchestrationIntakeToken,
+    Service,
+)
+from app.services.integrations.auth import hash_token
+from app.services.orchestration.validation import (
+    issues_to_messages,
+    validate_rule_definition,
+)
+from app.modules.common import utc_now
+
+
+VALID_SCOPES = {"global", "service"}
+VALID_MODES = {"active", "shadow", "disabled"}
+VALID_COMPATIBILITY_MODES = {"legacy", "hybrid", "orchestration"}
+VALID_VERSION_STATUSES = {"draft", "published", "archived"}
+VALID_PROCESSING_MODES = {
+    "continue",
+    "stop",
+    "evaluate_children",
+    "children_then_continue",
+}
+
+
+class OrchestrationError(ValueError):
+    """Base error raised for invalid orchestration state transitions."""
+
+
+class OrchestrationNotFound(OrchestrationError):
+    pass
+
+
+class OrchestrationConflict(OrchestrationError):
+    pass
+
+
+class OrchestrationValidationError(OrchestrationError):
+    def __init__(self, errors: Sequence[str], warnings: Optional[Sequence[str]] = None):
+        self.errors = list(errors)
+        self.warnings = list(warnings or [])
+        super().__init__("; ".join(self.errors) or "Invalid orchestration definition")
+
+
+_REFERENCE_ACTIONS: Dict[str, Tuple[str, Tuple[str, ...]]] = {
+    "set_team": ("Team", ("team_id", "value")),
+    "set_route": ("AlertRoute", ("route_id", "value")),
+    "set_service": ("Service", ("service_id", "value")),
+    "set_escalation_policy": (
+        "EscalationPolicy",
+        ("escalation_policy_id", "policy_id", "value"),
+    ),
+    "set_notification_policy": (
+        "NotificationPolicy",
+        ("notification_policy_id", "policy_id", "value"),
+    ),
+    "set_priority_policy": (
+        "PriorityPolicy",
+        ("priority_policy_id", "policy_id", "value"),
+    ),
+    "enqueue_webhook": (
+        "OrchestrationWebhookAction",
+        ("action_id", "webhook_action_id"),
+    ),
+}
+
+
+def canonical_json(value: Any) -> str:
+    """Return the stable JSON representation used for content hashing."""
+
+    return json.dumps(
+        value,
+        ensure_ascii=False,
+        sort_keys=True,
+        separators=(",", ":"),
+        allow_nan=False,
+    )
+
+
+def definition_hash(definition: Dict[str, Any]) -> str:
+    return hashlib.sha256(canonical_json(definition).encode("utf-8")).hexdigest()
+
+
+def _get_orchestration(orchestration_id: int) -> EventOrchestration:
+    orchestration = EventOrchestration.get_or_none(EventOrchestration.id == orchestration_id)
+    if (
+        orchestration is None
+        or bool(orchestration.deleted)
+        or orchestration.deleted_at is not None
+    ):
+        raise OrchestrationNotFound("Orchestration not found")
+    return orchestration
+
+
+def _get_version(version_id: int) -> EventOrchestrationVersion:
+    version = EventOrchestrationVersion.get_or_none(
+        EventOrchestrationVersion.id == version_id
+    )
+    if version is None:
+        raise OrchestrationNotFound("Orchestration version not found")
+    return version
+
+
+def _for_update(query):
+    """Use row locking where supported; SQLite is protected by its transaction."""
+
+    database = getattr(database_proxy, "obj", None)
+    if database is not None and database.__class__.__name__ != "SqliteDatabase":
+        return query.for_update()
+    return query
+
+
+def _locked_version(version_id: int) -> EventOrchestrationVersion:
+    version = _for_update(
+        EventOrchestrationVersion.select().where(
+            EventOrchestrationVersion.id == version_id
+        )
+    ).first()
+    if version is None:
+        raise OrchestrationNotFound("Orchestration version not found")
+    return version
+
+
+def _locked_orchestration(orchestration_id: int) -> EventOrchestration:
+    query = EventOrchestration.select().where(
+        (EventOrchestration.id == orchestration_id)
+        & (EventOrchestration.deleted == False)  # noqa: E712
+        & EventOrchestration.deleted_at.is_null(True)
+    )
+    orchestration = _for_update(query).first()
+    if orchestration is None:
+        raise OrchestrationNotFound("Orchestration not found")
+    return orchestration
+
+
+def _next_version_number(orchestration_id: int) -> int:
+    maximum = (
+        EventOrchestrationVersion.select(
+            fn.MAX(EventOrchestrationVersion.version_number)
+        )
+        .where(EventOrchestrationVersion.orchestration == orchestration_id)
+        .scalar()
+    )
+    return int(maximum or 0) + 1
+
+
+def _assert_draft(version: EventOrchestrationVersion) -> None:
+    if version.status != "draft":
+        raise OrchestrationConflict("Only draft versions can be edited")
+
+
+def _service_group_id(service_id: int) -> Optional[int]:
+    value = Service.select(Service.group).where(Service.id == service_id).scalar()
+    return int(value) if value is not None else None
+
+
+def create_orchestration(
+    *,
+    group_id: int,
+    name: str,
+    scope: str = "global",
+    service_id: Optional[int] = None,
+    description: Optional[str] = None,
+    created_by_id: Optional[int] = None,
+    compatibility_mode: str = "legacy",
+) -> EventOrchestration:
+    name = (name or "").strip()
+    if not name:
+        raise OrchestrationValidationError(["name is required"])
+    if scope not in VALID_SCOPES:
+        raise OrchestrationValidationError(["scope must be global or service"])
+    if compatibility_mode not in VALID_COMPATIBILITY_MODES:
+        raise OrchestrationValidationError(["invalid compatibility_mode"])
+    if scope == "global" and service_id is not None:
+        raise OrchestrationValidationError(
+            ["global orchestration cannot reference a service"]
+        )
+    if scope == "service":
+        if service_id is None:
+            raise OrchestrationValidationError(
+                ["service-scoped orchestration requires service_id"]
+            )
+        if _service_group_id(service_id) != int(group_id):
+            raise OrchestrationValidationError(
+                ["referenced service belongs to another group"]
+            )
+
+    try:
+        return EventOrchestration.create(
+            group=group_id,
+            name=name,
+            description=description,
+            scope=scope,
+            service=service_id,
+            enabled=False,
+            mode="disabled",
+            compatibility_mode=compatibility_mode,
+            created_by=created_by_id,
+        )
+    except IntegrityError as exc:
+        raise OrchestrationConflict(
+            "An orchestration with this name already exists in the group"
+        ) from exc
+
+
+
+
+def get_orchestration(orchestration_id: int) -> EventOrchestration:
+    """Return a non-deleted orchestration by id."""
+    orchestration = _get_orchestration(orchestration_id)
+    if bool(getattr(orchestration, "deleted", False)) or getattr(
+        orchestration, "deleted_at", None
+    ) is not None:
+        raise OrchestrationNotFound("Event orchestration not found")
+    return orchestration
+
+
+def list_orchestrations(
+    *,
+    group_ids: Optional[Sequence[int]] = None,
+    group_id: Optional[int] = None,
+) -> List[EventOrchestration]:
+    """List non-deleted orchestrations visible in the requested groups."""
+    query = EventOrchestration.select().where(
+        (EventOrchestration.deleted == False)  # noqa: E712
+        & EventOrchestration.deleted_at.is_null(True)
+    )
+    if group_id is not None:
+        query = query.where(EventOrchestration.group == int(group_id))
+    elif group_ids is not None:
+        normalized = sorted({int(value) for value in group_ids})
+        if not normalized:
+            return []
+        query = query.where(EventOrchestration.group.in_(normalized))
+    return list(
+        query.order_by(
+            EventOrchestration.group.asc(),
+            EventOrchestration.name.asc(),
+            EventOrchestration.id.asc(),
+        )
+    )
+
+
+def update_orchestration(
+    orchestration_id: int,
+    *,
+    name: Optional[str] = None,
+    description: Optional[str] = None,
+    description_provided: bool = False,
+    scope: Optional[str] = None,
+    scope_provided: bool = False,
+    service_id: Optional[int] = None,
+    service_provided: bool = False,
+) -> EventOrchestration:
+    """Update editable orchestration metadata without changing runtime state."""
+    with database_proxy.atomic():
+        orchestration = _locked_orchestration(orchestration_id)
+        if name is not None:
+            normalized_name = str(name or "").strip()
+            if not normalized_name:
+                raise OrchestrationValidationError(["name is required"])
+            orchestration.name = normalized_name
+        if description_provided:
+            orchestration.description = description
+
+        next_scope = scope if scope_provided else orchestration.scope
+        next_service_id = (
+            service_id if service_provided else orchestration.service_id
+        )
+
+        if next_scope not in VALID_SCOPES:
+            raise OrchestrationValidationError(
+                ["scope must be global or service"]
+            )
+        if next_scope == "global":
+            if service_provided and service_id is not None:
+                raise OrchestrationValidationError(
+                    ["global orchestration cannot reference a service"]
+                )
+            next_service_id = None
+        else:
+            if next_service_id is None:
+                raise OrchestrationValidationError(
+                    ["service-scoped orchestration requires service_id"]
+                )
+            if _service_group_id(next_service_id) != int(orchestration.group_id):
+                raise OrchestrationValidationError(
+                    ["referenced service belongs to another group"]
+                )
+
+        orchestration.scope = next_scope
+        orchestration.service = next_service_id
+        try:
+            orchestration.save()
+        except IntegrityError as exc:
+            raise OrchestrationConflict(
+                "An orchestration with this name already exists in the group"
+            ) from exc
+    return get_orchestration(orchestration_id)
+
+
+def list_versions(orchestration_id: int) -> List[EventOrchestrationVersion]:
+    orchestration = get_orchestration(orchestration_id)
+    return list(
+        EventOrchestrationVersion.select()
+        .where(EventOrchestrationVersion.orchestration == orchestration.id)
+        .order_by(
+            EventOrchestrationVersion.version_number.desc(),
+            EventOrchestrationVersion.id.desc(),
+        )
+    )
+
+
+def get_version(
+    orchestration_id: int,
+    version_id: int,
+) -> EventOrchestrationVersion:
+    orchestration = get_orchestration(orchestration_id)
+    version = _get_version(version_id)
+    if version.orchestration_id != orchestration.id:
+        raise OrchestrationNotFound("Orchestration version not found")
+    return version
+
+
+def get_draft(orchestration_id: int) -> Optional[EventOrchestrationVersion]:
+    return (
+        EventOrchestrationVersion.select()
+        .where(
+            (EventOrchestrationVersion.orchestration == orchestration_id)
+            & (EventOrchestrationVersion.status == "draft")
+        )
+        .order_by(EventOrchestrationVersion.version_number.desc())
+        .first()
+    )
+
+
+def _serialize_rule(rule: EventOrchestrationRule) -> Dict[str, Any]:
+    children = list(
+        EventOrchestrationRule.select()
+        .where(EventOrchestrationRule.parent_rule == rule.id)
+        .order_by(
+            EventOrchestrationRule.position.asc(),
+            EventOrchestrationRule.id.asc(),
+        )
+    )
+    return {
+        "name": rule.name,
+        "description": rule.description,
+        "enabled": bool(rule.enabled),
+        "condition_tree": rule.condition_tree_json or {},
+        "actions": rule.actions_json or [],
+        "processing_mode": rule.processing_mode,
+        "children": [_serialize_rule(child) for child in children],
+    }
+
+
+def export_version(version_id: int) -> Dict[str, Any]:
+    version = _get_version(version_id)
+    orchestration = version.orchestration
+    roots = list(
+        EventOrchestrationRule.select()
+        .where(
+            (EventOrchestrationRule.version == version.id)
+            & EventOrchestrationRule.parent_rule.is_null(True)
+        )
+        .order_by(
+            EventOrchestrationRule.position.asc(),
+            EventOrchestrationRule.id.asc(),
+        )
+    )
+    return {
+        "schema_version": 1,
+        "scope": orchestration.scope,
+        "service_id": orchestration.service_id,
+        "rules": [_serialize_rule(rule) for rule in roots],
+    }
+
+
+def _create_rule_tree(
+    version: EventOrchestrationVersion,
+    rules: Iterable[Dict[str, Any]],
+    parent_rule_id: Optional[int] = None,
+) -> None:
+    for position, raw_rule in enumerate(rules):
+        if not isinstance(raw_rule, dict):
+            raise OrchestrationValidationError(["every rule must be an object"])
+
+        children = raw_rule.get("children") or []
+        if not isinstance(children, list):
+            raise OrchestrationValidationError(["rule children must be a list"])
+
+        rule = EventOrchestrationRule.create(
+            version=version.id,
+            parent_rule=parent_rule_id,
+            position=position,
+            name=(raw_rule.get("name") or "").strip() or f"Rule {position + 1}",
+            description=raw_rule.get("description"),
+            enabled=bool(raw_rule.get("enabled", True)),
+            condition_tree_json=raw_rule.get("condition_tree") or {},
+            actions_json=raw_rule.get("actions") or [],
+            processing_mode=raw_rule.get("processing_mode") or "continue",
+        )
+        _create_rule_tree(version, children, rule.id)
+
+
+def replace_draft_rules(
+    version_id: int,
+    rules: Sequence[Dict[str, Any]],
+) -> EventOrchestrationVersion:
+    if not isinstance(rules, (list, tuple)):
+        raise OrchestrationValidationError(["rules must be a list"])
+
+    with database_proxy.atomic():
+        version = _locked_version(version_id)
+        _assert_draft(version)
+        EventOrchestrationRule.delete().where(
+            EventOrchestrationRule.version == version.id
+        ).execute()
+        _create_rule_tree(version, rules)
+        EventOrchestrationVersion.update(updated_at=utc_now()).where(
+            EventOrchestrationVersion.id == version.id
+        ).execute()
+    return _get_version(version_id)
+
+
+def save_draft_definition(
+    orchestration_id: int,
+    rules: Sequence[Dict[str, Any]],
+    *,
+    actor_id: Optional[int] = None,
+    comment: Optional[str] = None,
+) -> EventOrchestrationVersion:
+    """Create/update one draft definition and its metadata atomically."""
+    with database_proxy.atomic():
+        draft = get_or_create_draft(
+            orchestration_id,
+            actor_id=actor_id,
+            comment=comment,
+        )
+        draft = replace_draft_rules(draft.id, rules)
+        if comment is not None:
+            EventOrchestrationVersion.update(
+                comment=comment,
+                updated_at=utc_now(),
+            ).where(
+                EventOrchestrationVersion.id == draft.id
+            ).execute()
+            draft = _get_version(draft.id)
+        return draft
+
+
+def _clone_version_rules(
+    source_version_id: int,
+    target_version: EventOrchestrationVersion,
+) -> None:
+    source_definition = export_version(source_version_id)
+    _create_rule_tree(target_version, source_definition.get("rules") or [])
+
+
+def get_or_create_draft(
+    orchestration_id: int,
+    *,
+    actor_id: Optional[int] = None,
+    comment: Optional[str] = None,
+) -> EventOrchestrationVersion:
+    with database_proxy.atomic():
+        orchestration = _locked_orchestration(orchestration_id)
+        draft = get_draft(orchestration.id)
+        if draft is not None:
+            return draft
+
+        try:
+            draft = EventOrchestrationVersion.create(
+                orchestration=orchestration.id,
+                version_number=_next_version_number(orchestration.id),
+                status="draft",
+                definition_json={},
+                comment=comment,
+                created_by=actor_id,
+            )
+        except IntegrityError as exc:
+            # A concurrent creator may have won the unique version-number race.
+            draft = get_draft(orchestration.id)
+            if draft is None:
+                raise OrchestrationConflict(
+                    "Could not allocate an orchestration draft version"
+                ) from exc
+            return draft
+
+        if orchestration.active_version_id is not None:
+            active = _get_version(orchestration.active_version_id)
+            if active.orchestration_id != orchestration.id:
+                raise OrchestrationConflict(
+                    "Active version does not belong to the orchestration"
+                )
+            _clone_version_rules(active.id, draft)
+
+        return draft
+
+
+def _walk_json(value: Any):
+    yield value
+    if isinstance(value, dict):
+        for child in value.values():
+            yield from _walk_json(child)
+    elif isinstance(value, list):
+        for child in value:
+            yield from _walk_json(child)
+
+
+def _extract_reference_id(action: Dict[str, Any], keys: Sequence[str]) -> Any:
+    for key in keys:
+        if key in action and action[key] not in (None, ""):
+            return action[key]
+    params = action.get("params")
+    if isinstance(params, dict):
+        for key in keys:
+            if key in params and params[key] not in (None, ""):
+                return params[key]
+    return None
+
+
+def _entity_group_id(entity: Any) -> Optional[int]:
+    direct = getattr(entity, "group_id", None)
+    if direct is not None:
+        return int(direct)
+
+    team_id = getattr(entity, "team_id", None)
+    if team_id is not None:
+        team_model = getattr(db_models, "Team", None)
+        if team_model is None:
+            return None
+        value = team_model.select(team_model.group).where(team_model.id == team_id).scalar()
+        return int(value) if value is not None else None
+
+    service_id = getattr(entity, "service_id", None)
+    if service_id is not None:
+        return _service_group_id(service_id)
+
+    return None
+
+
+def _validate_action_references(
+    actions: Any,
+    orchestration_group_id: int,
+    rule_path: str,
+) -> List[str]:
+    errors: List[str] = []
+    for node in _walk_json(actions):
+        if not isinstance(node, dict):
+            continue
+        action_type = node.get("type") or node.get("action")
+        reference_spec = _REFERENCE_ACTIONS.get(action_type)
+        if reference_spec is None:
+            continue
+
+        model_name, id_keys = reference_spec
+        reference_id = _extract_reference_id(node, id_keys)
+        if reference_id in (None, ""):
+            errors.append(f"{rule_path}: {action_type} requires a reference id")
+            continue
+
+        model = getattr(db_models, model_name, None)
+        if model is None:
+            errors.append(
+                f"{rule_path}: action {action_type} references unsupported model {model_name}"
+            )
+            continue
+
+        try:
+            reference_id = int(reference_id)
+        except (TypeError, ValueError):
+            errors.append(f"{rule_path}: {action_type} reference id must be an integer")
+            continue
+
+        entity = model.get_or_none(model.id == reference_id)
+        if entity is None:
+            errors.append(f"{rule_path}: referenced {model_name} does not exist")
+            continue
+        if action_type == "enqueue_webhook" and (
+            not bool(getattr(entity, "enabled", False))
+            or bool(getattr(entity, "deleted", False))
+            or getattr(entity, "deleted_at", None) is not None
+        ):
+            errors.append(f"{rule_path}: referenced webhook action is disabled")
+            continue
+
+        entity_group_id = _entity_group_id(entity)
+        if entity_group_id is None:
+            errors.append(
+                f"{rule_path}: could not determine group for referenced {model_name}"
+            )
+        elif entity_group_id != int(orchestration_group_id):
+            errors.append(
+                f"{rule_path}: referenced {model_name} belongs to another group"
+            )
+
+    return errors
+
+
+def validate_version(version_id: int) -> Dict[str, Any]:
+    version = _get_version(version_id)
+    orchestration = version.orchestration
+    errors: List[str] = []
+    warnings: List[str] = []
+
+    if version.status not in VALID_VERSION_STATUSES:
+        errors.append("invalid version status")
+    if orchestration.scope not in VALID_SCOPES:
+        errors.append("invalid orchestration scope")
+    if orchestration.mode not in VALID_MODES:
+        errors.append("invalid orchestration mode")
+    if orchestration.compatibility_mode not in VALID_COMPATIBILITY_MODES:
+        errors.append("invalid orchestration compatibility mode")
+
+    if orchestration.scope == "global" and orchestration.service_id is not None:
+        errors.append("global orchestration cannot reference a service")
+    if orchestration.scope == "service":
+        if orchestration.service_id is None:
+            errors.append("service-scoped orchestration requires a service")
+        elif _service_group_id(orchestration.service_id) != orchestration.group_id:
+            errors.append("service-scoped orchestration references another group")
+
+    rules = list(
+        EventOrchestrationRule.select()
+        .where(EventOrchestrationRule.version == version.id)
+        .order_by(EventOrchestrationRule.id.asc())
+    )
+    if not rules:
+        warnings.append("orchestration version has no rules")
+
+    positions: Dict[Tuple[Optional[int], int], int] = {}
+    for rule in rules:
+        path = f"rule {rule.id} ({rule.name})"
+        if rule.processing_mode not in VALID_PROCESSING_MODES:
+            errors.append(f"{path}: invalid processing_mode")
+        if not isinstance(rule.condition_tree_json, dict):
+            errors.append(f"{path}: condition_tree must be an object")
+        if not isinstance(rule.actions_json, list):
+            errors.append(f"{path}: actions must be a list")
+
+        # EVENT_ORCHESTRATION_WS2_VALIDATION
+        if isinstance(rule.condition_tree_json, dict) and isinstance(
+            rule.actions_json, list
+        ):
+            rule_validation = validate_rule_definition(
+                rule.condition_tree_json,
+                rule.actions_json,
+                path=path,
+            )
+            errors.extend(issues_to_messages(rule_validation["errors"]))
+            warnings.extend(issues_to_messages(rule_validation["warnings"]))
+        if rule.parent_rule_id is not None:
+            parent_version_id = (
+                EventOrchestrationRule.select(EventOrchestrationRule.version)
+                .where(EventOrchestrationRule.id == rule.parent_rule_id)
+                .scalar()
+            )
+            if parent_version_id != version.id:
+                errors.append(f"{path}: parent belongs to another version")
+
+        position_key = (rule.parent_rule_id, rule.position)
+        positions[position_key] = positions.get(position_key, 0) + 1
+        if positions[position_key] > 1:
+            errors.append(f"{path}: duplicate sibling position {rule.position}")
+
+        errors.extend(
+            _validate_action_references(
+                rule.actions_json,
+                orchestration.group_id,
+                path,
+            )
+        )
+
+    exported = export_version(version.id)
+    digest = definition_hash(exported)
+    return {
+        "valid": not errors,
+        "errors": errors,
+        "warnings": warnings,
+        "definition": exported,
+        "definition_hash": digest,
+    }
+
+
+
+def _constant_condition_value(condition: Any) -> Optional[bool]:
+    """Return True/False for statically constant condition trees."""
+    if not isinstance(condition, dict):
+        return None
+    if not condition:
+        return True
+
+    logical = [key for key in ("all", "any", "none") if key in condition]
+    if len(logical) != 1 or len(condition) != 1:
+        return None
+
+    key = logical[0]
+    children = condition.get(key)
+    if not isinstance(children, list):
+        return None
+    values = [_constant_condition_value(child) for child in children]
+
+    if key == "all":
+        if any(value is False for value in values):
+            return False
+        if all(value is True for value in values):
+            return True
+        return None
+
+    if key == "any":
+        if any(value is True for value in values):
+            return True
+        if all(value is False for value in values):
+            return False
+        return None
+
+    # none is the negation of any(children).
+    if any(value is True for value in values):
+        return False
+    if all(value is False for value in values):
+        return True
+    return None
+
+
+def _definition_has_catch_all_drop(definition: Dict[str, Any]) -> bool:
+    def walk(rules):
+        for rule in rules or []:
+            if not isinstance(rule, dict) or not bool(rule.get("enabled", True)):
+                continue
+            actions = rule.get("actions") or []
+            if _constant_condition_value(rule.get("condition_tree") or {}) is True and any(
+                isinstance(action, dict)
+                and (action.get("type") or action.get("action")) == "drop"
+                for action in actions
+            ):
+                return True
+            if walk(rule.get("children") or []):
+                return True
+        return False
+
+    return walk(definition.get("rules") or [])
+
+def _publish_version_locked(
+    orchestration: EventOrchestration,
+    draft: EventOrchestrationVersion,
+    *,
+    actor_id: Optional[int],
+    comment: Optional[str],
+    confirm_catch_all_drop: bool = False,
+) -> EventOrchestrationVersion:
+    if draft.orchestration_id != orchestration.id:
+        raise OrchestrationConflict("Draft belongs to another orchestration")
+    _assert_draft(draft)
+
+    validation = validate_version(draft.id)
+    if not validation["valid"]:
+        raise OrchestrationValidationError(
+            validation["errors"],
+            validation["warnings"],
+        )
+    if (
+        _definition_has_catch_all_drop(validation["definition"])
+        and not confirm_catch_all_drop
+    ):
+        raise OrchestrationValidationError(
+            ["catch-all drop requires explicit publish confirmation"],
+            validation["warnings"],
+        )
+
+    now = utc_now()
+    EventOrchestrationVersion.update(
+        status="archived",
+        updated_at=now,
+    ).where(
+        (EventOrchestrationVersion.orchestration == orchestration.id)
+        & (EventOrchestrationVersion.status == "published")
+        & (EventOrchestrationVersion.id != draft.id)
+    ).execute()
+
+    update_values: Dict[str, Any] = {
+        "status": "published",
+        "definition_hash": validation["definition_hash"],
+        "definition_json": validation["definition"],
+        "published_by": actor_id,
+        "published_at": now,
+        "updated_at": now,
+    }
+    if comment is not None:
+        update_values["comment"] = comment
+
+    updated = (
+        EventOrchestrationVersion.update(**update_values)
+        .where(
+            (EventOrchestrationVersion.id == draft.id)
+            & (EventOrchestrationVersion.status == "draft")
+        )
+        .execute()
+    )
+    if updated != 1:
+        raise OrchestrationConflict("Draft changed while it was being published")
+
+    EventOrchestration.update(
+        active_version_id=draft.id,
+        updated_at=now,
+    ).where(EventOrchestration.id == orchestration.id).execute()
+
+    return _get_version(draft.id)
+
+
+def publish_draft(
+    orchestration_id: int,
+    *,
+    actor_id: Optional[int] = None,
+    comment: Optional[str] = None,
+    confirm_catch_all_drop: bool = False,
+) -> EventOrchestrationVersion:
+    """Validate and atomically activate the current draft."""
+
+    with database_proxy.atomic():
+        orchestration = _locked_orchestration(orchestration_id)
+        draft_query = EventOrchestrationVersion.select().where(
+            (EventOrchestrationVersion.orchestration == orchestration.id)
+            & (EventOrchestrationVersion.status == "draft")
+        ).order_by(EventOrchestrationVersion.version_number.desc())
+        draft = _for_update(draft_query).first()
+        if draft is None:
+            raise OrchestrationConflict("Orchestration has no draft to publish")
+        return _publish_version_locked(
+            orchestration,
+            draft,
+            actor_id=actor_id,
+            comment=comment,
+            confirm_catch_all_drop=confirm_catch_all_drop,
+        )
+
+
+def rollback_to_version(
+    orchestration_id: int,
+    source_version_id: int,
+    *,
+    actor_id: Optional[int] = None,
+    comment: Optional[str] = None,
+    confirm_catch_all_drop: bool = False,
+) -> EventOrchestrationVersion:
+    """Publish a new immutable version copied from an earlier version."""
+
+    with database_proxy.atomic():
+        orchestration = _locked_orchestration(orchestration_id)
+        source = _get_version(source_version_id)
+        if source.orchestration_id != orchestration.id:
+            raise OrchestrationValidationError(
+                ["rollback source belongs to another orchestration"]
+            )
+        if source.status not in {"published", "archived"}:
+            raise OrchestrationValidationError(
+                ["rollback source must be published or archived"]
+            )
+        if get_draft(orchestration.id) is not None:
+            raise OrchestrationConflict(
+                "Archive or publish the existing draft before rollback"
+            )
+
+        draft = EventOrchestrationVersion.create(
+            orchestration=orchestration.id,
+            version_number=_next_version_number(orchestration.id),
+            status="draft",
+            definition_json={},
+            comment=comment or f"Rollback to version {source.version_number}",
+            created_by=actor_id,
+        )
+        _clone_version_rules(source.id, draft)
+        return _publish_version_locked(
+            orchestration,
+            draft,
+            actor_id=actor_id,
+            comment=draft.comment,
+            confirm_catch_all_drop=confirm_catch_all_drop,
+        )
+
+
+def archive_draft(version_id: int) -> EventOrchestrationVersion:
+    with database_proxy.atomic():
+        version = _locked_version(version_id)
+        _assert_draft(version)
+        EventOrchestrationRule.delete().where(
+            EventOrchestrationRule.version == version.id
+        ).execute()
+        EventOrchestrationVersion.update(
+            status="archived",
+            updated_at=utc_now(),
+        ).where(
+            (EventOrchestrationVersion.id == version.id)
+            & (EventOrchestrationVersion.status == "draft")
+        ).execute()
+    return _get_version(version_id)
+
+
+def set_runtime_state(
+    orchestration_id: int,
+    *,
+    enabled: bool,
+    mode: str,
+    compatibility_mode: str,
+) -> EventOrchestration:
+    """Enable or disable one orchestration runtime atomically."""
+    if mode not in VALID_MODES:
+        raise OrchestrationValidationError(["invalid orchestration mode"])
+    if compatibility_mode not in VALID_COMPATIBILITY_MODES:
+        raise OrchestrationValidationError(["invalid compatibility_mode"])
+    if bool(enabled) != (mode != "disabled"):
+        raise OrchestrationValidationError([
+            "enabled must be true for active/shadow mode and false for disabled mode"
+        ])
+    with database_proxy.atomic():
+        orchestration = _locked_orchestration(orchestration_id)
+        if enabled and mode != "disabled" and orchestration.active_version_id is None:
+            raise OrchestrationConflict("Published version is required before enabling runtime")
+        EventOrchestration.update(
+            enabled=bool(enabled),
+            mode=mode,
+            compatibility_mode=compatibility_mode,
+            updated_at=utc_now(),
+        ).where(EventOrchestration.id == orchestration.id).execute()
+    return _get_orchestration(orchestration_id)
+
+
+def list_runtime_orchestrations(
+    *,
+    group_id: int,
+    scope: str,
+    service_id: Optional[int] = None,
+) -> List[EventOrchestration]:
+    """Return enabled runtime orchestrations in deterministic order."""
+    if scope not in VALID_SCOPES:
+        raise OrchestrationValidationError(["scope must be global or service"])
+    query = EventOrchestration.select().where(
+        (EventOrchestration.group == group_id)
+        & (EventOrchestration.scope == scope)
+        & (EventOrchestration.enabled == True)  # noqa: E712
+        & (EventOrchestration.mode.in_(("active", "shadow")))
+        & EventOrchestration.active_version_id.is_null(False)
+        & (EventOrchestration.deleted == False)  # noqa: E712
+        & EventOrchestration.deleted_at.is_null(True)
+    )
+    if scope == "service":
+        query = query.where(EventOrchestration.service == service_id)
+    return list(query.order_by(EventOrchestration.id.asc()))
+
+
+def get_published_runtime_version(orchestration: EventOrchestration) -> EventOrchestrationVersion:
+    """Return and verify the exact published version selected for runtime."""
+    if orchestration.active_version_id is None:
+        raise OrchestrationConflict("Orchestration has no active version")
+    version = _get_version(orchestration.active_version_id)
+    if version.orchestration_id != orchestration.id or version.status != "published":
+        raise OrchestrationConflict("Active orchestration version is not published")
+    return version
+
+
+def archive_orchestration(orchestration_id: int) -> EventOrchestration:
+    with database_proxy.atomic():
+        orchestration = _locked_orchestration(orchestration_id)
+        now = utc_now()
+        EventOrchestration.update(
+            enabled=False,
+            mode="disabled",
+            deleted=True,
+            deleted_at=now,
+            updated_at=now,
+        ).where(EventOrchestration.id == orchestration.id).execute()
+        OrchestrationIntakeToken.update(
+            enabled=False,
+            revoked_at=now,
+        ).where(
+            (OrchestrationIntakeToken.orchestration == orchestration.id)
+            & (OrchestrationIntakeToken.enabled == True)  # noqa: E712
+        ).execute()
+    return EventOrchestration.get_by_id(orchestration_id)
+
+
+def create_intake_token(
+    orchestration_id: int,
+    *,
+    name: str,
+    actor_id: Optional[int] = None,
+) -> Tuple[OrchestrationIntakeToken, str]:
+    """Create a token and return plaintext once together with the DB record."""
+
+    name = (name or "").strip()
+    if not name:
+        raise OrchestrationValidationError(["token name is required"])
+
+    with database_proxy.atomic():
+        orchestration = _locked_orchestration(orchestration_id)
+        plaintext = secrets.token_urlsafe(32)
+        record = OrchestrationIntakeToken.create(
+            orchestration=orchestration.id,
+            name=name,
+            token_hash=hash_token(plaintext),
+            token_prefix=plaintext[:12],
+            enabled=True,
+            created_by=actor_id,
+        )
+    return record, plaintext
+
+
+def authenticate_intake_token(plaintext: str) -> Optional[OrchestrationIntakeToken]:
+    if not plaintext:
+        return None
+    token = OrchestrationIntakeToken.get_or_none(
+        (OrchestrationIntakeToken.token_hash == hash_token(plaintext))
+        & (OrchestrationIntakeToken.enabled == True)  # noqa: E712
+        & OrchestrationIntakeToken.revoked_at.is_null(True)
+    )
+    if token is None:
+        return None
+    OrchestrationIntakeToken.update(last_used_at=utc_now()).where(
+        OrchestrationIntakeToken.id == token.id
+    ).execute()
+    return token
+
+
+def revoke_intake_token(token_id: int) -> OrchestrationIntakeToken:
+    now = utc_now()
+    updated = OrchestrationIntakeToken.update(
+        enabled=False,
+        revoked_at=now,
+    ).where(OrchestrationIntakeToken.id == token_id).execute()
+    if updated != 1:
+        raise OrchestrationNotFound("Orchestration intake token not found")
+    return OrchestrationIntakeToken.get_by_id(token_id)

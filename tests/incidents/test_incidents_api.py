@@ -11,6 +11,7 @@ from tests.factories import (
     create_team,
     create_user,
 )
+from app.modules.common import utc_now
 
 
 def disable_responder_notifications(monkeypatch):
@@ -941,7 +942,7 @@ def test_expire_due_incident_responders_expires_requested(db, monkeypatch):
         },
     )
 
-    responder.expires_at = datetime.utcnow() - timedelta(seconds=1)
+    responder.expires_at = utc_now() - timedelta(seconds=1)
     responder.save(only=[IncidentResponder.expires_at])
 
     result = expire_due_incident_responders(limit=10)

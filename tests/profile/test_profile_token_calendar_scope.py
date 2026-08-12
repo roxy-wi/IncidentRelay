@@ -66,7 +66,7 @@ def test_profile_token_rejects_unknown_scope(client, admin_user, db):
         "/api/profile/tokens",
         json={
             "name": "bad-token",
-            "scopes": ["calendar:write"],
+            "scopes": ["calendar:admin"],
             "days": 0,
         },
         headers=auth_headers_for_user(admin_user),
@@ -77,7 +77,7 @@ def test_profile_token_rejects_unknown_scope(client, admin_user, db):
     payload = response.get_json()
 
     assert payload["error"] == "Unknown token scopes"
-    assert payload["unknown_scopes"] == ["calendar:write"]
+    assert payload["unknown_scopes"] == ["calendar:admin"]
 
 
 def test_profile_token_rejects_wildcard_scope_for_non_admin(client, db):

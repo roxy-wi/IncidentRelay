@@ -9,6 +9,7 @@ from app.services.alerts.notification_queue import schedule_group_notification
 from app.services.alerts.priority import incident_priority_create_kwargs, incident_priority_from_alert
 from app.services.incidents.stakeholders import notify_stakeholders
 from app.services.routing.service_resolution import get_effective_escalation_policy, get_effective_route_rotation
+from app.modules.common import utc_now
 
 
 def _get_manual_incident_team(team_id):
@@ -68,7 +69,7 @@ def create_manual_incident(payload, *, user_id=None):
 
     manual_id = uuid4().hex
     group_key = f"manual:{manual_id}"
-    now = datetime.utcnow()
+    now = utc_now()
 
     alert_data = {
         "source": "manual",

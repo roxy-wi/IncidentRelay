@@ -791,9 +791,10 @@ def tags():
             "name": "integrations",
             "description": (
                 "Incoming alert endpoints for Alertmanager, Grafana, RMON, "
-                "Amazon SNS and CloudWatch, Zabbix, LibreNMS, generic webhooks "
-                "and Sentry. Alertmanager, Grafana, RMON, Zabbix, LibreNMS "
-                "and generic webhooks use route intake tokens. Sentry uses a "
+                "Amazon SNS and CloudWatch, Zabbix, LibreNMS, Uptime Kuma, "
+                "generic webhooks and Sentry. Alertmanager, Grafana, RMON, "
+                "Zabbix, LibreNMS, Uptime Kuma and generic webhooks use route "
+                "intake tokens. Sentry uses a "
                 "route-specific webhook signature. Amazon SNS requests are "
                 "verified using the SNS signature and the exact Topic ARN "
                 "configured for the route."
@@ -2164,6 +2165,143 @@ def paths():
     }
 
 
+    uptime_kuma_body = {
+        "type": "object",
+        "description": (
+            "Standard Uptime Kuma Webhook notification payload. Uptime Kuma "
+            "sends monitor, heartbeat and msg fields when the default JSON "
+            "request body is used."
+        ),
+        "additionalProperties": True,
+        "properties": {
+            "heartbeat": {
+                "type": "object",
+                "nullable": True,
+                "additionalProperties": True,
+                "properties": {
+                    "monitorID": {
+                        "oneOf": [
+                            {"type": "integer"},
+                            {"type": "string"},
+                        ],
+                        "description": "Stable Uptime Kuma monitor id.",
+                    },
+                    "status": {
+                        "oneOf": [
+                            {"type": "integer", "enum": [0, 1, 2, 3]},
+                            {"type": "string"},
+                        ],
+                        "description": (
+                            "Uptime Kuma status: 0 DOWN, 1 UP, 2 PENDING, "
+                            "3 MAINTENANCE."
+                        ),
+                    },
+                    "msg": {
+                        "type": "string",
+                        "nullable": True,
+                        "description": "Monitor check result message.",
+                    },
+                    "ping": {
+                        "type": "number",
+                        "nullable": True,
+                        "description": "Observed latency in milliseconds.",
+                    },
+                    "time": {
+                        "type": "string",
+                        "nullable": True,
+                    },
+                    "localDateTime": {
+                        "type": "string",
+                        "nullable": True,
+                    },
+                },
+            },
+            "monitor": {
+                "type": "object",
+                "nullable": True,
+                "additionalProperties": True,
+                "properties": {
+                    "id": {
+                        "oneOf": [
+                            {"type": "integer"},
+                            {"type": "string"},
+                        ],
+                    },
+                    "name": {"type": "string", "nullable": True},
+                    "type": {"type": "string", "nullable": True},
+                    "url": {"type": "string", "nullable": True},
+                    "hostname": {"type": "string", "nullable": True},
+                    "port": {
+                        "oneOf": [
+                            {"type": "integer"},
+                            {"type": "string"},
+                        ],
+                        "nullable": True,
+                    },
+                    "tags": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "additionalProperties": True,
+                            "properties": {
+                                "name": {"type": "string"},
+                                "value": {
+                                    "type": "string",
+                                    "nullable": True,
+                                },
+                            },
+                        },
+                    },
+                },
+            },
+            "msg": {
+                "type": "string",
+                "nullable": True,
+                "description": "Human-readable Uptime Kuma notification text.",
+            },
+            "severity": {
+                "type": "string",
+                "nullable": True,
+                "description": (
+                    "Optional IncidentRelay severity override for custom bodies."
+                ),
+            },
+            "labels": {
+                "type": "object",
+                "additionalProperties": True,
+                "description": "Optional additional IncidentRelay labels.",
+            },
+            "event_link": {
+                "type": "string",
+                "nullable": True,
+                "description": (
+                    "Optional link to the Uptime Kuma monitor for custom bodies."
+                ),
+            },
+        },
+        "example": {
+            "heartbeat": {
+                "monitorID": 42,
+                "status": 0,
+                "msg": "Connection refused",
+                "ping": None,
+                "time": "2026-07-27 12:00:00",
+            },
+            "monitor": {
+                "id": 42,
+                "name": "Production API",
+                "type": "http",
+                "url": "https://api.example.com",
+                "tags": [
+                    {"name": "team", "value": "sre"},
+                    {"name": "severity", "value": "critical"},
+                ],
+            },
+            "msg": "Production API is DOWN",
+        },
+    }
+
+
     return {
         "/api/integrations/alertmanager": {
             "post": {
@@ -2297,6 +2435,30 @@ def paths():
                 "requestBody": json_body("Zabbix webhook payload.", zabbix_body),
                 "responses": incoming_alert_responses("Zabbix alert accepted."),
             }
+        },
+
+        "/api/integrations/uptime-kuma": {
+            "post": {
+                "tags": ["integrations"],
+                "summary": "Receive Uptime Kuma monitor notifications",
+                "description": (
+                    "Receives the standard JSON body produced by the Uptime Kuma "
+                    "Webhook notification provider. The route intake token must "
+                    "belong to a route with source=uptime_kuma. DOWN and PENDING "
+                    "events are normalized to firing; UP and MAINTENANCE events "
+                    "are normalized to resolved. Monitor id is used as the stable "
+                    "deduplication key so recovery updates the existing alert."
+                ),
+                "operationId": "receiveUptimeKumaNotification",
+                "security": [{"bearerAuth": []}],
+                "requestBody": json_body(
+                    "Standard Uptime Kuma Webhook payload.",
+                    uptime_kuma_body,
+                ),
+                "responses": incoming_alert_responses(
+                    "Uptime Kuma notification accepted."
+                ),
+            },
         },
         "/api/integrations/sentry/{route_id}": {
             "post": {

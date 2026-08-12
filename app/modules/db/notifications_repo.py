@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from app.modules.db.models import AlertNotification, AlertNotificationEvent
+from app.modules.common import utc_now
 
 
 def get_notification(group_id, channel_id):
@@ -53,7 +54,7 @@ def save_notification(
             last_error=error,
             provider_status=provider_status,
             provider_payload=provider_payload,
-            updated_at=datetime.utcnow(),
+            updated_at=utc_now(),
         )
 
     record.provider = provider or record.provider
@@ -66,7 +67,7 @@ def save_notification(
     if provider_payload is not None:
         record.provider_payload = provider_payload
 
-    record.updated_at = datetime.utcnow()
+    record.updated_at = utc_now()
     record.save()
 
     return record
@@ -86,9 +87,9 @@ def update_notification_callback_state(
     if provider_payload is not None:
         notification.provider_payload = provider_payload
 
-    notification.last_callback_at = datetime.utcnow()
+    notification.last_callback_at = utc_now()
     notification.callback_count = (notification.callback_count or 0) + 1
-    notification.updated_at = datetime.utcnow()
+    notification.updated_at = utc_now()
     notification.save()
 
     return notification

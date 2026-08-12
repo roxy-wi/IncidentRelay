@@ -1,5 +1,6 @@
 from app.api.schemas.roles import TEAM_ROLE_VALUES
 from app.api.openapi.common import response, path_param, json_body
+from app.services.api_token_scopes import PROFILE_TOKEN_SCOPE_OPTIONS
 
 
 ERROR_SCHEMA = {
@@ -86,6 +87,25 @@ PROFILE_SCHEMA = {
             "description": "Phone number for voice or SMS integrations.",
             "example": "+77001234567",
         },
+        "timezone": {
+            "type": "string",
+            "nullable": True,
+            "description": "Preferred IANA timezone for calendar display.",
+            "example": "Asia/Almaty",
+        },
+        "locale": {
+            "type": "string",
+            "nullable": True,
+            "enum": ["en", "de", "fr", "ru"],
+            "description": "Preferred interface language.",
+            "example": "ru",
+        },
+        "theme": {
+            "type": "string",
+            "enum": ["system", "light", "dark"],
+            "description": "Preferred interface color theme.",
+            "example": "dark",
+        },
         "telegram_user_id": {
             "type": "string",
             "nullable": True,
@@ -95,7 +115,10 @@ PROFILE_SCHEMA = {
         "slack_user_id": {
             "type": "string",
             "nullable": True,
-            "description": "Slack user id used for direct notifications.",
+            "description": (
+                "Slack user ID used to attribute interactive Slack "
+                "ACK/Resolve actions to an IncidentRelay user."
+            ),
             "example": "U012ABCDEF",
         },
         "mattermost_user_id": {
@@ -136,6 +159,18 @@ PROFILE_SCHEMA = {
             "description": "Groups available to the current user.",
             "items": GROUP_MEMBERSHIP_SCHEMA,
         },
+        "available_token_scopes": {
+            "type": "array",
+            "readOnly": True,
+            "description": (
+                "Personal API token scopes selectable by the current user. "
+                "Wildcard is returned for global admins only."
+            ),
+            "items": {
+                "type": "string",
+                "enum": list(PROFILE_TOKEN_SCOPE_OPTIONS),
+            },
+        },
     },
 }
 
@@ -158,6 +193,22 @@ PROFILE_UPDATE_SCHEMA = {
             "type": "string",
             "nullable": True,
             "example": "+77001234567",
+        },
+        "timezone": {
+            "type": "string",
+            "nullable": True,
+            "example": "Asia/Almaty",
+        },
+        "locale": {
+            "type": "string",
+            "nullable": True,
+            "enum": ["en", "de", "fr", "ru"],
+            "example": "ru",
+        },
+        "theme": {
+            "type": "string",
+            "enum": ["system", "light", "dark"],
+            "example": "dark",
         },
         "telegram_user_id": {
             "type": "string",
@@ -242,9 +293,17 @@ PROFILE_TOKEN_SCHEMA = {
         },
         "scopes": {
             "type": "array",
-            "description": "Token scopes.",
-            "items": {"type": "string"},
-            "example": ["alerts:read", "resources:read", "calendar:read"],
+            "description": "Token scopes. Multiple granular scopes can be combined.",
+            "items": {
+                "type": "string",
+                "enum": list(PROFILE_TOKEN_SCOPE_OPTIONS),
+            },
+            "example": [
+                "alerts:read",
+                "services:read",
+                "incidents:read",
+                "teams:read",
+            ],
         },
         "group_id": {
             "type": "integer",
@@ -333,10 +392,21 @@ PROFILE_TOKEN_CREATE_SCHEMA = {
         },
         "scopes": {
             "type": "array",
-            "description": "Token scopes.",
-            "items": {"type": "string"},
+            "description": (
+                "One or more token scopes. Prefer granular entity scopes; "
+                "resources:read/write are legacy aggregate scopes."
+            ),
+            "items": {
+                "type": "string",
+                "enum": list(PROFILE_TOKEN_SCOPE_OPTIONS),
+            },
             "default": ["alerts:read"],
-            "example": ["alerts:read", "resources:read"],
+            "example": [
+                "alerts:read",
+                "services:read",
+                "incidents:read",
+                "teams:read",
+            ],
         },
         "days": {
             "type": "integer",

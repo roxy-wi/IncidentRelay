@@ -170,3 +170,36 @@ def test_same_alert_firing_after_payload_resolve_creates_new_group(db):
     assert old_alert.status == "resolved"
     assert old_group.resolved_at is not None
     assert old_alert.resolved_at is not None
+
+
+def test_resolve_alert_can_skip_message_updates(monkeypatch, db):
+    group, _team, _route, alert_group, _alert = _create_firing_group()
+    user = create_user("release-resolve-no-update-user", group)
+
+    message_updates = []
+    stakeholder_updates = []
+
+    monkeypatch.setattr(
+        "app.services.alerts.actions.update_alert_messages",
+        lambda current_group, event_type: message_updates.append(
+            (current_group.id, event_type)
+        )
+        or 1,
+    )
+    monkeypatch.setattr(
+        "app.services.alerts.actions.notify_stakeholders",
+        lambda current_group, event_type, **kwargs: stakeholder_updates.append(
+            (current_group.id, event_type, kwargs)
+        ),
+    )
+
+    resolved = resolve_alert(
+        alert_group.id,
+        user_id=user.id,
+        update_messages=False,
+    )
+
+    assert resolved.status == "resolved"
+    assert message_updates == []
+    assert len(stakeholder_updates) == 1
+    assert _event_count(alert_group.id, "resolved") == 1

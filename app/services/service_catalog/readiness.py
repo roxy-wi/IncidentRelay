@@ -28,6 +28,7 @@ from app.modules.db.models import (
 )
 from app.services.service_catalog.standards import list_applicable_standards
 from app.services.service_catalog.timeline import publish_service_event
+from app.modules.common import utc_now
 
 
 logger = logging.getLogger("oncall.services.readiness")
@@ -42,7 +43,7 @@ class CheckOutcome:
 
 def evaluate_service_readiness(service, *, trigger="system", actor_user=None):
     batch_uid = uuid.uuid4()
-    evaluated_at = datetime.utcnow()
+    evaluated_at = utc_now()
     standards = list_applicable_standards(service)
     database = Service._meta.database
 

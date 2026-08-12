@@ -18,6 +18,7 @@ from tests.factories import (
     create_user,
     unique,
 )
+from app.modules.common import utc_now
 
 
 def normalized_alert(**overrides):
@@ -234,7 +235,7 @@ def test_policy_escalation_moves_alert_to_next_rule(monkeypatch, db):
     assert alert_group.escalation_rule.id == first_rule.id
     assert alert_group.assignee.id == first_user.id
 
-    alert_group.next_escalation_at = datetime.utcnow() - timedelta(seconds=1)
+    alert_group.next_escalation_at = utc_now() - timedelta(seconds=1)
     alert_group.save()
 
     calls = []
@@ -303,7 +304,7 @@ def test_policy_alert_ignores_team_escalation_after_reminders(monkeypatch, db):
     assert created is True
 
     alert_group.reminder_count = 10
-    alert_group.next_escalation_at = datetime.utcnow() + timedelta(minutes=30)
+    alert_group.next_escalation_at = utc_now() + timedelta(minutes=30)
     alert_group.save()
 
     assert maybe_escalate_alert(alert_group) is False
@@ -355,7 +356,7 @@ def test_policy_escalation_runs_when_reminder_interval_is_disabled(monkeypatch, 
 
     assert created is True
 
-    alert_group.next_escalation_at = datetime.utcnow() - timedelta(seconds=1)
+    alert_group.next_escalation_at = utc_now() - timedelta(seconds=1)
     alert_group.save()
 
     assert send_unacked_reminders() == 1
@@ -458,3 +459,73 @@ def test_policy_exhausted_alert_does_not_send_more_reminders(monkeypatch, db):
 
     assert send_unacked_reminders() == 0
     assert calls == []
+
+
+def test_policy_escalation_moves_to_next_rule_without_notification_target(
+    monkeypatch,
+    db,
+):
+    group = create_group(slug="infra-policy-no-target")
+    team = create_team(group, slug="sre-policy-no-target")
+    first_user = create_user("alice-policy-no-target", group)
+    second_user = create_user("bob-policy-no-target", group)
+    add_user_to_team(team, first_user)
+    add_user_to_team(team, second_user)
+    first_rotation = create_rotation(team, name="Primary no target", users=[first_user])
+    second_rotation = create_rotation(team, name="Backup no target", users=[second_user])
+    policy = create_escalation_policy(team)
+    first_rule = create_escalation_policy_rule(
+        policy,
+        position=1,
+        delay_seconds=60,
+        target_type="rotation",
+        rotation=first_rotation,
+    )
+    second_rule = create_escalation_policy_rule(
+        policy,
+        position=2,
+        delay_seconds=120,
+        target_type="rotation",
+        rotation=second_rotation,
+    )
+    create_route(team, escalation_policy=policy)
+
+    monkeypatch.setattr(notification_queue, "notify_alert", lambda *args, **kwargs: 1)
+
+    result = upsert_alert(
+        normalized_alert(team_slug=team.slug)
+    )
+
+    assert result.group is not None
+    assert result.created_group is True
+
+    alert_group = result.group
+
+    assert alert_group.escalation_rule.id == first_rule.id
+
+    alert_group.next_escalation_at = utc_now() - timedelta(seconds=1)
+    alert_group.save()
+
+    monkeypatch.setattr(
+        alert_escalation,
+        "has_matching_notification_channel",
+        lambda *args, **kwargs: False,
+    )
+    monkeypatch.setattr(
+        alert_escalation,
+        "notify_alert",
+        lambda *args, **kwargs: 0,
+    )
+
+    assert maybe_escalate_alert(alert_group) is True
+
+    stored = AlertGroup.get_by_id(alert_group.id)
+
+    assert stored.escalation_rule.id == second_rule.id
+    assert stored.rotation.id == second_rotation.id
+    assert stored.assignee.id == second_user.id
+    assert stored.escalation_level == 1
+    assert AlertEvent.select().where(
+        (AlertEvent.group == stored.id)
+        & (AlertEvent.event_type == "escalation_notification_skipped")
+    ).exists()

@@ -116,6 +116,7 @@ def create_service_sli(service_id):
 
     write_audit(
         "service_sli.create",
+        team_id=service.team_id,
         object_type="service_sli",
         object_id=sli.id,
         data=snapshot,
@@ -159,6 +160,7 @@ def update_service_sli(sli_id):
 
     write_audit(
         "service_sli.update",
+        team_id=service.team_id,
         object_type="service_sli",
         object_id=sli.id,
         data={"before": before, "after": after},
@@ -198,6 +200,7 @@ def delete_service_sli(sli_id):
 
     write_audit(
         "service_sli.delete",
+        team_id=service.team_id,
         object_type="service_sli",
         object_id=sli.id,
         data={"before": before, "after": after},
@@ -277,6 +280,7 @@ def create_service_slo(service_id):
 
     write_audit(
         "service_slo.create",
+        team_id=service.team_id,
         object_type="service_slo",
         object_id=slo.id,
         data=snapshot,
@@ -336,6 +340,7 @@ def update_service_slo(slo_id):
 
     write_audit(
         "service_slo.update",
+        team_id=service.team_id,
         object_type="service_slo",
         object_id=slo.id,
         data={"before": before, "after": after},
@@ -376,6 +381,7 @@ def delete_service_slo(slo_id):
 
     write_audit(
         "service_slo.delete",
+        team_id=service.team_id,
         object_type="service_slo",
         object_id=slo.id,
         data={"before": before, "after": after},

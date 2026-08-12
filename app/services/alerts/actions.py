@@ -1,4 +1,5 @@
 from app.modules.db import alerts_repo, users_repo
+from app.modules.db.models import AlertGroup
 from app.services.alerts.correlation import refresh_alert_group_correlations_safely
 from app.services.incidents.stakeholders import notify_stakeholders
 from app.services.notifications.delivery import update_alert_messages
@@ -47,7 +48,12 @@ def acknowledge_alert(alert_id, user_id=None):
     return group
 
 
-def resolve_alert(alert_id, user_id=None):
+def resolve_alert(
+    alert_id: int,
+    user_id: int | None = None,
+    *,
+    update_messages: bool = True,
+) -> AlertGroup:
     """Resolve an alert group."""
     group_before = alerts_repo.get_alert_group(alert_id)
     old_status = getattr(group_before, "status", None)
@@ -76,7 +82,8 @@ def resolve_alert(alert_id, user_id=None):
 
     refresh_business_impacts_safely_for_group(group, reason="manual_resolve")
 
-    update_alert_messages(group, event_type="resolved")
+    if update_messages:
+        update_alert_messages(group, event_type="resolved")
 
     if old_status != group.status:
         notify_stakeholders(

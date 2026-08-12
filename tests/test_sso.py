@@ -26,6 +26,7 @@ from app.views.sso_admin_view import (
     delete_provider,
     list_group_mappings,
     list_providers,
+    update_group_mapping,
     update_provider,
 )
 from app.views.sso_auth_view import (
@@ -33,7 +34,7 @@ from app.views.sso_auth_view import (
     _validate_oidc_id_token,
     public_sso_providers,
 )
-from tests.factories import create_group, create_user, unique
+from tests.factories import create_group, create_team, create_user, unique
 from app.api.schemas.limits import normalize_phone
 
 
@@ -308,6 +309,137 @@ def test_admin_can_list_sso_group_mappings(app):
     assert len(data) == 1
     assert data[0]["external_group"] == "noc-sso"
     assert data[0]["group_role"] == "viewer"
+
+
+def test_admin_can_update_sso_group_mapping(app):
+    admin = make_admin()
+    provider = make_oidc_provider(slug="update-mapping-provider")
+    group = create_group(slug="sre", name="SRE")
+    team = create_team(group, slug="sre-oncall", name="SRE On-call")
+
+    mapping = SsoGroupMapping.create(
+        provider=provider,
+        external_group="sre-sso",
+        incidentrelay_group=group,
+        group_role="viewer",
+        active=True,
+        priority=100,
+    )
+
+    with app.test_request_context(
+        f"/api/admin/sso/mappings/{mapping.id}",
+        method="PUT",
+        json={
+            "external_group": "sre-sso-renamed",
+            "group_id": group.id,
+            "group_role": "editor",
+            "team_id": team.id,
+            "team_role": "manager",
+            "active": False,
+            "priority": 5,
+        },
+    ):
+        from flask import request
+
+        request.current_user = admin
+        response = update_group_mapping(mapping.id)
+
+    data = response.get_json()
+    mapping = SsoGroupMapping.get_by_id(mapping.id)
+
+    assert data["external_group"] == "sre-sso-renamed"
+    assert data["group_role"] == "editor"
+    assert data["team_id"] == team.id
+    assert data["team_role"] == "manager"
+    assert data["active"] is False
+    assert data["priority"] == 5
+    assert mapping.external_group == "sre-sso-renamed"
+    assert mapping.incidentrelay_team.id == team.id
+    assert mapping.active is False
+
+
+def test_admin_can_detach_team_from_sso_group_mapping(app):
+    admin = make_admin()
+    provider = make_oidc_provider(slug="detach-team-mapping-provider")
+    group = create_group(slug="net", name="Network")
+    team = create_team(group, slug="net-core", name="Core Network")
+
+    mapping = SsoGroupMapping.create(
+        provider=provider,
+        external_group="net-sso",
+        incidentrelay_group=group,
+        group_role="editor",
+        incidentrelay_team=team,
+        team_role="responder",
+        active=True,
+        priority=20,
+    )
+
+    with app.test_request_context(
+        f"/api/admin/sso/mappings/{mapping.id}",
+        method="PUT",
+        json={
+            "external_group": "net-sso",
+            "group_id": group.id,
+            "group_role": "editor",
+            "team_id": None,
+            "active": True,
+            "priority": 20,
+        },
+    ):
+        from flask import request
+
+        request.current_user = admin
+        response = update_group_mapping(mapping.id)
+
+    data = response.get_json()
+    mapping = SsoGroupMapping.get_by_id(mapping.id)
+
+    assert data["team_id"] is None
+    assert data["team_role"] is None
+    assert mapping.incidentrelay_team_id is None
+    assert mapping.team_role is None
+
+
+def test_admin_cannot_map_team_from_another_group(app):
+    admin = make_admin()
+    provider = make_oidc_provider(slug="foreign-team-mapping-provider")
+    group = create_group(slug="dba", name="DBA")
+    other_group = create_group(slug="qa", name="QA")
+    other_team = create_team(other_group, slug="qa-web", name="QA Web")
+
+    mapping = SsoGroupMapping.create(
+        provider=provider,
+        external_group="dba-sso",
+        incidentrelay_group=group,
+        group_role="viewer",
+        active=True,
+        priority=100,
+    )
+
+    with app.test_request_context(
+        f"/api/admin/sso/mappings/{mapping.id}",
+        method="PUT",
+        json={
+            "external_group": "dba-sso",
+            "group_id": group.id,
+            "group_role": "viewer",
+            "team_id": other_team.id,
+            "team_role": "manager",
+            "active": True,
+            "priority": 100,
+        },
+    ):
+        from flask import request
+
+        request.current_user = admin
+        response, status = update_group_mapping(mapping.id)
+
+    mapping = SsoGroupMapping.get_by_id(mapping.id)
+
+    assert status == 400
+    assert response.get_json()["error"] == "validation_error"
+    assert mapping.incidentrelay_team_id is None
 
 
 def test_non_admin_cannot_manage_sso(app):
@@ -829,3 +961,28 @@ def test_complete_sso_login_denies_user_without_matching_group_mapping():
         (SsoIdentity.provider == provider.id)
         & (SsoIdentity.subject == "orphan-sso-user")
     ).exists()
+
+
+def test_sso_json_loader_does_not_expose_network_exception(monkeypatch):
+    from urllib.error import URLError
+
+    import app.views.sso_auth_view as sso_auth_view
+
+    def fail_urlopen(*_args, **_kwargs):
+        raise URLError("internal-idp-secret-detail")
+
+    monkeypatch.setattr(sso_auth_view, "urlopen", fail_urlopen)
+
+    with pytest.raises(SsoLoginError) as exc_info:
+        sso_auth_view._load_json_url(
+            "https://idp.example.com/metadata",
+            "sso_oidc_metadata_error",
+            "Could not load OIDC metadata",
+        )
+
+    error = exc_info.value
+
+    assert error.error == "sso_oidc_metadata_error"
+    assert error.message == "Could not load OIDC metadata"
+    assert error.status_code == 502
+    assert "internal-idp-secret-detail" not in str(error)

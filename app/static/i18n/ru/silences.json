@@ -78,5 +78,16 @@
   "silences.permissions.disable_denied": "У вас нет права отключать это подавление.",
   "silences.confirm.disable_title": "Отключить это подавление?",
   "silences.confirm.disable_message": "После отключения совпадающие алерты больше не будут подавляться.",
-  "silences.confirm.disable": "Отключить"
+  "silences.confirm.disable": "Отключить",
+  "silences.details.apply_to_existing": "Существующие алерты",
+  "silences.details.apply_to_existing_enabled": "Применять к подходящим незакрытым алертам",
+  "silences.details.apply_to_existing_disabled": "Только новые алерты",
+  "silences.details.reactivate_on_end": "После завершения Silence",
+  "silences.details.reactivate_on_end_enabled": "Повторно активировать затронутые алерты",
+  "silences.details.reactivate_on_end_disabled": "Оставить затронутые алерты заглушёнными",
+  "silences.form.apply_to_existing": "Применить к существующим незакрытым алертам",
+  "silences.form.apply_to_existing_help": "Необязательно. Подходящие firing-алерты будут заглушены сразу. Уже отправленные уведомления останутся в истории.",
+  "silences.form.reactivate_on_end": "Повторно активировать заглушённые алерты после завершения Silence",
+  "silences.form.reactivate_on_end_help": "Включено по умолчанию. Алерты активируются только после завершения последнего подходящего Silence.",
+  "silences.form.reactivate_on_end_warning": "Затронутые алерты останутся заглушёнными после завершения Silence. Чтобы освободить их позже, включите эту опцию и сохраните Silence."
 }

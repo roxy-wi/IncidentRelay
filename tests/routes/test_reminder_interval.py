@@ -7,6 +7,7 @@ from app.api.schemas.rotations import RotationCreateSchema
 from app.modules.db.models import AlertEvent
 from app.services.alerts.reminders import should_send_reminder, send_unacked_reminders
 from tests.factories import attach_channel, create_alert, create_channel, create_group, create_route, create_rotation, create_team
+from app.modules.common import utc_now
 
 
 def _rotation_payload(reminder_interval_seconds):
@@ -55,9 +56,9 @@ def test_should_send_reminder_returns_false_when_rotation_interval_is_zero(db):
     route = create_route(team, rotation=rotation)
     alert = create_alert(route)
     alert.rotation = rotation
-    alert.last_notification_at = datetime.utcnow() - timedelta(days=1)
+    alert.last_notification_at = utc_now() - timedelta(days=1)
 
-    assert should_send_reminder(alert, datetime.utcnow()) is False
+    assert should_send_reminder(alert, utc_now()) is False
 
 
 def test_send_unacked_reminders_skips_rotation_with_zero_interval(monkeypatch, db):
@@ -73,7 +74,7 @@ def test_send_unacked_reminders_skips_rotation_with_zero_interval(monkeypatch, d
 
     alert = create_alert(route)
     alert.rotation = rotation
-    alert.last_notification_at = datetime.utcnow() - timedelta(days=1)
+    alert.last_notification_at = utc_now() - timedelta(days=1)
     alert.save()
 
     def fail_notify(*args, **kwargs):

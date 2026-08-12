@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from app.modules.db.models import AlertRouteChannel, Group, NotificationChannel, Team
+from app.modules.common import utc_now
 
 
 def list_channels(
@@ -154,7 +155,7 @@ def soft_delete_channel(channel_id):
     channel = get_channel(channel_id)
     channel.enabled = False
     channel.deleted = True
-    channel.deleted_at = datetime.utcnow()
+    channel.deleted_at = utc_now()
     channel.save()
     return channel
 

@@ -1,6 +1,7 @@
 from datetime import datetime
 
 from app.modules.db.models import AlertRoute, AlertRouteChannel, Group, Team
+from app.modules.common import utc_now
 
 
 def list_routes(team_id=None, team_ids=None, enabled_only=False, source=None, active_only=True, include_deleted=False):
@@ -309,7 +310,7 @@ def soft_delete_route(route_id):
 
     route.enabled = False
     route.deleted = True
-    route.deleted_at = datetime.utcnow()
+    route.deleted_at = utc_now()
     route.save()
 
     AlertRouteChannel.delete().where(

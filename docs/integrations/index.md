@@ -23,6 +23,7 @@ Incoming integrations create or update alerts in IncidentRelay. They are selecte
 | AWS SNS/Cloud watch | `POST /api/integrations/aws-sns`           | [AWS SNS/Cloud watch](integrations/aws-sns-cloudwatch.md) |
 | Grafana             | `POST /api/integrations/grafana`           | [Grafana](grafana.md)                                     |
 | Datadog             | `POST /api/integrations/datadog`           | [Datadog](datadog.md)                                     |
+| Uptime Kuma         | `POST /api/integrations/uptime-kuma`       | [Uptime Kuma](uptime-kuma.md)                             |
 | RMON                | `POST /api/integrations/rmon`              | [Grafana](rmon.md)                                        |
 | Zabbix              | `POST /api/integrations/zabbix`            | [Zabbix](zabbix.md)                                       |
 | Sentry              | `POST /api/integrations/sentry/<route_id>` | [Sentry](sentry.md)                                       |
@@ -40,7 +41,7 @@ Notification channels deliver alerts after a route has matched an incoming alert
 | Mattermost      | Chat notifications, optional ACK/Resolve buttons, message updates              | [Mattermost channel](mattermost.md)           |
 | Telegram        | Telegram Bot API notifications, optional inline actions                        | [Telegram channel](telegram.md)               |
 | Email           | Sends email to the assigned user's profile email                               | [Email channel](email.md)                     |
-| Slack           | Sends notifications to a Slack incoming webhook                                | [Webhook-based channels](webhook-channels.md) |
+| Slack           | Incoming webhook or Bot API notifications with ACK/Resolve actions and updates   | [Slack channel](slack.md)                      |
 | Discord         | Sends notifications to a Discord webhook                                       | [Webhook-based channels](webhook-channels.md) |
 | Microsoft Teams | Sends notifications to a Teams webhook                                         | [Webhook-based channels](webhook-channels.md) |
 | Webhook         | Sends notification payloads to a custom HTTP endpoint                          | [Webhook-based channels](webhook-channels.md) |

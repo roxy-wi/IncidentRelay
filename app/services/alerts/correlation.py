@@ -5,6 +5,7 @@ from datetime import datetime
 from app.db import database_proxy
 from app.modules.db.models import AlertGroup, AlertGroupCorrelation, ServiceDependency
 from app.modules.db import alerts_repo
+from app.modules.common import utc_now
 
 
 logger = logging.getLogger("oncall.alerts")
@@ -53,7 +54,7 @@ def _seen_at(group):
         getattr(group, "last_seen_at", None)
         or getattr(group, "first_seen_at", None)
         or getattr(group, "created_at", None)
-        or datetime.utcnow()
+        or utc_now()
     )
 
 
@@ -428,7 +429,7 @@ def _deactivate_stale_correlations(group, now, keep_ids=None):
 
 def refresh_alert_group_correlations(group):
     """Recalculate and persist dependency-aware correlations for a group."""
-    now = datetime.utcnow()
+    now = utc_now()
 
     with database_proxy.atomic():
         if getattr(group, "status", None) not in ACTIVE_ALERT_GROUP_STATUSES:

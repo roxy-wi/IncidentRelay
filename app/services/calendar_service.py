@@ -1,8 +1,14 @@
-from datetime import datetime, time, timedelta, timezone as dt_timezone
+from datetime import datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
 from app.modules.db import rotations_repo
-from app.api.schemas.base import as_utc_aware
+from app.modules.common import as_utc_aware, as_utc_naive
+from app.services.rotation_schedule import (
+    effective_layer_value,
+    layer_slot_index,
+    layer_start_utc_naive,
+    next_layer_boundary_utc,
+)
 
 
 _OVERRIDE_PRIORITY = 1_000_000
@@ -129,16 +135,7 @@ def build_layer_candidate_events(rotation, layer, start_at, end_at):
     if not members:
         return []
 
-    timezone_name = effective_layer_value(
-        layer,
-        "timezone",
-        rotation.timezone,
-    ) or "UTC"
-
-    layer_start_at = as_rotation_timezone_utc_naive(
-        effective_layer_value(layer, "start_at", rotation.start_at),
-        timezone_name,
-    )
+    layer_start_at = layer_start_utc_naive(layer)
 
     duration_seconds = int(
         effective_layer_value(layer, "duration_seconds", rotation.duration_seconds)
@@ -160,15 +157,9 @@ def build_layer_candidate_events(rotation, layer, start_at, end_at):
                 layer=layer,
                 members=members,
                 at=cursor,
-                duration_seconds=duration_seconds,
-                layer_start_at=layer_start_at,
             )
 
-            next_boundary = get_next_layer_boundary(
-                at=cursor,
-                duration_seconds=duration_seconds,
-                layer_start_at=layer_start_at,
-            )
+            next_boundary = next_layer_boundary_utc(layer, cursor)
 
             next_member_boundary = get_next_layer_member_boundary(
                 members=members,
@@ -464,7 +455,7 @@ def merge_windows(windows):
     return merged
 
 
-def get_layer_user_at(layer, members, at, duration_seconds, layer_start_at):
+def get_layer_user_at(layer, members, at):
     """Return scheduled user for a layer at a given UTC time."""
 
     effective_members = get_effective_layer_members_at(members, at)
@@ -472,45 +463,11 @@ def get_layer_user_at(layer, members, at, duration_seconds, layer_start_at):
     if not effective_members:
         return None
 
-    elapsed = int((at - layer_start_at).total_seconds())
+    slot = layer_slot_index(layer, at)
+    if slot is None:
+        return None
 
-    if elapsed < 0:
-        return effective_members[0].user
-
-    slot = elapsed // duration_seconds
     return effective_members[slot % len(effective_members)].user
-
-
-def get_next_layer_boundary(at, duration_seconds, layer_start_at):
-    """Return next rotation slot boundary."""
-
-    elapsed = int((at - layer_start_at).total_seconds())
-
-    if elapsed < 0:
-        return layer_start_at
-
-    next_slot = (elapsed // duration_seconds) + 1
-
-    return layer_start_at + timedelta(seconds=next_slot * duration_seconds)
-
-
-def effective_layer_value(layer, field_name, default=None):
-    """Return layer value with fallback to parent rotation."""
-
-    value = getattr(layer, field_name, None)
-
-    if value not in (None, ""):
-        return value
-
-    rotation = getattr(layer, "rotation", None)
-
-    if rotation is not None:
-        rotation_value = getattr(rotation, field_name, None)
-
-        if rotation_value not in (None, ""):
-            return rotation_value
-
-    return default
 
 
 def minutes_from_hhmm(value):
@@ -518,30 +475,3 @@ def minutes_from_hhmm(value):
 
     hour_raw, minute_raw = str(value).split(":", 1)
     return int(hour_raw) * 60 + int(minute_raw)
-
-
-def as_utc_naive(value):
-    """Return UTC datetime without tzinfo for DB-compatible comparisons."""
-
-    return as_utc_aware(value).replace(tzinfo=None)
-
-
-def as_rotation_timezone_utc_naive(value, timezone_name):
-    """
-    Convert rotation/layer local datetime to UTC naive.
-
-    If value is naive, treat it as local time in rotation/layer timezone.
-    If value is aware, convert it to UTC.
-    """
-    if value is None:
-        return None
-
-    try:
-        zone = ZoneInfo(timezone_name or "UTC")
-    except Exception:
-        zone = ZoneInfo("UTC")
-
-    if value.tzinfo is None:
-        return value.replace(tzinfo=zone).astimezone(dt_timezone.utc).replace(tzinfo=None)
-
-    return value.astimezone(dt_timezone.utc).replace(tzinfo=None)

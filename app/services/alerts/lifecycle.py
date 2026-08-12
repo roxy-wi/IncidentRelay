@@ -1,7 +1,7 @@
 import logging
-from datetime import datetime
 
 from app import Config
+from app.modules.common import utc_now
 from app.modules.db import alerts_repo, incidents_repo
 from app.services.alerts.escalation import apply_initial_escalation_policy_assignment
 from app.services.alerts.explain import AlertExplainTrace
@@ -9,7 +9,9 @@ from app.services.alerts.maintenance_state import (
     apply_maintenance_to_existing_alert,
     maintenance_create_kwargs,
     maybe_apply_maintenance_to_group,
+    reconcile_alert_group_maintenance,
     record_maintenance_match,
+    should_apply_window_to_group,
 )
 from app.services.alerts.notification_queue import schedule_group_notification
 from app.services.alerts.priority import (
@@ -21,6 +23,15 @@ from app.services.alerts.priority import (
 )
 from app.services.incidents.priority_policies.resolver import resolve_incident_priority
 from app.services.alerts.result import AlertProcessingResult
+from app.services.orchestration.runtime import (
+    attach_runtime_executions,
+    run_event_orchestration,
+    run_service_orchestration,
+)
+from app.services.orchestration.pending import (
+    resolve_pending_event,
+    store_paused_event,
+)
 from app.services.incidents.stakeholders import notify_stakeholders
 from app.services.maintenance import get_maintenance_decision
 from app.services.notifications.delivery import notify_alert
@@ -30,12 +41,29 @@ from app.services.routing.service_resolution import (
     get_effective_route_rotation,
     resolve_alert_service,
 )
-from app.services.silences import find_active_silence
+from app.services.silences import find_active_silences, record_new_alert_silences
 from app.services.alerts.correlation import refresh_alert_group_correlations, refresh_alert_group_correlations_safely
 from app.services.business_services.impact import refresh_business_impacts_safely_for_group
 from app.services.business_services.status import refresh_business_services_safely_for_technical_service
+from app.modules.common import utc_now
 
 logger = logging.getLogger("oncall.alerts")
+
+
+def _route_for_runtime(alert_data, runtime, *, current_route=None):
+    if runtime is None:
+        return find_route_for_alert(alert_data)
+
+    if runtime.route_selected_by_orchestration:
+        return runtime.route
+
+    if runtime.route is None:
+        return find_route_for_alert(alert_data)
+
+    if current_route is None:
+        return find_route_for_alert(alert_data)
+
+    return current_route
 
 
 def _add_service_stakeholders_for_new_group(group):
@@ -65,9 +93,39 @@ def upsert_alert(alert_data):
         AlertProcessingResult
     """
     trace = AlertExplainTrace.start(alert_data)
+    runtime = None
 
     try:
-        return _upsert_alert(alert_data, trace)
+        runtime = run_event_orchestration(alert_data, trace=trace)
+        if runtime.blocked:
+            return _stopped_result(
+                trace=trace,
+                outcome="orchestration_blocked",
+                reason=runtime.reason or "Event orchestration blocked processing.",
+                result={"created": False, "group_id": None, "alert_id": None},
+            )
+        if (
+            runtime.disposition == "drop"
+            and (alert_data.get("status") or "firing") != "resolved"
+        ):
+            trace.step(
+                "orchestration",
+                "orchestration_event_dropped",
+                "success",
+                "Event dropped by orchestration",
+                runtime.disposition_reason,
+            )
+            result = _stopped_result(
+                trace=trace,
+                outcome="dropped",
+                reason=runtime.disposition_reason or "Event dropped by orchestration.",
+                result={"created": False, "group_id": None, "alert_id": None},
+            )
+            attach_runtime_executions(runtime, group=None, alert=None)
+            return result
+        result = _upsert_alert(alert_data, trace, runtime=runtime)
+        attach_runtime_executions(runtime, group=result.group, alert=result.alert)
+        return result
     except Exception as exc:
         trace.fail(exc)
         raise
@@ -102,14 +160,23 @@ def _completed_result(*, trace, group, alert, created_group, outcome):
     )
 
 
-def _resolve_policy_assignment(route, service, rotation, maintenance_decision, trace):
-    policy = get_effective_escalation_policy(route, service)
+def _resolve_policy_assignment(
+    route,
+    service,
+    rotation,
+    maintenance_decision,
+    trace,
+    *,
+    policy_override=None,
+    orchestration_suppressed=False,
+):
+    policy = policy_override or get_effective_escalation_policy(route, service)
 
     policy_rule, rotation, assignee, next_escalation_at = (
         apply_initial_escalation_policy_assignment(policy, rotation)
     )
 
-    if maintenance_decision.pause_escalation_only:
+    if maintenance_decision.pause_escalation_only or orchestration_suppressed:
         next_escalation_at = None
 
     trace.policy_resolved(policy, policy_rule)
@@ -131,6 +198,7 @@ def _create_group(
     rotation,
     policy,
     policy_rule,
+    notification_policy,
     assignee,
     next_escalation_at,
     group_key,
@@ -140,6 +208,8 @@ def _create_group(
     silenced,
     priority_kwargs,
     maintenance_kwargs,
+    orchestration_suppressed=False,
+    orchestration_suppress_reason=None,
 ):
     return alerts_repo.create_alert_group(
         team=team.id if team else None,
@@ -148,6 +218,9 @@ def _create_group(
         rotation=rotation.id if rotation else None,
         escalation_policy=policy.id if policy else None,
         escalation_rule=policy_rule.id if policy_rule else None,
+        notification_policy=(
+            notification_policy.id if notification_policy else None
+        ),
         next_escalation_at=next_escalation_at,
         assignee=assignee.id if assignee else None,
         source=alert_data["source"],
@@ -160,6 +233,8 @@ def _create_group(
         last_seen_at=last_seen_at,
         silenced=silenced,
         priority_set_manually=False,
+        orchestration_suppressed=orchestration_suppressed,
+        orchestration_suppress_reason=orchestration_suppress_reason,
         **priority_kwargs,
         **maintenance_kwargs,
     )
@@ -172,12 +247,15 @@ def _set_alert_routing_fields(
     route,
     service,
     rotation,
+    notification_policy,
     group,
 ):
     alert.team = team.id if team else None
     alert.route = route.id if route else None
     alert.service = service.id if service else None
     alert.rotation = rotation.id if rotation else None
+    if notification_policy is not None:
+        alert.notification_policy = notification_policy.id
     alert.group = group.id
 
 
@@ -198,6 +276,10 @@ def _handle_existing_alert(
     maintenance_decision,
     maintenance_kwargs,
     now,
+    policy_override=None,
+    notification_policy_override=None,
+    orchestration_suppressed=False,
+    orchestration_suppress_reason=None,
 ):
     group = existing_alert.group or existing_group
     priority = priority_resolution.priority
@@ -212,6 +294,8 @@ def _handle_existing_alert(
                 rotation,
                 maintenance_decision,
                 trace,
+                policy_override=policy_override,
+                orchestration_suppressed=orchestration_suppressed,
             )
         )
 
@@ -223,6 +307,7 @@ def _handle_existing_alert(
             rotation=rotation,
             policy=policy,
             policy_rule=policy_rule,
+            notification_policy=notification_policy_override,
             assignee=assignee,
             next_escalation_at=next_escalation_at,
             group_key=group_key,
@@ -232,6 +317,8 @@ def _handle_existing_alert(
             silenced=bool(existing_alert.silenced),
             priority_kwargs=priority_kwargs,
             maintenance_kwargs=maintenance_kwargs,
+            orchestration_suppressed=orchestration_suppressed,
+            orchestration_suppress_reason=orchestration_suppress_reason,
         )
 
         created_group = True
@@ -278,11 +365,23 @@ def _handle_existing_alert(
         route=route,
         service=service,
         rotation=rotation,
+        notification_policy=notification_policy_override,
         group=group,
     )
 
-    if maintenance_decision.pause_escalation_only:
+    if notification_policy_override is not None:
+        group.notification_policy = notification_policy_override.id
+
+    existing_alert.orchestration_suppressed = orchestration_suppressed
+    existing_alert.orchestration_suppress_reason = orchestration_suppress_reason
+    group.orchestration_suppressed = orchestration_suppressed
+    group.orchestration_suppress_reason = orchestration_suppress_reason
+    group.save()
+
+    if maintenance_decision.pause_escalation_only or orchestration_suppressed:
         existing_alert.next_escalation_at = None
+        group.next_escalation_at = None
+        group.save(only=[group.__class__.next_escalation_at])
 
     apply_priority_to_existing_alert(existing_alert, priority)
     apply_maintenance_to_existing_alert(existing_alert, maintenance_decision)
@@ -347,7 +446,16 @@ def _handle_existing_alert(
 
     refresh_business_impacts_safely_for_group(group, reason="existing_alert_update")
 
-    if maintenance_decision.suppress_notifications:
+    if orchestration_suppressed:
+        alerts_repo.clear_alert_group_notification(group)
+        trace.step(
+            "orchestration",
+            "orchestration_notifications_suppressed",
+            "success",
+            "Notifications suppressed by orchestration",
+            orchestration_suppress_reason,
+        )
+    elif maintenance_decision.suppress_notifications:
         alerts_repo.clear_alert_group_notification(group)
         trace.notification_suppressed(
             behavior=maintenance_decision.behavior,
@@ -404,8 +512,8 @@ def _handle_existing_alert(
     )
 
 
-def _upsert_alert(alert_data, trace):
-    route = find_route_for_alert(alert_data)
+def _upsert_alert(alert_data, trace, runtime=None):
+    route = _route_for_runtime(alert_data, runtime)
 
     if not route:
         trace.route_not_matched(alert_data)
@@ -435,7 +543,52 @@ def _upsert_alert(alert_data, trace):
         )
 
     team = route.team
-    service = resolve_alert_service(route, alert_data)
+    service = (
+        runtime.service
+        if runtime and runtime.service
+        else resolve_alert_service(route, alert_data)
+    )
+
+    if runtime is not None and service is not None:
+        runtime = run_service_orchestration(
+            alert_data,
+            runtime,
+            route=route,
+            team=team,
+            service=service,
+            trace=trace,
+        )
+
+        if runtime.blocked:
+            return _stopped_result(
+                trace=trace,
+                outcome="orchestration_blocked",
+                reason=runtime.reason or "Service orchestration blocked processing.",
+                result={"created": False, "group_id": None, "alert_id": None},
+            )
+
+        route = _route_for_runtime(
+            alert_data,
+            runtime,
+            current_route=route,
+        )
+
+        if not route:
+            trace.route_not_matched(alert_data)
+
+            return _stopped_result(
+                trace=trace,
+                outcome="routing_failed",
+                reason="Service orchestration did not leave an active route.",
+                result={"created": False, "group_id": None, "alert_id": None},
+            )
+        team = route.team
+        service = (
+            runtime.service
+            if runtime.service
+            else resolve_alert_service(route, alert_data)
+        )
+
     rotation = get_effective_route_rotation(route, service)
 
     trace.route_matched(route, team)
@@ -443,6 +596,70 @@ def _upsert_alert(alert_data, trace):
     trace.rotation_resolved(rotation)
 
     status = alert_data.get("status") or "firing"
+    group_id = getattr(getattr(route, "team", None), "group_id", None)
+
+    if status == "resolved" and group_id is not None:
+        pending = resolve_pending_event(
+            group_id=group_id,
+            source=alert_data.get("source"),
+            dedup_key=alert_data.get("dedup_key"),
+            trace=trace,
+        )
+        if pending is not None:
+            return _stopped_result(
+                trace=trace,
+                outcome="resolved_before_activation",
+                reason="Paused event resolved before activation.",
+                result={
+                    "created": False,
+                    "group_id": None,
+                    "alert_id": None,
+                    "pending_event_id": pending.id,
+                },
+            )
+
+    if runtime is not None and runtime.disposition == "drop":
+        trace.step(
+            "orchestration",
+            "orchestration_event_dropped",
+            "success",
+            "Event dropped by orchestration",
+            runtime.disposition_reason,
+        )
+        return _stopped_result(
+            trace=trace,
+            outcome="dropped",
+            reason=runtime.disposition_reason or "Event dropped by orchestration.",
+            result={"created": False, "group_id": None, "alert_id": None},
+        )
+
+    if runtime is not None and runtime.disposition == "pause":
+        pending = store_paused_event(
+            alert_data,
+            runtime,
+            route=route,
+            service=service,
+            trace=trace,
+        )
+        return _stopped_result(
+            trace=trace,
+            outcome="paused",
+            reason=runtime.disposition_reason or "Event activation paused by orchestration.",
+            result={
+                "created": False,
+                "group_id": None,
+                "alert_id": None,
+                "pending_event_id": pending.id,
+                "activation_at": pending.activation_at.isoformat(),
+            },
+        )
+
+    orchestration_suppressed = bool(
+        runtime is not None and runtime.disposition == "suppress"
+    )
+    orchestration_suppress_reason = (
+        runtime.disposition_reason if orchestration_suppressed else None
+    )
 
     priority_resolution = resolve_incident_priority(
         alert_data,
@@ -458,15 +675,15 @@ def _upsert_alert(alert_data, trace):
         severity=alert_data.get("severity"),
     )
 
-    group_key = build_group_key(
-        route,
-        alert_data,
-        service=service,
+    group_key = (
+        runtime.group_key
+        if runtime and runtime.group_key
+        else build_group_key(route, alert_data, service=service)
     )
 
     trace.group_key_built(group_key)
 
-    now = datetime.utcnow()
+    now = utc_now()
 
     maintenance_decision = get_maintenance_decision(
         team=team,
@@ -476,17 +693,20 @@ def _upsert_alert(alert_data, trace):
         now=now,
     )
 
-    if maintenance_decision.incident_status:
-        status = maintenance_decision.incident_status
-
+    maintenance_incident_status = maintenance_decision.incident_status
     maintenance_kwargs = maintenance_create_kwargs(maintenance_decision)
 
     trace.maintenance_resolved(maintenance_decision)
 
+    grouping_window_seconds = (
+        runtime.grouping_window_seconds
+        if runtime and runtime.grouping_window_seconds is not None
+        else Config.ALERT_GROUP_WINDOW_SECONDS
+    )
     existing_alert = alerts_repo.find_existing_alert(
         alert_data["source"],
         alert_data["dedup_key"],
-        Config.ALERT_GROUP_WINDOW_SECONDS,
+        grouping_window_seconds,
     )
 
     existing_group = alerts_repo.find_open_alert_group(
@@ -501,6 +721,20 @@ def _upsert_alert(alert_data, trace):
         existing_alert=existing_alert,
         existing_group=existing_group,
     )
+
+    target_group = existing_alert.group if existing_alert and existing_alert.group else existing_group
+    if target_group and maintenance_decision.window and not should_apply_window_to_group(
+        maintenance_decision.window,
+        target_group,
+        now=now,
+    ):
+        from app.services.maintenance import MaintenanceDecision
+        maintenance_decision = MaintenanceDecision()
+        maintenance_kwargs = {}
+        maintenance_incident_status = None
+
+    if maintenance_incident_status:
+        status = maintenance_incident_status
 
     if maintenance_decision.suppress_incident and not existing_alert and not existing_group:
         trace.incident_suppressed(maintenance_decision)
@@ -538,6 +772,12 @@ def _upsert_alert(alert_data, trace):
             maintenance_decision=maintenance_decision,
             maintenance_kwargs=maintenance_kwargs,
             now=now,
+            policy_override=(runtime.escalation_policy if runtime else None),
+            notification_policy_override=(
+                runtime.notification_policy if runtime else None
+            ),
+            orchestration_suppressed=orchestration_suppressed,
+            orchestration_suppress_reason=orchestration_suppress_reason,
         )
 
     if status == "resolved":
@@ -573,17 +813,21 @@ def _upsert_alert(alert_data, trace):
             rotation,
             maintenance_decision,
             trace,
+            policy_override=(runtime.escalation_policy if runtime else None),
+            orchestration_suppressed=orchestration_suppressed,
         )
     )
 
-    silence = find_active_silence(
+    silences = find_active_silences(
         team.id if team else None,
         alert_data,
+        now=now,
     )
+    silence = silences[0] if silences else None
 
     trace.silence_resolved(silence)
 
-    if silence and status == "firing":
+    if silences and status == "firing":
         status = "silenced"
 
     group = existing_group
@@ -598,6 +842,7 @@ def _upsert_alert(alert_data, trace):
             rotation=rotation,
             policy=policy,
             policy_rule=policy_rule,
+            notification_policy=(runtime.notification_policy if runtime else None),
             assignee=assignee,
             next_escalation_at=next_escalation_at,
             group_key=group_key,
@@ -607,6 +852,8 @@ def _upsert_alert(alert_data, trace):
             silenced=bool(silence),
             priority_kwargs=priority_kwargs,
             maintenance_kwargs=maintenance_kwargs,
+            orchestration_suppressed=orchestration_suppressed,
+            orchestration_suppress_reason=orchestration_suppress_reason,
         )
 
         created_group = True
@@ -642,6 +889,20 @@ def _upsert_alert(alert_data, trace):
     else:
         trace.group_reused(group)
 
+    group.orchestration_suppressed = orchestration_suppressed
+    group.orchestration_suppress_reason = orchestration_suppress_reason
+    group_fields = [
+        group.__class__.orchestration_suppressed,
+        group.__class__.orchestration_suppress_reason,
+    ]
+    if orchestration_suppressed:
+        group.next_escalation_at = None
+        group_fields.append(group.__class__.next_escalation_at)
+    if runtime is not None and runtime.notification_policy is not None:
+        group.notification_policy = runtime.notification_policy.id
+        group_fields.append(group.__class__.notification_policy)
+    group.save(only=group_fields)
+
     priority_state_before_recalculate = group_priority_state(group)
 
     previous_priority_slug = (
@@ -665,6 +926,11 @@ def _upsert_alert(alert_data, trace):
         rotation=rotation.id if rotation else None,
         escalation_policy=policy.id if policy else None,
         escalation_rule=policy_rule.id if policy_rule else None,
+        notification_policy=(
+            runtime.notification_policy.id
+            if runtime and runtime.notification_policy
+            else getattr(group, "notification_policy_id", None)
+        ),
         next_escalation_at=next_escalation_at,
         assignee=assignee.id if assignee else None,
         source=alert_data["source"],
@@ -680,11 +946,16 @@ def _upsert_alert(alert_data, trace):
         first_seen_at=now,
         last_seen_at=now,
         silenced=bool(silence),
+        orchestration_suppressed=orchestration_suppressed,
+        orchestration_suppress_reason=orchestration_suppress_reason,
         **priority_kwargs,
         **maintenance_kwargs,
     )
 
     trace.alert_created(alert, group)
+
+    if silences:
+        record_new_alert_silences(alert, silences, now=now)
 
     alerts_repo.create_alert_event(
         alert_id=alert.id,
@@ -700,6 +971,12 @@ def _upsert_alert(alert_data, trace):
             alert_id=alert.id,
         )
 
+    reconcile_alert_group_maintenance(
+        group,
+        now=now,
+        trigger_source="intake",
+    )
+
     if alert_data.get("routing_error"):
         alerts_repo.create_alert_event(
             alert_id=alert.id,
@@ -710,12 +987,12 @@ def _upsert_alert(alert_data, trace):
 
         trace.routing_warning_recorded(alert_data["routing_error"])
 
-    if silence:
+    for matched_silence in silences:
         alerts_repo.create_alert_event(
             alert_id=alert.id,
             group_id=group.id,
             event_type="silenced",
-            message=f"Matched silence: {silence.name}",
+            message=f"Matched silence: {matched_silence.name}",
         )
 
     group = alerts_repo.recalculate_alert_group(group)
@@ -807,7 +1084,16 @@ def _upsert_alert(alert_data, trace):
         },
     )
 
-    if (
+    if orchestration_suppressed:
+        alerts_repo.clear_alert_group_notification(group)
+        trace.step(
+            "orchestration",
+            "orchestration_notifications_suppressed",
+            "success",
+            "Notifications suppressed by orchestration",
+            orchestration_suppress_reason,
+        )
+    elif (
         status == "firing"
         and group.status == "firing"
         and not maintenance_decision.suppress_notifications

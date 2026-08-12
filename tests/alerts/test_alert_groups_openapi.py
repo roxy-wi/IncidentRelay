@@ -73,3 +73,17 @@ def test_openapi_has_alerts_tag_for_group_lifecycle():
 
     assert "alerts" in tags
     assert "alert groups" in tags["alerts"]["description"].lower()
+
+
+def test_openapi_alert_comment_schema_keeps_validation_constraints():
+    from app.api.openapi.endpoints.alerts import alert_comment_schema
+
+    schema = alert_comment_schema()
+    properties = schema["properties"]
+
+    assert properties["body"]["minLength"] == 1
+    assert properties["body"]["maxLength"] == 5000
+    assert properties["user"]["nullable"] is True
+    assert properties["user"]["properties"]["email"]["format"] == "email"
+    assert properties["alert_id"]["nullable"] is True
+    assert "edited" in properties

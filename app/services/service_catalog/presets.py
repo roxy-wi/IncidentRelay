@@ -3,6 +3,7 @@ from datetime import datetime
 from peewee import IntegrityError
 
 from app.modules.db.models import ServiceStandard, ServiceStandardCheck
+from app.modules.common import utc_now
 
 
 BASIC_OPERATIONAL_STANDARD_SLUG = "basic-operational-readiness"
@@ -133,8 +134,8 @@ def _get_or_create_standard(group, *, actor_user=None):
             applies_to=BASIC_OPERATIONAL_STANDARD["applies_to"],
             enabled=BASIC_OPERATIONAL_STANDARD["enabled"],
             created_by=actor_user.id if actor_user else None,
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
+            created_at=utc_now(),
+            updated_at=utc_now(),
         ), True
     except IntegrityError:
         standard = ServiceStandard.get(
@@ -169,8 +170,8 @@ def _get_or_create_check(standard, check_data):
             required=check_data["required"],
             enabled=check_data["enabled"],
             position=check_data["position"],
-            created_at=datetime.utcnow(),
-            updated_at=datetime.utcnow(),
+            created_at=utc_now(),
+            updated_at=utc_now(),
         ), True
     except IntegrityError:
         check = ServiceStandardCheck.get(

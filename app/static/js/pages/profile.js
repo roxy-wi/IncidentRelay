@@ -115,16 +115,108 @@ function fillProfileGroupSelects(profile) {
     }
 }
 
+function getProfileTokenScopeValues() {
+    const element = document.getElementById("profile-token-scopes");
+
+    if (!element) {
+        return [];
+    }
+
+    const value = element.tomselect
+        ? element.tomselect.getValue()
+        : $(element).val();
+
+    if (Array.isArray(value)) {
+        return value;
+    }
+
+    return value ? [value] : [];
+}
+
+function setProfileTokenScopeValues(values) {
+    const element = document.getElementById("profile-token-scopes");
+    const normalized = (values || []).map(String);
+
+    if (!element) {
+        return;
+    }
+
+    if (element.tomselect) {
+        element.tomselect.setValue(normalized, true);
+        return;
+    }
+
+    $(element).val(normalized);
+}
+
+function renderProfileTokenScopes(profile) {
+    const element = document.getElementById("profile-token-scopes");
+
+    if (!element) {
+        return;
+    }
+
+    const selected = getProfileTokenScopeValues();
+    let scopes = asArray(profile.available_token_scopes);
+
+    if (!scopes.length) {
+        scopes = $(element).find("option").map(function () {
+            return String($(this).val());
+        }).get();
+
+        if (!profile.is_admin) {
+            scopes = scopes.filter(function (scope) { return scope !== "*"; });
+        }
+    }
+
+    if (element.tomselect) {
+        element.tomselect.destroy();
+    }
+
+    const select = $(element);
+    select.empty();
+
+    scopes.forEach(function (scope) {
+        select.append($("<option>").val(scope).text(scope));
+    });
+
+    const allowed = new Set(scopes);
+    let nextSelected = selected.filter(function (scope) {
+        return allowed.has(scope);
+    });
+
+    if (!nextSelected.length && allowed.has("alerts:read")) {
+        nextSelected = ["alerts:read"];
+    }
+
+    select.val(nextSelected);
+
+    if (typeof window.TomSelect !== "undefined") {
+        new TomSelect(element, {
+            create: false,
+            persist: false,
+            closeAfterSelect: false,
+            maxOptions: 200,
+            plugins: ["remove_button"],
+            searchField: ["text", "value"]
+        });
+        setProfileTokenScopeValues(nextSelected);
+    }
+}
+
 function loadProfile() {
     /*
      * Load current user profile and render all profile sections.
      */
     apiGet("/api/profile", function (profile) {
+        currentProfileData = profile;
         $("#profile-username").val(profile.username || "");
         $("#profile-display-name").val(profile.display_name || "");
         $("#profile-email").val(profile.email || "");
         $("#profile-phone").val(profile.phone || "");
         $("#profile-timezone").val(profile.timezone || "");
+        $("#profile-language").val(profile.locale || i18n.locale || "en");
+        $("#profile-theme").val(profile.theme || "system");
         $("#profile-telegram").val(profile.telegram_user_id || "");
         $("#profile-slack").val(profile.slack_user_id || "");
         $("#profile-mattermost").val(profile.mattermost_user_id || "");
@@ -148,9 +240,7 @@ function loadProfile() {
             AppTimezones.setOptionalSelectValue("#profile-timezone", profile.timezone);
         }
 
-        if (!profile.is_admin) {
-            $('#profile-token-scopes option[value="*"]').remove();
-        }
+        renderProfileTokenScopes(profile);
         renderProfileCaldav(profile);
         renderProfileHeader(profile);
         fillProfileGroupSelects(profile);
@@ -159,8 +249,14 @@ function loadProfile() {
 
 function saveProfile() {
     /*
-     * Save the current user profile.
+     * Save the current user profile. Interface preference changes reload the
+     * shell so every page and chart is rebuilt with the selected locale/theme.
      */
+    const previousLocale = i18n.locale;
+    const previousTheme = window.AppTheme
+        ? AppTheme.getPreference()
+        : "system";
+
     setProfileStatus("#profile-save-status", i18n.t("profile.status.saving"), false);
     apiPut(
         "/api/profile",
@@ -171,6 +267,8 @@ function saveProfile() {
             timezone: window.AppTimezones
                 ? AppTimezones.getOptionalSelectValue("#profile-timezone")
                 : ($("#profile-timezone").val() || null),
+            locale: $("#profile-language").val() || previousLocale,
+            theme: $("#profile-theme").val() || "system",
             telegram_user_id: $("#profile-telegram").val() || null,
             slack_user_id: $("#profile-slack").val() || null,
             mattermost_user_id: $("#profile-mattermost").val() || null,
@@ -179,8 +277,24 @@ function saveProfile() {
             notify_oncall_shift_start_mattermost: $("#profile-notify-shift-start-mattermost").is(":checked")
         },
         function (profile) {
+            currentProfileData = profile;
             setProfileStatus("#profile-save-status", i18n.t("profile.status.saved"), false);
             renderProfileHeader(profile);
+
+            if (window.AppTheme) {
+                AppTheme.apply(profile.theme || "system");
+            }
+
+            if (profile.locale && profile.locale !== previousLocale) {
+                i18n.setLocale(profile.locale);
+                return;
+            }
+
+            if ((profile.theme || "system") !== previousTheme) {
+                window.location.reload();
+                return;
+            }
+
             loadProfile();
         }
     );
@@ -318,6 +432,7 @@ function createProfileToken() {
     const groupId = $("#profile-token-group").val();
     const days = Number($("#profile-token-days").val() || 0);
     const name = $("#profile-token-name").val().trim() || "personal-api-token";
+    const scopes = getProfileTokenScopeValues();
 
     if (days < 0) {
         setProfileInlineStatus("#profile-token-status", i18n.t("profile.tokens.days_negative"), true);
@@ -329,7 +444,7 @@ function createProfileToken() {
         {
             name: name,
             group_id: groupId ? Number(groupId) : null,
-            scopes: $("#profile-token-scopes").val() || ["alerts:read"],
+            scopes: scopes.length ? scopes : ["alerts:read"],
             days: days,
         },
         function (data) {
@@ -413,6 +528,7 @@ function saveActiveGroup() {
 
 $(document).on("click", "#open-profile-token-modal", function () {
     resetProfileTokenModal();
+    setProfileTokenScopeValues(["alerts:read"]);
     openAppModal("#profile-token-modal");
 });
 $(document).on("click", "#close-profile-token-modal, #close-profile-token-modal-footer", function () {
@@ -640,11 +756,9 @@ function openCreateCaldavTokenModal() {
     $("#profile-token-days").val("");
     $("#profile-token-group").val("");
 
-    const scopes = $("#profile-token-scopes");
+    setProfileTokenScopeValues(["calendar:read"]);
 
-    scopes.val(["calendar:read"]);
-
-    if (!scopes.val() || scopes.val().indexOf("calendar:read") === -1) {
+    if (getProfileTokenScopeValues().indexOf("calendar:read") === -1) {
         setProfileInlineStatus(
             "#profile-caldav-status",
             i18n.t("profile.caldav.scope_missing"),

@@ -13,6 +13,7 @@ from app.modules.db.models import (
     ServiceSloMeasurement,
     User,
 )
+from app.modules.common import utc_now
 
 
 def list_services(team_id=None, team_ids=None, include_disabled=True):
@@ -88,7 +89,7 @@ def restore_service(service_id, data):
 
     service.deleted = False
     service.deleted_at = None
-    service.updated_at = datetime.utcnow()
+    service.updated_at = utc_now()
     service.save()
 
     return service
@@ -136,7 +137,7 @@ def create_service(data):
     if existing and existing.deleted:
         return restore_service(existing.id, data)
 
-    data["updated_at"] = datetime.utcnow()
+    data["updated_at"] = utc_now()
 
     return Service.create(**data)
 
@@ -152,7 +153,7 @@ def update_service(service_id, data):
     for field, value in data.items():
         setattr(service, field, value)
 
-    service.updated_at = datetime.utcnow()
+    service.updated_at = utc_now()
     service.save()
 
     return service
@@ -161,7 +162,7 @@ def update_service(service_id, data):
 def soft_delete_service(service_id):
     """Soft-delete a service and service-owned routing helpers."""
     service = get_service(service_id)
-    now = datetime.utcnow()
+    now = utc_now()
 
     service.enabled = False
     service.deleted = True
@@ -270,7 +271,7 @@ def get_match_rule(rule_id):
 
 def create_match_rule(data):
     """Create a service match rule."""
-    data["updated_at"] = datetime.utcnow()
+    data["updated_at"] = utc_now()
     return ServiceMatchRule.create(**data)
 
 
@@ -281,7 +282,7 @@ def update_match_rule(rule_id, data):
     for field, value in data.items():
         setattr(rule, field, value)
 
-    rule.updated_at = datetime.utcnow()
+    rule.updated_at = utc_now()
     rule.save()
 
     return rule
@@ -292,8 +293,8 @@ def soft_delete_match_rule(rule_id):
     rule = get_match_rule(rule_id)
     rule.enabled = False
     rule.deleted = True
-    rule.deleted_at = datetime.utcnow()
-    rule.updated_at = datetime.utcnow()
+    rule.deleted_at = utc_now()
+    rule.updated_at = utc_now()
     rule.save()
     return rule
 
@@ -486,7 +487,7 @@ def get_service_link(link_id):
 def create_service_link(service_id, data):
     """Create a service link."""
     data["service"] = service_id
-    data["updated_at"] = datetime.utcnow()
+    data["updated_at"] = utc_now()
     return ServiceLink.create(**data)
 
 
@@ -497,7 +498,7 @@ def update_service_link(link_id, data):
     for field, value in data.items():
         setattr(link, field, value)
 
-    link.updated_at = datetime.utcnow()
+    link.updated_at = utc_now()
     link.save()
 
     return link
@@ -508,8 +509,8 @@ def soft_delete_service_link(link_id):
     link = get_service_link(link_id)
     link.enabled = False
     link.deleted = True
-    link.deleted_at = datetime.utcnow()
-    link.updated_at = datetime.utcnow()
+    link.deleted_at = utc_now()
+    link.updated_at = utc_now()
     link.save()
     return link
 
@@ -531,7 +532,7 @@ def get_service_runbook(runbook_id):
 def create_service_runbook(service_id, data):
     """Create a service runbook."""
     data["service"] = service_id
-    data["updated_at"] = datetime.utcnow()
+    data["updated_at"] = utc_now()
     return ServiceRunbook.create(**data)
 
 
@@ -542,7 +543,7 @@ def update_service_runbook(runbook_id, data):
     for field, value in data.items():
         setattr(runbook, field, value)
 
-    runbook.updated_at = datetime.utcnow()
+    runbook.updated_at = utc_now()
     runbook.save()
 
     return runbook
@@ -553,8 +554,8 @@ def soft_delete_service_runbook(runbook_id):
     runbook = get_service_runbook(runbook_id)
     runbook.enabled = False
     runbook.deleted = True
-    runbook.deleted_at = datetime.utcnow()
-    runbook.updated_at = datetime.utcnow()
+    runbook.deleted_at = utc_now()
+    runbook.updated_at = utc_now()
     runbook.save()
     return runbook
 
@@ -575,7 +576,7 @@ def get_service_dependency(dependency_id):
 def create_service_dependency(service_id, data):
     """Create a service dependency."""
     data["service"] = service_id
-    data["updated_at"] = datetime.utcnow()
+    data["updated_at"] = utc_now()
     return ServiceDependency.create(**data)
 
 
@@ -586,7 +587,7 @@ def update_service_dependency(dependency_id, data):
     for field, value in data.items():
         setattr(dependency, field, value)
 
-    dependency.updated_at = datetime.utcnow()
+    dependency.updated_at = utc_now()
     dependency.save()
 
     return dependency
@@ -597,8 +598,8 @@ def soft_delete_service_dependency(dependency_id):
     dependency = get_service_dependency(dependency_id)
     dependency.enabled = False
     dependency.deleted = True
-    dependency.deleted_at = datetime.utcnow()
-    dependency.updated_at = datetime.utcnow()
+    dependency.deleted_at = utc_now()
+    dependency.updated_at = utc_now()
     dependency.save()
     return dependency
 
@@ -783,7 +784,7 @@ def create_service_sli(service_id, data):
     """Create a Service Level Indicator."""
     data = dict(data)
     data["service"] = service_id
-    data["updated_at"] = datetime.utcnow()
+    data["updated_at"] = utc_now()
     return ServiceSli.create(**data)
 
 
@@ -794,7 +795,7 @@ def update_service_sli(sli_id, data):
     for field, value in data.items():
         setattr(sli, field, value)
 
-    sli.updated_at = datetime.utcnow()
+    sli.updated_at = utc_now()
     sli.save()
 
     return sli
@@ -805,8 +806,8 @@ def soft_delete_service_sli(sli_id):
     sli = get_service_sli(sli_id)
     sli.enabled = False
     sli.deleted = True
-    sli.deleted_at = datetime.utcnow()
-    sli.updated_at = datetime.utcnow()
+    sli.deleted_at = utc_now()
+    sli.updated_at = utc_now()
     sli.save()
 
     return sli
@@ -856,7 +857,7 @@ def create_service_slo(service_id, data):
     """Create a Service Level Objective."""
     data = dict(data)
     data["service"] = service_id
-    data["updated_at"] = datetime.utcnow()
+    data["updated_at"] = utc_now()
     return ServiceSlo.create(**data)
 
 
@@ -867,7 +868,7 @@ def update_service_slo(slo_id, data):
     for field, value in data.items():
         setattr(slo, field, value)
 
-    slo.updated_at = datetime.utcnow()
+    slo.updated_at = utc_now()
     slo.save()
 
     return slo
@@ -878,8 +879,8 @@ def soft_delete_service_slo(slo_id):
     slo = get_service_slo(slo_id)
     slo.enabled = False
     slo.deleted = True
-    slo.deleted_at = datetime.utcnow()
-    slo.updated_at = datetime.utcnow()
+    slo.deleted_at = utc_now()
+    slo.updated_at = utc_now()
     slo.save()
 
     return slo

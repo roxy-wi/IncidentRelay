@@ -12,6 +12,7 @@ Choose one of the current installation guides:
 | Method | Guide |
 |---|---|
 | Docker Compose | [Docker Installation](docker.md) |
+| Kubernetes with Helm | [Kubernetes Installation](kubernetes.md) |
 | RPM package for RedHat-like distributions | [RPM Installation](rpm-installation.md) |
 | Manual source checkout with systemd | [Manual systemd Installation](systemd.md) |
 

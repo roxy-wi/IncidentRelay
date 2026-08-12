@@ -157,6 +157,12 @@ def maintenance_window_schema():
             ),
             "occurrence": maintenance_window_occurrence_schema(),
             "enabled": {"type": "boolean"},
+            "apply_to_existing": {"type": "boolean"},
+            "reactivate_on_end": {"type": "boolean"},
+            "reconciled_at": date_time_property(
+                "Last lifecycle reconciliation timestamp.",
+                nullable=True,
+            ),
             "deleted": {"type": "boolean"},
             "cancelled_by_id": {"type": "integer", "nullable": True},
             "cancelled_at": date_time_property(
@@ -251,6 +257,24 @@ def maintenance_window_request_schema():
             "enabled": {
                 "type": "boolean",
                 "default": True,
+            },
+            "apply_to_existing": {
+                "type": "boolean",
+                "default": False,
+                "description": (
+                    "Apply this window to matching unresolved alert groups that "
+                    "already existed when the occurrence started. Not supported "
+                    "for suppress_incident."
+                ),
+            },
+            "reactivate_on_end": {
+                "type": "boolean",
+                "default": True,
+                "description": (
+                    "Release affected alert groups when the window ends, is disabled, "
+                    "or is cancelled. Deletion and scope/behavior changes always release "
+                    "effects that no longer belong to the window."
+                ),
             },
             "scopes": {
                 "type": "array",

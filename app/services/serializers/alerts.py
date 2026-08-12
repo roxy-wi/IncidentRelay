@@ -42,7 +42,7 @@ def serialize_alert_event(event):
         "event_type": event.event_type,
         "message": event.message,
         "user": serialize_user_short(event.user),
-        "created_at": event.created_at.isoformat(),
+        "created_at": serialize_utc_datetime(event.created_at),
     }
 
 
@@ -185,8 +185,8 @@ def serialize_alert_notification(notification):
         "provider_payload": notification.provider_payload or {},
         "last_event_type": notification.last_event_type,
         "last_error": notification.last_error,
-        "created_at": notification.created_at.isoformat(),
-        "updated_at": notification.updated_at.isoformat(),
+        "created_at": serialize_utc_datetime(notification.created_at),
+        "updated_at": serialize_utc_datetime(notification.updated_at),
     }
 
 
@@ -586,6 +586,12 @@ def serialize_alert_group(
         "team_escalation_enabled": group.team.escalation_enabled if group.team else None,
         "maintenance_window_id": group.maintenance_window_id,
         "maintenance_suppressed": group.maintenance_suppressed,
+        "orchestration_suppressed": bool(
+            getattr(group, "orchestration_suppressed", False)
+        ),
+        "orchestration_suppress_reason": getattr(
+            group, "orchestration_suppress_reason", None
+        ),
         "correlation_summary": serialize_alert_group_correlation_summary(group),
         "business_impact_summary": serialize_alert_group_business_impact_summary(group),
     }
@@ -629,8 +635,8 @@ def serialize_alert_group(
 def serialize_alert_comment(comment):
     user = comment.user if getattr(comment, "user_id", None) else None
 
-    created_at = comment.created_at.isoformat() if comment.created_at else None
-    updated_at = comment.updated_at.isoformat() if comment.updated_at else None
+    created_at = serialize_utc_datetime(comment.created_at)
+    updated_at = serialize_utc_datetime(comment.updated_at)
 
     return {
         "id": comment.id,
@@ -696,7 +702,7 @@ def serialize_attached_maintenance_ref(obj):
 
 
 def serialize_alert_explain_step(row):
-    created_at = getattr(row, "created_at", None)
+    created_at = serialize_utc_datetime(getattr(row, "created_at", None))
 
     return {
         "id": row.id,
@@ -707,13 +713,13 @@ def serialize_alert_explain_step(row):
         "title": row.title,
         "message": row.message,
         "data": row.data or {},
-        "created_at": created_at.isoformat() if created_at else None,
+        "created_at": created_at,
     }
 
 
 def serialize_alert_explain_trace(row, steps=None):
-    started_at = getattr(row, "started_at", None)
-    finished_at = getattr(row, "finished_at", None)
+    started_at = serialize_utc_datetime(getattr(row, "started_at", None))
+    finished_at = serialize_utc_datetime(getattr(row, "finished_at", None))
 
     return {
         "id": row.id,
@@ -728,8 +734,8 @@ def serialize_alert_explain_trace(row, steps=None):
         "reason": row.reason,
         "input_summary": row.input_summary or {},
         "result": row.result or {},
-        "started_at": started_at.isoformat() if started_at else None,
-        "finished_at": finished_at.isoformat() if finished_at else None,
+        "started_at": started_at,
+        "finished_at": finished_at,
         "steps": [
             serialize_alert_explain_step(step)
             for step in (steps or [])

@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timedelta
 
 from app.modules.db.models import (
     EscalationPolicy,
@@ -12,29 +12,15 @@ from app.modules.db.models import (
     User,
 )
 from app.services.calendar_service import build_rotation_calendar
+from app.modules.common import as_utc_naive, utc_now
+from app.services.serializers.common import serialize_utc_datetime
 
 
 DEFAULT_LOOKAHEAD_DAYS = 30
 
 
-def _utc_naive_now():
-    return datetime.utcnow()
-
-
 def _parse_event_datetime(value):
-    if isinstance(value, datetime):
-        return value
-
-    text = str(value)
-    if text.endswith("Z"):
-        text = text[:-1] + "+00:00"
-
-    parsed = datetime.fromisoformat(text)
-
-    if parsed.tzinfo is not None:
-        parsed = parsed.astimezone(timezone.utc).replace(tzinfo=None)
-
-    return parsed
+    return as_utc_naive(value)
 
 
 def _display_name(name, slug, fallback="-"):
@@ -74,12 +60,8 @@ def _serialize_user_oncall_event(event):
         "type": event.get("type"),
         "timezone": event.get("timezone") or "UTC",
 
-        "start": _parse_event_datetime(event["start"]).replace(
-            tzinfo=timezone.utc,
-        ).isoformat().replace("+00:00", "Z"),
-        "end": _parse_event_datetime(event["end"]).replace(
-            tzinfo=timezone.utc,
-        ).isoformat().replace("+00:00", "Z"),
+        "start": serialize_utc_datetime(event["start"]),
+        "end": serialize_utc_datetime(event["end"]),
     }
 
 
@@ -166,14 +148,7 @@ def _list_user_rotations(user, *, start_at=None, end_at=None):
 
 
 def _serialize_datetime_utc(value):
-    parsed = _parse_event_datetime(value)
-
-    return (
-        parsed
-        .replace(tzinfo=timezone.utc)
-        .isoformat()
-        .replace("+00:00", "Z")
-    )
+    return serialize_utc_datetime(value)
 
 
 def _policy_display_name(policy):
@@ -414,7 +389,7 @@ def get_user_oncall_status(
     This uses the same calendar calculation as the calendar UI and future
     shift email notifications, so UI and scheduler stay consistent.
     """
-    now = now or _utc_naive_now()
+    now = now or utc_now()
     lookahead_days = max(1, min(int(lookahead_days or DEFAULT_LOOKAHEAD_DAYS), 90))
 
     lookbehind_days = max(lookahead_days, 7)

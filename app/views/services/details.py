@@ -1,11 +1,11 @@
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 
 from flask import jsonify, request
 from peewee import DoesNotExist
 
 from app.views.services.blueprint import services_bp
 from app.modules.db import maintenance_repo, services_repo
-from app.modules.db.models import AlertGroup
+from app.modules.db.models import AlertGroup, EventOrchestration
 from app.services.rbac import require_team_read, current_user
 from app.services.serializers.services import serialize_utc_datetime, serialize_maintenance_window, serialize_service, \
     serialize_service_readiness_state, serialize_service_link, serialize_service_runbook, serialize_service_dependency, \
@@ -15,6 +15,7 @@ from app.services.service_catalog.impact import build_single_service_impact_v2
 from app.services.service_catalog.sli_slo import evaluate_service_slos
 from app.services.service_catalog.timeline import list_service_events, serialize_service_event, build_next_cursor
 from app.services.validation import make_error_response
+from app.modules.common import as_utc_naive, utc_now
 
 
 class ServiceDetailsImpactQuery:
@@ -44,7 +45,7 @@ def _count_alert_groups(service_id, *conditions):
 
 
 def _service_alert_summary(service_id, *, days):
-    since = datetime.utcnow() - timedelta(days=days)
+    since = utc_now() - timedelta(days=days)
 
     base_query = _service_alert_group_query(service_id)
     recent_query = base_query.where(AlertGroup.last_seen_at >= since)
@@ -148,7 +149,7 @@ def _service_analytics_payload(
     timeline,
     impact=None,
 ):
-    until = datetime.utcnow()
+    until = utc_now()
     since = until - timedelta(days=days)
 
     impact = impact or {}
@@ -196,6 +197,31 @@ def _service_analytics_payload(
     }
 
 
+def _service_orchestration_summaries(service):
+    rows = (
+        EventOrchestration.select()
+        .where(
+            (EventOrchestration.group == service.group_id)
+            & (EventOrchestration.scope == "service")
+            & (EventOrchestration.service == service.id)
+            & (EventOrchestration.deleted == False)  # noqa: E712
+            & EventOrchestration.deleted_at.is_null(True)
+        )
+        .order_by(EventOrchestration.name.asc(), EventOrchestration.id.asc())
+    )
+    return [
+        {
+            "id": row.id,
+            "name": row.name,
+            "mode": row.mode,
+            "enabled": bool(row.enabled),
+            "compatibility_mode": row.compatibility_mode,
+            "active_version_id": row.active_version_id,
+        }
+        for row in rows
+    ]
+
+
 def _service_details_payload(service, *, days):
     alert_summary = _service_alert_summary(service.id, days=days)
     timeline = list_service_events(service.id, limit=50)
@@ -236,6 +262,7 @@ def _service_details_payload(service, *, days):
             current_user(),
             readiness_state=readiness_state,
         ),
+        "event_orchestrations": _service_orchestration_summaries(service),
         "summary": {
             "alerts": alert_summary,
             "maintenance_windows": len(_service_maintenance_windows(service)),
@@ -364,12 +391,9 @@ def _parse_service_timeline_datetime(value):
         return None, None
 
     try:
-        parsed = datetime.fromisoformat(value.replace("Z", "+00:00"))
+        parsed = as_utc_naive(value)
     except ValueError:
         return None, make_error_response("timeline_before_invalid", "Timeline before must be a valid ISO 8601 datetime", 400)
-
-    if parsed.tzinfo is not None:
-        parsed = parsed.astimezone(timezone.utc).replace(tzinfo=None)
 
     return parsed, None
 

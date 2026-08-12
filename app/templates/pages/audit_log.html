@@ -1,0 +1,186 @@
+<div class="first-div-page-layout audit-log-page page-stack">
+  <div class="summary-grid">
+    <div class="summary-card summary-primary">
+      <div class="summary-icon">L</div>
+      <div>
+        <div class="summary-title">{{ _('audit.summary.entries') }}</div>
+        <div id="audit-log-total-count" class="summary-value">0</div>
+        <div class="summary-hint">{{ _('audit.summary.entries_hint') }}</div>
+      </div>
+    </div>
+
+    <div class="summary-card summary-info">
+      <div class="summary-icon">U</div>
+      <div>
+        <div class="summary-title">{{ _('audit.summary.actors') }}</div>
+        <div id="audit-log-actor-count" class="summary-value">0</div>
+        <div class="summary-hint">{{ _('audit.summary.actors_hint') }}</div>
+      </div>
+    </div>
+
+    <div class="summary-card summary-success">
+      <div class="summary-icon">A</div>
+      <div>
+        <div class="summary-title">{{ _('audit.summary.actions') }}</div>
+        <div id="audit-log-action-count" class="summary-value">0</div>
+        <div class="summary-hint">{{ _('audit.summary.actions_hint') }}</div>
+      </div>
+    </div>
+
+    <div class="summary-card summary-muted">
+      <div class="summary-icon">G</div>
+      <div>
+        <div class="summary-title">{{ _('audit.summary.groups') }}</div>
+        <div id="audit-log-group-count" class="summary-value">0</div>
+        <div class="summary-hint">{{ _('audit.summary.groups_hint') }}</div>
+      </div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header audit-log-header">
+      <div>
+        <h2>{{ _('audit.list.title') }}</h2>
+        <div id="audit-log-scope-hint" class="card-subtitle">
+          {{ _('audit.list.subtitle') }}
+        </div>
+      </div>
+
+      <div class="card-header-actions">
+        <button id="reload-audit-log" type="button" class="btn btn-primary">
+          {{ _('audit.actions.reload') }}
+        </button>
+        <button id="clear-audit-log-filters" type="button" class="btn">
+          {{ _('audit.actions.clear_filters') }}
+        </button>
+      </div>
+    </div>
+
+    <div class="audit-log-filters">
+      <div class="audit-filter audit-filter-search">
+        <label for="audit-log-search">{{ _('audit.filters.search') }}</label>
+        <input
+          id="audit-log-search"
+          class="input"
+          type="search"
+          placeholder="{{ _('audit.filters.search_placeholder') }}"
+        >
+      </div>
+
+      <div class="audit-filter">
+        <label for="audit-log-group">{{ _('audit.filters.group') }}</label>
+        <select id="audit-log-group" class="input">
+          <option value="">{{ _('audit.filters.all_groups') }}</option>
+        </select>
+      </div>
+
+      <div class="audit-filter">
+        <label for="audit-log-actor">{{ _('audit.filters.actor') }}</label>
+        <select id="audit-log-actor" class="input">
+          <option value="">{{ _('audit.filters.all_actors') }}</option>
+        </select>
+      </div>
+
+      <div class="audit-filter">
+        <label for="audit-log-action">{{ _('audit.filters.action') }}</label>
+        <select id="audit-log-action" class="input">
+          <option value="">{{ _('audit.filters.all_actions') }}</option>
+        </select>
+      </div>
+
+      <div class="audit-filter">
+        <label for="audit-log-object-type">{{ _('audit.filters.object_type') }}</label>
+        <select id="audit-log-object-type" class="input">
+          <option value="">{{ _('audit.filters.all_object_types') }}</option>
+        </select>
+      </div>
+
+      <div class="audit-filter">
+        <label for="audit-log-date-from">{{ _('audit.filters.date_from') }}</label>
+        <input id="audit-log-date-from" class="input" type="date">
+      </div>
+
+      <div class="audit-filter">
+        <label for="audit-log-date-to">{{ _('audit.filters.date_to') }}</label>
+        <input id="audit-log-date-to" class="input" type="date">
+      </div>
+    </div>
+
+    <div class="table-wrapper has-table-pagination">
+      <table class="data-table audit-log-table">
+        <thead>
+          <tr>
+            <th>{{ _('audit.table.time') }}</th>
+            <th>{{ _('audit.table.actor') }}</th>
+            <th>{{ _('audit.table.action') }}</th>
+            <th>{{ _('audit.table.object') }}</th>
+            <th>{{ _('audit.table.scope') }}</th>
+            <th>{{ _('audit.table.message') }}</th>
+            <th>{{ _('audit.table.details') }}</th>
+          </tr>
+        </thead>
+        <tbody id="audit-log-table"></tbody>
+      </table>
+    </div>
+
+    <div class="table-pagination table-pagination-attached">
+      <div class="table-pagination-left">
+        <span id="audit-log-range">0–0 / 0</span>
+        <label for="audit-log-page-size">{{ _('audit.pagination.rows') }}</label>
+        <select id="audit-log-page-size" class="input table-page-size-select">
+          <option value="25">25</option>
+          <option value="50">50</option>
+          <option value="100">100</option>
+        </select>
+      </div>
+      <div id="audit-log-page-label" class="table-pagination-center">
+        {{ _('audit.pagination.page') }} 1 / 1
+      </div>
+      <div class="table-pagination-actions">
+        <button id="audit-log-prev-page" type="button" class="btn">
+          {{ _('audit.pagination.previous') }}
+        </button>
+        <button id="audit-log-next-page" type="button" class="btn">
+          {{ _('audit.pagination.next') }}
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <div id="audit-log-details-modal" class="app-modal is-hidden">
+    <div class="app-modal-dialog app-modal-dialog-wide">
+      <div class="app-modal-header">
+        <div>
+          <h2 id="audit-log-details-title">{{ _('audit.details.title') }}</h2>
+          <div id="audit-log-details-subtitle" class="card-subtitle"></div>
+        </div>
+        <button
+          id="close-audit-log-details"
+          type="button"
+          class="app-modal-close"
+          aria-label="{{ _('audit.actions.close') }}"
+        >×</button>
+      </div>
+
+      <div class="app-modal-body">
+        <div id="audit-log-details-summary" class="details-grid"></div>
+
+        <div class="card audit-log-json-card">
+          <div class="card-header details-header">
+            <div>
+              <h2>{{ _('audit.details.payload') }}</h2>
+              <div class="card-subtitle">{{ _('audit.details.payload_hint') }}</div>
+            </div>
+          </div>
+          <pre id="audit-log-details-json" class="audit-log-json">{}</pre>
+        </div>
+      </div>
+
+      <div class="app-modal-footer">
+        <button id="close-audit-log-details-footer" type="button" class="btn">
+          {{ _('audit.actions.close') }}
+        </button>
+      </div>
+    </div>
+  </div>
+</div>

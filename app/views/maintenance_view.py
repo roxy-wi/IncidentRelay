@@ -16,7 +16,6 @@ from app.services.maintenance import (
 from app.services.rbac import (
     current_user,
     require_team_read,
-    require_team_write,
 )
 from app.services.serializers.services import (
     serialize_maintenance_window,
@@ -54,6 +53,8 @@ def _maintenance_audit_data(window, payload=None):
         "starts_at": serialize_utc_datetime(window.starts_at),
         "ends_at": serialize_utc_datetime(window.ends_at),
         "enabled": window.enabled,
+        "apply_to_existing": bool(window.apply_to_existing),
+        "reactivate_on_end": bool(window.reactivate_on_end),
         "deleted": window.deleted,
     }
 
@@ -94,26 +95,6 @@ def _check_window_read(window):
 
         if scope.route_id and scope.route:
             error = require_team_read(scope.route.team_id)
-            if error:
-                return error
-
-    return None
-
-
-def _check_window_write(window):
-    for scope in window.scopes:
-        if scope.team_id:
-            error = require_team_write(scope.team_id)
-            if error:
-                return error
-
-        if scope.service_id and scope.service:
-            error = require_team_write(scope.service.team_id)
-            if error:
-                return error
-
-        if scope.route_id and scope.route:
-            error = require_team_write(scope.route.team_id)
             if error:
                 return error
 

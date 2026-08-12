@@ -3,6 +3,7 @@ from datetime import datetime
 from peewee import IntegrityError
 
 from app.modules.db.models import ServiceEvent
+from app.modules.common import utc_now
 
 
 def publish_service_event(service, *, category, event_type, title, summary=None, source="incidentrelay", source_ref=None, dedup_key=None, external_url=None, actor_user=None, actor_type=None, actor_label=None, severity=None, status=None, occurred_at=None, payload=None):
@@ -31,7 +32,7 @@ def publish_service_event(service, *, category, event_type, title, summary=None,
             actor_label=actor_label,
             severity=severity,
             status=status,
-            occurred_at=occurred_at or datetime.utcnow(),
+            occurred_at=occurred_at or utc_now(),
             payload=payload or {},
         )
     except IntegrityError:

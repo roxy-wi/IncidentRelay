@@ -1,3 +1,5 @@
+from app.api.openapi.common import path_param, response
+
 HEALTH_STATUSES = [
     "ok",
     "warning",
@@ -10,20 +12,6 @@ HEALTH_SEVERITIES = [
     "warning",
     "info",
 ]
-
-
-def path_param(name, description):
-    """Build an integer path parameter."""
-    return {
-        "name": name,
-        "in": "path",
-        "required": True,
-        "description": description,
-        "schema": {
-            "type": "integer",
-            "minimum": 1,
-        },
-    }
 
 
 def repeated_id_query_param(name, description):
@@ -45,22 +33,6 @@ def repeated_id_query_param(name, description):
             },
         },
     }
-
-
-def response(description, schema=None):
-    """Build a JSON response."""
-    item = {
-        "description": description,
-    }
-
-    if schema:
-        item["content"] = {
-            "application/json": {
-                "schema": schema,
-            },
-        }
-
-    return item
 
 
 def bearer_security():

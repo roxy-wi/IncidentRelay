@@ -5,6 +5,7 @@ from app.modules.db import priority_policies_repo, teams_repo
 from app.services.incidents.priority_policies.constants import FALLBACK_FIXED_PRIORITY, FALLBACK_SEVERITY_MAPPING
 from app.services.routing.matcher import service as matcher_preset_service
 from app.services.serializers.common import attach_team_permissions
+from app.services.payloads import payload_to_dict
 
 
 class PriorityPolicyError(ValueError):
@@ -21,13 +22,6 @@ class PriorityPolicyConflictError(PriorityPolicyError):
 
 class PriorityPolicyInUseError(PriorityPolicyConflictError):
     """Priority policy is still assigned to a service."""
-
-
-def _payload_dict(payload):
-    if hasattr(payload, "model_dump"):
-        return payload.model_dump(exclude_unset=True)
-
-    return dict(payload or {})
 
 
 def _clean_name(value):
@@ -116,7 +110,7 @@ def _resolve_fallback_priority(fallback_mode, fallback_priority_id):
 
 def create_policy(payload):
     """Create or restore a priority policy."""
-    data = _payload_dict(payload)
+    data = payload_to_dict(payload)
     team = _require_team(data.get("team_id"))
     name = _clean_name(data.get("name"))
 
@@ -182,7 +176,7 @@ def create_policy(payload):
 def update_policy(policy_id, payload):
     """Update a priority policy."""
     policy = get_policy(policy_id)
-    data = _payload_dict(payload)
+    data = payload_to_dict(payload)
 
     if "name" in data:
         name = _clean_name(data["name"])
@@ -306,7 +300,7 @@ def get_effective_policy(*, team_id, service=None):
 def create_rule(policy_id, payload):
     """Create one ordered priority policy rule."""
     policy = get_policy(policy_id)
-    data = _payload_dict(payload)
+    data = payload_to_dict(payload)
     priority = _require_priority(data.get("priority_id"))
     preset = _validate_matcher_preset_assignment(data.get("matcher_preset_id"), policy.team_id)
 
@@ -344,7 +338,7 @@ def create_rule(policy_id, payload):
 def update_rule(rule_id, payload):
     """Update a priority policy rule."""
     rule = get_rule(rule_id)
-    data = _payload_dict(payload)
+    data = payload_to_dict(payload)
 
     if "matcher_preset_id" in data:
         preset = _validate_matcher_preset_assignment(data.pop("matcher_preset_id"), rule.policy.team_id)

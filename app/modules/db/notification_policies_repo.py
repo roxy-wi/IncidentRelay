@@ -11,6 +11,7 @@ from app.modules.db.models import (
     Service,
     Team,
 )
+from app.modules.common import utc_now
 
 
 def list_notification_policies(
@@ -133,7 +134,7 @@ def create_notification_policy(
     enabled=True,
 ):
     """Create notification policy."""
-    now = datetime.utcnow()
+    now = utc_now()
 
     return NotificationPolicy.create(
         team=team_id,
@@ -163,7 +164,7 @@ def restore_notification_policy(
     policy.enabled = enabled
     policy.deleted = False
     policy.deleted_at = None
-    policy.updated_at = datetime.utcnow()
+    policy.updated_at = utc_now()
     policy.save()
 
     return policy
@@ -181,7 +182,7 @@ def update_notification_policy(policy_id, data):
         if field in data:
             setattr(policy, field, data[field])
 
-    policy.updated_at = datetime.utcnow()
+    policy.updated_at = utc_now()
     policy.save()
 
     return policy
@@ -190,7 +191,7 @@ def update_notification_policy(policy_id, data):
 def soft_delete_notification_policy(policy_id):
     """Soft-delete policy and its active rules."""
     policy = get_notification_policy(policy_id)
-    now = datetime.utcnow()
+    now = utc_now()
 
     with database_proxy.atomic():
         (
@@ -352,7 +353,7 @@ def create_policy_rule(
     enabled=True,
 ):
     """Create notification policy rule."""
-    now = datetime.utcnow()
+    now = utc_now()
 
     if position is None:
         position = get_next_rule_position(policy_id)
@@ -389,7 +390,7 @@ def update_policy_rule(rule_id, data):
         if field in data:
             setattr(rule, field, data[field])
 
-    rule.updated_at = datetime.utcnow()
+    rule.updated_at = utc_now()
     rule.save()
 
     return rule
@@ -398,7 +399,7 @@ def update_policy_rule(rule_id, data):
 def soft_delete_policy_rule(rule_id):
     """Soft-delete notification policy rule."""
     rule = get_policy_rule(rule_id)
-    now = datetime.utcnow()
+    now = utc_now()
 
     with database_proxy.atomic():
         (
@@ -513,7 +514,7 @@ def reorder_policy_rules(policy_id, ordered_rule_ids):
                 NotificationPolicyRule
                 .update(
                     position=temporary_base + index,
-                    updated_at=datetime.utcnow(),
+                    updated_at=utc_now(),
                 )
                 .where(
                     (NotificationPolicyRule.id == rule_id)
@@ -531,7 +532,7 @@ def reorder_policy_rules(policy_id, ordered_rule_ids):
                 NotificationPolicyRule
                 .update(
                     position=position,
-                    updated_at=datetime.utcnow(),
+                    updated_at=utc_now(),
                 )
                 .where(
                     (NotificationPolicyRule.id == rule_id)

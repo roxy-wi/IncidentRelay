@@ -1,4 +1,5 @@
-from datetime import datetime
+from app.modules.common import utc_now
+from app.services.serializers.common import serialize_utc_datetime
 
 
 def serialize_api_token(token):
@@ -8,7 +9,7 @@ def serialize_api_token(token):
     Never expose token_hash or full raw token.
     """
     expires_at = token.expires_at
-    expired = bool(expires_at and expires_at <= datetime.utcnow())
+    expired = bool(expires_at and expires_at <= utc_now())
 
     return {
         "id": token.id,
@@ -22,7 +23,7 @@ def serialize_api_token(token):
         "team_slug": token.team.slug if token.team else None,
         "active": token.active,
         "expired": expired,
-        "created_at": token.created_at.isoformat() if token.created_at else None,
-        "expires_at": expires_at.isoformat() if expires_at else None,
-        "last_used_at": token.last_used_at.isoformat() if token.last_used_at else None,
+        "created_at": serialize_utc_datetime(token.created_at),
+        "expires_at": serialize_utc_datetime(expires_at),
+        "last_used_at": serialize_utc_datetime(token.last_used_at),
     }

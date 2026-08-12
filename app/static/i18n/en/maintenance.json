@@ -134,5 +134,13 @@
   "maintenance.permissions.duplicate": "Team manager role is required to duplicate this maintenance window.",
   "maintenance.permissions.cancel": "Team manager role is required to cancel this maintenance window.",
   "maintenance.permissions.delete": "Delete permission is required to delete this maintenance window.",
-  "maintenance.badge.default": "Maintenance"
+  "maintenance.badge.default": "Maintenance",
+  "maintenance.form.apply_to_existing": "Apply to existing unresolved alerts",
+  "maintenance.form.apply_to_existing_help": "Optional. Matching unresolved alert groups that already existed when the window starts are affected immediately.",
+  "maintenance.form.apply_to_existing_unavailable": "Suppress incident prevents new alert-group creation and cannot be applied retroactively.",
+  "maintenance.form.reactivate_on_end": "Reactivate affected alerts when this maintenance ends",
+  "maintenance.form.reactivate_on_end_help": "Enabled by default. Effects are released only after the final applicable maintenance window no longer affects the alert.",
+  "maintenance.form.reactivate_on_end_warning": "Affected alerts will keep the maintenance effect after this window ends. Enable this option later and save the window to release them.",
+  "maintenance.details.apply_to_existing": "Existing alerts",
+  "maintenance.details.reactivate_on_end": "Reactivate after end"
 }

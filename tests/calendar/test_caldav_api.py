@@ -15,6 +15,7 @@ from tests.factories import (
     create_user,
     unique,
 )
+from app.modules.common import utc_now
 
 
 def unfold_ics(value: str) -> str:
@@ -72,7 +73,7 @@ def create_team_with_rotation():
     user = create_user(unique("alice"), group, email=f"{unique('alice')}@example.com")
     add_user_to_team(team, user)
 
-    start_at = datetime.utcnow() - timedelta(hours=1)
+    start_at = utc_now() - timedelta(hours=1)
 
     create_rotation(
         team,
@@ -181,7 +182,7 @@ def test_caldav_rejects_expired_token(client, db):
     _, _, user = create_team_with_rotation()
     headers, _ = caldav_headers(
         user,
-        expires_at=datetime.utcnow() - timedelta(seconds=1),
+        expires_at=utc_now() - timedelta(seconds=1),
     )
 
     response = client.open(

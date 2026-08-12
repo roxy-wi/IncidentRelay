@@ -1,10 +1,11 @@
 from datetime import datetime
 from typing import Any, Dict
 
-from pydantic import Field, model_validator
+from pydantic import Field, field_validator, model_validator
 
 from app.api.schemas.base import ApiModel
 from app.api.schemas.limits import DESCRIPTION_MAX_LENGTH
+from app.modules.common import as_utc_naive
 
 
 class SilenceCreateSchema(ApiModel):
@@ -20,6 +21,14 @@ class SilenceCreateSchema(ApiModel):
     starts_at: datetime
     ends_at: datetime
     created_by: int | None = Field(default=None, ge=1)
+    apply_to_existing: bool = False
+    reactivate_on_end: bool = True
+
+    @field_validator("starts_at", "ends_at")
+    @classmethod
+    def normalize_utc_datetime(cls, value: datetime) -> datetime:
+        """Normalize API timestamps to the naive UTC storage convention."""
+        return as_utc_naive(value)
 
     @model_validator(mode="after")
     def validate_range(self):

@@ -3,6 +3,7 @@ from datetime import datetime
 from app.modules.db.models import Group, SsoGroupMapping, SsoIdentity, SsoProvider, Team
 from app.modules.sso.crypto import encrypt_secret
 from app.modules.sso.saml_security import normalize_sso_extra_config
+from app.modules.common import utc_now
 
 
 PROVIDER_FIELDS = [
@@ -101,7 +102,7 @@ def _apply_provider_data(provider, data, update_secret=True):
         if private_key is not None:
             provider.saml_sp_private_key_encrypted = encrypt_secret(private_key)
 
-    provider.updated_at = datetime.utcnow()
+    provider.updated_at = utc_now()
     return provider
 
 
@@ -162,7 +163,7 @@ def update_provider(provider_id: int, data: dict) -> SsoProvider:
 def soft_delete_provider(provider_id):
     """Soft-delete SSO provider and disable it."""
     provider = get_provider(provider_id)
-    now = datetime.utcnow()
+    now = utc_now()
 
     database = SsoProvider._meta.database
     with database.atomic():
@@ -240,7 +241,7 @@ def update_group_mapping(mapping_id, data):
     mapping.team_role = data.get("team_role") if team else None
     mapping.active = data.get("active", True)
     mapping.priority = data.get("priority", 100)
-    mapping.updated_at = datetime.utcnow()
+    mapping.updated_at = utc_now()
     mapping.save()
 
     return mapping
@@ -281,7 +282,7 @@ def create_identity(provider_id, user_id, subject, email=None, username=None, ra
         email=email,
         username=username,
         raw_claims=raw_claims,
-        last_login_at=datetime.utcnow(),
+        last_login_at=utc_now(),
     )
 
 
@@ -290,6 +291,6 @@ def touch_identity(identity, email=None, username=None, raw_claims=None):
     identity.email = email
     identity.username = username
     identity.raw_claims = raw_claims
-    identity.last_login_at = datetime.utcnow()
+    identity.last_login_at = utc_now()
     identity.save()
     return identity

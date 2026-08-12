@@ -1,12 +1,4 @@
-from datetime import datetime
-
-
-def isoformat(value):
-    if not value:
-        return None
-    if isinstance(value, datetime):
-        return value.isoformat() + "Z"
-    return str(value)
+from app.services.serializers.common import serialize_utc_datetime
 
 
 def serialize_heartbeat(item, *, include_token=False, raw_token=None, base_url=None, pings=None, instances=None):
@@ -56,18 +48,18 @@ def serialize_heartbeat(item, *, include_token=False, raw_token=None, base_url=N
         "severity": item.severity,
         "priority_slug": item.priority_slug,
         "token_prefix": item.token_prefix,
-        "last_seen_at": isoformat(item.last_seen_at),
-        "next_expected_at": isoformat(item.next_expected_at),
-        "deadline_at": isoformat(deadline_at),
-        "overdue_since": isoformat(item.overdue_since),
-        "last_overdue_at": isoformat(item.last_overdue_at),
-        "last_recovered_at": isoformat(item.last_recovered_at),
+        "last_seen_at": serialize_utc_datetime(item.last_seen_at),
+        "next_expected_at": serialize_utc_datetime(item.next_expected_at),
+        "deadline_at": serialize_utc_datetime(deadline_at),
+        "overdue_since": serialize_utc_datetime(item.overdue_since),
+        "last_overdue_at": serialize_utc_datetime(item.last_overdue_at),
+        "last_recovered_at": serialize_utc_datetime(item.last_recovered_at),
         "current_alert_group_id": item.current_alert_group_id,
         "labels": item.labels or {},
         "metadata": item.metadata or {},
         "created_by_id": item.created_by_id,
-        "created_at": isoformat(item.created_at),
-        "updated_at": isoformat(item.updated_at),
+        "created_at": serialize_utc_datetime(item.created_at),
+        "updated_at": serialize_utc_datetime(item.updated_at),
     }
 
     if include_token and raw_token:
@@ -111,19 +103,19 @@ def serialize_heartbeat_instance(item):
         "status": item.status,
         "enabled": item.enabled,
         "auto_discovered": item.auto_discovered,
-        "first_seen_at": isoformat(item.first_seen_at),
-        "last_seen_at": isoformat(item.last_seen_at),
-        "next_expected_at": isoformat(item.next_expected_at),
-        "deadline_at": isoformat(deadline_at),
-        "overdue_since": isoformat(item.overdue_since),
-        "last_overdue_at": isoformat(item.last_overdue_at),
-        "last_recovered_at": isoformat(item.last_recovered_at),
+        "first_seen_at": serialize_utc_datetime(item.first_seen_at),
+        "last_seen_at": serialize_utc_datetime(item.last_seen_at),
+        "next_expected_at": serialize_utc_datetime(item.next_expected_at),
+        "deadline_at": serialize_utc_datetime(deadline_at),
+        "overdue_since": serialize_utc_datetime(item.overdue_since),
+        "last_overdue_at": serialize_utc_datetime(item.last_overdue_at),
+        "last_recovered_at": serialize_utc_datetime(item.last_recovered_at),
         "current_alert_group_id": item.current_alert_group_id,
         "last_payload": item.last_payload or {},
         "last_remote_addr": item.last_remote_addr,
         "metadata": item.metadata or {},
-        "created_at": isoformat(item.created_at),
-        "updated_at": isoformat(item.updated_at),
+        "created_at": serialize_utc_datetime(item.created_at),
+        "updated_at": serialize_utc_datetime(item.updated_at),
     }
 
 
@@ -131,7 +123,7 @@ def serialize_heartbeat_ping(item):
     return {
         "id": item.id,
         "heartbeat_id": item.heartbeat_id,
-        "received_at": isoformat(item.received_at),
+        "received_at": serialize_utc_datetime(item.received_at),
         "event_type": item.event_type,
         "instance_key": item.instance_key,
         "status_before": item.status_before,

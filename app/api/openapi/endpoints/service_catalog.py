@@ -5,6 +5,8 @@ This module intentionally keeps these newer service-catalog endpoints outside
 All paths still use the existing `services` Swagger tag.
 """
 
+from app.api.openapi.common import json_body, path_param, query_param, response
+
 from app.api.schemas.limits import (
     DESCRIPTION_MAX_LENGTH,
     NAME_MAX_LENGTH,
@@ -73,43 +75,6 @@ TIMELINE_CATEGORIES = [
     "alerting",
     "sli_slo",
 ]
-
-
-def path_param(name, description):
-    return {
-        "name": name,
-        "in": "path",
-        "required": True,
-        "description": description,
-        "schema": {"type": "integer", "minimum": 1},
-    }
-
-
-def query_param(name, description, schema=None, required=False):
-    return {
-        "name": name,
-        "in": "query",
-        "required": required,
-        "description": description,
-        "schema": schema or {"type": "string"},
-    }
-
-
-def json_body(description, schema, required=True):
-    return {
-        "required": required,
-        "description": description,
-        "content": {"application/json": {"schema": schema}},
-    }
-
-
-def response(description, schema=None):
-    item = {"description": description}
-
-    if schema:
-        item["content"] = {"application/json": {"schema": schema}}
-
-    return item
 
 
 ERROR_SCHEMA = {

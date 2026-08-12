@@ -1,7 +1,7 @@
 import logging
 import smtplib
 
-from datetime import datetime, timedelta, timezone
+from datetime import timedelta
 from email.message import EmailMessage
 
 from app import Config
@@ -14,6 +14,7 @@ from app.modules.db.models import (
 from app.notifiers.registry import get_notifier
 from app.notifiers.types import MATTERMOST_CHANNEL
 from app.services.calendar_service import build_rotation_calendar
+from app.modules.common import as_utc_naive, utc_now
 
 logger = logging.getLogger("oncall.shift_notifications")
 
@@ -28,19 +29,6 @@ def _display_name(user):
 
 def _team_display_name(event):
     return event.get("team_name") or event.get("team_slug") or "-"
-
-
-def _event_dt(value):
-    """Parse calendar event datetime and return naive UTC datetime."""
-    if isinstance(value, datetime):
-        parsed = value
-    else:
-        parsed = datetime.fromisoformat(str(value).replace("Z", "+00:00"))
-
-    if parsed.tzinfo is not None:
-        return parsed.astimezone(timezone.utc).replace(tzinfo=None)
-
-    return parsed
 
 
 def _format_dt(value):
@@ -77,30 +65,6 @@ def _mattermost_notification_fingerprint(event, event_type, mattermost_user_id):
     )
 
 
-def _event_contains_time(event, at):
-    start_at = _event_dt(event["start"])
-    end_at = _event_dt(event["end"])
-
-    return start_at <= at < end_at
-
-
-def _same_user_event_at(rotation, user_id, at):
-    events = build_rotation_calendar(
-        rotation,
-        at - timedelta(seconds=1),
-        at + timedelta(seconds=1),
-    )
-
-    for event in events:
-        if int(event.get("user_id") or 0) != int(user_id):
-            continue
-
-        if _event_contains_time(event, at):
-            return event
-
-    return None
-
-
 def _send_plain_email(to_email, subject, body):
     smtp_host = Config.SMTP_HOST
     smtp_port = int(Config.SMTP_PORT)
@@ -133,8 +97,8 @@ def _build_shift_email(user, event, event_type):
     rotation_name = event.get("rotation_name") or f"Rotation #{event.get('rotation_id')}"
     team_name = _team_display_name(event)
     layer_name = event.get("layer_name") or "Override" if event.get("type") == "override" else "-"
-    start_at = _event_dt(event["start"])
-    end_at = _event_dt(event["end"])
+    start_at = as_utc_naive(event["start"])
+    end_at = as_utc_naive(event["end"])
 
     if event_type == SHIFT_START:
         subject = f"[On-call] Your shift has started: {rotation_name}"
@@ -179,13 +143,13 @@ def _get_or_create_log(user, rotation, event, event_type):
             "user": user,
             "rotation": rotation,
             "event_type": event_type,
-            "slot_start_at": _event_dt(event["start"]),
-            "slot_end_at": _event_dt(event["end"]),
+            "slot_start_at": as_utc_naive(event["start"]),
+            "slot_end_at": as_utc_naive(event["end"]),
             "layer_id": event.get("layer_id"),
             "override_id": event.get("override_id"),
             "status": "pending",
-            "created_at": datetime.utcnow(),
-            "updated_at": datetime.utcnow(),
+            "created_at": utc_now(),
+            "updated_at": utc_now(),
         },
     )
 
@@ -195,10 +159,10 @@ def _get_or_create_log(user, rotation, event, event_type):
 def _mark_log(log, status, error=None):
     log.status = status
     log.last_error = error
-    log.updated_at = datetime.utcnow()
+    log.updated_at = utc_now()
 
     if status == "sent":
-        log.sent_at = datetime.utcnow()
+        log.sent_at = utc_now()
 
     log.save()
 
@@ -217,14 +181,14 @@ def _get_or_create_mattermost_log(user, rotation, event, event_type):
             "user": user,
             "rotation": rotation,
             "event_type": event_type,
-            "slot_start_at": _event_dt(event["start"]),
-            "slot_end_at": _event_dt(event["end"]),
+            "slot_start_at": as_utc_naive(event["start"]),
+            "slot_end_at": as_utc_naive(event["end"]),
             "layer_id": event.get("layer_id"),
             "override_id": event.get("override_id"),
             "mattermost_user_id": mattermost_user_id,
             "status": "pending",
-            "created_at": datetime.utcnow(),
-            "updated_at": datetime.utcnow(),
+            "created_at": utc_now(),
+            "updated_at": utc_now(),
         },
     )
 
@@ -347,8 +311,8 @@ def _send_shift_event(event, event_type):
 
 
 def _event_due(event, event_type, window_start, now):
-    start_at = _event_dt(event["start"])
-    end_at = _event_dt(event["end"])
+    start_at = as_utc_naive(event["start"])
+    end_at = as_utc_naive(event["end"])
 
     if event_type == SHIFT_START:
         return window_start < start_at <= now
@@ -366,7 +330,7 @@ def send_due_oncall_shift_email_notifications(now=None, lookback_seconds=None):
     The scheduler runs periodically, so this job looks back a small window
     and uses OnCallShiftEmailNotification.fingerprint to avoid duplicates.
     """
-    now = now or datetime.utcnow()
+    now = now or utc_now()
 
     if lookback_seconds is None:
         lookback_seconds = int(
@@ -414,7 +378,7 @@ def send_due_oncall_shift_mattermost_notifications(now=None, lookback_seconds=No
     User.mattermost_user_id is set. End-of-shift messages are intentionally
     not sent to avoid noisy direct messages.
     """
-    now = now or datetime.utcnow()
+    now = now or utc_now()
 
     if lookback_seconds is None:
         lookback_seconds = int(

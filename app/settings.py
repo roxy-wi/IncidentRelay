@@ -130,12 +130,100 @@ class Config:
     JWT_COOKIE_NAME = settings.get("auth", "jwt_cookie_name", "incidentrelay_jwt")
     JWT_COOKIE_SECURE = settings.get_bool("auth", "jwt_cookie_secure", False)
 
-    SSO_SECRET_ENCRYPTION_KEY = settings.get("sso", "secret_encryption_key", SECRET_KEY)
+    SECRET_ENCRYPTION_KEY = settings.get("main", "secret_encryption_key", SECRET_KEY)
+    SSO_SECRET_ENCRYPTION_KEY = settings.get("sso", "secret_encryption_key", SECRET_ENCRYPTION_KEY)
 
     REMINDER_INTERVAL_SECONDS = settings.get_int("alerts", "reminder_interval_seconds", 60)
     ALERT_GROUP_WINDOW_SECONDS = settings.get_int("alerts", "alert_group_window_seconds", 3600)
+    MAINTENANCE_LIFECYCLE_CHECK_INTERVAL_SECONDS = settings.get_int(
+        "maintenance", "lifecycle_check_interval_seconds", 30
+    )
+    MAINTENANCE_LIFECYCLE_BATCH_SIZE = settings.get_int(
+        "maintenance", "lifecycle_batch_size", 500
+    )
 
     SCHEDULER_LOCK_TTL_SECONDS = settings.get_int("scheduler", "lock_ttl_seconds", 120)
+    ORCHESTRATION_PENDING_CHECK_INTERVAL_SECONDS = settings.get_int(
+        "orchestration", "pending_check_interval_seconds", 10
+    )
+    ORCHESTRATION_PENDING_BATCH_SIZE = settings.get_int(
+        "orchestration", "pending_batch_size", 100
+    )
+    ORCHESTRATION_PENDING_CLAIM_TTL_SECONDS = settings.get_int(
+        "orchestration", "pending_claim_ttl_seconds", 300
+    )
+    ORCHESTRATION_PENDING_MAX_ATTEMPTS = settings.get_int(
+        "orchestration", "pending_max_attempts", 5
+    )
+    ORCHESTRATION_PENDING_RETRY_BASE_SECONDS = settings.get_int(
+        "orchestration", "pending_retry_base_seconds", 30
+    )
+    ORCHESTRATION_DROPPED_TRACE_RETENTION_DAYS = settings.get_int(
+        "orchestration", "dropped_trace_retention_days", 7
+    )
+    ORCHESTRATION_PENDING_EVENT_RETENTION_DAYS = settings.get_int(
+        "orchestration", "pending_event_retention_days", 30
+    )
+    ORCHESTRATION_RETENTION_CLEANUP_INTERVAL_SECONDS = settings.get_int(
+        "orchestration", "retention_cleanup_interval_seconds", 86400
+    )
+    ORCHESTRATION_WEBHOOK_CHECK_INTERVAL_SECONDS = settings.get_int(
+        "orchestration", "webhook_check_interval_seconds", 5
+    )
+    ORCHESTRATION_WEBHOOK_BATCH_SIZE = settings.get_int(
+        "orchestration", "webhook_batch_size", 50
+    )
+    ORCHESTRATION_WEBHOOK_CLAIM_TTL_SECONDS = settings.get_int(
+        "orchestration", "webhook_claim_ttl_seconds", 300
+    )
+    ORCHESTRATION_WEBHOOK_RETRY_BASE_SECONDS = settings.get_int(
+        "orchestration", "webhook_retry_base_seconds", 30
+    )
+    ORCHESTRATION_WEBHOOK_MAX_RESPONSE_BYTES = settings.get_int(
+        "orchestration", "webhook_max_response_bytes", 65536
+    )
+    ORCHESTRATION_WEBHOOK_MAX_REDIRECTS = settings.get_int(
+        "orchestration", "webhook_max_redirects", 3
+    )
+    ORCHESTRATION_WEBHOOK_ALLOW_HTTP = settings.get_bool(
+        "orchestration", "webhook_allow_http", False
+    )
+    ORCHESTRATION_WEBHOOK_PRIVATE_NETWORK_ALLOWLIST = settings.get(
+        "orchestration", "webhook_private_network_allowlist", ""
+    )
+    ORCHESTRATION_WEBHOOK_PER_GROUP_CONCURRENCY = settings.get_int(
+        "orchestration", "webhook_per_group_concurrency", 2
+    )
+    ORCHESTRATION_WEBHOOK_PER_GROUP_RATE_PER_MINUTE = settings.get_int(
+        "orchestration", "webhook_per_group_rate_per_minute", 60
+    )
+    ORCHESTRATION_WEBHOOK_EXECUTION_RETENTION_DAYS = settings.get_int(
+        "orchestration", "webhook_execution_retention_days", 30
+    )
+    ORCHESTRATION_REPLAY_MAX_EVENTS = settings.get_int(
+        "orchestration", "replay_max_events", 100
+    )
+    ORCHESTRATION_REPLAY_DROP_WARNING_PERCENT = settings.get_int(
+        "orchestration", "replay_drop_warning_percent", 20
+    )
+    ORCHESTRATION_TRACE_MAX_DEPTH = settings.get_int(
+        "orchestration", "trace_max_depth", 12
+    )
+    ORCHESTRATION_TRACE_MAX_STRING_CHARS = settings.get_int(
+        "orchestration", "trace_max_string_chars", 2048
+    )
+    ORCHESTRATION_TRACE_MAX_ITEMS = settings.get_int(
+        "orchestration", "trace_max_items", 512
+    )
+    ORCHESTRATION_SIMULATION_MAX_PAYLOAD_BYTES = settings.get_int(
+        "orchestration", "simulation_max_payload_bytes", 1048576
+    )
+    ORCHESTRATION_SIMULATION_MAX_DIFFS = settings.get_int(
+        "orchestration", "simulation_max_diffs", 512
+    )
+    ORCHESTRATION_SHADOW_METRICS_MAX_EXECUTIONS = settings.get_int(
+        "orchestration", "shadow_metrics_max_executions", 5000
+    )
     USER_NOTIFICATION_RULES_CHECK_INTERVAL_SECONDS = settings.get_int(
         "scheduler",
         "user_notification_rules_check_interval_seconds",
@@ -238,6 +326,13 @@ class Config:
         "alerts",
         "alert_group_notification_batch_size",
         100,
+    )
+
+
+    SILENCE_LIFECYCLE_CHECK_INTERVAL_SECONDS = settings.get_int(
+        "alerts",
+        "silence_lifecycle_check_interval_seconds",
+        30,
     )
 
     ALERT_EXPLAIN_TRACE_RETENTION_DAYS = settings.get_int(

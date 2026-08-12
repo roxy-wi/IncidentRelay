@@ -10,6 +10,7 @@ from tests.factories import (
     create_user,
     unique,
 )
+from app.modules.common import utc_now
 
 
 def create_team_with_rotation():
@@ -18,7 +19,7 @@ def create_team_with_rotation():
     user = create_user(unique("alice"), group, email=f"{unique('alice')}@example.com")
     add_user_to_team(team, user)
 
-    start_at = datetime.utcnow() - timedelta(hours=1)
+    start_at = utc_now() - timedelta(hours=1)
 
     create_rotation(
         team,

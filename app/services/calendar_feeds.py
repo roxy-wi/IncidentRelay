@@ -8,6 +8,7 @@ from peewee import DoesNotExist
 from app.modules.db import calendar_feeds_repo
 from app.services.calendar_service import build_team_calendar
 from app.services.caldav.ics import build_calendar_ics
+from app.modules.common import utc_now
 
 
 CALENDAR_FEED_TOKEN_PREFIX_LENGTH = 12
@@ -83,7 +84,7 @@ def serialize_calendar_feed(feed, base_url=None, token=None):
 
 
 def build_ics_for_calendar_feed(feed):
-    now = datetime.utcnow()
+    now = utc_now()
 
     start_at = now - timedelta(days=int(feed.past_days or 7))
     end_at = now + timedelta(days=int(feed.future_days or 90))

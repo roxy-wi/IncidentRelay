@@ -1,11 +1,13 @@
-import json
-import re
-
 from app.services.integrations.normalizers.common import (
     add_event_link_label,
+    canonical_label_key,
+    clean_string,
     first_event_link,
     first_non_empty,
     make_dedup_key,
+    normalize_label_value,
+    severity_from_priority,
+    stable_labels,
 )
 from app.services.severity import normalize_severity
 
@@ -20,24 +22,12 @@ RESOLVED_TRANSITIONS = {
     "success",
 }
 
-PRIORITY_SEVERITY = {
-    "p1": "critical",
-    "p2": "high",
-    "p3": "medium",
-    "p4": "warning",
-    "p5": "info",
-}
-
-
-def _canonical_key(value):
-    return re.sub(r"[^a-z0-9]+", "_", str(value or "").strip().lower()).strip("_")
-
 
 def _canonical_payload(payload):
     result = {}
 
     for key, value in (payload or {}).items():
-        normalized = _canonical_key(key)
+        normalized = canonical_label_key(key)
         if not normalized:
             continue
 
@@ -49,30 +39,9 @@ def _canonical_payload(payload):
     return result
 
 
-def _clean(value):
-    if value is None:
-        return None
-
-    value = str(value).strip()
-    return value or None
-
-
-def _label_value(value):
-    if value is None:
-        return None
-
-    if isinstance(value, (str, int, float, bool)):
-        return value
-
-    try:
-        return json.dumps(value, ensure_ascii=False, sort_keys=True)
-    except (TypeError, ValueError):
-        return str(value)
-
-
 def _get(data, *names):
     for name in names:
-        value = data.get(_canonical_key(name))
+        value = data.get(canonical_label_key(name))
         if value is not None:
             return value
 
@@ -82,7 +51,7 @@ def _get(data, *names):
 def normalize_datadog_status(transition, alert_type=None):
     """Convert Datadog transitions to IncidentRelay firing/resolved state."""
 
-    transition = _clean(transition)
+    transition = clean_string(transition)
     normalized = str(transition or "").lower().replace("_", " ").replace("-", " ")
 
     normalized = " ".join(normalized.split())
@@ -99,13 +68,13 @@ def normalize_datadog_status(transition, alert_type=None):
 def normalize_datadog_severity(explicit, alert_type=None, priority=None):
     """Map Datadog severity/type/monitor priority to IncidentRelay severity."""
 
-    explicit = _clean(explicit)
+    explicit = clean_string(explicit)
     if explicit:
         return normalize_severity(explicit) or "info"
 
-    priority_key = str(priority or "").strip().lower()
-    if priority_key in PRIORITY_SEVERITY:
-        return PRIORITY_SEVERITY[priority_key]
+    priority_severity = severity_from_priority(priority)
+    if priority_severity:
+        return priority_severity
 
     return normalize_severity(alert_type) or "info"
 
@@ -120,8 +89,8 @@ def normalize_datadog_tags(value):
 
     if isinstance(value, dict):
         for key, item in value.items():
-            key = _clean(key)
-            item = _label_value(item)
+            key = clean_string(key)
+            item = normalize_label_value(item)
             if key and item is not None:
                 labels[key] = item
         return labels
@@ -136,7 +105,7 @@ def normalize_datadog_tags(value):
             labels.update(normalize_datadog_tags(item))
             continue
 
-        item = _clean(item)
+        item = clean_string(item)
         if not item:
             continue
 
@@ -152,20 +121,6 @@ def normalize_datadog_tags(value):
     return labels
 
 
-def _stable_dedup_labels(labels):
-    ignored = {
-        "event_link",
-        "datadog_alert_transition",
-        "datadog_alert_status",
-    }
-
-    return {
-        key: labels[key]
-        for key in sorted(labels)
-        if key not in ignored
-    }
-
-
 def normalize_datadog(payload):
     """Normalize a Datadog Webhooks integration payload."""
 
@@ -175,25 +130,25 @@ def normalize_datadog(payload):
     raw_labels = _get(data, "labels")
     if isinstance(raw_labels, dict):
         for key, value in raw_labels.items():
-            key = _clean(key)
-            value = _label_value(value)
+            key = clean_string(key)
+            value = normalize_label_value(value)
             if key and value is not None:
                 labels[key] = value
 
     labels.update(normalize_datadog_tags(_get(data, "tags")))
     labels.update(normalize_datadog_tags(_get(data, "alert_scope", "scope")))
 
-    alert_id = _clean(_get(data, "alert_id", "monitor_id"))
-    event_id = _clean(_get(data, "id", "event_id"))
-    alert_cycle_key = _clean(_get(data, "alert_cycle_key"))
-    aggreg_key = _clean(_get(data, "aggreg_key", "aggregation_key"))
-    transition = _clean(_get(data, "alert_transition", "transition"))
-    alert_type = _clean(_get(data, "alert_type", "event_alert_type"))
-    priority = _clean(_get(data, "alert_priority", "priority"))
-    alert_scope = _clean(_get(data, "alert_scope", "scope"))
-    hostname = _clean(_get(data, "hostname", "host"))
-    event_type = _clean(_get(data, "event_type"))
-    metric = _clean(_get(data, "alert_metric", "metric"))
+    alert_id = clean_string(_get(data, "alert_id", "monitor_id"))
+    event_id = clean_string(_get(data, "id", "event_id"))
+    alert_cycle_key = clean_string(_get(data, "alert_cycle_key"))
+    aggreg_key = clean_string(_get(data, "aggreg_key", "aggregation_key"))
+    transition = clean_string(_get(data, "alert_transition", "transition"))
+    alert_type = clean_string(_get(data, "alert_type", "event_alert_type"))
+    priority = clean_string(_get(data, "alert_priority", "priority"))
+    alert_scope = clean_string(_get(data, "alert_scope", "scope"))
+    hostname = clean_string(_get(data, "hostname", "host"))
+    event_type = clean_string(_get(data, "event_type"))
+    metric = clean_string(_get(data, "alert_metric", "metric"))
 
     fixed_labels = {
         "datadog_alert_id": alert_id,
@@ -263,7 +218,14 @@ def normalize_datadog(payload):
             "datadog",
             external_id=alert_id or event_id,
             title=title,
-            labels=_stable_dedup_labels(labels),
+            labels=stable_labels(
+                labels,
+                exclude={
+                    "event_link",
+                    "datadog_alert_transition",
+                    "datadog_alert_status",
+                },
+            ),
         )
 
     team_slug = first_non_empty(

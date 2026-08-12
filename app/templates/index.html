@@ -1,9 +1,8 @@
 <!doctype html>
-<html lang="{{ current_locale }}">
+<html lang="{{ current_locale }}" data-theme="{{ current_theme }}">
 <head>
     <link rel="manifest" href="/manifest.webmanifest?v=1.0.3">
 
-    <meta name="theme-color" content="#1570ef">
     <meta name="mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-title" content="IncidentRelay">
@@ -13,18 +12,27 @@
     <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='images/favicon/favicon-32x32.png') }}">
     <link rel="icon" type="image/png" sizes="16x16" href="{{ url_for('static', filename='images/favicon/favicon-16x16.png') }}">
     <link rel="shortcut icon" href="{{ url_for('static', filename='images/favicon/favicon.ico') }}">
-    <meta name="theme-color" content="#0b5cff">
+    <meta id="app-theme-color" name="theme-color" content="#0b5cff">
     <meta charset="utf-8">
     <title>IncidentRelay</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <script>
+    window.__INCIDENTRELAY_UI__ = {
+      theme: {{ current_theme | tojson }}
+    };
+    </script>
+    <script src="{{ url_for('static', filename='js/core/theme.js') }}"></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='/css/vendor/fontawesome/all.min.css') }}">
     <link rel="stylesheet" href="/static/css/oncall.css">
     <link rel="stylesheet" href="/static/css/material.css">
     <link rel="stylesheet" href="/static/css/table_pages.css">
+    <link rel="stylesheet" href="/static/css/orchestrations.css">
+    <link rel="stylesheet" href="/static/css/audit_log.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/vendor/tom-select/tom-select.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/table_filters.css') }}">
     <link rel="stylesheet" href="/static/css/vendor/select2/select2.min.css">
     <link rel="stylesheet" href="/static/css/vendor/select2/override-select2.css">
+    <link rel="stylesheet" href="/static/css/theme_dark.css">
 
  <script>
  window.__INCIDENTRELAY_I18N__ = {
@@ -38,6 +46,7 @@
     <script src="/static/js/vendor/select2.min.js"></script>
     <script src="{{ url_for('static', filename='js/vendor/tom-select.complete.min.js') }}"></script>
     <script src="{{ url_for('static', filename='js/vendor/chart.min.js') }}"></script>
+    <script>window.AppTheme && window.AppTheme.applyChartDefaults();</script>
     <script src="{{ url_for('static', filename='/js/vendor/cytoscape.min.js') }}"></script>
 </head>
 <body class="md-theme">
@@ -138,6 +147,11 @@
           </div>
         </div>
 
+        <a href="/event-orchestration" data-page="orchestrations" class="menu-link" title="{{ _('nav.event_orchestration') }}">
+            <span class="menu-icon">⇄</span>
+            <span class="menu-text">{{ _('nav.event_orchestration') }}</span>
+        </a>
+
         <a href="/escalation-policies" data-page="escalation-policies" class="menu-link" title="{{ _('nav.escalation_policies') }}">
           <svg class="menu-icon"><use href="#icon-escalation-policies"></use></svg>
           <span class="menu-text">{{ _('nav.escalation_policies') }}</span>
@@ -170,6 +184,10 @@
                 <svg class="menu-icon"><use href="#icon-users"></use></svg>
                 <span class="menu-text">{{ _('nav.users') }}</span>
             </a>
+            <a href="/admin/audit-log" data-page="audit-log" class="menu-link menu-sub-link menu-link-audit is-hidden" title="{{ _('nav.audit_log') }}">
+                <svg class="menu-icon"><use href="#icon-audit-log"></use></svg>
+                <span class="menu-text">{{ _('nav.audit_log') }}</span>
+            </a>
             <a href="/admin/sso" data-page="sso" class="menu-link menu-sub-link menu-link-global-admin is-hidden" title="{{ _('nav.sso') }}">
                 <svg class="menu-icon"><use href="#icon-sso"></use></svg>
                 <span class="menu-text">{{ _('nav.sso') }}</span>
@@ -193,15 +211,6 @@
                 </div>
 
                 <div class="topbar-actions">
-
- <div class="topbar-select-group">
-  <label class="topbar-select-label" for="global-language-filter">{{ _('common.language') }}</label>
-  <select id="global-language-filter" class="input topbar-select" data-locale-select>
-  {% for locale_code, locale_name in supported_locales.items() %}
-  <option value="{{ locale_code }}"{% if locale_code == current_locale %} selected{% endif %}>{{ locale_name }}</option>
-  {% endfor %}
-  </select>
- </div>
 
                     <div class="topbar-select-group">
                         <label class="topbar-select-label" for="global-team-filter">{{ _('common.team') }}</label>
@@ -257,6 +266,7 @@
             {% include "pages/business_services.html" %}
             {% include "pages/heartbeats.html" %}
             <div id="view-maintenance-windows" class="view">{% include "pages/maintenance_windows.html" %}</div>
+            <div id="view-orchestrations" class="view">{% include "pages/orchestrations.html" %}</div>
             <div id="view-escalation-policies" class="view">{% include "pages/escalation_policies.html" %}</div>
             <div id="view-notification-policies" class="view">{% include "pages/notification_policies.html" %}</div>
             <div id="view-matcher-presets" class="view">{% include "pages/matcher_presets.html" %}</div>
@@ -265,6 +275,7 @@
             <div id="view-silences" class="view">{% include "pages/silences.html" %}</div>
             <div id="view-teams" class="view">{% include "pages/teams.html" %}</div>
             <div id="view-admin-users" class="view">{% include "pages/admin_users.html" %}</div>
+            <div id="view-audit-log" class="view">{% include "pages/audit_log.html" %}</div>
             <div id="view-sso" class="view">{% include "pages/sso.html" %}</div>
             <div id="view-groups" class="view">{% include "pages/groups.html" %}</div>
             <div id="view-profile" class="view">{% include "pages/profile.html" %}</div>
@@ -354,6 +365,7 @@
 <script src="{{ url_for('static', filename='js/pages/business_services.js') }}"></script>
 <script src="{{ url_for('static', filename='js/pages/heartbeats.js') }}"></script>
 <script src="{{ url_for('static', filename='js/pages/maintenance_windows.js') }}"></script>
+<script src="{{ url_for('static', filename='js/pages/orchestrations.js') }}"></script>
 <script src="{{ url_for('static', filename='js/pages/escalation_policies.js') }}"></script>
 <script src="{{ url_for('static', filename='js/pages/notification_policies.js') }}"></script>
 <script src="{{ url_for('static', filename='js/pages/priority_policies.js') }}"></script>
@@ -362,6 +374,7 @@
 <script src="/static/js/pages/silences.js"></script>
 <script src="/static/js/pages/teams.js"></script>
 <script src="/static/js/pages/admin_users.js"></script>
+<script src="/static/js/pages/audit_log.js"></script>
 <script src="/static/js/pages/groups.js"></script>
 <script src="/static/js/pages/profile.js"></script>
 <script src="/static/js/pages/sso.js"></script>

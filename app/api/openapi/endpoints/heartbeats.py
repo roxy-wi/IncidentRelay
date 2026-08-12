@@ -1,24 +1,7 @@
+from app.api.openapi.common import json_body, path_param, query_param, response
+
 def tags():
     return [{"name": "Heartbeats", "description": "Dead-man-switch checks that page when expected pings stop."}]
-
-
-def path_param(name, description):
-    return {"name": name, "in": "path", "required": True, "description": description, "schema": {"type": "integer", "minimum": 1}}
-
-
-def query_param(name, description, schema=None):
-    return {"name": name, "in": "query", "required": False, "description": description, "schema": schema or {"type": "string"}}
-
-
-def json_body(description, schema, required=True):
-    return {"required": required, "description": description, "content": {"application/json": {"schema": schema}}}
-
-
-def response(description, schema=None):
-    item = {"description": description}
-    if schema:
-        item["content"] = {"application/json": {"schema": schema}}
-    return item
 
 
 HEARTBEAT_INSTANCE_SCHEMA = {

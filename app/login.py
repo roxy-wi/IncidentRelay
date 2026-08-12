@@ -5,6 +5,7 @@ import jwt
 from werkzeug.security import check_password_hash, generate_password_hash
 
 from app.settings import Config
+from app.modules.common import utc_now
 
 
 JWT_ALGORITHM = "HS256"
@@ -62,14 +63,14 @@ def create_access_token(user):
     Create a JWT access token for a user.
     """
 
-    expires_at = datetime.utcnow() + timedelta(minutes=Config.JWT_EXPIRE_MINUTES)
+    expires_at = utc_now() + timedelta(minutes=Config.JWT_EXPIRE_MINUTES)
 
     payload = {
         "sub": str(user.id),
         "username": user.username,
         "is_admin": bool(user.is_admin),
         "exp": expires_at,
-        "iat": datetime.utcnow(),
+        "iat": utc_now(),
     }
 
     token = jwt.encode(payload, Config.JWT_SECRET_KEY, algorithm=JWT_ALGORITHM)

@@ -8,6 +8,7 @@ from app.modules.db.models import (
     ServiceOwner,
 )
 from app.modules.db import alerts_repo
+from app.modules.common import utc_now
 
 
 DEFAULT_PRIORITY_SLUG = "p3"
@@ -142,8 +143,8 @@ def set_incident_priority(group_id, priority_slug, *, user_id=None, manual=True)
     group.priority_order = priority.level
     group.priority_set_manually = manual
     group.priority_set_by = user_id
-    group.priority_set_at = datetime.utcnow()
-    group.updated_at = datetime.utcnow()
+    group.priority_set_at = utc_now()
+    group.updated_at = utc_now()
 
     group.save(only=[
         AlertGroup.priority,
@@ -180,7 +181,7 @@ def reset_incident_priority(group_id, priority, *, update_mode=None):
     group.priority_set_manually = False
     group.priority_set_by = None
     group.priority_set_at = None
-    group.updated_at = datetime.utcnow()
+    group.updated_at = utc_now()
 
     group.save(only=[
         AlertGroup.priority,
@@ -242,7 +243,7 @@ def update_incident_responder_notification(
         .update(
             notification_status=status,
             notification_error=error,
-            updated_at=datetime.utcnow(),
+            updated_at=utc_now(),
         )
         .where(IncidentResponder.id == responder_id)
         .execute()
@@ -258,7 +259,7 @@ def create_incident_responder(group_id, data):
     expires_at = data.get("expires_at")
 
     if not expires_at and data.get("expires_after_minutes"):
-        expires_at = datetime.utcnow() + timedelta(
+        expires_at = utc_now() + timedelta(
             minutes=int(data["expires_after_minutes"])
         )
 
@@ -275,10 +276,10 @@ def create_incident_responder(group_id, data):
         response_message=data.get("response_message"),
         notification_status=data.get("notification_status") or "pending",
         notification_error=data.get("notification_error"),
-        requested_at=datetime.utcnow(),
+        requested_at=utc_now(),
         expires_at=expires_at,
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
+        created_at=utc_now(),
+        updated_at=utc_now(),
     )
 
 
@@ -309,8 +310,8 @@ def update_incident_responder_status(
 
     responder.status = status
     responder.response_message = response_message
-    responder.responded_at = datetime.utcnow()
-    responder.updated_at = datetime.utcnow()
+    responder.responded_at = utc_now()
+    responder.updated_at = utc_now()
 
     save_fields = [
         IncidentResponder.status,
@@ -333,7 +334,7 @@ def update_incident_responder_status(
 
 def list_expired_requested_responders(*, now=None, limit=100):
     """Return requested responder rows whose expiration time has passed."""
-    now = now or datetime.utcnow()
+    now = now or utc_now()
 
     return list(
         IncidentResponder
@@ -353,7 +354,7 @@ def list_expired_requested_responders(*, now=None, limit=100):
 
 def expire_incident_responder(responder_id, *, now=None):
     """Expire one responder request only if it is still requested."""
-    now = now or datetime.utcnow()
+    now = now or utc_now()
 
     updated = (
         IncidentResponder
@@ -393,8 +394,8 @@ def create_incident_stakeholder(group_id, data):
         notify_on_comment=data.get("notify_on_comment", True),
         active=data.get("active", True),
         created_by=data.get("created_by_id"),
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
+        created_at=utc_now(),
+        updated_at=utc_now(),
     )
 
 
@@ -426,7 +427,7 @@ def deactivate_incident_stakeholder(stakeholder_id):
         IncidentStakeholder
         .update(
             active=False,
-            updated_at=datetime.utcnow(),
+            updated_at=utc_now(),
         )
         .where(
             IncidentStakeholder.id == stakeholder_id,

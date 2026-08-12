@@ -99,6 +99,7 @@
             "teams": "nav.teams",
             "groups": "nav.groups",
             "admin-users": "nav.users",
+            "audit-log": "nav.audit_log",
             "sso": "nav.sso",
         };
 
@@ -134,7 +135,6 @@
         document.documentElement.lang = locale;
         translateMenu();
 
-        setText('label[for="global-language-filter"]', "common.language");
         setText('label[for="global-team-filter"]', "common.team");
         setText("#app-dialog-title", "common.message");
         setText("#app-dialog-cancel", "common.cancel");

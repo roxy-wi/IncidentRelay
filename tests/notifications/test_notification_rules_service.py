@@ -11,6 +11,7 @@ from tests.factories import (
     create_team,
     create_user,
 )
+from app.modules.common import utc_now
 
 
 def create_assigned_group(user, *, status="firing", severity="critical"):
@@ -240,7 +241,7 @@ def test_enqueue_user_notifications_creates_pending_delayed_rule(db, monkeypatch
     assert delivery.rule_id == rule.id
     assert delivery.method == "browser_push"
     assert delivery.status == "pending"
-    assert delivery.scheduled_at > datetime.utcnow()
+    assert delivery.scheduled_at > utc_now()
 
 
 def test_process_due_user_notifications_sends_due_delivery(db, monkeypatch):
@@ -263,9 +264,9 @@ def test_process_due_user_notifications_sends_due_delivery(db, monkeypatch):
         method="browser_push",
         event_type="notification",
         status="pending",
-        scheduled_at=datetime.utcnow() - timedelta(seconds=1),
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
+        scheduled_at=utc_now() - timedelta(seconds=1),
+        created_at=utc_now(),
+        updated_at=utc_now(),
     )
 
     calls = []
@@ -311,9 +312,9 @@ def test_process_due_user_notifications_does_not_send_future_delivery(db, monkey
         method="browser_push",
         event_type="notification",
         status="pending",
-        scheduled_at=datetime.utcnow() + timedelta(minutes=5),
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
+        scheduled_at=utc_now() + timedelta(minutes=5),
+        created_at=utc_now(),
+        updated_at=utc_now(),
     )
 
     monkeypatch.setattr(
@@ -348,9 +349,9 @@ def test_process_due_user_notifications_skips_if_alert_no_longer_firing(
         method="browser_push",
         event_type="notification",
         status="pending",
-        scheduled_at=datetime.utcnow() - timedelta(seconds=1),
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
+        scheduled_at=utc_now() - timedelta(seconds=1),
+        created_at=utc_now(),
+        updated_at=utc_now(),
     )
 
     monkeypatch.setattr(
@@ -392,9 +393,9 @@ def test_process_due_user_notifications_does_not_send_already_processing_deliver
         method="browser_push",
         event_type="notification",
         status="processing",
-        scheduled_at=datetime.utcnow() - timedelta(seconds=1),
-        created_at=datetime.utcnow(),
-        updated_at=datetime.utcnow(),
+        scheduled_at=utc_now() - timedelta(seconds=1),
+        created_at=utc_now(),
+        updated_at=utc_now(),
     )
 
     monkeypatch.setattr(

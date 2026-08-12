@@ -127,5 +127,9 @@
   "services.dependencies.hard": "Hard",
   "services.dependencies.soft": "Soft",
   "services.dependencies.external": "External",
-  "services.dependencies.informational": "Informational"
+  "services.dependencies.informational": "Informational",
+  "services.details.event_orchestrations": "Event orchestrations",
+  "services.details.orchestration_disabled": "Disabled",
+  "services.details.orchestration_active": "Active",
+  "services.details.orchestration_shadow": "Shadow"
 }

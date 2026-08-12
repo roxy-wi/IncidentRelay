@@ -13,6 +13,7 @@ from app.api.schemas.integrations import (
     LibreNMSWebhookSchema,
     RmonWebhookSchema,
     SentryWebhookSchema,
+    UptimeKumaWebhookSchema,
     ZabbixWebhookSchema,
 )
 from app.services.serializers.alerts import serialize_alert_processing_result
@@ -21,17 +22,8 @@ from app.modules.db import channels_repo, users_repo, alerts_repo, routes_repo
 from app.services.alerts.actions import acknowledge_alert, resolve_alert
 from app.services.alerts.lifecycle import upsert_alert
 from app.services.integrations.auth import require_alert_token
-from app.services.integrations.normalizers.sentry import normalize_sentry
-from app.services.integrations.normalizers.webhook import (
-    is_pagerduty_events_v2,
-    normalize_webhook,
-)
-from app.services.integrations.normalizers.zabbix import normalize_zabbix
-from app.services.integrations.normalizers.alertmanager import normalize_alertmanager
-from app.services.integrations.normalizers.librenms import normalize_librenms
-from app.services.integrations.normalizers.grafana import normalize_grafana
-from app.services.integrations.normalizers.datadog import normalize_datadog
-from app.services.integrations.normalizers.rmon import normalize_rmon
+from app.services.integrations.normalizers.registry import normalize_for_source
+from app.services.integrations.normalizers.webhook import is_pagerduty_events_v2
 from app.services.validation import make_error_response, validate_body
 from app.notifiers.voice.loader import create_voice_provider
 from app.modules.db.models import UserNotificationDelivery
@@ -41,13 +33,11 @@ from app.services.integrations.aws_sns import (
     confirm_aws_sns_subscription,
     validate_aws_sns_message,
 )
-from app.services.integrations.normalizers.aws_sns import (
-    normalize_aws_sns,
-)
 from app.notifiers.slack.actions import (
     SlackActionError,
     handle_slack_action,
 )
+from app.modules.common import utc_now
 
 integrations_bp = Blueprint("integrations_api", __name__)
 
@@ -62,7 +52,9 @@ def alertmanager_webhook():
     payload, error = validate_body(AlertmanagerWebhookSchema)
     if error:
         return error
-    return process_incoming_alerts(normalize_alertmanager(payload.model_dump()))
+    return process_incoming_alerts(
+        normalize_for_source("alertmanager", payload.model_dump())
+    )
 
 
 @integrations_bp.route("/grafana", methods=["POST"])
@@ -74,7 +66,7 @@ def grafana_webhook():
         return error
 
     return process_incoming_alerts(
-        normalize_grafana(payload.model_dump())
+        normalize_for_source("grafana", payload.model_dump())
     )
 
 
@@ -97,7 +89,7 @@ def datadog_webhook():
         return error
 
     return process_incoming_alerts(
-        normalize_datadog(payload.model_dump(exclude_none=True))
+        normalize_for_source("datadog", payload.model_dump(exclude_none=True))
     )
 
 
@@ -112,7 +104,7 @@ def rmon_webhook():
         return error
 
     return process_incoming_alerts(
-        normalize_rmon(payload.model_dump())
+        normalize_for_source("rmon", payload.model_dump())
     )
 
 
@@ -247,7 +239,7 @@ def aws_sns_webhook(route_id):
     request.current_auth_type = "aws_sns_signature"
 
     return process_incoming_alerts(
-        normalize_aws_sns(envelope)
+        normalize_for_source("aws_sns", envelope)
     )
 
 
@@ -261,7 +253,9 @@ def zabbix_webhook():
     payload, error = validate_body(ZabbixWebhookSchema)
     if error:
         return error
-    return process_incoming_alerts(normalize_zabbix(payload.model_dump()))
+    return process_incoming_alerts(
+        normalize_for_source("zabbix", payload.model_dump())
+    )
 
 
 def _pagerduty_events_success(dedup_key):
@@ -343,12 +337,38 @@ def generic_webhook():
         return error
 
     raw_payload = payload.model_dump()
-    normalized_alerts = normalize_webhook(raw_payload)
+    normalized_alerts = normalize_for_source("webhook", raw_payload)
 
     if is_pagerduty_events_v2(raw_payload):
         return _process_pagerduty_events_v2(normalized_alerts[0])
 
     return process_incoming_alerts(normalized_alerts)
+
+
+@integrations_bp.route("/uptime-kuma", methods=["POST"])
+@require_alert_token()
+def uptime_kuma_webhook():
+    """Receive standard Uptime Kuma Webhook notifications."""
+
+    intake_route = getattr(request, "current_intake_route", None)
+
+    if intake_route and intake_route.source != "uptime_kuma":
+        return make_error_response(
+            error="route_source_mismatch",
+            message="Route source must be uptime_kuma.",
+            status_code=400,
+        )
+
+    payload, error = validate_body(UptimeKumaWebhookSchema)
+    if error:
+        return error
+
+    return process_incoming_alerts(
+        normalize_for_source(
+            "uptime_kuma",
+            payload.model_dump(exclude_none=True),
+        )
+    )
 
 
 @integrations_bp.route("/sentry/<int:route_id>", methods=["POST"])
@@ -407,7 +427,8 @@ def sentry_webhook(route_id):
     request.current_auth_type = "sentry_signature"
 
     return process_incoming_alerts(
-        normalize_sentry(
+        normalize_for_source(
+            "sentry",
             payload.model_dump(),
             headers=dict(request.headers),
             route_config=route.integration_config or {},
@@ -425,7 +446,7 @@ def librenms_webhook():
         return error
 
     return process_incoming_alerts(
-        normalize_librenms(payload.model_dump())
+        normalize_for_source("librenms", payload.model_dump())
     )
 
 
@@ -625,7 +646,7 @@ def voice_rule_callback(delivery_id, secret):
 def _process_voice_rule_callback_event(delivery, event):
     delivery.provider_status = event.status
     delivery.provider_payload = event.raw
-    delivery.updated_at = datetime.utcnow()
+    delivery.updated_at = utc_now()
     delivery.save()
 
     alert = delivery.alert

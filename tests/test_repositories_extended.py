@@ -24,6 +24,7 @@ from tests.factories import (
 
 from app.modules.db import alerts_repo
 from tests.factories import create_group, create_route, create_service, create_team
+from app.modules.common import utc_now
 
 
 def _create_repo_alert_group(team, route, service, title, status, severity, group_key):
@@ -274,7 +275,7 @@ def test_locks_repo_acquires_rejects_busy_steals_expired_and_releases(db):
     assert locks_repo.acquire_lock("job", "owner-2", ttl_seconds=60) is False
 
     lock = AppLock.get(AppLock.name == "job")
-    lock.expires_at = datetime.utcnow() - timedelta(seconds=1)
+    lock.expires_at = utc_now() - timedelta(seconds=1)
     lock.save()
 
     assert locks_repo.acquire_lock("job", "owner-2", ttl_seconds=60) is True

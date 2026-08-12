@@ -344,6 +344,21 @@ def normalize_window_payload(payload, *, existing_window=None, partial=False):
     if rrule:
         rrule = normalize_rrule(rrule, starts_at)
 
+    apply_to_existing = payload.get("apply_to_existing")
+    if apply_to_existing is None and partial and existing_window is not None:
+        apply_to_existing = existing_window.apply_to_existing
+    apply_to_existing = bool(apply_to_existing) if apply_to_existing is not None else False
+
+    reactivate_on_end = payload.get("reactivate_on_end")
+    if reactivate_on_end is None and partial and existing_window is not None:
+        reactivate_on_end = existing_window.reactivate_on_end
+    reactivate_on_end = True if reactivate_on_end is None else bool(reactivate_on_end)
+
+    if behavior == "suppress_incident" and apply_to_existing:
+        raise ValueError(
+            "apply_to_existing is not supported for suppress_incident behavior"
+        )
+
     enabled = payload.get("enabled")
     if enabled is None and partial and existing_window is not None:
         enabled = existing_window.enabled
@@ -366,6 +381,8 @@ def normalize_window_payload(payload, *, existing_window=None, partial=False):
         "starts_at": starts_at,
         "ends_at": ends_at,
         "enabled": enabled,
+        "apply_to_existing": apply_to_existing,
+        "reactivate_on_end": reactivate_on_end,
         "scopes": scopes,
     }
 
@@ -383,6 +400,13 @@ def create_maintenance_window(payload, *, user_id):
     window = maintenance_repo.create_maintenance_window(**data)
 
     maintenance_repo.replace_maintenance_window_scopes(window, scopes)
+
+    from app.services.alerts.maintenance_state import reconcile_maintenance_window
+    reconcile_maintenance_window(
+        window,
+        trigger_source="api",
+        actor_user_id=user.id,
+    )
 
     return window
 
@@ -417,6 +441,13 @@ def update_maintenance_window(window_id, payload, *, user_id):
     if scopes is not None:
         maintenance_repo.replace_maintenance_window_scopes(window, scopes)
 
+    from app.services.alerts.maintenance_state import reconcile_maintenance_window
+    reconcile_maintenance_window(
+        window,
+        trigger_source="api",
+        actor_user_id=user.id,
+    )
+
     return window
 
 
@@ -435,11 +466,19 @@ def cancel_maintenance_window(window_id, payload=None, *, user_id):
     if isinstance(payload, dict):
         reason = payload.get("reason")
 
-    return maintenance_repo.cancel_maintenance_window(
+    window = maintenance_repo.cancel_maintenance_window(
         window,
         cancelled_by=user,
         reason=reason,
     )
+
+    from app.services.alerts.maintenance_state import reconcile_maintenance_window
+    reconcile_maintenance_window(
+        window,
+        trigger_source="api",
+        actor_user_id=user.id,
+    )
+    return window
 
 
 def delete_maintenance_window(window_id, *, user_id):
@@ -454,6 +493,13 @@ def delete_maintenance_window(window_id, *, user_id):
 
     maintenance_repo.soft_delete_maintenance_window(window)
 
+    from app.services.alerts.maintenance_state import reconcile_maintenance_window
+    reconcile_maintenance_window(
+        window,
+        trigger_source="api",
+        actor_user_id=user.id,
+        force_release=True,
+    )
     return window
 
 

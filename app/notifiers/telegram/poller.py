@@ -17,6 +17,7 @@ from app.notifiers.telegram.bot import (
     get_telegram_bot,
     update_telegram_alert,
 )
+from app.modules.common import utc_now
 
 
 logger = logging.getLogger("oncall.telegram")
@@ -80,12 +81,12 @@ def _friendly_transport_error(exc):
 
 def _is_channel_transport_backoff_active(channel_id):
     retry_at = _channel_transport_failed_until.get(channel_id)
-    return bool(retry_at and retry_at > datetime.utcnow())
+    return bool(retry_at and retry_at > utc_now())
 
 
 def _mark_channel_transport_failed(channel_id):
     _channel_transport_failed_until[channel_id] = (
-        datetime.utcnow() + timedelta(seconds=TELEGRAM_TRANSPORT_RETRY_SECONDS)
+        utc_now() + timedelta(seconds=TELEGRAM_TRANSPORT_RETRY_SECONDS)
     )
 
 
@@ -101,12 +102,12 @@ def _is_telegram_unauthorized(exc):
 
 def _is_channel_auth_backoff_active(channel_id):
     retry_at = _channel_auth_failed_until.get(channel_id)
-    return bool(retry_at and retry_at > datetime.utcnow())
+    return bool(retry_at and retry_at > utc_now())
 
 
 def _mark_channel_auth_failed(channel_id):
     _channel_auth_failed_until[channel_id] = (
-        datetime.utcnow() + timedelta(seconds=TELEGRAM_AUTH_RETRY_SECONDS)
+        utc_now() + timedelta(seconds=TELEGRAM_AUTH_RETRY_SECONDS)
     )
 
 
@@ -328,7 +329,7 @@ def handle_telegram_callback(channel, callback):
                     "action": action,
                     "user_id": user.id,
                     "telegram_user_id": telegram_user_id,
-                    "processed_at": datetime.utcnow().isoformat(),
+                    "processed_at": utc_now().isoformat(),
                 }
             },
         )

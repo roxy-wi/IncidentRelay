@@ -4,6 +4,7 @@ Components:
   web        {{ .Values.web.replicaCount }} replica(s)
   scheduler  {{ .Values.scheduler.enabled | ternary "enabled" "disabled" }}
   telegram   {{ .Values.telegram.enabled | ternary "enabled" "disabled" }}
+  slack      {{ .Values.slack.enabled | ternary "enabled" "disabled" }}
 
 Access the web UI:
 {{- if .Values.ingress.enabled }}

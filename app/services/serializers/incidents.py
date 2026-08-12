@@ -1,6 +1,7 @@
 import json
 
 from app.services.serializers.alerts import serialize_alert_group, serialize_attached_maintenance_ref
+from app.services.serializers.common import serialize_utc_datetime
 
 
 def serialize_incident_stakeholder(stakeholder):
@@ -27,8 +28,8 @@ def serialize_incident_stakeholder(stakeholder):
         "notify_on_comment": bool(getattr(stakeholder, "notify_on_comment", True)),
         "active": stakeholder.active,
         "created_by_id": stakeholder.created_by_id,
-        "created_at": stakeholder.created_at.isoformat() if stakeholder.created_at else None,
-        "updated_at": stakeholder.updated_at.isoformat() if stakeholder.updated_at else None,
+        "created_at": serialize_utc_datetime(stakeholder.created_at),
+        "updated_at": serialize_utc_datetime(stakeholder.updated_at),
     }
 
 
@@ -47,7 +48,7 @@ def serialize_incident(group, *, current_user=None, include_details=False):
         "order": group.priority_order,
         "set_manually": group.priority_set_manually,
         "set_by_id": group.priority_set_by_id,
-        "set_at": group.priority_set_at.isoformat() if group.priority_set_at else None,
+        "set_at": serialize_utc_datetime(group.priority_set_at),
     }
 
     data["maintenance"] = {
@@ -74,10 +75,6 @@ def _as_dict(value):
         return parsed if isinstance(parsed, dict) else {}
 
     return {}
-
-
-def _isoformat(value):
-    return value.isoformat() if value else None
 
 
 def _extract_alert_annotations(payload):
@@ -114,6 +111,8 @@ def _add_optional_incident_alert_fields(data, alert):
         "maintenance_window_id",
         "maintenance_behavior",
         "maintenance_suppressed",
+        "orchestration_suppressed",
+        "orchestration_suppress_reason",
     )
 
     for field_name in optional_fields:
@@ -128,6 +127,11 @@ def _add_optional_incident_alert_fields(data, alert):
 
     if "maintenance_suppressed" in data:
         data["maintenance_suppressed"] = bool(data["maintenance_suppressed"])
+
+    if "orchestration_suppressed" in data:
+        data["orchestration_suppressed"] = bool(
+            data["orchestration_suppressed"]
+        )
 
 
 def serialize_incident_alert(alert):
@@ -163,19 +167,19 @@ def serialize_incident_alert(alert):
         "silenced": alert.silenced,
 
         "acknowledged_by_id": alert.acknowledged_by_id,
-        "acknowledged_at": _isoformat(alert.acknowledged_at),
+        "acknowledged_at": serialize_utc_datetime(alert.acknowledged_at),
 
-        "next_escalation_at": _isoformat(alert.next_escalation_at),
-        "last_escalated_at": _isoformat(alert.last_escalated_at),
+        "next_escalation_at": serialize_utc_datetime(alert.next_escalation_at),
+        "last_escalated_at": serialize_utc_datetime(alert.last_escalated_at),
         "escalation_repeat_count": alert.escalation_repeat_count,
         "escalation_level": alert.escalation_level,
 
-        "last_notification_at": _isoformat(alert.last_notification_at),
+        "last_notification_at": serialize_utc_datetime(alert.last_notification_at),
         "reminder_count": alert.reminder_count,
 
-        "first_seen_at": _isoformat(alert.first_seen_at),
-        "last_seen_at": _isoformat(alert.last_seen_at),
-        "resolved_at": _isoformat(alert.resolved_at),
+        "first_seen_at": serialize_utc_datetime(alert.first_seen_at),
+        "last_seen_at": serialize_utc_datetime(alert.last_seen_at),
+        "resolved_at": serialize_utc_datetime(alert.resolved_at),
     }
 
     _add_optional_incident_alert_fields(data, alert)

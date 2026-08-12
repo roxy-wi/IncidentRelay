@@ -4,6 +4,7 @@ from app.modules.db.models import BusinessService, BusinessServiceComponent, Bus
 from app.modules.db import business_services_repo
 from app.services.business_services.status import apply_business_service_status
 from tests.factories import create_group, create_service, create_team, unique
+from app.modules.common import utc_now
 
 
 def create_manual_status_fixture():
@@ -40,7 +41,7 @@ def test_manual_status_override_wins_over_calculated_status(db):
         business_service.id,
         manual_status="degraded",
         message="Customer impact is limited",
-        until=datetime.utcnow() + timedelta(hours=1),
+        until=utc_now() + timedelta(hours=1),
         user_id=None,
     )
 
@@ -66,7 +67,7 @@ def test_expired_manual_status_is_ignored_and_cleared(db):
         business_service.id,
         manual_status="operational",
         message="Expired override",
-        until=datetime.utcnow() - timedelta(minutes=1),
+        until=utc_now() - timedelta(minutes=1),
         user_id=None,
     )
 
@@ -94,7 +95,7 @@ def test_clear_manual_status_reverts_to_calculated_status(db):
         business_service.id,
         manual_status="degraded",
         message="Manual degraded",
-        until=datetime.utcnow() + timedelta(hours=1),
+        until=utc_now() + timedelta(hours=1),
         user_id=None,
     )
 
@@ -126,7 +127,7 @@ def test_manual_status_source_change_writes_history(db):
         business_service.id,
         manual_status="degraded",
         message="Manual confirmation",
-        until=datetime.utcnow() + timedelta(hours=1),
+        until=utc_now() + timedelta(hours=1),
         user_id=None,
     )
 
@@ -158,7 +159,7 @@ def test_set_manual_status_api(client, db, auth_headers):
         json={
             "status": "degraded",
             "message": "Limited customer impact",
-            "until": (datetime.utcnow() + timedelta(hours=1)).isoformat(),
+            "until": (utc_now() + timedelta(hours=1)).isoformat(),
         },
         headers=auth_headers,
     )
@@ -184,7 +185,7 @@ def test_clear_manual_status_api(client, db, auth_headers):
         business_service.id,
         manual_status="degraded",
         message="Manual degraded",
-        until=datetime.utcnow() + timedelta(hours=1),
+        until=utc_now() + timedelta(hours=1),
         user_id=None,
     )
 

@@ -4,6 +4,8 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from pydantic import EmailStr, Field, field_validator
 
 from app.api.schemas.base import ApiModel
+from app.i18n import normalize_locale
+from app.ui_preferences import normalize_theme
 from app.api.schemas.limits import (
     CONTACT_ID_MAX_LENGTH,
     DISPLAY_NAME_MAX_LENGTH,
@@ -27,6 +29,8 @@ class ProfileUpdateSchema(ApiModel):
         max_length=PHONE_MAX_LENGTH,
     )
     timezone: Optional[str] = Field(default=None, max_length=64)
+    locale: Optional[str] = Field(default=None, max_length=16)
+    theme: Optional[str] = Field(default=None, max_length=16)
     telegram_user_id: Optional[str] = Field(
         default=None,
         max_length=CONTACT_ID_MAX_LENGTH,
@@ -67,6 +71,29 @@ class ProfileUpdateSchema(ApiModel):
             raise ValueError("invalid timezone") from exc
 
         return value
+
+    @field_validator("locale")
+    @classmethod
+    def validate_locale_field(cls, value: str | None) -> str | None:
+        """Validate an optional supported interface locale."""
+        if value is None:
+            return None
+
+        normalized = normalize_locale(value)
+        if not normalized:
+            raise ValueError("unsupported locale")
+
+        return normalized
+
+    @field_validator("theme")
+    @classmethod
+    def validate_theme_field(cls, value: str | None) -> str:
+        """Validate the interface theme preference."""
+        normalized = normalize_theme(value)
+        if value is not None and not normalized:
+            raise ValueError("unsupported theme")
+
+        return normalized or "system"
 
 
 class ProfileTokenCreateSchema(ApiModel):

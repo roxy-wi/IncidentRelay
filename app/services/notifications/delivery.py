@@ -8,8 +8,10 @@ from app.services.severity import normalize_severity, normalize_severity_list
 from app.services.routing.service_context import format_service_context_plain, service_display_name
 from app.services.notifications import rules
 from app.services.alerts.priority import alert_priority_label, format_alert_title_with_priority
+from app.services.alerts.maintenance_state import is_notification_lifecycle_suppressed
 from app.services.notifications.policies.resolver import resolve_notification_channels
 from app.services.alerts.correlation import format_correlation_plain
+from app.modules.common import utc_now
 
 EDITABLE_EVENTS = {"acknowledged", "resolved"}
 
@@ -192,6 +194,22 @@ def notify_alert(group, event_type="notification"):
     """Send or update alert group notifications for route channels and user rules."""
 
     group = _ensure_alert_group(group)
+
+    if (
+        event_type in {"notification", "update", "reminder", "escalation"}
+        and is_notification_lifecycle_suppressed(group)
+    ):
+        logger.info(
+            "notification skipped during maintenance",
+            extra={
+                "extra": {
+                    "alert_group_id": group.id,
+                    "event_type": event_type,
+                    "maintenance_window_id": group.maintenance_window_id,
+                }
+            },
+        )
+        return 0
 
     text = format_alert_message(group, event_type)
     sent_count = 0
@@ -378,7 +396,7 @@ def notify_alert(group, event_type="notification"):
         )
 
     if sent_count:
-        alerts_repo.record_group_notification_time(group, datetime.utcnow())
+        alerts_repo.record_group_notification_time(group, utc_now())
 
     return sent_count
 

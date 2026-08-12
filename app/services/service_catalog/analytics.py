@@ -7,6 +7,7 @@ from statistics import mean
 from app.modules.db.models import Alert, AlertGroup, Service
 from app.services.serializers.services import serialize_utc_datetime
 from app.services.service_catalog.impact import build_single_service_impact_v2
+from app.modules.common import utc_now
 
 
 OPEN_ALERT_GROUP_STATUSES = {"firing", "acknowledged"}
@@ -48,7 +49,7 @@ def build_service_analytics_v2(query, *, team_ids=None):
     requested_team_id = getattr(query, "team_id", None)
     requested_service_id = getattr(query, "service_id", None)
 
-    until = datetime.utcnow()
+    until = utc_now()
     since = until - timedelta(days=days)
 
     services = _load_services(

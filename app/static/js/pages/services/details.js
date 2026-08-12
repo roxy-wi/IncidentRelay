@@ -1446,18 +1446,23 @@ function evaluateServiceReadiness(service) {
 
 
 function serviceDetailsCompactRow(label, value) {
+    const valueCell = $("<td>").addClass("table-cell-truncate-wide");
+
+    if (value && value.jquery) {
+        valueCell.append(value);
+    } else {
+        valueCell
+            .attr("title", value || "-")
+            .text(value || "-");
+    }
+
     return $("<tr>")
         .append(
             $("<td>")
                 .addClass("table-cell-truncate")
                 .append($("<strong>").text(label))
         )
-        .append(
-            $("<td>")
-                .addClass("table-cell-truncate-wide")
-                .attr("title", value || "-")
-                .text(value || "-")
-        );
+        .append(valueCell);
 }
 
 
@@ -1561,6 +1566,54 @@ function serviceDetailsTableCard(title, headers, rows, emptyMessage) {
 }
 
 
+function renderServiceOrchestrationAssignments(payload) {
+    const items = Array.isArray(payload.event_orchestrations)
+        ? payload.event_orchestrations
+        : [];
+
+    if (!items.length) {
+        return "-";
+    }
+
+    const list = $("<div>").addClass("service-orchestration-list");
+
+    items.forEach(function (item) {
+        const mode = item.mode || "disabled";
+        const link = $("<a>")
+            .addClass("service-orchestration-link")
+            .attr(
+                "href",
+                "/event-orchestration?orchestration_id=" + encodeURIComponent(item.id)
+            )
+            .text(item.name || ("#" + item.id));
+        const badge = $("<span>")
+            .addClass("status-pill")
+            .addClass(
+                mode === "active"
+                    ? "status-active"
+                    : mode === "shadow"
+                        ? "status-scheduled"
+                        : "status-neutral"
+            )
+            .text(
+                mode === "active"
+                    ? i18n.t("services.details.orchestration_active")
+                    : mode === "shadow"
+                        ? i18n.t("services.details.orchestration_shadow")
+                        : i18n.t("services.details.orchestration_disabled")
+            );
+
+        list.append(
+            $("<div>")
+                .addClass("service-orchestration-item")
+                .append(link, badge)
+        );
+    });
+
+    return list;
+}
+
+
 function renderServiceDetailsHero(payload) {
     const service = payload.service || {};
     const section = serviceDetailsSection(
@@ -1597,6 +1650,7 @@ function renderServiceDetailsHero(payload) {
                     ["Escalation policy", service.default_escalation_policy_name],
                     ["Notification policy", service.notification_policy_name],
                     ["Priority policy", service.priority_policy_name || "Team default"],
+                    [i18n.t("services.details.event_orchestrations"), renderServiceOrchestrationAssignments(payload)],
                     ["Maintenance", window.AppMaintenanceBadges.text(service, "-")],
                 ])
             )

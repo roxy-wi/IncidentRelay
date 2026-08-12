@@ -5,6 +5,7 @@ from app.services.notifications import rules
 from app.services.alerts.actions import resolve_alert
 from app.services.alerts.lifecycle import upsert_alert
 from tests.factories import add_user_to_team, create_group, create_route, create_team, create_user
+from app.modules.common import utc_now
 
 
 def _group_with_assignee():
@@ -109,7 +110,7 @@ def test_custom_delayed_user_notification_is_skipped_when_group_no_longer_firing
 
     resolve_alert(alert_group.id, user_id=user.id)
 
-    delivery.scheduled_at = datetime.utcnow() - timedelta(seconds=1)
+    delivery.scheduled_at = utc_now() - timedelta(seconds=1)
     delivery.save()
 
     monkeypatch.setattr(
@@ -151,7 +152,7 @@ def test_resolved_user_notification_is_not_skipped_when_group_is_resolved(db, mo
     assert created == 0
 
     delivery = UserNotificationDelivery.get()
-    delivery.scheduled_at = datetime.utcnow() - timedelta(seconds=1)
+    delivery.scheduled_at = utc_now() - timedelta(seconds=1)
     delivery.save()
 
     calls = []

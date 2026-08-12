@@ -8,10 +8,11 @@ from tests.factories import (
     create_team,
     unique,
 )
+from app.modules.common import utc_now
 
 
 def silence_payload(team, *, matcher_preset_id=None, matchers=None):
-    now = datetime.utcnow()
+    now = utc_now()
 
     return {
         "team_id": team.id,

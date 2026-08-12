@@ -484,7 +484,7 @@ function serviceDependencyGraphNodeDisplayStatus(service, impactMap) {
         return serviceDependencyGraphNormalizeStatus(impact.effective_status);
     }
 
-    return serviceDependencyGraphNodeStatus(service);
+    return serviceDependencyGraphServiceStatus(service);
 }
 
 function serviceDependencyGraphEdgeImpactStatus(dependency, upstreamService, impactMap) {
@@ -646,7 +646,7 @@ function serviceDependencyGraphServiceFromDependency(dependency, side, id, servi
     };
 }
 
-function serviceDependencyGraphNodeStatus(service) {
+function serviceDependencyGraphServiceStatus(service) {
     if (!service || service.enabled === false) {
         return "disabled";
     }

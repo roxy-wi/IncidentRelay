@@ -4,7 +4,15 @@ from datetime import timedelta, datetime
 from app.modules.db import alerts_repo
 from app.services import escalation_policies as escalation_policy_service
 from app.services.alerts.escalation import maybe_escalate_alert
+from app.services.alerts.maintenance_state import (
+    is_escalation_lifecycle_paused,
+    is_notification_lifecycle_suppressed,
+    pause_notification_lifecycle,
+    resume_notification_lifecycle,
+)
+from app.services.alerts.notification_queue import schedule_group_notification
 from app.services.notifications.delivery import has_matching_notification_channel, notify_alert
+from app.modules.common import utc_now
 
 logger = logging.getLogger("oncall.alerts")
 
@@ -42,11 +50,28 @@ def send_unacked_reminders():
     policy escalation must work even when reminder interval is disabled.
     """
 
-    now = datetime.utcnow()
+    now = utc_now()
     count = 0
 
     for group in alerts_repo.list_firing_alert_groups():
-        if group.escalation_policy_id:
+        if is_notification_lifecycle_suppressed(group, now=now):
+            pause_notification_lifecycle(group)
+            logger.debug(
+                "reminder and escalation skipped during maintenance",
+                extra={"extra": {"alert_group_id": group.id}},
+            )
+            continue
+
+        if resume_notification_lifecycle(group, now=now):
+            schedule_group_notification(
+                group,
+                reason="maintenance_ended",
+                now=now,
+            )
+            continue
+        escalation_paused = is_escalation_lifecycle_paused(group, now=now)
+
+        if group.escalation_policy_id and not escalation_paused:
             if maybe_escalate_alert(group):
                 count += 1
                 continue
@@ -124,7 +149,11 @@ def send_unacked_reminders():
         if not should_send_reminder(group, now):
             continue
 
-        if not group.escalation_policy_id and maybe_escalate_alert(group):
+        if (
+            not group.escalation_policy_id
+            and not escalation_paused
+            and maybe_escalate_alert(group)
+        ):
             count += 1
             continue
 
