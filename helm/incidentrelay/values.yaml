@@ -16,6 +16,9 @@ serviceAccount:
   # Defaults to the fullname when empty.
   name: ""
 
+# Custom CA certificate for ssl connections
+ca: ""
+
 # IncidentRelay reads every setting from a single INI file mounted at
 # /etc/incidentrelay/incidentrelay.conf. The map below is rendered into
 # that file verbatim: top-level keys become INI sections, nested keys
@@ -134,7 +137,7 @@ telegram:
 # Socket Mode worker for Slack interactive buttons. Harmless without a
 # configured Slack app (it idles), disable it if you do not use Slack.
 slack:
-  enabled: true
+  enabled: false
   strategy:
     type: Recreate
   resources: {}

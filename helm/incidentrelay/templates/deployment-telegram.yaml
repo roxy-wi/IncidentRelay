@@ -1,4 +1,5 @@
 {{- if .Values.telegram.enabled }}
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -20,6 +21,7 @@ spec:
     metadata:
       annotations:
         {{- include "incidentrelay.configChecksum" . | nindent 8 }}
+        {{- include "incidentrelay.caChecksum" . | nindent 8 }}
         {{- with .Values.telegram.podAnnotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}

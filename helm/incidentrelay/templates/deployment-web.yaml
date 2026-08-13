@@ -1,3 +1,4 @@
+---
 apiVersion: apps/v1
 kind: Deployment
 metadata:
@@ -19,6 +20,7 @@ spec:
     metadata:
       annotations:
         {{- include "incidentrelay.configChecksum" . | nindent 8 }}
+        {{- include "incidentrelay.caChecksum" . | nindent 8 }}
         {{- with .Values.web.podAnnotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -61,6 +63,12 @@ spec:
               value: {{ .Values.web.gunicorn.threads | quote }}
             - name: INCIDENTRELAY_WEB_TIMEOUT
               value: {{ .Values.web.gunicorn.timeout | quote }}
+            {{- if .Values.ca }}
+            - name: SSL_CERT_FILE
+              value: /usr/lib/ssl/certs/ca.pem
+            - name: REQUESTS_CA_BUNDLE
+              value: /usr/lib/ssl/certs/ca.pem
+            {{- end }}
             {{- with .Values.web.extraEnv }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
