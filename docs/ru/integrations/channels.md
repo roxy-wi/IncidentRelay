@@ -37,7 +37,7 @@ Incoming alert -> Route -> Notification channels
 | `mattermost` | Webhook URL или настройки Bot API | Опциональный Mattermost user ID для атрибуции пользователя | `public_base_url` для кнопок |
 | `telegram` | `bot_token`, `chat_id` | Telegram user ID для действий | Опциональный прокси Telegram |
 | `email` | Опциональный `html_template` | У назначенного пользователя должен быть `email` | Настройки SMTP |
-| `slack` | `webhook_url` | Нет | Нет |
+| `slack` | Режим webhook: `webhook_url`; Bot API: `bot_token`, `channel_id` и либо `signing_secret`, либо `app_token` | Необязательный Slack user ID для атрибуции действий | Публичный HTTPS-эндпоинт для HTTP-действий или воркер Slack для Socket Mode |
 | `discord` | `webhook_url` | Нет | Нет |
 | `teams` | `webhook_url` | Нет | Нет |
 | `webhook` | `webhook_url` | Нет | Нет |
@@ -86,14 +86,16 @@ IncidentRelay нормализует распространённые псевд
 | Канал | Поддерживает обновления | Примечания |
 |---|---:|---|
 | Mattermost Bot API | Да | Требуется режим Bot API |
+| Slack Bot API | Да | Требуются сохранённые метаданные канала и сообщения Slack |
 | Telegram | Да | Требуются сохранённые метаданные сообщения Telegram и опрос для действий |
 | Email | Нет | Для событий уведомлений может быть отправлено новое письмо |
 | Голосовой вызов | Нет | Вызовы являются односторонними уведомлениями |
-| Slack/Discord/Teams/webhook | Обычно нет | Входящие вебхуки обычно создают только новые сообщения |
+| Входящий webhook Slack, Discord, Teams, универсальный webhook | Нет | Доставка через webhook создаёт новые сообщения и не может обновить исходное уведомление |
 
 ## Страницы отдельных каналов
 
 - [Mattermost](mattermost.md)
+- [Slack](slack.md)
 - [Telegram](telegram.md)
 - [Email](email.md)
 - [Шаблоны email](email-channel-templates.md)

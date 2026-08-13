@@ -41,11 +41,12 @@ POST /api/push/actions
 
 ## Дополнительная документация по API
 
-1. [Services API](services.md)
-2. [Escalation Policies API](escalation-policies.md)
-3. [Matcher Suggestions API](matchers.md)
-4. [Sentry Integration API](sentry-integration.md)
-5. [Заметки по Voice Call OpenAPI](voice-call-openapi.md)
-6. [Бизнес-сервисы](business-services.md)
+1. [API Event Orchestration](event-orchestration.md)
+2. [Services API](services.md)
+3. [Escalation Policies API](escalation-policies.md)
+4. [Matcher Suggestions API](matchers.md)
+5. [Sentry Integration API](sentry-integration.md)
+6. [Заметки по Voice Call OpenAPI](voice-call-openapi.md)
+7. [Бизнес-сервисы](business-services.md)
 
 - [Heartbeats API](heartbeats.md)

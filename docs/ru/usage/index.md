@@ -9,6 +9,7 @@ description: Типовые повседневные рабочие сценар
 
 - [Профиль и персональные API-токены](profile-and-tokens.md)
 - [Браузерные push-уведомления](browser-push.md)
+- [Event Orchestration](event-orchestration.md)
 
 Операционные рабочие сценарии теперь вынесены в отдельные разделы:
 

@@ -884,35 +884,42 @@ notification policy not set by orchestration
 
 ## 20. Поверхность API
 
-Предлагаемые эндпоинты:
+Реализованные эндпоинты control plane:
 
 ```text
 GET    /api/event-orchestrations
 POST   /api/event-orchestrations
-GET    /api/event-orchestrations/{id}
-PATCH  /api/event-orchestrations/{id}
-DELETE /api/event-orchestrations/{id}
+GET    /api/event-orchestrations/catalog
+GET    /api/event-orchestrations/{orchestration_id}
+PATCH  /api/event-orchestrations/{orchestration_id}
+DELETE /api/event-orchestrations/{orchestration_id}
 
-POST   /api/event-orchestrations/{id}/draft
-POST   /api/event-orchestrations/{id}/validate
-POST   /api/event-orchestrations/{id}/publish
-POST   /api/event-orchestrations/{id}/rollback
-POST   /api/event-orchestrations/{id}/simulate
-POST   /api/event-orchestrations/{id}/replay
+POST   /api/event-orchestrations/{orchestration_id}/draft
+PUT    /api/event-orchestrations/{orchestration_id}/draft
+POST   /api/event-orchestrations/{orchestration_id}/validate
+POST   /api/event-orchestrations/{orchestration_id}/publish
+POST   /api/event-orchestrations/{orchestration_id}/rollback
+PATCH  /api/event-orchestrations/{orchestration_id}/runtime
+POST   /api/event-orchestrations/{orchestration_id}/simulate
+POST   /api/event-orchestrations/{orchestration_id}/replay
 
-GET    /api/event-orchestrations/{id}/versions
-GET    /api/event-orchestrations/{id}/versions/{version_id}
-GET    /api/event-orchestrations/{id}/executions
+GET    /api/event-orchestrations/{orchestration_id}/versions
+GET    /api/event-orchestrations/{orchestration_id}/versions/{version_id}
+GET    /api/event-orchestrations/{orchestration_id}/executions
+GET    /api/event-orchestrations/{orchestration_id}/shadow-metrics
 
 GET    /api/orchestration-webhook-actions
 POST   /api/orchestration-webhook-actions
-PATCH  /api/orchestration-webhook-actions/{id}
-DELETE /api/orchestration-webhook-actions/{id}
-
-POST   /api/integrations/orchestration
+PATCH  /api/orchestration-webhook-actions/{action_id}
+DELETE /api/orchestration-webhook-actions/{action_id}
+GET    /api/orchestration-webhook-actions/{action_id}/executions
 ```
 
-Все схемы условий и действий должны быть документированы в OpenAPI.
+Сгенерированный документ OpenAPI включает рекурсивные схемы деревьев условий,
+перечисление безопасных встроенных действий, метаданные авторов черновиков и
+версий, а также доступные только для записи секретные заголовки webhook.
+Отдельное руководство по публичному API находится в
+[`docs/api/event-orchestration.md`](../api/event-orchestration.md).
 
 ## 21. UI
 

@@ -12,6 +12,7 @@ description: Методы установки и первые шаги настр
 | Метод | Когда использовать | Руководство |
 |---|---|---|
 | Docker Compose | Вам нужен самый быстрый старт или развёртывание на основе контейнеров | [Установка через Docker](docker.md) |
+| Kubernetes с Helm | У вас уже работает кластер, и вы хотите управлять IncidentRelay так же | [Установка в Kubernetes](kubernetes.md) |
 | RPM-пакет | Вы используете RHEL, Rocky Linux, AlmaLinux или CentOS Stream | [Установка через RPM](rpm-installation.md) |
 | Ручная установка с systemd | Вы хотите запускать из исходного кода или самостоятельно управлять окружением Python | [Ручная установка с systemd](systemd.md) |
 

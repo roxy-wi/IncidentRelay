@@ -12,6 +12,7 @@ description: Навигация по руководствам установки
 | Метод | Руководство |
 |---|---|
 | Docker Compose | [Установка через Docker](docker.md) |
+| Kubernetes с Helm | [Установка в Kubernetes](kubernetes.md) |
 | RPM-пакет для дистрибутивов на основе RedHat | [Установка через RPM](rpm-installation.md) |
 | Ручная выгрузка исходников с systemd | [Ручная установка с systemd](systemd.md) |
 

@@ -20,9 +20,10 @@ Monitoring system -> Incoming integration -> Route -> Notification channels -> U
 | Источник            | Эндпоинт                                   | Документация                                              |
 |---------------------|--------------------------------------------|-----------------------------------------------------------|
 | Alertmanager        | `POST /api/integrations/alertmanager`      | [Alertmanager](alertmanager.md)                           |
-| AWS SNS/Cloud watch | `POST /api/integrations/aws-sns`           | [AWS SNS/Cloud watch](integrations/aws-sns-cloudwatch.md) |
+| AWS SNS/Cloud watch | `POST /api/integrations/aws-sns`           | [AWS SNS/Cloud watch](aws-sns-cloudwatch.md)              |
 | Grafana             | `POST /api/integrations/grafana`           | [Grafana](grafana.md)                                     |
 | Datadog             | `POST /api/integrations/datadog`           | [Datadog](datadog.md)                                     |
+| Uptime Kuma         | `POST /api/integrations/uptime-kuma`       | [Uptime Kuma](uptime-kuma.md)                             |
 | RMON                | `POST /api/integrations/rmon`              | [Grafana](rmon.md)                                        |
 | Zabbix              | `POST /api/integrations/zabbix`            | [Zabbix](zabbix.md)                                       |
 | Sentry              | `POST /api/integrations/sentry/<route_id>` | [Sentry](sentry.md)                                       |
@@ -40,7 +41,7 @@ Monitoring system -> Incoming integration -> Route -> Notification channels -> U
 | Mattermost      | Уведомления в чате, опциональные кнопки ACK/Resolve, обновления сообщений       | [Канал Mattermost](mattermost.md)             |
 | Telegram        | Уведомления через Telegram Bot API, опциональные inline-действия                | [Канал Telegram](telegram.md)                 |
 | Email           | Отправляет письмо на email из профиля назначенного пользователя                 | [Канал Email](email.md)                       |
-| Slack           | Отправляет уведомления во входящий вебхук Slack                                 | [Каналы на основе вебхуков](webhook-channels.md) |
+| Slack           | Уведомления через входящий webhook или Bot API с действиями ACK/Resolve и обновлениями | [Канал Slack](slack.md)                      |
 | Discord         | Отправляет уведомления в вебхук Discord                                         | [Каналы на основе вебхуков](webhook-channels.md) |
 | Microsoft Teams | Отправляет уведомления в вебхук Teams                                           | [Каналы на основе вебхуков](webhook-channels.md) |
 | Webhook         | Отправляет payload уведомления на пользовательский HTTP-эндпоинт                | [Каналы на основе вебхуков](webhook-channels.md) |

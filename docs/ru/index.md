@@ -85,6 +85,7 @@ export INCIDENTRELAY_CONFIG_FILE=/etc/incidentrelay/incidentrelay.conf
 - [Каналы](concepts/channels.md)
 - [Браузерные push-уведомления](usage/browser-push.md)
 - [Напоминания и эскалации](concepts/reminders-and-escalations.md)
+- [Event Orchestration](usage/event-orchestration.md)
 
 ## Сводка по RBAC
 
@@ -140,7 +141,7 @@ Team roles:  viewer, responder, manager
 | Mattermost                               | [Mattermost](integrations/mattermost.md)                   |
 | Telegram                                 | [Telegram](integrations/telegram.md)                       |
 | Email                                    | [Email](integrations/email.md)                             |
-| Slack                                    | [docs/integrations/slack.md](docs/integrations/slack.md)   |
+| Slack                                    | [Slack](integrations/slack.md)                             |
 | Discord, Microsoft Teams, кастомный вебхук | [Каналы на основе вебхуков](integrations/webhook-channels.md) |
 | Голосовой вызов                          | [Голосовой вызов](integrations/voice-call.md)                   |
 | Браузерные/PWA push                      | [Браузерные push-уведомления](usage/browser-push.md)        |

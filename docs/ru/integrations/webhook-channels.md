@@ -1,6 +1,6 @@
 ---
 title: Каналы уведомлений на основе вебхуков
-description: Slack, Discord, Microsoft Teams и универсальные каналы на вебхуках.
+description: Discord, Microsoft Teams и универсальные каналы на вебхуках.
 ---
 
 # Каналы уведомлений на основе вебхуков
@@ -10,7 +10,6 @@ description: Slack, Discord, Microsoft Teams и универсальные ка�
 На этой странице рассматриваются:
 
 ```text
-slack
 discord
 teams
 webhook
@@ -18,17 +17,7 @@ webhook
 
 Не путайте исходящие каналы-вебхуки с входящей [интеграцией через универсальный вебхук](generic-webhook.md).
 
-## Slack
-
-Канал Slack использует URL входящего вебхука.
-
-Типовая конфигурация:
-
-```json
-{
-  "webhook_url": "https://hooks.slack.com/services/..."
-}
-```
+У Slack также есть режим доставки через входящий webhook, но настройка Slack, действия Bot API и Socket Mode описаны отдельно: [Канал Slack](slack.md).
 
 ## Discord
 
