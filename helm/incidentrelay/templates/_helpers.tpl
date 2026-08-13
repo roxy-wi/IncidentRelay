@@ -108,6 +108,11 @@ Volumes shared by every component.
   {{- end }}
 - name: logs
   emptyDir: {}
+{{- if .Values.ca }}
+- name: ca
+  configMap:
+    name: {{ include "incidentrelay.fullname" . }}-ca
+{{- end }}
 {{- with .Values.extraVolumes }}
 {{ toYaml . }}
 {{- end }}
@@ -124,6 +129,11 @@ Volume mounts shared by every component.
   mountPath: /var/lib/incidentrelay
 - name: logs
   mountPath: /var/log/incidentrelay
+{{- if .Values.ca }}
+- name: ca
+  mountPath: /usr/lib/ssl/certs/ca.pem
+  subPath: ca.crt
+{{- end }}
 {{- with .Values.extraVolumeMounts }}
 {{ toYaml . }}
 {{- end }}
@@ -136,5 +146,11 @@ Empty when an existing Secret is used (the chart cannot see its content).
 {{- define "incidentrelay.configChecksum" -}}
 {{- if not .Values.existingConfigSecret -}}
 checksum/config: {{ include "incidentrelay.config" . | sha256sum }}
+{{- end }}
+{{- end }}
+
+{{- define "incidentrelay.caChecksum" -}}
+{{- if .Values.ca }}
+checksum/ca: {{ .Values.ca | sha256sum }}
 {{- end }}
 {{- end }}

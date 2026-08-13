@@ -1,0 +1,12 @@
+{{- if .Values.ca }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "incidentrelay.fullname" . }}-ca
+  labels:
+    {{- include "incidentrelay.labels" . | nindent 4 }}
+data:
+  ca.crt: |
+    {{ .Values.ca | nindent 4 }}
+{{- end -}}
