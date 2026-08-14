@@ -40,9 +40,9 @@ def validate_route_matcher_preset(team_id, preset_id):
     try:
         preset = matcher_preset_service.validate_preset_assignment(preset_id, team_id=team_id)
     except matcher_preset_service.MatcherPresetNotFoundError as exc:
-        return None, make_error_response("matcher_preset_not_found", str(exc), 400)
+        return None, make_error_response("matcher_preset_not_found", "Matcher preset was not found.", 400)
     except matcher_preset_service.MatcherPresetError as exc:
-        return None, make_error_response("matcher_preset_invalid", str(exc), 400)
+        return None, make_error_response("matcher_preset_invalid", "Matcher preset is invalid or unavailable.", 400)
 
     return preset, None
 

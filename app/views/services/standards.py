@@ -110,7 +110,7 @@ def _get_accessible_standard_check(standard, check_id):
 def _standard_validation_error(exc):
     return make_error_response(
         "service_standard_invalid",
-        str(exc),
+        "Service standard configuration is invalid.",
         400,
     )
 
@@ -118,7 +118,7 @@ def _standard_validation_error(exc):
 def _standard_check_validation_error(exc):
     return make_error_response(
         "service_standard_check_invalid",
-        str(exc),
+        "Service standard check configuration is invalid.",
         400,
     )
 

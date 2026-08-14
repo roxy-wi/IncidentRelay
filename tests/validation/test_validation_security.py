@@ -121,7 +121,7 @@ def test_normalize_validation_error_drops_exception_objects_from_context():
     assert result == {
         "field": "body.name",
         "loc": ["body", "name"],
-        "message": "invalid name",
+        "message": "Invalid value",
         "type": "value_error",
         "input": "Invalid value",
         "ctx": {"safe": "visible"},

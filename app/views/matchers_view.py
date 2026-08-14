@@ -90,7 +90,7 @@ def matcher_preview():
                 {
                     "field": "matchers",
                     "loc": ["matchers"],
-                    "message": str(exc),
+                    "message": "Matcher configuration is invalid.",
                     "type": "invalid_matcher",
                 }
             ],

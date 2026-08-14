@@ -86,28 +86,32 @@ def normalize_validation_error(error):
     loc = [str(item) for item in error.get("loc", [])]
     raw_message = error.get("msg", "Invalid value")
     input_value = error.get("input")
+    error_type = error.get("type")
+    ctx = error.get("ctx") or {}
+    exception_backed = (
+        error_type == "value_error"
+        or any(isinstance(value, BaseException) for value in ctx.values())
+    )
     sensitive = _validation_error_is_sensitive(loc, input_value, raw_message)
 
-    if sensitive:
+    if sensitive or exception_backed:
         message = "Invalid value"
     else:
         message = raw_message
-        if message.startswith("Value error, "):
-            message = message.replace("Value error, ", "", 1)
 
     result = {
         "field": ".".join(loc) if loc else None,
         "loc": loc,
         "message": message,
-        "type": error.get("type"),
+        "type": error_type,
     }
 
     if "input" in error:
         result["input"] = "***REDACTED***" if sensitive else make_json_safe(input_value)
 
-    ctx = _safe_validation_ctx(error.get("ctx"))
-    if ctx:
-        result["ctx"] = ctx
+    safe_ctx = _safe_validation_ctx(ctx)
+    if safe_ctx:
+        result["ctx"] = safe_ctx
 
     return result
 

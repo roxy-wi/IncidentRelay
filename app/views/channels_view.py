@@ -16,7 +16,7 @@ from app.services.rbac import (
 )
 from app.services.channel_config import merge_channel_config_secrets
 from app.services.serializers.channels import serialize_channel
-from app.services.validation import make_error_response, validate_body
+from app.services.validation import make_error_response, safe_exception_response, validate_body
 from app.services.service_catalog.reconciliation import reconcile_channel_services
 
 channels_bp = Blueprint("channels_api", __name__)
@@ -234,10 +234,12 @@ def update_channel(channel_id):
             current_channel.config,
         )
     except ValueError as exc:
-        return jsonify({
-            "error": "validation_error",
-            "message": str(exc),
-        }), 400
+        return safe_exception_response(
+            exc,
+            error="validation_error",
+            message="Channel secret configuration is invalid.",
+            status_code=400,
+        )
 
     update_data = {
         "team": payload.team_id,

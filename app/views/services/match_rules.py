@@ -94,13 +94,13 @@ def _validate_match_rule_payload(payload):
     except matcher_preset_service.MatcherPresetNotFoundError as exc:
         return None, make_error_response(
             "matcher_preset_not_found",
-            str(exc),
+            "Matcher preset was not found.",
             400,
         )
     except matcher_preset_service.MatcherPresetError as exc:
         return None, make_error_response(
             "matcher_preset_invalid",
-            str(exc),
+            "Matcher preset is invalid or unavailable.",
             400,
         )
 

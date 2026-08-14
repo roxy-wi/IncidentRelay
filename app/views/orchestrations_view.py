@@ -175,19 +175,19 @@ def _repo_error_response(error):
     if isinstance(error, orchestrations_repo.OrchestrationNotFound):
         return make_error_response(
             "orchestration_not_found",
-            str(error),
+            "Event orchestration was not found.",
             404,
         )
     if isinstance(error, orchestrations_repo.OrchestrationConflict):
         return make_error_response(
             "orchestration_conflict",
-            str(error),
+            "Event orchestration conflicts with the current state.",
             409,
         )
     if isinstance(error, orchestrations_repo.OrchestrationValidationError):
         return make_error_response(
             "orchestration_validation_error",
-            str(error),
+            "Event orchestration definition is invalid.",
             400,
             errors=error.errors,
             warnings=error.warnings,
@@ -206,7 +206,7 @@ def handle_orchestration_simulation_error(error):
     else:
         code = "orchestration_simulation_invalid"
         status = 400
-    return jsonify({"error": code, "message": str(error)}), status
+    return jsonify({"error": code, "message": "Orchestration simulation failed."}), status
 
 
 @orchestrations_bp.route("", methods=["GET"])
@@ -747,7 +747,11 @@ def create_webhook_action():
             409,
         )
     except (webhooks.WebhookValidationError, ValueError) as exc:
-        return make_error_response("webhook_action_invalid", str(exc), 400)
+        return make_error_response(
+            "webhook_action_invalid",
+            "Webhook action configuration is invalid.",
+            400,
+        )
     write_audit(
         "event_orchestration.webhook_action_create",
         object_type="orchestration_webhook_action",
@@ -778,7 +782,11 @@ def update_webhook_action(action_id):
             409,
         )
     except (webhooks.WebhookValidationError, ValueError) as exc:
-        return make_error_response("webhook_action_invalid", str(exc), 400)
+        return make_error_response(
+            "webhook_action_invalid",
+            "Webhook action configuration is invalid.",
+            400,
+        )
     write_audit(
         "event_orchestration.webhook_action_update",
         object_type="orchestration_webhook_action",

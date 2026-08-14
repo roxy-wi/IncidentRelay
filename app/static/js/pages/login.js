@@ -23,6 +23,35 @@ function getLoginReturnUrl() {
     return next && next.indexOf("/") === 0 && next.indexOf("//") !== 0 ? next : "/";
 }
 
+function redirectAfterLogin() {
+    /*
+     * Redirect only to a same-origin UI path after authentication.
+     * Keep the validation next to the navigation sink so untrusted query
+     * parameters can never become an external redirect target.
+     */
+    const returnPath = getLoginReturnUrl();
+
+    try {
+        const target = new URL(returnPath, window.location.origin);
+
+        if (target.origin !== window.location.origin) {
+            window.location.href = "/";
+            return;
+        }
+
+        const path = target.pathname + target.search + target.hash;
+
+        if (!path || path.indexOf("/") !== 0 || path.indexOf("//") === 0) {
+            window.location.href = "/";
+            return;
+        }
+
+        window.location.href = path;
+    } catch (error) {
+        window.location.href = "/";
+    }
+}
+
 function login(event) {
     /*
      * Request a JWT token and store it locally.
@@ -58,7 +87,7 @@ function login(event) {
                 "success"
             );
 
-            window.location.href = getLoginReturnUrl();
+            redirectAfterLogin();
         },
         function (xhr) {
             const message = getApiErrorMessage(
