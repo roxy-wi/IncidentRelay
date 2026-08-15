@@ -91,3 +91,81 @@ def test_orchestration_list_supports_editing_links_and_shared_action_menu():
     assert 'id="orchestration-create-modal-title"' in template
     assert 'id="orchestration-settings-scope"' in template
     assert 'id="orchestration-settings-service"' in template
+
+
+def test_orchestration_action_editor_has_localized_column_help():
+    javascript = (
+        ROOT / "app" / "static" / "js" / "pages" / "orchestrations.js"
+    ).read_text(encoding="utf-8")
+
+    expected_keys = {
+        "orchestrations.rule_editor.action_type",
+        "orchestrations.rule_editor.action_type_help",
+        "orchestrations.rule_editor.parameters",
+        "orchestrations.rule_editor.parameters_help",
+        "orchestrations.rule_editor.on_failure",
+        "orchestrations.rule_editor.on_failure_help",
+        "orchestrations.rule_editor.failure_continue",
+        "orchestrations.rule_editor.failure_stop_rule",
+        "orchestrations.rule_editor.failure_stop_orchestration",
+        "orchestrations.rule_editor.remove_action",
+    }
+
+    for locale in ("en", "ru", "de", "fr"):
+        path = ROOT / "app" / "static" / "i18n" / locale / "orchestrations.json"
+        catalog = json.loads(path.read_text(encoding="utf-8"))
+        assert expected_keys <= set(catalog)
+        assert all(catalog[key].strip() for key in expected_keys)
+
+    assert "orchestrationActionEditorHeader" in javascript
+    assert "orchestrationActionFailureEditor" in javascript
+    assert "orchestration-action-editor-header" in javascript
+    assert 'i18n.t("orchestrations.rule_editor.action_type_help")' in javascript
+    assert 'i18n.t("orchestrations.rule_editor.on_failure_help")' in javascript
+    assert 'i18n.t("orchestrations.rule_editor.failure_stop_orchestration")' in javascript
+
+
+
+def test_orchestration_condition_editor_has_localized_column_help_and_operator_labels():
+    javascript = (
+        ROOT / "app" / "static" / "js" / "pages" / "orchestrations.js"
+    ).read_text(encoding="utf-8")
+
+    operator_keys = {
+        "orchestrations.rule_editor.operator_" + operator
+        for operator in (
+            "equals", "not_equals", "contains", "not_contains", "starts_with",
+            "ends_with", "regex", "not_regex", "in", "not_in", "exists",
+            "not_exists", "greater_than", "less_than", "greater_or_equal",
+            "less_or_equal", "is_true", "is_false",
+        )
+    }
+    expected_keys = operator_keys | {
+        "orchestrations.rule_editor.condition_field",
+        "orchestrations.rule_editor.condition_field_help",
+        "orchestrations.rule_editor.condition_operator",
+        "orchestrations.rule_editor.condition_operator_help",
+        "orchestrations.rule_editor.condition_value",
+        "orchestrations.rule_editor.condition_value_help",
+        "orchestrations.rule_editor.condition_group_mode",
+        "orchestrations.rule_editor.condition_group_mode_help",
+        "orchestrations.rule_editor.condition_all",
+        "orchestrations.rule_editor.condition_any",
+        "orchestrations.rule_editor.condition_none",
+        "orchestrations.rule_editor.remove_condition",
+        "orchestrations.rule_editor.remove_condition_group",
+    }
+
+    for locale in ("en", "ru", "de", "fr"):
+        path = ROOT / "app" / "static" / "i18n" / locale / "orchestrations.json"
+        catalog = json.loads(path.read_text(encoding="utf-8"))
+        assert expected_keys <= set(catalog)
+        assert all(catalog[key].strip() for key in expected_keys)
+
+    assert "orchestrationConditionEditorHeader" in javascript
+    assert "orchestrationConditionOperatorLabel" in javascript
+    assert "orchestration-condition-editor-header" in javascript
+    assert 'i18n.t("orchestrations.rule_editor.condition_field_help")' in javascript
+    assert 'i18n.t("orchestrations.rule_editor.condition_operator_help")' in javascript
+    assert 'i18n.t("orchestrations.rule_editor.condition_value_help")' in javascript
+    assert '"orchestrations.rule_editor.operator_" + operator' in javascript

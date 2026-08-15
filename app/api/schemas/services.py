@@ -1,6 +1,7 @@
 from typing import Any, Dict, List, Literal
 
 from pydantic import Field, model_validator
+from pydantic_core import PydanticCustomError
 
 from app.api.schemas.base import ApiModel
 from app.api.schemas.limits import (
@@ -354,19 +355,28 @@ class ServiceSliBaseSchema(ApiModel):
 
         if priority_scope is not None:
             if not isinstance(priority_scope, list):
-                raise ValueError("priority_scope must be a list")
+                raise PydanticCustomError(
+                    "service_sli_priority_scope",
+                    "priority_scope must be a list",
+                )
 
             for value in priority_scope:
                 value = str(value or "").strip().lower()
 
                 if value not in SERVICE_SLI_PRIORITY_VALUES:
-                    raise ValueError("priority_scope values must be one of p1, p2, p3, p4")
+                    raise PydanticCustomError(
+                        "service_sli_priority_scope",
+                        "priority_scope values must be one of p1, p2, p3, p4",
+                    )
 
                 if value not in normalized:
                     normalized.append(value)
 
         if self.sli_type in SERVICE_IMPACT_SLI_TYPES and not normalized:
-            raise ValueError("Impact SLI requires priority_scope")
+            raise PydanticCustomError(
+                "service_sli_priority_scope",
+                "Impact SLI requires priority_scope",
+            )
 
         if normalized:
             configuration["priority_scope"] = normalized

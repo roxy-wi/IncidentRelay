@@ -3,6 +3,7 @@ from __future__ import annotations
 import logging
 
 from pydantic import BaseModel, field_validator
+from pydantic_core import PydanticCustomError
 
 from app.services.validation import (
     make_json_safe,
@@ -19,6 +20,18 @@ class _ExplodingBody(BaseModel):
     @classmethod
     def reject_name(cls, value):
         raise ValueError("database password is release-secret")
+
+
+class _PublicValidationBody(BaseModel):
+    name: str
+
+    @field_validator("name")
+    @classmethod
+    def reject_name(cls, value):
+        raise PydanticCustomError(
+            "public_validation",
+            "name must satisfy the public validation rule",
+        )
 
 
 def test_safe_exception_response_returns_only_generic_client_message(app, caplog):
@@ -81,6 +94,25 @@ def test_validation_error_does_not_expose_validator_exception(app):
 
     assert "release-secret" not in body
     assert "Traceback" not in body
+
+
+def test_validation_error_preserves_explicit_public_custom_message(app):
+    @app.post("/_release/public-validation")
+    def public_validation_route():
+        payload, error = validate_body(_PublicValidationBody)
+        if error:
+            return error
+        return {"name": payload.name}
+
+    response = app.test_client().post(
+        "/_release/public-validation",
+        json={"name": "invalid"},
+    )
+    detail = response.get_json()["details"][0]
+
+    assert response.status_code == 400
+    assert detail["type"] == "public_validation"
+    assert detail["message"] == "name must satisfy the public validation rule"
 
 
 def test_make_json_safe_recursively_hides_exception_messages():

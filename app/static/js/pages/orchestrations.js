@@ -591,15 +591,75 @@ function orchestrationPathDecode(value) {
     return JSON.parse(decodeURIComponent(escape(atob(value))));
 }
 
+function orchestrationConditionOperatorLabel(operator) {
+    return i18n.t(
+        "orchestrations.rule_editor.operator_" + operator,
+        {},
+        String(operator || "").replace(/_/g, " ")
+    );
+}
+
+function orchestrationConditionEditorHeader() {
+    return $("<div>")
+        .addClass("orchestration-condition-editor-header")
+        .append(
+            orchestrationEditorColumnHeader(
+                "orchestrations.rule_editor.condition_field",
+                "orchestrations.rule_editor.condition_field_help"
+            ),
+            orchestrationEditorColumnHeader(
+                "orchestrations.rule_editor.condition_operator",
+                "orchestrations.rule_editor.condition_operator_help"
+            ),
+            orchestrationEditorColumnHeader(
+                "orchestrations.rule_editor.condition_value",
+                "orchestrations.rule_editor.condition_value_help"
+            ),
+            $("<span>").attr("aria-hidden", "true")
+        );
+}
+
 function orchestrationConditionLeaf(node, path) {
     const encoded = orchestrationPathEncode(path);
+    const fieldHelp = i18n.t("orchestrations.rule_editor.condition_field_help");
+    const operatorHelp = i18n.t("orchestrations.rule_editor.condition_operator_help");
+    const valueHelp = i18n.t("orchestrations.rule_editor.condition_value_help");
+    const removeLabel = i18n.t("orchestrations.rule_editor.remove_condition");
     const row = $("<div>").addClass("orchestration-condition-leaf").attr("data-condition-path", encoded);
-    const field = $("<input>").addClass("input orchestration-condition-field").val(node.field || "labels.").attr({placeholder: "labels.environment", list: "orchestration-field-options"});
-    const operator = $("<select>").addClass("input orchestration-condition-operator");
-    ORCHESTRATION_CONDITION_OPERATORS.forEach(function (item) { operator.append($("<option>").val(item).text(item)); });
+    const field = $("<input>")
+        .addClass("input orchestration-condition-field")
+        .val(node.field || "labels.")
+        .attr({
+            placeholder: "labels.environment",
+            list: "orchestration-field-options",
+            title: fieldHelp,
+            "aria-label": i18n.t("orchestrations.rule_editor.condition_field")
+        });
+    const operator = $("<select>")
+        .addClass("input orchestration-condition-operator")
+        .attr({
+            title: operatorHelp,
+            "aria-label": i18n.t("orchestrations.rule_editor.condition_operator")
+        });
+    ORCHESTRATION_CONDITION_OPERATORS.forEach(function (item) {
+        operator.append($("<option>").val(item).text(orchestrationConditionOperatorLabel(item)));
+    });
     operator.val(node.operator || "equals");
-    const value = $("<input>").addClass("input orchestration-condition-value").val(Object.prototype.hasOwnProperty.call(node, "value") ? (typeof node.value === "string" ? node.value : JSON.stringify(node.value)) : "");
-    const remove = $("<button>").addClass("btn btn-compact btn-danger").attr("data-condition-remove", encoded).text("×");
+    const value = $("<input>")
+        .addClass("input orchestration-condition-value")
+        .val(Object.prototype.hasOwnProperty.call(node, "value") ? (typeof node.value === "string" ? node.value : JSON.stringify(node.value)) : "")
+        .attr({
+            title: valueHelp,
+            "aria-label": i18n.t("orchestrations.rule_editor.condition_value")
+        });
+    const remove = $("<button>")
+        .addClass("btn btn-compact btn-danger")
+        .attr({
+            "data-condition-remove": encoded,
+            title: removeLabel,
+            "aria-label": removeLabel
+        })
+        .text("×");
     row.append(field, operator, value, remove);
     return row;
 }
@@ -610,15 +670,42 @@ function orchestrationConditionGroup(node, path) {
     const encoded = orchestrationPathEncode(path);
     const group = $("<div>").addClass("orchestration-condition-group").attr("data-condition-path", encoded);
     const header = $("<div>").addClass("orchestration-condition-group-header");
-    const select = $("<select>").addClass("input orchestration-condition-logical");
-    ["all", "any", "none"].forEach(function (item) { select.append($("<option>").val(item).text(item.toUpperCase())); });
+    const groupModeHelp = i18n.t("orchestrations.rule_editor.condition_group_mode_help");
+    const select = $("<select>")
+        .addClass("input orchestration-condition-logical")
+        .attr({
+            title: groupModeHelp,
+            "aria-label": i18n.t("orchestrations.rule_editor.condition_group_mode")
+        });
+    ["all", "any", "none"].forEach(function (item) {
+        select.append(
+            $("<option>")
+                .val(item)
+                .text(i18n.t("orchestrations.rule_editor.condition_" + item))
+        );
+    });
     select.val(logical);
     header.append(select,
         $("<button>").addClass("btn btn-compact").attr("data-condition-add-leaf", encoded).text("+ " + i18n.t("orchestrations.rule_editor.condition")),
         $("<button>").addClass("btn btn-compact").attr("data-condition-add-group", encoded).text("+ " + i18n.t("orchestrations.rule_editor.group"))
     );
-    if (path.length) { header.append($("<button>").addClass("btn btn-compact btn-danger").attr("data-condition-remove", encoded).text("×")); }
+    if (path.length) {
+        const removeGroupLabel = i18n.t("orchestrations.rule_editor.remove_condition_group");
+        header.append(
+            $("<button>")
+                .addClass("btn btn-compact btn-danger")
+                .attr({
+                    "data-condition-remove": encoded,
+                    title: removeGroupLabel,
+                    "aria-label": removeGroupLabel
+                })
+                .text("×")
+        );
+    }
     const children = $("<div>").addClass("orchestration-condition-children");
+    if (!path.length) {
+        children.append(orchestrationConditionEditorHeader());
+    }
     asArray(node[logical]).forEach(function (child, index) {
         const childPath = path.concat([{key: logical, index: index}]);
         const childLogical = child && ["all", "any", "none"].some(function (key) { return Object.prototype.hasOwnProperty.call(child, key); });
@@ -701,9 +788,72 @@ function orchestrationCatalogOptions(type) {
     return asArray(orchestrationCatalogCache && orchestrationCatalogCache[map[type]]);
 }
 
+function orchestrationEditorColumnHeader(labelKey, helpKey) {
+    const helpText = i18n.t(helpKey);
+
+    return $("<div>")
+        .addClass("orchestration-editor-column-header")
+        .append(
+            $("<span>").text(i18n.t(labelKey)),
+            $("<span>")
+                .addClass("orchestration-editor-column-help")
+                .attr({
+                    title: helpText,
+                    "aria-label": helpText,
+                    tabindex: 0
+                })
+                .text("?")
+        );
+}
+
+function orchestrationActionEditorHeader() {
+    return $("<div>")
+        .addClass("orchestration-action-editor-header")
+        .append(
+            orchestrationEditorColumnHeader(
+                "orchestrations.rule_editor.action_type",
+                "orchestrations.rule_editor.action_type_help"
+            ),
+            orchestrationEditorColumnHeader(
+                "orchestrations.rule_editor.parameters",
+                "orchestrations.rule_editor.parameters_help"
+            ),
+            orchestrationEditorColumnHeader(
+                "orchestrations.rule_editor.on_failure",
+                "orchestrations.rule_editor.on_failure_help"
+            ),
+            $("<span>").attr("aria-hidden", "true")
+        );
+}
+
+function orchestrationActionFailureEditor(action) {
+    const helpText = i18n.t("orchestrations.rule_editor.on_failure_help");
+
+    return $("<select>")
+        .addClass("input orchestration-action-failure")
+        .attr({
+            title: helpText,
+            "aria-label": i18n.t("orchestrations.rule_editor.on_failure")
+        })
+        .append(
+            $("<option>")
+                .val("continue")
+                .text(i18n.t("orchestrations.rule_editor.failure_continue")),
+            $("<option>")
+                .val("stop_rule")
+                .text(i18n.t("orchestrations.rule_editor.failure_stop_rule")),
+            $("<option>")
+                .val("stop_orchestration")
+                .text(i18n.t("orchestrations.rule_editor.failure_stop_orchestration"))
+        )
+        .val(action.on_failure || "continue");
+}
+
 function orchestrationActionParamEditor(action, index) {
     const type = action.type || "set_title";
-    const container = $("<div>").addClass("orchestration-action-params");
+    const container = $("<div>")
+        .addClass("orchestration-action-params")
+        .attr("aria-label", i18n.t("orchestrations.rule_editor.parameters"));
     const textActions = ["set_title", "set_message", "set_description", "set_severity", "set_priority", "set_dedup_key", "set_group_key", "add_note"];
     const referenceActions = ["set_team", "set_route", "set_service", "set_escalation_policy", "set_notification_policy", "set_priority_policy", "enqueue_webhook"];
     if (type === "extract_regex") {
@@ -803,12 +953,6 @@ function orchestrationActionParamEditor(action, index) {
             $("<input>").addClass("input orchestration-action-reason").attr("placeholder", "reason").val(action.reason || "")
         );
     }
-    const failure = $("<select>").addClass("input orchestration-action-failure").append(
-        $("<option>").val("continue").text("continue"),
-        $("<option>").val("stop_rule").text("stop_rule"),
-        $("<option>").val("stop_orchestration").text("stop_orchestration")
-    ).val(action.on_failure || "continue");
-    container.append(failure);
     return container;
 }
 
@@ -816,11 +960,35 @@ function renderOrchestrationActionEditor() {
     const target = $("#orchestration-action-editor").empty();
     const actions = asArray(orchestrationRuleBuffer.actions);
     if (!actions.length) { target.append($("<div>").addClass("details-empty").text(i18n.t("orchestrations.rules.no_actions"))); return; }
+
+    target.append(orchestrationActionEditorHeader());
+
     actions.forEach(function (action, index) {
         const row = $("<div>").addClass("orchestration-action-row").attr("data-action-index", index);
-        const select = $("<select>").addClass("input orchestration-action-type");
+        const actionTypeHelp = i18n.t("orchestrations.rule_editor.action_type_help");
+        const select = $("<select>")
+            .addClass("input orchestration-action-type")
+            .attr({
+                title: actionTypeHelp,
+                "aria-label": i18n.t("orchestrations.rule_editor.action_type")
+            });
+        const removeLabel = i18n.t("orchestrations.rule_editor.remove_action");
+        const remove = $("<button>")
+            .addClass("btn btn-compact btn-danger")
+            .attr({
+                "data-action-remove": index,
+                title: removeLabel,
+                "aria-label": removeLabel
+            })
+            .text("×");
+
         orchestrationActionOptions(select, action.type);
-        row.append(select, orchestrationActionParamEditor(action, index), $("<button>").addClass("btn btn-compact btn-danger").attr("data-action-remove", index).text("×"));
+        row.append(
+            select,
+            orchestrationActionParamEditor(action, index),
+            orchestrationActionFailureEditor(action),
+            remove
+        );
         target.append(row);
     });
 }

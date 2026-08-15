@@ -4,6 +4,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from dateutil.rrule import rrulestr
 from pydantic import Field, field_validator, model_validator
+from pydantic_core import PydanticCustomError
 
 from app.api.schemas.base import ApiModel
 from app.modules.common import as_naive_datetime
@@ -51,7 +52,10 @@ def validate_rrule_value(value):
         return None
 
     if "\n" in text or "\r" in text:
-        raise ValueError("rrule must be a single RRULE value")
+        raise PydanticCustomError(
+            "maintenance_rrule",
+            "rrule must be a single RRULE value",
+        )
 
     if text.upper().startswith("RRULE:"):
         text = text.split(":", 1)[1].strip()
@@ -59,7 +63,10 @@ def validate_rrule_value(value):
     try:
         rrulestr(text)
     except (TypeError, ValueError) as exc:
-        raise ValueError("rrule must be a valid RFC5545 RRULE") from exc
+        raise PydanticCustomError(
+            "maintenance_rrule",
+            "rrule must be a valid RFC5545 RRULE",
+        ) from exc
 
     return text
 
@@ -80,7 +87,14 @@ class MaintenanceWindowScopeSchema(ApiModel):
         required_value = getattr(self, required_field)
 
         if not required_value:
-            raise ValueError(f"{required_field} is required for {self.scope_type} scope")
+            raise PydanticCustomError(
+                "maintenance_scope_target",
+                "{required_field} is required for {scope_type} scope",
+                {
+                    "required_field": required_field,
+                    "scope_type": self.scope_type,
+                },
+            )
 
         return self
 
@@ -121,7 +135,10 @@ class MaintenanceWindowBaseSchema(ApiModel):
         try:
             ZoneInfo(value)
         except ZoneInfoNotFoundError as exc:
-            raise ValueError("timezone must be a valid IANA timezone") from exc
+            raise PydanticCustomError(
+                "maintenance_timezone",
+                "timezone must be a valid IANA timezone",
+            ) from exc
 
         return value
 
@@ -138,17 +155,24 @@ class MaintenanceWindowBaseSchema(ApiModel):
     @model_validator(mode="after")
     def validate_time_range_and_rrule(self):
         if self.ends_at <= self.starts_at:
-            raise ValueError("ends_at must be greater than starts_at")
+            raise PydanticCustomError(
+                "maintenance_time_range",
+                "ends_at must be greater than starts_at",
+            )
 
         zone = ZoneInfo(self.timezone or "UTC")
         local_now = datetime.now(zone).replace(tzinfo=None)
 
         if self.ends_at <= local_now:
-            raise ValueError("ends_at must be in the future")
+            raise PydanticCustomError(
+                "maintenance_time_range",
+                "ends_at must be in the future",
+            )
 
         if self.behavior == "suppress_incident" and self.apply_to_existing:
-            raise ValueError(
-                "apply_to_existing is not supported for suppress_incident behavior"
+            raise PydanticCustomError(
+                "maintenance_behavior",
+                "apply_to_existing is not supported for suppress_incident behavior",
             )
 
         return self
@@ -186,15 +210,22 @@ class MaintenanceWindowUpdateSchema(ApiModel):
     @model_validator(mode="after")
     def validate_update_payload(self):
         if not self.model_fields_set:
-            raise ValueError("at least one field must be provided")
+            raise PydanticCustomError(
+                "maintenance_update",
+                "at least one field must be provided",
+            )
 
         if self.starts_at is not None and self.ends_at is not None:
             if self.ends_at <= self.starts_at:
-                raise ValueError("ends_at must be greater than starts_at")
+                raise PydanticCustomError(
+                "maintenance_time_range",
+                "ends_at must be greater than starts_at",
+            )
 
         if self.behavior == "suppress_incident" and self.apply_to_existing:
-            raise ValueError(
-                "apply_to_existing is not supported for suppress_incident behavior"
+            raise PydanticCustomError(
+                "maintenance_behavior",
+                "apply_to_existing is not supported for suppress_incident behavior",
             )
 
         if self.ends_at is not None:
@@ -208,7 +239,10 @@ class MaintenanceWindowUpdateSchema(ApiModel):
             local_now = datetime.now(zone).replace(tzinfo=None)
 
             if self.ends_at <= local_now:
-                raise ValueError("ends_at must be in the future")
+                raise PydanticCustomError(
+                "maintenance_time_range",
+                "ends_at must be in the future",
+            )
 
         return self
 
@@ -226,7 +260,10 @@ class MaintenanceWindowExtendSchema(ApiModel):
     @model_validator(mode="after")
     def validate_ends_at(self):
         if self.ends_at <= utc_now():
-            raise ValueError("ends_at must be in the future")
+            raise PydanticCustomError(
+                "maintenance_time_range",
+                "ends_at must be in the future",
+            )
 
         return self
 

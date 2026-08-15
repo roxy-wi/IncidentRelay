@@ -21,8 +21,14 @@
 .orchestration-condition-group-header { flex-wrap: wrap; margin-bottom: 8px; }
 .orchestration-condition-group-header select { width: 110px; }
 .orchestration-condition-children { display: grid; gap: 8px; }
-.orchestration-condition-leaf { display: grid; grid-template-columns: minmax(160px, 1.4fr) minmax(140px, .9fr) minmax(180px, 1.4fr) auto; gap: 8px; align-items: center; }
-.orchestration-action-row { display: grid; grid-template-columns: minmax(180px, .8fr) minmax(300px, 2fr) auto; border: 1px solid var(--border-color, #dfe4ea); border-radius: 10px; padding: 10px; }
+.orchestration-condition-editor-header, .orchestration-condition-leaf { display: grid; grid-template-columns: minmax(160px, 1.4fr) minmax(140px, .9fr) minmax(180px, 1.4fr) auto; gap: 8px; align-items: center; }
+.orchestration-condition-editor-header { padding: 0; }
+.orchestration-action-editor-header, .orchestration-action-row { display: grid; grid-template-columns: minmax(180px, .8fr) minmax(300px, 2fr) minmax(180px, .8fr) auto; gap: 8px; align-items: center; }
+.orchestration-action-editor-header { padding: 0 10px; }
+.orchestration-editor-column-header { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 12px; font-weight: 600; color: var(--muted, #667085); }
+.orchestration-editor-column-help { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border: 1px solid currentColor; border-radius: 50%; font-size: 11px; font-weight: 700; line-height: 1; cursor: help; opacity: .75; }
+.orchestration-editor-column-help:focus { outline: 2px solid currentColor; outline-offset: 2px; opacity: 1; }
+.orchestration-action-row { border: 1px solid var(--border-color, #dfe4ea); border-radius: 10px; padding: 10px; }
 .orchestration-action-params { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
 .orchestration-message { padding: 12px; border-radius: 8px; white-space: pre-wrap; margin-bottom: 12px; }
 .orchestration-message.validation-success { background: #ecfdf3; color: #027a48; border: 1px solid #abefc6; }
@@ -46,6 +52,7 @@ body.md-theme #orchestration-webhook-modal .app-modal-dialog-wide,
 .status-badge.status-muted { background: #f2f4f7; color: #475467; }
 .status-badge.status-active { background: #ecfdf3; color: #027a48; }
 @media (max-width: 900px) {
+  .orchestration-condition-editor-header, .orchestration-action-editor-header { display: none; }
   .orchestration-condition-leaf, .orchestration-action-row { grid-template-columns: 1fr; }
   .orchestration-rule-card-body > div { grid-template-columns: 1fr; }
   .orchestration-webhook-grid, .orchestration-webhook-options { grid-template-columns: 1fr; }
