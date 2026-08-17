@@ -1,0 +1,5 @@
+ruff==0.16.0
+bandit==1.9.4
+pytest-randomly==4.1.0
+mypy==2.3.0
+vulture==2.16
