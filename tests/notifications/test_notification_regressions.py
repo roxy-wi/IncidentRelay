@@ -21,7 +21,6 @@ from tests.factories import (
     create_team,
     create_user,
 )
-from app.modules.common import utc_now
 
 
 def _create_alert_route(*, rotation=None):

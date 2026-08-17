@@ -1,10 +1,13 @@
 from datetime import timedelta
+from types import SimpleNamespace
 
 from app.modules.common import utc_now
-from app.modules.db import alerts_repo
+from app.modules.db import alerts_repo, incidents_repo
 from app.modules.db.models import AlertEvent, AlertGroup
 from app.settings import Config
 from app.services.alerts.lifecycle import upsert_alert
+from app.services.incidents.priority_policies.resolver import PriorityResolution
+import app.services.alerts.lifecycle as alert_lifecycle
 import app.services.alerts.notification_queue as notification_queue
 from tests.factories import create_group, create_route, create_team
 
@@ -419,6 +422,96 @@ def test_multi_field_route_keeps_default_reopen_behavior(db):
     assert group2.acknowledged_at is None
 
 
+def test_manual_priority_prevents_correlated_child_from_reopening_group(db):
+    route = _route(group_by=["labels.incident_key"])
+    initial = upsert_alert(
+        _alert(
+            route,
+            "DiskUsageGrowing",
+            "host1",
+            severity="warning",
+            incident_key="host/node/host1",
+        )
+    )
+    group = initial.group
+    original_priority = group.priority_slug
+    group.priority_set_manually = True
+    group.save()
+    alerts_repo.acknowledge_alert_group(group.id)
+
+    result = upsert_alert(
+        _alert(
+            route,
+            "DiskUsageCritical",
+            "host1",
+            incident_key="host/node/host1",
+        )
+    )
+
+    assert result.group.status == "acknowledged"
+    assert result.group.priority_slug == original_priority
+    assert result.group.priority_set_manually is True
+
+
+def test_initial_only_priority_prevents_correlated_child_reopen(db, monkeypatch):
+    route = _route(group_by=["labels.incident_key"])
+    initial = upsert_alert(
+        _alert(
+            route,
+            "DiskUsageGrowing",
+            "host1",
+            severity="warning",
+            incident_key="host/node/host1",
+        )
+    )
+    original_priority = initial.group.priority_slug
+    alerts_repo.acknowledge_alert_group(initial.group.id)
+    p1 = incidents_repo.get_priority_by_slug("p1")
+
+    monkeypatch.setattr(
+        alert_lifecycle,
+        "resolve_incident_priority",
+        lambda *args, **kwargs: PriorityResolution(
+            priority=p1,
+            source="test",
+            update_mode="initial_only",
+        ),
+    )
+
+    result = upsert_alert(
+        _alert(
+            route,
+            "DiskUsageCritical",
+            "host1",
+            incident_key="host/node/host1",
+        )
+    )
+
+    assert result.group.status == "acknowledged"
+    assert result.group.priority_slug == original_priority
+
+
+def test_orchestration_group_key_override_keeps_default_reopen_behavior():
+    group = SimpleNamespace(
+        priority_order=1,
+        priority_set_manually=False,
+        common_labels={"incident_key": "host/node/host1"},
+    )
+    route = SimpleNamespace(group_by=["labels.incident_key"])
+    resolution = PriorityResolution(
+        priority=SimpleNamespace(level=1),
+        source="test",
+    )
+
+    assert alert_lifecycle._should_reopen_acknowledged_group(
+        group,
+        {"labels": {"incident_key": "host/node/host1"}},
+        resolution,
+        route,
+        group_key_overridden=True,
+    )
+
+
 def test_higher_priority_correlated_child_reopens_acknowledged_group(db):
     route = _route(group_by=["labels.incident_key"])
 
@@ -434,6 +527,7 @@ def test_higher_priority_correlated_child_reopens_acknowledged_group(db):
     group1 = result.group
 
     group1.next_escalation_at = utc_now() - timedelta(minutes=5)
+    group1.last_escalated_at = utc_now() - timedelta(minutes=10)
     group1.reminder_count = 4
     group1.save()
     alerts_repo.acknowledge_alert_group(group1.id)
@@ -453,6 +547,7 @@ def test_higher_priority_correlated_child_reopens_acknowledged_group(db):
     assert group2.priority_slug == "p1"
     assert group2.acknowledged_at is None
     assert group2.next_escalation_at is None
+    assert group2.last_escalated_at is None
     assert group2.reminder_count == 0
     assert AlertEvent.select().where(
         (AlertEvent.group == group2.id)

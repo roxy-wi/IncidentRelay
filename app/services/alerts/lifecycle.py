@@ -54,8 +54,16 @@ INCIDENT_KEY_GROUP_FIELDS = {
 }
 
 
-def _new_alert_raises_incident_priority(group, priority):
-    """Return whether a new child is more urgent than the acknowledged group."""
+def _new_alert_raises_incident_priority(group, priority_resolution):
+    """Return whether a new child can raise the effective incident priority."""
+
+    if getattr(group, "priority_set_manually", False):
+        return False
+
+    if getattr(priority_resolution, "update_mode", None) == "initial_only":
+        return False
+
+    priority = getattr(priority_resolution, "priority", None)
 
     current_order = getattr(group, "priority_order", None)
     incoming_order = getattr(priority, "level", None)
@@ -66,8 +74,17 @@ def _new_alert_raises_incident_priority(group, priority):
     return incoming_order < current_order
 
 
-def _same_correlated_incident(group, alert_data, route):
+def _same_correlated_incident(
+    group,
+    alert_data,
+    route,
+    *,
+    group_key_overridden=False,
+):
     """Return whether the new child belongs to the acknowledged fault domain."""
+
+    if group_key_overridden:
+        return False
 
     group_by = getattr(route, "group_by", None) or []
 
@@ -87,13 +104,25 @@ def _same_correlated_incident(group, alert_data, route):
     return bool(group_incident_key) and group_incident_key == incoming_incident_key
 
 
-def _should_reopen_acknowledged_group(group, alert_data, priority, route):
+def _should_reopen_acknowledged_group(
+    group,
+    alert_data,
+    priority_resolution,
+    route,
+    *,
+    group_key_overridden=False,
+):
     """Keep correlated updates sticky unless they raise incident priority."""
 
-    if _new_alert_raises_incident_priority(group, priority):
+    if _new_alert_raises_incident_priority(group, priority_resolution):
         return True
 
-    return not _same_correlated_incident(group, alert_data, route)
+    return not _same_correlated_incident(
+        group,
+        alert_data,
+        route,
+        group_key_overridden=group_key_overridden,
+    )
 
 
 def _route_for_runtime(alert_data, runtime, *, current_route=None):
@@ -923,11 +952,15 @@ def _upsert_alert(alert_data, trace, runtime=None):
         and _should_reopen_acknowledged_group(
             group,
             alert_data,
-            priority,
+            priority_resolution,
             route,
+            group_key_overridden=bool(runtime and runtime.group_key),
         )
     ):
-        priority_increased = _new_alert_raises_incident_priority(group, priority)
+        priority_increased = _new_alert_raises_incident_priority(
+            group,
+            priority_resolution,
+        )
 
         group.previous_status = group.status
         group.status = "firing"
@@ -942,6 +975,7 @@ def _upsert_alert(alert_data, trace, runtime=None):
             group.rotation = rotation
             group.assignee = assignee
             group.next_escalation_at = next_escalation_at
+            group.last_escalated_at = None
             group.escalation_level = 0
             group.escalation_repeat_count = 0
             group.reminder_count = 0
