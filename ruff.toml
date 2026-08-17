@@ -1,0 +1,17 @@
+target-version = "py310"
+
+[lint]
+# Bug-oriented rules only. Formatting/style can be introduced separately.
+select = [
+    "E9",
+    "F",
+    "B",
+    "PLE",
+]
+ignore = [
+    # Pydantic schemas intentionally use Field(...) in class definitions.
+    "B008",
+]
+
+[lint.per-file-ignores]
+"__init__.py" = ["F401"]
