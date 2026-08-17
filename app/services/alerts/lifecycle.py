@@ -45,9 +45,55 @@ from app.services.silences import find_active_silences, record_new_alert_silence
 from app.services.alerts.correlation import refresh_alert_group_correlations, refresh_alert_group_correlations_safely
 from app.services.business_services.impact import refresh_business_impacts_safely_for_group
 from app.services.business_services.status import refresh_business_services_safely_for_technical_service
-from app.modules.common import utc_now
 
 logger = logging.getLogger("oncall.alerts")
+INCIDENT_KEY_LABEL = "incident_key"
+INCIDENT_KEY_GROUP_FIELDS = {
+    INCIDENT_KEY_LABEL,
+    f"labels.{INCIDENT_KEY_LABEL}",
+}
+
+
+def _new_alert_raises_incident_priority(group, priority):
+    """Return whether a new child is more urgent than the acknowledged group."""
+
+    current_order = getattr(group, "priority_order", None)
+    incoming_order = getattr(priority, "level", None)
+
+    if current_order is None or incoming_order is None:
+        return False
+
+    return incoming_order < current_order
+
+
+def _same_correlated_incident(group, alert_data, route):
+    """Return whether the new child belongs to the acknowledged fault domain."""
+
+    group_by = getattr(route, "group_by", None) or []
+
+    if (
+        len(group_by) != 1
+        or str(group_by[0]).strip() not in INCIDENT_KEY_GROUP_FIELDS
+    ):
+        return False
+
+    group_labels = getattr(group, "common_labels", None) or {}
+    incoming_labels = alert_data.get("labels") or {}
+    group_incident_key = str(group_labels.get(INCIDENT_KEY_LABEL) or "").strip()
+    incoming_incident_key = str(
+        incoming_labels.get(INCIDENT_KEY_LABEL) or ""
+    ).strip()
+
+    return bool(group_incident_key) and group_incident_key == incoming_incident_key
+
+
+def _should_reopen_acknowledged_group(group, alert_data, priority, route):
+    """Keep correlated updates sticky unless they raise incident priority."""
+
+    if _new_alert_raises_incident_priority(group, priority):
+        return True
+
+    return not _same_correlated_incident(group, alert_data, route)
 
 
 def _route_for_runtime(alert_data, runtime, *, current_route=None):
@@ -871,11 +917,35 @@ def _upsert_alert(alert_data, trace, runtime=None):
             group,
             maintenance_decision,
         )
-    elif group.status == "acknowledged" and status == "firing":
+    elif (
+        group.status == "acknowledged"
+        and status == "firing"
+        and _should_reopen_acknowledged_group(
+            group,
+            alert_data,
+            priority,
+            route,
+        )
+    ):
+        priority_increased = _new_alert_raises_incident_priority(group, priority)
+
         group.previous_status = group.status
         group.status = "firing"
         group.acknowledged_by = None
         group.acknowledged_at = None
+
+        if priority_increased:
+            # Start a fresh escalation cycle for a material deterioration.
+            # Reusing a pre-ACK due time could immediately page a later step.
+            group.escalation_policy = policy
+            group.escalation_rule = policy_rule
+            group.rotation = rotation
+            group.assignee = assignee
+            group.next_escalation_at = next_escalation_at
+            group.escalation_level = 0
+            group.escalation_repeat_count = 0
+            group.reminder_count = 0
+
         group.updated_at = now
         group.save()
 
@@ -884,7 +954,7 @@ def _upsert_alert(alert_data, trace, runtime=None):
         alerts_repo.create_alert_event(
             group_id=group.id,
             event_type="reopened",
-            message="New alert received in acknowledged incident",
+            message="New alert requires reopening acknowledged incident",
         )
     else:
         trace.group_reused(group)

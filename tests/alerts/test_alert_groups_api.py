@@ -1,12 +1,12 @@
-from datetime import datetime, timedelta
+from datetime import timedelta
 
+from app.modules.common import utc_now
 from app.modules.db import alerts_repo
-from app.modules.db.models import AlertGroup
+from app.modules.db.models import AlertEvent, AlertGroup
 from app.settings import Config
 from app.services.alerts.lifecycle import upsert_alert
 import app.services.alerts.notification_queue as notification_queue
 from tests.factories import create_group, create_route, create_team
-from app.modules.common import utc_now
 
 
 def _route(group_by):
@@ -20,7 +20,23 @@ def _route(group_by):
     )
 
 
-def _alert(route, name, instance, status="firing"):
+def _alert(
+    route,
+    name,
+    instance,
+    status="firing",
+    severity="critical",
+    incident_key=None,
+):
+    labels = {
+        "alertname": name,
+        "severity": severity,
+        "instance": instance,
+    }
+
+    if incident_key:
+        labels["incident_key"] = incident_key
+
     return {
         "source": "webhook",
         "forced_route_id": route.id,
@@ -29,12 +45,8 @@ def _alert(route, name, instance, status="firing"):
         "status": status,
         "title": name,
         "message": f"{name} on {instance}",
-        "severity": "critical",
-        "labels": {
-            "alertname": name,
-            "severity": "critical",
-            "instance": instance,
-        },
+        "severity": severity,
+        "labels": labels,
         "payload": {},
     }
 
@@ -317,6 +329,121 @@ def test_new_child_alert_reopens_acknowledged_group(db):
     assert group1.id == group2.id
     assert group2.status == "firing"
     assert group2.acknowledged_at is None
+    assert AlertEvent.select().where(
+        (AlertEvent.group == group2.id)
+        & (AlertEvent.event_type == "reopened")
+    ).exists()
+
+
+def test_same_or_lower_priority_correlated_child_preserves_acknowledged_group(db):
+    route = _route(group_by=["labels.incident_key"])
+
+    result = upsert_alert(
+        _alert(
+            route,
+            "DiskUsageCritical",
+            "host1",
+            incident_key="host/node/host1",
+        )
+    )
+    group1 = result.group
+
+    acknowledged = alerts_repo.acknowledge_alert_group(group1.id)
+    acknowledged_at = acknowledged.acknowledged_at
+    result = upsert_alert(
+        _alert(
+            route,
+            "DiskUsageGrowing",
+            "host1",
+            severity="warning",
+            incident_key="host/node/host1",
+        )
+    )
+    group2 = result.group
+
+    assert result.created_group is False
+    assert group1.id == group2.id
+    assert group2.status == "acknowledged"
+    assert group2.priority_slug == "p1"
+    assert group2.acknowledged_at == acknowledged_at
+    assert group2.notification_pending is False
+    assert not AlertEvent.select().where(
+        (AlertEvent.group == group2.id)
+        & (AlertEvent.event_type == "reopened")
+    ).exists()
+
+
+def test_multi_field_route_keeps_default_reopen_behavior(db):
+    route = _route(
+        group_by=["labels.incident_key", "labels.instance"],
+    )
+
+    result = upsert_alert(
+        _alert(
+            route,
+            "DiskUsageCritical",
+            "host1",
+            incident_key="host/node/host1",
+        )
+    )
+    group1 = result.group
+
+    alerts_repo.acknowledge_alert_group(group1.id)
+    result = upsert_alert(
+        _alert(
+            route,
+            "DiskUsageStillCritical",
+            "host1",
+            incident_key="host/node/host1",
+        )
+    )
+    group2 = result.group
+
+    assert result.created_group is False
+    assert group1.id == group2.id
+    assert group2.status == "firing"
+    assert group2.acknowledged_at is None
+
+
+def test_higher_priority_correlated_child_reopens_acknowledged_group(db):
+    route = _route(group_by=["labels.incident_key"])
+
+    result = upsert_alert(
+        _alert(
+            route,
+            "DiskUsageGrowing",
+            "host1",
+            severity="warning",
+            incident_key="host/node/host1",
+        )
+    )
+    group1 = result.group
+
+    group1.next_escalation_at = utc_now() - timedelta(minutes=5)
+    group1.reminder_count = 4
+    group1.save()
+    alerts_repo.acknowledge_alert_group(group1.id)
+    result = upsert_alert(
+        _alert(
+            route,
+            "DiskUsageCritical",
+            "host1",
+            incident_key="host/node/host1",
+        )
+    )
+    group2 = result.group
+
+    assert result.created_group is False
+    assert group1.id == group2.id
+    assert group2.status == "firing"
+    assert group2.priority_slug == "p1"
+    assert group2.acknowledged_at is None
+    assert group2.next_escalation_at is None
+    assert group2.reminder_count == 0
+    assert AlertEvent.select().where(
+        (AlertEvent.group == group2.id)
+        & (AlertEvent.event_type == "reopened")
+    ).exists()
 
 
 def test_new_group_schedules_notification_instead_of_sending_immediately(db, monkeypatch):

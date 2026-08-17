@@ -1,7 +1,10 @@
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from app.db import init_database
+from app.modules.common import utc_now
+from app.modules.db import alerts_repo
 from app.modules.db.models import AlertEvent, AlertGroup, UserNotificationDelivery
+from app.services.alerts.actions import acknowledge_alert
 from app.services.alerts.lifecycle import upsert_alert
 import app.services.alerts.notification_queue as notification_queue
 import app.services.alerts.reminders as alert_reminders
@@ -251,6 +254,92 @@ def test_send_unacked_reminders_skips_group_without_initial_notification(
         )
         .exists()
     )
+
+
+def test_send_unacked_reminders_reloads_status_after_batch_selection(
+    db,
+    monkeypatch,
+):
+    group, team, route = _create_alert_route()
+    alert_group = _create_firing_alert_group(
+        route,
+        dedup_key="dedup-reminder-ack-race",
+    )
+
+    alert_group.last_notification_at = utc_now() - timedelta(minutes=10)
+    alert_group.notification_pending = False
+    alert_group.save()
+
+    stale_firing_group = AlertGroup.get_by_id(alert_group.id)
+    alerts_repo.acknowledge_alert_group(alert_group.id)
+
+    monkeypatch.setattr(
+        alert_reminders.alerts_repo,
+        "list_firing_alert_groups",
+        lambda: [stale_firing_group],
+    )
+    monkeypatch.setattr(
+        alert_reminders,
+        "notify_alert",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("acknowledged incident must not receive a reminder")
+        ),
+    )
+
+    assert alert_reminders.send_unacked_reminders() == 0
+    assert AlertGroup.get_by_id(alert_group.id).status == "acknowledged"
+
+
+def test_correlated_child_after_ack_does_not_send_reminder(db, monkeypatch):
+    _group, _team, route = _create_alert_route()
+    route.group_by = ["labels.incident_key"]
+    route.save()
+
+    def alert_payload(*, dedup_key, alertname, severity):
+        return {
+            "source": "alertmanager",
+            "forced_route_id": route.id,
+            "dedup_key": dedup_key,
+            "status": "firing",
+            "title": alertname,
+            "message": f"{alertname} on host1",
+            "severity": severity,
+            "labels": {
+                "alertname": alertname,
+                "instance": "host1",
+                "severity": severity,
+                "incident_key": "host/node/host1",
+            },
+            "payload": {},
+        }
+
+    first = upsert_alert(
+        alert_payload(
+            dedup_key="dedup-critical",
+            alertname="DiskUsageCritical",
+            severity="critical",
+        )
+    )
+    acknowledge_alert(first.group.id)
+
+    second = upsert_alert(
+        alert_payload(
+            dedup_key="dedup-warning",
+            alertname="DiskUsageGrowing",
+            severity="warning",
+        )
+    )
+
+    monkeypatch.setattr(
+        alert_reminders,
+        "notify_alert",
+        lambda *args, **kwargs: (_ for _ in ()).throw(
+            AssertionError("correlated child must not page after acknowledgement")
+        ),
+    )
+
+    assert second.group.status == "acknowledged"
+    assert alert_reminders.send_unacked_reminders() == 0
 
 
 def test_notify_alert_creates_user_notification_delivery_with_group_id(

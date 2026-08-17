@@ -119,7 +119,7 @@ Acknowledging an alert group marks the group as `acknowledged`.
 
 Child alerts are not individually acknowledged. This is intentional: the operator acknowledges the incident-level group, not every raw monitoring signal.
 
-If a new child alert arrives in an acknowledged group, IncidentRelay reopens the group as `firing`. This makes new signal visible again and prevents important new data from being hidden behind an old acknowledgement.
+If a new child alert arrives in an acknowledged group, IncidentRelay normally reopens the group as `firing`. On a route grouped only by `incident_key`, a child carrying the same non-empty value preserves `acknowledged` when its priority is the same or lower. A higher-priority child still reopens the group, so routine correlated signals do not page the on-call user again while a material escalation remains visible.
 
 ### Resolved
 
@@ -327,7 +327,7 @@ Add more fields to route `group_by`, such as `instance`, `mountpoint`, `service`
 
 ### The group was acknowledged but became firing again
 
-A new child alert arrived in the acknowledged group. IncidentRelay reopens acknowledged groups when new child alerts arrive so the new signal is visible.
+A new child alert either was not on a route grouped only by `incident_key`, did not carry the same non-empty value, or raised the incident priority. Same- or lower-priority children on such a route preserve the acknowledgement; all other new children reopen the group so the change is visible.
 
 ### A resolved notification was not sent
 

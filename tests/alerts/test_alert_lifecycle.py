@@ -1,4 +1,7 @@
-from app.modules.db.models import AlertEvent
+from datetime import timedelta
+
+from app.modules.common import utc_now
+from app.modules.db.models import AlertEvent, UserNotificationDelivery
 from app.services.alerts.actions import acknowledge_alert, resolve_alert
 from app.services.alerts.lifecycle import upsert_alert
 from tests.factories import create_group, create_route, create_team, create_user
@@ -57,6 +60,20 @@ def test_acknowledge_alert_is_idempotent(monkeypatch, db):
     group, _team, _route, alert_group, _alert = _create_firing_group()
     user = create_user("release-ack-user", group)
 
+    alert_group.notification_pending = True
+    alert_group.notification_due_at = utc_now() + timedelta(seconds=30)
+    alert_group.notification_reason = "notification"
+    alert_group.save()
+
+    pending_delivery = UserNotificationDelivery.create(
+        group=alert_group.id,
+        user=user.id,
+        method="voice_call",
+        event_type="reminder",
+        status="pending",
+        scheduled_at=utc_now() + timedelta(minutes=5),
+    )
+
     message_updates = []
     stakeholder_updates = []
 
@@ -79,6 +96,14 @@ def test_acknowledge_alert_is_idempotent(monkeypatch, db):
     assert first.status == "acknowledged"
     assert second.status == "acknowledged"
     assert second.acknowledged_by_id == user.id
+
+    stored_group = type(alert_group).get_by_id(alert_group.id)
+    stored_delivery = UserNotificationDelivery.get_by_id(pending_delivery.id)
+
+    assert stored_group.notification_pending is False
+    assert stored_group.notification_due_at is None
+    assert stored_delivery.status == "skipped"
+    assert stored_delivery.last_error == "alert_acknowledged"
 
     assert _event_count(alert_group.id, "acknowledged") == 1
     assert message_updates == [(alert_group.id, "acknowledged")]

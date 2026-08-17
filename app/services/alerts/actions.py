@@ -1,10 +1,36 @@
+from app.modules.common import utc_now
 from app.modules.db import alerts_repo, users_repo
-from app.modules.db.models import AlertGroup
+from app.modules.db.models import AlertGroup, UserNotificationDelivery
 from app.services.alerts.correlation import refresh_alert_group_correlations_safely
 from app.services.incidents.stakeholders import notify_stakeholders
 from app.services.notifications.delivery import update_alert_messages
 from app.services.business_services.impact import refresh_business_impacts_safely_for_group
 from app.services.business_services.status import refresh_business_services_safely_for_technical_service
+
+ACK_CANCELLED_EVENT_TYPES = ("notification", "reminder", "escalation")
+
+
+def _cancel_pending_acknowledged_deliveries(group):
+    """Cancel notification work that predates an acknowledgement."""
+
+    if getattr(group, "notification_pending", False):
+        alerts_repo.clear_alert_group_notification(group)
+
+    return (
+        UserNotificationDelivery
+        .update(
+            status="skipped",
+            provider_status="skipped",
+            last_error="alert_acknowledged",
+            updated_at=utc_now(),
+        )
+        .where(
+            (UserNotificationDelivery.group == group.id)
+            & (UserNotificationDelivery.status == "pending")
+            & (UserNotificationDelivery.event_type.in_(ACK_CANCELLED_EVENT_TYPES))
+        )
+        .execute()
+    )
 
 
 def acknowledge_alert(alert_id, user_id=None):
@@ -15,9 +41,11 @@ def acknowledge_alert(alert_id, user_id=None):
     # Repeated acknowledge is a no-op. This preserves the original
     # acknowledged_at/user and avoids duplicate timeline/notification effects.
     if old_status == "acknowledged":
+        _cancel_pending_acknowledged_deliveries(group_before)
         return group_before
 
     group = alerts_repo.acknowledge_alert_group(alert_id, user_id=user_id)
+    _cancel_pending_acknowledged_deliveries(group)
 
     alerts_repo.create_alert_event(
         group_id=group.id,
