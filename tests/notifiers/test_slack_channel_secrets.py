@@ -155,3 +155,53 @@ def test_slack_channel_update_does_not_expose_secret_merge_exception(
     assert "signing_secret" not in body
     assert "stored value" not in body
     assert "ValueError" not in body
+
+
+def test_non_slack_channel_credentials_are_masked():
+    cases = [
+        ("telegram", {"bot_token": "123:secret", "chat_id": "1"}, {"bot_token"}),
+        (
+            "mattermost",
+            {
+                "bot_token": "mm-secret",
+                "callback_secret": "callback-secret",
+                "webhook_url": "https://hooks.example/token",
+                "api_url": "https://mattermost.example",
+            },
+            {"bot_token", "callback_secret", "webhook_url"},
+        ),
+        ("webhook", {"webhook_url": "https://example/hook/token"}, {"webhook_url"}),
+        ("discord", {"webhook_url": "https://discord.example/token"}, {"webhook_url"}),
+        ("teams", {"webhook_url": "https://teams.example/token"}, {"webhook_url"}),
+    ]
+
+    for channel_type, raw_config, secret_keys in cases:
+        channel = SimpleNamespace(
+            id=1,
+            group=None,
+            team=None,
+            name=channel_type,
+            channel_type=channel_type,
+            config=raw_config,
+            enabled=True,
+        )
+        config = serialize_channel(channel)["config"]
+        for key in secret_keys:
+            assert config[key] == CHANNEL_SECRET_PLACEHOLDER
+
+
+def test_telegram_secret_placeholder_can_be_preserved_on_update():
+    from app.api.schemas.channels import ChannelUpdateSchema
+
+    payload = ChannelUpdateSchema.model_validate({
+        "team_id": 1,
+        "name": "Telegram",
+        "channel_type": "telegram",
+        "config": {
+            "bot_token": CHANNEL_SECRET_PLACEHOLDER,
+            "chat_id": "123",
+        },
+        "enabled": True,
+    })
+
+    assert payload.config["bot_token"] == CHANNEL_SECRET_PLACEHOLDER

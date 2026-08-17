@@ -16,6 +16,7 @@ SENSITIVE_KEY_PARTS = (
     "apikey",
     "access_key",
     "private_key",
+    "webhook_url",
 )
 
 

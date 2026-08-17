@@ -1,8 +1,7 @@
 import logging
 
-import requests
-
 from app.notifiers.base import BaseNotifier
+from app.services.outbound_http import safe_request
 from app.services.links import build_alert_web_url, build_source_event_url
 from app.services.routing.service_context import (
     get_alert_service_links,
@@ -94,7 +93,8 @@ class IncomingWebhookNotifier(BaseNotifier):
         if not webhook_url:
             raise RuntimeError("webhook_url is missing")
 
-        response = requests.post(
+        response = safe_request(
+            "POST",
             webhook_url,
             json={
                 "text": text,
@@ -166,7 +166,9 @@ class DiscordNotifier(IncomingWebhookNotifier):
         if not webhook_url:
             raise RuntimeError("webhook_url is missing")
 
-        response = requests.post(webhook_url, json={"content": text}, timeout=10)
+        response = safe_request(
+            "POST", webhook_url, json={"content": text}, timeout=10
+        )
         response.raise_for_status()
         return {"provider": self.name}
 

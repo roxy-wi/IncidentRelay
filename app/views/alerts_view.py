@@ -173,7 +173,8 @@ def ack_alert(alert_id):
         return error
 
     data = request.get_json(silent=True) or {}
-    user_id = data.get("user_id") or getattr(_request_user(), "id", None)
+    user_id = getattr(_request_user(), "id", None)
+    audit_data = {key: value for key, value in data.items() if key != "user_id"}
 
     group = acknowledge_alert(alert_id, user_id=user_id)
     write_audit(
@@ -182,7 +183,7 @@ def ack_alert(alert_id):
         object_id=group.id,
         team_id=group_before.team.id if group_before.team else None,
         user_id=user_id,
-        data=data,
+        data=audit_data,
     )
 
     return jsonify(
@@ -201,7 +202,8 @@ def resolve_alert_view(alert_id):
         return error
 
     data = request.get_json(silent=True) or {}
-    user_id = data.get("user_id") or getattr(_request_user(), "id", None)
+    user_id = getattr(_request_user(), "id", None)
+    audit_data = {key: value for key, value in data.items() if key != "user_id"}
 
     group = resolve_alert(alert_id, user_id=user_id)
     write_audit(
@@ -210,7 +212,7 @@ def resolve_alert_view(alert_id):
         object_id=group.id,
         team_id=group_before.team.id if group_before.team else None,
         user_id=user_id,
-        data=data,
+        data=audit_data,
     )
 
     return jsonify(

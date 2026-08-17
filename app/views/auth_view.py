@@ -5,11 +5,25 @@ from app.login import create_access_token, hash_password, verify_password
 from app.middleware import jwt_required
 from app.modules.db import users_repo, groups_repo
 from app.services.serializers.users import serialize_user
+from app.services.auth_throttle import (
+    clear_login_account_failures,
+    login_retry_after,
+    record_login_failure,
+)
 from app.services.validation import validate_body
 from app.settings import Config
 
 
 auth_bp = Blueprint("auth_api", __name__)
+
+
+def _login_rate_limited(retry_after):
+    response = jsonify({
+        "error": "Too many login attempts. Try again later.",
+        "retry_after_seconds": int(retry_after),
+    })
+    response.headers["Retry-After"] = str(max(int(retry_after), 1))
+    return response, 429
 
 
 @auth_bp.route("/login", methods=["POST"])
@@ -22,11 +36,21 @@ def login():
     if error:
         return error
 
+    remote_addr = request.remote_addr or "unknown"
+    retry_after = login_retry_after(payload.username, remote_addr)
+    if retry_after:
+        return _login_rate_limited(retry_after)
+
     user = users_repo.get_user_by_username(payload.username)
 
     if not user or not user.active or not verify_password(payload.password, user.password_hash):
+        record_login_failure(payload.username, remote_addr)
+        retry_after = login_retry_after(payload.username, remote_addr)
+        if retry_after:
+            return _login_rate_limited(retry_after)
         return jsonify({"error": "Invalid username or password"}), 401
 
+    clear_login_account_failures(payload.username)
     token, expires_at = create_access_token(user)
 
     response = make_response(jsonify({

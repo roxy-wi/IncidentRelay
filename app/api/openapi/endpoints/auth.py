@@ -41,6 +41,7 @@ def paths():
                 "responses": {
                     "200": {"description": "JWT token returned"},
                     "401": {"description": "Invalid username or password"},
+                    "429": {"description": "Too many login attempts; retry later"},
                 },
             }
         },

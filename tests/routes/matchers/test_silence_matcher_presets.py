@@ -22,7 +22,6 @@ def silence_payload(team, *, matcher_preset_id=None, matchers=None):
         "matchers": matchers or {},
         "starts_at": (now - timedelta(minutes=5)).isoformat(),
         "ends_at": (now + timedelta(hours=1)).isoformat(),
-        "created_by": None,
     }
 
 
@@ -55,6 +54,26 @@ def test_create_silence_with_matcher_preset(
     assert payload["matcher_preset_id"] == preset.id
     assert payload["matcher_preset"]["name"] == preset.name
     assert payload["matchers"] == {"severity": "critical"}
+
+
+def test_create_silence_rejects_client_created_by(
+    client,
+    admin_headers,
+    db,
+):
+    group = create_group(slug=unique("group"))
+    team = create_team(group, slug=unique("team"))
+    payload = silence_payload(team)
+    payload["created_by"] = 123
+
+    response = client.post(
+        "/api/silences",
+        headers=admin_headers,
+        json=payload,
+    )
+
+    assert response.status_code == 400
+    assert response.get_json()["error"] == "validation_error"
 
 
 def test_silence_rejects_matcher_preset_from_another_team(

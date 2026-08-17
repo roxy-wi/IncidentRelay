@@ -27,7 +27,7 @@ Required data:
 [voice]
 provider = stub
 providers_dir = /usr/local/lib/incidentrelay/voice_providers
-callback_secret = change-me
+callback_secret =
 ```
 
 Custom providers are documented in [Voice Providers](../voice-providers/index.md).

@@ -62,7 +62,7 @@ providers_dir = /usr/local/lib/incidentrelay/voice_providers
 
 # Global fallback secret for voice provider callbacks.
 # A channel-level callback_secret has higher priority.
-callback_secret = change-me
+callback_secret =
 ```
 
 ### provider
@@ -88,7 +88,7 @@ Global fallback secret for voice callbacks.
 Provider callback URLs use this format:
 
 ```text
-/api/integrations/voice/callback/{channel_id}/{secret}
+/api/integrations/voice/rule-callback/{delivery_id}
 ```
 
 If the channel config contains `callback_secret`, IncidentRelay uses the channel secret instead of the global one.
@@ -312,7 +312,7 @@ Callback URL that the provider should call when call status changes or DTMF digi
 Example:
 
 ```text
-https://incidentrelay.example.com/api/integrations/voice/callback/12/change-me
+https://incidentrelay.example.com/api/integrations/voice/rule-callback/1234
 ```
 
 May be `None` if callbacks are not configured.
@@ -644,7 +644,7 @@ If omitted, IncidentRelay uses global config:
 
 ```ini
 [voice]
-callback_secret = change-me
+callback_secret =
 ```
 
 ### text_template
@@ -920,7 +920,7 @@ When IncidentRelay creates a call, it passes `callback_url` to the provider.
 Example callback URL:
 
 ```text
-https://incidentrelay.example.com/api/integrations/voice/callback/12/change-me-channel-secret
+https://incidentrelay.example.com/api/integrations/voice/rule-callback/1234
 ```
 
 The provider should send call events to this URL.

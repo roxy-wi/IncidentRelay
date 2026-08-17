@@ -37,7 +37,8 @@ def test_mattermost_bot_payload_contains_action_context(db):
         context = action["integration"]["context"]
         assert context["alert_id"] == alert.id
         assert context["channel_id"] == channel.id
-        assert context["secret"] == "secret"
+        assert "secret" not in context
+        assert len(context["signature"]) == 64
 
 
 def test_mattermost_acknowledged_payload_keeps_only_resolve_action(db):
@@ -109,11 +110,12 @@ def test_discord_notifier_posts_content_payload(monkeypatch, db):
         def raise_for_status(self):
             calls.append("raise_for_status")
 
-    def fake_post(url, json, timeout):
+    def fake_request(method, url, json, timeout):
+        assert method == "POST"
         calls.append((url, json, timeout))
         return Response()
 
-    monkeypatch.setattr("app.notifiers.plugins.requests.post", fake_post)
+    monkeypatch.setattr("app.notifiers.plugins.safe_request", fake_request)
 
     result = DiscordNotifier().send(channel, alert, "discord text")
 
@@ -201,13 +203,14 @@ def test_incoming_webhook_payload_contains_incident_priority(monkeypatch, db):
         def raise_for_status(self):
             return None
 
-    def fake_post(url, json, timeout):
+    def fake_request(method, url, json, timeout):
+        assert method == "POST"
         captured["url"] = url
         captured["json"] = json
         captured["timeout"] = timeout
         return Response()
 
-    monkeypatch.setattr("app.notifiers.plugins.requests.post", fake_post)
+    monkeypatch.setattr("app.notifiers.plugins.safe_request", fake_request)
 
     result = IncomingWebhookNotifier().send(channel, alert, "plain text")
 

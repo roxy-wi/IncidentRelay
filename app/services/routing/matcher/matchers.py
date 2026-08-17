@@ -1,4 +1,86 @@
-import re
+import logging
+
+import regex
+
+
+logger = logging.getLogger("oncall.routing.matcher")
+
+MATCHER_REGEX_TIMEOUT_SECONDS = 0.05
+MATCHER_REGEX_MAX_PATTERN_LENGTH = 1024
+MATCHER_REGEX_MAX_INPUT_LENGTH = 65536
+
+
+def safe_regex_search(pattern, value):
+    """Evaluate an untrusted matcher regex with strict size and time bounds."""
+    pattern = str(pattern or "")
+    text = str(value or "")
+
+    if len(pattern) > MATCHER_REGEX_MAX_PATTERN_LENGTH:
+        return False
+    if len(text) > MATCHER_REGEX_MAX_INPUT_LENGTH:
+        return False
+
+    try:
+        return regex.search(
+            pattern,
+            text,
+            timeout=MATCHER_REGEX_TIMEOUT_SECONDS,
+        ) is not None
+    except TimeoutError:
+        logger.warning("matcher regex timed out")
+        return False
+    except regex.error:
+        return False
+
+
+def _validate_regex_pattern(pattern):
+    """Validate regex syntax without running it against attacker input."""
+    pattern = str(pattern or "")
+
+    if len(pattern) > MATCHER_REGEX_MAX_PATTERN_LENGTH:
+        raise ValueError("regex pattern is too long")
+
+    try:
+        regex.compile(pattern)
+    except regex.error as exc:
+        raise ValueError("invalid regex pattern") from exc
+
+
+def _validate_matcher_value_regexes(value):
+    if not isinstance(value, dict):
+        return
+
+    operator = value.get("op")
+    if operator is not None:
+        normalized_operator = {
+            "eq": "equals",
+            "ne": "not_equals",
+            "neq": "not_equals",
+        }.get(str(operator).strip().lower(), str(operator).strip().lower())
+        if normalized_operator == "regex":
+            _validate_regex_pattern(value.get("value"))
+
+    if "regex" in value:
+        _validate_regex_pattern(value.get("regex"))
+
+    if "not" in value:
+        _validate_matcher_value_regexes(value.get("not"))
+
+
+def validate_matcher_regexes(matchers):
+    """Raise ValueError when a matcher contains an invalid regex."""
+    normalized = normalize_matchers(matchers)
+
+    if "title_regex" in normalized:
+        _validate_regex_pattern(normalized.get("title_regex"))
+
+    for key in ("source", "title"):
+        if key in normalized:
+            _validate_matcher_value_regexes(normalized.get(key))
+
+    for container_name in ("labels", "fields"):
+        for value in (normalized.get(container_name) or {}).values():
+            _validate_matcher_value_regexes(value)
 
 
 MATCHER_STRUCTURED_KEYS = {
@@ -97,10 +179,10 @@ def match_value(actual_value, expected_value):
             expected_text = str(operator_value)
 
             if operator == "regex":
-                return re.search(
-                    str(operator_value or ""),
-                    str(actual_value or ""),
-                ) is not None
+                return safe_regex_search(
+                    operator_value,
+                    actual_value,
+                )
 
             if operator == "equals":
                 return actual_text == expected_text
@@ -117,10 +199,10 @@ def match_value(actual_value, expected_value):
             return False
 
         if "regex" in expected_value:
-            return re.search(
+            return safe_regex_search(
                 expected_value["regex"],
-                str(actual_value or ""),
-            ) is not None
+                actual_value,
+            )
 
         if "not" in expected_value:
             return not match_value(
@@ -145,10 +227,10 @@ def match_alert(alert_data, matchers):
         if key in matchers and not match_value(alert_data.get(key), matchers[key]):
             return False
 
-    if "title_regex" in matchers and re.search(
+    if "title_regex" in matchers and not safe_regex_search(
         matchers["title_regex"],
         alert_data.get("title") or "",
-    ) is None:
+    ):
         return False
 
     labels = alert_data.get("labels") or {}

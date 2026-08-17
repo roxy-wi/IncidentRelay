@@ -176,7 +176,7 @@ def place_call(self, request: VoiceCallRequest) -> VoiceCallResult:
 | `request.alert_id` | IncidentRelay alert ID |
 | `request.event_type` | Notification event type: `notification`, `reminder`, `escalation`, `test` |
 | `request.callback_url` | Callback URL for status and DTMF events |
-| `request.callback_secret` | Callback secret used in the callback URL |
+| `request.callback_secret` | Server-only callback credential; send it in `Authorization: Bearer ...` (or `X-IncidentRelay-Callback-Secret`), never in the URL |
 | `request.severity` | Alert severity |
 | `request.title` | Alert title |
 | `request.message` | Alert message |

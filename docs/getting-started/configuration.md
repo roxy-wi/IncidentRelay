@@ -39,7 +39,7 @@ The old `ONCALL_CONFIG_FILE` name should not be used.
 host = 0.0.0.0
 port = 8080
 public_base_url = https://incidentrelay.example.com
-secret_key = change-me
+secret_key =
 ```
 
 | Option | Description |
@@ -121,7 +121,7 @@ Example option names depend on the current service config implementation. Use th
 [voice]
 provider = stub
 providers_dir = /usr/local/lib/incidentrelay/voice_providers
-callback_secret = change-me
+callback_secret =
 ```
 
 | Option | Description |

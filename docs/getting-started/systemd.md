@@ -134,7 +134,7 @@ busy_timeout = 5000
 [voice]
 provider = stub
 providers_dir = /usr/local/lib/incidentrelay/voice_providers
-callback_secret = change-me
+callback_secret =
 ```
 
 For production behind Nginx or HAProxy, set `public_base_url` to the real external URL:

@@ -20,7 +20,6 @@ class SilenceCreateSchema(ApiModel):
     matchers: Dict[str, Any] = Field(default_factory=dict)
     starts_at: datetime
     ends_at: datetime
-    created_by: int | None = Field(default=None, ge=1)
     apply_to_existing: bool = False
     reactivate_on_end: bool = True
 

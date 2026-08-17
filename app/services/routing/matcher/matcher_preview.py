@@ -2,7 +2,10 @@ from peewee import JOIN
 
 from app.modules.db.models import Alert, AlertRoute, Service, Team
 from app.services.routing.matcher.match_context import build_alert_match_context
-from app.services.routing.matcher.matchers import match_alert
+from app.services.routing.matcher.matchers import (
+    match_alert,
+    validate_matcher_regexes,
+)
 
 
 DEFAULT_SCAN_LIMIT = 200
@@ -70,6 +73,8 @@ def build_matcher_preview(
     )
 
     preset_matchers = (preset.matchers or {}) if preset else {}
+    validate_matcher_regexes(preset_matchers)
+    validate_matcher_regexes(matchers or {})
     matched_count = 0
     items = []
 

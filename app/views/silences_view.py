@@ -111,6 +111,7 @@ def create_silence():
     if preset_error:
         return preset_error
 
+    actor = current_user()
     silence = silences_repo.create_silence(
         team_id=payload.team_id,
         name=payload.name,
@@ -119,7 +120,7 @@ def create_silence():
         matchers=payload.matchers,
         starts_at=payload.starts_at,
         ends_at=payload.ends_at,
-        created_by=payload.created_by,
+        created_by=getattr(actor, "id", None),
         apply_to_existing=payload.apply_to_existing,
         reactivate_on_end=payload.reactivate_on_end,
     )
@@ -176,7 +177,6 @@ def update_silence(silence_id):
             "matchers": payload.matchers,
             "starts_at": payload.starts_at,
             "ends_at": payload.ends_at,
-            "created_by": payload.created_by,
             "apply_to_existing": payload.apply_to_existing,
             "reactivate_on_end": payload.reactivate_on_end,
         },

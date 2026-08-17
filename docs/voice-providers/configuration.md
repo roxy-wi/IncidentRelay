@@ -15,7 +15,7 @@ Example:
 [voice]
 provider = stub
 providers_dir = /usr/local/lib/incidentrelay/voice_providers
-callback_secret = change-me
+callback_secret =
 text_template = IncidentRelay alert {alert_id}. {title}. Severity {severity}. {message}. Press 1 to acknowledge. Press 2 to resolve.
 dtmf_actions = {"1": "acknowledge", "2": "resolve"}
 
@@ -51,15 +51,9 @@ Recommended value:
 
 ### callback_secret
 
-Global fallback secret for voice callbacks.
+Optional dedicated secret for voice callbacks. If empty, IncidentRelay falls back to the application secret. A dedicated random value is recommended.
 
-Provider callback URLs use this format:
-
-```text
-/api/integrations/voice/callback/{channel_id}/{secret}
-```
-
-If the channel config contains `callback_secret`, IncidentRelay uses the channel secret instead of the global one.
+The secret is passed to providers as `request.callback_secret` and must be sent back in the `Authorization: Bearer ...` header (or `X-IncidentRelay-Callback-Secret`). It must never be embedded in the callback URL. Providers should use `request.callback_url` exactly as supplied by IncidentRelay.
 
 ## Provider file names
 
@@ -166,7 +160,7 @@ If omitted, IncidentRelay uses global config:
 
 ```ini
 [voice]
-callback_secret = change-me
+callback_secret =
 ```
 
 ### text_template

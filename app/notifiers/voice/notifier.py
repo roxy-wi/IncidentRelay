@@ -111,15 +111,6 @@ class VoiceCallNotifier(BaseNotifier):
         """Return callback secret for voice provider callbacks."""
         return getattr(Config, "VOICE_CALLBACK_SECRET", "")
 
-    def _callback_url(self, channel, callback_secret):
-        """Return callback URL for this voice channel."""
-        if not callback_secret:
-            return None
-        return (
-            f"{Config.PUBLIC_BASE_URL.rstrip()}"
-            f"/api/integrations/voice/callback/{channel.id}/{callback_secret}"
-        )
-
     def _dtmf_actions(self):
         """Return globally configured digit-to-action mapping."""
         return getattr(

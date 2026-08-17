@@ -47,7 +47,10 @@ class ChannelBaseSchema(ApiModel):
             if not bot_token or not chat_id:
                 raise ValueError("telegram channel requires bot_token and chat_id")
 
-            if ":" not in bot_token:
+            if (
+                bot_token != CHANNEL_SECRET_PLACEHOLDER
+                and ":" not in bot_token
+            ):
                 raise ValueError("telegram bot_token must contain ':'")
 
             config["bot_token"] = bot_token
@@ -153,17 +156,6 @@ class ChannelBaseSchema(ApiModel):
                 ):
                     config.pop(key, None)
 
-            if (
-                not self.allow_secret_placeholders
-                and contains_channel_secret_placeholder(
-                    self.channel_type,
-                    config,
-                )
-            ):
-                raise ValueError(
-                    "channel secret placeholders are only valid during updates"
-                )
-
         if self.channel_type in WEBHOOK_STYLE_CHANNELS and not config.get("webhook_url"):
             raise ValueError(f"{self.channel_type} channel requires webhook_url")
 
@@ -188,6 +180,14 @@ class ChannelBaseSchema(ApiModel):
                 config["html_template"] = html_template
             else:
                 config.pop("html_template", None)
+
+        if (
+            not self.allow_secret_placeholders
+            and contains_channel_secret_placeholder(self.channel_type, config)
+        ):
+            raise ValueError(
+                "channel secret placeholders are only valid during updates"
+            )
 
         self.config = config
         return self

@@ -14,6 +14,68 @@ if [ ! -f "$CONFIG_FILE" ]; then
   exit 1
 fi
 
+# The stock image config intentionally contains no reusable authentication
+# secrets. Create one persistent runtime config on the shared data volume so
+# web/scheduler/notifier processes all use the same random keys across restarts.
+if [ "$CONFIG_FILE" = "/etc/incidentrelay/incidentrelay.conf" ]; then
+  RUNTIME_CONFIG="/var/lib/incidentrelay/incidentrelay.conf"
+  python - "$CONFIG_FILE" "$RUNTIME_CONFIG" <<'PY_CONFIG'
+import configparser
+import fcntl
+import os
+import secrets
+import sys
+import tempfile
+
+source, target = sys.argv[1], sys.argv[2]
+os.makedirs(os.path.dirname(target), exist_ok=True)
+lock_path = target + ".lock"
+known_insecure = {
+    "",
+    "dev-secret-key",
+    "change-me",
+    "change-this-secret-key",
+    "change-this-jwt-secret",
+    "change-this-mattermost-action-secret",
+}
+
+with open(lock_path, "a+", encoding="utf-8") as lock_file:
+    fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
+    parser = configparser.ConfigParser()
+    parser.optionxform = str
+    parser.read(target if os.path.exists(target) else source)
+
+    def ensure_secret(section, option):
+        if not parser.has_section(section):
+            parser.add_section(section)
+        current = parser.get(section, option, fallback="").strip()
+        if current in known_insecure:
+            parser.set(section, option, secrets.token_urlsafe(48))
+
+    ensure_secret("main", "secret_key")
+    ensure_secret("main", "secret_encryption_key")
+    ensure_secret("auth", "jwt_secret")
+    ensure_secret("mattermost", "action_secret")
+    ensure_secret("voice", "callback_secret")
+
+    fd, temp_path = tempfile.mkstemp(
+        prefix="incidentrelay-conf-",
+        dir=os.path.dirname(target),
+        text=True,
+    )
+    try:
+        with os.fdopen(fd, "w", encoding="utf-8") as handle:
+            parser.write(handle)
+        os.chmod(temp_path, 0o600)
+        os.replace(temp_path, target)
+    finally:
+        if os.path.exists(temp_path):
+            os.unlink(temp_path)
+PY_CONFIG
+  CONFIG_FILE="$RUNTIME_CONFIG"
+  export INCIDENTRELAY_CONFIG_FILE="$CONFIG_FILE"
+fi
+
 echo "Using config: $CONFIG_FILE"
 echo "Starting IncidentRelay service: $SERVICE"
 

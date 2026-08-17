@@ -1,3 +1,4 @@
+import hmac
 import logging
 from datetime import datetime
 
@@ -33,11 +34,13 @@ from app.services.integrations.aws_sns import (
     confirm_aws_sns_subscription,
     validate_aws_sns_message,
 )
+from app.notifiers.mattermost.actions import verify_mattermost_action_signature
 from app.notifiers.slack.actions import (
     SlackActionError,
     handle_slack_action,
 )
 from app.modules.common import utc_now
+from app.services.rbac import can_respond_team
 
 integrations_bp = Blueprint("integrations_api", __name__)
 
@@ -528,39 +531,57 @@ def _incoming_alerts_status_code(items):
 
 @integrations_bp.route("/mattermost/actions", methods=["POST"])
 def mattermost_action():
-    """
-    Handle Mattermost interactive message button callbacks.
-    """
+    """Handle authenticated and authorized Mattermost alert actions."""
 
     payload = request.json or {}
     context = payload.get("context") or {}
     alert_id = context.get("alert_id")
     channel_id = context.get("channel_id")
     action = context.get("action")
-    secret = context.get("secret")
+    signature = context.get("signature")
 
     if not alert_id or not channel_id or action not in {"acknowledge", "resolve"}:
         return jsonify({"ephemeral_text": "Invalid action payload"}), 400
 
-    channel = channels_repo.get_channel(int(channel_id))
-    config = channel.config or {}
-    expected_secret = config.get("callback_secret") or Config.MATTERMOST_ACTION_SECRET
-
-    if secret != expected_secret:
+    try:
+        channel = channels_repo.get_channel(int(channel_id))
+        alert_group = alerts_repo.get_alert_group(int(alert_id))
+    except (DoesNotExist, TypeError, ValueError):
         return jsonify({"ephemeral_text": "Action rejected"}), 403
 
-    mattermost_user_id = payload.get("user_id")
+    config = channel.config or {}
+    signing_secret = config.get("callback_secret") or Config.MATTERMOST_ACTION_SECRET
+
+    if not verify_mattermost_action_signature(
+        signing_secret,
+        signature,
+        action,
+        alert_id,
+        channel_id,
+    ):
+        return jsonify({"ephemeral_text": "Action rejected"}), 403
+
+    if (
+        not alert_group.team_id
+        or not channel.team_id
+        or int(channel.team_id) != int(alert_group.team_id)
+    ):
+        return jsonify({"ephemeral_text": "Action rejected"}), 403
+
+    mattermost_user_id = str(payload.get("user_id") or "").strip()
     user = users_repo.get_user_by_mattermost_id(mattermost_user_id)
-    user_id = user.id if user else None
+
+    if not user or not can_respond_team(user, alert_group.team_id):
+        return jsonify({"ephemeral_text": "Action rejected"}), 403
 
     if action == "acknowledge":
-        alert = acknowledge_alert(int(alert_id), user_id=user_id)
+        alert = acknowledge_alert(int(alert_id), user_id=user.id)
         return jsonify({
             "ephemeral_text": f"Alert #{alert.id} acknowledged",
             "skip_slack_parsing": True,
         })
 
-    alert = resolve_alert(int(alert_id), user_id=user_id)
+    alert = resolve_alert(int(alert_id), user_id=user.id)
     return jsonify({
         "ephemeral_text": f"Alert #{alert.id} resolved",
         "skip_slack_parsing": True,
@@ -593,12 +614,22 @@ def slack_action():
     return jsonify(result)
 
 
-@integrations_bp.route("/voice/rule-callback/<int:delivery_id>/<secret>", methods=["POST"])
-def voice_rule_callback(delivery_id, secret):
-    """Handle voice callbacks for user notification rules."""
-    expected_secret = Config.VOICE_CALLBACK_SECRET
+@integrations_bp.route("/voice/rule-callback/<int:delivery_id>", methods=["POST"])
+def voice_rule_callback(delivery_id):
+    """Handle voice callbacks without placing credentials in the URL."""
+    expected_secret = str(Config.VOICE_CALLBACK_SECRET or "")
+    authorization = str(request.headers.get("Authorization") or "")
+    provided_secret = (
+        authorization[7:]
+        if authorization.startswith("Bearer ")
+        else str(request.headers.get("X-IncidentRelay-Callback-Secret") or "")
+    )
 
-    if not expected_secret or secret != expected_secret:
+    if (
+        not expected_secret
+        or not provided_secret
+        or not hmac.compare_digest(provided_secret, expected_secret)
+    ):
         return jsonify({"error": "voice callback rejected"}), 403
 
     delivery = UserNotificationDelivery.get_or_none(

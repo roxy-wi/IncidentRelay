@@ -10,6 +10,7 @@ from app.settings import Config
 from app.db import database_proxy as db
 from app.modules.db import alerts_repo, channels_repo, users_repo
 from app.services.alerts.actions import acknowledge_alert, resolve_alert
+from app.services.rbac import can_respond_team
 from app.notifiers.telegram.templates import format_telegram_alert_message
 from app.notifiers.telegram.actions import parse_telegram_action_data
 from app.notifiers.telegram.bot import (
@@ -282,6 +283,21 @@ def handle_telegram_callback(channel, callback):
 
         alert_id = int(action_data["alert_id"])
         action = action_data["action"]
+        alert_group = alerts_repo.get_alert_group(alert_id)
+
+        if (
+            not alert_group.team_id
+            or not getattr(channel, "team_id", None)
+            or int(channel.team_id) != int(alert_group.team_id)
+            or not can_respond_team(user, alert_group.team_id)
+        ):
+            answer_telegram_callback(
+                channel,
+                callback.id,
+                "You are not authorized to act on this alert",
+                show_alert=True,
+            )
+            return
 
         if action == "acknowledge":
             alert = acknowledge_alert(alert_id, user_id=user.id)

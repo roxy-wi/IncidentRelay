@@ -23,7 +23,8 @@ serviceAccount:
 # (secret_key, database password, SMTP password, VAPID keys, ...).
 config:
   main:
-    secret_key: change-me
+    # Required unless existingConfigSecret is used. Generate with: openssl rand -hex 32
+    secret_key: ""
   server:
     host: 0.0.0.0
     port: 8080
@@ -45,6 +46,10 @@ config:
   sqlite:
     wal: true
     busy_timeout: 5000
+  security:
+    # Private/loopback/link-local outbound notification targets are denied by default.
+    # Add only operator-approved CIDRs when internal webhooks are required.
+    outbound_private_network_allowlist: ""
   logging:
     level: INFO
     file: /var/log/incidentrelay/incidentrelay.log
@@ -54,7 +59,8 @@ config:
   voice:
     provider: stub
     providers_dir: /usr/local/lib/incidentrelay/voice_providers
-    callback_secret: change-me
+    # Empty falls back to the application secret; a dedicated random value is recommended.
+    callback_secret: ""
 
 # Name of an existing Secret holding the full config under the key
 # `incidentrelay.conf`. When set, the `config` map above is ignored and

@@ -75,7 +75,7 @@ At minimum, review:
 
 ```ini
 [server]
-secret_key = change-me
+secret_key =
 public_base_url = https://incidentrelay.example.com
 
 [database]

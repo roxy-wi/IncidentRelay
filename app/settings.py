@@ -85,7 +85,7 @@ class Config:
     Flask-compatible settings object built from the external config file.
     """
 
-    SECRET_KEY = settings.get("main", "secret_key", "dev-secret-key")
+    SECRET_KEY = settings.get("main", "secret_key", "") or ""
     DEFAULT_TIMEZONE = settings.get("main", "timezone", "UTC")
 
     SERVER_HOST = settings.get("server", "host", "0.0.0.0")
@@ -129,9 +129,27 @@ class Config:
     JWT_EXPIRE_MINUTES = settings.get_int("auth", "jwt_expire_minutes", 1440)
     JWT_COOKIE_NAME = settings.get("auth", "jwt_cookie_name", "incidentrelay_jwt")
     JWT_COOKIE_SECURE = settings.get_bool("auth", "jwt_cookie_secure", False)
+    AUTH_LOGIN_IP_MAX_FAILURES = settings.get_int(
+        "auth", "login_ip_max_failures", 60
+    )
+    AUTH_LOGIN_IP_WINDOW_SECONDS = settings.get_int(
+        "auth", "login_ip_window_seconds", 60
+    )
+    AUTH_LOGIN_IP_BLOCK_SECONDS = settings.get_int(
+        "auth", "login_ip_block_seconds", 60
+    )
+    AUTH_LOGIN_ACCOUNT_MAX_FAILURES = settings.get_int(
+        "auth", "login_account_max_failures", 20
+    )
+    AUTH_LOGIN_ACCOUNT_WINDOW_SECONDS = settings.get_int(
+        "auth", "login_account_window_seconds", 300
+    )
+    AUTH_LOGIN_ACCOUNT_BLOCK_SECONDS = settings.get_int(
+        "auth", "login_account_block_seconds", 300
+    )
 
-    SECRET_ENCRYPTION_KEY = settings.get("main", "secret_encryption_key", SECRET_KEY)
-    SSO_SECRET_ENCRYPTION_KEY = settings.get("sso", "secret_encryption_key", SECRET_ENCRYPTION_KEY)
+    SECRET_ENCRYPTION_KEY = settings.get("main", "secret_encryption_key", SECRET_KEY) or SECRET_KEY
+    SSO_SECRET_ENCRYPTION_KEY = settings.get("sso", "secret_encryption_key", SECRET_ENCRYPTION_KEY) or SECRET_ENCRYPTION_KEY
 
     REMINDER_INTERVAL_SECONDS = settings.get_int("alerts", "reminder_interval_seconds", 60)
     ALERT_GROUP_WINDOW_SECONDS = settings.get_int("alerts", "alert_group_window_seconds", 3600)
@@ -230,7 +248,7 @@ class Config:
         30,
     )
 
-    MATTERMOST_ACTION_SECRET = settings.get("mattermost", "action_secret", SECRET_KEY)
+    MATTERMOST_ACTION_SECRET = settings.get("mattermost", "action_secret", SECRET_KEY) or SECRET_KEY
     MATTERMOST_API_URL = settings.get("mattermost", "api_url", "")
     MATTERMOST_BOT_TOKEN = settings.get("mattermost", "bot_token", "")
     MATTERMOST_BOT_USER_ID = settings.get("mattermost", "bot_user_id", "")
@@ -243,7 +261,7 @@ class Config:
     SMTP_USE_TLS = settings.get_bool("smtp", "use_tls", True)
 
     VOICE_PROVIDER = settings.get("voice", "provider", "stub")
-    VOICE_CALLBACK_SECRET = settings.get("voice", "callback_secret", SECRET_KEY)
+    VOICE_CALLBACK_SECRET = settings.get("voice", "callback_secret", SECRET_KEY) or SECRET_KEY
     VOICE_TEXT_TEMPLATE = settings.get("voice", "text_template", "")
     VOICE_DTMF_ACTIONS = settings.get_json(
         "voice",
@@ -251,6 +269,22 @@ class Config:
         {"1": "acknowledge", "2": "resolve"},
     )
     VOICE_PROVIDER_CONFIG = settings.get_section("voice_provider", {})
+
+    OUTBOUND_HTTP_PRIVATE_NETWORK_ALLOWLIST = settings.get(
+        "security",
+        "outbound_private_network_allowlist",
+        "",
+    )
+    OUTBOUND_HTTP_MAX_REDIRECTS = settings.get_int(
+        "security",
+        "outbound_http_max_redirects",
+        3,
+    )
+    OUTBOUND_HTTP_MAX_RESPONSE_BYTES = settings.get_int(
+        "security",
+        "outbound_http_max_response_bytes",
+        1048576,
+    )
 
     TELEGRAM_PROXY_URL = settings.get("telegram", "proxy_url", "")
 
@@ -383,3 +417,28 @@ class Config:
         30,
     )
 
+INSECURE_DEFAULT_SECRETS = frozenset({
+    "dev-secret-key",
+    "change-me",
+    "change-this-secret-key",
+    "change-this-jwt-secret",
+    "change-this-mattermost-action-secret",
+})
+
+
+def validate_security_configuration(config=Config):
+    """Reject empty or shipped authentication secrets before the service starts."""
+    required = {
+        "main.secret_key": getattr(config, "SECRET_KEY", ""),
+        "auth.jwt_secret": getattr(config, "JWT_SECRET_KEY", ""),
+    }
+    for name, raw_value in required.items():
+        value = str(raw_value or "").strip()
+        if not value or value in INSECURE_DEFAULT_SECRETS:
+            raise RuntimeError(
+                f"insecure IncidentRelay secret configuration: {name} must be set "
+                "to a unique cryptographically random value"
+            )
+
+
+validate_security_configuration()

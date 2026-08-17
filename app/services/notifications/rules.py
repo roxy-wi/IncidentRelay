@@ -569,14 +569,12 @@ def build_direct_channel_config(delivery):
 def build_voice_rule_callback_url(delivery):
     from app.settings import Config
 
-    secret = getattr(Config, "VOICE_CALLBACK_SECRET", "")
-
-    if not secret:
+    if not getattr(Config, "VOICE_CALLBACK_SECRET", ""):
         return None
 
     return (
         f"{Config.PUBLIC_BASE_URL.rstrip()}"
-        f"/api/integrations/voice/rule-callback/{delivery.id}/{secret}"
+        f"/api/integrations/voice/rule-callback/{delivery.id}"
     )
 
 

@@ -1,9 +1,9 @@
 from urllib.parse import urljoin
 
-import requests
-
 from app import Config
 from app.notifiers.plugins import IncomingWebhookNotifier, alert_service_label
+from app.notifiers.mattermost.actions import build_mattermost_action_signature
+from app.services.outbound_http import safe_request
 from app.services.links import build_alert_web_url, build_source_event_url
 from app.services.routing.service_context import (
     format_service_links_markdown,
@@ -222,7 +222,7 @@ class MattermostNotifier(IncomingWebhookNotifier):
         """Send a Mattermost REST API request."""
         api_url = config.get("api_url", "").rstrip("/")
         url = urljoin(api_url + "/", path.lstrip("/"))
-        response = requests.request(
+        response = safe_request(
             method,
             url,
             json=payload,
@@ -354,9 +354,12 @@ class MattermostNotifier(IncomingWebhookNotifier):
         return fields
 
     def _actions(self, channel, alert):
-        """Return Mattermost action buttons."""
+        """Return Mattermost action buttons signed without exposing the secret."""
         action_url = f"{Config.PUBLIC_BASE_URL.rstrip('/')}/api/integrations/mattermost/actions"
         secret = self._callback_secret(channel)
+
+        if not secret:
+            return []
 
         if alert.status == "acknowledged":
             return [
@@ -369,8 +372,14 @@ class MattermostNotifier(IncomingWebhookNotifier):
         ]
 
     def _button(self, action, name, style, action_url, alert_id, channel_id, secret):
-        """Build one Mattermost button definition."""
+        """Build one Mattermost button definition with a per-action HMAC."""
         action_prefix = "ack" if action == "acknowledge" else "resolve"
+        signature = build_mattermost_action_signature(
+            secret,
+            action,
+            alert_id,
+            channel_id,
+        )
         return {
             "id": f"{action_prefix}{alert_id}",
             "name": name,
@@ -382,7 +391,7 @@ class MattermostNotifier(IncomingWebhookNotifier):
                     "alert_id": alert_id,
                     "channel_id": channel_id,
                     "action": action,
-                    "secret": secret,
+                    "signature": signature,
                 },
             },
         }

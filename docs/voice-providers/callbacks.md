@@ -18,13 +18,21 @@ When IncidentRelay creates a call, it passes `callback_url` to the provider.
 Example:
 
 ```text
-https://incidentrelay.example.com/api/integrations/voice/callback/12/change-me-channel-secret
+https://incidentrelay.example.com/api/integrations/voice/rule-callback/1234
 ```
 
-The URL format is:
+Providers must use the `request.callback_url` supplied by IncidentRelay instead
+of constructing callback URLs themselves. The callback credential is never part
+of the URL. Send `request.callback_secret` in one of these headers:
 
-```text
-/api/integrations/voice/callback/{channel_id}/{secret}
+```http
+Authorization: Bearer <callback_secret>
+```
+
+or:
+
+```http
+X-IncidentRelay-Callback-Secret: <callback_secret>
 ```
 
 ## Callback flow
@@ -34,7 +42,7 @@ The provider should send call events to the callback URL.
 IncidentRelay will:
 
 ```text
-1. Validate callback secret.
+1. Validate the callback secret from the request header.
 2. Load the globally configured voice provider.
 3. Pass raw callback payload to provider.parse_callback().
 4. Find notification by provider call_id.

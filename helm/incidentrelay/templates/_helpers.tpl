@@ -77,6 +77,9 @@ Name of the Secret holding incidentrelay.conf.
 Render the values under .Values.config as an INI file.
 */}}
 {{- define "incidentrelay.config" -}}
+{{- if not .Values.existingConfigSecret -}}
+{{- $_ := required "config.main.secret_key is required; set a unique random value or use existingConfigSecret" .Values.config.main.secret_key -}}
+{{- end -}}
 {{- range $section, $options := .Values.config }}
 [{{ $section }}]
 {{- range $key, $value := $options }}

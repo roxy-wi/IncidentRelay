@@ -61,7 +61,7 @@ IncidentRelay reads every setting from a single INI file mounted at `/etc/incide
 ```yaml
 config:
   main:
-    secret_key: change-me
+    secret_key: ""
   server:
     host: 0.0.0.0
     port: 8080
@@ -72,7 +72,7 @@ becomes:
 
 ```ini
 [main]
-secret_key = change-me
+secret_key =
 
 [server]
 host = 0.0.0.0

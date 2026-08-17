@@ -2686,34 +2686,27 @@ def paths():
                 },
             }
         },
-        "/api/integrations/voice/callback/{channel_id}/{secret}": {
+        "/api/integrations/voice/rule-callback/{delivery_id}": {
             "post": {
                 "tags": ["integrations"],
                 "summary": "Handle voice provider callback",
                 "description": (
-                    "Receives callbacks from voice call providers. "
-                    "The endpoint validates the channel callback secret, loads the provider "
-                    "configured for the voice_call channel, and passes the raw payload to "
-                    "provider.parse_callback(). "
-                    "Providers may normalize call status changes, DTMF button presses and errors. "
-                    "DTMF digits can be mapped to IncidentRelay actions through channel config, "
-                    "for example 1=acknowledge and 2=resolve."
+                    "Receives callbacks for voice notification-rule deliveries. "
+                    "The callback credential is sent in the Authorization header "
+                    "(`Bearer <voice.callback_secret>`) or the "
+                    "X-IncidentRelay-Callback-Secret header; it is never embedded "
+                    "in the callback URL. The configured provider then normalizes "
+                    "status changes and DTMF actions through provider.parse_callback()."
                 ),
                 "operationId": "handleVoiceProviderCallback",
                 "parameters": [
-                    path_param("channel_id", "Voice call notification channel id."),
+                    path_param("delivery_id", "User notification delivery id."),
                     {
-                        "name": "secret",
-                        "in": "path",
+                        "name": "Authorization",
+                        "in": "header",
                         "required": True,
-                        "description": (
-                            "Voice callback secret. "
-                            "Uses channel config callback_secret or global voice.callback_secret."
-                        ),
-                        "schema": {
-                            "type": "string",
-                            "minLength": 1,
-                        },
+                        "description": "Bearer voice callback secret.",
+                        "schema": {"type": "string", "minLength": 1},
                     },
                 ],
                 "requestBody": json_body(
@@ -2725,11 +2718,8 @@ def paths():
                         "Callback processed or ignored.",
                         VOICE_CALLBACK_RESPONSE_SCHEMA,
                     ),
-                    "400": response(
-                        "Invalid callback payload, provider parse error or channel is not voice_call."
-                    ),
-                    "403": response("Invalid voice callback secret."),
-                    "404": response("Channel or notification not found."),
+                    "403": response("Missing or invalid voice callback credential."),
+                    "404": response("Notification delivery was not found."),
                 },
             }
         },

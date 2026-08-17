@@ -146,7 +146,8 @@ class SlackNotifier(IncomingWebhookNotifier):
         if not webhook_url:
             raise RuntimeError("webhook_url is missing")
 
-        response = requests.post(
+        response = safe_request(
+            "POST",
             webhook_url,
             json=self._build_message_payload(
                 channel,

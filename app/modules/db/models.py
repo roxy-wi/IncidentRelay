@@ -2571,6 +2571,21 @@ class AppLock(BaseModel):
     updated_at = DateTimeField(default=utc_now)
 
 
+class LoginThrottle(BaseModel):
+    """Cross-worker login failure counter without storing raw identifiers."""
+
+    id = AutoField()
+    key_hash = CharField(unique=True, index=True)
+    scope = CharField(index=True)  # ip | account
+    failure_count = IntegerField(default=0)
+    window_started_at = DateTimeField()
+    blocked_until = DateTimeField(null=True, index=True)
+    updated_at = DateTimeField(default=utc_now)
+
+    class Meta:
+        table_name = "login_throttle"
+
+
 class RotationLayer(SoftDeleteModel):
     """Schedule layer inside a rotation.
 
