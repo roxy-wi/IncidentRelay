@@ -350,6 +350,20 @@ def test_same_or_lower_priority_correlated_child_preserves_acknowledged_group(db
 
     acknowledged = alerts_repo.acknowledge_alert_group(group1.id)
     acknowledged_at = acknowledged.acknowledged_at
+
+    same_priority = upsert_alert(
+        _alert(
+            route,
+            "DiskUsageStillCritical",
+            "host1",
+            incident_key="host/node/host1",
+        )
+    )
+
+    assert same_priority.created_group is False
+    assert same_priority.group.status == "acknowledged"
+    assert same_priority.group.acknowledged_at == acknowledged_at
+
     result = upsert_alert(
         _alert(
             route,

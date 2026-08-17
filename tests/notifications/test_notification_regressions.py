@@ -324,9 +324,9 @@ def test_correlated_child_after_ack_does_not_send_reminder(db, monkeypatch):
 
     second = upsert_alert(
         alert_payload(
-            dedup_key="dedup-warning",
-            alertname="DiskUsageGrowing",
-            severity="warning",
+            dedup_key="dedup-critical-update",
+            alertname="DiskUsageStillCritical",
+            severity="critical",
         )
     )
 
