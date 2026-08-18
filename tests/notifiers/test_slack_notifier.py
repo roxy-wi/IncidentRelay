@@ -123,6 +123,55 @@ def test_slack_bot_channel_supports_updates():
     ) is False
 
 
+def test_slack_webhook_send_uses_safe_request(monkeypatch):
+    notifier = SlackNotifier()
+    calls = []
+
+    monkeypatch.setattr(
+        notifier,
+        "_build_message_payload",
+        lambda *args, **kwargs: {
+            "text": "Fallback",
+            "blocks": [],
+        },
+    )
+
+    def fake_safe_request(method, url, **kwargs):
+        calls.append({
+            "method": method,
+            "url": url,
+            **kwargs,
+        })
+        return FakeResponse({})
+
+    monkeypatch.setattr(
+        "app.notifiers.slack.notifier.safe_request",
+        fake_safe_request,
+    )
+
+    channel = make_channel({
+        "mode": "webhook",
+        "webhook_url": "https://hooks.slack.com/services/test",
+    })
+
+    result = notifier.send(
+        channel,
+        SimpleNamespace(),
+        "Alert text",
+    )
+
+    assert calls == [{
+        "method": "POST",
+        "url": "https://hooks.slack.com/services/test",
+        "json": {
+            "text": "Fallback",
+            "blocks": [],
+        },
+        "timeout": 10,
+    }]
+    assert result == {"provider": "slack"}
+
+
 def test_slack_bot_send_uses_chat_post_message(
     monkeypatch,
 ):

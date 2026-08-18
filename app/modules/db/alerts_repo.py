@@ -1155,8 +1155,6 @@ def finish_alert_explain_trace(
     result=None,
     finished_at=None,
 ):
-    from datetime import datetime
-
     trace.status = status
     trace.outcome = outcome
     trace.reason = reason

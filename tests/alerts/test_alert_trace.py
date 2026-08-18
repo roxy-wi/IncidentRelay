@@ -11,7 +11,6 @@ from app.services.alerts.explain_cleanup import cleanup_alert_explain_traces
 from app.modules.db import alerts_repo, tokens_repo
 from app.services.integrations.auth import hash_token
 from app.services.alerts.lifecycle import upsert_alert
-from tests.conftest import admin_headers
 from tests.factories import create_group, create_route, create_team, create_user, unique
 from app.modules.common import utc_now
 
@@ -546,7 +545,7 @@ def test_cleanup_alert_explain_traces_rejects_invalid_retention(db):
     except ValueError as exc:
         assert str(exc) == "retention_days must be greater than 0"
     else:
-        assert False, "cleanup_alert_explain_traces must reject non-positive retention"
+        raise AssertionError("cleanup_alert_explain_traces must reject non-positive retention")
 
 
 def test_priority_resolution_trace_contains_normalized_severity(db):

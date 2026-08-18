@@ -45,7 +45,6 @@ from app.services.silences import find_active_silences, record_new_alert_silence
 from app.services.alerts.correlation import refresh_alert_group_correlations, refresh_alert_group_correlations_safely
 from app.services.business_services.impact import refresh_business_impacts_safely_for_group
 from app.services.business_services.status import refresh_business_services_safely_for_technical_service
-from app.modules.common import utc_now
 
 logger = logging.getLogger("oncall.alerts")
 

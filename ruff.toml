@@ -11,6 +11,11 @@ select = [
 ignore = [
     # Pydantic schemas intentionally use Field(...) in class definitions.
     "B008",
+    # Hygiene findings stay visible in the nightly advisory audit, but they
+    # should not hide correctness/security findings in the blocking scan.
+    "F401",
+    "F541",
+    "F841",
 ]
 
 [lint.per-file-ignores]

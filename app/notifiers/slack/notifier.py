@@ -8,6 +8,7 @@ from app.services.alerts.priority import (
     format_alert_title_with_priority,
 )
 from app.services.links import build_alert_web_url, build_source_event_url
+from app.services.outbound_http import safe_request
 from app.services.routing.service_context import (
     get_alert_service_links,
     get_alert_service_runbooks,

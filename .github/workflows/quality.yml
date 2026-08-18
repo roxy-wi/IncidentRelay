@@ -64,15 +64,21 @@ jobs:
             -r requirements-quality.txt
 
       - name: Check installed dependency consistency
+        id: pip_check
+        continue-on-error: true
         run: python -m pip check
 
       - name: Ruff full Python codebase
+        id: ruff
+        continue-on-error: true
         run: |
           ruff check \
             --output-format=github \
             app tests manage.py run.py
 
       - name: Bandit full application codebase
+        id: bandit
+        continue-on-error: true
         run: |
           bandit \
             -q \
@@ -81,6 +87,8 @@ jobs:
             -ii
 
       - name: Check all JavaScript syntax
+        id: javascript
+        continue-on-error: true
         shell: bash
         run: |
           set -euo pipefail
@@ -91,6 +99,41 @@ jobs:
             echo "Checking $file"
             node --check "$file"
             count=$((count + 1))
-          done < <(find app/static/js -type f -name '*.js' -print0)
+          done < <(find app/static -type f -name '*.js' -print0)
 
           echo "Checked $count JavaScript files."
+
+      - name: Report code quality results
+        if: always()
+        shell: bash
+        env:
+          PIP_CHECK_OUTCOME: ${{ steps.pip_check.outcome }}
+          RUFF_OUTCOME: ${{ steps.ruff.outcome }}
+          BANDIT_OUTCOME: ${{ steps.bandit.outcome }}
+          JAVASCRIPT_OUTCOME: ${{ steps.javascript.outcome }}
+        run: |
+          set -euo pipefail
+
+          {
+            echo "## Full code quality"
+            echo
+            echo "| Check | Result |"
+            echo "|---|---|"
+            echo "| pip check | $PIP_CHECK_OUTCOME |"
+            echo "| Ruff | $RUFF_OUTCOME |"
+            echo "| Bandit | $BANDIT_OUTCOME |"
+            echo "| JavaScript syntax | $JAVASCRIPT_OUTCOME |"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+          failed=0
+          for outcome in \
+            "$PIP_CHECK_OUTCOME" \
+            "$RUFF_OUTCOME" \
+            "$BANDIT_OUTCOME" \
+            "$JAVASCRIPT_OUTCOME"; do
+            if [[ "$outcome" != "success" ]]; then
+              failed=1
+            fi
+          done
+
+          exit "$failed"

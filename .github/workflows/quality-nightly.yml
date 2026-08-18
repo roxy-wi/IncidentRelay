@@ -45,13 +45,30 @@ jobs:
             -r requirements-dev.txt \
             -r requirements-quality.txt
 
-      - name: Full Ruff scan
+      - name: Full Ruff bug scan
+        id: ruff_bug
+        continue-on-error: true
         run: |
           ruff check \
             --output-format=github \
             app tests manage.py run.py
 
+      - name: Ruff hygiene audit
+        id: ruff_hygiene
+        continue-on-error: true
+        shell: bash
+        run: |
+          set -o pipefail
+          ruff check \
+            --select F401,F541,F841 \
+            --ignore B008 \
+            --output-format=concise \
+            app tests manage.py run.py \
+            2>&1 | tee ruff-hygiene-report.txt
+
       - name: Full Bandit scan
+        id: bandit
+        continue-on-error: true
         run: |
           bandit \
             -q \
@@ -91,10 +108,13 @@ jobs:
             echo
             echo "| Check | Result |"
             echo "|---|---|"
+            echo "| Ruff bug scan | ${{ steps.ruff_bug.outcome }} |"
+            echo "| Bandit | ${{ steps.bandit.outcome }} |"
+            echo "| Ruff hygiene | ${{ steps.ruff_hygiene.outcome }} |"
             echo "| mypy | ${{ steps.mypy.outcome }} |"
             echo "| Vulture | ${{ steps.vulture.outcome }} |"
             echo
-            echo "mypy and Vulture are advisory during the initial legacy audit."
+            echo "Ruff hygiene, mypy and Vulture are advisory during the initial legacy audit."
             echo "Ruff and Bandit remain blocking."
           } >> "$GITHUB_STEP_SUMMARY"
 
@@ -104,10 +124,24 @@ jobs:
         with:
           name: deep-static-analysis-reports
           path: |
+            ruff-hygiene-report.txt
             mypy-report.txt
             vulture-report.txt
           if-no-files-found: ignore
           retention-days: 14
+
+      - name: Enforce blocking static analysis
+        if: always()
+        shell: bash
+        env:
+          RUFF_BUG_OUTCOME: ${{ steps.ruff_bug.outcome }}
+          BANDIT_OUTCOME: ${{ steps.bandit.outcome }}
+        run: |
+          set -euo pipefail
+
+          if [[ "$RUFF_BUG_OUTCOME" != "success" || "$BANDIT_OUTCOME" != "success" ]]; then
+            exit 1
+          fi
 
   randomized-tests:
     name: Randomized pytest order

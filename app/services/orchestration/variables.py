@@ -394,7 +394,7 @@ def extract_variables(
                 if targets is not None:
                     if len(parts) < len(targets):
                         raise ExtractionError("split produced fewer parts than targets")
-                    produced.update(zip(targets, parts))
+                    produced.update(zip(targets, parts, strict=False))
                 else:
                     split_index = extractor["index"]
                     if split_index >= len(parts):

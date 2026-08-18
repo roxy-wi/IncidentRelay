@@ -37,6 +37,7 @@ def pwa_manifest():
     for shortcut, shortcut_key in zip(
         payload.get("shortcuts", []),
         shortcut_keys,
+        strict=False,
     ):
         shortcut["name"] = translate(f"pwa.shortcut.{shortcut_key}.name")
         shortcut["short_name"] = translate(
@@ -50,6 +51,7 @@ def pwa_manifest():
     for screenshot, screenshot_key in zip(
         payload.get("screenshots", []),
         screenshot_keys,
+        strict=False,
     ):
         screenshot["label"] = translate(
             f"pwa.screenshot.{screenshot_key}"

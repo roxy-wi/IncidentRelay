@@ -130,8 +130,8 @@ def create_rotation(
 
             return rotation
 
-    except IntegrityError:
-        raise ValueError("rotation with this name already exists in this team")
+    except IntegrityError as exc:
+        raise ValueError("rotation with this name already exists in this team") from exc
 
 
 def create_rotation_if_missing(team_id, name, description, start_at, duration_seconds, reminder_interval_seconds=300, rotation_type="daily", interval_value=1, interval_unit="days", handoff_time="09:00", handoff_weekday=None, timezone="UTC"):
