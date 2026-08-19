@@ -68,7 +68,7 @@ def create_policy(team_id, name, description=None, enabled=True, repeat_count=0)
 
 def update_policy(policy_id, data):
     """Update an escalation policy."""
-    get_policy(policy_id)
+    policy = get_policy(policy_id)
 
     for field in ["name", "description", "enabled", "repeat_count"]:
         if field in data:
