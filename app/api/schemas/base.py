@@ -2,7 +2,6 @@ from typing import Any, Dict, List, Optional
 
 from pydantic import BaseModel, ConfigDict, Field
 
-from app.modules.common import as_utc_aware
 
 
 class ApiModel(BaseModel):

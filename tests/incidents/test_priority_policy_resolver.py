@@ -173,7 +173,7 @@ def test_source_priority_can_be_read_from_labels():
     group = create_group()
     team = create_team(group)
 
-    policy = create_priority_policy(
+    create_priority_policy(
         team,
         default_for_team=True,
         source_priority_mode="prefer",

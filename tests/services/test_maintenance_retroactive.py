@@ -2,7 +2,6 @@ from datetime import timedelta
 
 from app.modules.common import utc_now
 from app.modules.db.models import (
-    Alert,
     AlertGroup,
     MaintenanceWindow,
     MaintenanceWindowAlertApplication,

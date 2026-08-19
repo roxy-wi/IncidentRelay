@@ -1,4 +1,3 @@
-from datetime import datetime
 
 from app.db import init_database
 from app.modules.db.models import (

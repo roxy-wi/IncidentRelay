@@ -8,7 +8,6 @@ from app.modules.db.models import AlertGroup, Service, ServiceDependency, Team
 from app.services.service_catalog.impact_scoring import (
     alert_group_impact_score,
     clamp_impact_score,
-    combined_impact_score,
     max_severity,
     max_status,
     normalize_severity,

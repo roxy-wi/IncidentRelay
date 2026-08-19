@@ -36,7 +36,6 @@ def _extract_postgres_constraint(message: str) -> str | None:
 
 
 def _make_duplicate_message(fields: list[str], constraint: str | None) -> str:
-    joined = " ".join(fields or [])
     constraint_name = constraint or ""
 
     if "alert_route" in constraint_name or {"team_id", "name"}.issubset(set(fields)):

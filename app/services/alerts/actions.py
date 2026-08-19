@@ -1,4 +1,4 @@
-from app.modules.db import alerts_repo, users_repo
+from app.modules.db import alerts_repo
 from app.modules.db.models import AlertGroup
 from app.services.alerts.correlation import refresh_alert_group_correlations_safely
 from app.services.incidents.stakeholders import notify_stakeholders

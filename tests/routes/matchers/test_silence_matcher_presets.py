@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from app.services.silences import find_active_silence
 from tests.factories import (

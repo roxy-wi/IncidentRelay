@@ -18,6 +18,7 @@ Conventions follow the Kubernetes naming style:
 """
 
 import logging
+from typing import Any
 
 from flask import Blueprint, jsonify
 
@@ -58,7 +59,7 @@ def readyz():
     is not ready.
     """
     db = init_database()
-    response = {"status": "ready"}
+    response: dict[str, Any] = {"status": "ready"}
     http_status = 200
 
     # Database check ------------------------------------------------------
@@ -68,7 +69,7 @@ def readyz():
             db.connect(reuse_if_open=True)
         db.execute_sql("SELECT 1")
         response["database"] = "ok"
-    except Exception as exc:
+    except Exception:
         response["status"] = "not_ready"
         response["database"] = "error"
         response["database_error"] = "database check failed"
@@ -105,7 +106,7 @@ def readyz():
             response["status"] = "not_ready"
             response["migrations"]["pending"] = pending
             http_status = 503
-    except Exception as exc:
+    except Exception:
         response["status"] = "not_ready"
         response["migrations"] = {"error": "migration check failed"}
         http_status = 503

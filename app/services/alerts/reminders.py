@@ -1,5 +1,5 @@
 import logging
-from datetime import timedelta, datetime
+from datetime import timedelta
 
 from app.modules.db import alerts_repo
 from app.services import escalation_policies as escalation_policy_service

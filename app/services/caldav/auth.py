@@ -1,5 +1,4 @@
 import base64
-from datetime import datetime
 from functools import wraps
 
 from flask import Response, g, request

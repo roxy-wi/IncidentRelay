@@ -8,7 +8,7 @@ from app.api.schemas.groups import (
     UserGroupAddSchema,
     UserGroupUpdateSchema,
 )
-from app.api.schemas.roles import GROUP_USER_ADMIN_ROLE, GROUP_VIEWER_ROLE
+from app.api.schemas.roles import GROUP_VIEWER_ROLE
 from app.api.schemas.users import GroupUserCreateSchema
 from app.db import database_proxy as db
 from app.login import hash_password

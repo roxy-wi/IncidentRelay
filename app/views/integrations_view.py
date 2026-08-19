@@ -1,6 +1,5 @@
 import hmac
 import logging
-from datetime import datetime
 
 from flask import Blueprint, jsonify, request
 from peewee import DoesNotExist

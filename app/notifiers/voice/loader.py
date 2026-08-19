@@ -6,6 +6,7 @@ import sys
 from functools import lru_cache
 from pathlib import Path
 from types import ModuleType
+from typing import cast
 
 from app.notifiers.voice.base import BaseVoiceProvider
 from app.settings import Config
@@ -89,17 +90,15 @@ def get_voice_provider_class(provider_name: str) -> type[BaseVoiceProvider]:
 
     provider_cls = getattr(module, "Provider", None)
 
-    try:
-        is_valid = issubclass(provider_cls, BaseVoiceProvider)
-    except TypeError:
-        is_valid = False
-
-    if not is_valid:
+    if not isinstance(provider_cls, type) or not issubclass(
+        provider_cls,
+        BaseVoiceProvider,
+    ):
         raise RuntimeError(
             f"voice provider {name} must define Provider(BaseVoiceProvider)"
         )
 
-    return provider_cls
+    return cast(type[BaseVoiceProvider], provider_cls)
 
 
 def create_voice_provider(

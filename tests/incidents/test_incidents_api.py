@@ -914,7 +914,7 @@ def test_add_responder_rejects_extra_target_id(client, db, monkeypatch):
 def test_expire_due_incident_responders_expires_requested(db, monkeypatch):
     disable_responder_notifications(monkeypatch)
 
-    from datetime import datetime, timedelta
+    from datetime import timedelta
 
     from app.modules.db import incidents_repo
     from app.services.incidents.responders import expire_due_incident_responders

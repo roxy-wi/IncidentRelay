@@ -76,6 +76,15 @@ jobs:
             --output-format=github \
             app tests manage.py run.py
 
+      - name: Ruff hygiene audit
+        id: ruff_hygiene
+        continue-on-error: true
+        run: |
+          ruff check \
+            --select F401,F541,F841 \
+            --output-format=github \
+            app tests manage.py run.py
+
       - name: Bandit full application codebase
         id: bandit
         continue-on-error: true
@@ -110,6 +119,7 @@ jobs:
           PIP_CHECK_OUTCOME: ${{ steps.pip_check.outcome }}
           RUFF_OUTCOME: ${{ steps.ruff.outcome }}
           BANDIT_OUTCOME: ${{ steps.bandit.outcome }}
+          RUFF_HYGIENE_OUTCOME: ${{ steps.ruff_hygiene.outcome }}
           JAVASCRIPT_OUTCOME: ${{ steps.javascript.outcome }}
         run: |
           set -euo pipefail
@@ -121,6 +131,7 @@ jobs:
             echo "|---|---|"
             echo "| pip check | $PIP_CHECK_OUTCOME |"
             echo "| Ruff | $RUFF_OUTCOME |"
+            echo "| Ruff hygiene (advisory) | $RUFF_HYGIENE_OUTCOME |"
             echo "| Bandit | $BANDIT_OUTCOME |"
             echo "| JavaScript syntax | $JAVASCRIPT_OUTCOME |"
           } >> "$GITHUB_STEP_SUMMARY"

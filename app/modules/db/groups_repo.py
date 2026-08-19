@@ -1,4 +1,3 @@
-from datetime import datetime
 
 from app.db import database_proxy as db
 from app.api.schemas.roles import (

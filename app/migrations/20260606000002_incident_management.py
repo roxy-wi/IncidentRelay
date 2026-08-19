@@ -4,7 +4,6 @@ This migration is intentionally SQL-dialect aware because tests run on SQLite,
 while production can run on PostgreSQL.
 """
 
-from datetime import datetime
 
 from app.db import database_proxy as db
 from app.migrations.introspection import (

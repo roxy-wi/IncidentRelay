@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from app.modules.db.models import AlertGroup, HeartbeatInstance
 from app.services.heartbeats.service import process_overdue_heartbeats, receive_heartbeat_ping

@@ -1,6 +1,6 @@
 import re
 import logging
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from urllib.parse import urlsplit
 from telebot.apihelper import ApiTelegramException

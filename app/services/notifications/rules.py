@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timedelta
+from datetime import timedelta
 from types import SimpleNamespace
 
 from app.modules.db.models import (

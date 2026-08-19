@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from app.modules.db.models import (
     EscalationPolicy,
@@ -9,7 +9,6 @@ from app.modules.db.models import (
     RotationLayerMember,
     RotationOverride,
     Team,
-    User,
 )
 from app.services.calendar_service import build_rotation_calendar
 from app.modules.common import as_utc_naive, utc_now

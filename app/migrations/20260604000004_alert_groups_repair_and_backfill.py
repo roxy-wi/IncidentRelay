@@ -1,7 +1,6 @@
 """Repair alert group schema and backfill old alerts into groups."""
 
 import hashlib
-from datetime import datetime
 
 from peewee import IntegerField
 from playhouse.migrate import migrate

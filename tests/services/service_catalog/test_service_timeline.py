@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from app.services.service_catalog.timeline import build_next_cursor, list_service_events, publish_service_event, serialize_service_event
 from tests.factories import create_group, create_service, create_team

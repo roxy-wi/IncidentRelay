@@ -120,6 +120,12 @@ def load_migration_module(filepath: str) -> Tuple[Callable, Optional[Callable]]:
 
     module_name = os.path.basename(filepath).replace(".py", "")
     spec = importlib.util.spec_from_file_location(module_name, filepath)
+
+    if spec is None or spec.loader is None:
+        raise MigrationError(
+            f"Could not load migration module {module_name}"
+        )
+
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
 

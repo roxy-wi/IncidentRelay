@@ -1,4 +1,3 @@
-from datetime import datetime
 
 from peewee import DoesNotExist
 from flask import Blueprint, jsonify, request

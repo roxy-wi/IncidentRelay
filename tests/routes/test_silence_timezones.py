@@ -1,11 +1,6 @@
-import json
-import os
-import shutil
-import subprocess
 from datetime import datetime
 from pathlib import Path
 
-import pytest
 
 from app.api.schemas.silences import SilenceCreateSchema
 from app.modules.db import silences_repo

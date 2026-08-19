@@ -91,13 +91,13 @@ def _validate_match_rule_payload(payload):
             payload.matcher_preset_id,
             team_id=payload.team_id,
         )
-    except matcher_preset_service.MatcherPresetNotFoundError as exc:
+    except matcher_preset_service.MatcherPresetNotFoundError:
         return None, make_error_response(
             "matcher_preset_not_found",
             "Matcher preset was not found.",
             400,
         )
-    except matcher_preset_service.MatcherPresetError as exc:
+    except matcher_preset_service.MatcherPresetError:
         return None, make_error_response(
             "matcher_preset_invalid",
             "Matcher preset is invalid or unavailable.",

@@ -905,7 +905,7 @@ def test_ping_recovery_does_not_send_resolved_without_initial_notification(
     _, team, service, route = _fixture()
     now = utc_now()
 
-    heartbeat = create_heartbeat(
+    create_heartbeat(
         team,
         route,
         service=service,

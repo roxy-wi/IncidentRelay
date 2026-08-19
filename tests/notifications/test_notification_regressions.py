@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from app.db import init_database
 from app.modules.db.models import AlertEvent, AlertGroup, UserNotificationDelivery

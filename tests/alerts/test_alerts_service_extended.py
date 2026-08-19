@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from app.modules.db import alerts_repo, escalation_policies_repo
 from app.modules.db.models import Alert, AlertEvent, AlertGroup

@@ -1,4 +1,3 @@
-from datetime import datetime
 
 from app.modules.db.models import Group, SsoGroupMapping, SsoIdentity, SsoProvider, Team
 from app.modules.sso.crypto import encrypt_secret

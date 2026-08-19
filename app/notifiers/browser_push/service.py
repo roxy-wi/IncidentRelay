@@ -2,7 +2,7 @@ import hashlib
 import json
 import logging
 import secrets
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from pywebpush import WebPushException, webpush
 

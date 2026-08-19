@@ -2,7 +2,7 @@ from app.db import init_database
 from app.migrations.introspection import (
     get_columns as migration_get_columns,
 )
-from app.modules.db.models import Alert, AlertRoute, EscalationPolicy, EscalationPolicyRule
+from app.modules.db.models import EscalationPolicy, EscalationPolicyRule
 
 
 db = init_database()

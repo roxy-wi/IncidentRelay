@@ -5,6 +5,13 @@ from pathlib import Path
 from app.config import CONFIG_FILE
 
 
+class _CaseSensitiveConfigParser(configparser.ConfigParser):
+    """ConfigParser variant that preserves option name casing."""
+
+    def optionxform(self, optionstr: str) -> str:
+        return optionstr
+
+
 class Settings:
     """
     Load service settings from an INI configuration file.
@@ -15,8 +22,7 @@ class Settings:
         Initialize settings from a config file path.
         """
         self.path = Path(path or CONFIG_FILE)
-        self.parser = configparser.ConfigParser()
-        self.parser.optionxform = str
+        self.parser = _CaseSensitiveConfigParser()
 
         if self.path.exists():
             self.parser.read(self.path)
@@ -88,7 +94,10 @@ class Config:
     SECRET_KEY = settings.get("main", "secret_key", "") or ""
     DEFAULT_TIMEZONE = settings.get("main", "timezone", "UTC")
 
-    SERVER_HOST = settings.get("server", "host", "0.0.0.0")
+    # Intentional default for container/reverse-proxy deployments. Operators
+    # can bind IncidentRelay to a narrower interface explicitly with
+    # server.host.
+    SERVER_HOST = settings.get("server", "host", "0.0.0.0")  # nosec B104
     SERVER_PORT = settings.get_int("server", "port", 8080)
     PUBLIC_BASE_URL = settings.get("server", "public_base_url", "http://127.0.0.1:8080")
 

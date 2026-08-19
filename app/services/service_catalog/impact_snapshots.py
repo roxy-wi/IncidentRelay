@@ -1,5 +1,5 @@
 from collections import Counter, defaultdict
-from datetime import datetime, timedelta
+from datetime import timedelta
 from types import SimpleNamespace
 
 from app.db import database_proxy

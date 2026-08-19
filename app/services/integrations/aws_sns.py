@@ -268,7 +268,10 @@ def validate_aws_sns_message(
     )
 
     if signature_version == "1":
-        digest = hashes.SHA1()
+        # AWS SNS SignatureVersion 1 requires SHA-1 for verification.
+        # This does not create new SHA-1 signatures or use SHA-1 for
+        # passwords/tokens; it only verifies the legacy AWS wire format.
+        digest = hashes.SHA1()  # nosec B303
     elif signature_version == "2":
         digest = hashes.SHA256()
     else:

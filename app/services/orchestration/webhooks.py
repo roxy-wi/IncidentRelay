@@ -18,7 +18,6 @@ from urllib.parse import urljoin, urlsplit, urlunsplit
 import urllib3
 from peewee import fn
 
-from app.db import database_proxy as db
 from app.modules.common import utc_now
 from app.modules.crypto import decrypt_json, decrypt_secret, encrypt_json, encrypt_secret
 from app.modules.db.models import (

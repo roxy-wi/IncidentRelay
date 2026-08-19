@@ -2,7 +2,6 @@
 
 from __future__ import annotations
 
-from typing import Any
 
 from flask import Blueprint, jsonify, request
 from peewee import IntegrityError
@@ -24,7 +23,6 @@ from app.modules.db.models import (
     AlertRoute,
     AutomationExecution,
     EscalationPolicy,
-    EventOrchestration,
     EventOrchestrationVersion,
     Group,
     NotificationPolicy,
@@ -746,7 +744,7 @@ def create_webhook_action():
             "A webhook action with this name already exists in the group.",
             409,
         )
-    except (webhooks.WebhookValidationError, ValueError) as exc:
+    except (webhooks.WebhookValidationError, ValueError):
         return make_error_response(
             "webhook_action_invalid",
             "Webhook action configuration is invalid.",
@@ -781,7 +779,7 @@ def update_webhook_action(action_id):
             "A webhook action with this name already exists in the group.",
             409,
         )
-    except (webhooks.WebhookValidationError, ValueError) as exc:
+    except (webhooks.WebhookValidationError, ValueError):
         return make_error_response(
             "webhook_action_invalid",
             "Webhook action configuration is invalid.",

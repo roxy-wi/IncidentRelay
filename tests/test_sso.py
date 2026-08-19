@@ -30,6 +30,7 @@ from app.views.sso_admin_view import (
     update_provider,
 )
 from app.views.sso_auth_view import (
+    _load_json_url,
     _merge_oidc_claims,
     _validate_oidc_id_token,
     public_sso_providers,
@@ -162,6 +163,19 @@ def test_public_sso_providers_returns_enabled_only(app):
             "enabled": True,
         }
     ]
+
+
+def test_load_json_url_rejects_non_http_scheme():
+    with pytest.raises(SsoLoginError) as exc_info:
+        _load_json_url(
+            "file:///etc/passwd",
+            "sso_oidc_metadata_error",
+            "Could not load OIDC metadata",
+        )
+
+    assert exc_info.value.error == "sso_oidc_metadata_error"
+    assert exc_info.value.message == "Could not load OIDC metadata"
+    assert exc_info.value.status_code == 502
 
 
 def test_admin_can_create_oidc_provider(app):
@@ -964,14 +978,14 @@ def test_complete_sso_login_denies_user_without_matching_group_mapping():
 
 
 def test_sso_json_loader_does_not_expose_network_exception(monkeypatch):
-    from urllib.error import URLError
+    from app.services.outbound_http import OutboundHttpError
 
     import app.views.sso_auth_view as sso_auth_view
 
-    def fail_urlopen(*_args, **_kwargs):
-        raise URLError("internal-idp-secret-detail")
+    def fail_safe_request(*_args, **_kwargs):
+        raise OutboundHttpError("internal-idp-secret-detail")
 
-    monkeypatch.setattr(sso_auth_view, "urlopen", fail_urlopen)
+    monkeypatch.setattr(sso_auth_view, "safe_request", fail_safe_request)
 
     with pytest.raises(SsoLoginError) as exc_info:
         sso_auth_view._load_json_url(

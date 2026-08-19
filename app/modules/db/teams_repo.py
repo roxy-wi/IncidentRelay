@@ -1,4 +1,3 @@
-from datetime import datetime
 
 from app.api.schemas.roles import TEAM_VIEWER_ROLE
 from app.db import database_proxy

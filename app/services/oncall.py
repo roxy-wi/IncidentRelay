@@ -1,7 +1,6 @@
 from app.modules.db import rotations_repo
 from app.modules.common import as_utc_aware, as_utc_naive, utc_now
 from app.services.rotation_schedule import (
-    effective_layer_value as _effective_layer_value,
     layer_slot_index,
     layer_timezone,
 )

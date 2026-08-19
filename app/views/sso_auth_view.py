@@ -1,7 +1,5 @@
 import json
 import secrets
-from urllib.error import HTTPError, URLError
-from urllib.request import Request as UrlRequest, urlopen
 
 from authlib.integrations.requests_client import OAuth2Session
 from flask import Blueprint, Response, jsonify, redirect, request, session
@@ -23,6 +21,7 @@ from app.modules.sso.sso_login import (
 from app.login import normalize_auth_redirect_target
 from app.settings import Config
 from app.modules.sso.saml_security import get_saml_security, validate_saml_crypto_config
+from app.services.outbound_http import OutboundHttpError, safe_request
 from app.services.validation import safe_exception_response
 
 sso_auth_bp = Blueprint("sso_auth_api", __name__)
@@ -63,15 +62,17 @@ def public_sso_providers():
 
 
 def _load_json_url(url, error_code, error_message):
-    """Load JSON document from URL."""
+    """Load an SSO JSON document through the shared SSRF-safe client."""
     try:
-        req = UrlRequest(
+        response = safe_request(
+            "GET",
             url,
             headers={"Accept": "application/json"},
+            timeout=10,
         )
-        with urlopen(req, timeout=10) as response:
-            return json.loads(response.read().decode("utf-8"))
-    except (HTTPError, URLError, TimeoutError, json.JSONDecodeError) as exc:
+        response.raise_for_status()
+        return response.json()
+    except (OutboundHttpError, json.JSONDecodeError) as exc:
         raise SsoLoginError(
             error_code,
             error_message,

@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from types import SimpleNamespace
 
@@ -340,7 +340,7 @@ def make_alerts_write_headers(*, user=None, group=None, team=None):
 def test_alertmanager_ingest_response_includes_trace_id(client, admin_headers, db):
     group = create_group(slug=unique("group"))
     team = create_team(group, slug=unique("team"))
-    route = create_route(
+    create_route(
         team=team,
         source="alertmanager",
         matchers={},
@@ -525,8 +525,6 @@ def test_cleanup_alert_explain_traces_deletes_old_traces(db):
     assert fresh_result.trace_id
 
     old_trace = alerts_repo.get_alert_explain_trace(old_result.trace_id)
-    fresh_trace = alerts_repo.get_alert_explain_trace(fresh_result.trace_id)
-
     old_trace.started_at = utc_now() - timedelta(days=40)
     old_trace.save()
 

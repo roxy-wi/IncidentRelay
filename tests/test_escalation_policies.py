@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from app.modules.db.models import AlertEvent, AlertGroup
 from app.services.alerts.escalation import maybe_escalate_alert

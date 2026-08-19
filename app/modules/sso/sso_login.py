@@ -1,6 +1,5 @@
 import json
 import re
-from datetime import datetime
 
 from flask import make_response, redirect
 from peewee import IntegrityError

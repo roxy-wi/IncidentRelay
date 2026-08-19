@@ -1,7 +1,7 @@
 from datetime import timedelta
 
 from app.modules.common import utc_now
-from app.modules.db import alerts_repo, silences_repo
+from app.modules.db import silences_repo
 from app.modules.db.models import (
     Alert,
     AlertEvent,

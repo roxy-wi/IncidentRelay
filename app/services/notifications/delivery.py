@@ -1,5 +1,4 @@
 import logging
-from datetime import datetime
 
 from app.modules.db import alerts_repo, notifications_repo
 from app.notifiers.registry import get_notifier

@@ -1,5 +1,5 @@
 import base64
-from datetime import datetime, timedelta
+from datetime import timedelta
 from xml.etree import ElementTree
 
 from app.modules.db import tokens_repo

@@ -1,4 +1,3 @@
-import ast
 import sys
 from pathlib import Path
 
@@ -9,8 +8,6 @@ def main():
     """
 
     manage_py = Path("manage.py").read_text(encoding="utf-8")
-    tree = ast.parse(manage_py)
-
     source = manage_py
 
     checks = {

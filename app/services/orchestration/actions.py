@@ -358,6 +358,11 @@ def _static_reference(action: Mapping[str, Any], keys: Sequence[str], *, path: s
         raise ActionValidationError("action requires exactly one static reference id", path=path)
     source = present[0]
     if source.startswith("params."):
+        if not isinstance(params, dict):
+            raise ActionValidationError(
+                "action requires exactly one static reference id",
+                path=path,
+            )
         value = params[source.split(".", 1)[1]]
     else:
         value = action[source]

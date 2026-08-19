@@ -1,4 +1,4 @@
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from app.modules.db import channels_repo, groups_repo, locks_repo, routes_repo, teams_repo, tokens_repo
 from app.modules.db.models import (

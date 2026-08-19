@@ -1,4 +1,3 @@
-from datetime import datetime
 
 from peewee import IntegrityError
 
@@ -69,7 +68,7 @@ def create_policy(team_id, name, description=None, enabled=True, repeat_count=0)
 
 def update_policy(policy_id, data):
     """Update an escalation policy."""
-    policy = get_policy(policy_id)
+    get_policy(policy_id)
 
     for field in ["name", "description", "enabled", "repeat_count"]:
         if field in data:
@@ -144,7 +143,7 @@ def create_rule(
     enabled=True,
 ):
     """Create an escalation policy rule."""
-    policy = get_policy(policy_id)
+    get_policy(policy_id)
 
     data = {
         "policy": policy_id,

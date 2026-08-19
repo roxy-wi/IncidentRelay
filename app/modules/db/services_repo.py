@@ -1,4 +1,3 @@
-from datetime import datetime
 
 from app.modules.db.models import (
     Service,

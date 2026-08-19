@@ -6,10 +6,10 @@ import copy
 import json
 import re
 from dataclasses import dataclass
-from typing import Any, Dict, Iterable, List, Mapping, MutableMapping, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Mapping, MutableMapping, Optional, Sequence, Tuple
 
 from .errors import ExtractionError, RegexSafetyError, ValidationIssue
-from .fields import MISSING, normalize_field_reference, resolve_field
+from .fields import normalize_field_reference, resolve_field
 from .limits import (
     MAX_JSON_PATH_LENGTH,
     MAX_SPLIT_PARTS,

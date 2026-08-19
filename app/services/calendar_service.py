@@ -256,7 +256,7 @@ def build_override_candidate_events(rotation, start_at, end_at):
 def collapse_calendar_candidates(candidates, start_at, end_at):
     """Collapse overlapping candidates into final schedule events."""
 
-    points = {start_at, end_at}
+    point_set = {start_at, end_at}
     normalized = []
 
     for candidate in candidates:
@@ -271,10 +271,10 @@ def collapse_calendar_candidates(candidates, start_at, end_at):
         candidate["_end"] = item_end
 
         normalized.append(candidate)
-        points.add(item_start)
-        points.add(item_end)
+        point_set.add(item_start)
+        point_set.add(item_end)
 
-    points = sorted(points)
+    points = sorted(point_set)
 
     result = []
 

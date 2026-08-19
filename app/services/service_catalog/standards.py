@@ -1,4 +1,3 @@
-from datetime import datetime
 
 from app.modules.db.models import ServiceStandard, ServiceStandardCheck
 from app.modules.common import utc_now
@@ -226,7 +225,7 @@ def validate_standard_applies_to(applies_to):
             f"Unsupported applies_to fields: {fields}"
         )
 
-    normalized = {}
+    normalized: dict[str, object] = {}
 
     for field, allowed_values in APPLICABILITY_VALUES.items():
         values = applies_to.get(field)

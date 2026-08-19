@@ -12,7 +12,7 @@ from dataclasses import dataclass
 from typing import Any, Dict, Iterable, List, Mapping, Sequence, Tuple
 
 from .errors import TemplateValidationError, ValidationIssue
-from .fields import MISSING, normalize_field_reference, resolve_field
+from .fields import normalize_field_reference, resolve_field
 from .limits import (
     MAX_TEMPLATE_EXPRESSION_LENGTH,
     MAX_TEMPLATE_EXPRESSIONS,

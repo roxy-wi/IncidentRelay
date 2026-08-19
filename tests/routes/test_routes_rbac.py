@@ -52,7 +52,7 @@ def test_group_admin_can_update_route(client, db):
 def test_route_response_contains_team_name_and_permissions(client, db):
     group = create_group(slug=unique("group"))
     team = create_team(group=group, slug=unique("team"), name="Network Team")
-    route = create_route(team=team)
+    create_route(team=team)
 
     user = create_user(
         username=unique("group-admin"),

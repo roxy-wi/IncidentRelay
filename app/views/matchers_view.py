@@ -81,7 +81,7 @@ def matcher_preview():
             scan_limit=payload.scan_limit,
             result_limit=payload.result_limit,
         )
-    except (re.error, TypeError, ValueError) as exc:
+    except (re.error, TypeError, ValueError):
         return make_error_response(
             "validation_error",
             "Matchers are invalid.",

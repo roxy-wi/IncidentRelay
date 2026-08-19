@@ -1,6 +1,5 @@
 import logging
 from dataclasses import dataclass
-from datetime import datetime
 
 from app.db import database_proxy
 from app.modules.db.models import AlertGroup, AlertGroupCorrelation, ServiceDependency
@@ -675,7 +674,7 @@ def format_correlation_plain(group):
 
     if root_candidates:
         best_score = max(item.score for item in root_candidates)
-        lines.append(f"Role: possible_symptom")
+        lines.append("Role: possible_symptom")
         lines.append(f"Score: {best_score}")
         lines.append("Possible root cause:")
 

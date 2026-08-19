@@ -1,11 +1,10 @@
 import logging
 
-from datetime import datetime, timedelta
+from datetime import timedelta
 
 from app.services.rbac import current_user
 from app.services.serializers.common import attach_team_permissions
 from app.modules.db import escalation_policies_repo
-from app.modules.db import alerts_repo
 from app.modules.db.models import EscalationPolicyRule
 from app.services.oncall import get_current_oncall_user
 

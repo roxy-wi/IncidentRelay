@@ -4,10 +4,8 @@ from app.modules.db.models import (
     ServiceStandard,
     ServiceStandardCheck,
     ServiceDependency,
-    AlertRoute,
     EscalationPolicy,
     NotificationPolicy,
-    Rotation,
     ServiceMatchRule,
 )
 from app.services.service_catalog.reconciliation import (
@@ -18,10 +16,7 @@ from app.services.service_catalog.reconciliation import (
     reconcile_dependency_component,
     list_services_by_escalation_policy,
     list_services_by_notification_policy,
-    reconcile_escalation_policy_services,
-    reconcile_notification_policy_services,
     reconcile_rotation_services,
-    reconcile_route_services,
     list_services_by_rotation,
     list_services_by_route,
 )

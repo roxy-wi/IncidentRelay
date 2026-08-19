@@ -1,4 +1,4 @@
-from app.modules.db.migrations import list_migrations, migrate
+from app.modules.db.migrations import list_migrations
 from app.version import get_service_version
 
 

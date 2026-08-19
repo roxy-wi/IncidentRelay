@@ -5,7 +5,7 @@ from __future__ import annotations
 import math
 from dataclasses import dataclass, field as dataclass_field
 from decimal import Decimal, InvalidOperation
-from typing import Any, Dict, Iterable, List, Mapping, Optional, Sequence, Tuple
+from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
 from .errors import ConditionValidationError, RegexSafetyError, ValidationIssue
 from .fields import MISSING, resolve_field, validate_field_reference
