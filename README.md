@@ -169,13 +169,13 @@ A Helm chart lives in `helm/incidentrelay`. It deploys the web UI plus the sched
 
 ```bash
 helm install incidentrelay ./helm/incidentrelay \
-  --set config.main.secret_key="$(openssl rand -hex 32)"
+  --set-string config.main.secret_key="$(openssl rand -hex 32)"
 ```
 
 By default, the chart uses:
 
 ```bash
-ghcr.io/roxy-wi/incidentrelay:1.1.0
+ghcr.io/roxy-wi/incidentrelay:2.0
 ```
 
 To pin another image:
@@ -183,11 +183,11 @@ To pin another image:
 ```bash
 helm upgrade --install incidentrelay ./helm/incidentrelay \
   --set image.repository=ghcr.io/roxy-wi/incidentrelay \
-  --set image.tag=1.1.0 \
-  --set config.main.secret_key="$(openssl rand -hex 32)"
+  --set image.tag=2.0 \
+  --set-string config.main.secret_key="$(openssl rand -hex 32)"
 ```
 
-All settings from `incidentrelay.conf` are available under `config.*` in [values.yaml](helm/incidentrelay/values.yaml); you can also bring a pre-rendered config via `existingConfigSecret`.
+All settings from `incidentrelay.conf` are available under `config.*` in [values.yaml](helm/incidentrelay/values.yaml); you can also bring a pre-rendered config via `existingConfigSecret`. IncidentRelay 2.0 enables API authentication and RBAC by default in the chart, and empty JWT/encryption/callback secrets inherit the required `config.main.secret_key` so all pods share stable keys.
 
 Read more: [Kubernetes installation](docs/getting-started/kubernetes.md)
 

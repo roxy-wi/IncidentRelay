@@ -72,6 +72,11 @@ spec:
       {{- with .Values.scheduler.affinity }}
       affinity:
         {{- toYaml . | nindent 8 }}
+      {{- else }}
+      {{- if $.Values.persistence.enabled }}
+      affinity:
+        {{- include "incidentrelay.dataWorkerAffinity" $ | nindent 8 }}
+      {{- end }}
       {{- end }}
       {{- with .Values.scheduler.tolerations }}
       tolerations:

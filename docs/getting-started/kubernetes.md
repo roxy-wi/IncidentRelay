@@ -36,7 +36,7 @@ Each component runs the same image and is selected by `INCIDENTRELAY_SERVICE`, e
 
 ```bash
 helm install incidentrelay ./helm/incidentrelay \
-  --set config.main.secret_key="$(openssl rand -hex 32)"
+  --set-string config.main.secret_key="$(openssl rand -hex 32)"
 ```
 
 The chart pulls `ghcr.io/roxy-wi/incidentrelay` and defaults the tag to the chart `appVersion`. To pin an explicit image:
@@ -44,8 +44,8 @@ The chart pulls `ghcr.io/roxy-wi/incidentrelay` and defaults the tag to the char
 ```bash
 helm upgrade --install incidentrelay ./helm/incidentrelay \
   --set image.repository=ghcr.io/roxy-wi/incidentrelay \
-  --set image.tag=1.1.0 \
-  --set config.main.secret_key="$(openssl rand -hex 32)"
+  --set image.tag=2.0 \
+  --set-string config.main.secret_key="$(openssl rand -hex 32)"
 ```
 
 Watch the rollout:
@@ -62,6 +62,10 @@ IncidentRelay reads every setting from a single INI file mounted at `/etc/incide
 config:
   main:
     secret_key: ""
+  auth:
+    api_auth_required: true
+    rbac_enforced: true
+    jwt_secret: ""
   server:
     host: 0.0.0.0
     port: 8080
@@ -74,6 +78,11 @@ becomes:
 [main]
 secret_key =
 
+[auth]
+api_auth_required = true
+rbac_enforced = true
+jwt_secret = <same shared secret when left empty in values.yaml>
+
 [server]
 host = 0.0.0.0
 port = 8080
@@ -83,6 +92,8 @@ public_base_url = https://incidentrelay.example.com
 Anything valid in `incidentrelay.conf` can be set this way. See [Configuration](configuration.md) for the available options.
 
 Set `public_base_url` to the address users actually reach. It is used for generated links and callbacks.
+
+For chart-rendered configuration, `config.main.secret_key` is required. IncidentRelay 2.0 uses it as the shared fallback for `main.secret_encryption_key`, `auth.jwt_secret`, `mattermost.action_secret`, and `voice.callback_secret` when those values are empty. This is intentional: every pod must use stable shared signing/encryption keys, especially when PostgreSQL is used and `/var/lib/incidentrelay` is not shared. You can override any of those values with a separate random secret.
 
 ### Bring your own Secret
 
@@ -118,7 +129,7 @@ persistence:
 ```
 
 !!! warning
-    This is only safe while every pod lands on the same node. SQLite over network-backed ReadWriteMany storage such as NFS is a known way to corrupt the database. For anything multi-node, use PostgreSQL.
+    SQLite is supported only with `persistence.enabled=true` and `web.replicaCount=1`. For chart-rendered SQLite configuration, the chart automatically adds required pod affinity to scheduler/Telegram/Slack workers so they run on the web pod's node and can mount the same ReadWriteOnce claim. SQLite over network-backed ReadWriteMany storage such as NFS is still unsafe. For anything multi-node or horizontally scaled, use PostgreSQL.
 
 The PVC is created by the chart and therefore removed by `helm uninstall`. To keep the data, create the claim yourself and reference it:
 
@@ -139,7 +150,7 @@ config:
     port: 5432
     name: incidentrelay
     user: incidentrelay
-    password: change-me
+    password: <database-password>
 
 persistence:
   enabled: false
@@ -294,6 +305,14 @@ extraVolumeMounts:
 ```
 
 ## Upgrade and uninstall
+
+### Upgrading from 1.x to 2.0
+
+The 2.0 chart can reuse 1.x values. During rendering it materializes the new secure auth defaults and shared JWT/encryption/callback secrets before creating `incidentrelay.conf`, so old values do not cause different pods to generate different runtime keys. `config.main.secret_key` must still be present and must be a unique random value.
+
+If you use `existingConfigSecret`, Helm cannot normalize that external file. Before the 2.0 upgrade, make sure it contains a valid `main.secret_key`, enables the desired `[auth]` settings, and uses a stable `auth.jwt_secret` (or omits/leaves it empty so the application falls back to `main.secret_key`).
+
+For SQLite, keep `persistence.enabled=true` and `web.replicaCount=1`. For PostgreSQL/multi-node deployments, set `persistence.enabled=false` once every security secret is stable in the rendered or external config.
 
 ```bash
 helm upgrade incidentrelay ./helm/incidentrelay --reuse-values

@@ -36,7 +36,7 @@ ServiceAccount и Ingress, если он включён
 
 ```bash
 helm install incidentrelay ./helm/incidentrelay \
-  --set config.main.secret_key="$(openssl rand -hex 32)"
+  --set-string config.main.secret_key="$(openssl rand -hex 32)"
 ```
 
 Чарт загружает `ghcr.io/roxy-wi/incidentrelay` и по умолчанию использует тег из `appVersion` чарта. Чтобы зафиксировать конкретный образ:
@@ -44,8 +44,8 @@ helm install incidentrelay ./helm/incidentrelay \
 ```bash
 helm upgrade --install incidentrelay ./helm/incidentrelay \
   --set image.repository=ghcr.io/roxy-wi/incidentrelay \
-  --set image.tag=1.1.0 \
-  --set config.main.secret_key="$(openssl rand -hex 32)"
+  --set image.tag=2.0 \
+  --set-string config.main.secret_key="$(openssl rand -hex 32)"
 ```
 
 Следите за развёртыванием:
@@ -61,7 +61,11 @@ IncidentRelay читает все настройки из одного INI-фа�
 ```yaml
 config:
   main:
-    secret_key: change-me
+    secret_key: ""
+  auth:
+    api_auth_required: true
+    rbac_enforced: true
+    jwt_secret: ""
   server:
     host: 0.0.0.0
     port: 8080
@@ -72,7 +76,12 @@ config:
 
 ```ini
 [main]
-secret_key = change-me
+secret_key =
+
+[auth]
+api_auth_required = true
+rbac_enforced = true
+jwt_secret = <общий secret, если значение оставлено пустым в values.yaml>
 
 [server]
 host = 0.0.0.0
@@ -83,6 +92,8 @@ public_base_url = https://incidentrelay.example.com
 Таким способом можно задать всё, что допустимо в `incidentrelay.conf`. Список доступных параметров см. в разделе [Конфигурация](configuration.md).
 
 Укажите в `public_base_url` адрес, по которому пользователи действительно открывают приложение. Он используется в создаваемых ссылках и обратных вызовах.
+
+При конфигурации, создаваемой самим чартом, `config.main.secret_key` обязателен. В IncidentRelay 2.0 он используется как общий fallback для `main.secret_encryption_key`, `auth.jwt_secret`, `mattermost.action_secret` и `voice.callback_secret`, если соответствующие значения оставлены пустыми. Это нужно, чтобы все pod'ы использовали стабильные общие ключи, особенно при PostgreSQL, когда `/var/lib/incidentrelay` не является общим томом. При необходимости каждый из этих секретов можно задать отдельным случайным значением.
 
 ### Собственный Secret
 
@@ -118,7 +129,7 @@ persistence:
 ```
 
 !!! warning "Предупреждение"
-    Это безопасно только пока все pod'ы размещаются на одном узле. Использование SQLite на сетевом хранилище ReadWriteMany, например NFS, — известный способ повредить базу данных. Для любой многоузловой конфигурации используйте PostgreSQL.
+    SQLite поддерживается только при `persistence.enabled=true` и `web.replicaCount=1`. Для конфигурации SQLite, создаваемой самим чартом, чарт автоматически добавляет обязательный pod affinity для scheduler/Telegram/Slack, чтобы они запускались на том же узле, что и web pod, и монтировали один ReadWriteOnce claim. SQLite на сетевом ReadWriteMany-хранилище (например NFS) всё равно использовать нельзя. Для многоузловой или горизонтально масштабируемой конфигурации используйте PostgreSQL.
 
 PVC создаётся чартом и поэтому удаляется командой `helm uninstall`. Чтобы сохранить данные, создайте claim самостоятельно и укажите ссылку на него:
 
@@ -139,7 +150,7 @@ config:
     port: 5432
     name: incidentrelay
     user: incidentrelay
-    password: change-me
+    password: <database-password>
 
 persistence:
   enabled: false
@@ -294,6 +305,14 @@ extraVolumeMounts:
 ```
 
 ## Обновление и удаление
+
+### Обновление с 1.x до 2.0
+
+Чарт 2.0 умеет повторно использовать values от 1.x. При рендеринге он добавляет новые безопасные настройки авторизации и общие JWT/encryption/callback secrets до формирования `incidentrelay.conf`, поэтому старые values не приводят к генерации разных runtime-ключей в разных pod'ах. `config.main.secret_key` при этом должен быть задан уникальным случайным значением.
+
+При использовании `existingConfigSecret` Helm не может нормализовать внешний файл. До обновления на 2.0 убедитесь, что в нём задан корректный `main.secret_key`, включены нужные настройки `[auth]` и используется стабильный `auth.jwt_secret` (либо параметр отсутствует/пустой и приложение использует `main.secret_key`).
+
+Для SQLite оставьте `persistence.enabled=true` и `web.replicaCount=1`. Для PostgreSQL и многоузловой установки можно установить `persistence.enabled=false`, когда все security secrets уже стабильно заданы в сгенерированной или внешней конфигурации.
 
 ```bash
 helm upgrade incidentrelay ./helm/incidentrelay --reuse-values
