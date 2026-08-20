@@ -537,13 +537,21 @@ def test_cleanup_alert_explain_traces_deletes_old_traces(db):
     assert alerts_repo.get_alert_explain_trace(fresh_result.trace_id) is not None
 
 
-def test_cleanup_alert_explain_traces_rejects_invalid_retention(db):
-    try:
-        cleanup_alert_explain_traces(retention_days=0)
-    except ValueError as exc:
-        assert str(exc) == "retention_days must be greater than 0"
-    else:
-        raise AssertionError("cleanup_alert_explain_traces must reject non-positive retention")
+def test_cleanup_alert_explain_traces_is_disabled_when_retention_is_zero(db):
+    result = cleanup_alert_explain_traces(retention_days=0)
+
+    assert result == {
+        "traces_deleted": 0,
+        "steps_deleted": 0,
+        "cutoff": None,
+    }
+
+
+def test_cleanup_alert_explain_traces_rejects_negative_retention(db):
+    import pytest
+
+    with pytest.raises(ValueError, match="retention_days"):
+        cleanup_alert_explain_traces(retention_days=-1)
 
 
 def test_priority_resolution_trace_contains_normalized_severity(db):

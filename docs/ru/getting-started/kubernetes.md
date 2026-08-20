@@ -44,7 +44,7 @@ helm install incidentrelay ./helm/incidentrelay \
 ```bash
 helm upgrade --install incidentrelay ./helm/incidentrelay \
   --set image.repository=ghcr.io/roxy-wi/incidentrelay \
-  --set image.tag=2.0 \
+  --set image.tag=2.1 \
   --set-string config.main.secret_key="$(openssl rand -hex 32)"
 ```
 

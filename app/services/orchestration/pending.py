@@ -511,7 +511,7 @@ def retry_failed_pending_event(pending_event_id: int, *, now=None):
     return updated == 1
 
 
-def cleanup_orchestration_retention(*, now=None):
+def cleanup_orchestration_retention(*, now=None, execution_retention_days=None):
     now = now or utc_now()
     executions_deleted = (
         OrchestrationExecution.delete()
@@ -521,6 +521,26 @@ def cleanup_orchestration_retention(*, now=None):
         )
         .execute()
     )
+
+    if execution_retention_days is None:
+        execution_retention_days = getattr(
+            Config,
+            "RETENTION_ORCHESTRATION_EXECUTION_DAYS",
+            0,
+        )
+    execution_retention_days = int(execution_retention_days)
+    if execution_retention_days < 0:
+        raise ValueError(
+            "execution_retention_days must be greater than or equal to 0"
+        )
+    if execution_retention_days > 0:
+        execution_cutoff = now - timedelta(days=execution_retention_days)
+        executions_deleted += (
+            OrchestrationExecution.delete()
+            .where(OrchestrationExecution.created_at < execution_cutoff)
+            .execute()
+        )
+
     retention_days = int(
         getattr(Config, "ORCHESTRATION_PENDING_EVENT_RETENTION_DAYS", 30)
     )

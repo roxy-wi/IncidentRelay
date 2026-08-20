@@ -61,22 +61,50 @@ def readyz():
     db = init_database()
     response: dict[str, Any] = {"status": "ready"}
     http_status = 200
-
-    # Database check ------------------------------------------------------
     db_was_closed = db.is_closed()
+
     try:
-        if db_was_closed:
-            db.connect(reuse_if_open=True)
-        db.execute_sql("SELECT 1")
-        response["database"] = "ok"
-    except Exception:
-        response["status"] = "not_ready"
-        response["database"] = "error"
-        response["database_error"] = "database check failed"
-        http_status = 503
-        logger.warning("readyz database check failed", exc_info=True)
-        # If the database is unreachable, there is no point in checking
-        # migrations; return early.
+        # Keep the connection open for both checks. Closing it after SELECT 1
+        # and relying on an implicit reconnect in get_applied_migrations()
+        # makes readiness depend on Peewee/backend autoconnect behaviour.
+        try:
+            if db_was_closed:
+                db.connect(reuse_if_open=True)
+            db.execute_sql("SELECT 1")
+            response["database"] = "ok"
+        except Exception:
+            response["status"] = "not_ready"
+            response["database"] = "error"
+            response["database_error"] = "database check failed"
+            logger.warning("readyz database check failed", exc_info=True)
+            return jsonify(response), 503
+
+        # Migration table stores names WITHOUT the .py suffix; on-disk files
+        # carry it. Normalize the disk side so set comparison works (this
+        # matches how migrations.migrate() itself compares them).
+        try:
+            applied = set(get_applied_migrations())
+            on_disk = [
+                filename.replace(".py", "")
+                for filename in get_migration_files()
+            ]
+            pending = [name for name in on_disk if name not in applied]
+
+            response["migrations"] = {
+                "applied": len(applied),
+                "total": len(on_disk),
+            }
+
+            if pending:
+                response["status"] = "not_ready"
+                response["migrations"]["pending"] = pending
+                http_status = 503
+        except Exception:
+            response["status"] = "not_ready"
+            response["migrations"] = {"error": "migration check failed"}
+            http_status = 503
+            logger.warning("readyz migration check failed", exc_info=True)
+
         return jsonify(response), http_status
     finally:
         if db_was_closed and not db.is_closed():
@@ -84,32 +112,3 @@ def readyz():
                 db.close()
             except Exception:
                 pass
-
-    # Migrations check ----------------------------------------------------
-    # Migration table stores names WITHOUT the .py suffix; on-disk files
-    # carry it. Normalize the disk side so set comparison works (this
-    # matches how migrations.migrate() itself compares them).
-    try:
-        applied = set(get_applied_migrations())
-        on_disk = [
-            filename.replace(".py", "")
-            for filename in get_migration_files()
-        ]
-        pending = [name for name in on_disk if name not in applied]
-
-        response["migrations"] = {
-            "applied": len(applied),
-            "total": len(on_disk),
-        }
-
-        if pending:
-            response["status"] = "not_ready"
-            response["migrations"]["pending"] = pending
-            http_status = 503
-    except Exception:
-        response["status"] = "not_ready"
-        response["migrations"] = {"error": "migration check failed"}
-        http_status = 503
-        logger.warning("readyz migration check failed", exc_info=True)
-
-    return jsonify(response), http_status

@@ -3,6 +3,7 @@ from datetime import timedelta
 import pytest
 
 from app.modules.common import utc_now
+from app.settings import Config
 from app.modules.db.models import (
     Alert,
     AlertGroup,
@@ -425,6 +426,33 @@ def test_retention_cleanup_removes_expired_drop_trace_and_terminal_pause(db):
     }
     assert OrchestrationExecution.get_or_none(OrchestrationExecution.id == execution.id) is None
     assert PendingOrchestratedEvent.get_or_none(PendingOrchestratedEvent.id == pending.id) is None
+
+
+def test_retention_cleanup_removes_old_general_execution(db, monkeypatch):
+    group = create_group()
+    team = create_team(group)
+    route = create_route(team, source="alertmanager")
+    _publish(group, [{"type": "set_title", "value": "Retention test"}])
+
+    upsert_alert(_alert_data(route, "retention-general-1"))
+    execution = OrchestrationExecution.get()
+    execution.created_at = utc_now() - timedelta(days=60)
+    execution.expires_at = None
+    execution.save(
+        only=[
+            OrchestrationExecution.created_at,
+            OrchestrationExecution.expires_at,
+        ]
+    )
+
+    monkeypatch.setattr(Config, "RETENTION_ORCHESTRATION_EXECUTION_DAYS", 30)
+
+    result = cleanup_orchestration_retention(now=utc_now())
+
+    assert result["executions_deleted"] == 1
+    assert OrchestrationExecution.get_or_none(
+        OrchestrationExecution.id == execution.id
+    ) is None
 
 
 def test_disposition_metrics_count_executions_and_pending_states(db):

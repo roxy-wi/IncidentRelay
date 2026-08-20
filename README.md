@@ -23,7 +23,8 @@ Uptime Kuma and generic webhook/PagerDuty Event API v2 integrations;
 - maintenance windows for planned work and alert behavior control;
 - calendar view for on-call schedules;
 - personal API tokens;
-- Swagger/OpenAPI documentation.
+- Swagger/OpenAPI documentation;
+- configurable data retention for resolved alert history and diagnostic traces.
 
 IncidentRelay is designed for **self-hosted environments** where teams need predictable behavior, clear ownership, easy integrations, and full control over alert routing.
 
@@ -175,7 +176,7 @@ helm install incidentrelay ./helm/incidentrelay \
 By default, the chart uses:
 
 ```bash
-ghcr.io/roxy-wi/incidentrelay:2.0
+ghcr.io/roxy-wi/incidentrelay:2.1
 ```
 
 To pin another image:
@@ -183,7 +184,7 @@ To pin another image:
 ```bash
 helm upgrade --install incidentrelay ./helm/incidentrelay \
   --set image.repository=ghcr.io/roxy-wi/incidentrelay \
-  --set image.tag=2.0 \
+  --set image.tag=2.1 \
   --set-string config.main.secret_key="$(openssl rand -hex 32)"
 ```
 

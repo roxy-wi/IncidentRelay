@@ -4,17 +4,21 @@ from app.modules.db import alerts_repo
 from app.modules.common import utc_now
 
 
-DEFAULT_ALERT_EXPLAIN_RETENTION_DAYS = 30
-
-
 def cleanup_alert_explain_traces(*, retention_days=None, now=None):
     if retention_days is None:
-        retention_days = DEFAULT_ALERT_EXPLAIN_RETENTION_DAYS
+        retention_days = 0
 
     retention_days = int(retention_days)
 
-    if retention_days <= 0:
-        raise ValueError("retention_days must be greater than 0")
+    if retention_days < 0:
+        raise ValueError("retention_days must be greater than or equal to 0")
+
+    if retention_days == 0:
+        return {
+            "traces_deleted": 0,
+            "steps_deleted": 0,
+            "cutoff": None,
+        }
 
     if now is None:
         now = utc_now()

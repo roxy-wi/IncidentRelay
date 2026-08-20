@@ -8,6 +8,7 @@ description: Administration topics for operating IncidentRelay.
 Administration topics:
 
 - [Scheduler](scheduler.md)
+- [Data Retention](data-retention.md)
 - [Logging](logging.md)
 - [SSO](sso.md)
 - [Demo Data](demo-data.md)

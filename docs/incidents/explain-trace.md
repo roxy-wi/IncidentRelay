@@ -192,23 +192,24 @@ Orphan traces are traces without `group_id`. They can be read only by administra
 
 ## Retention
 
-Explain traces are cleaned up automatically by the scheduler.
-
-Default retention:
+Explain Trace uses the central `[retention]` policy. When no trace-specific value is configured, it inherits `alert_days`:
 
 ```ini
-[alerts]
-alert_explain_trace_retention_days = 30
+[retention]
+alert_days = 30
 ```
 
-Default cleanup interval:
+To keep Explain Trace for a different period, set an override in the same section:
 
 ```ini
-[scheduler]
-alert_explain_trace_cleanup_interval_seconds = 86400
+[retention]
+alert_days = 90
+explain_trace_days = 30
 ```
 
-Set `alert_explain_trace_retention_days` to a positive integer.
+An explicit `explain_trace_days = 0` disables standalone Explain Trace cleanup. Traces linked to an alert or alert group are still removed when that alert history is deleted through database cascades. Cleanup runs as part of the single `retention_cleanup_job`; its cadence is controlled by `retention.cleanup_interval_seconds`.
+
+IncidentRelay 2.1 accepts the old `[alerts] alert_explain_trace_retention_days` value only as an upgrade fallback when `retention.explain_trace_days` is absent. New configuration should use `[retention]`.
 
 ## Troubleshooting
 

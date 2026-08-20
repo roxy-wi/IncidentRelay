@@ -32,6 +32,30 @@ environment:
 
 Старое имя `ONCALL_CONFIG_FILE` использовать не следует.
 
+## Основной секрет и секрет аутентификации
+
+Сгенерируйте два разных случайных значения и не меняйте их при перезапусках и
+обновлениях:
+
+```bash
+openssl rand -hex 32
+openssl rand -hex 32
+```
+
+```ini
+[main]
+secret_key = замените-на-первое-случайное-значение
+
+[auth]
+jwt_secret = замените-на-второе-случайное-значение
+jwt_cookie_secure = true
+```
+
+Параметр `secret_key` относится к секции `[main]`, а не `[server]`.
+Параметр `jwt_secret` относится к `[auth]`. Не используйте одно значение для
+обоих параметров. При HTTPS в `public_base_url` установите
+`jwt_cookie_secure = true`.
+
 ## Секция server
 
 ```ini
@@ -39,7 +63,6 @@ environment:
 host = 0.0.0.0
 port = 8080
 public_base_url = https://incidentrelay.example.com
-secret_key = change-me
 ```
 
 | Параметр | Описание |
@@ -47,7 +70,6 @@ secret_key = change-me
 | `host` | Адрес, к которому привязывается веб-сервис |
 | `port` | HTTP-порт |
 | `public_base_url` | Внешний URL, используемый в ссылках алертов, кнопках и колбэках |
-| `secret_key` | Секрет приложения; смените его в продакшене |
 
 В продакшене `public_base_url` должен быть реальным внешним HTTPS-URL.
 
@@ -56,7 +78,7 @@ secret_key = change-me
 ```ini
 [database]
 type = sqlite
-path = /var/lib/incidentrelay/incidentrelay.db
+name = /var/lib/incidentrelay/incidentrelay.db
 
 [sqlite]
 wal = true
@@ -78,6 +100,22 @@ password = change-me
 ```
 
 Используйте PostgreSQL для более крупных инсталляций, высокого объёма алертов, нескольких веб-воркеров или долгосрочных продакшен-развёртываний.
+
+
+## Политика хранения данных
+
+В IncidentRelay 2.1 все новые retention-настройки находятся в одной секции:
+
+```ini
+[retention]
+alert_days = 30
+# explain_trace_days = 30
+# orchestration_execution_days = 30
+cleanup_interval_seconds = 86400
+batch_size = 500
+```
+
+`alert_days = 0` используется по умолчанию и хранит завершённую историю alerts бессрочно. Explain Trace и обычные Event Orchestration executions наследуют `alert_days`, если для них не задан отдельный override. Точные правила удаления и совместимость при обновлении описаны в разделе [Политика хранения данных](../administration/data-retention.md).
 
 ## Секция SMTP
 

@@ -51,6 +51,20 @@ Rotation reminder interval rules:
 
 Do not use a global runtime fallback for reminder-after when rotations require an explicit reminder interval.
 
+
+## Data retention job
+
+IncidentRelay 2.1 runs one periodic retention job for alert history, Explain Trace, and Event Orchestration retention. Configure its cadence in the dedicated section:
+
+```ini
+[retention]
+alert_days = 30
+cleanup_interval_seconds = 86400
+batch_size = 500
+```
+
+`explain_trace_days` and `orchestration_execution_days` inherit `alert_days` when omitted. The job uses the same distributed database-lock mechanism as other scheduler maintenance jobs. See [Data Retention](data-retention.md).
+
 ## Environment variables
 
 The scheduler process should use:

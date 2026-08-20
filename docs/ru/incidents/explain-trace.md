@@ -190,25 +190,26 @@ Alerts -> Explain trace
 
 Трассировки-сироты — это трассировки без `group_id`. Их могут читать только администраторы.
 
-## Хранение
+## Retention
 
-Трассировки объяснения автоматически очищаются планировщиком.
-
-Срок хранения по умолчанию:
+Explain Trace использует общую политику `[retention]`. Если отдельное значение для trace не задано, используется `alert_days`:
 
 ```ini
-[alerts]
-alert_explain_trace_retention_days = 30
+[retention]
+alert_days = 30
 ```
 
-Интервал очистки по умолчанию:
+Чтобы хранить Explain Trace другой срок, задайте override в той же секции:
 
 ```ini
-[scheduler]
-alert_explain_trace_cleanup_interval_seconds = 86400
+[retention]
+alert_days = 90
+explain_trace_days = 30
 ```
 
-Задайте для `alert_explain_trace_retention_days` положительное целое число.
+Явный `explain_trace_days = 0` отключает отдельную очистку standalone Explain Trace. Traces, связанные с alert или alert group, всё равно удаляются каскадно вместе с alert history. Cleanup выполняется единым `retention_cleanup_job`; его периодичность задаёт `retention.cleanup_interval_seconds`.
+
+IncidentRelay 2.1 читает старый `[alerts] alert_explain_trace_retention_days` только как fallback при обновлении, если `retention.explain_trace_days` отсутствует. В новом конфиге следует использовать `[retention]`.
 
 ## Устранение неполадок
 

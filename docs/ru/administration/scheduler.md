@@ -51,6 +51,20 @@ incidentrelay-scheduler   # one scheduler process
 
 Не используйте глобальный резервный интервал времени выполнения для reminder-after, когда ротации требуют явного интервала напоминаний.
 
+
+## Retention данных
+
+IncidentRelay 2.1 запускает один периодический retention job для истории alerts, Explain Trace и Event Orchestration. Периодичность настраивается в отдельной секции:
+
+```ini
+[retention]
+alert_days = 30
+cleanup_interval_seconds = 86400
+batch_size = 500
+```
+
+`explain_trace_days` и `orchestration_execution_days` наследуют `alert_days`, если не заданы явно. Job использует тот же distributed database lock, что и остальные scheduler jobs. Подробнее: [Политика хранения данных](data-retention.md).
+
 ## Переменные окружения
 
 Процесс планировщика должен использовать:
