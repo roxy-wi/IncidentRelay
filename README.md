@@ -166,29 +166,27 @@ Read more: [Docker installation](docs/getting-started/docker.md)
 
 ### Kubernetes (Helm)
 
-A Helm chart lives in `helm/incidentrelay`. It deploys the web UI plus the scheduler, Telegram and Slack workers, renders the application config from values into a Secret, and wires up the `/healthz` and `/readyz` probes.
+The IncidentRelay Helm chart is published as an OCI artifact in GHCR, so installing it does not require cloning this repository. It deploys the web UI plus the scheduler, Telegram and Slack workers, renders the application config from values into a Secret, and wires up the `/healthz` and `/readyz` probes.
 
 ```bash
-helm install incidentrelay ./helm/incidentrelay \
+helm install incidentrelay \
+  oci://ghcr.io/roxy-wi/incidentrelay-charts/incidentrelay \
+  --version 2.1.0 \
   --set-string config.main.secret_key="$(openssl rand -hex 32)"
 ```
 
-By default, the chart uses:
+The chart defaults to `ghcr.io/roxy-wi/incidentrelay:2.1`. To pin another application image:
 
 ```bash
-ghcr.io/roxy-wi/incidentrelay:2.1
-```
-
-To pin another image:
-
-```bash
-helm upgrade --install incidentrelay ./helm/incidentrelay \
+helm upgrade --install incidentrelay \
+  oci://ghcr.io/roxy-wi/incidentrelay-charts/incidentrelay \
+  --version 2.1.0 \
   --set image.repository=ghcr.io/roxy-wi/incidentrelay \
   --set image.tag=2.1 \
   --set-string config.main.secret_key="$(openssl rand -hex 32)"
 ```
 
-All settings from `incidentrelay.conf` are available under `config.*` in [values.yaml](helm/incidentrelay/values.yaml); you can also bring a pre-rendered config via `existingConfigSecret`. IncidentRelay 2.0 enables API authentication and RBAC by default in the chart, and empty JWT/encryption/callback secrets inherit the required `config.main.secret_key` so all pods share stable keys.
+For development from a source checkout, use `./helm/incidentrelay` instead of the OCI URL. All settings from `incidentrelay.conf` are available under `config.*` in [values.yaml](helm/incidentrelay/values.yaml); you can also bring a pre-rendered config via `existingConfigSecret`. Empty JWT/encryption/callback secrets inherit the required `config.main.secret_key` so all pods share stable keys.
 
 Read more: [Kubernetes installation](docs/getting-started/kubernetes.md)
 

@@ -13,3 +13,7 @@ keywords:
   - incident
   - alerting
   - notifications
+annotations:
+  org.opencontainers.image.source: https://github.com/roxy-wi/IncidentRelay
+  org.opencontainers.image.description: IncidentRelay Helm chart for on-call scheduling, alert routing and incident response
+  org.opencontainers.image.licenses: MIT

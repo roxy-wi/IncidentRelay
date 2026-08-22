@@ -1,4 +1,4 @@
-name: Docker image
+name: Docker image and Helm chart
 
 on:
   workflow_dispatch:
@@ -7,22 +7,62 @@ on:
       - main
     tags:
       - "v*"
+  pull_request:
+    branches:
+      - main
 
 permissions:
   contents: read
   packages: write
 
 concurrency:
-  group: docker-image-${{ github.ref }}
+  group: release-artifacts-${{ github.ref }}
   cancel-in-progress: true
 
 env:
   REGISTRY: ghcr.io
   IMAGE_NAME: roxy-wi/incidentrelay
+  CHART_DIR: helm/incidentrelay
+  CHART_REGISTRY: ghcr.io/roxy-wi/incidentrelay-charts
 
 jobs:
+  helm-check:
+    name: Helm ${{ matrix.helm-version }} validation
+    runs-on: ubuntu-latest
+
+    strategy:
+      fail-fast: false
+      matrix:
+        helm-version:
+          - v3.21.3
+          - v4.2.3
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v5.0.1
+        with:
+          version: ${{ matrix.helm-version }}
+
+      - name: Lint chart
+        run: |
+          helm lint "${CHART_DIR}" \
+            --set-string config.main.secret_key=incidentrelay-ci-secret
+
+      - name: Render chart
+        run: |
+          helm template incidentrelay "${CHART_DIR}" \
+            --namespace incidentrelay \
+            --set-string config.main.secret_key=incidentrelay-ci-secret \
+            > /tmp/incidentrelay.yaml
+          test -s /tmp/incidentrelay.yaml
+
   build-and-push:
     name: Build and push Docker image
+    needs: helm-check
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
 
     steps:
@@ -90,3 +130,63 @@ jobs:
           labels: ${{ steps.image.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  helm-publish:
+    name: Publish Helm chart to GHCR
+    needs: build-and-push
+    if: startsWith(github.ref, 'refs/tags/v') && !contains(github.ref_name, '-')
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Set up Helm
+        uses: azure/setup-helm@v5.0.1
+        with:
+          version: v4.2.3
+
+      - name: Validate release metadata
+        id: chart
+        shell: bash
+        run: |
+          release_version="${GITHUB_REF_NAME#v}"
+          chart_version="$(awk '$1 == "version:" {gsub(/[\"'\'' ]/, "", $2); print $2; exit}' "${CHART_DIR}/Chart.yaml")"
+          app_version="$(awk '$1 == "appVersion:" {gsub(/[\"'\'' ]/, "", $2); print $2; exit}' "${CHART_DIR}/Chart.yaml")"
+
+          if [[ ! "${release_version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+            echo "Stable Helm releases require a vMAJOR.MINOR.PATCH tag, got ${GITHUB_REF_NAME}" >&2
+            exit 1
+          fi
+
+          if [[ "${chart_version}" != "${release_version}" ]]; then
+            echo "Chart version ${chart_version} does not match release tag ${release_version}" >&2
+            exit 1
+          fi
+
+          if [[ -z "${app_version}" ]]; then
+            echo "Chart appVersion is empty" >&2
+            exit 1
+          fi
+
+          echo "version=${chart_version}" >> "${GITHUB_OUTPUT}"
+
+      - name: Package chart
+        run: |
+          mkdir -p dist
+          helm package "${CHART_DIR}" --destination dist
+          test -f "dist/incidentrelay-${{ steps.chart.outputs.version }}.tgz"
+
+      - name: Log in to GHCR with Helm
+        shell: bash
+        run: |
+          echo "${{ secrets.GITHUB_TOKEN }}" | \
+            helm registry login "${REGISTRY}" \
+              --username "${GITHUB_ACTOR}" \
+              --password-stdin
+
+      - name: Push chart to GHCR
+        run: |
+          helm push \
+            "dist/incidentrelay-${{ steps.chart.outputs.version }}.tgz" \
+            "oci://${CHART_REGISTRY}"
