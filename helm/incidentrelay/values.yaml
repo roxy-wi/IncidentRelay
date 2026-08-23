@@ -73,6 +73,8 @@ config:
     outbound_http_max_redirects: 3
     outbound_http_max_response_bytes: 1048576
   alerts:
+    # Processing trace detail: full, compact or disabled. Global Event Orchestration may override it.
+    explain_trace_level: full
     reminder_interval_seconds: 60
     alert_group_window_seconds: 3600
     alert_group_wait_seconds: 30

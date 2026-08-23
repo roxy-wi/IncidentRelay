@@ -7,6 +7,7 @@ from app.services.orchestration.actions import (
     FAILURE_MODES,
     PROCESS_DISPOSITIONS,
     SUPPORTED_ACTION_TYPES,
+    TRACE_LEVELS,
 )
 from app.services.orchestration.conditions import SUPPORTED_OPERATORS
 
@@ -139,6 +140,11 @@ ACTION_SCHEMA = {
         "priority_policy_id": {"type": "integer", "minimum": 1},
         "action_id": {"type": "integer", "minimum": 1},
         "event_action": {"type": "string", "enum": sorted(EVENT_ACTIONS)},
+        "level": {
+            "type": "string",
+            "enum": sorted(TRACE_LEVELS),
+            "description": "Detail level for the set_trace_level action.",
+        },
         "group_key": {"type": "string"},
         "dedup_key": {"type": "string"},
         "window_seconds": {"type": "integer", "minimum": 0, "maximum": 86400},

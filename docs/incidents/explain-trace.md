@@ -94,6 +94,7 @@ Example response:
     "id": 12,
     "trace_id": "4fd2a8c9-8c2f-44e8-96fd-77b7f03e72f2",
     "mode": "live",
+    "trace_level": "full",
     "group_id": 123,
     "alert_id": 456,
     "source": "alertmanager",
@@ -151,6 +152,34 @@ Example response:
   ]
 }
 ```
+
+## Trace detail level
+
+The default processing trace level is configured globally:
+
+```ini
+[alerts]
+explain_trace_level = full
+```
+
+Available levels:
+
+- `full` — records the complete Explain Trace, including `input_summary`, result payload and step `data`;
+- `compact` — records the trace and ordered steps, but stores those detailed JSON fields as empty objects;
+- `disabled` — does not create `AlertExplainTrace` or `AlertExplainStep` rows and ingest responses return `trace_id: null`.
+
+Global Event Orchestration can override the default for matching events:
+
+```json
+{
+  "type": "set_trace_level",
+  "level": "compact"
+}
+```
+
+`set_trace_level` is intentionally limited to global orchestrations. Service-scoped orchestration may run after alert lifecycle processing has already started, which is too late to guarantee that disabled traces never reach the database. If several matching global actions set the level, the last applied value wins.
+
+Trace level controls **how much is written**. The `[retention]` section independently controls **how long persisted traces are kept**.
 
 ## UI
 

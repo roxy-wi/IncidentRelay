@@ -597,6 +597,9 @@ Catch-all-правила полезны в конце определения д�
 | `set_dedup_key` | Определить, какие повторные события обновляют один дочерний алерт. | `{{ labels.alertname }}:{{ labels.instance }}` |
 | `set_group_key` | Определить, какие дочерние алерты относятся к одной группе. | `{{ labels.alertname }}:{{ labels.environment }}` |
 | `set_event_action` | Принудительно задать семантику trigger или resolve. | `trigger` или `resolve` |
+| `set_trace_level` | Переопределить детализацию Alert Explain Trace для события. Только для global orchestration. | `full`, `compact` или `disabled` |
+
+`set_trace_level` управляет объёмом Alert Explain Trace до того, как alert lifecycle начнёт записывать trace. `compact` сохраняет упорядоченные шаги без подробных JSON-данных payload, а `disabled` не создаёт строки Alert Explain Trace. Service-scoped orchestration не может использовать это действие, потому что она может выполниться уже после начала lifecycle.
 
 Используйте стабильные значения для дедупликации и группировки. Не включайте временные метки и другие значения, меняющиеся при каждом запросе, если только вы намеренно не хотите каждый раз создавать новый алерт.
 

@@ -125,6 +125,7 @@ GET /api/alerts/explain/{trace_id}
   "id": 12,
   "trace_id": "4fd2a8c9-8c2f-44e8-96fd-77b7f03e72f2",
   "mode": "live",
+  "trace_level": "full",
   "group_id": 123,
   "alert_id": 456,
   "source": "alertmanager",
@@ -151,6 +152,34 @@ GET /api/alerts/explain/{trace_id}
   ]
 }
 ```
+
+## Уровень детализации trace
+
+Уровень обработки по умолчанию задаётся глобально:
+
+```ini
+[alerts]
+explain_trace_level = full
+```
+
+Доступные уровни:
+
+- `full` — записывает полный Explain Trace, включая `input_summary`, payload результата и `data` каждого шага;
+- `compact` — сохраняет trace и последовательность шагов, но подробные JSON-поля записывает пустыми объектами;
+- `disabled` — не создаёт строки `AlertExplainTrace` и `AlertExplainStep`, а Ingest API возвращает `trace_id: null`.
+
+Глобальная Event Orchestration может переопределить значение для совпавших событий:
+
+```json
+{
+  "type": "set_trace_level",
+  "level": "compact"
+}
+```
+
+`set_trace_level` намеренно разрешён только в global orchestration. Service-scoped orchestration может выполняться уже после начала alert lifecycle, когда слишком поздно гарантировать отсутствие записей в БД для режима `disabled`. Если несколько совпавших global actions задают уровень, используется последнее применённое значение.
+
+Trace level определяет **сколько данных записывать**, а секция `[retention]` независимо определяет **сколько времени хранить уже записанные traces**.
 
 ## Интерфейс
 

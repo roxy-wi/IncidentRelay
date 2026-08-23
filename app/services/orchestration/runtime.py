@@ -78,6 +78,7 @@ class RuntimeResult:
     notification_policy: Any = None
     group_key: Optional[str] = None
     grouping_window_seconds: Optional[int] = None
+    trace_level: Optional[str] = None
     route_selected_by_orchestration: bool = False
     steps: List[RuntimeStep] = field(default_factory=list)
     blocked: bool = False
@@ -107,6 +108,7 @@ class RuntimeResult:
             "notification_policy_id": getattr(self.notification_policy, "id", None),
             "group_key": self.group_key,
             "grouping_window_seconds": self.grouping_window_seconds,
+            "trace_level": self.trace_level,
             "blocked": self.blocked,
             "reason": self.reason,
             "disposition": self.disposition,
@@ -604,6 +606,13 @@ def _evaluate_orchestrations(
             runtime.grouping_window_seconds = grouping.get("window_seconds")
 
         result_state = context.get("result") or {}
+        trace_level = result_state.get("trace_level")
+        if (
+            orchestration.scope == "global"
+            and trace_level in {"full", "compact", "disabled"}
+        ):
+            runtime.trace_level = trace_level
+
         disposition = result_state.get("disposition") or "process"
         if disposition in {"suppress", "pause", "drop"}:
             runtime.disposition = disposition
@@ -1002,6 +1011,7 @@ def restore_runtime_result(data: Mapping[str, Any]) -> RuntimeResult:
         ) if payload.get("notification_policy_id") else None,
         group_key=payload.get("group_key"),
         grouping_window_seconds=payload.get("grouping_window_seconds"),
+        trace_level=payload.get("trace_level"),
         route_selected_by_orchestration=bool(
             payload.get("route_selected_by_orchestration")
         ),

@@ -2,6 +2,7 @@ from datetime import timedelta
 
 from types import SimpleNamespace
 
+from app import Config
 from app.services.alerts.explain import AlertExplainTrace
 from app.services.incidents.priority_policies.resolver import (
     PriorityResolution,
@@ -9,6 +10,7 @@ from app.services.incidents.priority_policies.resolver import (
 
 from app.services.alerts.explain_cleanup import cleanup_alert_explain_traces
 from app.modules.db import alerts_repo, tokens_repo
+from app.modules.db.models import AlertExplainStep, AlertExplainTrace as AlertExplainTraceModel
 from app.services.integrations.auth import hash_token
 from app.services.alerts.lifecycle import upsert_alert
 from tests.factories import create_group, create_route, create_team, create_user, unique
@@ -721,3 +723,49 @@ def test_priority_application_trace_explains_less_severe_priority(db):
     assert step.data["incoming_priority_slug"] == "p4"
     assert step.data["previous_priority_slug"] == "p2"
     assert step.data["priority_slug"] == "p2"
+
+
+def test_global_compact_trace_level_keeps_steps_without_data(db, monkeypatch):
+    monkeypatch.setattr(Config, "ALERT_EXPLAIN_TRACE_LEVEL", "compact")
+    group = create_group(slug=unique("group"))
+    team = create_team(group, slug=unique("team"))
+    route = create_route(team, source="alertmanager")
+
+    result = upsert_alert(make_alert_payload(route))
+    trace, steps = _trace_steps(result.trace_id)
+
+    assert trace.trace_level == "compact"
+    assert trace.input_summary == {}
+    assert trace.result == {}
+    assert steps
+    assert all(step.data == {} for step in steps)
+
+
+def test_global_disabled_trace_level_does_not_write_trace_rows(db, monkeypatch):
+    monkeypatch.setattr(Config, "ALERT_EXPLAIN_TRACE_LEVEL", "disabled")
+    group = create_group(slug=unique("group"))
+    team = create_team(group, slug=unique("team"))
+    route = create_route(team, source="alertmanager")
+    traces_before = AlertExplainTraceModel.select().count()
+    steps_before = AlertExplainStep.select().count()
+
+    result = upsert_alert(make_alert_payload(route))
+
+    assert result.group is not None
+    assert result.alert is not None
+    assert result.trace_id is None
+    assert AlertExplainTraceModel.select().count() == traces_before
+    assert AlertExplainStep.select().count() == steps_before
+
+
+def test_invalid_global_trace_level_falls_back_to_full(db, monkeypatch):
+    monkeypatch.setattr(Config, "ALERT_EXPLAIN_TRACE_LEVEL", "verbose")
+    group = create_group(slug=unique("group"))
+    team = create_team(group, slug=unique("team"))
+    route = create_route(team, source="alertmanager")
+
+    result = upsert_alert(make_alert_payload(route))
+    trace, _ = _trace_steps(result.trace_id)
+
+    assert trace.trace_level == "full"
+    assert trace.input_summary["title"] == "DiskFull"

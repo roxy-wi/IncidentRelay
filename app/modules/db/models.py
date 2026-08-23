@@ -2177,6 +2177,7 @@ class AlertExplainTrace(BaseModel):
     )
 
     mode = CharField(default="live", index=True)  # live, dry_run
+    trace_level = CharField(default="full")  # full, compact
     source = CharField(null=True, index=True)
     dedup_key = CharField(null=True, index=True)
 

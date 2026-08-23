@@ -22,6 +22,7 @@ const ORCHESTRATION_ACTION_TYPES = [
     "set_variable", "static", "lowercase", "uppercase", "trim",
     "set_title", "set_message", "set_description", "set_severity",
     "set_priority", "set_dedup_key", "set_group_key", "set_event_action",
+    "set_trace_level",
     "set_label", "remove_label", "set_custom_field", "remove_custom_field",
     "set_team", "set_route", "set_service", "set_escalation_policy",
     "set_notification_policy", "set_priority_policy", "set_grouping",
@@ -774,7 +775,11 @@ function removeOrchestrationCondition(path) {
 }
 
 function orchestrationActionOptions(select, selected) {
-    ORCHESTRATION_ACTION_TYPES.forEach(function (item) { select.append($("<option>").val(item).text(item)); });
+    ORCHESTRATION_ACTION_TYPES
+        .filter(function (item) {
+            return item !== "set_trace_level" || !orchestrationCurrent || orchestrationCurrent.scope !== "service";
+        })
+        .forEach(function (item) { select.append($("<option>").val(item).text(item)); });
     select.val(selected || "set_title");
 }
 
@@ -928,6 +933,17 @@ function orchestrationActionParamEditor(action, index) {
         container.append($("<input>").addClass("input orchestration-action-value").attr("placeholder", "value or {{ template }}").val(action.template !== undefined ? action.template : (action.value !== undefined ? action.value : "")));
     } else if (type === "set_event_action") {
         container.append($("<select>").addClass("input orchestration-action-value").append($("<option>").val("trigger").text("trigger"), $("<option>").val("resolve").text("resolve")).val(action.value || "trigger"));
+    } else if (type === "set_trace_level") {
+        container.append(
+            $("<select>")
+                .addClass("input orchestration-action-trace-level")
+                .append(
+                    $("<option>").val("full").text("full"),
+                    $("<option>").val("compact").text("compact"),
+                    $("<option>").val("disabled").text("disabled")
+                )
+                .val(action.level || "full")
+        );
     } else if (["set_label", "set_custom_field"].includes(type)) {
         container.append($("<input>").addClass("input orchestration-action-name").attr("placeholder", type === "set_label" ? "label name" : "field name").val(action.name || ""), $("<input>").addClass("input orchestration-action-value").attr("placeholder", "value or {{ template }}").val(action.template !== undefined ? action.template : (action.value !== undefined ? (typeof action.value === "string" ? action.value : JSON.stringify(action.value)) : "")));
     } else if (["remove_label", "remove_custom_field"].includes(type)) {
@@ -1052,6 +1068,8 @@ function syncOrchestrationActionEditor() {
             if (dedupKey) { action.dedup_key = dedupKey; }
             if (windowValue !== "") { action.window_seconds = Number(windowValue); }
         }
+        const traceLevel = row.find(".orchestration-action-trace-level").val();
+        if (type === "set_trace_level" && traceLevel) { action.level = traceLevel; }
         const reason = row.find(".orchestration-action-reason").val();
         if (reason) { action.reason = reason; }
         if (type === "pause") {

@@ -725,6 +725,7 @@ def serialize_alert_explain_trace(row, steps=None):
         "id": row.id,
         "trace_id": row.trace_id,
         "mode": row.mode,
+        "trace_level": getattr(row, "trace_level", "full") or "full",
         "group_id": row.group_id,
         "alert_id": row.alert_id,
         "source": row.source,

@@ -20,7 +20,10 @@ from app.modules.db.models import (
     PendingOrchestratedEvent,
 )
 from app.modules.redaction import redact_secrets
-from app.services.alerts.explain import AlertExplainTrace
+from app.services.alerts.explain import (
+    AlertExplainTrace,
+    resolve_alert_explain_trace_level,
+)
 from app.services.alerts.result import AlertProcessingResult
 from app.services.orchestration.runtime import (
     RuntimeResult,
@@ -407,7 +410,10 @@ def _activate_claimed(
         row = PendingOrchestratedEvent.get_by_id(row.id)
         alert_data = copy.deepcopy(row.normalized_event_json or {})
         runtime = _activation_runtime(row)
-        trace = AlertExplainTrace.start(alert_data)
+        trace = AlertExplainTrace.start_buffered(alert_data)
+        trace.apply_level(
+            resolve_alert_explain_trace_level(runtime.trace_level)
+        )
         trace.step(
             "orchestration",
             "orchestration_pause_activated",

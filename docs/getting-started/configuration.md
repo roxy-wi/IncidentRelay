@@ -100,6 +100,17 @@ password = change-me
 
 Use PostgreSQL for larger installations, higher alert volume, multiple web workers, or long-term production deployments.
 
+## Alert processing trace
+
+The global Explain Trace detail level is configured in `[alerts]`:
+
+```ini
+[alerts]
+explain_trace_level = full
+```
+
+Supported values are `full`, `compact` and `disabled`. `full` preserves the existing detailed trace. `compact` keeps ordered processing steps but omits `input_summary`, result payloads and per-step `data`. `disabled` stores no Alert Explain Trace rows. A global Event Orchestration rule can override this value for matching events with the `set_trace_level` action.
+
 
 ## Data retention
 

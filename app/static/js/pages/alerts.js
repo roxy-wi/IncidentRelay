@@ -1342,6 +1342,18 @@ function renderAlertExplainSummary(trace) {
 
     target.empty();
     target.append(detailItem(i18n.t("alert_details.explain.trace"), trace.trace_id));
+    if (trace.trace_level) {
+        target.append(
+            detailItem(
+                i18n.t("alert_details.explain.level"),
+                i18n.t(
+                    "alert_details.explain.level." + trace.trace_level,
+                    {},
+                    trace.trace_level
+                )
+            )
+        );
+    }
     target.append(
         $("<div>")
             .addClass("detail-item")
@@ -1360,6 +1372,14 @@ function renderAlertExplainSummary(trace) {
 
     if (trace.reason) {
         target.append(detailItem(i18n.t("alert_details.explain.reason"), trace.reason));
+    }
+
+    if (trace.trace_level === "compact") {
+        target.append(
+            $("<div>")
+                .addClass("help-text")
+                .text(i18n.t("alert_details.explain.compact_notice"))
+        );
     }
 }
 

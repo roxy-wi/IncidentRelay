@@ -4,7 +4,10 @@ from app import Config
 from app.modules.common import utc_now
 from app.modules.db import alerts_repo, incidents_repo
 from app.services.alerts.escalation import apply_initial_escalation_policy_assignment
-from app.services.alerts.explain import AlertExplainTrace
+from app.services.alerts.explain import (
+    AlertExplainTrace,
+    resolve_alert_explain_trace_level,
+)
 from app.services.alerts.maintenance_state import (
     apply_maintenance_to_existing_alert,
     maintenance_create_kwargs,
@@ -91,11 +94,14 @@ def upsert_alert(alert_data):
     Return:
         AlertProcessingResult
     """
-    trace = AlertExplainTrace.start(alert_data)
+    trace = AlertExplainTrace.start_buffered(alert_data)
     runtime = None
 
     try:
         runtime = run_event_orchestration(alert_data, trace=trace)
+        trace.apply_level(
+            resolve_alert_explain_trace_level(runtime.trace_level)
+        )
         if runtime.blocked:
             return _stopped_result(
                 trace=trace,
@@ -126,6 +132,11 @@ def upsert_alert(alert_data):
         attach_runtime_executions(runtime, group=result.group, alert=result.alert)
         return result
     except Exception as exc:
+        trace.apply_level(
+            resolve_alert_explain_trace_level(
+                getattr(runtime, "trace_level", None) if runtime is not None else None
+            )
+        )
         trace.fail(exc)
         raise
 

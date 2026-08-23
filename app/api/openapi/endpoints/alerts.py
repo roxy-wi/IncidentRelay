@@ -221,6 +221,12 @@ def alert_explain_trace_schema(include_steps=False):
             "description": "Trace mode.",
             "example": "live",
         },
+        "trace_level": {
+            "type": "string",
+            "enum": ["full", "compact"],
+            "description": "Detail level recorded for this processing trace.",
+            "example": "compact",
+        },
         "group_id": {
             "type": "integer",
             "nullable": True,
