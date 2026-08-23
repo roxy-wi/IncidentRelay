@@ -13,6 +13,7 @@ from app.services.alerts.correlation import format_correlation_plain
 from app.modules.common import utc_now
 
 EDITABLE_EVENTS = {"acknowledged", "resolved"}
+FIRING_ONLY_DELIVERY_EVENTS = {"notification", "update", "reminder", "escalation"}
 
 logger = logging.getLogger("oncall.notifications")
 
@@ -193,6 +194,24 @@ def notify_alert(group, event_type="notification"):
     """Send or update alert group notifications for route channels and user rules."""
 
     group = _ensure_alert_group(group)
+
+    if event_type in FIRING_ONLY_DELIVERY_EVENTS:
+        # A scheduler/queue worker can hold a stale in-memory group while an
+        # ACK is committed by another process. Re-read status immediately
+        # before resolving notification targets.
+        group = alerts_repo.get_alert_group(group.id)
+        if group.status != "firing" or group.merged_into_id:
+            logger.info(
+                "notification skipped because alert group is no longer firing",
+                extra={
+                    "extra": {
+                        "alert_group_id": group.id,
+                        "event_type": event_type,
+                        "status": group.status,
+                    }
+                },
+            )
+            return 0
 
     if (
         event_type in {"notification", "update", "reminder", "escalation"}

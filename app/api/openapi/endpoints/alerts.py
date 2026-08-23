@@ -965,8 +965,11 @@ def paths():
                 "tags": ["alerts"],
                 "summary": "Acknowledge alert group",
                 "description": (
-                    "Marks an alert group as acknowledged. Child alerts are not individually "
-                    "acknowledged. If a new child alert arrives later, the group is reopened as firing."
+                    "Marks an alert group as acknowledged and cancels queued firing/reminder/"
+                    "escalation deliveries. Child alerts are not individually acknowledged. "
+                    "A new child normally reopens the group. On routes grouped only by a "
+                    "non-empty incident_key, correlated children preserve acknowledgement "
+                    "unless they raise the effective incident priority."
                 ),
                 "operationId": "acknowledgeAlertGroup",
                 "security": bearer_security(),
