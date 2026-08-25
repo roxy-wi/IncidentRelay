@@ -11,7 +11,7 @@ It provides the core building blocks of an on-call system:
 - access groups and RBAC-style group roles;
 - teams and on-call rotations;
 - alert intake routes with per-route tokens;
-- Alertmanager, AWS SNS/Cloud watch, Grafana, Zabbix, Sentry, LibreNMS, Datadog, RMON,
+- Alertmanager, AWS SNS/Cloud watch, Grafana, Zabbix, Sentry, LibreNMS, Datadog, New Relic, RMON,
 Uptime Kuma and generic webhook/PagerDuty Event API v2 integrations;
 - Mattermost, Slack, Telegram, Discord, Microsoft Teams, email, webhook, and voice-call notifications;
 - profile-level browser/PWA push notifications;
@@ -114,6 +114,7 @@ IncidentRelay includes Swagger/OpenAPI documentation and personal API tokens wit
 |-----------------|--------------------------------------------|
 | Alertmanager    | `POST /api/integrations/alertmanager`      |
 | Datadog         | `POST /api/integrations/datadog`           |
+| New Relic       | `POST /api/integrations/new-relic`         |
 | Grafana         | `POST /api/integrations/grafana`           |
 | RMON            | `POST /api/integrations/rmon`              |
 | Zabbix          | `POST /api/integrations/zabbix`            |
@@ -406,6 +407,7 @@ More examples:
 - [Alertmanager integration](docs/integrations/alertmanager.md)
 - [AWS SNS/Cloud watch](integrations/aws-sns-cloudwatch.md)
 - [Datadog integration](docs/integrations/datadog.md)
+- [New Relic integration](docs/integrations/new-relic.md)
 - [Grafana integration](docs/integrations/grafana.md)
 - [Datalog integration](docs/integrations/datadog.md)
 - [RMON integration](docs/integrations/rmon.md)

@@ -17,6 +17,7 @@ def test_registry_contains_all_supported_integration_normalizers():
         "datadog",
         "grafana",
         "librenms",
+        "new_relic",
         "rmon",
         "sentry",
         "uptime_kuma",

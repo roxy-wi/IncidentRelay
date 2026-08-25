@@ -231,6 +231,52 @@ class DatadogWebhookSchema(ApiModel):
         return self
 
 
+class NewRelicWebhookSchema(ApiModel):
+    """Validate a New Relic Alerts Workflows webhook payload."""
+
+    # Workflow webhook templates are customizable. Keep well-known fields typed
+    # and preserve additional New Relic variables for normalization/routing.
+    model_config = ConfigDict(extra="allow")
+
+    issue_id: str | int | None = None
+    issueId: str | int | None = None
+    title: str | None = None
+    issue_title: str | None = None
+    issueTitle: str | None = None
+    message: str | None = None
+    description: str | None = None
+    state: str | None = None
+    status: str | None = None
+    priority: str | None = None
+    severity: str | None = None
+    issue_url: str | None = None
+    issuePageUrl: str | None = None
+    condition_name: str | None = None
+    policy_name: str | None = None
+    entity_guid: str | None = None
+    entity_name: str | None = None
+    entity_type: str | None = None
+    labels: Dict[str, Any] = Field(default_factory=dict)
+    tags: Any = None
+    team: str | None = None
+    accumulations: Dict[str, Any] = Field(default_factory=dict)
+    entitiesData: Dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def validate_not_empty(self):
+        payload = self.model_dump(exclude_none=True)
+        for key in ("labels", "accumulations", "entitiesData"):
+            if payload.get(key) == {}:
+                payload.pop(key, None)
+
+        if not payload:
+            raise ValueError(
+                "New Relic webhook payload must contain at least one field"
+            )
+
+        return self
+
+
 class UptimeKumaWebhookSchema(ApiModel):
     """Validate the standard Uptime Kuma Webhook payload."""
 

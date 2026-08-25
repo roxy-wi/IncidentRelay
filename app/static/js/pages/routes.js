@@ -322,6 +322,7 @@ function fillRouteSourceFilter(routes) {
         alertmanager: true,
         aws_sns: true,
         datadog: true,
+        new_relic: true,
         grafana: true,
         rmon: true,
         heartbeat: true,
@@ -1099,6 +1100,7 @@ function updateRouteSourceUi() {
     const isSentry = source === "sentry";
     const isAwsSns = source === "aws_sns";
     const isDatadog = source === "datadog";
+    const isNewRelic = source === "new_relic";
     const isUptimeKuma = source === "uptime_kuma";
     const isWebhook = source === "webhook";
 
@@ -1110,6 +1112,10 @@ function updateRouteSourceUi() {
     $("#route-datadog-help").toggleClass(
         "is-hidden",
         !isDatadog
+    );
+    $("#route-new-relic-help").toggleClass(
+        "is-hidden",
+        !isNewRelic
     );
     $("#route-uptime-kuma-help").toggleClass(
         "is-hidden",
@@ -1143,6 +1149,10 @@ function updateRouteSourceUi() {
         } else if (source === "datadog") {
             $("#route-group-by").val(
                 '["datadog_alert_id","datadog_scope"]'
+            );
+        } else if (source === "new_relic") {
+            $("#route-group-by").val(
+                '["new_relic_issue_id"]'
             );
         } else if (source === "rmon") {
             $("#route-group-by").val(
@@ -1507,6 +1517,10 @@ function getRouteIntakePath(route) {
         return "/api/integrations/zabbix";
     }
 
+    if (source === "new_relic") {
+        return "/api/integrations/new-relic";
+    }
+
     if (source === "uptime_kuma") {
         return "/api/integrations/uptime-kuma";
     }
@@ -1554,6 +1568,16 @@ function buildRouteIntakeCurl(route, token) {
         ].join("\n");
     }
 
+    if (source === "new_relic") {
+        return [
+            "# " + i18n.t("routes.intake.new_relic_example_comment"),
+            `curl -X POST '${url}' \\`,
+            "  -H 'Content-Type: application/json' \\",
+            `  -H 'Authorization: Bearer ${token || "<route-token>"}' \\`,
+            "  -d '{\"issue_id\":\"issue-example-1\",\"title\":\"API latency is high\",\"state\":\"ACTIVATED\",\"status\":\"CREATED\",\"priority\":\"CRITICAL\",\"issue_url\":\"https://one.newrelic.com/redirects/issue/issue-example-1\",\"condition_name\":\"API latency\",\"policy_name\":\"Production API\",\"entity_name\":\"checkout-api\",\"labels\":{\"environment\":\"production\",\"team\":\"sre\"}}'"
+        ].join("\n");
+    }
+
     if (source === "uptime_kuma") {
         return [
             "# " + i18n.t("routes.intake.uptime_kuma_example_comment"),
@@ -1593,6 +1617,7 @@ function showRouteIntakeDetails(route) {
     const isSentry = source === "sentry";
     const isHeartbeat = source === "heartbeat";
     const isDatadog = source === "datadog";
+    const isNewRelic = source === "new_relic";
     const isUptimeKuma = source === "uptime_kuma";
     const isWebhook = source === "webhook";
     const url = getRouteIntakeUrl(route);
@@ -1612,6 +1637,9 @@ function showRouteIntakeDetails(route) {
     } else if (isDatadog) {
         subtitleKey = "routes.intake.datadog_subtitle";
         helpKey = "routes.intake.datadog_help";
+    } else if (isNewRelic) {
+        subtitleKey = "routes.intake.new_relic_subtitle";
+        helpKey = "routes.intake.new_relic_help";
     } else if (isUptimeKuma) {
         subtitleKey = "routes.intake.uptime_kuma_subtitle";
         helpKey = "routes.intake.uptime_kuma_help";

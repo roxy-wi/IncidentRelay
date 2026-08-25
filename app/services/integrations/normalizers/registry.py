@@ -14,6 +14,7 @@ from app.services.integrations.normalizers.aws_sns import normalize_aws_sns
 from app.services.integrations.normalizers.datadog import normalize_datadog
 from app.services.integrations.normalizers.grafana import normalize_grafana
 from app.services.integrations.normalizers.librenms import normalize_librenms
+from app.services.integrations.normalizers.new_relic import normalize_new_relic
 from app.services.integrations.normalizers.rmon import normalize_rmon
 from app.services.integrations.normalizers.sentry import normalize_sentry
 from app.services.integrations.normalizers.uptime_kuma import normalize_uptime_kuma
@@ -61,6 +62,7 @@ _NORMALIZERS: Dict[str, Normalizer] = {
     "datadog": _payload_only(normalize_datadog),
     "grafana": _payload_only(normalize_grafana),
     "librenms": _payload_only(normalize_librenms),
+    "new_relic": _payload_only(normalize_new_relic),
     "rmon": _payload_only(normalize_rmon),
     "sentry": _normalize_sentry,
     "uptime_kuma": _payload_only(normalize_uptime_kuma),

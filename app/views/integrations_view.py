@@ -8,6 +8,7 @@ from app.api.schemas.integrations import (
     AlertmanagerWebhookSchema,
     AwsSnsEnvelopeSchema,
     DatadogWebhookSchema,
+    NewRelicWebhookSchema,
     GenericWebhookSchema,
     GrafanaWebhookSchema,
     LibreNMSWebhookSchema,
@@ -92,6 +93,32 @@ def datadog_webhook():
 
     return process_incoming_alerts(
         normalize_for_source("datadog", payload.model_dump(exclude_none=True))
+    )
+
+
+@integrations_bp.route("/new-relic", methods=["POST"])
+@require_alert_token()
+def new_relic_webhook():
+    """Receive alerts from New Relic Alerts Workflows."""
+
+    intake_route = getattr(request, "current_intake_route", None)
+
+    if intake_route and intake_route.source != "new_relic":
+        return make_error_response(
+            error="route_source_mismatch",
+            message="Route source must be new_relic.",
+            status_code=400,
+        )
+
+    payload, error = validate_body(NewRelicWebhookSchema)
+    if error:
+        return error
+
+    return process_incoming_alerts(
+        normalize_for_source(
+            "new_relic",
+            payload.model_dump(exclude_none=True),
+        )
     )
 
 
