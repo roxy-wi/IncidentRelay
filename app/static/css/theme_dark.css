@@ -65,6 +65,24 @@ html[data-color-scheme="dark"] {
     --md-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.32);
     --md-shadow-md: 0 10px 30px rgba(0, 0, 0, 0.34);
     --md-shadow-lg: 0 22px 58px rgba(0, 0, 0, 0.46);
+
+    /* Legacy/page-specific aliases. Keep these mapped to the Material tokens so
+     * components using light-theme fallbacks do not turn white in dark mode. */
+    --surface: var(--md-surface);
+    --surface-bg: var(--md-bg);
+    --surface-color: var(--md-surface);
+    --surface-elevated: var(--md-surface-soft);
+    --surface-muted: var(--md-surface-soft);
+    --surface-hover: var(--md-surface-hover);
+    --surface-variant: var(--md-surface-soft);
+    --text-color: var(--md-text);
+    --text-primary: var(--md-text);
+    --text-secondary: var(--md-text-soft);
+    --text-muted: var(--md-muted);
+    --muted-text: var(--md-muted);
+    --body-text: var(--md-text);
+    --primary-color: var(--md-primary);
+    --link-color: var(--md-primary);
 }
 
 html[data-color-scheme="dark"] body.md-theme {
@@ -423,4 +441,89 @@ html[data-color-scheme="dark"] body.md-theme .status-badge.status-muted {
 html[data-color-scheme="dark"] body.md-theme ::selection {
     background: rgba(96, 165, 250, 0.35);
     color: #ffffff;
+}
+
+/* Page components that still have explicit light backgrounds in their base
+ * styles. theme_dark.css is loaded last, so keep dark-only compatibility
+ * overrides here instead of duplicating page styles. */
+html[data-color-scheme="dark"] body.md-theme .detail-item,
+html[data-color-scheme="dark"] body.md-theme .event-item {
+    background-color: var(--md-surface-soft);
+    border-color: var(--md-border);
+    color: var(--md-text);
+}
+
+html[data-color-scheme="dark"] body.md-theme .stack-card-header {
+    background: var(--md-surface-soft);
+    border-color: var(--md-border);
+    color: var(--md-text);
+}
+
+html[data-color-scheme="dark"] body.md-theme .service-context-item {
+    background: var(--md-surface-soft);
+    border-color: var(--md-border);
+    color: var(--md-text);
+}
+
+html[data-color-scheme="dark"] body.md-theme .service-context-item-title,
+html[data-color-scheme="dark"] body.md-theme .service-context-item-main a {
+    color: var(--md-text);
+}
+
+html[data-color-scheme="dark"] body.md-theme .alert-service-context {
+    background: var(--md-surface-soft);
+    border-color: var(--md-border);
+    color: var(--md-text);
+}
+
+html[data-color-scheme="dark"] body.md-theme .alert-service-context-header h3,
+html[data-color-scheme="dark"] body.md-theme .alert-service-context-section h4,
+html[data-color-scheme="dark"] body.md-theme .alert-service-context-title {
+    color: var(--md-text);
+}
+
+html[data-color-scheme="dark"] body.md-theme .alert-service-context-link {
+    background: var(--md-surface);
+    border-color: var(--md-border);
+    color: var(--md-text);
+}
+
+html[data-color-scheme="dark"] body.md-theme .alert-service-context-link:hover {
+    background: var(--md-surface-hover);
+    border-color: var(--md-primary);
+}
+
+html[data-color-scheme="dark"] body.md-theme .alert-service-context-meta {
+    color: var(--md-muted);
+}
+
+html[data-color-scheme="dark"] body.md-theme .impact-path-node,
+html[data-color-scheme="dark"] body.md-theme .impact-flag {
+    background: var(--md-surface-soft);
+    border-color: var(--md-border);
+    color: var(--md-text-soft);
+}
+
+html[data-color-scheme="dark"] body.md-theme .impact-reason-upstream_dependency,
+html[data-color-scheme="dark"] body.md-theme .impact-reason-alert_group,
+html[data-color-scheme="dark"] body.md-theme .impact-reason-own_status,
+html[data-color-scheme="dark"] body.md-theme .impact-path-node-cycle,
+html[data-color-scheme="dark"] body.md-theme .impact-flag-warning {
+    background: var(--md-warning-soft);
+    color: var(--md-warning);
+}
+
+html[data-color-scheme="dark"] body.md-theme .impact-reason-maintenance {
+    background: var(--md-primary-soft);
+    color: var(--md-primary);
+}
+
+html[data-color-scheme="dark"] body.md-theme .impact-reason-none {
+    background: var(--md-success-soft);
+    color: var(--md-success);
+}
+
+html[data-color-scheme="dark"] body.md-theme .page-tab-count {
+    background: var(--md-primary-soft);
+    color: var(--md-primary);
 }

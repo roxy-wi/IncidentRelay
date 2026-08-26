@@ -71,3 +71,10 @@ def test_dark_theme_overrides_shared_light_surfaces():
     assert ".orchestration-rule-card" in css
     assert "--card-background: #111827" in css
     assert "--border-color: #334155" in css
+    assert "--surface-elevated: var(--md-surface-soft)" in css
+    assert "--surface-color: var(--md-surface)" in css
+    assert ".detail-item" in css
+    assert ".event-item" in css
+    assert ".stack-card-header" in css
+    assert ".alert-service-context" in css
+    assert ".impact-path-node" in css
