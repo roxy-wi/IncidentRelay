@@ -11,10 +11,10 @@
     max-width: 100%;
     min-height: 1.75rem;
     padding: 0.25rem 0.65rem;
-    border: 1px solid var(--border-color, #d7dfec);
+    border: 1px solid var(--border-color);
     border-radius: 999px;
-    background: var(--surface-elevated, #ffffff);
-    color: var(--text-secondary, #52627a);
+    background: var(--surface-elevated);
+    color: var(--text-secondary);
     font-size: 0.8125rem;
     white-space: nowrap;
 }
@@ -25,36 +25,36 @@
 
 .ts-control {
     min-height: 2.5rem;
-    border: 1px solid var(--border-color, #d7dfec);
+    border: 1px solid var(--border-color);
     border-radius: var(--radius-md, 0.75rem);
-    background: var(--surface-elevated, #ffffff);
-    color: var(--text-primary, #182235);
+    background: var(--surface-elevated);
+    color: var(--text-primary);
     box-shadow: none;
     font: inherit;
 }
 
 .ts-wrapper.multi .ts-control > div {
     border-radius: 999px;
-    background: var(--surface-muted, #f4f7fb);
-    color: var(--text-primary, #182235);
+    background: var(--surface-muted);
+    color: var(--text-primary);
 }
 
 .ts-dropdown {
-    border: 1px solid var(--border-color, #d7dfec);
+    border: 1px solid var(--border-color);
     border-radius: var(--radius-lg, 1rem);
-    background: var(--surface-elevated, #ffffff);
+    background: var(--surface-elevated);
     box-shadow: var(--shadow-lg, 0 16px 40px rgba(15, 23, 42, 0.16));
     overflow: hidden;
 }
 
 .ts-dropdown .option {
     padding: 0.5rem 0.75rem;
-    color: var(--text-primary, #182235);
+    color: var(--text-primary);
 }
 
 .ts-dropdown .active {
-    background: var(--surface-muted, #f4f7fb);
-    color: var(--text-primary, #182235);
+    background: var(--surface-muted);
+    color: var(--text-primary);
 }
 
 .ts-control input {
@@ -62,10 +62,10 @@
 }
 
 .ts-wrapper.focus .ts-control {
-    border-color: var(--primary, #4f7cff);
+    border-color: var(--primary);
     box-shadow: 0 0 0 3px rgba(79, 124, 255, 0.14);
 }
 
 .ts-wrapper.plugin-remove_button .item .remove {
-    border-left-color: var(--border-color, #d7dfec);
+    border-left-color: var(--border-color);
 }

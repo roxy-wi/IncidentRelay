@@ -1522,7 +1522,28 @@ function serviceDependencyGraphElements() {
     });
 }
 
+function serviceDependencyGraphThemeColor(name, fallback) {
+    const value = window.getComputedStyle(document.documentElement)
+        .getPropertyValue(name)
+        .trim();
+    return value || fallback;
+}
+
 function serviceDependencyGraphStyle() {
+    const theme = {
+        text: serviceDependencyGraphThemeColor("--md-text", "#0f172a"),
+        textSoft: serviceDependencyGraphThemeColor("--md-text-soft", "#334155"),
+        muted: serviceDependencyGraphThemeColor("--md-muted", "#64748b"),
+        surface: serviceDependencyGraphThemeColor("--md-surface", "#ffffff"),
+        border: serviceDependencyGraphThemeColor("--md-border-strong", "#cbd5e1"),
+        primary: serviceDependencyGraphThemeColor("--md-primary", "#2563eb"),
+        operational: serviceDependencyGraphThemeColor("--md-operational", "#16a34a"),
+        degraded: serviceDependencyGraphThemeColor("--md-degraded", "#f59e0b"),
+        partialOutage: serviceDependencyGraphThemeColor("--md-partial-outage", "#f97316"),
+        majorOutage: serviceDependencyGraphThemeColor("--md-major-outage", "#dc2626"),
+        maintenance: serviceDependencyGraphThemeColor("--md-maintenance", "#7c3aed")
+    };
+
     return [
         {
             selector: "node",
@@ -1532,13 +1553,13 @@ function serviceDependencyGraphStyle() {
                 "text-max-width": 120,
                 "font-size": 12,
                 "font-weight": 600,
-                "color": "#0f172a",
+                "color": theme.text,
                 "text-valign": "bottom",
                 "text-halign": "center",
                 "text-margin-y": 8,
-                "background-color": "#64748b",
+                "background-color": theme.muted,
                 "border-width": 2,
-                "border-color": "#ffffff",
+                "border-color": theme.surface,
                 "width": 42,
                 "height": 42,
                 "overlay-opacity": 0
@@ -1547,32 +1568,32 @@ function serviceDependencyGraphStyle() {
         {
             selector: "node.status-operational",
             style: {
-                "background-color": "#16a34a"
+                "background-color": theme.operational
             }
         },
         {
             selector: "node.status-degraded",
             style: {
-                "background-color": "#f59e0b"
+                "background-color": theme.degraded
             }
         },
         {
             selector: "node.status-partial_outage",
             style: {
-                "background-color": "#f97316"
+                "background-color": theme.partialOutage
             }
         },
         {
             selector: "node.status-major_outage",
             style: {
-                "background-color": "#dc2626"
+                "background-color": theme.majorOutage
             }
         },
         {
             selector: "node.has-own-alerts",
             style: {
                 "border-width": 4,
-                "border-color": "#991b1b"
+                "border-color": theme.majorOutage
             }
         },
         {
@@ -1580,13 +1601,13 @@ function serviceDependencyGraphStyle() {
             style: {
                 "border-style": "double",
                 "border-width": 5,
-                "border-color": "#7c3aed"
+                "border-color": theme.maintenance
             }
         },
         {
             selector: "node.has-own-alerts.has-dependency-impact",
             style: {
-                "border-color": "#991b1b"
+                "border-color": theme.majorOutage
             }
         },
         {
@@ -1600,7 +1621,7 @@ function serviceDependencyGraphStyle() {
                 "text-halign": "center",
                 "text-margin-y": 0,
                 "border-width": 3,
-                "border-color": "#0f172a"
+                "border-color": theme.text
             }
         },
         {
@@ -1614,23 +1635,23 @@ function serviceDependencyGraphStyle() {
                 "text-valign": "center",
                 "text-halign": "center",
                 "text-margin-y": 0,
-                "background-color": "#e2e8f0",
+                "background-color": theme.border,
                 "border-width": 2,
                 "border-style": "dashed",
-                "border-color": "#64748b",
-                "color": "#334155"
+                "border-color": theme.muted,
+                "color": theme.textSoft
             }
         },
         {
             selector: "node.status-maintenance",
             style: {
-                "background-color": "#2563eb"
+                "background-color": theme.maintenance
             }
         },
         {
             selector: "node.status-disabled",
             style: {
-                "background-color": "#94a3b8",
+                "background-color": theme.muted,
                 "opacity": 0.65
             }
         },
@@ -1640,7 +1661,7 @@ function serviceDependencyGraphStyle() {
                 "width": 56,
                 "height": 56,
                 "border-width": 4,
-                "border-color": "#0f172a",
+                "border-color": theme.text,
                 "z-index": 20
             }
         },
@@ -1649,12 +1670,12 @@ function serviceDependencyGraphStyle() {
             style: {
                 "curve-style": "bezier",
                 "target-arrow-shape": "triangle",
-                "line-color": "#94a3b8",
-                "target-arrow-color": "#94a3b8",
+                "line-color": theme.muted,
+                "target-arrow-color": theme.muted,
                 "width": 2,
                 "font-size": 10,
-                "color": "#475569",
-                "text-background-color": "#ffffff",
+                "color": theme.textSoft,
+                "text-background-color": theme.surface,
                 "text-background-opacity": 0.85,
                 "text-background-padding": 3,
                 "label": "data(displayLabel)",
@@ -1682,43 +1703,43 @@ function serviceDependencyGraphStyle() {
         {
             selector: "edge.impact-status-operational",
             style: {
-                "line-color": "#16a34a",
-                "target-arrow-color": "#16a34a"
+                "line-color": theme.operational,
+                "target-arrow-color": theme.operational
             }
         },
         {
             selector: "edge.impact-status-degraded",
             style: {
-                "line-color": "#f59e0b",
-                "target-arrow-color": "#f59e0b"
+                "line-color": theme.degraded,
+                "target-arrow-color": theme.degraded
             }
         },
         {
             selector: "edge.impact-status-partial_outage",
             style: {
-                "line-color": "#f97316",
-                "target-arrow-color": "#f97316"
+                "line-color": theme.partialOutage,
+                "target-arrow-color": theme.partialOutage
             }
         },
         {
             selector: "edge.impact-status-major_outage",
             style: {
-                "line-color": "#dc2626",
-                "target-arrow-color": "#dc2626"
+                "line-color": theme.majorOutage,
+                "target-arrow-color": theme.majorOutage
             }
         },
         {
             selector: "edge.impact-status-maintenance",
             style: {
-                "line-color": "#2563eb",
-                "target-arrow-color": "#2563eb"
+                "line-color": theme.maintenance,
+                "target-arrow-color": theme.maintenance
             }
         },
         {
             selector: "edge.impact-status-unknown",
             style: {
-                "line-color": "#64748b",
-                "target-arrow-color": "#64748b"
+                "line-color": theme.muted,
+                "target-arrow-color": theme.muted
             }
         },
         {
@@ -1752,9 +1773,9 @@ function serviceDependencyGraphStyle() {
             selector: ":selected",
             style: {
                 "border-width": 4,
-                "border-color": "#0f172a",
-                "line-color": "#0f172a",
-                "target-arrow-color": "#0f172a"
+                "border-color": theme.text,
+                "line-color": theme.text,
+                "target-arrow-color": theme.text
             }
         }
     ];
@@ -1920,3 +1941,9 @@ function initializeServiceDependencyGraph() {
             }
         });
 }
+
+document.addEventListener("incidentrelay:theme-change", function () {
+    if (serviceDependenciesView === "graph") {
+        scheduleRenderServiceDependencyGraph(0);
+    }
+});

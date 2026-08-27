@@ -6,14 +6,14 @@
 }
 
 .impact-summary-card {
-    border: 1px solid var(--border, #e5edf6);
+    border: 1px solid var(--border);
     border-radius: 14px;
     padding: 12px;
-    background: var(--surface, #ffffff);
+    background: var(--surface);
 }
 
 .impact-summary-value {
-    color: var(--text, #101828);
+    color: var(--text);
     font-size: 24px;
     font-weight: 800;
     line-height: 1.1;
@@ -21,14 +21,14 @@
 
 .impact-summary-label {
     margin-top: 4px;
-    color: var(--text, #101828);
+    color: var(--text);
     font-size: 13px;
     font-weight: 700;
 }
 
 .impact-summary-hint {
     margin-top: 2px;
-    color: var(--muted, #667085);
+    color: var(--muted);
     font-size: 12px;
 }
 
@@ -54,8 +54,8 @@
     min-height: 22px;
     padding: 3px 9px;
     border-radius: 999px;
-    background: var(--surface-muted, #f8fafc);
-    color: var(--text, #101828);
+    background: var(--surface-muted);
+    color: var(--text);
     font-size: 12px;
     font-weight: 800;
     line-height: 1.2;
@@ -65,24 +65,24 @@
 .impact-reason-upstream_dependency,
 .impact-reason-alert_group,
 .impact-reason-own_status {
-    background: #fff4e5;
-    color: #b54708;
+    background: var(--md-warning-soft);
+    color: var(--md-warning);
 }
 
 .impact-reason-maintenance {
-    background: #eef4ff;
-    color: #3538cd;
+    background: var(--md-primary-soft);
+    color: var(--md-primary);
 }
 
 .impact-reason-none {
-    background: #ecfdf3;
-    color: #027a48;
+    background: var(--md-success-soft);
+    color: var(--md-success);
 }
 
 .impact-reason-disabled,
 .impact-reason-unknown {
-    background: var(--surface-muted, #f8fafc);
-    color: var(--muted, #667085);
+    background: var(--surface-muted);
+    color: var(--muted);
 }
 
 .impact-reason-source {
@@ -90,7 +90,7 @@
     border: 0;
     background: transparent;
     padding: 0;
-    color: var(--muted, #667085);
+    color: var(--muted);
     font: inherit;
     font-size: 12px;
     font-weight: 700;
@@ -105,13 +105,13 @@
 
 .impact-explanation-message,
 .impact-path-title {
-    color: var(--muted, #667085);
+    color: var(--muted);
     font-size: 12px;
     line-height: 1.35;
 }
 
 .impact-explanation-title {
-    color: var(--text, #101828);
+    color: var(--text);
     font-size: 13px;
     font-weight: 800;
     line-height: 1.3;
@@ -130,10 +130,10 @@
     align-items: center;
     min-height: 22px;
     padding: 3px 8px;
-    border: 1px solid var(--border, #e5edf6);
+    border: 1px solid var(--border);
     border-radius: 999px;
-    background: var(--surface-muted, #f8fafc);
-    color: var(--text, #101828);
+    background: var(--surface-muted);
+    color: var(--text);
     font-size: 12px;
     font-weight: 700;
     line-height: 1.2;
@@ -150,7 +150,7 @@ button.impact-root-cause-chip:hover {
 .impact-rule-list {
     margin: 0;
     padding-left: 18px;
-    color: var(--muted, #667085);
+    color: var(--muted);
     font-size: 12px;
     line-height: 1.35;
 }
@@ -177,20 +177,20 @@ button.impact-root-cause-chip:hover {
     flex-direction: column;
     gap: 2px;
     padding: 7px 8px;
-    border: 1px solid var(--border, #e5edf6);
+    border: 1px solid var(--border);
     border-radius: 10px;
-    background: var(--surface-muted, #f8fafc);
+    background: var(--surface-muted);
 }
 
 .impact-blast-value {
-    color: var(--text, #101828);
+    color: var(--text);
     font-size: 16px;
     font-weight: 800;
     line-height: 1;
 }
 
 .impact-blast-label {
-    color: var(--muted, #667085);
+    color: var(--muted);
     font-size: 11px;
     line-height: 1.1;
 }

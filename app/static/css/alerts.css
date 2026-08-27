@@ -18,7 +18,7 @@
 
 .alerts-table .empty-table-cell {
     text-align: center;
-    color: #7b8794;
+    color: var(--md-muted);
     padding: 18px;
 }
 
@@ -38,7 +38,7 @@
     display: flex;
     align-items: center;
     gap: 7px;
-    color: #344054;
+    color: var(--md-text-soft);
     font-size: 13px;
     font-weight: 700;
     cursor: pointer;
@@ -59,7 +59,7 @@
 /*    gap: 8px;*/
 /*    padding: 12px 18px;*/
 /*    border-bottom: 1px solid var(--border);*/
-/*    background: #ffffff;*/
+/*    background: var(--md-surface);*/
 /*}*/
 
 /*.alerts-filter-chip {*/
@@ -68,8 +68,8 @@
 /*    min-height: 24px;*/
 /*    padding: 4px 9px;*/
 /*    border-radius: 999px;*/
-/*    color: #344054;*/
-/*    background: #f2f4f7;*/
+/*    color: var(--md-text-soft);*/
+/*    background: var(--md-surface-soft);*/
 /*    font-size: 12px;*/
 /*    font-weight: 700;*/
 /*}*/
@@ -100,7 +100,7 @@
 }
 
 .alerts-team {
-    color: #101828;
+    color: var(--md-text);
     font-weight: 800;
 }
 
@@ -125,7 +125,7 @@
     align-items: center;
     gap: 7px;
     margin: 0;
-    color: #344054;
+    color: var(--md-text-soft);
     font-size: 13px;
     font-weight: 700;
     line-height: 1;
@@ -184,7 +184,7 @@
     color: var(--md-text);
     /*border: 1px solid var(--border);*/
     /*border-radius: 16px;*/
-    /*background: #f8fafc;*/
+    /*background: var(--md-surface-soft);*/
     white-space: pre-wrap;
     word-break: break-word;
     font-family: inherit;
@@ -251,8 +251,8 @@
     align-items: center;
     gap: 0.75rem;
     padding: 0.75rem 1rem;
-    border-bottom: 1px solid var(--border-color, #e5e7eb);
-    background: var(--surface-color, #fff);
+    border-bottom: 1px solid var(--border-color);
+    background: var(--surface-color);
 }
 
 .alerts-bulk-selected-count {
@@ -285,11 +285,11 @@
 }
 
 .alert-child-item {
-    border: 1px solid var(--border-color, #e5e7eb);
+    border: 1px solid var(--border-color);
     border-radius: 12px;
     padding: 0.75rem;
     margin-bottom: 0.75rem;
-    background: var(--surface-color, #fff);
+    background: var(--surface-color);
 }
 
 .alert-child-header {
@@ -381,7 +381,7 @@ body.md-theme .alert-comment-edit-body {
     gap: 12px;
     flex-wrap: wrap;
     margin-top: 6px;
-    color: var(--muted-text, #64748b);
+    color: var(--muted-text);
     font-size: 12px;
 }
 

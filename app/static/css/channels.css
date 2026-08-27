@@ -10,7 +10,7 @@
     border: 0;
     padding: 0;
     background: transparent;
-    color: #101828;
+    color: var(--md-text);
     cursor: pointer;
     font: inherit;
     font-weight: 800;
@@ -23,11 +23,11 @@
 }
 
 .channel-type-pill {
-    color: #175cd3;
-    background: #d1e9ff;
+    color: var(--md-primary);
+    background: var(--md-primary-soft);
 }
 
 .channel-mode-pill {
-    color: #344054;
-    background: #f2f4f7;
+    color: var(--md-text-soft);
+    background: var(--md-surface-soft);
 }

@@ -215,7 +215,7 @@ body.md-theme .empty-table-cell {
 
 .dashboard-impact-root {
     margin-top: 4px;
-    color: var(--muted, #667085);
+    color: var(--muted);
     font-size: 12px;
     line-height: 1.35;
 }
@@ -230,26 +230,26 @@ body.md-theme .empty-table-cell {
 
 .dashboard-impact-more {
     justify-content: center;
-    color: var(--muted, #667085);
+    color: var(--muted);
     font-weight: 700;
 }
 
 .overview-dot-major-outage {
-    background: #d92d20 !important;
+    background: var(--md-major-outage) !important;
 }
 
 .overview-dot-partial-outage {
-    background: #f79009 !important;
+    background: var(--md-partial-outage) !important;
 }
 
 .overview-dot-degraded {
-    background: #fdb022 !important;
+    background: var(--md-degraded) !important;
 }
 
 .overview-dot-maintenance {
-    background: #7a5af8 !important;
+    background: var(--md-maintenance) !important;
 }
 
 .overview-dot-unknown {
-    background: #98a2b3 !important;
+    background: var(--md-muted) !important;
 }

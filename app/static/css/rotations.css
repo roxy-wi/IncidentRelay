@@ -25,7 +25,7 @@
 
 .rotations-form-card summary {
     padding: 16px 18px;
-    color: #101828;
+    color: var(--md-text);
     font-size: 18px;
     font-weight: 800;
     cursor: pointer;
@@ -66,9 +66,9 @@
 }
 
 .rotation-layer-card {
-    border: 1px solid var(--border, #e5edf6);
+    border: 1px solid var(--border);
     border-radius: 18px;
-    background: #ffffff;
+    background: var(--md-surface);
     box-shadow: 0 8px 24px rgba(16, 24, 40, 0.04);
     overflow: hidden;
 }
@@ -88,8 +88,8 @@
     display: inline-flex;
     align-items: center;
     justify-content: center;
-    background: #eef5ff;
-    color: #175cd3;
+    background: var(--md-primary-soft);
+    color: var(--md-primary);
     font-weight: 800;
 }
 
@@ -100,13 +100,13 @@
 .rotation-layer-title strong {
     display: block;
     font-size: 16px;
-    color: var(--text, #101828);
+    color: var(--text);
 }
 
 .rotation-layer-title small {
     display: block;
     margin-top: 3px;
-    color: var(--muted, #667085);
+    color: var(--muted);
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
@@ -122,8 +122,8 @@
 .rotation-layer-summary-item {
     padding: 12px;
     border-radius: 14px;
-    background: #f8fafc;
-    border: 1px solid #edf2f7;
+    background: var(--md-surface-soft);
+    border: 1px solid var(--md-border);
 }
 
 .rotation-layer-summary-item span {
@@ -131,14 +131,14 @@
     margin-bottom: 4px;
     font-size: 12px;
     font-weight: 800;
-    color: var(--muted, #667085);
+    color: var(--muted);
     text-transform: uppercase;
     letter-spacing: 0.03em;
 }
 
 .rotation-layer-summary-item strong {
     display: block;
-    color: var(--text, #101828);
+    color: var(--text);
     font-size: 13px;
     line-height: 1.35;
 }
@@ -146,8 +146,8 @@
 .rotation-layer-editor {
     display: none;
     padding: 18px;
-    border-top: 1px solid var(--border, #e5edf6);
-    background: #fbfcfe;
+    border-top: 1px solid var(--border);
+    background: var(--md-surface-soft);
 }
 
 .rotation-layer-card.is-editing .rotation-layer-editor {
@@ -162,7 +162,7 @@
     margin: 0 0 10px;
     font-size: 14px;
     font-weight: 800;
-    color: var(--text, #101828);
+    color: var(--text);
 }
 
 .layer-users-list,
@@ -197,8 +197,8 @@
     gap: 6px;
     padding: 5px 9px;
     border-radius: 999px;
-    background: #eef5ff;
-    color: #175cd3;
+    background: var(--md-primary-soft);
+    color: var(--md-primary);
     font-size: 12px;
     font-weight: 700;
 }
@@ -226,7 +226,7 @@
     gap: 14px 18px;
     align-items: start;
     padding-bottom: 16px;
-    border-bottom: 1px solid var(--border, #e5edf6);
+    border-bottom: 1px solid var(--border);
 }
 
 .rotation-layer-editor .layer-settings-grid > .app-field {
@@ -240,7 +240,7 @@
 .rotation-layer-editor .layer-settings-grid > .app-field > label:not(.layer-settings-checkbox) {
     display: block;
     margin: 0;
-    color: var(--text, #101828);
+    color: var(--text);
     font-size: 13px;
     font-weight: 700;
     line-height: 1.25;
@@ -284,7 +284,7 @@
     gap: 8px;
     min-height: 42px;
     margin: 23px 0 0;
-    color: var(--text, #101828);
+    color: var(--text);
     line-height: 1.3;
 }
 
@@ -301,7 +301,7 @@
 }
 
 .layer-settings-checkbox small {
-    color: var(--muted, #667085);
+    color: var(--muted);
     font-size: 13px;
 }
 
@@ -362,9 +362,9 @@
     gap: 12px;
     align-items: center;
     padding: 12px;
-    border: 1px solid var(--border, #e5edf6);
+    border: 1px solid var(--border);
     border-radius: 14px;
-    background: #ffffff;
+    background: var(--md-surface);
 }
 
 .layer-member-name {
@@ -373,7 +373,7 @@
 
 .layer-member-name strong {
     display: block;
-    color: var(--text, #101828);
+    color: var(--text);
     font-size: 14px;
     line-height: 1.25;
 }
@@ -381,7 +381,7 @@
 .layer-member-name small {
     display: block;
     margin-top: 3px;
-    color: var(--muted, #667085);
+    color: var(--muted);
     font-size: 12px;
     line-height: 1.25;
 }
@@ -418,7 +418,7 @@
 }
 
 .layer-member-enabled small {
-    color: var(--muted, #667085);
+    color: var(--muted);
     font-size: 12px;
 }
 

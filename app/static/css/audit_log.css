@@ -8,8 +8,8 @@
     grid-template-columns: minmax(240px, 2fr) repeat(6, minmax(150px, 1fr));
     gap: 12px;
     padding: 16px;
-    border-top: 1px solid var(--md-border, #dfe3e8);
-    border-bottom: 1px solid var(--md-border, #dfe3e8);
+    border-top: 1px solid var(--md-border);
+    border-bottom: 1px solid var(--md-border);
 }
 
 .audit-filter {
@@ -48,7 +48,7 @@
 }
 
 .audit-log-secondary {
-    color: var(--md-text-muted, #667085);
+    color: var(--md-text-muted);
     font-size: 12px;
 }
 
@@ -62,8 +62,8 @@
     padding: 16px;
     overflow: auto;
     border-radius: 0 0 10px 10px;
-    background: var(--md-code-bg, #111827);
-    color: var(--md-code-text, #e5e7eb);
+    background: var(--md-code-bg);
+    color: var(--md-code-text);
     font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
     font-size: 13px;
     line-height: 1.55;
