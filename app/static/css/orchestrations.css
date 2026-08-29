@@ -61,3 +61,51 @@ body.md-theme #orchestration-webhook-modal .app-modal-dialog-wide,
 .orchestration-rule-card[draggable="true"] { cursor: grab; }
 .orchestration-rule-card[draggable="true"]:active { cursor: grabbing; }
 .orchestration-rule-card.is-drag-over { outline: 2px solid currentColor; outline-offset: 3px; }
+
+/* Simulator result workspace */
+.orchestration-simulation-result-card { min-width: 0; }
+.orchestration-simulation-empty { min-height: 180px; display: grid; place-items: center; padding: 28px; color: var(--muted); text-align: center; }
+.orchestration-simulation-view { display: grid; gap: 14px; min-width: 0; }
+.orchestration-simulation-overview { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; padding: 14px 14px 0; }
+.orchestration-simulation-metric { min-width: 0; display: grid; gap: 5px; padding: 11px 12px; border: 1px solid var(--border-color); border-radius: 10px; background: var(--md-surface-soft); }
+.orchestration-simulation-metric-label { color: var(--muted); font-size: 12px; font-weight: 600; }
+.orchestration-simulation-metric strong { min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.orchestration-simulation-result-tabs { margin: 0 14px; padding: 0; border: 1px solid var(--border-color); border-radius: 10px; overflow-x: auto; }
+.orchestration-simulation-result-panel { min-width: 0; padding: 0 14px 14px; }
+.orchestration-simulation-section { display: grid; gap: 10px; margin-bottom: 18px; }
+.orchestration-simulation-section:last-child { margin-bottom: 0; }
+.orchestration-simulation-section h3 { margin: 0; font-size: 14px; }
+.orchestration-simulation-kv-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; }
+.orchestration-simulation-kv { min-width: 0; display: grid; gap: 5px; padding: 10px 11px; border: 1px solid var(--border-color); border-radius: 9px; background: var(--md-surface-soft); }
+.orchestration-simulation-kv > span { color: var(--muted); font-size: 12px; font-weight: 600; }
+.orchestration-simulation-kv strong,
+.orchestration-simulation-kv code { min-width: 0; overflow-wrap: anywhere; color: var(--md-text); }
+.orchestration-simulation-rules { display: grid; gap: 10px; }
+.orchestration-simulation-rule { display: grid; gap: 10px; margin-left: calc(var(--orchestration-rule-depth, 0) * 14px); padding: 12px; border: 1px solid var(--border-color); border-radius: 10px; background: var(--md-surface-soft); }
+.orchestration-simulation-rule-header { display: flex; gap: 12px; align-items: flex-start; justify-content: space-between; }
+.orchestration-simulation-rule-header > div { min-width: 0; }
+.orchestration-simulation-rule-details { display: grid; gap: 6px; }
+.orchestration-simulation-detail-label { color: var(--muted); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .04em; }
+.orchestration-simulation-step { display: grid; grid-template-columns: 18px minmax(0, 1fr); gap: 6px; align-items: start; margin-left: calc(var(--orchestration-condition-depth, 0) * 12px); color: var(--md-text-soft); font-size: 13px; }
+.orchestration-simulation-step-icon { font-weight: 800; text-align: center; }
+.orchestration-simulation-step.is-success .orchestration-simulation-step-icon { color: var(--md-success); }
+.orchestration-simulation-step.is-failed .orchestration-simulation-step-icon { color: var(--md-warning); }
+.orchestration-simulation-diff-table { table-layout: fixed; }
+.orchestration-simulation-diff-table th:first-child,
+.orchestration-simulation-diff-table td:first-child { width: 30%; }
+.orchestration-simulation-diff-table code { white-space: pre-wrap; overflow-wrap: anywhere; }
+.orchestration-simulation-no-changes { padding: 18px; border: 1px dashed var(--border-color); border-radius: 9px; color: var(--muted); text-align: center; }
+.orchestration-simulation-truncated { padding: 8px 2px 0; }
+.status-badge.status-danger { background: var(--md-danger-soft); color: var(--md-danger); }
+
+@media (max-width: 1100px) {
+  .orchestration-simulation-overview { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+  .orchestration-simulation-kv-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+@media (max-width: 700px) {
+  .orchestration-simulation-overview,
+  .orchestration-simulation-kv-grid { grid-template-columns: 1fr; }
+  .orchestration-simulation-rule { margin-left: 0; }
+  .orchestration-simulation-rule-header { align-items: stretch; flex-direction: column; }
+}

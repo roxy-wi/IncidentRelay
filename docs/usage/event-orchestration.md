@@ -1018,6 +1018,13 @@ The Simulator evaluates the current draft in isolation. It does not:
 - execute outbound webhooks;
 - modify production data.
 
+Simulation results are split into four views:
+
+- **Summary** shows the effective event, selected route/team/service and execution outcome;
+- **Rules** explains matched and skipped rules, including condition values and action before/after values;
+- **Changes** shows the deterministic input → result diff and, when enabled, active → draft differences;
+- **Raw JSON** keeps the complete API response available for troubleshooting.
+
 ### Normalized event input
 
 Choose **Normalized event** when you already know the fields used by your rules.

@@ -14,8 +14,14 @@ let auditLogItems = [];
 let auditLogSearchTimer = null;
 
 
-function auditLogFilterValue(selector) {
-    return String($(selector).val() || "").trim();
+function auditLogFilterValue(selector, paramName) {
+    const value = String($(selector).val() || "").trim();
+
+    if (value || !paramName || !window.PageUrlState) {
+        return value;
+    }
+
+    return String(window.PageUrlState.getParam(paramName, "") || "").trim();
 }
 
 
@@ -25,13 +31,13 @@ function auditLogBuildUrl() {
     params.set("page_size", String(auditLogPageSize));
 
     const filters = {
-        search: auditLogFilterValue("#audit-log-search"),
-        group_id: auditLogFilterValue("#audit-log-group"),
-        actor_id: auditLogFilterValue("#audit-log-actor"),
-        action: auditLogFilterValue("#audit-log-action"),
-        object_type: auditLogFilterValue("#audit-log-object-type"),
-        date_from: auditLogFilterValue("#audit-log-date-from"),
-        date_to: auditLogFilterValue("#audit-log-date-to"),
+        search: auditLogFilterValue("#audit-log-search", "search"),
+        group_id: auditLogFilterValue("#audit-log-group", "group_id"),
+        actor_id: auditLogFilterValue("#audit-log-actor", "actor_id"),
+        action: auditLogFilterValue("#audit-log-action", "action"),
+        object_type: auditLogFilterValue("#audit-log-object-type", "object_type"),
+        date_from: auditLogFilterValue("#audit-log-date-from", "date_from"),
+        date_to: auditLogFilterValue("#audit-log-date-to", "date_to"),
     };
 
     Object.keys(filters).forEach(function (key) {
@@ -60,6 +66,10 @@ function loadAuditLog() {
         renderAuditLogScope((response && response.permissions) || {});
         renderAuditLogTable(auditLogItems);
         renderAuditLogPagination(auditLogPagination);
+
+        if (window.PageUrlState) {
+            window.PageUrlState.write("audit-log");
+        }
     });
 }
 
@@ -134,6 +144,10 @@ function renderAuditLogFilterOptions(filters) {
         function (objectType) { return objectType; },
         "audit.filters.all_object_types"
     );
+
+    if (window.PageUrlState) {
+        window.PageUrlState.restoreFields("audit-log");
+    }
 }
 
 
@@ -313,6 +327,9 @@ function clearAuditLogFilters() {
     $("#audit-log-date-from").val("");
     $("#audit-log-date-to").val("");
     auditLogCurrentPage = 1;
+    if (window.PageUrlState) {
+        window.PageUrlState.write("audit-log");
+    }
     loadAuditLog();
 }
 

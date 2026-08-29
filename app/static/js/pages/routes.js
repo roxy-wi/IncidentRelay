@@ -347,6 +347,10 @@ function fillRouteSourceFilter(routes) {
     if (selected && sources[selected]) {
         filter.val(selected);
     }
+
+    if (window.PageUrlState) {
+        window.PageUrlState.restoreFields("routes");
+    }
 }
 
 function getRouteSearchText(route) {
@@ -1730,7 +1734,12 @@ function initRoutesTableSorting() {
         "#routes-table-view",
         routesSortState,
         routesSortColumns,
-        renderRoutesTable
+        function () {
+            if (window.PageUrlState) {
+                window.PageUrlState.write("routes");
+            }
+            renderRoutesTable();
+        }
     );
 }
 

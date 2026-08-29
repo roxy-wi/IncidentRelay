@@ -392,7 +392,8 @@ function getAlertsQueryStringForApply() {
     return queryString;
 }
 
-function buildAlertsStateParams() {
+function buildAlertsStateParams(options) {
+    options = options || {};
     const params = new URLSearchParams();
 
     appendTableFilterParams(params, "status", getTableFilterValues("#status-filter"));
@@ -415,12 +416,16 @@ function buildAlertsStateParams() {
     params.set("sort", alertsSortState.column || "activity");
     params.set("order", alertsSortState.direction || "desc");
 
+    if (options.includeUrlTeam && typeof selectedTeamId === "function" && selectedTeamId()) {
+        params.set("team", String(selectedTeamId()));
+    }
+
     return params;
 }
 
 
 function buildAlertsQueryString() {
-    const query = buildAlertsStateParams().toString();
+    const query = buildAlertsStateParams({includeUrlTeam: true}).toString();
 
     return query ? "?" + query : "";
 }

@@ -132,6 +132,10 @@ function fillTeamsGroupFilter(teams) {
     if (selected && groups[selected]) {
         filter.val(selected);
     }
+
+    if (window.PageUrlState) {
+        window.PageUrlState.restoreFields("teams");
+    }
 }
 
 function getTeamSearchText(team) {

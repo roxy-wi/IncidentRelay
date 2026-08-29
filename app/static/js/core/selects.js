@@ -20,21 +20,37 @@ function writeStoredGlobalTeamId(teamId) {
     }
 }
 
+function readGlobalTeamIdFromUrl() {
+    const params = new URLSearchParams(window.location.search || "");
+    const routePath = typeof normalizeAppRoutePath === "function"
+        ? normalizeAppRoutePath(window.location.pathname || "/")
+        : (window.location.pathname || "/");
+
+    if (routePath === "/calendar") {
+        return params.get("team_id") || "";
+    }
+
+    return params.get("team") || "";
+}
+
 function restoreGlobalTeamFilterValue() {
     const select = $("#global-team-filter");
+    const urlTeamId = readGlobalTeamIdFromUrl();
     const storedTeamId = readStoredGlobalTeamId();
+    const preferredTeamId = urlTeamId || storedTeamId;
 
     if (!select.length) {
         return;
     }
 
     if (
-        storedTeamId &&
+        preferredTeamId &&
         select.find("option").filter(function () {
-            return String($(this).val()) === String(storedTeamId);
+            return String($(this).val()) === String(preferredTeamId);
         }).length
     ) {
-        select.val(storedTeamId);
+        select.val(preferredTeamId);
+        writeStoredGlobalTeamId(preferredTeamId);
         return;
     }
 

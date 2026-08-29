@@ -2356,6 +2356,7 @@ $(document).on("click", "#reload-overrides", loadOverrides);
 $(document).on("click", "#create-override", createOverride);
 
 $(document).on("input", "#rotations-search", renderRotationsTable);
+$(document).on("change", "#rotations-status-filter", renderRotationsTable);
 
 $(document).on("click", "#open-rotation-create-modal", openCreateRotationModal);
 $(document).on("click", "#close-rotation-form-modal", function () {

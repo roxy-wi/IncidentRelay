@@ -442,6 +442,7 @@ function openOrchestration(id, options) {
             $("#orchestration-add-webhook").prop("disabled", !orchestrationCan("manage_actions"));
             renderOrchestrationRules();
             setOrchestrationRulesView("builder");
+            resetOrchestrationSimulationResult();
             switchOrchestrationTab("rules");
 
             if (settings.updateUrl) {
@@ -1175,6 +1176,359 @@ function rollbackOrchestrationVersion(versionId) {
     });
 }
 
+function orchestrationSimulationValue(value) {
+    if (value === undefined || value === null || value === "") { return "—"; }
+    if (typeof value === "string") { return value; }
+    if (typeof value === "number" || typeof value === "boolean") { return String(value); }
+    return orchestrationJson(value);
+}
+
+function orchestrationSimulationCompactValue(value) {
+    const text = orchestrationSimulationValue(value).replace(/\s+/g, " ").trim();
+    return text.length > 180 ? text.slice(0, 177) + "…" : text;
+}
+
+function orchestrationSimulationEntity(value) {
+    if (!value) { return "—"; }
+    return value.name || value.slug || (value.id ? "#" + value.id : "—");
+}
+
+function orchestrationSimulationStatusBadge(text, kind) {
+    return $("<span>")
+        .addClass("status-badge " + (kind || "status-muted"))
+        .text(text || "—");
+}
+
+function orchestrationSimulationMetric(label, value, options) {
+    const settings = $.extend({badge: false, badgeKind: "status-muted"}, options || {});
+    const target = $("<div>").addClass("orchestration-simulation-metric");
+    target.append($("<span>").addClass("orchestration-simulation-metric-label").text(label));
+    if (settings.badge) {
+        target.append(orchestrationSimulationStatusBadge(value, settings.badgeKind));
+    } else {
+        target.append($("<strong>").text(orchestrationSimulationValue(value)));
+    }
+    return target;
+}
+
+function orchestrationSimulationDispositionKind(disposition) {
+    if (disposition === "process") { return "status-active"; }
+    if (disposition === "drop") { return "status-danger"; }
+    if (disposition === "suppress" || disposition === "pause") { return "status-warning"; }
+    return "status-muted";
+}
+
+function orchestrationSimulationFlattenRules(rules, depth, output) {
+    const target = output || [];
+    asArray(rules).forEach(function (rule) {
+        target.push({rule: rule, depth: depth || 0});
+        orchestrationSimulationFlattenRules(rule.children, (depth || 0) + 1, target);
+    });
+    return target;
+}
+
+function orchestrationSimulationConditionRows(condition, depth, output) {
+    const target = output || [];
+    if (!condition) { return target; }
+    const currentDepth = depth || 0;
+    if (condition.field) {
+        target.push({condition: condition, depth: currentDepth});
+        return target;
+    }
+    asArray(condition.children).forEach(function (child) {
+        orchestrationSimulationConditionRows(child, currentDepth + 1, target);
+    });
+    return target;
+}
+
+function orchestrationSimulationConditionText(condition) {
+    const operator = orchestrationConditionOperatorLabel(condition.operator || "");
+    const field = condition.field || condition.path || "condition";
+    let text = field + " " + operator;
+    if (!["exists", "not_exists", "is_true", "is_false"].includes(condition.operator)) {
+        text += " " + orchestrationSimulationCompactValue(condition.expected);
+    }
+    if (condition.found === true) {
+        text += " · " + i18n.t("orchestrations.simulator.actual") + ": " + orchestrationSimulationCompactValue(condition.actual);
+    } else if (condition.found === false) {
+        text += " · " + i18n.t("orchestrations.simulator.field_missing");
+    }
+    return text;
+}
+
+function orchestrationSimulationActionText(action) {
+    const type = action.type || "action";
+    const before = orchestrationSimulationCompactValue(action.before);
+    const after = orchestrationSimulationCompactValue(action.after);
+    if (before === after) { return type + " · " + after; }
+    return type + ": " + before + " → " + after;
+}
+
+function switchOrchestrationSimulationResultTab(tab) {
+    const selected = tab || "summary";
+    $("[data-simulation-result-tab]")
+        .removeClass("is-active")
+        .attr("aria-selected", "false");
+    $("[data-simulation-result-tab='" + selected + "']")
+        .addClass("is-active")
+        .attr("aria-selected", "true");
+    $("[data-simulation-result-panel]").addClass("is-hidden");
+    $("[data-simulation-result-panel='" + selected + "']").removeClass("is-hidden");
+}
+
+function resetOrchestrationSimulationResult() {
+    $("#orchestration-simulation-empty").removeClass("is-hidden");
+    $("#orchestration-simulation-view").addClass("is-hidden");
+    $("#orchestration-simulation-overview, #orchestration-simulation-summary, #orchestration-simulation-rules, #orchestration-simulation-changes").empty();
+    $("#orchestration-simulation-result").empty();
+    switchOrchestrationSimulationResultTab("summary");
+}
+
+function renderOrchestrationSimulationOverview(result) {
+    const target = $("#orchestration-simulation-overview").empty();
+    const execution = result.execution || {};
+    const flattened = orchestrationSimulationFlattenRules(execution.rules || [], 0, []);
+    const disposition = (result.disposition || {}).type || "process";
+    target.append(
+        orchestrationSimulationMetric(
+            i18n.t("orchestrations.simulator.disposition"),
+            disposition,
+            {badge: true, badgeKind: orchestrationSimulationDispositionKind(disposition)}
+        ),
+        orchestrationSimulationMetric(
+            i18n.t("orchestrations.simulator.outcome"),
+            execution.outcome || (result.executed ? "continue" : i18n.t("orchestrations.simulator.not_executed"))
+        ),
+        orchestrationSimulationMetric(
+            i18n.t("orchestrations.simulator.matched_rules"),
+            String(execution.matched_rule_count || 0) + " / " + String(flattened.length)
+        ),
+        orchestrationSimulationMetric(
+            i18n.t("orchestrations.simulator.duration"),
+            result.duration_ms === undefined ? "—" : result.duration_ms + " ms"
+        )
+    );
+}
+
+function orchestrationSimulationKeyValue(label, value, options) {
+    const settings = $.extend({code: false}, options || {});
+    const item = $("<div>").addClass("orchestration-simulation-kv");
+    item.append($("<span>").text(label));
+    const rendered = $(settings.code ? "<code>" : "<strong>").text(orchestrationSimulationValue(value));
+    item.append(rendered);
+    return item;
+}
+
+function renderOrchestrationSimulationSummary(result) {
+    const target = $("#orchestration-simulation-summary").empty();
+    if (!result.executed) {
+        const errors = asArray(result.errors);
+        target.append(
+            $("<div>")
+                .addClass("orchestration-message validation-error")
+                .text(errors.length ? errors.join("\n") : i18n.t("orchestrations.simulator.not_executed"))
+        );
+        return;
+    }
+
+    const context = result.final_context || {};
+    const event = context.event || {};
+    const runtimeResult = context.result || {};
+    const selected = result.selected || {};
+    const disposition = result.disposition || {};
+
+    const eventSection = $("<section>").addClass("orchestration-simulation-section").append(
+        $("<h3>").text(i18n.t("orchestrations.simulator.effective_event")),
+        $("<div>").addClass("orchestration-simulation-kv-grid").append(
+            orchestrationSimulationKeyValue(i18n.t("orchestrations.simulator.title"), event.title),
+            orchestrationSimulationKeyValue(i18n.t("orchestrations.simulator.severity"), event.severity),
+            orchestrationSimulationKeyValue(i18n.t("orchestrations.simulator.priority"), event.priority),
+            orchestrationSimulationKeyValue(i18n.t("orchestrations.simulator.dedup_key"), event.dedup_key, {code: true}),
+            orchestrationSimulationKeyValue(i18n.t("orchestrations.simulator.group_key"), event.group_key, {code: true}),
+            orchestrationSimulationKeyValue(i18n.t("orchestrations.simulator.trace_level"), runtimeResult.trace_level)
+        )
+    );
+
+    const selectionSection = $("<section>").addClass("orchestration-simulation-section").append(
+        $("<h3>").text(i18n.t("orchestrations.simulator.selected_targets")),
+        $("<div>").addClass("orchestration-simulation-kv-grid").append(
+            orchestrationSimulationKeyValue(i18n.t("orchestrations.simulator.route"), orchestrationSimulationEntity(selected.route)),
+            orchestrationSimulationKeyValue(i18n.t("orchestrations.simulator.team"), orchestrationSimulationEntity(selected.team)),
+            orchestrationSimulationKeyValue(i18n.t("orchestrations.simulator.service"), orchestrationSimulationEntity(selected.service)),
+            orchestrationSimulationKeyValue(i18n.t("orchestrations.simulator.escalation_policy"), orchestrationSimulationEntity(selected.escalation_policy)),
+            orchestrationSimulationKeyValue(i18n.t("orchestrations.simulator.notification_policy"), orchestrationSimulationEntity(selected.notification_policy)),
+            orchestrationSimulationKeyValue(i18n.t("orchestrations.simulator.priority_policy"), orchestrationSimulationEntity(selected.priority_policy))
+        )
+    );
+
+    const executionSection = $("<section>").addClass("orchestration-simulation-section").append(
+        $("<h3>").text(i18n.t("orchestrations.simulator.execution_details")),
+        $("<div>").addClass("orchestration-simulation-kv-grid").append(
+            orchestrationSimulationKeyValue(i18n.t("orchestrations.simulator.version"), "v" + (result.version_number || result.version_id || "—")),
+            orchestrationSimulationKeyValue(i18n.t("orchestrations.simulator.normalizer"), result.selected_normalizer),
+            orchestrationSimulationKeyValue(i18n.t("orchestrations.simulator.normalized_events"), result.normalized_event_count),
+            orchestrationSimulationKeyValue(i18n.t("orchestrations.simulator.reason"), disposition.reason),
+            orchestrationSimulationKeyValue(i18n.t("orchestrations.simulator.pause_seconds"), disposition.pause_seconds),
+            orchestrationSimulationKeyValue(i18n.t("orchestrations.simulator.grouping"), selected.grouping, {code: true})
+        )
+    );
+
+    target.append(eventSection, selectionSection, executionSection);
+
+    const errors = asArray(result.errors);
+    if (errors.length) {
+        target.append(
+            $("<section>").addClass("orchestration-simulation-section").append(
+                $("<h3>").text(i18n.t("orchestrations.simulator.errors")),
+                $("<div>").addClass("orchestration-message validation-error").text(errors.join("\n"))
+            )
+        );
+    }
+}
+
+function renderOrchestrationSimulationRules(result) {
+    const target = $("#orchestration-simulation-rules").empty();
+    const execution = result.execution || {};
+    const flattened = orchestrationSimulationFlattenRules(execution.rules || [], 0, []);
+    if (!flattened.length) {
+        target.append($("<div>").addClass("empty-cell").text(i18n.t("orchestrations.simulator.no_rules")));
+        return;
+    }
+
+    flattened.forEach(function (entry) {
+        const rule = entry.rule || {};
+        let stateText = i18n.t("orchestrations.simulator.skipped");
+        let stateKind = "status-muted";
+        if (rule.enabled === false) {
+            stateText = i18n.t("orchestrations.simulator.disabled_rule");
+        } else if (rule.matched) {
+            stateText = i18n.t("orchestrations.simulator.matched");
+            stateKind = "status-active";
+        } else {
+            stateText = i18n.t("orchestrations.simulator.not_matched");
+            stateKind = "status-warning";
+        }
+
+        const card = $("<article>")
+            .addClass("orchestration-simulation-rule")
+            .css("--orchestration-rule-depth", Math.min(Number(entry.depth || 0), 8));
+        const header = $("<div>").addClass("orchestration-simulation-rule-header").append(
+            $("<div>").append(
+                $("<strong>").text(rule.name || rule.path || i18n.t("orchestrations.simulator.rule")),
+                $("<div>").addClass("row-subtitle").text((rule.path || "") + (rule.reason ? " · " + rule.reason : ""))
+            ),
+            orchestrationSimulationStatusBadge(stateText, stateKind)
+        );
+        card.append(header);
+
+        const conditionRows = orchestrationSimulationConditionRows(rule.condition, 0, []);
+        if (conditionRows.length) {
+            const conditions = $("<div>").addClass("orchestration-simulation-rule-details").append(
+                $("<div>").addClass("orchestration-simulation-detail-label").text(i18n.t("orchestrations.simulator.conditions"))
+            );
+            conditionRows.forEach(function (conditionEntry) {
+                const condition = conditionEntry.condition || {};
+                conditions.append(
+                    $("<div>")
+                        .addClass("orchestration-simulation-step " + (condition.matched ? "is-success" : "is-failed"))
+                        .css("--orchestration-condition-depth", Math.min(Number(conditionEntry.depth || 0), 8))
+                        .append(
+                            $("<span>").addClass("orchestration-simulation-step-icon").attr("aria-hidden", "true").text(condition.matched ? "✓" : "×"),
+                            $("<span>").text(orchestrationSimulationConditionText(condition))
+                        )
+                );
+            });
+            card.append(conditions);
+        }
+
+        const actions = asArray(rule.actions);
+        if (actions.length) {
+            const actionList = $("<div>").addClass("orchestration-simulation-rule-details").append(
+                $("<div>").addClass("orchestration-simulation-detail-label").text(i18n.t("orchestrations.simulator.actions"))
+            );
+            actions.forEach(function (action) {
+                actionList.append(
+                    $("<div>")
+                        .addClass("orchestration-simulation-step " + (action.success ? "is-success" : "is-failed"))
+                        .append(
+                            $("<span>").addClass("orchestration-simulation-step-icon").attr("aria-hidden", "true").text(action.success ? "✓" : "×"),
+                            $("<span>").text(orchestrationSimulationActionText(action))
+                        )
+                );
+            });
+            card.append(actionList);
+        }
+        target.append(card);
+    });
+}
+
+function orchestrationSimulationDiffTable(diff) {
+    const changes = asArray(diff && diff.changes);
+    if (!changes.length) {
+        return $("<div>").addClass("orchestration-simulation-no-changes").text(i18n.t("orchestrations.simulator.no_changes"));
+    }
+    const table = $("<table>").addClass("data-table orchestration-simulation-diff-table");
+    table.append(
+        $("<thead>").append(
+            $("<tr>").append(
+                $("<th>").text(i18n.t("orchestrations.simulator.path")),
+                $("<th>").text(i18n.t("orchestrations.simulator.before")),
+                $("<th>").text(i18n.t("orchestrations.simulator.after"))
+            )
+        )
+    );
+    const body = $("<tbody>");
+    changes.forEach(function (change) {
+        body.append(
+            $("<tr>").append(
+                $("<td>").append($("<code>").text(change.path || "$")),
+                $("<td>").append($("<code>").text(orchestrationSimulationCompactValue(change.before))),
+                $("<td>").append($("<code>").text(orchestrationSimulationCompactValue(change.after)))
+            )
+        );
+    });
+    table.append(body);
+    const wrapper = $("<div>").addClass("table-wrapper").append(table);
+    if (diff && diff.truncated) {
+        wrapper.append(
+            $("<div>").addClass("card-subtitle orchestration-simulation-truncated").text(
+                i18n.t("orchestrations.simulator.diff_truncated", {count: diff.total_changes})
+            )
+        );
+    }
+    return wrapper;
+}
+
+function renderOrchestrationSimulationChanges(result) {
+    const target = $("#orchestration-simulation-changes").empty();
+    target.append(
+        $("<section>").addClass("orchestration-simulation-section").append(
+            $("<h3>").text(i18n.t("orchestrations.simulator.input_output_changes")),
+            orchestrationSimulationDiffTable(result.input_output_diff || {})
+        )
+    );
+
+    if (result.active_draft_diff) {
+        target.append(
+            $("<section>").addClass("orchestration-simulation-section").append(
+                $("<h3>").text(i18n.t("orchestrations.simulator.active_draft_changes")),
+                orchestrationSimulationDiffTable(result.active_draft_diff)
+            )
+        );
+    }
+}
+
+function renderOrchestrationSimulationResult(result) {
+    $("#orchestration-simulation-empty").addClass("is-hidden");
+    $("#orchestration-simulation-view").removeClass("is-hidden");
+    renderOrchestrationSimulationOverview(result || {});
+    renderOrchestrationSimulationSummary(result || {});
+    renderOrchestrationSimulationRules(result || {});
+    renderOrchestrationSimulationChanges(result || {});
+    $("#orchestration-simulation-result").text(orchestrationJson(result || {}));
+    switchOrchestrationSimulationResultTab("summary");
+}
+
 function runOrchestrationSimulation() {
     const source = $("#orchestration-simulation-source").val();
     const parsed = orchestrationParseJson($("#orchestration-simulation-payload").val(), null);
@@ -1182,7 +1536,7 @@ function runOrchestrationSimulation() {
     const payload = {compare_with_active: $("#orchestration-compare-active").is(":checked")};
     if (source === "normalized") { payload.normalized_event = parsed; } else { payload.source = source; payload.payload = parsed; }
     apiPost("/api/event-orchestrations/" + orchestrationCurrent.id + "/simulate", payload, function (result) {
-        $("#orchestration-simulation-result").text(orchestrationJson(result));
+        renderOrchestrationSimulationResult(result);
     });
 }
 
@@ -1309,6 +1663,7 @@ $(document).on("click", "[data-close-modal]", function () { orchestrationCloseMo
 $(document).on("click", "[data-open-orchestration]", function () { openOrchestration($(this).attr("data-open-orchestration")); });
 $(document).on("click", "#orchestration-back", closeOrchestrationWorkspace);
 $(document).on("click", "[data-orchestration-tab]", function () { switchOrchestrationTab($(this).attr("data-orchestration-tab")); });
+$(document).on("click", "[data-simulation-result-tab]", function () { switchOrchestrationSimulationResultTab($(this).attr("data-simulation-result-tab")); });
 $(document).on("click", "#orchestration-add-rule", function () { openOrchestrationRuleEditor(null); });
 $(document).on("click", "[data-rule-edit]", function () { openOrchestrationRuleEditor($(this).attr("data-rule-edit")); });
 $(document).on("click", "[data-rule-delete]", function () { orchestrationDefinition.rules.splice(Number($(this).attr("data-rule-delete")), 1); renderOrchestrationRules(); });
