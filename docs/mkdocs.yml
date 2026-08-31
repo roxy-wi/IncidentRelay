@@ -65,6 +65,7 @@ nav:
       - Incoming alert sources:
           - Alertmanager: integrations/alertmanager.md
           - New Relic: integrations/new-relic.md
+          - Nagios: integrations/nagios.md
           - Zabbix: integrations/zabbix.md
           - Sentry: integrations/sentry.md
           - Sentry Troubleshooting: integrations/sentry-troubleshooting.md

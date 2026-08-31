@@ -9,6 +9,7 @@ from app.api.schemas.integrations import (
     AwsSnsEnvelopeSchema,
     DatadogWebhookSchema,
     NewRelicWebhookSchema,
+    NagiosWebhookSchema,
     GenericWebhookSchema,
     GrafanaWebhookSchema,
     LibreNMSWebhookSchema,
@@ -120,6 +121,74 @@ def new_relic_webhook():
             payload.model_dump(exclude_none=True),
         )
     )
+
+
+def _process_nagios_lifecycle(alert_data):
+    """Handle Nagios notification types that are not normal trigger/recovery."""
+
+    action = alert_data.get("lifecycle_action")
+    dedup_key = alert_data.get("dedup_key")
+    intake_route = getattr(request, "current_intake_route", None)
+
+    if action == "ignore":
+        return jsonify({
+            "status": "ignored",
+            "notification_type": (
+                (alert_data.get("labels") or {}).get(
+                    "nagios_notification_type"
+                )
+            ),
+            "dedup_key": dedup_key,
+        }), 202
+
+    if action != "acknowledge":
+        return process_incoming_alerts([alert_data])
+
+    existing_alert = alerts_repo.find_existing_alert(
+        source="nagios",
+        dedup_key=dedup_key,
+        route_id=intake_route.id if intake_route else None,
+    )
+
+    if not existing_alert or not existing_alert.group:
+        return jsonify({
+            "status": "ignored",
+            "reason": "matching_alert_not_found",
+            "dedup_key": dedup_key,
+        }), 200
+
+    group = acknowledge_alert(existing_alert.group.id)
+    return jsonify({
+        "status": "acknowledged",
+        "dedup_key": dedup_key,
+        "alert_id": existing_alert.id,
+        "group_id": group.id,
+    }), 200
+
+
+@integrations_bp.route("/nagios", methods=["POST"])
+@require_alert_token()
+def nagios_webhook():
+    """Receive host and service notifications from Nagios Core/XI."""
+
+    intake_route = getattr(request, "current_intake_route", None)
+
+    if intake_route and intake_route.source != "nagios":
+        return make_error_response(
+            error="route_source_mismatch",
+            message="Route source must be nagios.",
+            status_code=400,
+        )
+
+    payload, error = validate_body(NagiosWebhookSchema)
+    if error:
+        return error
+
+    normalized = normalize_for_source(
+        "nagios",
+        payload.model_dump(exclude_none=True),
+    )[0]
+    return _process_nagios_lifecycle(normalized)
 
 
 @integrations_bp.route("/rmon", methods=["POST"])

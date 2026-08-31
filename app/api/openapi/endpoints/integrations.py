@@ -1458,6 +1458,57 @@ def paths():
         },
     }
 
+    nagios_body = {
+        "type": "object",
+        "required": ["host_name"],
+        "additionalProperties": True,
+        "description": (
+            "Nagios Core/XI host or service notification payload. "
+            "The bundled examples/nagios/incidentrelay_notify.py sender "
+            "maps standard Nagios notification macros to these fields."
+        ),
+        "properties": {
+            "notification_type": {
+                "type": "string",
+                "example": "PROBLEM",
+                "description": (
+                    "Nagios NOTIFICATIONTYPE macro, for example PROBLEM, "
+                    "RECOVERY or ACKNOWLEDGEMENT."
+                ),
+            },
+            "host_name": {"type": "string", "example": "db01"},
+            "host_alias": {"type": "string"},
+            "host_address": {"type": "string", "example": "10.10.20.15"},
+            "host_state": {"type": "string", "example": "UP"},
+            "host_output": {"type": "string"},
+            "service_description": {
+                "type": "string",
+                "example": "Disk Usage",
+            },
+            "service_state": {"type": "string", "example": "CRITICAL"},
+            "service_output": {
+                "type": "string",
+                "example": "/var is 96% full",
+            },
+            "state_type": {"type": "string", "example": "HARD"},
+            "event_link": {"type": "string", "format": "uri"},
+            "labels": {
+                "type": "object",
+                "additionalProperties": True,
+            },
+        },
+        "example": {
+            "notification_type": "PROBLEM",
+            "host_name": "db01",
+            "host_address": "10.10.20.15",
+            "host_state": "UP",
+            "service_description": "Disk Usage",
+            "service_state": "CRITICAL",
+            "service_output": "/var is 96% full",
+            "state_type": "HARD",
+        },
+    }
+
     rmon_body = {
         "type": "object",
         "required": ["title"],
@@ -2477,6 +2528,27 @@ def paths():
                 ),
                 "responses": incoming_alert_responses(
                     "New Relic alert accepted."
+                ),
+            },
+        },
+        "/api/integrations/nagios": {
+            "post": {
+                "tags": ["integrations"],
+                "summary": "Receive Nagios Core/XI notifications",
+                "description": (
+                    "Receives host and service notifications from Nagios. "
+                    "PROBLEM opens or updates an alert, RECOVERY resolves it, "
+                    "ACKNOWLEDGEMENT acknowledges the matching group, and "
+                    "downtime/flapping notification types are ignored."
+                ),
+                "operationId": "receiveNagiosNotifications",
+                "security": [{"bearerAuth": []}],
+                "requestBody": json_body(
+                    "Nagios notification payload.",
+                    nagios_body,
+                ),
+                "responses": incoming_alert_responses(
+                    "Nagios notification accepted."
                 ),
             },
         },

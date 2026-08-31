@@ -277,6 +277,49 @@ class NewRelicWebhookSchema(ApiModel):
         return self
 
 
+class NagiosWebhookSchema(ApiModel):
+    """Validate a Nagios Core/XI host or service notification payload."""
+
+    model_config = ConfigDict(extra="allow")
+
+    notification_type: str | None = None
+    host_name: str | None = None
+    hostname: str | None = None
+    host_alias: str | None = None
+    host_address: str | None = None
+    host_state: str | None = None
+    host_output: str | None = None
+    long_host_output: str | None = None
+    service_description: str | None = None
+    service_state: str | None = None
+    service_output: str | None = None
+    long_service_output: str | None = None
+    state_type: str | None = None
+    event_link: str | None = None
+    team: str | None = None
+    labels: Dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def validate_host_identity(self):
+        payload = self.model_dump(exclude_none=True)
+        canonical = {
+            str(key).strip().lower().replace("-", "_"): value
+            for key, value in payload.items()
+        }
+
+        host = (
+            canonical.get("host_name")
+            or canonical.get("hostname")
+            or canonical.get("host")
+        )
+        if not str(host or "").strip():
+            raise ValueError(
+                "Nagios webhook payload must contain host_name or hostname"
+            )
+
+        return self
+
+
 class UptimeKumaWebhookSchema(ApiModel):
     """Validate the standard Uptime Kuma Webhook payload."""
 
