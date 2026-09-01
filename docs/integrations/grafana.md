@@ -72,6 +72,38 @@ In Grafana:
 
 Attach the contact point to the required Grafana notification policy.
 
+
+### Grafana provisioning example
+
+Grafana OSS/Enterprise can provision the contact point from a file under `provisioning/alerting`:
+
+```yaml
+apiVersion: 1
+
+contactPoints:
+  - orgId: 1
+    name: IncidentRelay
+    receivers:
+      - uid: incidentrelay-webhook
+        type: webhook
+        disableResolveMessage: false
+        settings:
+          url: https://incidentrelay.example.com/api/integrations/grafana
+          httpMethod: POST
+          authorization_scheme: Bearer
+          authorization_credentials: $INCIDENTRELAY_ROUTE_TOKEN
+```
+
+Set `INCIDENTRELAY_ROUTE_TOKEN` in the Grafana process/container environment instead of storing the token in the provisioning file. Keep `disableResolveMessage: false` so recovery events reach IncidentRelay.
+
+Place the file, for example, at:
+
+```text
+/etc/grafana/provisioning/alerting/incidentrelay.yaml
+```
+
+Then restart Grafana or reload the provisioned alerting resources using Grafana's provisioning API. The contact point must still be selected by an alert rule or notification policy.
+
 ## Recommended Grafana labels
 
 Add stable labels to Grafana alert rules so IncidentRelay can route and group them predictably.

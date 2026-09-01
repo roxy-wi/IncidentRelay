@@ -69,6 +69,41 @@ OK
 
 `INSUFFICIENT_DATA` трактуется как активный алерт с важностью warning.
 
+
+## Пример настройки через AWS CLI
+
+Ту же конфигурацию можно создать через AWS CLI. Сначала подпишите endpoint маршрута IncidentRelay на SNS topic:
+
+```bash
+TOPIC_ARN='arn:aws:sns:eu-west-1:123456789012:incidentrelay-alerts'
+
+aws sns subscribe \
+  --topic-arn "$TOPIC_ARN" \
+  --protocol https \
+  --notification-endpoint 'https://incidentrelay.example.com/api/integrations/aws-sns/17'
+```
+
+IncidentRelay проверяет подписанный `SubscriptionConfirmation` и подтверждает подписку автоматически.
+
+Затем создайте или обновите CloudWatch alarm и отправляйте как alarm, так и recovery actions в один и тот же SNS topic:
+
+```bash
+aws cloudwatch put-metric-alarm \
+  --alarm-name HighCPU \
+  --namespace AWS/EC2 \
+  --metric-name CPUUtilization \
+  --dimensions Name=InstanceId,Value=i-0123456789abcdef0 \
+  --statistic Average \
+  --period 300 \
+  --evaluation-periods 2 \
+  --threshold 90 \
+  --comparison-operator GreaterThanThreshold \
+  --alarm-actions "$TOPIC_ARN" \
+  --ok-actions "$TOPIC_ARN"
+```
+
+Использование одного topic одновременно в `--alarm-actions` и `--ok-actions` даёт IncidentRelay полный lifecycle firing → resolved.
+
 ## Сопоставление состояний CloudWatch
 
 | Состояние CloudWatch | Статус IncidentRelay | Важность по умолчанию |

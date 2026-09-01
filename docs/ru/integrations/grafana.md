@@ -72,6 +72,38 @@ Content-Type: application/json
 
 Привяжите точку контакта к нужной политике уведомлений Grafana.
 
+
+### Пример provisioning-конфигурации Grafana
+
+Grafana OSS/Enterprise позволяет создать contact point из файла в каталоге `provisioning/alerting`:
+
+```yaml
+apiVersion: 1
+
+contactPoints:
+  - orgId: 1
+    name: IncidentRelay
+    receivers:
+      - uid: incidentrelay-webhook
+        type: webhook
+        disableResolveMessage: false
+        settings:
+          url: https://incidentrelay.example.com/api/integrations/grafana
+          httpMethod: POST
+          authorization_scheme: Bearer
+          authorization_credentials: $INCIDENTRELAY_ROUTE_TOKEN
+```
+
+Передайте `INCIDENTRELAY_ROUTE_TOKEN` через окружение процесса/контейнера Grafana вместо хранения токена в provisioning-файле. Оставьте `disableResolveMessage: false`, чтобы IncidentRelay получал события восстановления.
+
+Например, сохраните файл как:
+
+```text
+/etc/grafana/provisioning/alerting/incidentrelay.yaml
+```
+
+После этого перезапустите Grafana или перезагрузите provisioned alerting resources через provisioning API Grafana. Contact point всё равно нужно выбрать в alert rule или notification policy.
+
 ## Рекомендуемые метки Grafana
 
 Добавьте стабильные метки к правилам алертов Grafana, чтобы IncidentRelay мог предсказуемо маршрутизировать и группировать их.

@@ -69,6 +69,41 @@ OK
 
 `INSUFFICIENT_DATA` is treated as firing with warning severity.
 
+
+## AWS CLI configuration example
+
+The same setup can be created from the AWS CLI. First subscribe the IncidentRelay route endpoint to the SNS topic:
+
+```bash
+TOPIC_ARN='arn:aws:sns:eu-west-1:123456789012:incidentrelay-alerts'
+
+aws sns subscribe \
+  --topic-arn "$TOPIC_ARN" \
+  --protocol https \
+  --notification-endpoint 'https://incidentrelay.example.com/api/integrations/aws-sns/17'
+```
+
+IncidentRelay validates the signed `SubscriptionConfirmation` request and confirms the subscription automatically.
+
+Then create or update a CloudWatch alarm and send both alarm and recovery actions to the same SNS topic:
+
+```bash
+aws cloudwatch put-metric-alarm \
+  --alarm-name HighCPU \
+  --namespace AWS/EC2 \
+  --metric-name CPUUtilization \
+  --dimensions Name=InstanceId,Value=i-0123456789abcdef0 \
+  --statistic Average \
+  --period 300 \
+  --evaluation-periods 2 \
+  --threshold 90 \
+  --comparison-operator GreaterThanThreshold \
+  --alarm-actions "$TOPIC_ARN" \
+  --ok-actions "$TOPIC_ARN"
+```
+
+Using the same topic in both `--alarm-actions` and `--ok-actions` is what gives IncidentRelay the complete firing → resolved lifecycle.
+
 ## CloudWatch state mapping
 
 | CloudWatch state | IncidentRelay status | Default severity |

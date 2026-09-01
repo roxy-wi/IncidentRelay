@@ -29,6 +29,69 @@ Source: alertmanager
 
 Attach at least one notification channel and copy the route intake token into Alertmanager webhook configuration.
 
+
+## Alertmanager configuration example
+
+A minimal `alertmanager.yml` receiver can send both firing and resolved notifications directly to IncidentRelay:
+
+```yaml
+route:
+  receiver: incidentrelay
+  group_by:
+    - alertname
+    - cluster
+    - service
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+
+receivers:
+  - name: incidentrelay
+    webhook_configs:
+      - url: https://incidentrelay.example.com/api/integrations/alertmanager
+        send_resolved: true
+        http_config:
+          authorization:
+            type: Bearer
+            credentials_file: /etc/alertmanager/secrets/incidentrelay-route-token
+```
+
+The credentials file must contain only the IncidentRelay route token, without the `Bearer ` prefix. Keeping the token in a mounted secret file is preferred over committing it to `alertmanager.yml`.
+
+For a small test installation, the token can also be configured inline:
+
+```yaml
+receivers:
+  - name: incidentrelay
+    webhook_configs:
+      - url: https://incidentrelay.example.com/api/integrations/alertmanager
+        send_resolved: true
+        http_config:
+          authorization:
+            type: Bearer
+            credentials: ROUTE_TOKEN
+```
+
+`send_resolved: true` is important. Without resolved notifications, IncidentRelay cannot automatically close the corresponding alert when Alertmanager reports recovery.
+
+If only part of the Alertmanager tree should go to IncidentRelay, route that subset to the receiver instead of making it the default receiver:
+
+```yaml
+route:
+  receiver: default-receiver
+  routes:
+    - receiver: incidentrelay
+      matchers:
+        - team="infra"
+        - environment="production"
+```
+
+After changing the configuration, validate it before reloading Alertmanager:
+
+```bash
+amtool check-config /etc/alertmanager/alertmanager.yml
+```
+
 ## Service assignment
 
 After a route matches the incoming alert, IncidentRelay can attach the alert to a service.
