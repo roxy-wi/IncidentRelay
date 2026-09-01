@@ -597,6 +597,9 @@ Actions run in the order displayed inside a matching rule. An earlier action can
 | `set_dedup_key` | Decide which repeated events update the same child alert. | `{{ labels.alertname }}:{{ labels.instance }}` |
 | `set_group_key` | Decide which child alerts belong to the same alert group. | `{{ labels.alertname }}:{{ labels.environment }}` |
 | `set_event_action` | Force trigger or resolve semantics. | `trigger` or `resolve` |
+| `set_trace_level` | Override Alert Explain Trace detail for this event. Global orchestrations only. | `full`, `compact` or `disabled` |
+
+`set_trace_level` controls Alert Explain Trace storage before the alert lifecycle writes the trace. `compact` keeps ordered steps without detailed JSON payload data; `disabled` stores no Alert Explain Trace rows. Service-scoped orchestrations cannot use this action because they may execute after lifecycle processing has already started.
 
 Use stable values for deduplication and grouping. Do not include timestamps or other values that change on every request unless you intentionally want a new alert every time.
 
@@ -1014,6 +1017,13 @@ The Simulator evaluates the current draft in isolation. It does not:
 - send notifications;
 - execute outbound webhooks;
 - modify production data.
+
+Simulation results are split into four views:
+
+- **Summary** shows the effective event, selected route/team/service and execution outcome;
+- **Rules** explains matched and skipped rules, including condition values and action before/after values;
+- **Changes** shows the deterministic input → result diff and, when enabled, active → draft differences;
+- **Raw JSON** keeps the complete API response available for troubleshooting.
 
 ### Normalized event input
 

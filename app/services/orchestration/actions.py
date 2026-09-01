@@ -34,6 +34,7 @@ MAX_GROUP_WINDOW_SECONDS = 86_400
 FAILURE_MODES = frozenset({"continue", "stop_rule", "stop_orchestration"})
 PROCESS_DISPOSITIONS = frozenset({"process", "suppress", "pause", "drop"})
 EVENT_ACTIONS = frozenset({"trigger", "resolve"})
+TRACE_LEVELS = frozenset({"full", "compact", "disabled"})
 
 _TEXT_FIELD_ACTIONS = {
     "set_title": "title",
@@ -61,6 +62,7 @@ SUPPORTED_ACTION_TYPES = frozenset(
     | set(_POLICY_ACTIONS)
     | {
         "set_event_action",
+        "set_trace_level",
         "set_label",
         "remove_label",
         "set_custom_field",
@@ -106,6 +108,7 @@ class EventActionState:
         result = _json_copy(context.get("result") or {}, path="result")
         result.setdefault("disposition", "process")
         result.setdefault("suppress_notifications", False)
+        result.setdefault("trace_level", None)
         result.setdefault("dropped", False)
         result.setdefault("pause_seconds", None)
         result.setdefault("pause_retrigger", "preserve")
@@ -422,6 +425,16 @@ def validate_action(action: Any, *, path: str = "action") -> List[ValidationIssu
             issues.append(
                 ValidationIssue(f"{path}.value", "invalid_event_action", "event action must be trigger or resolve")
             )
+    elif action_type == "set_trace_level":
+        level = action.get("level")
+        if level not in TRACE_LEVELS:
+            issues.append(
+                ValidationIssue(
+                    f"{path}.level",
+                    "invalid_trace_level",
+                    "trace level must be full, compact or disabled",
+                )
+            )
     elif action_type in {"set_label", "remove_label"}:
         try:
             _validate_name(action.get("name", action.get("label")), path=f"{path}.name", max_length=MAX_LABEL_NAME_LENGTH)
@@ -562,6 +575,17 @@ def _execute_action(action: Mapping[str, Any], state: EventActionState, *, path:
             raise ActionValidationError("event action must be trigger or resolve", path=f"{path}.value")
         state.event["event_action"] = normalized
         return before, normalized, references, "continue"
+
+    if action_type == "set_trace_level":
+        before = state.result.get("trace_level")
+        level = str(action.get("level") or "").strip().lower()
+        if level not in TRACE_LEVELS:
+            raise ActionValidationError(
+                "trace level must be full, compact or disabled",
+                path=f"{path}.level",
+            )
+        state.result["trace_level"] = level
+        return before, level, (), "continue"
 
     if action_type == "set_label":
         name = action.get("name", action.get("label"))
@@ -808,6 +832,7 @@ __all__ = [
     "ActionValidationError",
     "EventActionState",
     "SUPPORTED_ACTION_TYPES",
+    "TRACE_LEVELS",
     "execute_actions",
     "validate_action",
     "validate_action_list",

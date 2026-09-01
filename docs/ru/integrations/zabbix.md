@@ -29,6 +29,79 @@ Source: zabbix
 
 Привяжите хотя бы один канал уведомлений и скопируйте токен приёма маршрута в настройку типа медиа Zabbix или конфигурацию вебхука.
 
+
+## Готовый Webhook Media Type для Zabbix
+
+Для Zabbix 6.x/7.x откройте **Alerts → Media types → Create media type** и выберите тип **Webhook**. Такой media type может вызывать IncidentRelay напрямую, без внешнего скрипта.
+
+Рекомендуемые параметры:
+
+| Параметр | Значение |
+|---|---|
+| `url` | `https://incidentrelay.example.com/api/integrations/zabbix` |
+| `token` | `{$INCIDENTRELAY.TOKEN}` |
+| `event_id` | `{EVENT.ID}` |
+| `trigger_id` | `{TRIGGER.ID}` |
+| `event_name` | `{EVENT.NAME}` |
+| `host` | `{HOST.NAME}` |
+| `event_severity` | `{EVENT.SEVERITY}` |
+| `event_status` | `{EVENT.STATUS}` |
+| `opdata` | `{EVENT.OPDATA}` |
+| `tags_json` | `{EVENT.TAGSJSON}` |
+| `team` | `{EVENT.TAGS.oncall_team}` |
+| `event_link` | `{$ZABBIX.URL}/tr_events.php?triggerid={TRIGGER.ID}&eventid={EVENT.ID}` |
+| `HTTPProxy` | необязательный URL proxy или пустое значение |
+
+Создайте `{$INCIDENTRELAY.TOKEN}` как секретный пользовательский макрос Zabbix, а `{$ZABBIX.URL}` — как внешний URL frontend Zabbix.
+
+Используйте следующий Webhook script:
+
+```javascript
+try {
+    var params = JSON.parse(value),
+        req = new HttpRequest(),
+        payload,
+        response,
+        status;
+
+    if (params.HTTPProxy) {
+        req.setProxy(params.HTTPProxy);
+    }
+
+    req.addHeader('Content-Type: application/json');
+    req.addHeader('Authorization: Bearer ' + params.token);
+
+    payload = {
+        event_id: params.event_id,
+        trigger_id: params.trigger_id,
+        event_name: params.event_name,
+        host: params.host,
+        event_severity: params.event_severity,
+        event_status: params.event_status,
+        opdata: params.opdata,
+        tags: params.tags_json,
+        team: params.team,
+        event_link: params.event_link
+    };
+
+    response = req.post(params.url, JSON.stringify(payload));
+    status = req.getStatus();
+
+    if (status < 200 || status >= 300) {
+        throw 'HTTP ' + status + ': ' + response;
+    }
+
+    return response;
+} catch (error) {
+    Zabbix.log(3, '[ IncidentRelay webhook ] ' + error);
+    throw 'IncidentRelay webhook failed: ' + error;
+}
+```
+
+Создайте пользователя/media с этим media type и добавьте пользователя или группу в нужный trigger action. Настройте как **Operations**, так и **Recovery operations**, иначе событие восстановления из Zabbix не попадёт в IncidentRelay.
+
+Перед подключением к production actions media type можно проверить встроенным тестом в UI Zabbix.
+
 ## Назначение сервиса
 
 После того как маршрут сопоставит входящий алерт, IncidentRelay может привязать алерт к сервису.

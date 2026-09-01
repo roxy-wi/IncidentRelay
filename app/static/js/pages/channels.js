@@ -833,6 +833,13 @@ function fillChannelTypeFilter(types) {
     if (selected && types.includes(selected)) {
         filter.val(selected);
     }
+
+    if (window.PageUrlState) {
+        window.PageUrlState.restoreFields("channels");
+    }
+    if (channelsCache.length) {
+        renderChannels();
+    }
 }
 
 function channelDetailsItem(label, value) {

@@ -21,8 +21,8 @@
     height: 72px;
     flex: 0 0 72px;
     border-radius: 20px;
-    color: #ffffff;
-    background: linear-gradient(135deg, #0b6cff, #001f4d);
+    color: var(--md-on-accent);
+    background: var(--md-brand-gradient);
     font-size: 24px;
     font-weight: 800;
 }
@@ -41,7 +41,7 @@
 
 .profile-hero h2 {
     margin: 4px 0 4px;
-    color: #101828;
+    color: var(--md-text);
     font-size: 26px;
     line-height: 1.15;
 }
@@ -114,11 +114,11 @@
     padding: 9px 10px;
     border: 1px solid var(--border);
     border-radius: 10px;
-    background: #ffffff;
+    background: var(--md-surface);
 }
 
 .profile-group-name {
-    color: #101828;
+    color: var(--md-text);
     font-weight: 700;
 }
 

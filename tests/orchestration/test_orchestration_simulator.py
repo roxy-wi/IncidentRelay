@@ -148,6 +148,10 @@ def test_simulate_draft_compares_with_active_without_persisting_state(db):
     assert result["active"]["version_id"] == published.id
     assert result["active"]["final_context"]["event"]["title"] == "published"
     assert result["active_draft_diff"]["changed"] is True
+    assert result["input_output_diff"]["changed"] is True
+    changed_paths = {change["path"] for change in result["input_output_diff"]["changes"]}
+    assert "event.title" in changed_paths
+    assert "event.severity" in changed_paths
     assert result["disposition"]["type"] == "suppress"
     assert result["initial_context"]["raw"]["token"] == "***REDACTED***"
     assert event == original

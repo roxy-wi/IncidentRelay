@@ -1089,15 +1089,21 @@ def create_alert_explain_trace(
     mode="live",
     source=None,
     dedup_key=None,
+    trace_level="full",
     input_summary=None,
+    started_at=None,
 ):
-    return AlertExplainTrace.create(
-        trace_id=trace_id,
-        mode=mode,
-        source=source,
-        dedup_key=dedup_key,
-        input_summary=input_summary or {},
-    )
+    values = {
+        "trace_id": trace_id,
+        "mode": mode,
+        "trace_level": trace_level,
+        "source": source,
+        "dedup_key": dedup_key,
+        "input_summary": input_summary or {},
+    }
+    if started_at is not None:
+        values["started_at"] = started_at
+    return AlertExplainTrace.create(**values)
 
 
 def create_alert_explain_step(
@@ -1110,17 +1116,21 @@ def create_alert_explain_step(
     title,
     message=None,
     data=None,
+    created_at=None,
 ):
-    return AlertExplainStep.create(
-        trace=trace,
-        position=position,
-        stage=stage,
-        code=code,
-        status=status,
-        title=title,
-        message=message,
-        data=data or {},
-    )
+    values = {
+        "trace": trace,
+        "position": position,
+        "stage": stage,
+        "code": code,
+        "status": status,
+        "title": title,
+        "message": message,
+        "data": data or {},
+    }
+    if created_at is not None:
+        values["created_at"] = created_at
+    return AlertExplainStep.create(**values)
 
 
 def attach_alert_explain_trace(trace, *, group=None, alert=None):

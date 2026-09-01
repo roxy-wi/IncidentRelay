@@ -16,6 +16,7 @@ from app.services.notifications.shift_notifications import (
 from app.services.notifications.rules import process_due_user_notifications
 from app.services.incidents.responders import expire_due_incident_responders
 from app.services.alerts.explain_cleanup import cleanup_alert_explain_traces
+from app.services.alerts.retention import cleanup_alert_history
 from app.services.service_catalog.impact_snapshots import capture_scheduled_service_impact_snapshot
 from app.services.heartbeats.service import process_overdue_heartbeats
 from app.services.silences import process_silence_lifecycle
@@ -342,67 +343,102 @@ def incident_responder_expire_job():
             db.close()
 
 
-def alert_explain_trace_cleanup_job():
-    """Delete old alert explain traces under a database lock."""
+def retention_cleanup_job():
+    """Run database retention cleanup under one distributed lock."""
     if db.is_closed():
         db.connect(reuse_if_open=True)
 
     owner = None
 
     try:
-        owner = acquire_db_lock("alert_explain_trace_cleanup_job")
-
+        owner = acquire_db_lock("retention_cleanup_job")
         if not owner:
-            logger.debug("alert explain trace cleanup job skipped because lock is busy")
+            logger.debug("retention cleanup job skipped because lock is busy")
             return {
-                "traces_deleted": 0,
-                "steps_deleted": 0,
+                "alert_history": {},
+                "explain_traces": {},
+                "orchestration": {},
+                "skipped": True,
             }
 
-        retention_days = int(
-            getattr(Config, "ALERT_EXPLAIN_TRACE_RETENTION_DAYS", 30)
+        alert_days = int(getattr(Config, "RETENTION_ALERT_DAYS", 0))
+        explain_trace_days = int(
+            getattr(Config, "RETENTION_EXPLAIN_TRACE_DAYS", alert_days)
         )
+        orchestration_execution_days = int(
+            getattr(
+                Config,
+                "RETENTION_ORCHESTRATION_EXECUTION_DAYS",
+                alert_days,
+            )
+        )
+        batch_size = int(getattr(Config, "RETENTION_BATCH_SIZE", 500))
 
         logger.info(
-            "alert explain trace cleanup job started",
+            "retention cleanup job started",
             extra={
                 "extra": {
                     "event_type": "scheduler",
-                    "retention_days": retention_days,
+                    "alert_days": alert_days,
+                    "explain_trace_days": explain_trace_days,
+                    "orchestration_execution_days": orchestration_execution_days,
+                    "batch_size": batch_size,
                 }
             },
         )
 
-        result = cleanup_alert_explain_traces(
-            retention_days=retention_days,
+        alert_result = cleanup_alert_history(
+            retention_days=alert_days,
+            batch_size=batch_size,
+        )
+        explain_result = cleanup_alert_explain_traces(
+            retention_days=explain_trace_days,
+        )
+        orchestration_result = cleanup_orchestration_retention(
+            execution_retention_days=orchestration_execution_days,
         )
 
+        result = {
+            "alert_history": alert_result,
+            "explain_traces": explain_result,
+            "orchestration": orchestration_result,
+        }
         logger.info(
-            "alert explain trace cleanup job finished",
+            "retention cleanup job finished",
             extra={
                 "extra": {
                     "event_type": "scheduler",
-                    "traces_deleted": result.get("traces_deleted", 0),
-                    "steps_deleted": result.get("steps_deleted", 0),
-                    "cutoff": str(result.get("cutoff")),
+                    "alert_groups_deleted": alert_result.get("groups_deleted", 0),
+                    "alerts_deleted": alert_result.get("alerts_deleted", 0),
+                    "explain_traces_deleted": explain_result.get(
+                        "traces_deleted", 0
+                    ),
+                    "orchestration_executions_deleted": orchestration_result.get(
+                        "executions_deleted", 0
+                    ),
+                    "pending_events_deleted": orchestration_result.get(
+                        "pending_events_deleted", 0
+                    ),
+                    "webhook_executions_deleted": orchestration_result.get(
+                        "webhook_executions_deleted", 0
+                    ),
                 }
             },
         )
-
         return result
 
     except Exception:
-        logger.exception("alert explain trace cleanup job failed")
-
+        logger.exception("retention cleanup job failed")
         return {
-            "traces_deleted": 0,
-            "steps_deleted": 0,
+            "alert_history": {},
+            "explain_traces": {},
+            "orchestration": {},
             "failed": 1,
         }
 
     finally:
         if owner:
-            release_db_lock("alert_explain_trace_cleanup_job", owner)
+            release_db_lock("retention_cleanup_job", owner)
 
         if not db.is_closed():
             db.close()
@@ -617,30 +653,6 @@ def orchestration_webhook_job():
             db.close()
 
 
-def orchestration_retention_cleanup_job():
-    """Prune expired dropped traces and terminal pending rows."""
-    if db.is_closed():
-        db.connect(reuse_if_open=True)
-    owner = None
-    try:
-        owner = acquire_db_lock("orchestration_retention_cleanup_job")
-        if not owner:
-            return {"executions_deleted": 0, "pending_events_deleted": 0}
-        result = cleanup_orchestration_retention()
-        logger.info(
-            "orchestration retention cleanup job finished",
-            extra={"extra": {"event_type": "scheduler", **result}},
-        )
-        return result
-    except Exception:
-        logger.exception("orchestration retention cleanup job failed")
-        return {"executions_deleted": 0, "pending_events_deleted": 0}
-    finally:
-        if owner:
-            release_db_lock("orchestration_retention_cleanup_job", owner)
-        if not db.is_closed():
-            db.close()
-
 def start_scheduler():
     """
     Start the background scheduler.
@@ -775,19 +787,19 @@ def start_scheduler():
     )
 
     _scheduler.add_job(
-        alert_explain_trace_cleanup_job,
+        retention_cleanup_job,
         "interval",
         seconds=int(
             getattr(
                 Config,
-                "ALERT_EXPLAIN_TRACE_CLEANUP_INTERVAL_SECONDS",
+                "RETENTION_CLEANUP_INTERVAL_SECONDS",
                 86400,
             )
         ),
         max_instances=1,
         coalesce=True,
         next_run_time=utc_now(),
-        id="alert_explain_trace_cleanup_job",
+        id="retention_cleanup_job",
         replace_existing=True,
     )
 
@@ -834,17 +846,6 @@ def start_scheduler():
         coalesce=True,
         next_run_time=utc_now(),
         id="orchestration_webhook_job",
-        replace_existing=True,
-    )
-
-    _scheduler.add_job(
-        orchestration_retention_cleanup_job,
-        "interval",
-        seconds=int(getattr(Config, "ORCHESTRATION_RETENTION_CLEANUP_INTERVAL_SECONDS", 86400)),
-        max_instances=1,
-        coalesce=True,
-        next_run_time=utc_now(),
-        id="orchestration_retention_cleanup_job",
         replace_existing=True,
     )
 

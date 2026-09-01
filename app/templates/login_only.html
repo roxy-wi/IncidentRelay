@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="{{ current_locale }}">
+<html lang="{{ current_locale }}" data-theme="system">
 <head>
     <link rel="apple-touch-icon" sizes="180x180" href="{{ url_for('static', filename='images/favicon/apple-touch-icon.png') }}">
     <link rel="icon" type="image/png" sizes="32x32" href="{{ url_for('static', filename='images/favicon/favicon-32x32.png') }}">
@@ -10,9 +10,14 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>IncidentRelay - {{ _('login.title') }}</title>
+    <script>
+    window.__INCIDENTRELAY_UI__ = { theme: "system" };
+    </script>
+    <script src="/static/js/core/theme.js"></script>
     <link rel="stylesheet" href="/static/css/login.css">
     <link rel="stylesheet" href="/static/css/oncall.css">
     <link rel="stylesheet" href="/static/css/material.css">
+    <link rel="stylesheet" href="/static/css/theme_dark.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='/css/vendor/fontawesome/all.min.css') }}">
     <script>
  window.__INCIDENTRELAY_I18N__ = {
@@ -28,7 +33,7 @@
     <script src="/static/js/core/auth.js"></script>
     <script src="/static/js/pages/login.js"></script>
 </head>
-<body>
+<body class="md-theme login-shell">
 <div class="login-page">
     <div class="login-card">
         <div class="login-brand-block">

@@ -5,15 +5,13 @@ description: Развёртывание IncidentRelay в Kubernetes с помо�
 
 # Установка в Kubernetes
 
-Helm-чарт находится в репозитории в каталоге `helm/incidentrelay`. Он развёртывает веб-приложение и фоновые воркеры, формирует конфигурацию приложения в Secret и подключает пробы `/healthz` и `/readyz` к Kubernetes.
-
-Чарт пока не опубликован в репозитории чартов. Устанавливайте его из локальной копии этого репозитория.
+Helm-чарт IncidentRelay публикуется как OCI-артефакт в GHCR и также хранится в репозитории в каталоге `helm/incidentrelay`. Он развёртывает веб-приложение и фоновые воркеры, формирует конфигурацию приложения в Secret и подключает пробы `/healthz` и `/readyz` к Kubernetes.
 
 ## Требования
 
 ```text
 Kubernetes 1.23+
-Helm 3
+Helm 3.8+ или Helm 4
 StorageClass, если используется стандартная конфигурация SQLite
 ```
 
@@ -35,16 +33,29 @@ ServiceAccount и Ingress, если он включён
 ## Быстрый старт
 
 ```bash
-helm install incidentrelay ./helm/incidentrelay \
+helm install incidentrelay \
+  oci://ghcr.io/roxy-wi/incidentrelay-charts/incidentrelay \
+  --version 2.1.0 \
   --set-string config.main.secret_key="$(openssl rand -hex 32)"
 ```
 
-Чарт загружает `ghcr.io/roxy-wi/incidentrelay` и по умолчанию использует тег из `appVersion` чарта. Чтобы зафиксировать конкретный образ:
+Поддержка OCI включена по умолчанию в Helm 3.8 и новее, поэтому `helm repo add` не требуется. Чарт загружает `ghcr.io/roxy-wi/incidentrelay`, а tag image по умолчанию берётся из `appVersion` чарта. Чтобы явно зафиксировать image:
+
+```bash
+helm upgrade --install incidentrelay \
+  oci://ghcr.io/roxy-wi/incidentrelay-charts/incidentrelay \
+  --version 2.1.0 \
+  --set image.repository=ghcr.io/roxy-wi/incidentrelay \
+  --set image.tag=2.1 \
+  --set-string config.main.secret_key="$(openssl rand -hex 32)"
+```
+
+### Установка из исходного кода
+
+Для разработки чарта или проверки ещё не выпущенных изменений установите встроенный чарт напрямую:
 
 ```bash
 helm upgrade --install incidentrelay ./helm/incidentrelay \
-  --set image.repository=ghcr.io/roxy-wi/incidentrelay \
-  --set image.tag=2.0 \
   --set-string config.main.secret_key="$(openssl rand -hex 32)"
 ```
 
@@ -315,7 +326,10 @@ extraVolumeMounts:
 Для SQLite оставьте `persistence.enabled=true` и `web.replicaCount=1`. Для PostgreSQL и многоузловой установки можно установить `persistence.enabled=false`, когда все security secrets уже стабильно заданы в сгенерированной или внешней конфигурации.
 
 ```bash
-helm upgrade incidentrelay ./helm/incidentrelay --reuse-values
+helm upgrade incidentrelay \
+  oci://ghcr.io/roxy-wi/incidentrelay-charts/incidentrelay \
+  --version 2.1.0 \
+  --reuse-values
 ```
 
 ```bash

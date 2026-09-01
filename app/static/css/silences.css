@@ -16,7 +16,7 @@
 .silence-matchers-preview {
     max-width: 260px;
     overflow: hidden;
-    color: #344054;
+    color: var(--md-text-soft);
     font-size: 12px;
     text-overflow: ellipsis;
     white-space: nowrap;

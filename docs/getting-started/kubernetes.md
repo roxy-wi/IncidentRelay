@@ -5,15 +5,13 @@ description: Deploy IncidentRelay to Kubernetes with the bundled Helm chart
 
 # Kubernetes Installation
 
-A Helm chart is bundled with the repository in `helm/incidentrelay`. It deploys the web application and the background workers, renders the application config into a Secret, and wires the `/healthz` and `/readyz` probes to Kubernetes.
-
-The chart is not published to a chart repository yet. Install it from a checkout of this repository.
+The IncidentRelay Helm chart is published as an OCI artifact in GHCR and is also kept in this repository at `helm/incidentrelay`. It deploys the web application and the background workers, renders the application config into a Secret, and wires the `/healthz` and `/readyz` probes to Kubernetes.
 
 ## Requirements
 
 ```text
 Kubernetes 1.23+
-Helm 3
+Helm 3.8+ or Helm 4
 a StorageClass, if you keep the default SQLite setup
 ```
 
@@ -35,16 +33,29 @@ Each component runs the same image and is selected by `INCIDENTRELAY_SERVICE`, e
 ## Quick start
 
 ```bash
-helm install incidentrelay ./helm/incidentrelay \
+helm install incidentrelay \
+  oci://ghcr.io/roxy-wi/incidentrelay-charts/incidentrelay \
+  --version 2.1.0 \
   --set-string config.main.secret_key="$(openssl rand -hex 32)"
 ```
 
-The chart pulls `ghcr.io/roxy-wi/incidentrelay` and defaults the tag to the chart `appVersion`. To pin an explicit image:
+OCI support is enabled by default in Helm 3.8 and later. No `helm repo add` step is required. The chart pulls `ghcr.io/roxy-wi/incidentrelay` and defaults the image tag to the chart `appVersion`. To pin an explicit image:
+
+```bash
+helm upgrade --install incidentrelay \
+  oci://ghcr.io/roxy-wi/incidentrelay-charts/incidentrelay \
+  --version 2.1.0 \
+  --set image.repository=ghcr.io/roxy-wi/incidentrelay \
+  --set image.tag=2.1 \
+  --set-string config.main.secret_key="$(openssl rand -hex 32)"
+```
+
+### Install from a source checkout
+
+For chart development or testing unreleased changes, install the bundled chart directly:
 
 ```bash
 helm upgrade --install incidentrelay ./helm/incidentrelay \
-  --set image.repository=ghcr.io/roxy-wi/incidentrelay \
-  --set image.tag=2.0 \
   --set-string config.main.secret_key="$(openssl rand -hex 32)"
 ```
 
@@ -315,7 +326,10 @@ If you use `existingConfigSecret`, Helm cannot normalize that external file. Bef
 For SQLite, keep `persistence.enabled=true` and `web.replicaCount=1`. For PostgreSQL/multi-node deployments, set `persistence.enabled=false` once every security secret is stable in the rendered or external config.
 
 ```bash
-helm upgrade incidentrelay ./helm/incidentrelay --reuse-values
+helm upgrade incidentrelay \
+  oci://ghcr.io/roxy-wi/incidentrelay-charts/incidentrelay \
+  --version 2.1.0 \
+  --reuse-values
 ```
 
 ```bash

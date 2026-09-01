@@ -11,7 +11,7 @@ It provides the core building blocks of an on-call system:
 - access groups and RBAC-style group roles;
 - teams and on-call rotations;
 - alert intake routes with per-route tokens;
-- Alertmanager, AWS SNS/Cloud watch, Grafana, Zabbix, Sentry, LibreNMS, Datadog, RMON,
+- Alertmanager, AWS SNS/Cloud watch, Grafana, Zabbix, Sentry, LibreNMS, Datadog, New Relic, Nagios, RMON,
 Uptime Kuma and generic webhook/PagerDuty Event API v2 integrations;
 - Mattermost, Slack, Telegram, Discord, Microsoft Teams, email, webhook, and voice-call notifications;
 - profile-level browser/PWA push notifications;
@@ -23,7 +23,8 @@ Uptime Kuma and generic webhook/PagerDuty Event API v2 integrations;
 - maintenance windows for planned work and alert behavior control;
 - calendar view for on-call schedules;
 - personal API tokens;
-- Swagger/OpenAPI documentation.
+- Swagger/OpenAPI documentation;
+- configurable data retention for resolved alert history and diagnostic traces.
 
 IncidentRelay is designed for **self-hosted environments** where teams need predictable behavior, clear ownership, easy integrations, and full control over alert routing.
 
@@ -113,6 +114,8 @@ IncidentRelay includes Swagger/OpenAPI documentation and personal API tokens wit
 |-----------------|--------------------------------------------|
 | Alertmanager    | `POST /api/integrations/alertmanager`      |
 | Datadog         | `POST /api/integrations/datadog`           |
+| New Relic       | `POST /api/integrations/new-relic`         |
+| Nagios          | `POST /api/integrations/nagios`            |
 | Grafana         | `POST /api/integrations/grafana`           |
 | RMON            | `POST /api/integrations/rmon`              |
 | Zabbix          | `POST /api/integrations/zabbix`            |
@@ -165,29 +168,27 @@ Read more: [Docker installation](docs/getting-started/docker.md)
 
 ### Kubernetes (Helm)
 
-A Helm chart lives in `helm/incidentrelay`. It deploys the web UI plus the scheduler, Telegram and Slack workers, renders the application config from values into a Secret, and wires up the `/healthz` and `/readyz` probes.
+The IncidentRelay Helm chart is published as an OCI artifact in GHCR, so installing it does not require cloning this repository. It deploys the web UI plus the scheduler, Telegram and Slack workers, renders the application config from values into a Secret, and wires up the `/healthz` and `/readyz` probes.
 
 ```bash
-helm install incidentrelay ./helm/incidentrelay \
+helm install incidentrelay \
+  oci://ghcr.io/roxy-wi/incidentrelay-charts/incidentrelay \
+  --version 2.1.0 \
   --set-string config.main.secret_key="$(openssl rand -hex 32)"
 ```
 
-By default, the chart uses:
+The chart defaults to `ghcr.io/roxy-wi/incidentrelay:2.1`. To pin another application image:
 
 ```bash
-ghcr.io/roxy-wi/incidentrelay:2.0
-```
-
-To pin another image:
-
-```bash
-helm upgrade --install incidentrelay ./helm/incidentrelay \
+helm upgrade --install incidentrelay \
+  oci://ghcr.io/roxy-wi/incidentrelay-charts/incidentrelay \
+  --version 2.1.0 \
   --set image.repository=ghcr.io/roxy-wi/incidentrelay \
-  --set image.tag=2.0 \
+  --set image.tag=2.1 \
   --set-string config.main.secret_key="$(openssl rand -hex 32)"
 ```
 
-All settings from `incidentrelay.conf` are available under `config.*` in [values.yaml](helm/incidentrelay/values.yaml); you can also bring a pre-rendered config via `existingConfigSecret`. IncidentRelay 2.0 enables API authentication and RBAC by default in the chart, and empty JWT/encryption/callback secrets inherit the required `config.main.secret_key` so all pods share stable keys.
+For development from a source checkout, use `./helm/incidentrelay` instead of the OCI URL. All settings from `incidentrelay.conf` are available under `config.*` in [values.yaml](helm/incidentrelay/values.yaml); you can also bring a pre-rendered config via `existingConfigSecret`. Empty JWT/encryption/callback secrets inherit the required `config.main.secret_key` so all pods share stable keys.
 
 Read more: [Kubernetes installation](docs/getting-started/kubernetes.md)
 
@@ -407,6 +408,8 @@ More examples:
 - [Alertmanager integration](docs/integrations/alertmanager.md)
 - [AWS SNS/Cloud watch](integrations/aws-sns-cloudwatch.md)
 - [Datadog integration](docs/integrations/datadog.md)
+- [New Relic integration](docs/integrations/new-relic.md)
+- [Nagios integration](docs/integrations/nagios.md)
 - [Grafana integration](docs/integrations/grafana.md)
 - [Datalog integration](docs/integrations/datadog.md)
 - [RMON integration](docs/integrations/rmon.md)

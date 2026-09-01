@@ -94,6 +94,7 @@ Example response:
     "id": 12,
     "trace_id": "4fd2a8c9-8c2f-44e8-96fd-77b7f03e72f2",
     "mode": "live",
+    "trace_level": "full",
     "group_id": 123,
     "alert_id": 456,
     "source": "alertmanager",
@@ -152,6 +153,34 @@ Example response:
 }
 ```
 
+## Trace detail level
+
+The default processing trace level is configured globally:
+
+```ini
+[alerts]
+explain_trace_level = full
+```
+
+Available levels:
+
+- `full` — records the complete Explain Trace, including `input_summary`, result payload and step `data`;
+- `compact` — records the trace and ordered steps, but stores those detailed JSON fields as empty objects;
+- `disabled` — does not create `AlertExplainTrace` or `AlertExplainStep` rows and ingest responses return `trace_id: null`.
+
+Global Event Orchestration can override the default for matching events:
+
+```json
+{
+  "type": "set_trace_level",
+  "level": "compact"
+}
+```
+
+`set_trace_level` is intentionally limited to global orchestrations. Service-scoped orchestration may run after alert lifecycle processing has already started, which is too late to guarantee that disabled traces never reach the database. If several matching global actions set the level, the last applied value wins.
+
+Trace level controls **how much is written**. The `[retention]` section independently controls **how long persisted traces are kept**.
+
 ## UI
 
 Existing alert groups show explain data in the alert details modal.
@@ -192,23 +221,24 @@ Orphan traces are traces without `group_id`. They can be read only by administra
 
 ## Retention
 
-Explain traces are cleaned up automatically by the scheduler.
-
-Default retention:
+Explain Trace uses the central `[retention]` policy. When no trace-specific value is configured, it inherits `alert_days`:
 
 ```ini
-[alerts]
-alert_explain_trace_retention_days = 30
+[retention]
+alert_days = 30
 ```
 
-Default cleanup interval:
+To keep Explain Trace for a different period, set an override in the same section:
 
 ```ini
-[scheduler]
-alert_explain_trace_cleanup_interval_seconds = 86400
+[retention]
+alert_days = 90
+explain_trace_days = 30
 ```
 
-Set `alert_explain_trace_retention_days` to a positive integer.
+An explicit `explain_trace_days = 0` disables standalone Explain Trace cleanup. Traces linked to an alert or alert group are still removed when that alert history is deleted through database cascades. Cleanup runs as part of the single `retention_cleanup_job`; its cadence is controlled by `retention.cleanup_interval_seconds`.
+
+IncidentRelay 2.1 accepts the old `[alerts] alert_explain_trace_retention_days` value only as an upgrade fallback when `retention.explain_trace_days` is absent. New configuration should use `[retention]`.
 
 ## Troubleshooting
 

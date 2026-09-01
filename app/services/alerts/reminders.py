@@ -53,7 +53,14 @@ def send_unacked_reminders():
     now = utc_now()
     count = 0
 
-    for group in alerts_repo.list_firing_alert_groups():
+    for selected_group in alerts_repo.list_firing_alert_groups():
+        # ACK may be handled by another worker after the scheduler selected
+        # this batch. Reload the row before any reminder/escalation decision.
+        group = alerts_repo.get_alert_group(selected_group.id)
+
+        if group.status != "firing" or group.merged_into_id:
+            continue
+
         if is_notification_lifecycle_suppressed(group, now=now):
             pause_notification_lifecycle(group)
             logger.debug(

@@ -1,36 +1,21 @@
 /* IncidentRelay dark color scheme.
  *
- * The active scheme is resolved by js/core/theme.js before stylesheets load.
- * Keep component-specific rules here as overrides so existing page styles do
- * not need to duplicate complete light and dark definitions.
+ * First-party components consume the shared --md-* tokens from material.css.
+ * This file only changes token values for dark mode and contains compatibility
+ * overrides for third-party controls that ship their own hard-coded palette.
  */
 
 html[data-color-scheme="dark"] {
     color-scheme: dark;
 
-    --bg: #0b1220;
-    --sidebar-bg: #020617;
-    --sidebar-border: #1e293b;
-    --card-bg: #111827;
-    --text: #e5edf6;
-    --muted: #94a3b8;
-    --border: #334155;
-    --primary: #60a5fa;
-    --primary-hover: #93c5fd;
-    --danger: #f87171;
-    --warning: #fbbf24;
-    --success: #4ade80;
-    --info: #38bdf8;
-    --shadow: 0 12px 36px rgba(0, 0, 0, 0.34);
-
-    /* Compatibility variables used by page-specific styles. */
-    --card-background: #111827;
-    --border-color: #334155;
-
     --md-bg: #0b1220;
     --md-surface: #111827;
     --md-surface-soft: #172033;
     --md-surface-hover: #1e293b;
+    --md-surface-glass: rgba(17, 24, 39, 0.88);
+    --md-surface-card: rgba(17, 24, 39, 0.96);
+    --md-input-bg: #0f172a;
+    --md-disabled-bg: #172033;
 
     --md-sidebar-bg: #020617;
     --md-sidebar-bg-2: #0f172a;
@@ -45,6 +30,8 @@ html[data-color-scheme="dark"] {
     --md-text: #e5edf6;
     --md-text-soft: #cbd5e1;
     --md-muted: #94a3b8;
+    --md-placeholder: #64748b;
+    --md-on-accent: #ffffff;
 
     --md-primary: #60a5fa;
     --md-primary-hover: #93c5fd;
@@ -52,277 +39,45 @@ html[data-color-scheme="dark"] {
 
     --md-danger: #f87171;
     --md-danger-soft: rgba(248, 113, 113, 0.16);
+    --md-danger-border: rgba(248, 113, 113, 0.38);
 
     --md-warning: #fbbf24;
     --md-warning-soft: rgba(251, 191, 36, 0.16);
+    --md-warning-border: rgba(251, 191, 36, 0.38);
 
     --md-success: #4ade80;
     --md-success-soft: rgba(74, 222, 128, 0.16);
+    --md-success-border: rgba(74, 222, 128, 0.38);
 
     --md-info: #38bdf8;
     --md-info-soft: rgba(56, 189, 248, 0.16);
+    --md-info-border: rgba(56, 189, 248, 0.38);
+
+    --md-operational: #4ade80;
+    --md-degraded: #fbbf24;
+    --md-partial-outage: #fb923c;
+    --md-major-outage: #f87171;
+    --md-maintenance: #a78bfa;
 
     --md-shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.32);
     --md-shadow-md: 0 10px 30px rgba(0, 0, 0, 0.34);
     --md-shadow-lg: 0 22px 58px rgba(0, 0, 0, 0.46);
+
+    --md-code-bg: #020617;
+    --md-code-text: #dbeafe;
+    --md-chip-overlay: rgba(15, 23, 42, 0.72);
+    --md-sidebar-overlay: rgba(255, 255, 255, 0.08);
+    --md-sidebar-overlay-hover: rgba(255, 255, 255, 0.14);
+    --md-subtle-overlay: rgba(255, 255, 255, 0.08);
+    --md-chart-grid: rgba(148, 163, 184, 0.22);
 }
 
-html[data-color-scheme="dark"] body.md-theme {
-    background:
-        radial-gradient(circle at top left, rgba(59, 130, 246, 0.12), transparent 34rem),
-        var(--md-bg);
-}
-
-html[data-color-scheme="dark"] body.md-theme .sidebar {
-    box-shadow: 8px 0 30px rgba(0, 0, 0, 0.34);
-}
-
-html[data-color-scheme="dark"] body.md-theme .sidebar-toggle {
-    background: #172033;
-}
-
-html[data-color-scheme="dark"] body.md-theme .topbar,
-html[data-color-scheme="dark"] body.md-theme .card,
-html[data-color-scheme="dark"] body.md-theme .summary-card,
-html[data-color-scheme="dark"] body.md-theme .metric-card,
-html[data-color-scheme="dark"] body.md-theme .table-wrapper,
-html[data-color-scheme="dark"] body.md-theme .details-body,
-html[data-color-scheme="dark"] body.md-theme .calendar-shell,
-html[data-color-scheme="dark"] body.md-theme .calendar-legend,
-html[data-color-scheme="dark"] body.md-theme .app-modal-dialog,
-html[data-color-scheme="dark"] body.md-theme .modal-content,
-html[data-color-scheme="dark"] body.md-theme .drawer,
-html[data-color-scheme="dark"] body.md-theme .drawer-panel,
-html[data-color-scheme="dark"] body.md-theme .popover,
-html[data-color-scheme="dark"] body.md-theme .dropdown-menu {
-    background-color: var(--md-surface);
-    color: var(--md-text);
-}
-
-html[data-color-scheme="dark"] body.md-theme .card:hover {
-    box-shadow: var(--md-shadow-md);
-}
-
-html[data-color-scheme="dark"] body.md-theme .card-header {
-    background: linear-gradient(180deg, var(--md-surface-soft), var(--md-surface));
-    border-color: var(--md-border);
-}
-
-html[data-color-scheme="dark"] body.md-theme .app-modal-header,
-html[data-color-scheme="dark"] body.md-theme .modal-header {
-    background: linear-gradient(180deg, var(--md-surface-soft), var(--md-surface));
-    border-color: var(--md-border);
-}
-
-html[data-color-scheme="dark"] body.md-theme .app-modal-footer,
-html[data-color-scheme="dark"] body.md-theme .modal-footer {
-    background: var(--md-surface);
-    border-color: var(--md-border);
-}
-
-html[data-color-scheme="dark"] body.md-theme .page-tabs {
-    background: var(--md-surface);
-    border-color: var(--md-border);
-}
-
-html[data-color-scheme="dark"] body.md-theme .page-tab:hover {
-    background: var(--md-surface-hover);
-    color: var(--md-text);
-}
-
-html[data-color-scheme="dark"] body.md-theme .page-tab.is-active {
-    background: var(--md-surface-soft);
-    color: var(--md-primary);
-    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.32);
-}
-
-html[data-color-scheme="dark"] body.md-theme .summary-mini-item,
-html[data-color-scheme="dark"] body.md-theme .section-box,
-html[data-color-scheme="dark"] body.md-theme .editor-panel,
-html[data-color-scheme="dark"] body.md-theme .calendar-team-header,
-html[data-color-scheme="dark"] body.md-theme .calendar-day-header,
-html[data-color-scheme="dark"] body.md-theme .calendar-team-cell,
-html[data-color-scheme="dark"] body.md-theme .calendar-month-weekday,
-html[data-color-scheme="dark"] body.md-theme .calendar-day-outside-month,
-html[data-color-scheme="dark"] body.md-theme .empty-state,
-html[data-color-scheme="dark"] body.md-theme .details-item,
-html[data-color-scheme="dark"] body.md-theme .list-item,
-html[data-color-scheme="dark"] body.md-theme .stack-card,
-html[data-color-scheme="dark"] body.md-theme .filter-panel,
-html[data-color-scheme="dark"] body.md-theme .toolbar-panel,
-html[data-color-scheme="dark"] body.md-theme .profile-group-item {
-    background-color: var(--md-surface-soft);
-    color: var(--md-text);
-    border-color: var(--md-border);
-}
-
-html[data-color-scheme="dark"] body.md-theme .calendar-team-header,
-html[data-color-scheme="dark"] body.md-theme .calendar-day-header,
-html[data-color-scheme="dark"] body.md-theme .calendar-team-cell,
-html[data-color-scheme="dark"] body.md-theme .calendar-day-cell,
-html[data-color-scheme="dark"] body.md-theme .calendar-month-weekday,
-html[data-color-scheme="dark"] body.md-theme .calendar-month-day-cell {
-    background-color: var(--md-surface);
-    border-color: var(--md-border);
-}
-
-html[data-color-scheme="dark"] body.md-theme .calendar-day-outside-month {
-    background-color: #0f172a;
-}
-
-html[data-color-scheme="dark"] body.md-theme h1,
-html[data-color-scheme="dark"] body.md-theme h2,
-html[data-color-scheme="dark"] body.md-theme h3,
-html[data-color-scheme="dark"] body.md-theme h4,
-html[data-color-scheme="dark"] body.md-theme .profile-hero h2,
-html[data-color-scheme="dark"] body.md-theme .profile-group-name,
-html[data-color-scheme="dark"] body.md-theme .details-value,
-html[data-color-scheme="dark"] body.md-theme .row-title,
-html[data-color-scheme="dark"] body.md-theme .item-title {
-    color: var(--md-text);
-}
-
-html[data-color-scheme="dark"] body.md-theme .page-subtitle,
-html[data-color-scheme="dark"] body.md-theme .card-subtitle,
-html[data-color-scheme="dark"] body.md-theme .row-subtitle,
-html[data-color-scheme="dark"] body.md-theme .help-text,
-html[data-color-scheme="dark"] body.md-theme .field-hint,
-html[data-color-scheme="dark"] body.md-theme .details-label,
-html[data-color-scheme="dark"] body.md-theme .profile-meta,
-html[data-color-scheme="dark"] body.md-theme .profile-eyebrow {
-    color: var(--md-muted);
-}
-
-html[data-color-scheme="dark"] body.md-theme .input,
-html[data-color-scheme="dark"] body.md-theme input[type="text"],
-html[data-color-scheme="dark"] body.md-theme input[type="email"],
-html[data-color-scheme="dark"] body.md-theme input[type="password"],
-html[data-color-scheme="dark"] body.md-theme input[type="number"],
-html[data-color-scheme="dark"] body.md-theme input[type="datetime-local"],
-html[data-color-scheme="dark"] body.md-theme input[type="date"],
-html[data-color-scheme="dark"] body.md-theme input[type="time"],
-html[data-color-scheme="dark"] body.md-theme input[type="search"],
-html[data-color-scheme="dark"] body.md-theme input[type="tel"],
-html[data-color-scheme="dark"] body.md-theme input[type="url"],
-html[data-color-scheme="dark"] body.md-theme select,
-html[data-color-scheme="dark"] body.md-theme textarea {
-    background-color: #0f172a;
-    border-color: var(--md-border);
-    color: var(--md-text);
-}
-
-html[data-color-scheme="dark"] body.md-theme input:disabled,
-html[data-color-scheme="dark"] body.md-theme select:disabled,
-html[data-color-scheme="dark"] body.md-theme textarea:disabled {
-    background-color: #172033;
-    color: #94a3b8;
-}
-
-html[data-color-scheme="dark"] body.md-theme input::placeholder,
-html[data-color-scheme="dark"] body.md-theme textarea::placeholder {
-    color: #64748b;
-}
-
-html[data-color-scheme="dark"] body.md-theme .btn:not(.btn-primary):not(.btn-danger):not(.btn-warning):not(.btn-success):not(.btn-info),
-html[data-color-scheme="dark"] body.md-theme .topbar-icon-button,
-html[data-color-scheme="dark"] body.md-theme .app-modal-close {
-    background-color: var(--md-surface-soft);
-    border-color: var(--md-border);
-    color: var(--md-text-soft);
-}
-
-html[data-color-scheme="dark"] body.md-theme .btn:not(.btn-primary):not(.btn-danger):not(.btn-warning):not(.btn-success):not(.btn-info):hover,
-html[data-color-scheme="dark"] body.md-theme .topbar-icon-button:hover,
-html[data-color-scheme="dark"] body.md-theme .app-modal-close:hover {
-    background-color: var(--md-surface-hover);
-    color: var(--md-text);
-}
-
-html[data-color-scheme="dark"] body.md-theme .data-table,
-html[data-color-scheme="dark"] body.md-theme table {
-    color: var(--md-text);
-}
-
-html[data-color-scheme="dark"] body.md-theme .data-table th,
-html[data-color-scheme="dark"] body.md-theme table th {
-    background-color: #172033;
-    border-color: var(--md-border);
-    color: var(--md-text-soft);
-}
-
-html[data-color-scheme="dark"] body.md-theme .data-table td,
-html[data-color-scheme="dark"] body.md-theme table td {
-    background-color: var(--md-surface);
-    border-color: var(--md-border);
-    color: var(--md-text);
-}
-
-html[data-color-scheme="dark"] body.md-theme .data-table tr:hover td,
-html[data-color-scheme="dark"] body.md-theme table tbody tr:hover td {
-    background-color: var(--md-surface-hover);
-}
-
-html[data-color-scheme="dark"] body.md-theme .table-toolbar,
-html[data-color-scheme="dark"] body.md-theme .table-active-filters,
-html[data-color-scheme="dark"] body.md-theme .table-pagination,
-html[data-color-scheme="dark"] body.md-theme .alerts-pagination {
-    background-color: var(--md-surface);
-    border-color: var(--md-border);
-    color: var(--md-text);
-}
-
-html[data-color-scheme="dark"] body.md-theme .table-pagination-left,
-html[data-color-scheme="dark"] body.md-theme .table-pagination-center,
-html[data-color-scheme="dark"] body.md-theme .table-pagination-actions,
-html[data-color-scheme="dark"] body.md-theme .table-title {
-    color: var(--md-text-soft);
-}
-
-html[data-color-scheme="dark"] body.md-theme .table-filter-chip,
-html[data-color-scheme="dark"] body.md-theme .table-meta-pill {
-    background-color: var(--md-surface-soft);
-    color: var(--md-text-soft);
-}
-
-html[data-color-scheme="dark"] body.md-theme .page-tab,
-html[data-color-scheme="dark"] body.md-theme .tab-button,
-html[data-color-scheme="dark"] body.md-theme [role="tab"] {
-    color: var(--md-muted);
-}
-
-html[data-color-scheme="dark"] body.md-theme .page-tab.is-active,
-html[data-color-scheme="dark"] body.md-theme .tab-button.is-active,
-html[data-color-scheme="dark"] body.md-theme [role="tab"][aria-selected="true"] {
-    color: var(--md-primary);
-}
-
-html[data-color-scheme="dark"] body.md-theme .app-action-menu-list,
-html[data-color-scheme="dark"] body.md-theme .app-action-menu-list.app-action-menu-portal {
-    background-color: var(--md-surface);
-    border-color: var(--md-border);
-}
-
-html[data-color-scheme="dark"] body.md-theme .app-action-menu-item {
-    color: var(--md-text);
-}
-
-html[data-color-scheme="dark"] body.md-theme .app-action-menu-item:hover {
-    background-color: var(--md-surface-hover);
-}
-
-html[data-color-scheme="dark"] body.md-theme .app-action-menu-item.is-danger {
-    color: var(--md-danger);
-}
-
-html[data-color-scheme="dark"] body.md-theme .app-action-menu-item.is-danger:hover {
-    background-color: var(--md-danger-soft);
-}
-
+/* Third-party Select2 ships light colors after material.css. */
 html[data-color-scheme="dark"] body.md-theme .select2-container .select2-selection--single,
 html[data-color-scheme="dark"] body.md-theme .select2-container .select2-selection--multiple,
 html[data-color-scheme="dark"] body.md-theme .select2-dropdown,
 html[data-color-scheme="dark"] body.md-theme .select2-search__field {
-    background-color: #0f172a;
+    background-color: var(--md-input-bg);
     border-color: var(--md-border);
     color: var(--md-text);
 }
@@ -333,94 +88,42 @@ html[data-color-scheme="dark"] body.md-theme .select2-container--default .select
     color: var(--md-text);
 }
 
+html[data-color-scheme="dark"] body.md-theme .select2-container--default .select2-selection--multiple .select2-selection__choice {
+    background-color: var(--md-surface-soft);
+    border-color: var(--md-border);
+    color: var(--md-text-soft);
+}
+
 html[data-color-scheme="dark"] body.md-theme .select2-container--default .select2-results__option--highlighted[aria-selected],
 html[data-color-scheme="dark"] body.md-theme .select2-container--default .select2-results__option--selected {
     background-color: var(--md-surface-hover);
     color: var(--md-text);
 }
 
+/* Tom Select also ships a fixed light palette. */
 html[data-color-scheme="dark"] body.md-theme .ts-wrapper .ts-control,
-html[data-color-scheme="dark"] body.md-theme .ts-dropdown,
-html[data-color-scheme="dark"] body.md-theme .ts-dropdown .active {
-    background-color: #0f172a;
+html[data-color-scheme="dark"] body.md-theme .ts-dropdown {
+    background-color: var(--md-input-bg);
     border-color: var(--md-border);
+    color: var(--md-text);
+}
+
+html[data-color-scheme="dark"] body.md-theme .ts-wrapper .ts-control > .item {
+    background: var(--md-surface-soft);
+    color: var(--md-text);
+}
+
+html[data-color-scheme="dark"] body.md-theme .ts-dropdown .option {
     color: var(--md-text);
 }
 
 html[data-color-scheme="dark"] body.md-theme .ts-dropdown .option:hover,
 html[data-color-scheme="dark"] body.md-theme .ts-dropdown .active {
     background-color: var(--md-surface-hover);
-}
-
-html[data-color-scheme="dark"] body.md-theme pre,
-html[data-color-scheme="dark"] body.md-theme code,
-html[data-color-scheme="dark"] body.md-theme .code-block,
-html[data-color-scheme="dark"] body.md-theme .json-view,
-html[data-color-scheme="dark"] body.md-theme .payload-view {
-    background-color: #020617;
-    color: #dbeafe;
-    border-color: var(--md-border);
-}
-
-html[data-color-scheme="dark"] body.md-theme hr {
-    border-color: var(--md-border);
-}
-
-html[data-color-scheme="dark"] body.md-theme canvas {
-    color-scheme: dark;
-}
-
-html[data-color-scheme="dark"] body.md-theme .cytoscape-container,
-html[data-color-scheme="dark"] body.md-theme .dependency-graph,
-html[data-color-scheme="dark"] body.md-theme .chart-container {
-    background-color: var(--md-surface);
-    border-color: var(--md-border);
-}
-
-html[data-color-scheme="dark"] body.md-theme .badge-muted,
-html[data-color-scheme="dark"] body.md-theme .badge-neutral,
-html[data-color-scheme="dark"] body.md-theme .pill-muted {
-    background-color: var(--md-surface-soft);
-    color: var(--md-text-soft);
-    border-color: var(--md-border);
-}
-
-html[data-color-scheme="dark"] body.md-theme .orchestration-rule-card,
-html[data-color-scheme="dark"] body.md-theme .orchestration-action-row,
-html[data-color-scheme="dark"] body.md-theme .orchestration-metric {
-    background-color: var(--md-surface-soft);
-    border-color: var(--md-border);
     color: var(--md-text);
-}
-
-html[data-color-scheme="dark"] body.md-theme .orchestration-keyword {
-    color: var(--md-text-soft);
-}
-
-html[data-color-scheme="dark"] body.md-theme .orchestration-message.validation-success,
-html[data-color-scheme="dark"] body.md-theme .status-badge.status-active {
-    background-color: var(--md-success-soft);
-    border-color: rgba(74, 222, 128, 0.38);
-    color: var(--md-success);
-}
-
-html[data-color-scheme="dark"] body.md-theme .orchestration-message.validation-error {
-    background-color: var(--md-danger-soft);
-    border-color: rgba(248, 113, 113, 0.38);
-    color: var(--md-danger);
-}
-
-html[data-color-scheme="dark"] body.md-theme .status-badge.status-warning {
-    background-color: var(--md-warning-soft);
-    color: var(--md-warning);
-}
-
-html[data-color-scheme="dark"] body.md-theme .status-badge.status-muted {
-    background-color: var(--md-surface-soft);
-    color: var(--md-muted);
 }
 
 html[data-color-scheme="dark"] body.md-theme ::selection {
     background: rgba(96, 165, 250, 0.35);
-    color: #ffffff;
+    color: var(--md-on-accent);
 }

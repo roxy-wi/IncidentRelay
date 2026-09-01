@@ -61,13 +61,20 @@ def test_authenticated_shell_uses_profile_preferences(
     assert 'js/core/theme.js' in html
 
 
-def test_dark_theme_overrides_shared_light_surfaces():
-    css = Path("app/static/css/theme_dark.css").read_text(encoding="utf-8")
+def test_dark_theme_uses_shared_material_tokens():
+    material_css = Path("app/static/css/material.css").read_text(encoding="utf-8")
+    dark_css = Path("app/static/css/theme_dark.css").read_text(encoding="utf-8")
 
-    assert ".app-modal-header" in css
-    assert ".app-modal-footer" in css
-    assert ".table-pagination" in css
-    assert ".alerts-pagination" in css
-    assert ".orchestration-rule-card" in css
-    assert "--card-background: #111827" in css
-    assert "--border-color: #334155" in css
+    assert "--surface: var(--md-surface)" in material_css
+    assert "--text: var(--md-text)" in material_css
+    assert "--card-background: var(--md-surface)" in material_css
+    assert "--md-surface: #111827" in dark_css
+    assert "--md-input-bg: #0f172a" in dark_css
+    assert "--md-code-bg: #020617" in dark_css
+
+    # First-party page components consume shared tokens instead of being
+    # re-declared one-by-one in the dark stylesheet.
+    assert ".detail-item" not in dark_css
+    assert ".event-item" not in dark_css
+    assert ".alert-service-context" not in dark_css
+    assert ".impact-path-node" not in dark_css

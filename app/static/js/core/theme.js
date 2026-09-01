@@ -27,6 +27,13 @@
         return mediaQuery && mediaQuery.matches ? "dark" : "light";
     }
 
+    function themeToken(name, fallback) {
+        const value = window.getComputedStyle(document.documentElement)
+            .getPropertyValue(name)
+            .trim();
+        return value || fallback;
+    }
+
     function updateThemeColor(colorScheme) {
         const element = document.querySelector('meta[name="theme-color"]');
         if (element) {
@@ -37,16 +44,16 @@
         }
     }
 
-    function applyChartDefaults(colorScheme) {
+    function applyChartDefaults() {
         if (!window.Chart || !window.Chart.defaults) {
             return;
         }
 
-        const dark = colorScheme === "dark";
-        window.Chart.defaults.color = dark ? "#cbd5e1" : "#334155";
-        window.Chart.defaults.borderColor = dark
-            ? "rgba(148, 163, 184, 0.22)"
-            : "rgba(100, 116, 139, 0.18)";
+        window.Chart.defaults.color = themeToken("--md-text-soft", "#334155");
+        window.Chart.defaults.borderColor = themeToken(
+            "--md-chart-grid",
+            "rgba(100, 116, 139, 0.18)"
+        );
     }
 
     function applyTheme(nextPreference) {
@@ -57,7 +64,7 @@
         document.documentElement.dataset.colorScheme = colorScheme;
         document.documentElement.style.colorScheme = colorScheme;
         updateThemeColor(colorScheme);
-        applyChartDefaults(colorScheme);
+        applyChartDefaults();
 
         document.dispatchEvent(
             new CustomEvent("incidentrelay:theme-change", {
@@ -88,7 +95,7 @@
     window.AppTheme = Object.freeze({
         apply: applyTheme,
         applyChartDefaults: function () {
-            applyChartDefaults(resolveColorScheme(preference));
+            applyChartDefaults();
         },
         getPreference: function () {
             return preference;

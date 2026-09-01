@@ -1873,6 +1873,7 @@ class AlertGroup(BaseModel):
             (("source", "group_key_hash", "status"), False),
             (("route", "status"), False),
             (("service", "status"), False),
+            (("status", "resolved_at"), False),
             (("merged_into",), False),
         )
 
@@ -1961,6 +1962,7 @@ class Alert(BaseModel):
             (("team", "status"), False),
             (("source", "dedup_key"), False),
             (("group_key", "status"), False),
+            (("status", "resolved_at"), False),
         )
 
 
@@ -2175,6 +2177,7 @@ class AlertExplainTrace(BaseModel):
     )
 
     mode = CharField(default="live", index=True)  # live, dry_run
+    trace_level = CharField(default="full")  # full, compact
     source = CharField(null=True, index=True)
     dedup_key = CharField(null=True, index=True)
 

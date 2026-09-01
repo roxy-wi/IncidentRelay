@@ -66,7 +66,22 @@
 }</textarea>
         <label class="md-checkbox"><input id="orchestration-compare-active" type="checkbox"><span>{{ _('orchestrations.simulator.compare_active') }}</span></label>
         <button id="orchestration-run-simulation" class="btn btn-primary" type="button">{{ _('orchestrations.actions.run_simulation') }}</button>
-      </div></section><section class="card"><div class="card-header"><div><h2>{{ _('orchestrations.simulator.result') }}</h2><div class="card-subtitle">{{ _('orchestrations.simulator.result_help') }}</div></div></div><pre id="orchestration-simulation-result" class="orchestration-output">{{ _('orchestrations.simulator.no_result') }}</pre></section></div>
+      </div></section><section class="card orchestration-simulation-result-card"><div class="card-header"><div><h2>{{ _('orchestrations.simulator.result') }}</h2><div class="card-subtitle">{{ _('orchestrations.simulator.result_help') }}</div></div></div>
+        <div id="orchestration-simulation-empty" class="orchestration-simulation-empty">{{ _('orchestrations.simulator.no_result') }}</div>
+        <div id="orchestration-simulation-view" class="orchestration-simulation-view is-hidden">
+          <div id="orchestration-simulation-overview" class="orchestration-simulation-overview"></div>
+          <div class="page-tabs orchestration-simulation-result-tabs" role="tablist" aria-label="{{ _('orchestrations.simulator.result_views') }}">
+            <button class="page-tab is-active" type="button" role="tab" aria-selected="true" data-simulation-result-tab="summary">{{ _('orchestrations.simulator.summary') }}</button>
+            <button class="page-tab" type="button" role="tab" aria-selected="false" data-simulation-result-tab="rules">{{ _('orchestrations.simulator.rules') }}</button>
+            <button class="page-tab" type="button" role="tab" aria-selected="false" data-simulation-result-tab="changes">{{ _('orchestrations.simulator.changes') }}</button>
+            <button class="page-tab" type="button" role="tab" aria-selected="false" data-simulation-result-tab="raw">{{ _('orchestrations.simulator.raw_json') }}</button>
+          </div>
+          <div class="orchestration-simulation-result-panel" data-simulation-result-panel="summary"><div id="orchestration-simulation-summary"></div></div>
+          <div class="orchestration-simulation-result-panel is-hidden" data-simulation-result-panel="rules"><div id="orchestration-simulation-rules"></div></div>
+          <div class="orchestration-simulation-result-panel is-hidden" data-simulation-result-panel="changes"><div id="orchestration-simulation-changes"></div></div>
+          <div class="orchestration-simulation-result-panel is-hidden" data-simulation-result-panel="raw"><pre id="orchestration-simulation-result" class="orchestration-output"></pre></div>
+        </div>
+      </section></div>
     </div>
 
     <div class="orchestration-tab-panel is-hidden" data-orchestration-panel="versions"><div class="page-toolbar is-flush-top"><div><strong>{{ _('orchestrations.versions.title') }}</strong></div><button id="reload-orchestration-versions" class="btn" type="button">{{ _('orchestrations.actions.reload') }}</button></div><div class="table-wrapper"><table class="data-table"><thead><tr><th>#</th><th>{{ _('orchestrations.versions.status') }}</th><th>{{ _('orchestrations.versions.comment') }}</th><th>{{ _('orchestrations.versions.hash') }}</th><th>{{ _('orchestrations.versions.published') }}</th><th class="actions-th">{{ _('orchestrations.table.actions') }}</th></tr></thead><tbody id="orchestration-version-table"></tbody></table></div><div class="grid-two orchestration-diff-grid"><section><h3>{{ _('orchestrations.versions.selected_definition') }}</h3><pre id="orchestration-version-definition" class="orchestration-output"></pre></section><section><h3>{{ _('orchestrations.versions.active_diff') }}</h3><pre id="orchestration-version-diff" class="orchestration-output"></pre></section></div></div>

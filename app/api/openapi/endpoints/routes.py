@@ -2,7 +2,7 @@ from app.api.openapi.common import json_body, path_param, query_param, response
 
 SOURCE_SCHEMA_WITH_SENTRY = {
     "type": "string",
-    "enum": ["alertmanager", "aws_sns", "datadog", "grafana", "rmon", "zabbix", "webhook", "sentry", "librenms", "uptime_kuma", "heartbeat"],
+    "enum": ["alertmanager", "aws_sns", "datadog", "grafana", "nagios", "rmon", "zabbix", "webhook", "sentry", "librenms", "new_relic", "uptime_kuma", "heartbeat"],
     "description": "Incoming alert source type.",
 }
 
@@ -68,7 +68,7 @@ ROUTE_SCHEMA = {
     "properties": {
         "team_id": {"type": "integer", "minimum": 1},
         "name": {"type": "string", "example": "infra-alertmanager"},
-        "source": {"type": "string", "enum": ["alertmanager", "zabbix", "webhook"]},
+        "source": {"type": "string", "enum": ["alertmanager", "aws_sns", "datadog", "grafana", "new_relic", "nagios", "rmon", "zabbix", "webhook", "sentry", "librenms", "uptime_kuma", "heartbeat"]},
         "rotation_id": {"type": "integer", "nullable": True, "description": "Rotation that receives alerts for this route."},
         "service_id": {
             "type": "integer",

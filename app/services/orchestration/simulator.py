@@ -25,6 +25,7 @@ from app.services.integrations.normalizers.registry import (
     UnknownNormalizerSource,
     normalize_for_source,
 )
+from app.services.orchestration.actions import EventActionState
 from app.services.orchestration.engine import execute_rule_tree
 from app.services.orchestration.runtime import (
     RuntimeOrchestrationError,
@@ -406,6 +407,7 @@ def _simulate_version(
     )
     context.setdefault("time", {})["now"] = evaluated_at
     definition = orchestrations_repo.export_version(version.id)
+    baseline_context = EventActionState.from_context(context).to_dict()
     started = time.perf_counter()
     try:
         result = execute_rule_tree(definition.get("rules") or [], context)
@@ -437,6 +439,9 @@ def _simulate_version(
             "initial_context": safe_trace_value(context),
             "execution": safe_trace_value(result.to_dict()),
             "final_context": safe_trace_value(result.context),
+            "input_output_diff": safe_trace_value(
+                context_diff(baseline_context, result.context)
+            ),
             "selected": safe_trace_value(selected),
             "disposition": safe_trace_value(_disposition(result.context)),
             "errors": selection_errors,

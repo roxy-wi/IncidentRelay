@@ -322,6 +322,8 @@ function fillRouteSourceFilter(routes) {
         alertmanager: true,
         aws_sns: true,
         datadog: true,
+        new_relic: true,
+        nagios: true,
         grafana: true,
         rmon: true,
         heartbeat: true,
@@ -345,6 +347,10 @@ function fillRouteSourceFilter(routes) {
     });
     if (selected && sources[selected]) {
         filter.val(selected);
+    }
+
+    if (window.PageUrlState) {
+        window.PageUrlState.restoreFields("routes");
     }
 }
 
@@ -868,7 +874,8 @@ function routeDetailsCode(label, value) {
         .append($("<pre>").addClass("details-code").text(JSON.stringify(value || {}, null, 2)));
 }
 
-function renderRouteDetails(route) {
+function renderRouteDetails(route, options) {
+    options = options || {};
     selectedRouteDetailsId = route.id;
 
     $("#route-details-subtitle").text(
@@ -883,105 +890,115 @@ function renderRouteDetails(route) {
 
     const body = $("#route-details-body");
     body.empty();
-    body.append(
-        $("<div>")
-            .addClass("details-list")
-            .append(routeDetailsItem(i18n.t("routes.details.name"), route.name))
-            .append(routeDetailsItem(i18n.t("routes.details.team"), getRouteTeamLabel(route)))
-            .append(routeDetailsItem(i18n.t("routes.details.source"), route.source))
-            .append(
-                route.source === "sentry"
-                    ? routeDetailsItem(
-                        i18n.t("routes.details.sentry_webhook"),
-                        getSentryWebhookUrl(route)
-                    )
-                    : $()
-            )
-            .append(
-                route.source === "sentry"
-                    ? routeDetailsItem(
-                        i18n.t("routes.details.sentry_secret"),
-                        getRouteSentryConfig(route).has_webhook_secret
-                            ? i18n.t("routes.details.configured")
-                            : i18n.t("routes.details.not_configured")
-                    )
-                    : $()
-            )
-            .append(
-                route.source === "sentry"
-                    ? routeDetailsItem(
-                        i18n.t("routes.details.sentry_base_url"),
-                        getRouteSentryConfig(route).base_url || "-"
-                    )
-                    : $()
-            )
-            .append(
-                route.source === "sentry"
-                    ? routeDetailsItem(
-                        i18n.t("routes.details.sentry_org"),
-                        getRouteSentryConfig(route).organization_slug || "-"
-                    )
-                    : $()
-            )
-            .append(
-                routeDetailsItem(
-                    route.source === "aws_sns"
-                        ? i18n.t("routes.details.sns_webhook")
-                        : i18n.t("routes.details.webhook"),
-                    getRouteIntakeUrl(route)
+
+    const detailsGrid = $("<div>").addClass("details-grid");
+    detailsGrid
+        .append(routeDetailsItem(i18n.t("routes.details.name"), route.name))
+        .append(routeDetailsItem(i18n.t("routes.details.team"), getRouteTeamLabel(route)))
+        .append(routeDetailsItem(i18n.t("routes.details.source"), route.source))
+        .append(
+            route.source === "sentry"
+                ? routeDetailsItem(
+                    i18n.t("routes.details.sentry_secret"),
+                    getRouteSentryConfig(route).has_webhook_secret
+                        ? i18n.t("routes.details.configured")
+                        : i18n.t("routes.details.not_configured")
                 )
-            )
-            .append(
-                routeDetailsItem(
-                    i18n.t("routes.details.maintenance"),
-                    window.AppMaintenanceBadges.text(route, "-")
+                : $()
+        )
+        .append(
+            route.source === "sentry"
+                ? routeDetailsItem(
+                    i18n.t("routes.details.sentry_base_url"),
+                    getRouteSentryConfig(route).base_url || "-"
                 )
-            )
-            .append(routeDetailsItem(i18n.t("routes.details.escalation"), getRouteEscalationLabel(route)))
-            .append(routeDetailsItem(i18n.t("routes.details.team_escalation"), getRouteTeamEscalationLabel(route)))
-            .append(routeDetailsItem(i18n.t("routes.details.notification_source"), getRouteNotificationModeLabel(route)))
-            .append(routeDetailsItem(i18n.t("routes.details.channels"), asArray(route.channels).map(function (channel) {
-                return channel.name;
-            }).join(", ") || "-"))
-            .append(
-                !["sentry", "aws_sns"].includes(route.source)
-                    ? routeDetailsItem(
-                        i18n.t("routes.details.token_prefix"),
-                        route.intake_token_prefix
-                    )
-                    : $()
-            )
-            .append(
-                routeDetailsItem(
-                    i18n.t("routes.details.status"),
-                    route.enabled
-                        ? i18n.t("routes.status.enabled")
-                        : i18n.t("routes.status.disabled")
+                : $()
+        )
+        .append(
+            route.source === "sentry"
+                ? routeDetailsItem(
+                    i18n.t("routes.details.sentry_org"),
+                    getRouteSentryConfig(route).organization_slug || "-"
                 )
+                : $()
+        )
+        .append(
+            routeDetailsItem(
+                i18n.t("routes.details.maintenance"),
+                window.AppMaintenanceBadges.text(route, "-")
             )
-            .append(
-                routeDetailsItem(
-                    i18n.t("routes.details.matcher_preset"),
-                    route.matcher_preset
-                        ? formatMatcherPresetOption(route.matcher_preset)
-                        : i18n.t("routes.form.no_preset")
+        )
+        .append(routeDetailsItem(i18n.t("routes.details.escalation"), getRouteEscalationLabel(route)))
+        .append(routeDetailsItem(i18n.t("routes.details.team_escalation"), getRouteTeamEscalationLabel(route)))
+        .append(routeDetailsItem(i18n.t("routes.details.notification_source"), getRouteNotificationModeLabel(route)))
+        .append(routeDetailsItem(i18n.t("routes.details.channels"), asArray(route.channels).map(function (channel) {
+            return channel.name;
+        }).join(", ") || "-"))
+        .append(
+            !["sentry", "aws_sns"].includes(route.source)
+                ? routeDetailsItem(
+                    i18n.t("routes.details.token_prefix"),
+                    route.intake_token_prefix
                 )
+                : $()
+        )
+        .append(
+            routeDetailsItem(
+                i18n.t("routes.details.status"),
+                route.enabled
+                    ? i18n.t("routes.status.enabled")
+                    : i18n.t("routes.status.disabled")
             )
-            .append(routeDetailsCode(i18n.t("routes.details.additional_matchers"), route.matchers || {}))
-            .append(routeDetailsCode(i18n.t("routes.details.group_by"), asArray(route.group_by)))
-            .append(routeDetailsItem(i18n.t("routes.details.service"), route.service_name || route.service_slug || "-"))
+        )
+        .append(
+            routeDetailsItem(
+                i18n.t("routes.details.matcher_preset"),
+                route.matcher_preset
+                    ? formatMatcherPresetOption(route.matcher_preset)
+                    : i18n.t("routes.form.no_preset")
+            )
+        )
+        .append(routeDetailsItem(i18n.t("routes.details.service"), route.service_name || route.service_slug || "-"));
+
+    body.append(detailsGrid);
+
+    // Keep long identifiers and structured values full-width so the compact
+    // summary grid stays readable even for long URLs, ARNs and matcher JSON.
+    const fullWidthDetails = $("<div>").addClass("details-list");
+
+    if (route.source === "sentry") {
+        fullWidthDetails.append(
+            routeDetailsItem(
+                i18n.t("routes.details.sentry_webhook"),
+                getSentryWebhookUrl(route)
+            )
+        );
+    }
+
+    fullWidthDetails.append(
+        routeDetailsItem(
+            route.source === "aws_sns"
+                ? i18n.t("routes.details.sns_webhook")
+                : i18n.t("routes.details.webhook"),
+            getRouteIntakeUrl(route)
+        )
     );
 
     if (route.source === "aws_sns") {
         const awsSnsConfig = getRouteAwsSnsConfig(route);
-
-        body.find(".details-list").append(
+        fullWidthDetails.append(
             routeDetailsItem(
                 i18n.t("routes.details.sns_topic"),
                 awsSnsConfig.topic_arn
             )
         );
     }
+
+    fullWidthDetails
+        .append(routeDetailsCode(i18n.t("routes.details.additional_matchers"), route.matchers || {}))
+        .append(routeDetailsCode(i18n.t("routes.details.group_by"), asArray(route.group_by)));
+
+    body.append(fullWidthDetails);
 
     const actions = $("<div>").addClass("details-actions");
     appendIconActionIfAllowed(actions, route, {
@@ -1030,37 +1047,36 @@ function renderRouteDetails(route) {
     if (actions.children().length) {
         body.append(actions);
     }
+
+    if (options.open !== false) {
+        openAppModal("#route-details-modal");
+    }
 }
 
 function renderRouteDetailsEmpty() {
     selectedRouteDetailsId = null;
-    $("#route-details-subtitle").text(i18n.t("routes.details.select"));
-    $("#route-details-body")
-        .empty()
-        .append(
-            $("<p>")
-                .addClass("muted")
-                .text(i18n.t("routes.details.empty"))
-        );
+    $("#route-details-subtitle").text("");
+    $("#route-details-body").empty();
+    closeAppModal("#route-details-modal");
 }
 
 function restoreRouteDetails() {
-    if (!routesCache.length) {
+    if (!selectedRouteDetailsId) {
+        return;
+    }
+
+    const selected = routesCache.find(function (route) {
+        return Number(route.id) === Number(selectedRouteDetailsId);
+    });
+
+    if (!selected) {
         renderRouteDetailsEmpty();
         return;
     }
 
-    if (selectedRouteDetailsId) {
-        const selected = routesCache.find(function (route) {
-            return Number(route.id) === Number(selectedRouteDetailsId);
-        });
-        if (selected) {
-            renderRouteDetails(selected);
-            return;
-        }
+    if ($("#route-details-modal").hasClass("is-open")) {
+        renderRouteDetails(selected, {open: false});
     }
-
-    renderRouteDetails(routesCache[0]);
 }
 function getRouteSentryConfig(route) {
     const integrationConfig = route && route.integration_config
@@ -1099,6 +1115,8 @@ function updateRouteSourceUi() {
     const isSentry = source === "sentry";
     const isAwsSns = source === "aws_sns";
     const isDatadog = source === "datadog";
+    const isNewRelic = source === "new_relic";
+    const isNagios = source === "nagios";
     const isUptimeKuma = source === "uptime_kuma";
     const isWebhook = source === "webhook";
 
@@ -1110,6 +1128,14 @@ function updateRouteSourceUi() {
     $("#route-datadog-help").toggleClass(
         "is-hidden",
         !isDatadog
+    );
+    $("#route-new-relic-help").toggleClass(
+        "is-hidden",
+        !isNewRelic
+    );
+    $("#route-nagios-help").toggleClass(
+        "is-hidden",
+        !isNagios
     );
     $("#route-uptime-kuma-help").toggleClass(
         "is-hidden",
@@ -1143,6 +1169,14 @@ function updateRouteSourceUi() {
         } else if (source === "datadog") {
             $("#route-group-by").val(
                 '["datadog_alert_id","datadog_scope"]'
+            );
+        } else if (source === "new_relic") {
+            $("#route-group-by").val(
+                '["new_relic_issue_id"]'
+            );
+        } else if (source === "nagios") {
+            $("#route-group-by").val(
+                '["nagios_host","nagios_service"]'
             );
         } else if (source === "rmon") {
             $("#route-group-by").val(
@@ -1507,6 +1541,14 @@ function getRouteIntakePath(route) {
         return "/api/integrations/zabbix";
     }
 
+    if (source === "new_relic") {
+        return "/api/integrations/new-relic";
+    }
+
+    if (source === "nagios") {
+        return "/api/integrations/nagios";
+    }
+
     if (source === "uptime_kuma") {
         return "/api/integrations/uptime-kuma";
     }
@@ -1554,6 +1596,26 @@ function buildRouteIntakeCurl(route, token) {
         ].join("\n");
     }
 
+    if (source === "new_relic") {
+        return [
+            "# " + i18n.t("routes.intake.new_relic_example_comment"),
+            `curl -X POST '${url}' \\`,
+            "  -H 'Content-Type: application/json' \\",
+            `  -H 'Authorization: Bearer ${token || "<route-token>"}' \\`,
+            "  -d '{\"issue_id\":\"issue-example-1\",\"title\":\"API latency is high\",\"state\":\"ACTIVATED\",\"status\":\"CREATED\",\"priority\":\"CRITICAL\",\"issue_url\":\"https://one.newrelic.com/redirects/issue/issue-example-1\",\"condition_name\":\"API latency\",\"policy_name\":\"Production API\",\"entity_name\":\"checkout-api\",\"labels\":{\"environment\":\"production\",\"team\":\"sre\"}}'"
+        ].join("\n");
+    }
+
+    if (source === "nagios") {
+        return [
+            "# " + i18n.t("routes.intake.nagios_example_comment"),
+            `curl -X POST '${url}' \\`,
+            "  -H 'Content-Type: application/json' \\",
+            `  -H 'Authorization: Bearer ${token || "<route-token>"}' \\`,
+            "  -d '{\"notification_type\":\"PROBLEM\",\"host_name\":\"db01\",\"service_description\":\"Disk Usage\",\"service_state\":\"CRITICAL\",\"service_output\":\"/var is 96% full\"}'"
+        ].join("\n");
+    }
+
     if (source === "uptime_kuma") {
         return [
             "# " + i18n.t("routes.intake.uptime_kuma_example_comment"),
@@ -1593,6 +1655,8 @@ function showRouteIntakeDetails(route) {
     const isSentry = source === "sentry";
     const isHeartbeat = source === "heartbeat";
     const isDatadog = source === "datadog";
+    const isNewRelic = source === "new_relic";
+    const isNagios = source === "nagios";
     const isUptimeKuma = source === "uptime_kuma";
     const isWebhook = source === "webhook";
     const url = getRouteIntakeUrl(route);
@@ -1612,6 +1676,12 @@ function showRouteIntakeDetails(route) {
     } else if (isDatadog) {
         subtitleKey = "routes.intake.datadog_subtitle";
         helpKey = "routes.intake.datadog_help";
+    } else if (isNewRelic) {
+        subtitleKey = "routes.intake.new_relic_subtitle";
+        helpKey = "routes.intake.new_relic_help";
+    } else if (isNagios) {
+        subtitleKey = "routes.intake.nagios_subtitle";
+        helpKey = "routes.intake.nagios_help";
     } else if (isUptimeKuma) {
         subtitleKey = "routes.intake.uptime_kuma_subtitle";
         helpKey = "routes.intake.uptime_kuma_help";
@@ -1702,7 +1772,12 @@ function initRoutesTableSorting() {
         "#routes-table-view",
         routesSortState,
         routesSortColumns,
-        renderRoutesTable
+        function () {
+            if (window.PageUrlState) {
+                window.PageUrlState.write("routes");
+            }
+            renderRoutesTable();
+        }
     );
 }
 

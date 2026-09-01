@@ -1,29 +1,27 @@
+/* Login layout uses the same semantic palette as the authenticated shell. */
 :root {
-    --bg-color: #f4f6f8;
-    --dark-bg: #202936;
-    --dark-card: #263244;
-    --dark-card-border: rgba(255, 255, 255, 0.08);
-    --text-color: #ffffff;
-    --muted-text: #b8c2cf;
-    --primary-color: #4a90e2;
-    --primary-hover: #357abd;
-    --input-bg: #1b2430;
-    --input-border: rgba(255, 255, 255, 0.12);
-    --input-border-focus: #4a90e2;
-    --shadow: 0 18px 45px rgba(0, 0, 0, 0.35);
+    --bg-color: var(--md-bg);
+    --dark-bg: var(--md-sidebar-bg);
+    --dark-card: var(--md-surface);
+    --dark-card-border: var(--md-border);
+    --text-color: var(--md-text);
+    --muted-text: var(--md-muted);
+    --primary-color: var(--md-primary);
+    --primary-hover: var(--md-primary-hover);
+    --input-bg: var(--md-input-bg);
+    --input-border: var(--md-border);
+    --input-border-focus: var(--md-primary);
+    --shadow: var(--md-shadow-lg);
 }
 
-* {
-    box-sizing: border-box;
-}
 
 body {
     margin: 0;
     padding: 0;
     font-family: Arial, sans-serif;
     background:
-        radial-gradient(circle at top left, rgba(74, 144, 226, 0.20), transparent 32%),
-        radial-gradient(circle at bottom right, rgba(74, 144, 226, 0.12), transparent 34%),
+        radial-gradient(circle at top left, color-mix(in srgb, var(--md-primary) 20%, transparent), transparent 32%),
+        radial-gradient(circle at bottom right, color-mix(in srgb, var(--md-primary) 12%, transparent), transparent 34%),
         var(--bg-color);
     color: var(--text-color);
 }
@@ -41,7 +39,7 @@ body {
     max-width: 460px;
     padding: 42px;
     border-radius: 22px;
-    background: rgba(38, 50, 68, 0.96);
+    background: var(--md-surface-card);
     border: 1px solid var(--dark-card-border);
     box-shadow: var(--shadow);
 }
@@ -75,7 +73,7 @@ body {
     padding: 8px 14px;
     border-radius: 20px;
     background: rgba(74, 144, 226, 0.15);
-    color: #c9dcf7;
+    color: var(--md-primary);
     font-size: 13px;
     font-weight: bold;
 }
@@ -84,7 +82,7 @@ body {
     margin: 0 0 12px;
     font-size: 36px;
     line-height: 1.1;
-    color: #fff;
+    color: var(--md-on-accent);
 }
 
 .login-description {
@@ -103,7 +101,7 @@ body {
     margin-bottom: 8px;
     font-size: 14px;
     font-weight: bold;
-    color: #e5edf7;
+    color: var(--md-text-soft);
 }
 
 .form-group input {
@@ -115,11 +113,11 @@ body {
     font-size: 14px;
     outline: none;
     background: var(--input-bg);
-    color: #fff;
+    color: var(--md-on-accent);
 }
 
 .form-group input::placeholder {
-    color: #7f8a99;
+    color: var(--md-placeholder);
 }
 
 .form-group input:focus {
@@ -134,7 +132,7 @@ body {
     border: none;
     border-radius: 12px;
     background: var(--primary-color);
-    color: #fff;
+    color: var(--md-on-accent);
     font-size: 15px;
     font-weight: bold;
     cursor: pointer;
@@ -152,7 +150,7 @@ body {
 .login-note {
     margin-top: 18px;
     font-size: 13px;
-    color: #9aa4b2;
+    color: var(--md-muted);
     text-align: center;
 }
 
@@ -162,7 +160,7 @@ body {
     border-radius: 10px;
     background: rgba(239, 68, 68, 0.14);
     border: 1px solid rgba(239, 68, 68, 0.25);
-    color: #ffd4d4;
+    color: var(--md-danger);
     font-size: 14px;
 }
 
@@ -186,21 +184,21 @@ body {
     }
 }
 .login-status-error {
-    color: #991b1b;
-    background: #fef2f2;
-    border: 1px solid #fecaca;
+    color: var(--md-danger);
+    background: var(--md-danger-soft);
+    border: 1px solid var(--md-danger-border);
 }
 
 .login-status-success {
-    color: #166534;
-    background: #f0fdf4;
-    border: 1px solid #bbf7d0;
+    color: var(--md-success);
+    background: var(--md-success-soft);
+    border: 1px solid var(--md-success-border);
 }
 
 .login-status-info {
-    color: #1e3a8a;
-    background: #eff6ff;
-    border: 1px solid #bfdbfe;
+    color: var(--md-primary);
+    background: var(--md-primary-soft);
+    border: 1px solid var(--md-info-border);
 }
 
 #login-status {
@@ -219,12 +217,10 @@ body {
   font-size: 22px;
   line-height: 1;
 }
-body.md-theme .login-sso-section,
 .login-sso-section {
   margin-top: 22px;
 }
 
-body.md-theme .login-divider,
 .login-divider {
   display: flex;
   align-items: center;
@@ -235,8 +231,6 @@ body.md-theme .login-divider,
   font-weight: 600;
 }
 
-body.md-theme .login-divider::before,
-body.md-theme .login-divider::after,
 .login-divider::before,
 .login-divider::after {
   content: "";
@@ -245,13 +239,11 @@ body.md-theme .login-divider::after,
   background: rgba(226, 232, 240, 0.32);
 }
 
-body.md-theme .login-sso-buttons,
 .login-sso-buttons {
   display: grid;
   gap: 12px;
 }
 
-body.md-theme .login-sso-button,
 .login-sso-button {
   display: grid;
   grid-template-columns: 46px 1fr auto;
@@ -265,7 +257,7 @@ body.md-theme .login-sso-button,
   background:
     linear-gradient(135deg, rgba(79, 70, 229, 0.96), rgba(59, 130, 246, 0.88)),
     rgba(30, 41, 59, 0.92);
-  color: #ffffff;
+  color: var(--md-on-accent);
   text-decoration: none;
   box-shadow:
     0 18px 42px rgba(37, 99, 235, 0.24),
@@ -277,11 +269,10 @@ body.md-theme .login-sso-button,
     filter 0.16s ease;
 }
 
-body.md-theme .login-sso-button:hover,
 .login-sso-button:hover {
   transform: translateY(-1px);
   border-color: rgba(191, 219, 254, 0.62);
-  color: #ffffff;
+  color: var(--md-on-accent);
   text-decoration: none;
   filter: brightness(1.04);
   box-shadow:
@@ -289,13 +280,11 @@ body.md-theme .login-sso-button:hover,
     inset 0 1px 0 rgba(255, 255, 255, 0.22);
 }
 
-body.md-theme .login-sso-button:active,
 .login-sso-button:active {
   transform: translateY(0);
   filter: brightness(0.98);
 }
 
-body.md-theme .login-sso-icon,
 .login-sso-icon {
   display: inline-flex;
   align-items: center;
@@ -304,19 +293,17 @@ body.md-theme .login-sso-icon,
   height: 46px;
   border-radius: 16px;
   background: rgba(255, 255, 255, 0.14);
-  color: #ffffff;
+  color: var(--md-on-accent);
 }
 
-body.md-theme .login-sso-main,
 .login-sso-main {
   display: grid;
   gap: 3px;
   min-width: 0;
 }
 
-body.md-theme .login-sso-title,
 .login-sso-title {
-  color: #ffffff;
+  color: var(--md-on-accent);
   font-size: 15px;
   font-weight: 800;
   letter-spacing: 0.01em;
@@ -325,7 +312,6 @@ body.md-theme .login-sso-title,
   text-overflow: ellipsis;
 }
 
-body.md-theme .login-sso-subtitle,
 .login-sso-subtitle {
   color: rgba(226, 232, 240, 0.78);
   font-size: 12px;
@@ -335,7 +321,6 @@ body.md-theme .login-sso-subtitle,
   text-overflow: ellipsis;
 }
 
-body.md-theme .login-sso-protocol,
 .login-sso-protocol {
   display: inline-flex;
   align-items: center;
@@ -345,14 +330,13 @@ body.md-theme .login-sso-protocol,
   padding: 0 12px;
   border-radius: 12px;
   background: rgba(255, 255, 255, 0.14);
-  color: #ffffff;
+  color: var(--md-on-accent);
   font-size: 11px;
   font-weight: 900;
   letter-spacing: 0.08em;
   text-transform: uppercase;
 }
 
-body.md-theme .login-sso-button-saml,
 .login-sso-button-saml {
   background:
     linear-gradient(135deg, rgba(124, 58, 237, 0.96), rgba(37, 99, 235, 0.88)),
@@ -360,12 +344,10 @@ body.md-theme .login-sso-button-saml,
 }
 
 @media (max-width: 520px) {
-  body.md-theme .login-sso-button,
   .login-sso-button {
     grid-template-columns: 42px 1fr;
   }
 
-  body.md-theme .login-sso-protocol,
   .login-sso-protocol {
     grid-column: 2;
     justify-self: start;

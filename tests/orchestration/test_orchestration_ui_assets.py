@@ -169,3 +169,15 @@ def test_orchestration_condition_editor_has_localized_column_help_and_operator_l
     assert 'i18n.t("orchestrations.rule_editor.condition_operator_help")' in javascript
     assert 'i18n.t("orchestrations.rule_editor.condition_value_help")' in javascript
     assert '"orchestrations.rule_editor.operator_" + operator' in javascript
+
+
+def test_orchestration_builder_supports_global_trace_level_action():
+    javascript = (
+        ROOT / "app" / "static" / "js" / "pages" / "orchestrations.js"
+    ).read_text(encoding="utf-8")
+
+    assert '"set_trace_level"' in javascript
+    assert "orchestration-action-trace-level" in javascript
+    assert 'orchestrationCurrent.scope !== "service"' in javascript
+    for level in ("full", "compact", "disabled"):
+        assert f'.val("{level}")' in javascript

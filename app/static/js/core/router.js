@@ -86,6 +86,10 @@ function navigate(path, pushState) {
         history.pushState({path: normalizedPath.fullPath}, "", normalizedPath.fullPath);
     }
 
+    if (window.PageUrlState && typeof window.PageUrlState.restorePath === "function") {
+        window.PageUrlState.restorePath(normalizedPath.routePath);
+    }
+
     safePageLoad(selectedRoute.load);
     applyRbacUiState();
 }
@@ -150,6 +154,47 @@ function updateAuthUi() {
     applyRbacUiState();
 }
 
+const TEAM_SCOPED_ROUTE_PATHS = {
+    "/": true,
+    "/alerts": true,
+    "/rotations": true,
+    "/calendar": true,
+    "/routes": true,
+    "/services": true,
+    "/business-services": true,
+    "/heartbeats": true,
+    "/escalation-policies": true,
+    "/notification-policies": true,
+    "/matcher-presets": true,
+    "/priority-policies": true,
+    "/channels": true,
+    "/silences": true,
+    "/teams": true,
+};
+
+function appUrlWithGlobalTeamScope(path, options) {
+    const settings = $.extend({teamChanged: false}, options || {});
+    const url = new URL(path || currentAppUrl(), window.location.origin);
+    const routePath = normalizeAppRoutePath(url.pathname);
+    const teamId = typeof selectedTeamId === "function" ? selectedTeamId() : "";
+
+    url.searchParams.delete("team");
+
+    if (routePath === "/calendar") {
+        url.searchParams.delete("team_id");
+        if (teamId) {
+            url.searchParams.set("team_id", String(teamId));
+        }
+        if (settings.teamChanged) {
+            url.searchParams.delete("rotation_id");
+        }
+    } else if (TEAM_SCOPED_ROUTE_PATHS[routePath] && teamId) {
+        url.searchParams.set("team", String(teamId));
+    }
+
+    return url.pathname + url.search + url.hash;
+}
+
 function startAuthenticatedApp() {
     apiGet("/api/auth/me", function (user) {
         currentUser = user;
@@ -160,7 +205,14 @@ function startAuthenticatedApp() {
         }
 
         fillTeamSelect("#global-team-filter", true, function () {
-            navigate(currentAppUrl(), false);
+            const scopedUrl = appUrlWithGlobalTeamScope(currentAppUrl());
+            const currentUrl = currentAppUrl();
+
+            if (scopedUrl !== currentUrl && window.history && window.history.replaceState) {
+                window.history.replaceState({path: scopedUrl}, "", scopedUrl);
+            }
+
+            navigate(scopedUrl, false);
         });
     });
 }
@@ -183,32 +235,12 @@ $(document).ready(function () {
 
     $(".menu-link[data-page]").on("click", function (event) {
         event.preventDefault();
-        navigate($(this).attr("href"), true);
+        navigate(appUrlWithGlobalTeamScope($(this).attr("href")), true);
     });
-
-    function currentAppUrlWithoutTeamScope() {
-        /*
-         * Global team selector is the only source of team filtering.
-         * Remove stale team_id from page URLs so page code cannot reset
-         * the global selector back to an old value.
-         */
-        const url = new URL(currentAppUrl(), window.location.origin);
-        const routePath = normalizeAppRoutePath(url.pathname);
-
-        url.searchParams.delete("team_id");
-
-        if (routePath === "/calendar") {
-            url.searchParams.delete("rotation_id");
-        }
-
-        const query = url.searchParams.toString();
-
-        return url.pathname + (query ? "?" + query : "") + url.hash;
-    }
 
     $("#global-team-filter").on("change", function () {
         writeStoredGlobalTeamId($(this).val());
-        navigate(currentAppUrlWithoutTeamScope(), true);
+        navigate(appUrlWithGlobalTeamScope(currentAppUrl(), {teamChanged: true}), true);
         applyRbacUiState();
     });
 
@@ -227,7 +259,11 @@ $(document).ready(function () {
                 }
 
                 fillTeamSelect("#global-team-filter", true, function () {
-                    navigate(currentAppUrl(), false);
+                    const scopedUrl = appUrlWithGlobalTeamScope(currentAppUrl());
+                    if (scopedUrl !== currentAppUrl() && window.history && window.history.replaceState) {
+                        window.history.replaceState({path: scopedUrl}, "", scopedUrl);
+                    }
+                    navigate(scopedUrl, false);
                 });
             }
         );

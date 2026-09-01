@@ -37,8 +37,7 @@
     </div>
   </div>
 
-  <div class="page-layout-grid">
-    <section class="card page-layout-main">
+  <section class="card">
       <div class="card-header">
         <div>
           <h2>{{ _("routes.list.title") }}</h2>
@@ -104,24 +103,40 @@
           </tbody>
         </table>
       </div>
-    </section>
+  </section>
 
-    <aside class="card page-details-card">
-      <div class="card-header">
+  <div id="route-details-modal" class="app-modal" style="display: none;" aria-hidden="true">
+    <div class="app-modal-dialog app-modal-dialog-wide">
+      <div class="app-modal-header">
         <div>
           <h2>{{ _("routes.details.title") }}</h2>
-          <div id="route-details-subtitle" class="card-subtitle">
-            {{ _("routes.details.select") }}
-          </div>
+          <div id="route-details-subtitle" class="card-subtitle"></div>
         </div>
+
+        <button
+          type="button"
+          class="app-modal-close"
+          data-modal-close="#route-details-modal"
+          aria-label="{{ _('routes.actions.close') }}"
+        >
+          ×
+        </button>
       </div>
 
-      <div id="route-details-body" class="details-body">
-        <div class="details-empty">
-          {{ _("routes.details.empty") }}
-        </div>
+      <div class="app-modal-body">
+        <div id="route-details-body"></div>
       </div>
-    </aside>
+
+      <div class="app-modal-footer">
+        <button
+          type="button"
+          class="btn"
+          data-modal-close="#route-details-modal"
+        >
+          {{ _("routes.actions.close") }}
+        </button>
+      </div>
+    </div>
   </div>
 
   <div id="route-form-modal" class="app-modal" style="display: none;">
@@ -177,6 +192,8 @@
                   <option value="aws_sns">AWS SNS / CloudWatch</option>
                   <option value="grafana">Grafana</option>
                   <option value="datadog">Datadog</option>
+                  <option value="new_relic">New Relic</option>
+                  <option value="nagios">Nagios</option>
                   <option value="rmon">RMON</option>
                   <option value="heartbeat">Heartbeat</option>
                   <option value="zabbix">Zabbix</option>
@@ -190,6 +207,12 @@
               </div>
               <div id="route-datadog-help" class="help-text is-hidden">
                 {{ _("routes.form.datadog_help") }}
+              </div>
+              <div id="route-new-relic-help" class="help-text is-hidden">
+                {{ _("routes.form.new_relic_help") }}
+              </div>
+              <div id="route-nagios-help" class="help-text is-hidden">
+                {{ _("routes.form.nagios_help") }}
               </div>
               <div id="route-uptime-kuma-help" class="help-text is-hidden">
                 {{ _("routes.form.uptime_kuma_help") }}

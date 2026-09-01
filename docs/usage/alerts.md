@@ -119,7 +119,9 @@ Acknowledging an alert group marks the group as `acknowledged`.
 
 Child alerts are not individually acknowledged. This is intentional: the operator acknowledges the incident-level group, not every raw monitoring signal.
 
-If a new child alert arrives in an acknowledged group, IncidentRelay reopens the group as `firing`. This makes new signal visible again and prevents important new data from being hidden behind an old acknowledgement.
+Acknowledgement also cancels queued `notification`, `reminder`, and `escalation` deliveries that were scheduled before the ACK. Workers re-check persisted group status before sending firing-only notifications, so stale scheduler state does not page an already acknowledged incident.
+
+A new child alert normally reopens an acknowledged group as `firing`. There is one correlation-specific exception: when the route groups **only** by a non-empty `incident_key` (or `labels.incident_key`), a new child with the same key preserves `acknowledged` if it cannot raise the effective incident priority. A genuine priority increase still reopens the group and starts a fresh escalation cycle.
 
 ### Resolved
 
@@ -327,7 +329,7 @@ Add more fields to route `group_by`, such as `instance`, `mountpoint`, `service`
 
 ### The group was acknowledged but became firing again
 
-A new child alert arrived in the acknowledged group. IncidentRelay reopens acknowledged groups when new child alerts arrive so the new signal is visible.
+A new child alert normally reopens the acknowledged group. If the route groups only by `incident_key`, same-key children preserve ACK unless they can raise effective incident priority. If such a group reopened, check whether the incoming child had a higher priority, the key was empty/different, grouping used additional fields, or orchestration overrode the group key.
 
 ### A resolved notification was not sent
 

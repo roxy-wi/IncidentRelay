@@ -56,3 +56,42 @@ def test_first_party_javascript_does_not_redeclare_top_level_functions():
             duplicates[str(path)] = repeated
 
     assert duplicates == {}
+
+
+def _python_string_assignment(path: Path, name: str) -> str:
+    tree = ast.parse(path.read_text(encoding="utf-8"), filename=str(path))
+    for node in tree.body:
+        if not isinstance(node, ast.Assign):
+            continue
+        if not any(
+            isinstance(target, ast.Name) and target.id == name
+            for target in node.targets
+        ):
+            continue
+        if isinstance(node.value, ast.Constant) and isinstance(node.value.value, str):
+            return node.value.value
+    raise AssertionError(f"{name} is not a top-level string assignment in {path}")
+
+
+def _yaml_scalar(path: Path, key: str) -> str:
+    prefix = f"{key}:"
+    for line in path.read_text(encoding="utf-8").splitlines():
+        if not line.startswith(prefix):
+            continue
+        value = line[len(prefix):].strip()
+        if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+            value = value[1:-1]
+        return value
+    raise AssertionError(f"{key} is missing from {path}")
+
+
+
+def test_release_artifact_versions_match_application_version():
+    service_version = _python_string_assignment(
+        APP_ROOT / "version.py", "SERVICE_VERSION"
+    )
+    chart_app_version = _yaml_scalar(
+        Path("helm") / "incidentrelay" / "Chart.yaml",
+        "appVersion",
+    )
+    assert chart_app_version == service_version

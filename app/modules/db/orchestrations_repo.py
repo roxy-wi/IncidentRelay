@@ -661,6 +661,15 @@ def validate_version(version_id: int) -> Dict[str, Any]:
             )
             errors.extend(issues_to_messages(rule_validation["errors"]))
             warnings.extend(issues_to_messages(rule_validation["warnings"]))
+
+            if orchestration.scope == "service" and any(
+                isinstance(action, dict)
+                and (action.get("type") or action.get("action")) == "set_trace_level"
+                for action in rule.actions_json
+            ):
+                errors.append(
+                    f"{path}: set_trace_level is only supported in global orchestrations"
+                )
         if rule.parent_rule_id is not None:
             parent_version_id = (
                 EventOrchestrationRule.select(EventOrchestrationRule.version)

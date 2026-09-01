@@ -98,6 +98,13 @@ def test_simulate_api_accepts_normalized_event(client, db):
     body = response.get_json()
     assert body["selected_normalizer"] == "normalized"
     assert body["final_context"]["event"]["severity"] == "critical"
+    assert body["input_output_diff"]["changed"] is True
+    assert any(
+        change["path"] == "event.severity"
+        and change["before"] is None
+        and change["after"] == "critical"
+        for change in body["input_output_diff"]["changes"]
+    )
     assert OrchestrationExecution.select().count() == 0
 
 

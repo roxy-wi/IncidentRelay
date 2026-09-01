@@ -438,6 +438,9 @@ function restoreSilenceDetails() {
 function applySilenceSummaryFilter(status) {
     selectedSilenceSummaryFilter = status || "";
     $("#silences-status-filter").val(selectedSilenceSummaryFilter);
+    if (window.PageUrlState) {
+        window.PageUrlState.write("silences");
+    }
     applySilenceFilters();
 }
 

@@ -2,8 +2,8 @@ apiVersion: v2
 name: incidentrelay
 description: On-call scheduling, alert routing and incident notification service
 type: application
-version: 2.0.0
-appVersion: "2.0"
+version: 2.1.0
+appVersion: "2.1"
 kubeVersion: ">=1.23.0-0"
 home: https://github.com/roxy-wi/IncidentRelay
 sources:
@@ -13,3 +13,7 @@ keywords:
   - incident
   - alerting
   - notifications
+annotations:
+  org.opencontainers.image.source: https://github.com/roxy-wi/IncidentRelay
+  org.opencontainers.image.description: IncidentRelay Helm chart for on-call scheduling, alert routing and incident response
+  org.opencontainers.image.licenses: MIT

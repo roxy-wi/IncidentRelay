@@ -3,8 +3,29 @@ from app.modules.db.models import AlertGroup
 from app.services.alerts.correlation import refresh_alert_group_correlations_safely
 from app.services.incidents.stakeholders import notify_stakeholders
 from app.services.notifications.delivery import update_alert_messages
+from app.services.notifications.rules import cancel_pending_group_deliveries
 from app.services.business_services.impact import refresh_business_impacts_safely_for_group
 from app.services.business_services.status import refresh_business_services_safely_for_technical_service
+
+
+ACK_CANCELLED_DELIVERY_EVENT_TYPES = frozenset({
+    "notification",
+    "reminder",
+    "escalation",
+})
+
+
+def _cancel_acknowledged_notification_work(group):
+    """Cancel queued notification work that predates an acknowledgement."""
+
+    if getattr(group, "notification_pending", False):
+        alerts_repo.clear_alert_group_notification(group)
+
+    return cancel_pending_group_deliveries(
+        group,
+        event_types=ACK_CANCELLED_DELIVERY_EVENT_TYPES,
+        reason="alert_acknowledged",
+    )
 
 
 def acknowledge_alert(alert_id, user_id=None):
@@ -15,9 +36,11 @@ def acknowledge_alert(alert_id, user_id=None):
     # Repeated acknowledge is a no-op. This preserves the original
     # acknowledged_at/user and avoids duplicate timeline/notification effects.
     if old_status == "acknowledged":
+        _cancel_acknowledged_notification_work(group_before)
         return group_before
 
     group = alerts_repo.acknowledge_alert_group(alert_id, user_id=user_id)
+    _cancel_acknowledged_notification_work(group)
 
     alerts_repo.create_alert_event(
         group_id=group.id,

@@ -7,6 +7,8 @@ from app.modules.db.models import (
     EventOrchestration,
     EventOrchestrationRule,
     EventOrchestrationVersion,
+    AlertExplainStep,
+    AlertExplainTrace,
     OrchestrationExecution,
     OrchestrationIntakeToken,
     PendingOrchestratedEvent,
@@ -54,6 +56,8 @@ def orchestration_tables(db):
             EventOrchestrationVersion,
             EventOrchestrationRule,
             OrchestrationIntakeToken,
+            AlertExplainStep,
+            AlertExplainTrace,
             OrchestrationExecution,
             PendingOrchestratedEvent,
         ],
@@ -648,3 +652,101 @@ def test_lifecycle_applies_orchestration_escalation_and_priority_policies(db):
     assert priority_step.data["policy_id"] == priority_policy.id
     assert priority_step.data["policy_source"] == "orchestration"
     assert priority_step.data["rule_id"] == priority_rule.id
+
+
+def test_global_orchestration_can_record_compact_alert_trace(db):
+    group = create_group()
+    team = create_team(group)
+    route = create_route(team, source="alertmanager")
+    _publish(
+        group,
+        _always([{"type": "set_trace_level", "level": "compact"}]),
+    )
+    alert_data = {
+        "source": "alertmanager",
+        "forced_route_id": route.id,
+        "external_id": "runtime-trace-compact-1",
+        "dedup_key": "runtime-trace-compact-1",
+        "title": "Compact trace",
+        "message": "Compact trace",
+        "severity": "warning",
+        "status": "firing",
+        "labels": {"alertname": "RuntimeTraceCompact"},
+        "payload": {"large": {"diagnostic": "value"}},
+    }
+
+    result = upsert_alert(alert_data)
+
+    assert result.trace_id
+    trace = AlertExplainTrace.get(AlertExplainTrace.trace_id == result.trace_id)
+    steps = list(
+        AlertExplainStep.select().where(AlertExplainStep.trace == trace.id)
+    )
+    assert trace.trace_level == "compact"
+    assert trace.input_summary == {}
+    assert trace.result == {}
+    assert steps
+    assert all(step.data == {} for step in steps)
+
+
+def test_global_orchestration_can_disable_alert_trace_storage(db):
+    group = create_group()
+    team = create_team(group)
+    route = create_route(team, source="alertmanager")
+    _publish(
+        group,
+        _always([{"type": "set_trace_level", "level": "disabled"}]),
+    )
+    alert_data = {
+        "source": "alertmanager",
+        "forced_route_id": route.id,
+        "external_id": "runtime-trace-disabled-1",
+        "dedup_key": "runtime-trace-disabled-1",
+        "title": "Disabled trace",
+        "message": "Disabled trace",
+        "severity": "warning",
+        "status": "firing",
+        "labels": {"alertname": "RuntimeTraceDisabled"},
+        "payload": {"large": {"diagnostic": "value"}},
+    }
+
+    trace_count_before = AlertExplainTrace.select().count()
+    step_count_before = AlertExplainStep.select().count()
+    result = upsert_alert(alert_data)
+
+    assert result.group is not None
+    assert result.alert is not None
+    assert result.trace_id is None
+    assert AlertExplainTrace.select().count() == trace_count_before
+    assert AlertExplainStep.select().count() == step_count_before
+
+
+def test_last_matching_global_trace_level_action_wins(db):
+    group = create_group()
+    team = create_team(group)
+    route = create_route(team, source="alertmanager")
+    _publish(
+        group,
+        _always([
+            {"type": "set_trace_level", "level": "compact"},
+            {"type": "set_trace_level", "level": "full"},
+        ]),
+    )
+    alert_data = {
+        "source": "alertmanager",
+        "forced_route_id": route.id,
+        "external_id": "runtime-trace-last-wins-1",
+        "dedup_key": "runtime-trace-last-wins-1",
+        "title": "Last trace action wins",
+        "message": "Last trace action wins",
+        "severity": "warning",
+        "status": "firing",
+        "labels": {"alertname": "RuntimeTraceLastWins"},
+        "payload": {},
+    }
+
+    result = upsert_alert(alert_data)
+    trace = AlertExplainTrace.get(AlertExplainTrace.trace_id == result.trace_id)
+
+    assert trace.trace_level == "full"
+    assert trace.input_summary["title"] == "Last trace action wins"

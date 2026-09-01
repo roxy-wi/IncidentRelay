@@ -1363,6 +1363,152 @@ def paths():
         },
     }
 
+    new_relic_body = {
+        "type": "object",
+        "minProperties": 1,
+        "additionalProperties": True,
+        "description": (
+            "JSON payload sent by a New Relic Alerts Workflow webhook. "
+            "IncidentRelay supports the recommended flattened template and "
+            "common native Workflow fields such as issueId, issueTitle, "
+            "issuePageUrl, accumulations and entitiesData."
+        ),
+        "properties": {
+            "issue_id": {
+                "oneOf": [{"type": "string"}, {"type": "integer"}],
+                "description": (
+                    "Stable New Relic issue id. Map {{issueId}} to this field "
+                    "so open/update/close notifications deduplicate correctly."
+                ),
+            },
+            "title": {
+                "type": "string",
+                "description": "Rendered New Relic issue title.",
+            },
+            "message": {
+                "type": "string",
+                "description": "Optional human-readable issue details.",
+            },
+            "state": {
+                "type": "string",
+                "description": "New Relic issue state.",
+                "example": "ACTIVATED",
+            },
+            "status": {
+                "type": "string",
+                "description": "New Relic issue notification status.",
+                "example": "CREATED",
+            },
+            "priority": {
+                "type": "string",
+                "description": "New Relic issue priority.",
+                "example": "CRITICAL",
+            },
+            "issue_url": {
+                "type": "string",
+                "format": "uri",
+                "description": "Rendered {{issuePageUrl}} value.",
+            },
+            "condition_name": {
+                "type": "string",
+                "description": "Alert condition name.",
+            },
+            "policy_name": {
+                "type": "string",
+                "description": "Alert policy name.",
+            },
+            "entity_guid": {
+                "type": "string",
+                "description": "New Relic entity GUID.",
+            },
+            "entity_name": {
+                "type": "string",
+                "description": "New Relic entity name.",
+            },
+            "entity_type": {
+                "type": "string",
+                "description": "New Relic entity type.",
+            },
+            "labels": {
+                "type": "object",
+                "additionalProperties": True,
+                "description": "Matcher-friendly labels/tags from the workflow.",
+            },
+        },
+        "example": {
+            "issue_id": "issue-abc-123",
+            "title": "API latency is high",
+            "message": "p95 latency exceeded 2 seconds",
+            "state": "ACTIVATED",
+            "status": "CREATED",
+            "priority": "CRITICAL",
+            "issue_url": (
+                "https://one.newrelic.com/redirects/issue/issue-abc-123"
+            ),
+            "condition_name": "API latency",
+            "policy_name": "Production API",
+            "entity_guid": "MTIzfEFQTXxBUFBMSUNBVElPTnwx",
+            "entity_name": "checkout-api",
+            "entity_type": "APPLICATION",
+            "labels": {
+                "environment": "production",
+                "service": "checkout",
+                "team": "sre",
+            },
+        },
+    }
+
+    nagios_body = {
+        "type": "object",
+        "required": ["host_name"],
+        "additionalProperties": True,
+        "description": (
+            "Nagios Core/XI host or service notification payload. "
+            "The bundled examples/nagios/incidentrelay_notify.py sender "
+            "maps standard Nagios notification macros to these fields."
+        ),
+        "properties": {
+            "notification_type": {
+                "type": "string",
+                "example": "PROBLEM",
+                "description": (
+                    "Nagios NOTIFICATIONTYPE macro, for example PROBLEM, "
+                    "RECOVERY or ACKNOWLEDGEMENT."
+                ),
+            },
+            "host_name": {"type": "string", "example": "db01"},
+            "host_alias": {"type": "string"},
+            "host_address": {"type": "string", "example": "10.10.20.15"},
+            "host_state": {"type": "string", "example": "UP"},
+            "host_output": {"type": "string"},
+            "service_description": {
+                "type": "string",
+                "example": "Disk Usage",
+            },
+            "service_state": {"type": "string", "example": "CRITICAL"},
+            "service_output": {
+                "type": "string",
+                "example": "/var is 96% full",
+            },
+            "state_type": {"type": "string", "example": "HARD"},
+            "event_link": {"type": "string", "format": "uri"},
+            "labels": {
+                "type": "object",
+                "additionalProperties": True,
+            },
+        },
+        "example": {
+            "notification_type": "PROBLEM",
+            "host_name": "db01",
+            "host_address": "10.10.20.15",
+            "host_state": "UP",
+            "service_description": "Disk Usage",
+            "service_state": "CRITICAL",
+            "service_output": "/var is 96% full",
+            "state_type": "HARD",
+        },
+    }
+
     rmon_body = {
         "type": "object",
         "required": ["title"],
@@ -2360,6 +2506,49 @@ def paths():
                 ),
                 "responses": incoming_alert_responses(
                     "Datadog alert accepted."
+                ),
+            },
+        },
+        "/api/integrations/new-relic": {
+            "post": {
+                "tags": ["integrations"],
+                "summary": "Receive New Relic workflow alerts",
+                "description": (
+                    "Receives issue notifications from a New Relic Alerts "
+                    "Workflow webhook. The route intake token must belong to "
+                    "an active route with source=new_relic. Use issueId as "
+                    "issue_id so open, update and close notifications update "
+                    "the same IncidentRelay alert."
+                ),
+                "operationId": "receiveNewRelicAlerts",
+                "security": [{"bearerAuth": []}],
+                "requestBody": json_body(
+                    "New Relic Alerts Workflow webhook payload.",
+                    new_relic_body,
+                ),
+                "responses": incoming_alert_responses(
+                    "New Relic alert accepted."
+                ),
+            },
+        },
+        "/api/integrations/nagios": {
+            "post": {
+                "tags": ["integrations"],
+                "summary": "Receive Nagios Core/XI notifications",
+                "description": (
+                    "Receives host and service notifications from Nagios. "
+                    "PROBLEM opens or updates an alert, RECOVERY resolves it, "
+                    "ACKNOWLEDGEMENT acknowledges the matching group, and "
+                    "downtime/flapping notification types are ignored."
+                ),
+                "operationId": "receiveNagiosNotifications",
+                "security": [{"bearerAuth": []}],
+                "requestBody": json_body(
+                    "Nagios notification payload.",
+                    nagios_body,
+                ),
+                "responses": incoming_alert_responses(
+                    "Nagios notification accepted."
                 ),
             },
         },

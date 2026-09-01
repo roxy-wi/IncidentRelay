@@ -4,7 +4,10 @@ from app import Config
 from app.modules.common import utc_now
 from app.modules.db import alerts_repo, incidents_repo
 from app.services.alerts.escalation import apply_initial_escalation_policy_assignment
-from app.services.alerts.explain import AlertExplainTrace
+from app.services.alerts.explain import (
+    AlertExplainTrace,
+    resolve_alert_explain_trace_level,
+)
 from app.services.alerts.maintenance_state import (
     apply_maintenance_to_existing_alert,
     maintenance_create_kwargs,
@@ -35,7 +38,12 @@ from app.services.orchestration.pending import (
 from app.services.incidents.stakeholders import notify_stakeholders
 from app.services.maintenance import get_maintenance_decision
 from app.services.notifications.delivery import notify_alert
-from app.services.routing.routing import build_group_key, find_route_for_alert
+from app.services.routing.routing import (
+    build_group_key,
+    find_route_for_alert,
+    get_alert_group_field_value,
+    get_effective_group_by,
+)
 from app.services.routing.service_resolution import (
     get_effective_escalation_policy,
     get_effective_route_rotation,
@@ -47,6 +55,98 @@ from app.services.business_services.impact import refresh_business_impacts_safel
 from app.services.business_services.status import refresh_business_services_safely_for_technical_service
 
 logger = logging.getLogger("oncall.alerts")
+
+INCIDENT_KEY_GROUP_FIELDS = frozenset({"incident_key", "labels.incident_key"})
+
+
+def _incoming_priority_raises_incident(group, priority_resolution):
+    """Return whether the incoming child can raise effective incident priority."""
+
+    if not group or not priority_resolution:
+        return False
+
+    if getattr(group, "priority_set_manually", False):
+        return False
+
+    if getattr(priority_resolution, "update_mode", None) == "initial_only":
+        return False
+
+    priority = getattr(priority_resolution, "priority", None)
+    current_order = getattr(group, "priority_order", None)
+    incoming_order = getattr(priority, "level", None)
+
+    if current_order is None or incoming_order is None:
+        return False
+
+    return incoming_order < current_order
+
+
+def _group_incident_key(group):
+    """Return a stable incident_key from persisted group state when available."""
+
+    common_labels = getattr(group, "common_labels", None) or {}
+    value = common_labels.get("incident_key")
+
+    if value not in (None, ""):
+        return str(value).strip()
+
+    # Older groups can predate common_labels snapshots. Fall back to child
+    # labels only when they all agree on one non-empty incident_key.
+    values = {
+        str((alert.labels or {}).get("incident_key") or "").strip()
+        for alert in alerts_repo.list_alerts_for_group(group.id)
+    }
+    values.discard("")
+
+    if len(values) == 1:
+        return next(iter(values))
+
+    return ""
+
+
+def _is_same_incident_key_group(group, alert_data, route, *, group_key_overridden=False):
+    """Return whether a child belongs to an acknowledged incident_key group."""
+
+    if group_key_overridden or not route:
+        return False
+
+    group_by = get_effective_group_by(route)
+
+    if len(group_by) != 1 or group_by[0] not in INCIDENT_KEY_GROUP_FIELDS:
+        return False
+
+    incoming_key = get_alert_group_field_value(
+        group_by[0],
+        alert_data,
+        route=route,
+    )
+    incoming_key = str(incoming_key or "").strip()
+
+    if not incoming_key:
+        return False
+
+    return _group_incident_key(group) == incoming_key
+
+
+def _should_preserve_acknowledgement(
+    group,
+    alert_data,
+    route,
+    priority_resolution,
+    *,
+    group_key_overridden=False,
+):
+    """Keep ACK sticky for the same correlated incident unless it deteriorates."""
+
+    if _incoming_priority_raises_incident(group, priority_resolution):
+        return False
+
+    return _is_same_incident_key_group(
+        group,
+        alert_data,
+        route,
+        group_key_overridden=group_key_overridden,
+    )
 
 
 def _route_for_runtime(alert_data, runtime, *, current_route=None):
@@ -91,11 +191,14 @@ def upsert_alert(alert_data):
     Return:
         AlertProcessingResult
     """
-    trace = AlertExplainTrace.start(alert_data)
+    trace = AlertExplainTrace.start_buffered(alert_data)
     runtime = None
 
     try:
         runtime = run_event_orchestration(alert_data, trace=trace)
+        trace.apply_level(
+            resolve_alert_explain_trace_level(runtime.trace_level)
+        )
         if runtime.blocked:
             return _stopped_result(
                 trace=trace,
@@ -126,6 +229,11 @@ def upsert_alert(alert_data):
         attach_runtime_executions(runtime, group=result.group, alert=result.alert)
         return result
     except Exception as exc:
+        trace.apply_level(
+            resolve_alert_explain_trace_level(
+                getattr(runtime, "trace_level", None) if runtime is not None else None
+            )
+        )
         trace.fail(exc)
         raise
 
@@ -871,20 +979,63 @@ def _upsert_alert(alert_data, trace, runtime=None):
             maintenance_decision,
         )
     elif group.status == "acknowledged" and status == "firing":
-        group.previous_status = group.status
-        group.status = "firing"
-        group.acknowledged_by = None
-        group.acknowledged_at = None
-        group.updated_at = now
-        group.save()
-
-        trace.group_reopened(group)
-
-        alerts_repo.create_alert_event(
-            group_id=group.id,
-            event_type="reopened",
-            message="New alert received in acknowledged incident",
+        preserve_ack = _should_preserve_acknowledgement(
+            group,
+            alert_data,
+            route,
+            priority_resolution,
+            group_key_overridden=bool(runtime and runtime.group_key),
         )
+
+        if preserve_ack:
+            trace.step(
+                "grouping",
+                "acknowledgement_preserved",
+                "success",
+                "Acknowledgement preserved",
+                (
+                    "Correlated child matched the acknowledged incident_key "
+                    "without increasing effective incident priority."
+                ),
+                incident_key=_group_incident_key(group),
+                priority_slug=getattr(group, "priority_slug", None),
+            )
+            trace.group_reused(group)
+        else:
+            priority_increased = _incoming_priority_raises_incident(
+                group,
+                priority_resolution,
+            )
+
+            group.previous_status = group.status
+            group.status = "firing"
+            group.acknowledged_by = None
+            group.acknowledged_at = None
+
+            if priority_increased:
+                # A material deterioration starts a fresh escalation cycle.
+                # Reusing a pre-ACK due time could immediately jump to a later
+                # escalation step after the incident is reopened.
+                group.escalation_policy = policy
+                group.escalation_rule = policy_rule
+                group.rotation = rotation
+                group.assignee = assignee
+                group.next_escalation_at = next_escalation_at
+                group.last_escalated_at = None
+                group.escalation_level = 0
+                group.escalation_repeat_count = 0
+                group.reminder_count = 0
+
+            group.updated_at = now
+            group.save()
+
+            trace.group_reopened(group)
+
+            alerts_repo.create_alert_event(
+                group_id=group.id,
+                event_type="reopened",
+                message="New alert requires reopening acknowledged incident",
+            )
     else:
         trace.group_reused(group)
 

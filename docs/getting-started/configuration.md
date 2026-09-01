@@ -32,6 +32,29 @@ environment:
 
 The old `ONCALL_CONFIG_FILE` name should not be used.
 
+## Main and authentication secrets
+
+Generate two different random values and keep them stable across restarts and
+upgrades:
+
+```bash
+openssl rand -hex 32
+openssl rand -hex 32
+```
+
+```ini
+[main]
+secret_key = replace-with-the-first-random-value
+
+[auth]
+jwt_secret = replace-with-the-second-random-value
+jwt_cookie_secure = true
+```
+
+`secret_key` belongs to `[main]`, not `[server]`. `jwt_secret` belongs to
+`[auth]`. Do not reuse the same value for both settings. Set
+`jwt_cookie_secure = true` when `public_base_url` uses HTTPS.
+
 ## Server section
 
 ```ini
@@ -39,7 +62,6 @@ The old `ONCALL_CONFIG_FILE` name should not be used.
 host = 0.0.0.0
 port = 8080
 public_base_url = https://incidentrelay.example.com
-secret_key =
 ```
 
 | Option | Description |
@@ -47,7 +69,6 @@ secret_key =
 | `host` | Address to bind the web service to |
 | `port` | HTTP port |
 | `public_base_url` | External URL used in alert links, buttons and callbacks |
-| `secret_key` | Application secret; change it in production |
 
 In production, `public_base_url` must be the real external HTTPS URL.
 
@@ -56,7 +77,7 @@ In production, `public_base_url` must be the real external HTTPS URL.
 ```ini
 [database]
 type = sqlite
-path = /var/lib/incidentrelay/incidentrelay.db
+name = /var/lib/incidentrelay/incidentrelay.db
 
 [sqlite]
 wal = true
@@ -78,6 +99,33 @@ password = change-me
 ```
 
 Use PostgreSQL for larger installations, higher alert volume, multiple web workers, or long-term production deployments.
+
+## Alert processing trace
+
+The global Explain Trace detail level is configured in `[alerts]`:
+
+```ini
+[alerts]
+explain_trace_level = full
+```
+
+Supported values are `full`, `compact` and `disabled`. `full` preserves the existing detailed trace. `compact` keeps ordered processing steps but omits `input_summary`, result payloads and per-step `data`. `disabled` stores no Alert Explain Trace rows. A global Event Orchestration rule can override this value for matching events with the `set_trace_level` action.
+
+
+## Data retention
+
+IncidentRelay 2.1 keeps retention settings in one section:
+
+```ini
+[retention]
+alert_days = 30
+# explain_trace_days = 30
+# orchestration_execution_days = 30
+cleanup_interval_seconds = 86400
+batch_size = 500
+```
+
+`alert_days = 0` is the default and keeps resolved alert history indefinitely. Explain Trace and general Event Orchestration execution retention inherit `alert_days` unless their optional override is set. See [Data Retention](../administration/data-retention.md) for deletion rules and upgrade compatibility.
 
 ## SMTP section
 

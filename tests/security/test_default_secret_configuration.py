@@ -31,15 +31,10 @@ def test_stock_deployment_does_not_ship_known_authentication_secret():
     docker_config = (ROOT / "docker" / "incidentrelay.docker.conf").read_text()
     helm_values = (ROOT / "helm" / "incidentrelay" / "values.yaml").read_text()
     rpm_config = (ROOT / "etc" / "incidentrelay" / "incidentrelay.conf").read_text()
-    entrypoint = (ROOT / "docker" / "entrypoint.sh").read_text()
-
     for value in ("dev-secret-key", "change-this-jwt-secret"):
         assert value not in docker_config
         assert value not in helm_values
         assert value not in rpm_config
-
-    assert "secrets.token_urlsafe(48)" in entrypoint
-    assert "RUNTIME_CONFIG" in entrypoint
 
 
 def test_webhook_urls_are_treated_as_credentials_in_audit_redaction():

@@ -29,6 +29,69 @@ Source: alertmanager
 
 Привяжите хотя бы один канал уведомлений и скопируйте токен приёма маршрута в конфигурацию вебхука Alertmanager.
 
+
+## Пример конфигурации Alertmanager
+
+Минимальный receiver в `alertmanager.yml` может отправлять в IncidentRelay как firing, так и resolved уведомления:
+
+```yaml
+route:
+  receiver: incidentrelay
+  group_by:
+    - alertname
+    - cluster
+    - service
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+
+receivers:
+  - name: incidentrelay
+    webhook_configs:
+      - url: https://incidentrelay.example.com/api/integrations/alertmanager
+        send_resolved: true
+        http_config:
+          authorization:
+            type: Bearer
+            credentials_file: /etc/alertmanager/secrets/incidentrelay-route-token
+```
+
+Файл credentials должен содержать только токен маршрута IncidentRelay, без префикса `Bearer `. Хранить токен в подключаемом secret-файле предпочтительнее, чем коммитить его в `alertmanager.yml`.
+
+Для небольшой тестовой инсталляции токен можно указать непосредственно в конфигурации:
+
+```yaml
+receivers:
+  - name: incidentrelay
+    webhook_configs:
+      - url: https://incidentrelay.example.com/api/integrations/alertmanager
+        send_resolved: true
+        http_config:
+          authorization:
+            type: Bearer
+            credentials: ROUTE_TOKEN
+```
+
+`send_resolved: true` важен: без resolved-уведомлений IncidentRelay не сможет автоматически закрывать соответствующий алерт после восстановления в Alertmanager.
+
+Если в IncidentRelay должна уходить только часть дерева маршрутизации Alertmanager, направьте в receiver только нужную ветку вместо использования его как receiver по умолчанию:
+
+```yaml
+route:
+  receiver: default-receiver
+  routes:
+    - receiver: incidentrelay
+      matchers:
+        - team="infra"
+        - environment="production"
+```
+
+После изменения конфигурации проверьте её перед reload Alertmanager:
+
+```bash
+amtool check-config /etc/alertmanager/alertmanager.yml
+```
+
 ## Назначение сервиса
 
 После того как маршрут сопоставит входящий алерт, IncidentRelay может привязать алерт к сервису.

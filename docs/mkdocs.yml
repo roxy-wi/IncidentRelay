@@ -64,6 +64,8 @@ nav:
       - Overview: integrations/index.md
       - Incoming alert sources:
           - Alertmanager: integrations/alertmanager.md
+          - New Relic: integrations/new-relic.md
+          - Nagios: integrations/nagios.md
           - Zabbix: integrations/zabbix.md
           - Sentry: integrations/sentry.md
           - Sentry Troubleshooting: integrations/sentry-troubleshooting.md
@@ -105,6 +107,7 @@ nav:
       - Overview: administration/index.md
       - SSO: administration/sso.md
       - Scheduler: administration/scheduler.md
+      - Data Retention: administration/data-retention.md
       - Logging: administration/logging.md
       - Demo Data: administration/demo-data.md
       - Schema Check: administration/schema-check.md

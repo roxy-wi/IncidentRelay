@@ -354,6 +354,37 @@ def enqueue_user_notifications(group, event_type="notification"):
     return sent_count
 
 
+def cancel_pending_group_deliveries(
+    group,
+    *,
+    event_types,
+    reason,
+):
+    """Skip pending user deliveries that are no longer relevant for a group."""
+
+    group = _ensure_alert_group(group)
+    event_types = tuple(sorted({str(value) for value in event_types if value}))
+
+    if not event_types:
+        return 0
+
+    return (
+        UserNotificationDelivery
+        .update(
+            status="skipped",
+            provider_status="skipped",
+            last_error=reason,
+            updated_at=utc_now(),
+        )
+        .where(
+            (UserNotificationDelivery.group == group.id)
+            & (UserNotificationDelivery.status == "pending")
+            & (UserNotificationDelivery.event_type.in_(event_types))
+        )
+        .execute()
+    )
+
+
 def create_delivery(group, user, rule, method, event_type, scheduled_at):
     group = _ensure_alert_group(group)
 

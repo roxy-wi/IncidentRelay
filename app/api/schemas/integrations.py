@@ -231,6 +231,95 @@ class DatadogWebhookSchema(ApiModel):
         return self
 
 
+class NewRelicWebhookSchema(ApiModel):
+    """Validate a New Relic Alerts Workflows webhook payload."""
+
+    # Workflow webhook templates are customizable. Keep well-known fields typed
+    # and preserve additional New Relic variables for normalization/routing.
+    model_config = ConfigDict(extra="allow")
+
+    issue_id: str | int | None = None
+    issueId: str | int | None = None
+    title: str | None = None
+    issue_title: str | None = None
+    issueTitle: str | None = None
+    message: str | None = None
+    description: str | None = None
+    state: str | None = None
+    status: str | None = None
+    priority: str | None = None
+    severity: str | None = None
+    issue_url: str | None = None
+    issuePageUrl: str | None = None
+    condition_name: str | None = None
+    policy_name: str | None = None
+    entity_guid: str | None = None
+    entity_name: str | None = None
+    entity_type: str | None = None
+    labels: Dict[str, Any] = Field(default_factory=dict)
+    tags: Any = None
+    team: str | None = None
+    accumulations: Dict[str, Any] = Field(default_factory=dict)
+    entitiesData: Dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def validate_not_empty(self):
+        payload = self.model_dump(exclude_none=True)
+        for key in ("labels", "accumulations", "entitiesData"):
+            if payload.get(key) == {}:
+                payload.pop(key, None)
+
+        if not payload:
+            raise ValueError(
+                "New Relic webhook payload must contain at least one field"
+            )
+
+        return self
+
+
+class NagiosWebhookSchema(ApiModel):
+    """Validate a Nagios Core/XI host or service notification payload."""
+
+    model_config = ConfigDict(extra="allow")
+
+    notification_type: str | None = None
+    host_name: str | None = None
+    hostname: str | None = None
+    host_alias: str | None = None
+    host_address: str | None = None
+    host_state: str | None = None
+    host_output: str | None = None
+    long_host_output: str | None = None
+    service_description: str | None = None
+    service_state: str | None = None
+    service_output: str | None = None
+    long_service_output: str | None = None
+    state_type: str | None = None
+    event_link: str | None = None
+    team: str | None = None
+    labels: Dict[str, Any] = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def validate_host_identity(self):
+        payload = self.model_dump(exclude_none=True)
+        canonical = {
+            str(key).strip().lower().replace("-", "_"): value
+            for key, value in payload.items()
+        }
+
+        host = (
+            canonical.get("host_name")
+            or canonical.get("hostname")
+            or canonical.get("host")
+        )
+        if not str(host or "").strip():
+            raise ValueError(
+                "Nagios webhook payload must contain host_name or hostname"
+            )
+
+        return self
+
+
 class UptimeKumaWebhookSchema(ApiModel):
     """Validate the standard Uptime Kuma Webhook payload."""
 

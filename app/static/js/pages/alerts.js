@@ -392,7 +392,8 @@ function getAlertsQueryStringForApply() {
     return queryString;
 }
 
-function buildAlertsStateParams() {
+function buildAlertsStateParams(options) {
+    options = options || {};
     const params = new URLSearchParams();
 
     appendTableFilterParams(params, "status", getTableFilterValues("#status-filter"));
@@ -415,12 +416,16 @@ function buildAlertsStateParams() {
     params.set("sort", alertsSortState.column || "activity");
     params.set("order", alertsSortState.direction || "desc");
 
+    if (options.includeUrlTeam && typeof selectedTeamId === "function" && selectedTeamId()) {
+        params.set("team", String(selectedTeamId()));
+    }
+
     return params;
 }
 
 
 function buildAlertsQueryString() {
-    const query = buildAlertsStateParams().toString();
+    const query = buildAlertsStateParams({includeUrlTeam: true}).toString();
 
     return query ? "?" + query : "";
 }
@@ -1342,6 +1347,18 @@ function renderAlertExplainSummary(trace) {
 
     target.empty();
     target.append(detailItem(i18n.t("alert_details.explain.trace"), trace.trace_id));
+    if (trace.trace_level) {
+        target.append(
+            detailItem(
+                i18n.t("alert_details.explain.level"),
+                i18n.t(
+                    "alert_details.explain.level." + trace.trace_level,
+                    {},
+                    trace.trace_level
+                )
+            )
+        );
+    }
     target.append(
         $("<div>")
             .addClass("detail-item")
@@ -1360,6 +1377,14 @@ function renderAlertExplainSummary(trace) {
 
     if (trace.reason) {
         target.append(detailItem(i18n.t("alert_details.explain.reason"), trace.reason));
+    }
+
+    if (trace.trace_level === "compact") {
+        target.append(
+            $("<div>")
+                .addClass("help-text")
+                .text(i18n.t("alert_details.explain.compact_notice"))
+        );
     }
 }
 

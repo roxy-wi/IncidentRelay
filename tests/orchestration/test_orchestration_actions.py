@@ -245,3 +245,31 @@ def test_pause_rejects_unknown_retrigger_mode():
     )
 
     assert any(issue.code == "invalid_pause_retrigger" for issue in issues)
+
+
+def test_set_trace_level_records_explicit_result():
+    result = execute_actions(
+        [{"type": "set_trace_level", "level": "compact"}],
+        build_context(event={"title": "noisy"}),
+    )
+
+    assert result.context["result"]["trace_level"] == "compact"
+    assert result.steps[0].before is None
+    assert result.steps[0].after == "compact"
+
+
+@pytest.mark.parametrize("level", ["full", "compact", "disabled"])
+def test_set_trace_level_accepts_supported_levels(level):
+    issues = validate_action_list(
+        [{"type": "set_trace_level", "level": level}]
+    )
+
+    assert issues == []
+
+
+def test_set_trace_level_rejects_unknown_level():
+    issues = validate_action_list(
+        [{"type": "set_trace_level", "level": "verbose"}]
+    )
+
+    assert any(issue.code == "invalid_trace_level" for issue in issues)

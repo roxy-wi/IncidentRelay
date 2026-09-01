@@ -162,6 +162,7 @@ class Config:
 
     REMINDER_INTERVAL_SECONDS = settings.get_int("alerts", "reminder_interval_seconds", 60)
     ALERT_GROUP_WINDOW_SECONDS = settings.get_int("alerts", "alert_group_window_seconds", 3600)
+    ALERT_EXPLAIN_TRACE_LEVEL = settings.get("alerts", "explain_trace_level", "full")
     MAINTENANCE_LIFECYCLE_CHECK_INTERVAL_SECONDS = settings.get_int(
         "maintenance", "lifecycle_check_interval_seconds", 30
     )
@@ -190,9 +191,6 @@ class Config:
     )
     ORCHESTRATION_PENDING_EVENT_RETENTION_DAYS = settings.get_int(
         "orchestration", "pending_event_retention_days", 30
-    )
-    ORCHESTRATION_RETENTION_CLEANUP_INTERVAL_SECONDS = settings.get_int(
-        "orchestration", "retention_cleanup_interval_seconds", 86400
     )
     ORCHESTRATION_WEBHOOK_CHECK_INTERVAL_SECONDS = settings.get_int(
         "orchestration", "webhook_check_interval_seconds", 5
@@ -378,16 +376,51 @@ class Config:
         30,
     )
 
-    ALERT_EXPLAIN_TRACE_RETENTION_DAYS = settings.get_int(
-        "alerts",
-        "alert_explain_trace_retention_days",
-        30,
+    RETENTION_ALERT_DAYS = settings.get_int(
+        "retention",
+        "alert_days",
+        0,
     )
 
-    ALERT_EXPLAIN_TRACE_CLEANUP_INTERVAL_SECONDS = settings.get_int(
-        "scheduler",
-        "alert_explain_trace_cleanup_interval_seconds",
-        86400,
+    # IncidentRelay 2.0 exposed Explain Trace retention under [alerts]. Keep
+    # that value as an upgrade fallback, but all new configuration lives in
+    # the dedicated [retention] section.
+    RETENTION_EXPLAIN_TRACE_DAYS = settings.get_int(
+        "retention",
+        "explain_trace_days",
+        settings.get_int(
+            "alerts",
+            "alert_explain_trace_retention_days",
+            RETENTION_ALERT_DAYS,
+        ),
+    )
+
+    RETENTION_ORCHESTRATION_EXECUTION_DAYS = settings.get_int(
+        "retention",
+        "orchestration_execution_days",
+        RETENTION_ALERT_DAYS,
+    )
+
+    # Older installations may have customized one of the two cleanup
+    # intervals that 2.1 consolidates into a single retention scheduler job.
+    RETENTION_CLEANUP_INTERVAL_SECONDS = settings.get_int(
+        "retention",
+        "cleanup_interval_seconds",
+        settings.get_int(
+            "scheduler",
+            "alert_explain_trace_cleanup_interval_seconds",
+            settings.get_int(
+                "orchestration",
+                "retention_cleanup_interval_seconds",
+                86400,
+            ),
+        ),
+    )
+
+    RETENTION_BATCH_SIZE = settings.get_int(
+        "retention",
+        "batch_size",
+        500,
     )
 
     SERVICE_IMPACT_SNAPSHOT_ENABLED = settings.get_bool(

@@ -125,6 +125,7 @@ GET /api/alerts/explain/{trace_id}
   "id": 12,
   "trace_id": "4fd2a8c9-8c2f-44e8-96fd-77b7f03e72f2",
   "mode": "live",
+  "trace_level": "full",
   "group_id": 123,
   "alert_id": 456,
   "source": "alertmanager",
@@ -151,6 +152,34 @@ GET /api/alerts/explain/{trace_id}
   ]
 }
 ```
+
+## Уровень детализации trace
+
+Уровень обработки по умолчанию задаётся глобально:
+
+```ini
+[alerts]
+explain_trace_level = full
+```
+
+Доступные уровни:
+
+- `full` — записывает полный Explain Trace, включая `input_summary`, payload результата и `data` каждого шага;
+- `compact` — сохраняет trace и последовательность шагов, но подробные JSON-поля записывает пустыми объектами;
+- `disabled` — не создаёт строки `AlertExplainTrace` и `AlertExplainStep`, а Ingest API возвращает `trace_id: null`.
+
+Глобальная Event Orchestration может переопределить значение для совпавших событий:
+
+```json
+{
+  "type": "set_trace_level",
+  "level": "compact"
+}
+```
+
+`set_trace_level` намеренно разрешён только в global orchestration. Service-scoped orchestration может выполняться уже после начала alert lifecycle, когда слишком поздно гарантировать отсутствие записей в БД для режима `disabled`. Если несколько совпавших global actions задают уровень, используется последнее применённое значение.
+
+Trace level определяет **сколько данных записывать**, а секция `[retention]` независимо определяет **сколько времени хранить уже записанные traces**.
 
 ## Интерфейс
 
@@ -190,25 +219,26 @@ Alerts -> Explain trace
 
 Трассировки-сироты — это трассировки без `group_id`. Их могут читать только администраторы.
 
-## Хранение
+## Retention
 
-Трассировки объяснения автоматически очищаются планировщиком.
-
-Срок хранения по умолчанию:
+Explain Trace использует общую политику `[retention]`. Если отдельное значение для trace не задано, используется `alert_days`:
 
 ```ini
-[alerts]
-alert_explain_trace_retention_days = 30
+[retention]
+alert_days = 30
 ```
 
-Интервал очистки по умолчанию:
+Чтобы хранить Explain Trace другой срок, задайте override в той же секции:
 
 ```ini
-[scheduler]
-alert_explain_trace_cleanup_interval_seconds = 86400
+[retention]
+alert_days = 90
+explain_trace_days = 30
 ```
 
-Задайте для `alert_explain_trace_retention_days` положительное целое число.
+Явный `explain_trace_days = 0` отключает отдельную очистку standalone Explain Trace. Traces, связанные с alert или alert group, всё равно удаляются каскадно вместе с alert history. Cleanup выполняется единым `retention_cleanup_job`; его периодичность задаёт `retention.cleanup_interval_seconds`.
+
+IncidentRelay 2.1 читает старый `[alerts] alert_explain_trace_retention_days` только как fallback при обновлении, если `retention.explain_trace_days` отсутствует. В новом конфиге следует использовать `[retention]`.
 
 ## Устранение неполадок
 

@@ -67,8 +67,21 @@ def process_due_alert_group_notifications(limit=100):
         limit=limit,
     )
 
-    for group in groups:
+    for selected_group in groups:
+        group = selected_group
+
         try:
+            # The due-list query can race with an ACK handled by another
+            # worker. Reload before recalculation so a stale firing object does
+            # not overwrite the persisted acknowledged state.
+            group = alerts_repo.get_alert_group(selected_group.id)
+
+            if not group.notification_pending or group.status != "firing":
+                if group.notification_pending:
+                    alerts_repo.clear_alert_group_notification(group)
+                skipped += 1
+                continue
+
             group = alerts_repo.recalculate_alert_group(group)
 
             if is_notification_lifecycle_suppressed(group, now=now):

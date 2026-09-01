@@ -1,9 +1,53 @@
 import logging
 import uuid
 
+from app.modules.common import utc_now
 from app.modules.db import alerts_repo
 
 logger = logging.getLogger("oncall.alerts.explain")
+
+TRACE_LEVEL_FULL = "full"
+TRACE_LEVEL_COMPACT = "compact"
+TRACE_LEVEL_DISABLED = "disabled"
+EFFECTIVE_TRACE_LEVELS = {
+    TRACE_LEVEL_FULL,
+    TRACE_LEVEL_COMPACT,
+    TRACE_LEVEL_DISABLED,
+}
+
+
+def normalize_alert_explain_trace_level(value, *, default=TRACE_LEVEL_FULL):
+    level = str(value or "").strip().lower()
+    if level in EFFECTIVE_TRACE_LEVELS:
+        return level
+    return default
+
+
+def resolve_alert_explain_trace_level(override=None):
+    """Resolve orchestration override against the global alert default."""
+    if override is not None:
+        level = str(override or "").strip().lower()
+        if level in EFFECTIVE_TRACE_LEVELS:
+            return level
+        logger.warning(
+            "invalid orchestration explain trace level; using global default",
+            extra={"extra": {"explain_trace_level": level}},
+        )
+
+    from app import Config
+
+    configured = str(
+        getattr(Config, "ALERT_EXPLAIN_TRACE_LEVEL", TRACE_LEVEL_FULL)
+        or TRACE_LEVEL_FULL
+    ).strip().lower()
+    if configured not in EFFECTIVE_TRACE_LEVELS:
+        logger.warning(
+            "invalid global explain trace level; using full",
+            extra={"extra": {"explain_trace_level": configured}},
+        )
+        return TRACE_LEVEL_FULL
+    return configured
+
 
 
 def _obj_id(obj):
@@ -39,7 +83,11 @@ def _normalize_severity(value):
 
 
 class AlertExplainTrace:
-    """Explain trace for one alert processing run."""
+    """Explain trace for one alert processing run.
+
+    Lifecycle processing starts in buffered mode so global Event Orchestration
+    can choose the effective trace level before any trace rows are written.
+    """
 
     def __init__(
         self,
@@ -48,20 +96,39 @@ class AlertExplainTrace:
         source=None,
         dedup_key=None,
         input_summary=None,
+        level=TRACE_LEVEL_FULL,
+        buffered=False,
     ):
         self.trace_id = uuid.uuid4().hex
         self.position = 0
+        self.row = None
+        self.trace_level = None
 
-        self.row = alerts_repo.create_alert_explain_trace(
-            trace_id=self.trace_id,
-            mode=mode,
-            source=source,
-            dedup_key=dedup_key,
-            input_summary=input_summary or {},
-        )
+        self._mode = mode
+        self._source = source
+        self._dedup_key = dedup_key
+        self._input_summary = input_summary or {}
+        self._started_at = utc_now()
+        self._buffered = bool(buffered)
+        self._applied = False
+        self._disabled = False
+        self._pending_steps = []
+        self._pending_group = None
+        self._pending_alert = None
+        self._pending_finish = None
+
+        if not self._buffered:
+            self.apply_level(level)
 
     @classmethod
-    def start(cls, alert_data, *, mode="live"):
+    def start(
+        cls,
+        alert_data,
+        *,
+        mode="live",
+        level=TRACE_LEVEL_FULL,
+        buffered=False,
+    ):
         trace = cls(
             mode=mode,
             source=alert_data.get("source"),
@@ -75,6 +142,8 @@ class AlertExplainTrace:
                 "team_slug": alert_data.get("team_slug"),
                 "labels": alert_data.get("labels") or {},
             },
+            level=level,
+            buffered=buffered,
         )
 
         trace.step(
@@ -91,16 +160,143 @@ class AlertExplainTrace:
 
         return trace
 
+    @classmethod
+    def start_buffered(cls, alert_data, *, mode="live"):
+        return cls.start(alert_data, mode=mode, buffered=True)
+
+    def _stored_data(self, value):
+        if self.trace_level == TRACE_LEVEL_COMPACT:
+            return {}
+        return value or {}
+
+    def apply_level(self, level):
+        """Commit buffered trace data according to the effective level."""
+        if self._applied:
+            return self
+
+        level = normalize_alert_explain_trace_level(level)
+        self.trace_level = level
+        self._applied = True
+        self._buffered = False
+
+        if level == TRACE_LEVEL_DISABLED:
+            self._disabled = True
+            self.trace_id = None
+            self._pending_steps.clear()
+            self._pending_finish = None
+            self._pending_group = None
+            self._pending_alert = None
+            return self
+
+        self.row = alerts_repo.create_alert_explain_trace(
+            trace_id=self.trace_id,
+            mode=self._mode,
+            source=self._source,
+            dedup_key=self._dedup_key,
+            trace_level=level,
+            input_summary=self._stored_data(self._input_summary),
+            started_at=self._started_at,
+        )
+
+        for item in self._pending_steps:
+            try:
+                alerts_repo.create_alert_explain_step(
+                    trace=self.row,
+                    position=item["position"],
+                    stage=item["stage"],
+                    code=item["code"],
+                    status=item["status"],
+                    title=item["title"],
+                    message=item["message"],
+                    data=self._stored_data(item["data"]),
+                    created_at=item["created_at"],
+                )
+            except Exception:
+                logger.exception(
+                    "failed to create buffered alert explain step",
+                    extra={
+                        "extra": {
+                            "trace_id": self.trace_id,
+                            "stage": item["stage"],
+                            "code": item["code"],
+                        }
+                    },
+                )
+        self._pending_steps.clear()
+
+        if self._pending_group is not None or self._pending_alert is not None:
+            try:
+                self.row = alerts_repo.attach_alert_explain_trace(
+                    self.row,
+                    group=self._pending_group,
+                    alert=self._pending_alert,
+                )
+            except Exception:
+                logger.exception(
+                    "failed to attach buffered alert explain trace",
+                    extra={
+                        "extra": {
+                            "trace_id": self.trace_id,
+                            "group_id": _obj_id(self._pending_group),
+                            "alert_id": _obj_id(self._pending_alert),
+                        }
+                    },
+                )
+
+        if self._pending_finish is not None:
+            finish = self._pending_finish
+            try:
+                self.row = alerts_repo.finish_alert_explain_trace(
+                    self.row,
+                    status=finish["status"],
+                    outcome=finish["outcome"],
+                    reason=finish["reason"],
+                    result=self._stored_data(finish["result"]),
+                    finished_at=finish["finished_at"],
+                )
+            except Exception:
+                logger.exception(
+                    "failed to finish buffered alert explain trace",
+                    extra={
+                        "extra": {
+                            "trace_id": self.trace_id,
+                            "outcome": finish["outcome"],
+                        }
+                    },
+                )
+            self._pending_finish = None
+
+        return self
+
     def step(
-            self,
-            stage,
-            code,
-            step_status,
-            title,
-            message=None,
-            **data,
+        self,
+        stage,
+        code,
+        step_status,
+        title,
+        message=None,
+        **data,
     ):
+        if self._disabled:
+            return None
+
         self.position += 1
+        created_at = utc_now()
+
+        if self.row is None:
+            self._pending_steps.append(
+                {
+                    "position": self.position,
+                    "stage": stage,
+                    "code": code,
+                    "status": step_status,
+                    "title": title,
+                    "message": message,
+                    "data": data,
+                    "created_at": created_at,
+                }
+            )
+            return None
 
         try:
             return alerts_repo.create_alert_explain_step(
@@ -111,7 +307,8 @@ class AlertExplainTrace:
                 status=step_status,
                 title=title,
                 message=message,
-                data=data,
+                data=self._stored_data(data),
+                created_at=created_at,
             )
         except Exception:
             logger.exception(
@@ -128,6 +325,16 @@ class AlertExplainTrace:
             return None
 
     def attach(self, *, group=None, alert=None):
+        if self._disabled:
+            return self
+
+        if self.row is None:
+            if group is not None:
+                self._pending_group = group
+            if alert is not None:
+                self._pending_alert = alert
+            return self
+
         try:
             self.row = alerts_repo.attach_alert_explain_trace(
                 self.row,
@@ -156,13 +363,30 @@ class AlertExplainTrace:
         reason=None,
         result=None,
     ):
+        if self._disabled:
+            return self
+
+        finished_at = utc_now()
+        finish = {
+            "status": status,
+            "outcome": outcome,
+            "reason": reason,
+            "result": result or {},
+            "finished_at": finished_at,
+        }
+
+        if self.row is None:
+            self._pending_finish = finish
+            return self
+
         try:
             self.row = alerts_repo.finish_alert_explain_trace(
                 self.row,
                 status=status,
                 outcome=outcome,
                 reason=reason,
-                result=result or {},
+                result=self._stored_data(result or {}),
+                finished_at=finished_at,
             )
         except Exception:
             logger.exception(
