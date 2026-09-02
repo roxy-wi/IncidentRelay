@@ -96,7 +96,7 @@ PROFILE_SCHEMA = {
         "locale": {
             "type": "string",
             "nullable": True,
-            "enum": ["en", "de", "fr", "ru"],
+            "enum": ["en", "de", "fr", "ru", "zh"],
             "description": "Preferred interface language.",
             "example": "ru",
         },
@@ -202,7 +202,7 @@ PROFILE_UPDATE_SCHEMA = {
         "locale": {
             "type": "string",
             "nullable": True,
-            "enum": ["en", "de", "fr", "ru"],
+            "enum": ["en", "de", "fr", "ru", "zh"],
             "example": "ru",
         },
         "theme": {

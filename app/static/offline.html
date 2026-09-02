@@ -130,6 +130,12 @@
             heading: "Sie sind offline",
             description: "IncidentRelay benötigt eine Netzwerkverbindung, um aktuelle Alarme, Rotationen und Auswirkungen auf Services anzuzeigen. Überprüfen Sie Ihre Verbindung und versuchen Sie es erneut.",
             retry: "Erneut versuchen"
+        },
+        zh: {
+            title: "IncidentRelay 离线",
+            heading: "当前处于离线状态",
+            description: "IncidentRelay 需要网络连接才能显示最新告警、值班安排和服务影响。请检查网络连接后重试。",
+            retry: "重试"
         }
     };
 
@@ -147,7 +153,9 @@
         ? "ru"
         : requestedLocale.startsWith("de")
             ? "de"
-            : "en";
+            : requestedLocale.startsWith("zh")
+                ? "zh"
+                : "en";
     const selected = messages[locale];
 
     document.documentElement.lang = locale;

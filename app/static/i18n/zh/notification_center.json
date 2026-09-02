@@ -1,0 +1,21 @@
+{
+  "notification_center.notifications": "通知",
+  "notification_center.title": "响应人员请求",
+  "notification_center.empty": "没有待处理请求",
+  "notification_center.notification": "通知",
+  "notification_center.responder_requested": "已请求响应人员",
+  "notification_center.help_requested": "{requester} 请求你协助处理此事件。",
+  "notification_center.accept": "接受",
+  "notification_center.decline": "拒绝",
+  "notification_center.open_incident": "打开事件",
+  "notification_center.unknown_user": "未知用户",
+  "notification_center.user_id": "用户 #{id}",
+  "notification_center.no_team": "无团队",
+  "notification_center.no_service": "无服务",
+  "notification_center.status.firing": "告警中",
+  "notification_center.status.acknowledged": "已确认",
+  "notification_center.status.resolved": "已解决",
+  "notification_center.status.maintenance": "维护中",
+  "notification_center.status.open": "未关闭",
+  "notification_center.status.closed": "已关闭"
+}

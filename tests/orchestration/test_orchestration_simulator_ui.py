@@ -51,7 +51,7 @@ def test_simulator_result_keys_exist_in_every_locale():
         "orchestrations.simulator.actual",
     }
 
-    for locale in ("en", "ru", "de", "fr"):
+    for locale in ("en", "ru", "de", "fr", "zh"):
         catalog = json.loads(
             (ROOT / "app" / "static" / "i18n" / locale / "orchestrations.json").read_text(
                 encoding="utf-8"

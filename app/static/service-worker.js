@@ -154,6 +154,16 @@ const IR_SW_MESSAGES = {
         network_error: "Netzwerkfehler",
         acknowledged: "{alert} bestätigt",
         resolved: "{alert} gelöst"
+    },
+    zh: {
+        acknowledge: "确认",
+        resolve: "解决",
+        alert: "告警",
+        action_failed: "操作失败：{error}",
+        unknown_error: "未知错误",
+        network_error: "网络错误",
+        acknowledged: "已确认 {alert}",
+        resolved: "已解决 {alert}"
     }
 };
 
@@ -167,6 +177,9 @@ function normalizeIncidentRelayLocale(value) {
     }
     if (locale.startsWith("de")) {
         return "de";
+    }
+    if (locale.startsWith("zh")) {
+        return "zh";
     }
     return "en";
 }

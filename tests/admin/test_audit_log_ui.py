@@ -29,7 +29,7 @@ def test_audit_log_translations_exist_for_all_supported_locales():
 
     import json
 
-    for locale in ("en", "de", "fr", "ru"):
+    for locale in ("en", "de", "fr", "ru", "zh"):
         path = ROOT / "app/static/i18n" / locale / "audit_logs.json"
         payload = json.loads(path.read_text(encoding="utf-8"))
         assert required_keys <= payload.keys()
