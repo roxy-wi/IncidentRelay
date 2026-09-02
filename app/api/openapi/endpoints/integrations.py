@@ -148,6 +148,94 @@ def incoming_alert_responses(success_description="Alerts accepted."):
     }
 
 
+AZURE_MONITOR_WEBHOOK_BODY_SCHEMA = {
+    "type": "object",
+    "required": ["schemaId", "data"],
+    "additionalProperties": True,
+    "description": "Azure Monitor Common Alert Schema webhook payload.",
+    "properties": {
+        "schemaId": {
+            "type": "string",
+            "enum": ["azureMonitorCommonAlertSchema"],
+        },
+        "data": {
+            "type": "object",
+            "required": ["essentials"],
+            "additionalProperties": True,
+            "properties": {
+                "essentials": {
+                    "type": "object",
+                    "required": ["monitorCondition"],
+                    "additionalProperties": True,
+                    "properties": {
+                        "alertId": {"type": "string", "nullable": True},
+                        "alertRule": {"type": "string", "nullable": True},
+                        "alertRuleId": {"type": "string", "nullable": True},
+                        "severity": {
+                            "type": "string",
+                            "enum": ["Sev0", "Sev1", "Sev2", "Sev3", "Sev4"],
+                        },
+                        "signalType": {"type": "string", "nullable": True},
+                        "monitorCondition": {
+                            "type": "string",
+                            "enum": ["Fired", "Resolved"],
+                        },
+                        "monitoringService": {"type": "string", "nullable": True},
+                        "alertTargetIDs": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                        },
+                        "configurationItems": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                        },
+                        "originAlertId": {"type": "string", "nullable": True},
+                        "description": {"type": "string", "nullable": True},
+                        "targetResourceGroup": {"type": "string", "nullable": True},
+                        "targetResourceType": {"type": "string", "nullable": True},
+                        "investigationLink": {"type": "string", "nullable": True},
+                    },
+                },
+                "alertContext": {
+                    "type": "object",
+                    "additionalProperties": True,
+                },
+                "customProperties": {
+                    "type": "object",
+                    "additionalProperties": True,
+                    "description": (
+                        "Custom Azure alert properties copied to matcher-friendly labels."
+                    ),
+                },
+            },
+        },
+    },
+    "example": {
+        "schemaId": "azureMonitorCommonAlertSchema",
+        "data": {
+            "essentials": {
+                "alertId": (
+                    "/subscriptions/example/providers/"
+                    "Microsoft.AlertsManagement/alerts/example-1"
+                ),
+                "alertRule": "Checkout API latency",
+                "severity": "Sev1",
+                "signalType": "Metric",
+                "monitorCondition": "Fired",
+                "monitoringService": "Platform",
+                "configurationItems": ["checkout-api"],
+                "description": "p95 latency exceeded 2 seconds",
+            },
+            "customProperties": {
+                "team": "sre",
+                "service": "checkout",
+                "environment": "production",
+            },
+        },
+    },
+}
+
+
 SENTRY_WEBHOOK_BODY_SCHEMA = {
     "type": "object",
     "description": (
@@ -2528,6 +2616,32 @@ def paths():
                 ),
                 "responses": incoming_alert_responses(
                     "New Relic alert accepted."
+                ),
+            },
+        },
+        "/api/integrations/azure-monitor": {
+            "post": {
+                "tags": ["integrations"],
+                "summary": "Receive Azure Monitor alerts",
+                "description": (
+                    "Receives Azure Monitor Common Alert Schema webhook payloads. "
+                    "The route must use source=azure_monitor. Native Azure Action "
+                    "Group Webhook actions can authenticate with HTTP Basic using "
+                    "username incidentrelay and the route intake token as password. "
+                    "Bearer route tokens remain supported for clients that can set "
+                    "custom Authorization headers."
+                ),
+                "operationId": "receiveAzureMonitorAlerts",
+                "security": [
+                    {"bearerAuth": []},
+                    {"basicRouteAuth": []},
+                ],
+                "requestBody": json_body(
+                    "Azure Monitor Common Alert Schema payload.",
+                    AZURE_MONITOR_WEBHOOK_BODY_SCHEMA,
+                ),
+                "responses": incoming_alert_responses(
+                    "Azure Monitor alert accepted."
                 ),
             },
         },

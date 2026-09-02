@@ -151,8 +151,15 @@ jobs:
         shell: bash
         run: |
           release_version="${GITHUB_REF_NAME#v}"
-          chart_version="$(awk '$1 == "version:" {gsub(/[\"'\'' ]/, "", $2); print $2; exit}' "${CHART_DIR}/Chart.yaml")"
-          app_version="$(awk '$1 == "appVersion:" {gsub(/[\"'\'' ]/, "", $2); print $2; exit}' "${CHART_DIR}/Chart.yaml")"
+          chart_version="$(
+            awk '$1 == "version:" {print $2; exit}' "${CHART_DIR}/Chart.yaml" |
+            tr -d "\"'"
+          )"
+          
+          app_version="$(
+            awk '$1 == "appVersion:" {print $2; exit}' "${CHART_DIR}/Chart.yaml" |
+            tr -d "\"'"
+          )"
 
           if [[ ! "${release_version}" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
             echo "Stable Helm releases require a vMAJOR.MINOR.PATCH tag, got ${GITHUB_REF_NAME}" >&2

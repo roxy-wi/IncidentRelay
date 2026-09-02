@@ -7,6 +7,7 @@ from peewee import DoesNotExist
 from app.api.schemas.integrations import (
     AlertmanagerWebhookSchema,
     AwsSnsEnvelopeSchema,
+    AzureMonitorWebhookSchema,
     DatadogWebhookSchema,
     NewRelicWebhookSchema,
     NagiosWebhookSchema,
@@ -118,6 +119,32 @@ def new_relic_webhook():
     return process_incoming_alerts(
         normalize_for_source(
             "new_relic",
+            payload.model_dump(exclude_none=True),
+        )
+    )
+
+
+@integrations_bp.route("/azure-monitor", methods=["POST"])
+@require_alert_token(allow_basic_route_token=True)
+def azure_monitor_webhook():
+    """Receive Azure Monitor Common Alert Schema notifications."""
+
+    intake_route = getattr(request, "current_intake_route", None)
+
+    if intake_route and intake_route.source != "azure_monitor":
+        return make_error_response(
+            error="route_source_mismatch",
+            message="Route source must be azure_monitor.",
+            status_code=400,
+        )
+
+    payload, error = validate_body(AzureMonitorWebhookSchema)
+    if error:
+        return error
+
+    return process_incoming_alerts(
+        normalize_for_source(
+            "azure_monitor",
             payload.model_dump(exclude_none=True),
         )
     )

@@ -100,7 +100,16 @@ def build_openapi_spec():
                         "JWT access token, regular API token, or channel alert "
                         "intake token. Use: Authorization: Bearer <token>."
                     ),
-                }
+                },
+                "basicRouteAuth": {
+                    "type": "http",
+                    "scheme": "basic",
+                    "description": (
+                        "Provider-specific route authentication. Azure Monitor "
+                        "webhooks use username incidentrelay and the route intake "
+                        "token as the HTTP Basic password."
+                    ),
+                },
             }
         },
     }

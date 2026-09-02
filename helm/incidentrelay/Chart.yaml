@@ -2,8 +2,8 @@ apiVersion: v2
 name: incidentrelay
 description: On-call scheduling, alert routing and incident notification service
 type: application
-version: 2.1.0
-appVersion: "2.1"
+version: 2.2.0
+appVersion: "2.2"
 kubeVersion: ">=1.23.0-0"
 home: https://github.com/roxy-wi/IncidentRelay
 sources:

@@ -321,6 +321,7 @@ function fillRouteSourceFilter(routes) {
     const sources = {
         alertmanager: true,
         aws_sns: true,
+        azure_monitor: true,
         datadog: true,
         new_relic: true,
         nagios: true,
@@ -1116,6 +1117,7 @@ function updateRouteSourceUi() {
     const isAwsSns = source === "aws_sns";
     const isDatadog = source === "datadog";
     const isNewRelic = source === "new_relic";
+    const isAzureMonitor = source === "azure_monitor";
     const isNagios = source === "nagios";
     const isUptimeKuma = source === "uptime_kuma";
     const isWebhook = source === "webhook";
@@ -1132,6 +1134,10 @@ function updateRouteSourceUi() {
     $("#route-new-relic-help").toggleClass(
         "is-hidden",
         !isNewRelic
+    );
+    $("#route-azure-monitor-help").toggleClass(
+        "is-hidden",
+        !isAzureMonitor
     );
     $("#route-nagios-help").toggleClass(
         "is-hidden",
@@ -1173,6 +1179,10 @@ function updateRouteSourceUi() {
         } else if (source === "new_relic") {
             $("#route-group-by").val(
                 '["new_relic_issue_id"]'
+            );
+        } else if (source === "azure_monitor") {
+            $("#route-group-by").val(
+                '["azure_alert_id"]'
             );
         } else if (source === "nagios") {
             $("#route-group-by").val(
@@ -1545,6 +1555,10 @@ function getRouteIntakePath(route) {
         return "/api/integrations/new-relic";
     }
 
+    if (source === "azure_monitor") {
+        return "/api/integrations/azure-monitor";
+    }
+
     if (source === "nagios") {
         return "/api/integrations/nagios";
     }
@@ -1562,6 +1576,13 @@ function getRouteIntakePath(route) {
 
 function getRouteIntakeUrl(route) {
     return window.location.origin + getRouteIntakePath(route);
+}
+
+function getAzureMonitorWebhookUrl(route, token) {
+    const url = new URL(getRouteIntakeUrl(route));
+    url.username = "incidentrelay";
+    url.password = token || "<route-token>";
+    return url.toString();
 }
 
 function buildRouteIntakeCurl(route, token) {
@@ -1603,6 +1624,16 @@ function buildRouteIntakeCurl(route, token) {
             "  -H 'Content-Type: application/json' \\",
             `  -H 'Authorization: Bearer ${token || "<route-token>"}' \\`,
             "  -d '{\"issue_id\":\"issue-example-1\",\"title\":\"API latency is high\",\"state\":\"ACTIVATED\",\"status\":\"CREATED\",\"priority\":\"CRITICAL\",\"issue_url\":\"https://one.newrelic.com/redirects/issue/issue-example-1\",\"condition_name\":\"API latency\",\"policy_name\":\"Production API\",\"entity_name\":\"checkout-api\",\"labels\":{\"environment\":\"production\",\"team\":\"sre\"}}'"
+        ].join("\n");
+    }
+
+    if (source === "azure_monitor") {
+        return [
+            "# " + i18n.t("routes.intake.azure_monitor_example_comment"),
+            `curl -X POST '${url}' \\`,
+            "  -H 'Content-Type: application/json' \\",
+            `  -u 'incidentrelay:${token || "<route-token>"}' \\`,
+            "  -d '{\"schemaId\":\"azureMonitorCommonAlertSchema\",\"data\":{\"essentials\":{\"alertId\":\"/subscriptions/example/providers/Microsoft.AlertsManagement/alerts/example-1\",\"alertRule\":\"Example alert\",\"severity\":\"Sev1\",\"signalType\":\"Metric\",\"monitorCondition\":\"Fired\",\"monitoringService\":\"Platform\"},\"customProperties\":{\"team\":\"sre\",\"service\":\"api\"}}}'"
         ].join("\n");
     }
 
@@ -1656,6 +1687,7 @@ function showRouteIntakeDetails(route) {
     const isHeartbeat = source === "heartbeat";
     const isDatadog = source === "datadog";
     const isNewRelic = source === "new_relic";
+    const isAzureMonitor = source === "azure_monitor";
     const isNagios = source === "nagios";
     const isUptimeKuma = source === "uptime_kuma";
     const isWebhook = source === "webhook";
@@ -1679,6 +1711,9 @@ function showRouteIntakeDetails(route) {
     } else if (isNewRelic) {
         subtitleKey = "routes.intake.new_relic_subtitle";
         helpKey = "routes.intake.new_relic_help";
+    } else if (isAzureMonitor) {
+        subtitleKey = "routes.intake.azure_monitor_subtitle";
+        helpKey = "routes.intake.azure_monitor_help";
     } else if (isNagios) {
         subtitleKey = "routes.intake.nagios_subtitle";
         helpKey = "routes.intake.nagios_help";
@@ -1693,7 +1728,11 @@ function showRouteIntakeDetails(route) {
     $("#route-intake-title").text(i18n.t(titleKey));
     $("#route-intake-subtitle").text(i18n.t(subtitleKey));
 
-    $("#route-intake-url").val(url);
+    $("#route-intake-url").val(
+        isAzureMonitor
+            ? getAzureMonitorWebhookUrl(route, token)
+            : url
+    );
     $("#route-intake-token").val(token);
     $("#route-intake-curl").val(buildRouteIntakeCurl(route, token));
 

@@ -11,6 +11,7 @@ from typing import Any, Callable, Dict, Mapping, Optional
 
 from app.services.integrations.normalizers.alertmanager import normalize_alertmanager
 from app.services.integrations.normalizers.aws_sns import normalize_aws_sns
+from app.services.integrations.normalizers.azure_monitor import normalize_azure_monitor
 from app.services.integrations.normalizers.datadog import normalize_datadog
 from app.services.integrations.normalizers.grafana import normalize_grafana
 from app.services.integrations.normalizers.librenms import normalize_librenms
@@ -60,6 +61,7 @@ def _normalize_sentry(
 _NORMALIZERS: Dict[str, Normalizer] = {
     "alertmanager": _payload_only(normalize_alertmanager),
     "aws_sns": _payload_only(normalize_aws_sns),
+    "azure_monitor": _payload_only(normalize_azure_monitor),
     "datadog": _payload_only(normalize_datadog),
     "grafana": _payload_only(normalize_grafana),
     "librenms": _payload_only(normalize_librenms),

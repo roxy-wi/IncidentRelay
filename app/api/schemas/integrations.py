@@ -231,6 +231,50 @@ class DatadogWebhookSchema(ApiModel):
         return self
 
 
+class AzureMonitorWebhookSchema(ApiModel):
+    """Validate Azure Monitor Common Alert Schema payload."""
+
+    model_config = ConfigDict(extra="allow")
+
+    schemaId: str
+    data: Dict[str, Any]
+
+    @model_validator(mode="after")
+    def validate_common_alert_schema(self):
+        schema_id = str(self.schemaId or "").strip()
+
+        if schema_id.lower() != "azuremonitorcommonalertschema":
+            raise ValueError(
+                "Azure Monitor Common Alert Schema is required"
+            )
+
+        essentials = self.data.get("essentials")
+
+        if not isinstance(essentials, dict):
+            raise ValueError(
+                "Azure Monitor payload must contain data.essentials"
+            )
+
+        if not (
+            str(essentials.get("alertId") or "").strip()
+            or str(essentials.get("alertRule") or "").strip()
+        ):
+            raise ValueError(
+                "Azure Monitor essentials must contain "
+                "alertId or alertRule"
+            )
+
+        if not str(
+            essentials.get("monitorCondition") or ""
+        ).strip():
+            raise ValueError(
+                "Azure Monitor essentials must contain "
+                "monitorCondition"
+            )
+
+        return self
+
+
 class NewRelicWebhookSchema(ApiModel):
     """Validate a New Relic Alerts Workflows webhook payload."""
 
