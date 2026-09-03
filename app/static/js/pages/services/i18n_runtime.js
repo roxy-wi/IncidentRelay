@@ -578,6 +578,18 @@
             [/^Edit SLO #(\d+)$/i, "编辑 SLO #$1"],
         ];
 
+        const numberedSpanish = [
+            [/^Service #(\d+)$/i, "Servicio n.º $1"],
+            [/^Runbook #(\d+)$/i, "Runbook n.º $1"],
+            [/^Link #(\d+)$/i, "Enlace n.º $1"],
+            [/^Window #(\d+)$/i, "Ventana n.º $1"],
+            [/^User #(\d+)$/i, "Usuario n.º $1"],
+            [/^SLI #(\d+)$/i, "SLI n.º $1"],
+            [/^SLO #(\d+)$/i, "SLO n.º $1"],
+            [/^Edit SLI #(\d+)$/i, "Editar SLI n.º $1"],
+            [/^Edit SLO #(\d+)$/i, "Editar SLO n.º $1"],
+        ];
+
         if (window.i18n && i18n.locale === "ru") {
             for (const pair of numbered) {
                 if (pair[0].test(normalized)) {
@@ -719,6 +731,78 @@
             match = normalized.match(/^([0-9]+) \/ ([0-9]+) upstream \/ downstream$/i);
             if (match) {
                 return "En amont : " + match[1] + " / en aval : " + match[2];
+            }
+        }
+
+        if (window.i18n && i18n.locale === "es") {
+            for (const pair of numberedSpanish) {
+                if (pair[0].test(normalized)) {
+                    return normalized.replace(pair[0], pair[1]);
+                }
+            }
+
+            match = normalized.match(/^Correlation (\d+)s$/i);
+            if (match) {
+                return "Correlación: " + match[1] + " s";
+            }
+
+            match = normalized.match(/^(\d+) day window$/i);
+            if (match) {
+                return "Ventana: " + match[1] + " días";
+            }
+
+            match = normalized.match(/^Loading service details for\s+(.+?)(?:\.\.\.)?$/i);
+            if (match) {
+                return "Cargando detalles del servicio «" + match[1] + "»...";
+            }
+
+            match = normalized.match(/^(\d+) more path\(s\)$/i);
+            if (match) {
+                return match[1] + " ruta(s) más";
+            }
+
+            match = normalized.match(/^(\d+) more downstream path\(s\)$/i);
+            if (match) {
+                return match[1] + " ruta(s) descendente(s) más";
+            }
+
+            match = normalized.match(/^Budget used:\s*(.+)$/i);
+            if (match) {
+                return "Presupuesto usado: " + match[1];
+            }
+
+            match = normalized.match(/^Delete SLI [“\"]?(.+?)[”\"]?\? SLOs attached to it will be deleted by the database\.$/i);
+            if (match) {
+                return "¿Eliminar el SLI «" + match[1] + "»? Los SLO asociados se eliminarán de la base de datos.";
+            }
+
+            match = normalized.match(/^Delete (service|link|runbook|dependency|SLI|SLO|default stakeholder) [“\"]?(.+?)[”\"]?\?$/i);
+            if (match) {
+                const names = {
+                    service: "el servicio",
+                    link: "el enlace",
+                    runbook: "el runbook",
+                    dependency: "la dependencia",
+                    sli: "el SLI",
+                    slo: "el SLO",
+                    "default stakeholder": "el stakeholder predeterminado",
+                };
+                return "¿Eliminar " + names[match[1].toLowerCase()] + " «" + match[2] + "»?";
+            }
+
+            match = normalized.match(/^Delete dependency on [“\"]?(.+?)[”\"]?\?$/i);
+            if (match) {
+                return "¿Eliminar la dependencia de «" + match[1] + "»?";
+            }
+
+            match = normalized.match(/^([0-9]+) upstream \/ ([0-9]+) downstream$/i);
+            if (match) {
+                return "Ascendentes: " + match[1] + " / descendentes: " + match[2];
+            }
+
+            match = normalized.match(/^([0-9]+) \/ ([0-9]+) upstream \/ downstream$/i);
+            if (match) {
+                return "Ascendentes: " + match[1] + " / descendentes: " + match[2];
             }
         }
 

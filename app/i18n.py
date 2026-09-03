@@ -16,6 +16,7 @@ SUPPORTED_LOCALES = {
     "en": "English",
     "de": "Deutsch",
     "fr": "Français",
+    "es": "Español",
     "ru": "Русский",
     "zh": "简体中文",
 }

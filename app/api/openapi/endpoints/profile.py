@@ -202,7 +202,7 @@ PROFILE_UPDATE_SCHEMA = {
         "locale": {
             "type": "string",
             "nullable": True,
-            "enum": ["en", "de", "fr", "ru", "zh"],
+            "enum": ["en", "de", "fr", "ru"],
             "example": "ru",
         },
         "theme": {

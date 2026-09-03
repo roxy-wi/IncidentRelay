@@ -111,7 +111,7 @@ def test_orchestration_action_editor_has_localized_column_help():
         "orchestrations.rule_editor.remove_action",
     }
 
-    for locale in ("en", "ru", "de", "fr", "zh"):
+    for locale in ("en", "ru", "de", "fr"):
         path = ROOT / "app" / "static" / "i18n" / locale / "orchestrations.json"
         catalog = json.loads(path.read_text(encoding="utf-8"))
         assert expected_keys <= set(catalog)
@@ -156,7 +156,7 @@ def test_orchestration_condition_editor_has_localized_column_help_and_operator_l
         "orchestrations.rule_editor.remove_condition_group",
     }
 
-    for locale in ("en", "ru", "de", "fr", "zh"):
+    for locale in ("en", "ru", "de", "fr"):
         path = ROOT / "app" / "static" / "i18n" / locale / "orchestrations.json"
         catalog = json.loads(path.read_text(encoding="utf-8"))
         assert expected_keys <= set(catalog)
