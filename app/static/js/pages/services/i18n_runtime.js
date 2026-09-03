@@ -566,6 +566,18 @@
             [/^Edit SLO #(\d+)$/i, "Modifier le SLO n° $1"],
         ];
 
+        const numberedChinese = [
+            [/^Service #(\d+)$/i, "服务 #$1"],
+            [/^Runbook #(\d+)$/i, "运维手册 #$1"],
+            [/^Link #(\d+)$/i, "链接 #$1"],
+            [/^Window #(\d+)$/i, "窗口 #$1"],
+            [/^User #(\d+)$/i, "用户 #$1"],
+            [/^SLI #(\d+)$/i, "SLI #$1"],
+            [/^SLO #(\d+)$/i, "SLO #$1"],
+            [/^Edit SLI #(\d+)$/i, "编辑 SLI #$1"],
+            [/^Edit SLO #(\d+)$/i, "编辑 SLO #$1"],
+        ];
+
         if (window.i18n && i18n.locale === "ru") {
             for (const pair of numbered) {
                 if (pair[0].test(normalized)) {
@@ -779,6 +791,145 @@
             match = normalized.match(/^([0-9]+) \/ ([0-9]+) upstream \/ downstream$/i);
             if (match) {
                 return "Vorgelagert: " + match[1] + " / nachgelagert: " + match[2];
+            }
+        }
+
+        if (window.i18n && i18n.locale === "zh") {
+            for (const pair of numberedChinese) {
+                if (pair[0].test(normalized)) {
+                    return normalized.replace(pair[0], pair[1]);
+                }
+            }
+
+            match = normalized.match(/^Correlation (\d+)s$/i);
+            if (match) {
+                return "关联窗口：" + match[1] + " 秒";
+            }
+
+            match = normalized.match(/^(\d+) day window$/i);
+            if (match) {
+                return "统计窗口：" + match[1] + " 天";
+            }
+
+            match = normalized.match(/^Loading service details for\s+(.+?)(?:\.\.\.)?$/i);
+            if (match) {
+                return "正在加载服务“" + match[1] + "”的详情...";
+            }
+
+            match = normalized.match(/^\+?(\d+) more path\(s\)$/i);
+            if (match) {
+                return "另有 " + match[1] + " 条路径";
+            }
+
+            match = normalized.match(/^\+?(\d+) more downstream path\(s\)$/i);
+            if (match) {
+                return "另有 " + match[1] + " 条下游路径";
+            }
+
+            match = normalized.match(/^Target ≥\s*(.+)$/i);
+            if (match) {
+                return "目标值 ≥ " + match[1];
+            }
+
+            match = normalized.match(/^Threshold ≤\s*(.+)$/i);
+            if (match) {
+                return "阈值 ≤ " + match[1];
+            }
+
+            match = normalized.match(/^Max incidents ≤\s*(\d+)$/i);
+            if (match) {
+                return "最大事件数 ≤ " + match[1];
+            }
+
+            match = normalized.match(/^Budget used:\s*(.+?)\s+of\s+(.+)$/i);
+            if (match) {
+                return "已使用错误预算：" + match[1] + " / 总计 " + match[2];
+            }
+
+            match = normalized.match(/^Budget used:\s*(.+)$/i);
+            if (match) {
+                return "已使用错误预算：" + match[1];
+            }
+
+            match = normalized.match(/^remaining\s+(.+)$/i);
+            if (match) {
+                return "剩余错误预算：" + match[1];
+            }
+
+            match = normalized.match(/^over budget by\s+(.+)$/i);
+            if (match) {
+                return "超出错误预算：" + match[1];
+            }
+
+            match = normalized.match(/^([0-9.]+)% availability over (\d+) days$/i);
+            if (match) {
+                return match[2] + " 天内可用性为 " + match[1] + "%";
+            }
+
+            match = normalized.match(/^(\d+) matching incidents over (\d+) days$/i);
+            if (match) {
+                return match[2] + " 天内有 " + match[1] + " 个匹配事件";
+            }
+
+            match = normalized.match(/^≤\s*(\d+) incidents$/i);
+            if (match) {
+                return "事件数 ≤ " + match[1];
+            }
+
+            if (/^(?:severity|priority):/i.test(normalized)) {
+                return normalized.split(" / ").map(function (part) {
+                    match = part.match(/^severity:\s*(.+)$/i);
+                    if (match) {
+                        const severity = match[1];
+                        const titleCased = severity.charAt(0).toUpperCase() + severity.slice(1);
+                        return "严重程度：" + (exactTranslation(titleCased) || severity);
+                    }
+
+                    match = part.match(/^priority:\s*(.+)$/i);
+                    if (match) {
+                        return "优先级：" + match[1];
+                    }
+
+                    if (/^maintenance excluded$/i.test(part)) {
+                        return "已排除维护时段";
+                    }
+
+                    return part;
+                }).join(" / ");
+            }
+
+            match = normalized.match(/^Delete SLI [“\"]?(.+?)[”\"]?\? SLOs attached to it will be deleted by the database\.$/i);
+            if (match) {
+                return "删除 SLI“" + match[1] + "”？数据库将同时删除关联的 SLO。";
+            }
+
+            match = normalized.match(/^Delete (service|link|runbook|dependency|SLI|SLO|default stakeholder) [“\"]?(.+?)[”\"]?\?$/i);
+            if (match) {
+                const names = {
+                    service: "服务",
+                    link: "链接",
+                    runbook: "运维手册",
+                    dependency: "依赖关系",
+                    sli: "SLI",
+                    slo: "SLO",
+                    "default stakeholder": "默认干系人",
+                };
+                return "删除" + names[match[1].toLowerCase()] + "“" + match[2] + "”？";
+            }
+
+            match = normalized.match(/^Delete dependency on [“\"]?(.+?)[”\"]?\?$/i);
+            if (match) {
+                return "删除对“" + match[1] + "”的依赖关系？";
+            }
+
+            match = normalized.match(/^([0-9]+) upstream \/ ([0-9]+) downstream$/i);
+            if (match) {
+                return "上游：" + match[1] + " / 下游：" + match[2];
+            }
+
+            match = normalized.match(/^([0-9]+) \/ ([0-9]+) upstream \/ downstream$/i);
+            if (match) {
+                return "上游：" + match[1] + " / 下游：" + match[2];
             }
         }
 

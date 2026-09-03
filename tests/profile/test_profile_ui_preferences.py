@@ -23,6 +23,29 @@ def test_profile_updates_locale_and_theme(client, auth_headers, admin_user):
     assert stored_user.theme == "dark"
 
 
+def test_profile_updates_and_renders_chinese_locale(
+    client,
+    auth_headers,
+    admin_user,
+):
+    update_response = client.put(
+        "/api/profile",
+        json={"locale": "zh-CN"},
+        headers=auth_headers,
+    )
+
+    assert update_response.status_code == 200
+    assert update_response.get_json()["locale"] == "zh"
+    assert User.get_by_id(admin_user.id).locale == "zh"
+
+    page_response = client.get("/profile", headers=auth_headers)
+
+    assert page_response.status_code == 200
+    html = page_response.get_data(as_text=True)
+    assert '<html lang="zh"' in html
+    assert "个人资料" in html
+
+
 def test_profile_rejects_unsupported_locale_and_theme(client, auth_headers):
     locale_response = client.put(
         "/api/profile",

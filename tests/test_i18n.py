@@ -34,6 +34,8 @@ def test_normalize_locale_accepts_region_variants():
     assert normalize_locale("en_US") == "en"
     assert normalize_locale("de-DE") == "de"
     assert normalize_locale("fr-FR") == "fr"
+    assert normalize_locale("zh-CN") == "zh"
+    assert normalize_locale("zh_CN") == "zh"
 
 
 def test_normalize_locale_rejects_unsupported_values():
@@ -82,6 +84,16 @@ def test_accept_language_selects_french_locale():
     )
 
     assert response.get_data(as_text=True) == "Se connecter|fr"
+
+
+def test_accept_language_selects_chinese_locale():
+    app = create_test_app()
+    response = app.test_client().get(
+        "/",
+        headers={"Accept-Language": "zh-CN,zh;q=0.9,en;q=0.8"},
+    )
+
+    assert response.get_data(as_text=True) == "登录|zh"
 
 
 def test_unsupported_language_falls_back_to_english():
