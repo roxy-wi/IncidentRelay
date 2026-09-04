@@ -312,6 +312,27 @@ sudo journalctl -u incidentrelay-telegram-worker -f
 
 ## 10. Upgrade IncidentRelay
 
+!!! warning "Upgrading from 1.2 to 2.1 or later"
+    IncidentRelay 2.1 blocks private/loopback/link-local/reserved outbound HTTP
+    destinations unless they are explicitly allowed. Existing internal OIDC
+    metadata/JWKS endpoints and outgoing webhooks/API integrations can therefore
+    stop working immediately after the upgrade.
+
+Before upgrading, identify internal endpoints used by IncidentRelay and add the
+smallest required CIDRs/IPs to the existing configuration:
+
+```ini
+[security]
+outbound_private_network_allowlist = 10.20.0.0/16,192.168.50.10/32
+```
+
+The RPM installs `incidentrelay.conf` as a `noreplace` configuration file, so
+an existing configuration is preserved during upgrade. Check for
+`/etc/incidentrelay/incidentrelay.conf.rpmnew`, but do not assume the new
+security option was merged into your active file automatically. See
+[Outbound HTTP network policy](configuration.md#outbound-http-network-policy)
+for the DNS behavior and additional examples.
+
 ```bash
 sudo dnf update -y incidentrelay
 ```

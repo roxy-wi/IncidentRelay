@@ -100,6 +100,74 @@ password = change-me
 
 Use PostgreSQL for larger installations, higher alert volume, multiple web workers, or long-term production deployments.
 
+## Outbound HTTP network policy
+
+IncidentRelay protects administrator-configured outbound HTTP requests against
+server-side request forgery (SSRF). Private, loopback, link-local, multicast,
+reserved and unspecified destination addresses are blocked by default.
+
+The policy is controlled by the `[security]` section:
+
+```ini
+[security]
+outbound_private_network_allowlist =
+outbound_http_max_redirects = 3
+outbound_http_max_response_bytes = 1048576
+```
+
+`outbound_private_network_allowlist` is a comma- or semicolon-separated list of
+IPv4/IPv6 addresses and CIDR networks that IncidentRelay is explicitly allowed
+to contact when they are otherwise considered private or unsafe.
+
+Examples:
+
+```ini
+# One internal service only.
+outbound_private_network_allowlist = 192.168.50.10/32
+```
+
+```ini
+# Several approved internal networks/addresses.
+outbound_private_network_allowlist = 10.20.0.0/16,192.168.50.10/32,fd00:1234::/48
+```
+
+A single IP may also be written without the prefix length, but `/32` for IPv4
+and `/128` for IPv6 make the intended scope explicit. Prefer the narrowest
+possible entries instead of allowlisting whole private address ranges.
+
+This policy is used by the shared outbound HTTP client, including OIDC metadata
+and JWKS retrieval and outgoing integrations such as generic/Teams/Discord
+webhooks, Slack webhooks and Mattermost API requests. The list is not a hostname
+allowlist: IncidentRelay resolves the hostname first and checks the resolved IP
+addresses.
+
+For DNS names, **every address returned by DNS must be public or explicitly
+allowlisted**. If even one returned address is blocked, the request fails
+closed. Redirect targets are resolved and checked again before IncidentRelay
+follows them.
+
+!!! warning "Upgrade impact in 2.1"
+    IncidentRelay 2.1 enforces this policy for outbound requests. An installation
+    upgraded from 1.2 can therefore lose access to an existing internal OIDC
+    metadata/JWKS endpoint or outgoing integration even though its URL did not
+    change. Before upgrading, resolve every internal endpoint from the
+    IncidentRelay host/pod and add only the required IPs or CIDRs.
+
+For example, if an internal identity provider resolves to `10.42.7.15`:
+
+```ini
+[security]
+outbound_private_network_allowlist = 10.42.7.15/32
+```
+
+After changing this setting, restart every IncidentRelay process that can make
+outbound requests.
+
+The allowlist changes only the destination network policy. It does **not**
+disable HTTPS certificate verification or trust a private certificate
+authority. Internal HTTPS endpoints using a private CA must also have that CA
+installed in the operating system/container trust store.
+
 ## Alert processing trace
 
 The global Explain Trace detail level is configured in `[alerts]`:

@@ -317,6 +317,35 @@ extraVolumeMounts:
 
 ## Upgrade and uninstall
 
+### Upgrading from 1.2 to 2.1 or later
+
+!!! warning
+    IncidentRelay 2.1 blocks private/loopback/link-local/reserved outbound HTTP
+    destinations unless they are explicitly allowed. Internal OIDC
+    metadata/JWKS endpoints and outgoing webhook/API integrations that worked in
+    1.2 can therefore stop working after the chart upgrade.
+
+For chart-rendered configuration, add the required internal CIDRs/IPs before
+the upgrade:
+
+```yaml
+config:
+  security:
+    outbound_private_network_allowlist: "10.20.0.0/16,192.168.50.10/32"
+```
+
+If you use `existingConfigSecret`, update its `incidentrelay.conf` instead:
+
+```ini
+[security]
+outbound_private_network_allowlist = 10.20.0.0/16,192.168.50.10/32
+```
+
+Resolve internal hostnames from the cluster and allow only the addresses that
+IncidentRelay actually needs. See
+[Outbound HTTP network policy](configuration.md#outbound-http-network-policy)
+for DNS fail-closed behavior and additional examples.
+
 ### Upgrading from 1.x to 2.0
 
 The 2.0 chart can reuse 1.x values. During rendering it materializes the new secure auth defaults and shared JWT/encryption/callback secrets before creating `incidentrelay.conf`, so old values do not cause different pods to generate different runtime keys. `config.main.secret_key` must still be present and must be a unique random value.

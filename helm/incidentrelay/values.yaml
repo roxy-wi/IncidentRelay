@@ -16,6 +16,20 @@ serviceAccount:
   # Defaults to the fullname when empty.
   name: ""
 
+# Optional private PKI trust. When configured, the chart builds a combined CA
+# bundle from the system trust store in the IncidentRelay image plus these
+# custom PEM certificates, then uses it in web, scheduler, Telegram and Slack.
+# Set either `bundle` or `existingConfigMap`, not both.
+customCA:
+  # One or more PEM certificates. The chart renders a ConfigMap when non-empty.
+  bundle: ""
+  # Use an existing ConfigMap instead of rendering one. Its content is appended
+  # to the image system trust store when each pod starts.
+  existingConfigMap: ""
+  existingConfigMapKey: ca.crt
+  # python:3.12-slim with ca-certificates uses this system bundle path.
+  systemBundlePath: /etc/ssl/certs/ca-certificates.crt
+
 # IncidentRelay reads every setting from a single INI file mounted at
 # /etc/incidentrelay/incidentrelay.conf. The map below is rendered into
 # that file: top-level keys become INI sections, nested keys become options.
@@ -67,8 +81,10 @@ config:
     wal: true
     busy_timeout: 5000
   security:
-    # Private/loopback/link-local outbound notification targets are denied by default.
-    # Add only operator-approved CIDRs when internal webhooks are required.
+    # Private/loopback/link-local/multicast/reserved/unspecified outbound HTTP
+    # targets are denied by default, including OIDC metadata/JWKS and webhooks.
+    # Add only operator-approved CIDRs or IPs for internal destinations.
+    # Example: "10.20.0.0/16,192.168.50.10/32"
     outbound_private_network_allowlist: ""
     outbound_http_max_redirects: 3
     outbound_http_max_response_bytes: 1048576

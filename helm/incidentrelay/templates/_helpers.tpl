@@ -190,6 +190,122 @@ Name of the PVC backing /var/lib/incidentrelay.
 {{- end }}
 
 {{/*
+Validate custom CA settings. The chart can either render the custom bundle or
+read it from an existing ConfigMap, but never both at the same time.
+*/}}
+{{- define "incidentrelay.validateCustomCA" -}}
+{{- $customCA := default (dict) .Values.customCA -}}
+{{- $bundle := default "" (get $customCA "bundle") | toString | trim -}}
+{{- $existingConfigMap := default "" (get $customCA "existingConfigMap") | toString | trim -}}
+{{- if and $bundle $existingConfigMap -}}
+{{- fail "customCA.bundle and customCA.existingConfigMap are mutually exclusive; configure only one" -}}
+{{- end -}}
+{{- end }}
+
+{{/*
+Return a non-empty value when custom CA trust is configured.
+*/}}
+{{- define "incidentrelay.customCAEnabled" -}}
+{{- include "incidentrelay.validateCustomCA" . -}}
+{{- $customCA := default (dict) .Values.customCA -}}
+{{- $bundle := default "" (get $customCA "bundle") | toString | trim -}}
+{{- $existingConfigMap := default "" (get $customCA "existingConfigMap") | toString | trim -}}
+{{- if or $bundle $existingConfigMap -}}true{{- end -}}
+{{- end }}
+
+{{/*
+Name of the ConfigMap holding only the user-provided CA certificates.
+*/}}
+{{- define "incidentrelay.customCAConfigMapName" -}}
+{{- $customCA := default (dict) .Values.customCA -}}
+{{- $existingConfigMap := default "" (get $customCA "existingConfigMap") | toString | trim -}}
+{{- default (printf "%s-custom-ca" (include "incidentrelay.fullname" .)) $existingConfigMap -}}
+{{- end }}
+
+{{/*
+Source key inside the custom CA ConfigMap. Inline bundles always use ca.crt;
+existing ConfigMaps may expose the bundle under a different key.
+*/}}
+{{- define "incidentrelay.customCASourceKey" -}}
+{{- $customCA := default (dict) .Values.customCA -}}
+{{- $existingConfigMap := default "" (get $customCA "existingConfigMap") | toString | trim -}}
+{{- if $existingConfigMap -}}
+{{- $key := default "" (get $customCA "existingConfigMapKey") | toString | trim -}}
+{{- default "ca.crt" $key -}}
+{{- else -}}ca.crt{{- end -}}
+{{- end }}
+
+{{/*
+Checksum annotation for custom CA configuration. Inline bundle changes trigger a
+rollout automatically. For an external ConfigMap the chart can hash only the
+reference; restart pods after changing the external ConfigMap contents.
+*/}}
+{{- define "incidentrelay.customCAChecksum" -}}
+{{- if include "incidentrelay.customCAEnabled" . -}}
+{{- $customCA := default (dict) .Values.customCA -}}
+{{- $bundle := default "" (get $customCA "bundle") | toString -}}
+{{- $existingConfigMap := default "" (get $customCA "existingConfigMap") | toString | trim -}}
+{{- $key := include "incidentrelay.customCASourceKey" . -}}
+{{- if $bundle -}}
+checksum/custom-ca: {{ $bundle | sha256sum }}
+{{- else -}}
+checksum/custom-ca: {{ printf "%s:%s" $existingConfigMap $key | sha256sum }}
+{{- end -}}
+{{- end -}}
+{{- end }}
+
+{{/*
+Environment variables used by Python/OpenSSL and Requests so every component
+uses the combined system + custom trust bundle.
+*/}}
+{{- define "incidentrelay.customCAEnv" -}}
+{{- if include "incidentrelay.customCAEnabled" . }}
+- name: SSL_CERT_FILE
+  value: /etc/incidentrelay/ca/ca-bundle.crt
+- name: REQUESTS_CA_BUNDLE
+  value: /etc/incidentrelay/ca/ca-bundle.crt
+{{- end }}
+{{- end }}
+
+{{/*
+Init container that copies the image system trust store and appends custom PEM
+certificates. It uses the same IncidentRelay image, so the system bundle path is
+identical to the application container.
+*/}}
+{{- define "incidentrelay.customCAInitContainer" -}}
+{{- if include "incidentrelay.customCAEnabled" . }}
+- name: build-ca-bundle
+  image: {{ include "incidentrelay.image" . }}
+  imagePullPolicy: {{ .Values.image.pullPolicy }}
+  command:
+    - /bin/sh
+    - -ec
+    - |
+      if [ ! -r "$SYSTEM_CA_BUNDLE" ]; then
+        echo "system CA bundle is not readable: $SYSTEM_CA_BUNDLE" >&2
+        exit 1
+      fi
+      if [ ! -s /custom-ca/ca.crt ]; then
+        echo "custom CA bundle is empty: /custom-ca/ca.crt" >&2
+        exit 1
+      fi
+      cat "$SYSTEM_CA_BUNDLE" > /ca-work/ca-bundle.crt
+      printf '\n' >> /ca-work/ca-bundle.crt
+      cat /custom-ca/ca.crt >> /ca-work/ca-bundle.crt
+  env:
+    - name: SYSTEM_CA_BUNDLE
+      {{- $systemBundlePath := default "" (get (default (dict) .Values.customCA) "systemBundlePath") | toString | trim }}
+      value: {{ default "/etc/ssl/certs/ca-certificates.crt" $systemBundlePath | quote }}
+  volumeMounts:
+    - name: custom-ca-source
+      mountPath: /custom-ca
+      readOnly: true
+    - name: custom-ca-bundle
+      mountPath: /ca-work
+{{- end }}
+{{- end }}
+
+{{/*
 Volumes shared by every component.
 */}}
 {{- define "incidentrelay.volumes" -}}
@@ -205,6 +321,16 @@ Volumes shared by every component.
   {{- end }}
 - name: logs
   emptyDir: {}
+{{- if include "incidentrelay.customCAEnabled" . }}
+- name: custom-ca-source
+  configMap:
+    name: {{ include "incidentrelay.customCAConfigMapName" . }}
+    items:
+      - key: {{ include "incidentrelay.customCASourceKey" . | quote }}
+        path: ca.crt
+- name: custom-ca-bundle
+  emptyDir: {}
+{{- end }}
 {{- with .Values.extraVolumes }}
 {{ toYaml . }}
 {{- end }}
@@ -221,6 +347,11 @@ Volume mounts shared by every component.
   mountPath: /var/lib/incidentrelay
 - name: logs
   mountPath: /var/log/incidentrelay
+{{- if include "incidentrelay.customCAEnabled" . }}
+- name: custom-ca-bundle
+  mountPath: /etc/incidentrelay/ca
+  readOnly: true
+{{- end }}
 {{- with .Values.extraVolumeMounts }}
 {{ toYaml . }}
 {{- end }}

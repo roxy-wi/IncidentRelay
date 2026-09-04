@@ -19,6 +19,7 @@ spec:
     metadata:
       annotations:
         {{- include "incidentrelay.configChecksum" . | nindent 8 }}
+        {{- include "incidentrelay.customCAChecksum" . | nindent 8 }}
         {{- with .Values.web.podAnnotations }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
@@ -38,6 +39,10 @@ spec:
       securityContext:
         {{- toYaml . | nindent 8 }}
       {{- end }}
+      {{- if include "incidentrelay.customCAEnabled" . }}
+      initContainers:
+        {{- include "incidentrelay.customCAInitContainer" . | nindent 8 }}
+      {{- end }}
       containers:
         - name: web
           image: {{ include "incidentrelay.image" . }}
@@ -53,6 +58,7 @@ spec:
               value: web
             - name: INCIDENTRELAY_RUN_MIGRATIONS
               value: {{ .Values.web.runMigrations | ternary "1" "0" | quote }}
+            {{- include "incidentrelay.customCAEnv" . | nindent 12 }}
             - name: INCIDENTRELAY_PORT
               value: {{ .Values.web.port | quote }}
             - name: INCIDENTRELAY_WEB_WORKERS
