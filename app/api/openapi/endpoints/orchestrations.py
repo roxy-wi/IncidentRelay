@@ -2,6 +2,7 @@
 
 from app.api.openapi.common import ERROR_SCHEMA, json_body, path_param, query_param, response
 from app.services.integrations.normalizers.registry import SUPPORTED_NORMALIZER_SOURCES
+from app.services.alerts.event_history import ALERT_EVENT_HISTORY_LEVELS
 from app.services.orchestration.actions import (
     EVENT_ACTIONS,
     FAILURE_MODES,
@@ -142,8 +143,12 @@ ACTION_SCHEMA = {
         "event_action": {"type": "string", "enum": sorted(EVENT_ACTIONS)},
         "level": {
             "type": "string",
-            "enum": sorted(TRACE_LEVELS),
-            "description": "Detail level for the set_trace_level action.",
+            "enum": sorted(TRACE_LEVELS | ALERT_EVENT_HISTORY_LEVELS),
+            "description": (
+                "Level for set_trace_level or set_alert_event_history. "
+                "Trace supports full/compact/disabled; alert event history "
+                "supports full/initial/disabled."
+            ),
         },
         "group_key": {"type": "string"},
         "dedup_key": {"type": "string"},

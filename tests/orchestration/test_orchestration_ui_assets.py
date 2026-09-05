@@ -181,3 +181,15 @@ def test_orchestration_builder_supports_global_trace_level_action():
     assert 'orchestrationCurrent.scope !== "service"' in javascript
     for level in ("full", "compact", "disabled"):
         assert f'.val("{level}")' in javascript
+
+
+def test_orchestration_builder_supports_alert_event_history_action():
+    javascript = (
+        ROOT / "app" / "static" / "js" / "pages" / "orchestrations.js"
+    ).read_text(encoding="utf-8")
+
+    assert '"set_alert_event_history"' in javascript
+    assert "orchestration-action-event-history" in javascript
+    assert 'i18n.t("orchestrations.simulator.alert_event_history")' in javascript
+    for level in ("full", "initial", "disabled"):
+        assert f'.val("{level}")' in javascript

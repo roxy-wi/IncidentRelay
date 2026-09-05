@@ -5,6 +5,7 @@ import pytest
 from app.modules.db import alerts_repo, incidents_repo
 from app.modules.db.models import (
     EventOrchestration,
+    AlertEvent,
     EventOrchestrationRule,
     EventOrchestrationVersion,
     AlertExplainStep,
@@ -750,3 +751,108 @@ def test_last_matching_global_trace_level_action_wins(db):
 
     assert trace.trace_level == "full"
     assert trace.input_summary["title"] == "Last trace action wins"
+
+
+def test_global_orchestration_can_reduce_incoming_alert_event_history(db):
+    group = create_group()
+    team = create_team(group)
+    route = create_route(team, source="alertmanager")
+    _publish(
+        group,
+        _always([{"type": "set_alert_event_history", "level": "initial"}]),
+    )
+    alert_data = {
+        "source": "alertmanager",
+        "forced_route_id": route.id,
+        "external_id": "runtime-history-initial-1",
+        "dedup_key": "runtime-history-initial-1",
+        "title": "Noisy alert",
+        "message": "first",
+        "severity": "warning",
+        "status": "firing",
+        "labels": {"alertname": "RuntimeHistoryInitial"},
+        "payload": {},
+    }
+
+    first = upsert_alert(dict(alert_data))
+    updated = dict(alert_data)
+    updated["message"] = "second"
+    upsert_alert(updated)
+
+    event_types = [
+        event.event_type
+        for event in AlertEvent.select()
+        .where(AlertEvent.alert == first.alert.id)
+        .order_by(AlertEvent.id.asc())
+    ]
+
+    assert event_types == ["created"]
+
+
+def test_service_orchestration_can_override_global_alert_event_history(db):
+    group = create_group()
+    team = create_team(group)
+    service = create_service(team, name="Noisy API", slug="noisy-api")
+    route = create_route(team, source="alertmanager", service=service)
+    _publish(
+        group,
+        _always([{"type": "set_alert_event_history", "level": "disabled"}]),
+    )
+    _publish(
+        group,
+        _always([{"type": "set_alert_event_history", "level": "full"}]),
+        scope="service",
+        service=service,
+    )
+    alert_data = {
+        "source": "alertmanager",
+        "forced_route_id": route.id,
+        "service_id": service.id,
+        "external_id": "runtime-history-service-1",
+        "dedup_key": "runtime-history-service-1",
+        "title": "Service override",
+        "message": "first",
+        "severity": "warning",
+        "status": "firing",
+        "labels": {"alertname": "RuntimeHistoryService"},
+        "payload": {},
+    }
+
+    first = upsert_alert(dict(alert_data))
+    updated = dict(alert_data)
+    updated["message"] = "second"
+    second = upsert_alert(updated)
+
+    event_types = [
+        event.event_type
+        for event in AlertEvent.select()
+        .where(AlertEvent.alert == first.alert.id)
+        .order_by(AlertEvent.id.asc())
+    ]
+
+    assert second.alert.message == "second"
+    assert event_types == ["created", "updated"]
+
+
+def test_last_matching_alert_event_history_action_wins(db):
+    group = create_group()
+    team = create_team(group)
+    route = create_route(team, source="alertmanager")
+    _publish(
+        group,
+        _always([
+            {"type": "set_alert_event_history", "level": "full"},
+            {"type": "set_alert_event_history", "level": "disabled"},
+        ]),
+    )
+    runtime = run_event_orchestration({
+        "source": "alertmanager",
+        "forced_route_id": route.id,
+        "external_id": "runtime-history-last-1",
+        "dedup_key": "runtime-history-last-1",
+        "title": "Last event history action wins",
+        "labels": {},
+        "payload": {},
+    })
+
+    assert runtime.alert_event_history == "disabled"

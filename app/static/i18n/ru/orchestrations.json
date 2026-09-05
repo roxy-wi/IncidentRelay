@@ -223,5 +223,6 @@
   "orchestrations.simulator.input_output_changes": "Вход → результат",
   "orchestrations.simulator.active_draft_changes": "Активная версия → черновик",
   "orchestrations.edit.title": "Редактирование оркестрации событий",
-  "orchestrations.edit.help": "Измените метаданные, область применения и настройки выполнения."
+  "orchestrations.edit.help": "Измените метаданные, область применения и настройки выполнения.",
+  "orchestrations.simulator.alert_event_history": "История событий алерта"
 }

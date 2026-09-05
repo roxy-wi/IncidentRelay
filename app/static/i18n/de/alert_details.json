@@ -321,5 +321,6 @@
   "alert_details.manual.select_team_error": "Wählen Sie ein Team.",
   "alert_details.manual.title_required": "Incident Title ist erforderlich.",
   "alert_details.manual.permission": "Sie haben keine Erlaubnis, Vorfälle für dieses Team zu erstellen.",
-  "alert_details.priority.current": "Aktuell: {value}"
+  "alert_details.priority.current": "Aktuell: {value}",
+  "alert_details.events.load_older": "Ältere Ereignisse laden"
 }

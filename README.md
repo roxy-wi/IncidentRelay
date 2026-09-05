@@ -2,200 +2,214 @@
 
 # IncidentRelay
 
-**Self-hosted on-call scheduling, alert routing, alert delivery, reminders, and escalations for teams that want control over their incident workflow.**
+**Self-hosted on-call, alert routing, event orchestration and incident response for teams that want to keep operational control in their own infrastructure.**
 
-IncidentRelay helps SRE, DevOps, platform, infrastructure, and operations teams route alerts to the right people through the right channels without depending on a hosted incident-management platform.
+IncidentRelay receives alerts from monitoring systems, normalizes and orchestrates them, routes them to the responsible service and team, groups related signals into incidents, applies priority and escalation rules, and delivers notifications to on-call responders.
 
-It provides the core building blocks of an on-call system:
-
-- access groups and RBAC-style group roles;
-- teams and on-call rotations;
-- alert intake routes with per-route tokens;
-- Alertmanager, AWS SNS/Cloud watch, Azure Monitor, Grafana, Zabbix, Sentry, LibreNMS, Datadog, New Relic, Nagios, RMON,
-Uptime Kuma and generic webhook/PagerDuty Event API v2 integrations;
-- Mattermost, Slack, Telegram, Discord, Microsoft Teams, email, webhook, and voice-call notifications;
-- profile-level browser/PWA push notifications;
-- profile notification rules for browser push, email, and voice-call follow-up;
-- acknowledge and resolve workflows;
-- reminders and escalation to the next on-call user;
-- rotation overrides;
-- alert silences;
-- maintenance windows for planned work and alert behavior control;
-- calendar view for on-call schedules;
-- personal API tokens;
-- Swagger/OpenAPI documentation;
-- configurable data retention for resolved alert history and diagnostic traces.
-
-IncidentRelay is designed for **self-hosted environments** where teams need predictable behavior, clear ownership, easy integrations, and full control over alert routing.
+It is designed for SRE, DevOps, platform, infrastructure and operations teams that need PagerDuty-style building blocks without depending on a hosted incident-management platform.
 
 ![Alerts](screenshots/alerts.png)
 
+## What IncidentRelay provides
+
+### Alert intake, routing and orchestration
+
+- route-based intake tokens and source-specific webhook endpoints;
+- native integrations for Alertmanager, AWS SNS / CloudWatch, Azure Monitor, Datadog, Grafana, LibreNMS, Nagios, New Relic, RMON, Sentry, Uptime Kuma and Zabbix;
+- generic webhook intake with PagerDuty Events API v2-compatible trigger, acknowledge and resolve events;
+- Global and Service Event Orchestration;
+- orchestration Builder and JSON editor, validation, simulation, shadow mode, replay, immutable published versions and rollback;
+- orchestration actions for routing, service selection, labels, severity, priority, grouping, suppression, pause/drop decisions, policy selection and asynchronous webhooks;
+- configurable Explain Trace detail and retention.
+
+### Incident management
+
+- alert groups with child alerts, deduplication and grouping;
+- acknowledge and resolve workflows;
+- incident priorities and priority policies;
+- responders, stakeholders and comments;
+- reminders and escalation policies;
+- silences and maintenance windows;
+- notification center and audit history;
+- dependency-aware alert correlation and Explain Trace.
+
+### Service catalog and impact
+
+- technical services with ownership, criticality, tier, links and runbooks;
+- matcher-based service routing and reusable matcher presets;
+- service dependencies and blast-radius analysis;
+- Business Services and component impact;
+- current service impact plus historical impact snapshots;
+- Service Standards and readiness checks;
+- SLI/SLO definitions and measurements;
+- service events and default stakeholders;
+- Heartbeats with expected and auto-discovered instances.
+
+### On-call and notification delivery
+
+- groups, teams and RBAC-style group/team roles;
+- rotations, rotation layers, restrictions and temporary overrides;
+- on-call calendar, ICS feeds and CalDAV access;
+- route channels and service Notification Policies;
+- Mattermost, Slack, Telegram, Discord, Microsoft Teams, email and generic webhook delivery;
+- interactive ACK / Resolve actions for supported chat providers;
+- profile-level browser/PWA push notifications;
+- personal notification rules for browser push, email and voice-call follow-up;
+- pluggable self-hosted voice providers.
+
+### Access and administration
+
+- OIDC and SAML 2.0 SSO with mapping rules;
+- personal API tokens with scopes;
+- Swagger/OpenAPI documentation;
+- configurable retention for resolved alerts and diagnostic/orchestration history;
+- SQLite for small single-node installations and PostgreSQL for larger deployments;
+- Docker Compose, Helm/Kubernetes, RPM and manual systemd installation paths.
+
 ---
 
-## Why IncidentRelay?
+## Alert flow
 
-Many teams need on-call routing, but do not always need a large SaaS incident platform.
-
-IncidentRelay focuses on the practical workflow:
+A simplified IncidentRelay 2.x flow looks like this:
 
 ```text
-Monitoring system -> Route -> Team -> Rotation -> Notification channels -> ACK / Resolve
+Monitoring system
+      ↓
+Integration authentication + normalization
+      ↓
+Global Event Orchestration
+      ↓
+Route / Service / Team selection
+      ↓
+Service Event Orchestration
+      ↓
+Grouping + correlation + priority
+      ↓
+Rotation / escalation + notification policy
+      ↓
+Shared channels + personal notification rules
+      ↓
+ACK / Resolve / responders / stakeholders
 ```
 
-A route owns its own intake token, so external systems send alerts to an exact alert path:
+Routes control how alerts enter IncidentRelay and provide the security boundary for intake tokens. Services describe **what** is affected. Notification delivery can come directly from route channels, from a service Notification Policy, or from both, depending on route configuration. Event Orchestration can override routing, service and policy decisions for matching events.
+
+Browser/PWA push and personal notification rules are evaluated separately from shared route/service channels.
+
+---
+
+## Event Orchestration
+
+Event Orchestration lets incoming events be transformed and routed before the normal alert lifecycle finishes processing them.
+
+Typical rules can:
 
 ```text
-ROUTE_INTAKE_TOKEN -> Route -> Team -> Rotation -> Channels
+IF labels.environment == production
+AND severity == critical
+THEN
+  select Payments service
+  set priority P1
+  use Critical escalation policy
+  normalize labels
 ```
 
-Channels only describe where notifications are delivered. Routes decide which team receives the alert and which channels are used.
+Global orchestration can make group-wide routing decisions. Service orchestration runs after a service is known and can apply service-specific logic. Published definitions support simulation, shadow evaluation, replay, version history and rollback.
 
-Profile browser push and profile notification rules are separate from route channels. They target the assigned user's own browser devices and contact methods.
+![Event Orchestration](screenshots/event_orchestration.png)
 
-This keeps alert delivery easier to reason about, easier to audit, and safer for self-hosted deployments.
+Explain Trace shows why an alert was routed, grouped, prioritized, suppressed or notified the way it was.
 
----
+![Alert Explain Trace](screenshots/alert-explain-trace.png)
 
-![Callendar](screenshots/callendar.png)
-
-## Highlights
-
-### Self-hosted by design
-
-Run IncidentRelay in your own environment, with your own database, your own network rules, and your own operational policies.
-
-### Route-based alert intake
-
-Alert intake tokens belong to routes, not channels. This makes it clear which incoming integration is allowed to submit alerts to which team and rotation.
-
-### Multi-team and multi-group support
-
-Use groups as access boundaries. Teams, rotations, routes, channels, alerts, and silences are scoped through groups and memberships.
-
-### Escalation and reminders
-
-Unacknowledged alerts can trigger repeated reminders and then escalate to the next on-call user according to the team configuration.
-
-### Mattermost with real actions
-
-Mattermost Bot API mode supports interactive `Acknowledge` and `Resolve` buttons, message updates, and severity-based attachment colors.
-
-### Slack with interactive actions
-
-Slack Bot API mode supports interactive `Acknowledge` and `Resolve` buttons, message updates after alert state changes, and responder attribution by Slack user ID.
-
-### Telegram actions and worker
-
-Telegram notifications can include action buttons and alert links. Telegram callback/polling processing is handled by the optional `incidentrelay-telegram-worker` service.
-
-### Pluggable voice calls
-
-IncidentRelay can be extended with custom voice providers for self-hosted installations. Providers can implement text-to-speech calls, call status callbacks, DTMF button callbacks, ACK / Resolve actions from phone keypad, and optional call status polling.
-
-### Browser/PWA push and profile rules
-
-Users can enable browser push from their profile and receive alert notifications on active browser or installed PWA devices. Browser push can include `Acknowledge` and `Resolve` actions.
-
-Profile notification rules let users define follow-up delivery through browser push, email, or voice call without turning browser push into a route channel.
-
-### API-first
-
-IncidentRelay includes Swagger/OpenAPI documentation and personal API tokens with scopes for alerts, resources, and profile access.
+Read more: [Event Orchestration](docs/usage/event-orchestration.md) and [Explain Trace](docs/incidents/explain-trace.md).
 
 ---
-
-![Routes](screenshots/routes.png)
 
 ## Supported integrations
 
 ### Incoming alert sources
 
-| Source          | Endpoint                                   |
-|-----------------|--------------------------------------------|
-| Alertmanager    | `POST /api/integrations/alertmanager`      |
-| Datadog         | `POST /api/integrations/datadog`           |
-| New Relic       | `POST /api/integrations/new-relic`         |
-| Azure Monitor   | `POST /api/integrations/azure-monitor`      |
-| Nagios          | `POST /api/integrations/nagios`            |
-| Grafana         | `POST /api/integrations/grafana`           |
-| RMON            | `POST /api/integrations/rmon`              |
-| Zabbix          | `POST /api/integrations/zabbix`            |
-| Sentry          | `POST /api/integrations/sentry/<route_id>` |
-| LibreNMS        | `POST /api/integrations/librenms`          |
-| Uptime Kuma     | `POST /api/integrations/uptime-kuma`       |
-| Generic webhook | `POST /api/integrations/webhook`           |
+| Source | Endpoint | Documentation |
+|---|---|---|
+| Alertmanager | `POST /api/integrations/alertmanager` | [Alertmanager](docs/integrations/alertmanager.md) |
+| AWS SNS / CloudWatch | `POST /api/integrations/aws-sns/<route_id>` | [AWS SNS / CloudWatch](docs/integrations/aws-sns-cloudwatch.md) |
+| Azure Monitor | `POST /api/integrations/azure-monitor` | [Azure Monitor](docs/integrations/azure-monitor.md) |
+| Datadog | `POST /api/integrations/datadog` | [Datadog](docs/integrations/datadog.md) |
+| Grafana | `POST /api/integrations/grafana` | [Grafana](docs/integrations/grafana.md) |
+| LibreNMS | `POST /api/integrations/librenms` | [LibreNMS](docs/integrations/librenms.md) |
+| Nagios | `POST /api/integrations/nagios` | [Nagios](docs/integrations/nagios.md) |
+| New Relic | `POST /api/integrations/new-relic` | [New Relic](docs/integrations/new-relic.md) |
+| RMON | `POST /api/integrations/rmon` | [RMON](docs/integrations/rmon.md) |
+| Sentry | `POST /api/integrations/sentry/<route_id>` | [Sentry](docs/integrations/sentry.md) |
+| Uptime Kuma | `POST /api/integrations/uptime-kuma` | [Uptime Kuma](docs/integrations/uptime-kuma.md) |
+| Zabbix | `POST /api/integrations/zabbix` | [Zabbix](docs/integrations/zabbix.md) |
+| Generic / PagerDuty Events API v2 | `POST /api/integrations/webhook` | [Generic webhook](docs/integrations/generic-webhook.md) |
 
-### Notification channels
+Incoming integrations use route intake credentials. The generated endpoint/help text on the Routes page shows the authentication form supported by each source.
 
-| Channel         | Notes                                                          |
-|-----------------|----------------------------------------------------------------|
-| Mattermost      | Incoming webhook mode or Bot API mode with buttons and updates |
-| Slack           | Incoming webhook mode or Bot API mode with buttons and updates |
-| Telegram        | Bot notifications and optional action buttons                  |
-| Discord         | Webhook notifications                                          |
-| Microsoft Teams | Webhook notifications                                          |
-| Email           | Email recipients                                               |
-| Webhook         | Generic outbound webhook                                       |
-| Voice call      | Pluggable provider API for self-hosted voice integrations      |
+### Shared notification channels
 
-Browser/PWA push is profile-level, not a notification channel. Users enable it in Profile, and IncidentRelay sends push notifications to the assigned user's active browser/PWA devices.
+| Channel | Notes |
+|---|---|
+| Mattermost | Incoming webhook or Bot API; Bot API supports interactive actions and message updates |
+| Slack | Incoming webhook or Bot API; interactive actions can use HTTP callbacks or Socket Mode worker |
+| Telegram | Bot notifications with optional action buttons |
+| Discord | Webhook delivery |
+| Microsoft Teams | Webhook delivery |
+| Email | Delivered through global SMTP configuration |
+| Webhook | Generic outbound webhook |
+
+Browser/PWA push is profile-level rather than a shared channel. Personal notification rules can deliver through browser push, email or voice call to the assigned user's profile contacts.
+
+Read more: [Notification channels](docs/integrations/channels.md) and [Notification Policies](docs/services/notification-policies.md).
 
 ---
 
 ## Installation
 
-Choose the installation method that matches your environment.
-
 ### Docker Compose
 
-Recommended for quick start, testing, and simple self-hosted deployments.
+Docker Compose is the fastest way to run a small self-hosted installation. The repository Compose file uses the published IncidentRelay image and starts the web service, scheduler, Telegram worker and Slack Socket Mode worker.
 
 ```bash
 cd docker
-docker compose up -d --build
+docker compose up -d
 ```
 
-With PostgreSQL:
+Open:
+
+```text
+http://SERVER_IP:8080/login
+```
+
+Use PostgreSQL with the supplied override:
 
 ```bash
-cd docker
 docker compose \
   -f docker-compose.yml \
   -f docker-compose.postgres.yml \
   up -d
 ```
 
-Read more: [Docker installation](docs/getting-started/docker.md)
+Read more: [Docker installation](docs/getting-started/docker.md).
 
-### Kubernetes (Helm)
+### Kubernetes / Helm
 
-The IncidentRelay Helm chart is published as an OCI artifact in GHCR, so installing it does not require cloning this repository. It deploys the web UI plus the scheduler, Telegram and Slack workers, renders the application config from values into a Secret, and wires up the `/healthz` and `/readyz` probes.
+The Helm chart is published as an OCI artifact in GHCR:
 
 ```bash
 helm install incidentrelay \
   oci://ghcr.io/roxy-wi/incidentrelay-charts/incidentrelay \
-  --version 2.1.0 \
+  --version 2.2.0 \
   --set-string config.main.secret_key="$(openssl rand -hex 32)"
 ```
 
-The chart defaults to `ghcr.io/roxy-wi/incidentrelay:2.1`. To pin another application image:
+The chart defaults to the `ghcr.io/roxy-wi/incidentrelay:2.2` application image. Configuration can be rendered from `config.*` values or supplied through `existingConfigSecret`.
 
-```bash
-helm upgrade --install incidentrelay \
-  oci://ghcr.io/roxy-wi/incidentrelay-charts/incidentrelay \
-  --version 2.1.0 \
-  --set image.repository=ghcr.io/roxy-wi/incidentrelay \
-  --set image.tag=2.1 \
-  --set-string config.main.secret_key="$(openssl rand -hex 32)"
-```
+Read more: [Kubernetes installation](docs/getting-started/kubernetes.md).
 
-For development from a source checkout, use `./helm/incidentrelay` instead of the OCI URL. All settings from `incidentrelay.conf` are available under `config.*` in [values.yaml](helm/incidentrelay/values.yaml); you can also bring a pre-rendered config via `existingConfigSecret`. Empty JWT/encryption/callback secrets inherit the required `config.main.secret_key` so all pods share stable keys.
-
-Read more: [Kubernetes installation](docs/getting-started/kubernetes.md)
-
-### RedHat-like distributions from RPM repository
-
-Recommended for RHEL, Rocky Linux, AlmaLinux, and CentOS Stream.
+### RHEL / Rocky Linux / AlmaLinux / CentOS Stream
 
 ```bash
 sudo dnf install -y curl
@@ -206,52 +220,38 @@ sudo dnf makecache
 sudo dnf install -y incidentrelay
 ```
 
-For older yum-based systems:
-
-```bash
-sudo yum install -y curl
-sudo curl -fsSL \
-  https://repo.incidentrelay.io/incidentrelay.repo \
-  -o /etc/yum.repos.d/incidentrelay.repo
-sudo yum makecache
-sudo yum install -y incidentrelay
-```
-
-Read more: [RedHat RPM installation](docs/getting-started/rpm-installation.md)
+Read more: [RPM installation](docs/getting-started/rpm-installation.md).
 
 ### Manual systemd installation
 
-Recommended when you want to run IncidentRelay directly from source code or manage the Python environment manually.
+Use the manual installation path when running directly from a source checkout or when you manage the Python environment yourself.
 
-Read more: [Systemd installation](docs/getting-started/systemd.md)
+Read more: [Systemd installation](docs/getting-started/systemd.md).
 
 ---
 
-## Runtime layout
+## Runtime services
 
-Common paths used by the RPM and systemd installation:
+A full installation can run these processes:
 
 ```text
-/var/www/incidentrelay                  # application code
-/var/www/incidentrelay/venv             # Python environment or venv-compatible wrapper
-/etc/incidentrelay/incidentrelay.conf   # main configuration file
-/var/lib/incidentrelay                  # runtime data
-/var/log/incidentrelay                  # logs
-/usr/local/lib/incidentrelay/voice_providers  # custom voice providers
+incidentrelay.service                  # HTTP API, UI and incoming webhooks
+incidentrelay-scheduler.service        # reminders, escalations and periodic jobs
+incidentrelay-telegram-worker.service  # optional Telegram callbacks / polling
+incidentrelay-slack-worker.service     # optional Slack Socket Mode interactions
 ```
 
-Systemd services:
+The scheduler should run as a dedicated process rather than once per web worker.
+
+Common RPM/systemd paths:
 
 ```text
-incidentrelay.service               # HTTP API, UI, webhooks
-incidentrelay-scheduler.service         # reminders, escalations, periodic jobs
-incidentrelay-telegram-worker.service   # optional Telegram callbacks/polling
-```
-
-System user:
-
-```text
-incidentrelay
+/var/www/incidentrelay
+/var/www/incidentrelay/venv
+/etc/incidentrelay/incidentrelay.conf
+/var/lib/incidentrelay
+/var/log/incidentrelay
+/usr/local/lib/incidentrelay/voice_providers
 ```
 
 ---
@@ -270,22 +270,26 @@ Example:
 export INCIDENTRELAY_CONFIG_FILE=/etc/incidentrelay/incidentrelay.conf
 ```
 
-For production, set the public URL used for generated links and callback URLs:
+For production, set the public base URL used for links and provider callbacks:
 
 ```ini
 [server]
 public_base_url = https://incidentrelay.example.com
 ```
 
-SQLite is suitable for small single-node installations:
+SQLite is suitable for a small single-node installation:
 
 ```ini
 [database]
 type = sqlite
-path = /var/lib/incidentrelay/incidentrelay.db
+name = /var/lib/incidentrelay/incidentrelay.db
+
+[sqlite]
+wal = true
+busy_timeout = 5000
 ```
 
-PostgreSQL is recommended for larger or long-running production installations:
+PostgreSQL is recommended for larger installations and multi-worker deployments:
 
 ```ini
 [database]
@@ -297,17 +301,13 @@ user = incidentrelay
 password = change-me
 ```
 
-Read more: [Configuration](docs/getting-started/configuration.md)
+Important operational settings include retention, outbound HTTP network policy and Explain Trace detail. See [Configuration](docs/getting-started/configuration.md) for the canonical reference.
 
 ---
 
 ## First setup
 
-After installation, initialize the database and create the first administrator.
-
-### Run database migrations
-
-For RPM/systemd installations:
+For RPM/systemd installations, run migrations and create the first administrator:
 
 ```bash
 sudo -u incidentrelay \
@@ -315,17 +315,6 @@ sudo -u incidentrelay \
   /var/www/incidentrelay/venv/bin/python \
   /var/www/incidentrelay/manage.py migrate
 ```
-
-For Docker installations:
-
-```bash
-docker compose exec incidentrelay \
-  python manage.py migrate
-```
-
-### Create the first admin user
-
-For RPM/systemd installations:
 
 ```bash
 sudo -u incidentrelay \
@@ -337,9 +326,10 @@ sudo -u incidentrelay \
   --email admin@example.com
 ```
 
-For Docker installations:
+For Docker Compose, the web container can run migrations automatically. Create the first administrator with:
 
 ```bash
+cd docker
 docker compose exec incidentrelay \
   python manage.py create-admin \
   --username admin \
@@ -347,33 +337,25 @@ docker compose exec incidentrelay \
   --email admin@example.com
 ```
 
-Change the password and email before using these commands in production.
+Change the example password before production use.
 
----
-
-## Basic UI setup flow
-
-After the first login:
+A typical UI setup is:
 
 ```text
-1. Create a group
-2. Create users
-3. Add users to the group
-4. Create a team
-5. Add users to the team
-6. Create a rotation
-7. Add rotation members
-8. Create notification channels
-9. Create a route
-10. Copy the route intake token
-11. Configure browser push VAPID keys if browser/PWA notifications are required
-12. Ask users to enable browser push or profile notification rules if required
-13. Configure Alertmanager, Grafana , Zabbix, Sentry, LibreNMS or webhook sender
-14. Send a test alert
-15. Acknowledge or resolve the alert
+1. Create a group and users
+2. Create a team and assign team roles
+3. Create a rotation and on-call members
+4. Create technical services
+5. Add runbooks, links and dependencies as needed
+6. Create shared notification channels
+7. Optionally create notification / priority / escalation policies
+8. Create a route and select its service/channel mode
+9. Optionally configure Global or Service Event Orchestration
+10. Copy the route intake credential into the monitoring system
+11. Send a test alert and verify ACK / Resolve
 ```
 
-Detailed guide: [First login and initial setup](docs/getting-started/first-login.md)
+Detailed guide: [First login and initial setup](docs/getting-started/first-login.md).
 
 ---
 
@@ -382,7 +364,7 @@ Detailed guide: [First login and initial setup](docs/getting-started/first-login
 ```bash
 curl -X POST http://127.0.0.1:8080/api/integrations/alertmanager \
   -H 'Content-Type: application/json' \
-  -H 'Authorization: Bearer ALERTMANAGER_ROUTE_TOKEN' \
+  -H 'Authorization: Bearer ROUTE_TOKEN' \
   -d '{
     "status": "firing",
     "alerts": [
@@ -404,128 +386,61 @@ curl -X POST http://127.0.0.1:8080/api/integrations/alertmanager \
   }'
 ```
 
-More examples:
-
-- [Alertmanager integration](docs/integrations/alertmanager.md)
-- [AWS SNS/Cloud watch](integrations/aws-sns-cloudwatch.md)
-- [Datadog integration](docs/integrations/datadog.md)
-- [New Relic integration](docs/integrations/new-relic.md)
-- [Nagios integration](docs/integrations/nagios.md)
-- [Grafana integration](docs/integrations/grafana.md)
-- [Datalog integration](docs/integrations/datadog.md)
-- [RMON integration](docs/integrations/rmon.md)
-- [Sentry integration](docs/integrations/sentry.md)
-- [LibreNMS integration](docs/integrations/librenms.md)
-- [Zabbix integration](docs/integrations/zabbix.md)
-- [Uptime Kuma integration](docs/integrations/uptime-kuma.md)
-- [Generic webhook integration](docs/integrations/generic-webhook.md)
+Read more: [Alertmanager integration](docs/integrations/alertmanager.md).
 
 ---
 
-## Mattermost buttons and message updates
+## API
 
-Mattermost has two modes.
-
-**Incoming webhook mode** sends plain messages only.
-
-**Bot API mode** is recommended when you want:
-
-- `Acknowledge` button;
-- `Resolve` button;
-- message updates after ACK / Resolve;
-- severity-based colors.
-
-More details: [Mattermost integration](docs/integrations/mattermost.md)
-
----
-
-## Custom voice providers
-
-IncidentRelay supports custom voice providers for self-hosted installations.
-
-A provider is a Python module that can be placed into:
-
-```text
-/usr/local/lib/incidentrelay/voice_providers
-```
-
-Custom providers can implement:
-
-- text-to-speech call creation;
-- provider call ID tracking;
-- call status callbacks;
-- DTMF button callbacks;
-- ACK / Resolve actions from phone keypad;
-- optional call status polling.
-
-Start here:
-
-- [Custom Voice Providers](docs/voice-providers/index.md)
-- [Provider API](docs/voice-providers/provider-api.md)
-- [Configuration](docs/voice-providers/configuration.md)
-- [Callbacks and DTMF](docs/voice-providers/callbacks.md)
-- [Security](docs/voice-providers/security.md)
-- [Troubleshooting](docs/voice-providers/troubleshooting.md)
-- [Example providers](docs/examples/voice_providers/)
-
----
-
-## API documentation
-
-Swagger UI is available at:
+Swagger UI:
 
 ```text
 /docs
 ```
 
-OpenAPI JSON is available at:
+OpenAPI JSON:
 
 ```text
 /api/openapi.json
 ```
 
+Personal API tokens can be created from the user profile and restricted by scope.
+
+Read more: [API documentation](docs/api/index.md) and [Profile/API tokens](docs/usage/profile-and-tokens.md).
+
 ---
 
 ## Documentation
 
-| Topic                    | Link                                                                                 |
-|--------------------------|--------------------------------------------------------------------------------------|
-| Getting started          | [docs/getting-started/](docs/getting-started/index.md)                               |
-| Docker installation      | [docs/getting-started/docker.md](docs/getting-started/docker.md)                     |
-| RedHat RPM installation  | [docs/getting-started/rpm-installation.md](docs/getting-started/rpm-installation.md) |
-| Systemd installation     | [docs/getting-started/systemd.md](docs/getting-started/systemd.md)                   |
-| Configuration            | [docs/getting-started/configuration.md](docs/getting-started/configuration.md)       |
-| First login              | [docs/getting-started/first-login.md](docs/getting-started/first-login.md)           |
-| Groups and RBAC          | [docs/concepts/groups-and-rbac.md](docs/concepts/groups-and-rbac.md)                 |
-| Teams, rotations, routes | [docs/concepts/teams-rotations-routes.md](docs/concepts/teams-rotations-routes.md)   |
-| Route intake tokens      | [docs/concepts/route-intake-tokens.md](docs/concepts/route-intake-tokens.md)         |
-| Maintenance Windows      | [docs/concepts/maintenance-windows.md](docs/concepts/maintenance-windows.md)         |
-| Services                 | [docs/concepts/services.md](docs/concepts/services.md)                               |
-| Channels                 | [docs/concepts/channels.md](docs/concepts/channels.md)                               |
-| Alertmanager             | [docs/integrations/alertmanager.md](docs/integrations/alertmanager.md)               |
-| AWS SNS/Cloud watch      | [docs/integrations/aws-sns-cloudwatch.md](docs/integrations/aws-sns-cloudwatch.md)   |
-| Grafana                  | [docs/integrations/grafana.md](docs/integrations/grafana.md)                         |
-| RMON                     | [docs/integrations/rmon.md](docs/integrations/rmon.md)                               |
-| Sentry                   | [docs/integrations/sentry.md](docs/integrations/sentry.md)                           |
-| LibreNMS                 | [docs/integrations/librenms.md](docs/integrations/librenms.md)                       |
-| Zabbix                   | [docs/integrations/zabbix.md](docs/integrations/zabbix.md)                           |
-| Generic webhook          | [docs/integrations/generic-webhook.md](docs/integrations/generic-webhook.md)         |
-| Mattermost               | [docs/integrations/mattermost.md](docs/integrations/mattermost.md)                   |
-| Alerts                   | [docs/usage/alerts.md](docs/usage/alerts.md)                                         |
-| Browser push             | [docs/usage/browser-push.md](docs/usage/browser-push.md)                             |
-| Calendar                 | [docs/usage/calendar.md](docs/usage/calendar.md)                                     |
-| Silences                 | [docs/usage/silences.md](docs/usage/silences.md)                                     |
-| Rotation overrides       | [docs/usage/rotation-overrides.md](docs/usage/rotation-overrides.md)                 |
-| Profile and API tokens   | [docs/usage/profile-and-tokens.md](docs/usage/profile-and-tokens.md)                 |
-| Logging                  | [docs/administration/logging.md](docs/administration/logging.md)                     |
-| Troubleshooting          | [docs/administration/troubleshooting.md](docs/administration/troubleshooting.md)     |
-| Demo data                | [docs/administration/demo-data.md](docs/administration/demo-data.md)                 |
-| Schema check             | [docs/administration/schema-check.md](docs/administration/schema-check.md)           |
-| Custom voice providers   | [docs/voice-providers/index.md](docs/voice-providers/index.md)                       |
+| Area | Documentation |
+|---|---|
+| Getting started | [Getting started](docs/getting-started/index.md) |
+| Configuration | [Configuration](docs/getting-started/configuration.md) |
+| Groups and RBAC | [Groups and RBAC](docs/concepts/groups-and-rbac.md) |
+| Teams, rotations and routes | [Teams, rotations and routes](docs/concepts/teams-rotations-routes.md) |
+| Alerts and incidents | [Alerts](docs/usage/alerts.md) |
+| Event Orchestration | [Event Orchestration](docs/usage/event-orchestration.md) |
+| Explain Trace | [Explain Trace](docs/incidents/explain-trace.md) |
+| Incident priorities | [Priorities](docs/incidents/priorities.md) |
+| Responders / stakeholders | [Responders](docs/incidents/responders.md) / [Stakeholders](docs/incidents/stakeholders.md) |
+| Services | [Services](docs/concepts/services.md) |
+| Business Services | [Business Services](docs/concepts/business-services.md) |
+| Dependency correlation | [Alert correlation](docs/concepts/alert-correlation.md) |
+| Service SLI/SLO | [SLI/SLO](docs/services/service-sli-slo.md) |
+| Service standards | [Standards and events](docs/services/service-standards-and-events.md) |
+| Heartbeats | [Heartbeats](docs/concepts/heartbeats.md) |
+| Notification Policies | [Notification Policies](docs/services/notification-policies.md) |
+| Maintenance windows | [Maintenance Windows](docs/concepts/maintenance-windows.md) |
+| On-call calendar | [Calendar](docs/usage/calendar.md) |
+| Browser/PWA push | [Browser Push](docs/usage/browser-push.md) |
+| SSO | [OIDC and SAML](docs/administration/sso.md) |
+| Data retention | [Data retention](docs/administration/data-retention.md) |
+| Integrations | [Integrations](docs/integrations/index.md) |
+| Troubleshooting | [Troubleshooting](docs/administration/troubleshooting.md) |
 
 ---
 
-## Demo data
+## Demo and development checks
 
 Create demo data:
 
@@ -533,56 +448,16 @@ Create demo data:
 python manage.py demo-data
 ```
 
-The command creates demo groups, users, teams, rotations, channels, routes, and route intake tokens.
-
-Static demo-data check:
-
-```bash
-python app/check_demo_data.py
-```
-
-More details: [Demo data](docs/administration/demo-data.md)
-
----
-
-## Schema check
-
-After running migrations, verify that all Peewee model tables and columns exist in the configured database:
+After migrations, verify that the configured database matches the Peewee models:
 
 ```bash
 python app/check_schema.py
 ```
 
-Expected output:
-
-```text
-Schema check OK: all model tables and columns exist.
-```
-
-More details: [Schema check](docs/administration/schema-check.md)
-
----
-
-## Troubleshooting
-
-If an alert is not visible or not delivered:
-
-```text
-1. Check that the correct route intake token was used.
-2. Check that the endpoint matches the route source.
-3. Check that route matchers match alert labels.
-4. Check that the group is active.
-5. Check that the team is active.
-6. Check that the UI active group is correct.
-7. Select "All my groups" and reload the Alerts page.
-8. Check routing_error in the integration response.
-9. Check JSON logs by error_id if the server returned one.
-```
-
-More details: [Troubleshooting](docs/administration/troubleshooting.md)
+See [Demo data](docs/administration/demo-data.md), [Schema check](docs/administration/schema-check.md) and [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 
 ## License
 
-See [LICENSE](LICENSE).
+IncidentRelay is licensed under the [MIT License](LICENSE).

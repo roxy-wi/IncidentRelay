@@ -125,9 +125,7 @@ function refreshAlertCommentsAndEvents(groupId) {
 
     loadAlertComments(groupId);
 
-    apiGet("/api/alerts/" + groupId + "/events", function (events) {
-        renderEvents(events || [], alertDetailsModal());
-    });
+    loadAlertEventsPage(groupId, 1, false);
 }
 function renderAlertCommentActions(comment) {
     return $("<div>")

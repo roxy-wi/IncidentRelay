@@ -5,6 +5,20 @@ from pydantic import Field, field_validator
 from app.api.schemas.base import ApiModel
 
 
+class AlertEventListQuerySchema(ApiModel):
+    """Pagination for alert event history."""
+
+    page: int = Field(default=1, ge=1)
+    page_size: int = Field(default=50, ge=1, le=100)
+
+
+class AlertDetailQuerySchema(ApiModel):
+    """Optional event pagination embedded in alert-group details."""
+
+    events_page: int | None = Field(default=None, ge=1)
+    events_page_size: int | None = Field(default=None, ge=1, le=100)
+
+
 class AlertListQuerySchema(ApiModel):
     """Validate alert group list query parameters."""
 

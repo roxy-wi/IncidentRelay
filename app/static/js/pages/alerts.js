@@ -1,5 +1,6 @@
 let currentDetailsAlertId = null;
 let currentDetailsAlertCanRespond = false;
+const ALERT_EVENTS_PAGE_SIZE = 50;
 let currentDetailsActiveTab = "summary";
 let currentDetailsExplainLoadedAlertId = null;
 let currentDetailsExplainTraceId = null;
@@ -1505,7 +1506,10 @@ function loadAlertExplainForCurrentDetails() {
 function showAlertDetails(alertId) {
     currentDetailsAlertId = alertId;
 
-    apiGet("/api/alerts/" + alertId, function (alert) {
+    apiGet(
+        "/api/alerts/" + alertId
+        + "?events_page=1&events_page_size=" + ALERT_EVENTS_PAGE_SIZE,
+        function (alert) {
         const modal = alertDetailsModal();
 
         if (!modal.length) {
@@ -1535,7 +1539,12 @@ function showAlertDetails(alertId) {
         );
 
         renderAlertGroupChildren(alert.alerts || [], modal);
-        renderEvents(alert.events || [], modal);
+        renderEvents(
+            alert.events || [],
+            modal,
+            alert.events_pagination || null,
+            false
+        );
         renderNotifications(alert.notifications || [], modal);
         prepareAlertComments(alert, modal);
 
@@ -2522,14 +2531,44 @@ function alertEventTypeLabel(eventType) {
     return labels[eventType] || eventType || "-";
 }
 
-function renderEvents(events, modal) {
+function loadAlertEventsPage(groupId, page, append) {
+    if (!groupId) {
+        return;
+    }
+
+    apiGet(
+        "/api/alerts/" + groupId
+        + "/events?page=" + encodeURIComponent(page || 1)
+        + "&page_size=" + ALERT_EVENTS_PAGE_SIZE,
+        function (response) {
+            const items = Array.isArray(response)
+                ? response
+                : asArray(response && response.items);
+            const pagination = Array.isArray(response)
+                ? null
+                : (response && response.pagination) || null;
+
+            renderEvents(
+                items,
+                alertDetailsModal(),
+                pagination,
+                !!append
+            );
+        }
+    );
+}
+
+function renderEvents(events, modal, pagination, append) {
     const target = modal.find("#alert-details-events");
 
-    target.empty();
+    if (!append) {
+        target.empty();
+    }
+    target.find(".alert-events-load-more").remove();
 
     events = asArray(events);
 
-    if (!events.length) {
+    if (!events.length && !append) {
         target.append(
             $("<div>")
                 .addClass("help-text")
@@ -2561,6 +2600,23 @@ function renderEvents(events, modal) {
                 )
         );
     });
+
+    if (pagination && pagination.has_next) {
+        target.append(
+            $("<button>")
+                .attr("type", "button")
+                .addClass("btn btn-secondary btn-small alert-events-load-more")
+                .text(i18n.t("alert_details.events.load_older"))
+                .on("click", function () {
+                    $(this).prop("disabled", true);
+                    loadAlertEventsPage(
+                        currentDetailsAlertId,
+                        Number(pagination.page || 1) + 1,
+                        true
+                    );
+                })
+        );
+    }
 }
 
 function renderNotifications(notifications, modal) {

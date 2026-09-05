@@ -546,6 +546,10 @@ def alert_group_schema(include_details=False):
             "type": "array",
             "items": alert_event_schema(),
         }
+        properties["events_pagination"] = {
+            "type": "object",
+            "additionalProperties": True,
+        }
         properties["notifications"] = {
             "type": "array",
             "items": alert_notification_schema(),
@@ -890,6 +894,16 @@ def paths():
                 "security": bearer_security(),
                 "parameters": [
                     path_param("alert_id", "Alert group id."),
+                    query_param(
+                        "events_page",
+                        "Optional embedded event-history page. Supplying this or events_page_size enables bounded event history in the detail response.",
+                        {"type": "integer", "minimum": 1},
+                    ),
+                    query_param(
+                        "events_page_size",
+                        "Optional embedded event-history page size. Maximum 100.",
+                        {"type": "integer", "minimum": 1, "maximum": 100},
+                    ),
                 ],
                 "responses": {
                     "200": response(
@@ -1045,13 +1059,40 @@ def paths():
                 "security": bearer_security(),
                 "parameters": [
                     path_param("alert_id", "Alert group id."),
+                    query_param(
+                        "page",
+                        "Optional page number. Supplying page or page_size enables paginated object response.",
+                        {"type": "integer", "minimum": 1, "default": 1},
+                    ),
+                    query_param(
+                        "page_size",
+                        "Optional page size. Maximum 100.",
+                        {"type": "integer", "minimum": 1, "maximum": 100, "default": 50},
+                    ),
                 ],
                 "responses": {
                     "200": response(
-                        "Alert group event history.",
+                        "Alert group event history. Without pagination parameters the legacy array response is preserved.",
                         {
-                            "type": "array",
-                            "items": alert_event_schema(),
+                            "oneOf": [
+                                {
+                                    "type": "array",
+                                    "items": alert_event_schema(),
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "items": {
+                                            "type": "array",
+                                            "items": alert_event_schema(),
+                                        },
+                                        "pagination": {
+                                            "type": "object",
+                                            "additionalProperties": True,
+                                        },
+                                    },
+                                },
+                            ]
                         },
                     ),
                     "401": response("Authentication required."),

@@ -91,6 +91,8 @@ config:
   alerts:
     # Processing trace detail: full, compact or disabled. Global Event Orchestration may override it.
     explain_trace_level: full
+    # Incoming child-alert history: full, initial or disabled. Event Orchestration may override it.
+    event_history: full
     reminder_interval_seconds: 60
     alert_group_window_seconds: 3600
     alert_group_wait_seconds: 30

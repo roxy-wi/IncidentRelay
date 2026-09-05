@@ -321,5 +321,6 @@
   "alert_details.manual.select_team_error": "Sélectionnez une équipe.",
   "alert_details.manual.title_required": "Le titre de l’incident est requis.",
   "alert_details.manual.permission": "Vous n’avez pas l’autorisation de créer des incidents pour cette équipe.",
-  "alert_details.priority.current": "Actuelle : {value}"
+  "alert_details.priority.current": "Actuelle : {value}",
+  "alert_details.events.load_older": "Charger les événements plus anciens"
 }

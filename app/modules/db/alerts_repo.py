@@ -690,19 +690,55 @@ def increment_group_reminder(group, now):
     return group
 
 
-def list_group_events(group_id):
-    """Return group-level and child alert events."""
+def _group_events_query(group_id):
+    """Build the query shared by full and paginated event history reads."""
 
     alert_ids = Alert.select(Alert.id).where(Alert.group == group_id)
-
-    return list(
-        AlertEvent.select()
-        .where(
-            (AlertEvent.group == group_id)
-            | (AlertEvent.alert.in_(alert_ids))
-        )
-        .order_by(AlertEvent.id.asc())
+    return AlertEvent.select().where(
+        (AlertEvent.group == group_id)
+        | (AlertEvent.alert.in_(alert_ids))
     )
+
+
+def list_group_events(group_id):
+    """Return group-level and child alert events in legacy chronological order."""
+
+    return list(_group_events_query(group_id).order_by(AlertEvent.id.asc()))
+
+
+def paginate_group_events(group_id, page=1, page_size=50):
+    """Return one newest-first page of group and child alert events."""
+
+    page = normalize_alert_page(page)
+    page_size = normalize_alert_page_size(page_size)
+    query = _group_events_query(group_id)
+    total_items = query.count()
+    total_pages = max(1, int(ceil(total_items / float(page_size))))
+
+    if page > total_pages:
+        page = total_pages
+
+    items = list(
+        query
+        .order_by(AlertEvent.id.desc())
+        .paginate(page, page_size)
+    )
+    start_index = (page - 1) * page_size
+    end_index = start_index + len(items)
+
+    return {
+        "items": items,
+        "pagination": {
+            "page": page,
+            "page_size": page_size,
+            "total_items": total_items,
+            "total_pages": total_pages,
+            "from": start_index + 1 if total_items else 0,
+            "to": end_index if total_items else 0,
+            "has_prev": page > 1,
+            "has_next": page < total_pages,
+        },
+    }
 
 
 def merge_alert_groups(target_group_id, source_group_ids, user_id=None, reason=None):

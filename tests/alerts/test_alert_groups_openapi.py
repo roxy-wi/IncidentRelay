@@ -87,3 +87,25 @@ def test_openapi_alert_comment_schema_keeps_validation_constraints():
     assert properties["user"]["properties"]["email"]["format"] == "email"
     assert properties["alert_id"]["nullable"] is True
     assert "edited" in properties
+
+
+def test_openapi_alert_events_documents_optional_pagination():
+    spec = build_openapi_spec()
+    operation = spec["paths"]["/api/alerts/{alert_id}/events"]["get"]
+    parameters = {item["name"]: item for item in operation["parameters"]}
+
+    assert parameters["page"]["schema"]["minimum"] == 1
+    assert parameters["page_size"]["schema"]["maximum"] == 100
+    schema = _json_schema(operation)
+    assert len(schema["oneOf"]) == 2
+
+
+def test_openapi_alert_group_detail_exposes_event_pagination():
+    spec = build_openapi_spec()
+    operation = spec["paths"]["/api/alerts/{alert_id}"]["get"]
+    schema = _json_schema(operation)
+    parameters = {item["name"]: item for item in operation["parameters"]}
+
+    assert "events_pagination" in schema["properties"]
+    assert parameters["events_page"]["schema"]["minimum"] == 1
+    assert parameters["events_page_size"]["schema"]["maximum"] == 100

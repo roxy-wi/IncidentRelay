@@ -1,6 +1,6 @@
 # Event Orchestration v1
 
-**Status:** Proposed  
+**Status:** Done  
 **Target:** Production-ready first release  
 **Project:** IncidentRelay  
 **Document path:** `docs/architecture/event-orchestration-v1.md`

@@ -180,6 +180,19 @@ explain_trace_level = full
 
 Поддерживаются `full`, `compact` и `disabled`. `full` сохраняет текущее подробное поведение. `compact` сохраняет последовательность шагов обработки, но не записывает `input_summary`, payload результата и `data` отдельных шагов. `disabled` вообще не создаёт строки Alert Explain Trace. Глобальное правило Event Orchestration может переопределить значение для совпавших событий действием `set_trace_level`.
 
+## История событий алерта
+
+Историю входящих событий дочерних алертов можно настраивать независимо от самого lifecycle:
+
+```ini
+[alerts]
+event_history = full
+```
+
+Поддерживаются `full`, `initial` и `disabled`. `full` сохраняет входящие события `created`, `updated` и `resolved` дочерних алертов. `initial` сохраняет только первое событие `created`. `disabled` не сохраняет эти входящие history-записи. При этом обновление состояния алерта, grouping, notifications, escalation и resolution продолжают работать во всех режимах. Operational timeline — acknowledgement, comments, reminders, maintenance, correlations, responders и stakeholders — сохраняется всегда.
+
+Global и Service Event Orchestration могут переопределить значение для совпавших событий действием `set_alert_event_history`. Если несколько совпавших actions задают уровень, применяется последнее действие.
+
 
 ## Политика хранения данных
 

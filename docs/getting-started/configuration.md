@@ -179,6 +179,19 @@ explain_trace_level = full
 
 Supported values are `full`, `compact` and `disabled`. `full` preserves the existing detailed trace. `compact` keeps ordered processing steps but omits `input_summary`, result payloads and per-step `data`. `disabled` stores no Alert Explain Trace rows. A global Event Orchestration rule can override this value for matching events with the `set_trace_level` action.
 
+## Alert event history
+
+Incoming child-alert history can be controlled independently from alert lifecycle processing:
+
+```ini
+[alerts]
+event_history = full
+```
+
+Supported values are `full`, `initial` and `disabled`. `full` stores incoming child-alert `created`, `updated` and `resolved` events. `initial` stores only the initial child-alert `created` event. `disabled` stores none of those incoming child-alert history rows. Alert state updates, grouping, notifications, escalation and resolution continue normally in every mode. Operational incident timeline entries such as acknowledgements, comments, reminders, maintenance, correlations, responders and stakeholders are always preserved.
+
+Global and service Event Orchestration can override the configured default for matching events with `set_alert_event_history`. If several matching actions set a level, the last applied action wins.
+
 
 ## Data retention
 

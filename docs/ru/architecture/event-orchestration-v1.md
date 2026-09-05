@@ -1,6 +1,6 @@
 # Event Orchestration v1
 
-**Статус:** предложено  
+**Статус:** реализованно  
 **Цель:** первый релиз, готовый к промышленной эксплуатации  
 **Проект:** IncidentRelay  
 **Путь документа:** `docs/architecture/event-orchestration-v1.md`

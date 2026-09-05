@@ -786,3 +786,104 @@ def test_maybe_escalate_alert_records_notification_failure_after_transition(
         (AlertEvent.group == stored.id)
         & (AlertEvent.event_type == "escalation_notification_failed")
     ).exists()
+
+
+def test_event_history_initial_stores_only_incoming_creation(monkeypatch, db):
+    from app.settings import Config
+
+    group = create_group(slug="event-history-initial")
+    team = create_team(group, slug="event-history-team")
+    create_route(team, source="alertmanager")
+    monkeypatch.setattr(Config, "ALERT_EVENT_HISTORY", "initial", raising=False)
+
+    first = upsert_alert(normalized_alert(team_slug=team.slug, dedup_key="history-initial"))
+    upsert_alert(normalized_alert(
+        team_slug=team.slug,
+        dedup_key="history-initial",
+        message="updated payload",
+    ))
+
+    event_types = [
+        event.event_type
+        for event in AlertEvent.select()
+        .where(AlertEvent.alert == first.alert.id)
+        .order_by(AlertEvent.id.asc())
+    ]
+
+    assert event_types == ["created"]
+
+
+def test_event_history_disabled_preserves_operational_group_timeline(monkeypatch, db):
+    from app.settings import Config
+
+    group = create_group(slug="event-history-disabled")
+    team = create_team(group, slug="event-history-disabled-team")
+    create_route(team, source="alertmanager")
+    monkeypatch.setattr(Config, "ALERT_EVENT_HISTORY", "disabled", raising=False)
+
+    first = upsert_alert(normalized_alert(team_slug=team.slug, dedup_key="history-disabled"))
+    upsert_alert(normalized_alert(
+        team_slug=team.slug,
+        dedup_key="history-disabled",
+        message="updated payload",
+    ))
+
+    assert not AlertEvent.select().where(AlertEvent.alert == first.alert.id).exists()
+    assert AlertEvent.select().where(
+        (AlertEvent.group == first.group.id)
+        & (AlertEvent.alert.is_null(True))
+        & (AlertEvent.event_type == "created")
+    ).exists()
+
+
+def test_invalid_event_history_config_falls_back_to_full(monkeypatch, db):
+    from app.settings import Config
+
+    group = create_group(slug="event-history-invalid")
+    team = create_team(group, slug="event-history-invalid-team")
+    create_route(team, source="alertmanager")
+    monkeypatch.setattr(Config, "ALERT_EVENT_HISTORY", "unexpected", raising=False)
+
+    first = upsert_alert(normalized_alert(team_slug=team.slug, dedup_key="history-invalid"))
+    upsert_alert(normalized_alert(
+        team_slug=team.slug,
+        dedup_key="history-invalid",
+        message="updated payload",
+    ))
+
+    event_types = [
+        event.event_type
+        for event in AlertEvent.select()
+        .where(AlertEvent.alert == first.alert.id)
+        .order_by(AlertEvent.id.asc())
+    ]
+
+    assert event_types == ["created", "updated"]
+
+
+def test_paginate_group_events_returns_newest_first(db):
+    group = create_group(slug="event-pagination")
+    team = create_team(group, slug="event-pagination-team")
+    route = create_route(team, source="alertmanager")
+    alert_group = create_alert_group_for_route(
+        route,
+        dedup_key="event-pagination-alert",
+        external_id="event-pagination-alert",
+    )
+
+    for index in range(75):
+        alerts_repo.create_alert_event(
+            group_id=alert_group.id,
+            event_type="test_event",
+            message=f"event-{index}",
+        )
+
+    first = alerts_repo.paginate_group_events(alert_group.id, page=1, page_size=50)
+    second = alerts_repo.paginate_group_events(alert_group.id, page=2, page_size=50)
+
+    assert len(first["items"]) == 50
+    assert first["pagination"]["has_next"] is True
+    assert first["items"][0].id > first["items"][-1].id
+    assert len(second["items"]) >= 25
+    assert second["pagination"]["has_next"] is False
+    assert first["items"][-1].id > second["items"][0].id

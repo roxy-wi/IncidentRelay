@@ -545,3 +545,66 @@ def test_new_child_after_notification_schedules_group_interval_update(db, monkey
     assert alert_group.notification_reason == "update"
     assert alert_group.notification_due_at == first_notification_at + timedelta(seconds=300)
     assert alert_group.last_notification_at == first_notification_at
+
+
+def test_alert_event_endpoint_supports_paginated_response(client, admin_headers, db):
+    route = _route(group_by=["alertname", "severity"])
+    result = upsert_alert(_alert(route, "DiskFull", "host1"))
+    group = result.group
+
+    for index in range(60):
+        alerts_repo.create_alert_event(
+            group_id=group.id,
+            event_type="test_event",
+            message=f"event-{index}",
+        )
+
+    response = client.get(
+        f"/api/alerts/{group.id}/events?page=1&page_size=25",
+        headers=admin_headers,
+    )
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert len(payload["items"]) == 25
+    assert payload["pagination"]["page"] == 1
+    assert payload["pagination"]["page_size"] == 25
+    assert payload["pagination"]["has_next"] is True
+    assert payload["items"][0]["id"] > payload["items"][-1]["id"]
+
+
+def test_alert_event_endpoint_preserves_legacy_array_response(client, admin_headers, db):
+    route = _route(group_by=["alertname", "severity"])
+    result = upsert_alert(_alert(route, "DiskFull", "host1"))
+
+    response = client.get(
+        f"/api/alerts/{result.group.id}/events",
+        headers=admin_headers,
+    )
+
+    assert response.status_code == 200
+    assert isinstance(response.get_json(), list)
+
+
+def test_alert_group_details_bound_initial_event_history(client, admin_headers, db):
+    route = _route(group_by=["alertname", "severity"])
+    result = upsert_alert(_alert(route, "DiskFull", "host1"))
+    group = result.group
+
+    for index in range(60):
+        alerts_repo.create_alert_event(
+            group_id=group.id,
+            event_type="test_event",
+            message=f"event-{index}",
+        )
+
+    response = client.get(
+        f"/api/alerts/{group.id}?events_page=1&events_page_size=50",
+        headers=admin_headers,
+    )
+
+    assert response.status_code == 200
+    payload = response.get_json()
+    assert len(payload["events"]) == 50
+    assert payload["events_pagination"]["has_next"] is True
+    assert payload["events"][0]["id"] > payload["events"][-1]["id"]

@@ -321,5 +321,6 @@
   "alert_details.manual.select_team_error": "Выберите команду.",
   "alert_details.manual.title_required": "Укажите название инцидента.",
   "alert_details.manual.permission": "У вас нет права создавать инциденты для этой команды.",
-  "alert_details.priority.current": "Текущий: {value}"
+  "alert_details.priority.current": "Текущий: {value}",
+  "alert_details.events.load_older": "Загрузить более старые события"
 }

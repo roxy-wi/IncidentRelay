@@ -223,5 +223,6 @@
   "orchestrations.simulator.input_output_changes": "Input → result",
   "orchestrations.simulator.active_draft_changes": "Active → draft",
   "orchestrations.edit.title": "Edit event orchestration",
-  "orchestrations.edit.help": "Update metadata, scope and runtime settings."
+  "orchestrations.edit.help": "Update metadata, scope and runtime settings.",
+  "orchestrations.simulator.alert_event_history": "Alert event history"
 }
