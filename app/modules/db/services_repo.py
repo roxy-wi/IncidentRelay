@@ -1,9 +1,17 @@
 
 from app.modules.db.models import (
+    Alert,
+    AlertGroup,
+    AlertRoute,
+    BusinessServiceComponent,
+    EventOrchestration,
+    Heartbeat,
     Service,
+    ServiceChannel,
     ServiceDependency,
     ServiceLink,
     ServiceMatchRule,
+    ServiceReadinessState,
     ServiceRunbook,
     Team,
     ServiceOwner,
@@ -159,33 +167,130 @@ def update_service(service_id, data):
 
 
 def soft_delete_service(service_id):
-    """Soft-delete a service and service-owned routing helpers."""
+    """Soft-delete a service and stop service-owned operational state."""
+    from app.modules.db import orchestrations_repo
+    from app.modules.db.soft_delete_hardening import cancel_pending_orchestration_work
+
     service = get_service(service_id)
     now = utc_now()
+    database = Service._meta.database
 
-    service.enabled = False
-    service.deleted = True
-    service.deleted_at = now
-    service.updated_at = now
-    service.save()
+    with database.atomic():
+        # Prevent current incidents from silently inheriting configuration if
+        # this service row is restored later. Historical resolved incidents keep
+        # their original service reference.
+        Alert.update(service=None).where(
+            (Alert.service == service.id)
+            & (Alert.status != "resolved")
+        ).execute()
+        AlertGroup.update(service=None, updated_at=now).where(
+            (AlertGroup.service == service.id)
+            & (~AlertGroup.status.in_(("resolved", "merged")))
+        ).execute()
+        AlertRoute.update(service=None).where(AlertRoute.service == service.id).execute()
+        Heartbeat.update(service=None, updated_at=now).where(
+            Heartbeat.service == service.id
+        ).execute()
 
-    ServiceMatchRule.update(
-        deleted=True,
-        enabled=False,
-        updated_at=now,
-    ).where(
-        (ServiceMatchRule.service == service.id)
-        & (ServiceMatchRule.deleted == False)
-    ).execute()
+        ServiceMatchRule.update(
+            deleted=True,
+            deleted_at=now,
+            enabled=False,
+            updated_at=now,
+        ).where(
+            (ServiceMatchRule.service == service.id)
+            & (ServiceMatchRule.deleted == False)  # noqa: E712
+        ).execute()
+        ServiceRunbook.update(
+            deleted=True,
+            deleted_at=now,
+            enabled=False,
+            updated_at=now,
+        ).where(
+            (ServiceRunbook.service == service.id)
+            & (ServiceRunbook.deleted == False)  # noqa: E712
+        ).execute()
+        ServiceLink.update(
+            deleted=True,
+            deleted_at=now,
+            enabled=False,
+            updated_at=now,
+        ).where(
+            (ServiceLink.service == service.id)
+            & (ServiceLink.deleted == False)  # noqa: E712
+        ).execute()
+        ServiceDependency.update(
+            deleted=True,
+            deleted_at=now,
+            enabled=False,
+            updated_at=now,
+        ).where(
+            (
+                (ServiceDependency.service == service.id)
+                | (ServiceDependency.depends_on_service == service.id)
+            )
+            & (ServiceDependency.deleted == False)  # noqa: E712
+        ).execute()
+        # Active/derived state must be rebuilt explicitly after a restore.
+        ServiceChannel.delete().where(ServiceChannel.service == service.id).execute()
+        ServiceReadinessState.delete().where(
+            ServiceReadinessState.service == service.id
+        ).execute()
+        ServiceOwner.update(active=False).where(ServiceOwner.service == service.id).execute()
+        ServiceSlo.update(
+            deleted=True,
+            deleted_at=now,
+            enabled=False,
+            updated_at=now,
+        ).where(
+            (ServiceSlo.service == service.id)
+            & (ServiceSlo.deleted == False)  # noqa: E712
+        ).execute()
+        ServiceSli.update(
+            deleted=True,
+            deleted_at=now,
+            enabled=False,
+            updated_at=now,
+        ).where(
+            (ServiceSli.service == service.id)
+            & (ServiceSli.deleted == False)  # noqa: E712
+        ).execute()
+        BusinessServiceComponent.update(
+            deleted=True,
+            deleted_at=now,
+            enabled=False,
+            updated_at=now,
+        ).where(
+            (BusinessServiceComponent.service == service.id)
+            & (BusinessServiceComponent.deleted == False)  # noqa: E712
+        ).execute()
 
-    ServiceRunbook.update(
-        deleted=True,
-        enabled=False,
-        updated_at=now,
-    ).where(
-        (ServiceRunbook.service == service.id)
-        & (ServiceRunbook.deleted == False)
-    ).execute()
+        orchestration_ids = [
+            row.id for row in EventOrchestration.select(EventOrchestration.id).where(
+                (EventOrchestration.service == service.id)
+                & (EventOrchestration.deleted == False)  # noqa: E712
+            )
+        ]
+        for orchestration_id in orchestration_ids:
+            orchestrations_repo.archive_orchestration(orchestration_id)
+
+        orchestrations_repo.revoke_intake_tokens_for_scope(
+            service_id=service.id,
+            now=now,
+        )
+
+        cancel_pending_orchestration_work(
+            service_id=service.id,
+            orchestration_ids=orchestration_ids,
+            now=now,
+            reason="service_deleted",
+        )
+
+        service.enabled = False
+        service.deleted = True
+        service.deleted_at = now
+        service.updated_at = now
+        service.save()
 
     return service
 
@@ -573,9 +678,27 @@ def get_service_dependency(dependency_id):
 
 
 def create_service_dependency(service_id, data):
-    """Create a service dependency."""
+    """Create or restore a service dependency."""
+    data = dict(data)
+    target_id = data["depends_on_service"]
+    existing = ServiceDependency.get_or_none(
+        (ServiceDependency.service == service_id)
+        & (ServiceDependency.depends_on_service == target_id)
+    )
+    now = utc_now()
+    if existing is not None and existing.deleted:
+        for field, value in data.items():
+            setattr(existing, field, value)
+        existing.service = service_id
+        existing.deleted = False
+        existing.deleted_at = None
+        existing.enabled = data.get("enabled", True)
+        existing.updated_at = now
+        existing.save()
+        return existing
+
     data["service"] = service_id
-    data["updated_at"] = utc_now()
+    data["updated_at"] = now
     return ServiceDependency.create(**data)
 
 
@@ -641,7 +764,11 @@ def list_service_owners(service_id, active_only=True):
     )
 
     if active_only:
-        query = query.where(ServiceOwner.active == True)  # noqa: E712
+        query = query.where(
+            (ServiceOwner.active == True)  # noqa: E712
+            & (User.active == True)  # noqa: E712
+            & (User.deleted == False)  # noqa: E712
+        )
 
     return list(query)
 
@@ -670,7 +797,9 @@ def find_service_owner(service_id, user_id, role):
 
 def create_service_owner(service_id, data):
     """Create or reactivate a service owner."""
-    User.get_by_id(data["user"])
+    user = User.get_by_id(data["user"])
+    if user.deleted or not user.active:
+        raise ValueError("Service owner user is inactive or deleted")
 
     existing = find_service_owner(
         service_id,
@@ -780,10 +909,26 @@ def get_service_sli(sli_id):
 
 
 def create_service_sli(service_id, data):
-    """Create a Service Level Indicator."""
+    """Create or restore a Service Level Indicator."""
     data = dict(data)
+    existing = ServiceSli.get_or_none(
+        (ServiceSli.service == service_id)
+        & (ServiceSli.slug == data["slug"])
+    )
+    now = utc_now()
+    if existing is not None and existing.deleted:
+        for field, value in data.items():
+            setattr(existing, field, value)
+        existing.service = service_id
+        existing.enabled = data.get("enabled", True)
+        existing.deleted = False
+        existing.deleted_at = None
+        existing.updated_at = now
+        existing.save()
+        return existing
+
     data["service"] = service_id
-    data["updated_at"] = utc_now()
+    data["updated_at"] = now
     return ServiceSli.create(**data)
 
 
@@ -853,10 +998,26 @@ def get_service_slo(slo_id):
 
 
 def create_service_slo(service_id, data):
-    """Create a Service Level Objective."""
+    """Create or restore a Service Level Objective."""
     data = dict(data)
+    existing = ServiceSlo.get_or_none(
+        (ServiceSlo.service == service_id)
+        & (ServiceSlo.name == data["name"])
+    )
+    now = utc_now()
+    if existing is not None and existing.deleted:
+        for field, value in data.items():
+            setattr(existing, field, value)
+        existing.service = service_id
+        existing.enabled = data.get("enabled", True)
+        existing.deleted = False
+        existing.deleted_at = None
+        existing.updated_at = now
+        existing.save()
+        return existing
+
     data["service"] = service_id
-    data["updated_at"] = utc_now()
+    data["updated_at"] = now
     return ServiceSlo.create(**data)
 
 

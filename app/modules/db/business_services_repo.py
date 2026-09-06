@@ -52,8 +52,11 @@ def _active_component_service_ids():
     return Service.select(Service.id).where(Service.deleted == False)  # noqa: E712
 
 
-def get_business_service(business_service_id):
-    return BusinessService.get_by_id(business_service_id)
+def get_business_service(business_service_id, *, include_deleted=False):
+    query = BusinessService.select().where(BusinessService.id == business_service_id)
+    if not include_deleted:
+        query = query.where(BusinessService.deleted == False)  # noqa: E712
+    return query.get()
 
 
 def get_business_service_or_none(business_service_id):
@@ -92,6 +95,22 @@ def list_business_services(group_id=None, public_only=False, active_only=True):
 def create_business_service(data):
     data = dict(data)
     now = utc_now()
+    existing = BusinessService.get_or_none(
+        (BusinessService.group == data["group"])
+        & (BusinessService.slug == data["slug"])
+    )
+    if existing is not None and existing.deleted:
+        for field, value in data.items():
+            setattr(existing, field, value)
+        existing.status = data.get("status", "unknown")
+        existing.status_source = data.get("status_source", "calculated")
+        existing.enabled = data.get("enabled", True)
+        existing.deleted = False
+        existing.deleted_at = None
+        existing.updated_at = now
+        existing.save()
+        return existing
+
     data.setdefault("status", "unknown")
     data.setdefault("status_source", "calculated")
     data.setdefault("created_at", now)
@@ -193,6 +212,21 @@ def list_components_for_service(service_id, active_only=True):
 def create_business_service_component(business_service_id, data):
     data = dict(data)
     now = utc_now()
+    existing = BusinessServiceComponent.get_or_none(
+        (BusinessServiceComponent.business_service == business_service_id)
+        & (BusinessServiceComponent.service == data["service"])
+    )
+    if existing is not None and existing.deleted:
+        for field, value in data.items():
+            setattr(existing, field, value)
+        existing.business_service = business_service_id
+        existing.enabled = data.get("enabled", True)
+        existing.deleted = False
+        existing.deleted_at = None
+        existing.updated_at = now
+        existing.save()
+        return existing
+
     data["business_service"] = business_service_id
     data.setdefault("created_at", now)
     data["updated_at"] = now

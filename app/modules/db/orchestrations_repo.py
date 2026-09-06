@@ -196,6 +196,25 @@ def create_orchestration(
                 ["referenced service belongs to another group"]
             )
 
+    existing = EventOrchestration.get_or_none(
+        (EventOrchestration.group == group_id)
+        & (EventOrchestration.name == name)
+    )
+    if existing is not None and existing.deleted:
+        existing.description = description
+        existing.scope = scope
+        existing.service = service_id
+        existing.enabled = False
+        existing.mode = "disabled"
+        existing.compatibility_mode = compatibility_mode
+        existing.active_version_id = None
+        existing.created_by = created_by_id
+        existing.deleted = False
+        existing.deleted_at = None
+        existing.updated_at = utc_now()
+        existing.save()
+        return existing
+
     try:
         return EventOrchestration.create(
             group=group_id,
@@ -996,6 +1015,13 @@ def archive_orchestration(orchestration_id: int) -> EventOrchestration:
             (OrchestrationIntakeToken.orchestration == orchestration.id)
             & (OrchestrationIntakeToken.enabled == True)  # noqa: E712
         ).execute()
+
+        from app.modules.db.soft_delete_hardening import cancel_pending_orchestration_work
+        cancel_pending_orchestration_work(
+            orchestration_ids=[orchestration.id],
+            now=now,
+            reason="orchestration_deleted",
+        )
     return EventOrchestration.get_by_id(orchestration_id)
 
 
@@ -1026,12 +1052,26 @@ def create_intake_token(
 
 
 def authenticate_intake_token(plaintext: str) -> Optional[OrchestrationIntakeToken]:
+    """Authenticate an intake token only for a live orchestration.
+
+    The parent check is intentionally defensive: installations upgraded from
+    versions that did not revoke intake tokens during every soft-delete path
+    may contain an enabled token whose orchestration is already deleted.
+    """
     if not plaintext:
         return None
-    token = OrchestrationIntakeToken.get_or_none(
-        (OrchestrationIntakeToken.token_hash == hash_token(plaintext))
-        & (OrchestrationIntakeToken.enabled == True)  # noqa: E712
-        & OrchestrationIntakeToken.revoked_at.is_null(True)
+    token = (
+        OrchestrationIntakeToken
+        .select(OrchestrationIntakeToken, EventOrchestration)
+        .join(EventOrchestration)
+        .where(
+            (OrchestrationIntakeToken.token_hash == hash_token(plaintext))
+            & (OrchestrationIntakeToken.enabled == True)  # noqa: E712
+            & OrchestrationIntakeToken.revoked_at.is_null(True)
+            & (EventOrchestration.deleted == False)  # noqa: E712
+            & EventOrchestration.deleted_at.is_null(True)
+        )
+        .first()
     )
     if token is None:
         return None
@@ -1039,6 +1079,37 @@ def authenticate_intake_token(plaintext: str) -> Optional[OrchestrationIntakeTok
         OrchestrationIntakeToken.id == token.id
     ).execute()
     return token
+
+
+def revoke_intake_tokens_for_scope(*, group_id=None, service_id=None, now=None) -> int:
+    """Revoke every intake token owned by the selected orchestration scope.
+
+    Unlike ``archive_orchestration`` this also covers already soft-deleted
+    orchestrations, repairing legacy rows that may still carry an enabled
+    credential.
+    """
+    if group_id is None and service_id is None:
+        return 0
+
+    query = EventOrchestration.select(EventOrchestration.id)
+    if group_id is not None:
+        query = query.where(EventOrchestration.group == int(group_id))
+    if service_id is not None:
+        query = query.where(EventOrchestration.service == int(service_id))
+
+    now = now or utc_now()
+    return (
+        OrchestrationIntakeToken
+        .update(enabled=False, revoked_at=now)
+        .where(
+            OrchestrationIntakeToken.orchestration.in_(query)
+            & (
+                (OrchestrationIntakeToken.enabled == True)  # noqa: E712
+                | OrchestrationIntakeToken.revoked_at.is_null(True)
+            )
+        )
+        .execute()
+    )
 
 
 def revoke_intake_token(token_id: int) -> OrchestrationIntakeToken:

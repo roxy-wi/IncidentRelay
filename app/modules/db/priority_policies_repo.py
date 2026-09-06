@@ -223,6 +223,10 @@ def soft_delete_priority_policy(policy_id):
             rule.updated_at = now
             rule.save()
 
+        Service.update(priority_policy=None, updated_at=now).where(
+            Service.priority_policy == policy.id
+        ).execute()
+
         policy.enabled = False
         policy.default_for_team = False
         policy.deleted = True

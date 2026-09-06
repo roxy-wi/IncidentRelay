@@ -9,6 +9,7 @@ from app.modules.db.models import (
 )
 from app.modules.db.orchestrations_repo import (
     OrchestrationValidationError,
+    authenticate_intake_token,
     canonical_json,
     create_intake_token,
     create_orchestration,
@@ -17,6 +18,7 @@ from app.modules.db.orchestrations_repo import (
     publish_draft,
     replace_draft_rules,
     revoke_intake_token,
+    revoke_intake_tokens_for_scope,
     rollback_to_version,
     validate_version,
 )
@@ -265,6 +267,27 @@ def test_new_orchestration_is_disabled_and_preserves_legacy_behavior(db):
     assert orchestration.mode == "disabled"
     assert orchestration.compatibility_mode == "legacy"
     assert orchestration.active_version_id is None
+
+
+def test_legacy_intake_token_for_deleted_orchestration_is_rejected_and_revoked(db):
+    group, user, _, _, orchestration = _fixture()
+    token, plaintext = create_intake_token(
+        orchestration.id,
+        name="Legacy token",
+        actor_id=user.id,
+    )
+
+    EventOrchestration.update(deleted=True).where(
+        EventOrchestration.id == orchestration.id
+    ).execute()
+
+    assert authenticate_intake_token(plaintext) is None
+    assert OrchestrationIntakeToken.get_by_id(token.id).enabled is True
+
+    assert revoke_intake_tokens_for_scope(group_id=group.id) == 1
+    token = OrchestrationIntakeToken.get_by_id(token.id)
+    assert token.enabled is False
+    assert token.revoked_at is not None
 
 
 def test_intake_token_is_returned_once_and_can_be_revoked(db):

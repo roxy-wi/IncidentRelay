@@ -12,6 +12,7 @@ from app.modules.db.models import (
     AlertGroupMerge,
     AlertRoute,
     AlertComment,
+    Group,
     Rotation,
     Service,
     Team,
@@ -666,13 +667,19 @@ def resolve_alert_group(group_id, user_id=None):
 
 
 def list_firing_alert_groups():
-    """Return groups for reminder/escalation processing."""
-
+    """Return firing groups whose owning team/group is still active."""
     return list(
-        AlertGroup.select()
+        AlertGroup
+        .select(AlertGroup)
+        .join(Team, on=(AlertGroup.team == Team.id))
+        .join(Group, on=(Team.group == Group.id))
         .where(
             (AlertGroup.status == "firing")
             & (AlertGroup.merged_into.is_null(True))
+            & (Team.active == True)  # noqa: E712
+            & (Team.deleted == False)  # noqa: E712
+            & (Group.active == True)  # noqa: E712
+            & (Group.deleted == False)  # noqa: E712
         )
     )
 

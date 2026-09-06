@@ -8,6 +8,7 @@ from app.api.schemas.sso import (
     SsoGroupMappingCreateSchema,
     SsoProviderCreateSchema,
 )
+from app.modules.db import users_repo
 from app.modules.db.models import (
     SsoGroupMapping,
     SsoIdentity,
@@ -570,6 +571,71 @@ def test_complete_sso_login_auto_creates_user_and_links_identity():
     assert user.active is True
     assert identity.user.id == user.id
 
+
+
+def test_complete_sso_login_restores_soft_deleted_linked_user():
+    provider = make_oidc_provider(
+        slug="restore-deleted-user",
+        auto_create_users=True,
+        auto_link_by_email=True,
+        allowed_domains=["example.com"],
+    )
+    claims = {
+        "sub": "restore-subject",
+        "email": "restore-user@example.com",
+        "email_verified": True,
+        "preferred_username": "restore-user",
+        "name": "Restore User",
+        "groups": [],
+    }
+
+    original = complete_sso_login(provider, claims)
+    identity = SsoIdentity.get(
+        (SsoIdentity.provider == provider.id)
+        & (SsoIdentity.subject == claims["sub"])
+    )
+
+    users_repo.soft_delete_user(original.id)
+    deleted = User.get_by_id(original.id)
+    assert deleted.deleted is True
+    assert deleted.active is False
+
+    restored = complete_sso_login(provider, claims)
+
+    assert restored.id == original.id
+    assert restored.deleted is False
+    assert restored.deleted_at is None
+    assert restored.active is True
+    assert restored.is_admin is False
+    assert SsoIdentity.get_by_id(identity.id).user_id == restored.id
+
+
+def test_complete_sso_login_does_not_reactivate_manually_disabled_user():
+    provider = make_oidc_provider(
+        slug="disabled-user",
+        auto_create_users=True,
+        allowed_domains=["example.com"],
+    )
+    claims = {
+        "sub": "disabled-subject",
+        "email": "disabled-user@example.com",
+        "email_verified": True,
+        "preferred_username": "disabled-user",
+        "name": "Disabled User",
+        "groups": [],
+    }
+
+    user = complete_sso_login(provider, claims)
+    user.active = False
+    user.save()
+
+    with pytest.raises(SsoLoginError) as exc:
+        complete_sso_login(provider, claims)
+
+    assert exc.value.error == "sso_user_disabled"
+    current = User.get_by_id(user.id)
+    assert current.deleted is False
+    assert current.active is False
 
 def test_complete_sso_login_auto_links_existing_user_by_email():
     provider = make_oidc_provider(

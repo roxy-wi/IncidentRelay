@@ -10,6 +10,7 @@ from app.modules.db.models import (
     AlertGroup,
     BrowserPushActionToken,
     BrowserPushSubscription,
+    User,
 )
 from app.db import database_proxy as db
 from app.services.audit import write_audit
@@ -182,6 +183,13 @@ def has_active_user_subscriptions(user_id):
     if not user_id:
         return False
 
+    if not User.select(User.id).where(
+        (User.id == user_id)
+        & (User.active == True)  # noqa: E712
+        & (User.deleted == False)  # noqa: E712
+    ).exists():
+        return False
+
     return (
         BrowserPushSubscription
         .select(BrowserPushSubscription.id)
@@ -230,6 +238,8 @@ def build_alert_push_payload(group, user, event_type="notification"):
 
 def send_alert_push_to_user(user, group, event_type="notification"):
     if not Config.BROWSER_PUSH_ENABLED:
+        return 0
+    if not user or user.deleted or not user.active:
         return 0
 
     subscriptions = _active_user_subscriptions(user.id)

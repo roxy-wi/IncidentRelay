@@ -5,6 +5,7 @@ from peewee import fn
 
 from app.modules.db.models import (
     ApiToken,
+    SsoIdentity,
     RotationLayerMember,
     RotationMember,
     RotationOverride,
@@ -14,6 +15,7 @@ from app.modules.db.models import (
     UserRole,
 )
 from app.modules.common import utc_now
+from app.modules.db.soft_delete_hardening import deactivate_user_runtime
 
 
 DEFAULT_USERS_PAGE_SIZE = 25
@@ -213,21 +215,67 @@ def get_user(user_id, include_deleted=False):
     return query.get()
 
 
+def restore_user(user_id, *, preserve_sso_identity_id=None, **kwargs):
+    """Restore one soft-deleted user row as a fresh active account.
+
+    Access grants removed during deletion are intentionally not restored. Old
+    SSO identities are also removed unless the caller explicitly preserves the
+    identity that authenticated the current SSO login.
+    """
+    user = get_user(user_id, include_deleted=True)
+    if not user.deleted:
+        return user
+
+    database = User._meta.database
+    with database.atomic():
+        identities = SsoIdentity.delete().where(SsoIdentity.user == user.id)
+        if preserve_sso_identity_id is not None:
+            identities = identities.where(SsoIdentity.id != preserve_sso_identity_id)
+        identities.execute()
+
+        for field, value in kwargs.items():
+            if hasattr(User, field):
+                setattr(user, field, value)
+
+        user.active = bool(kwargs.get("active", True))
+        user.deleted = False
+        user.deleted_at = None
+        user.active_group = None
+        user.save()
+
+    return user
+
+
+def restore_user_for_sso(user_id, *, identity_id):
+    """Restore a deleted SSO-linked account without reviving old access."""
+    return restore_user(
+        user_id,
+        preserve_sso_identity_id=identity_id,
+        active=True,
+        is_admin=False,
+        password_hash=None,
+    )
+
+
 def create_user(**kwargs):
-    """
-    Create a user.
-    """
+    """Create a user or restore a deleted row occupying the username."""
+    username = kwargs.get("username")
+    if username:
+        existing = User.get_or_none(User.username == username)
+        if existing is not None and existing.deleted:
+            return restore_user(existing.id, **kwargs)
 
     return User.create(**kwargs)
 
 
 def create_user_if_missing(username, **kwargs):
-    """
-    Create a user if it does not exist.
-    """
-
-    user, _ = User.get_or_create(username=username, defaults=kwargs)
-    return user
+    """Create, restore, or return a user with the requested username."""
+    existing = User.get_or_none(User.username == username)
+    if existing is not None:
+        if existing.deleted:
+            return restore_user(existing.id, username=username, **kwargs)
+        return existing
+    return create_user(username=username, **kwargs)
 
 
 def update_user(user_id, data):
@@ -297,8 +345,8 @@ def soft_delete_user(user_id):
         RotationLayerMember.delete().where(RotationLayerMember.user == user.id).execute()
         RotationOverride.delete().where(RotationOverride.user == user.id).execute()
         RotationMember.delete().where(RotationMember.user == user.id).execute()
-        RotationOverride.delete().where(RotationOverride.user == user.id).execute()
         UserRole.delete().where(UserRole.user == user.id).execute()
+        deactivate_user_runtime(user.id, now=now)
         ApiToken.update(
             active=False,
             deleted=True,
@@ -309,6 +357,7 @@ def soft_delete_user(user_id):
         ).execute()
 
         user.active = False
+        user.is_admin = False
         user.deleted = True
         user.deleted_at = now
         user.active_group = None

@@ -206,6 +206,29 @@ def _find_user_by_email(email):
     return matches[0] if matches else None
 
 
+def _find_deleted_user_by_email(email):
+    """Find one soft-deleted local user by email for safe SSO restore."""
+    if not email:
+        return None
+
+    matches = list(
+        User
+        .select()
+        .where(
+            (User.email == email)
+            & (User.deleted == True)  # noqa: E712
+        )
+        .limit(2)
+    )
+    if len(matches) > 1:
+        raise SsoLoginError(
+            "sso_email_ambiguous",
+            "More than one deleted local user has this email address",
+            409,
+        )
+    return matches[0] if matches else None
+
+
 def _get_subject(provider, claims):
     """Return stable external subject for provider."""
     subject_claim = provider.subject_claim
@@ -243,7 +266,27 @@ def _resolve_sso_user(provider, claims):
 
     if identity:
         user = identity.user
-        if not user or user.deleted or not user.active:
+        if not user:
+            raise SsoLoginError(
+                "sso_user_disabled",
+                "Linked local user is disabled",
+                403,
+            )
+
+        if user.deleted:
+            if not provider.auto_create_users:
+                raise SsoLoginError(
+                    "sso_user_disabled",
+                    "Linked local user is disabled",
+                    403,
+                )
+            user = users_repo.restore_user_for_sso(
+                user.id,
+                identity_id=identity.id,
+            )
+        elif not user.active:
+            # Explicit administrative disable is different from soft deletion
+            # and must never be overridden by SSO auto-create.
             raise SsoLoginError(
                 "sso_user_disabled",
                 "Linked local user is disabled",
@@ -262,12 +305,21 @@ def _resolve_sso_user(provider, claims):
 
     if provider.auto_link_by_email and email:
         user = _find_user_by_email(email)
-        if user and (user.deleted or not user.active):
+        if user and not user.active:
             raise SsoLoginError(
                 "sso_user_disabled",
                 "Local user with this email is disabled",
                 403,
             )
+        if not user and provider.auto_create_users:
+            deleted_user = _find_deleted_user_by_email(email)
+            if deleted_user is not None:
+                user = users_repo.restore_user(
+                    deleted_user.id,
+                    active=True,
+                    is_admin=False,
+                    password_hash=None,
+                )
 
     if not user:
         if not provider.auto_create_users:
@@ -352,6 +404,10 @@ def _sync_team_membership_from_mapping(user, mapping):
     if not team_id:
         return
 
+    team = teams_repo.get_team(team_id)
+    if not team.active:
+        return
+
     teams_repo.add_user_to_team(
         team_id=team_id,
         user_id=user.id,
@@ -379,6 +435,22 @@ def _sync_group_memberships(user, provider, claims):
         )
         .order_by(SsoGroupMapping.priority.asc(), SsoGroupMapping.id.asc())
     )
+    # Defensive filtering for installations that contain legacy active mappings
+    # pointing at scopes deleted before cascade hardening was introduced.
+    mappings = [
+        mapping for mapping in mappings
+        if mapping.incidentrelay_group
+        and mapping.incidentrelay_group.active
+        and not mapping.incidentrelay_group.deleted
+        and (
+            not mapping.incidentrelay_team_id
+            or (
+                mapping.incidentrelay_team
+                and mapping.incidentrelay_team.active
+                and not mapping.incidentrelay_team.deleted
+            )
+        )
+    ]
 
     if not mappings:
         user, _active_group_ids = ensure_user_active_group(user)

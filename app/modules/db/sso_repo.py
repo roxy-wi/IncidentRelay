@@ -123,11 +123,24 @@ def _find_provider_by_slug(slug: str, exclude_id: int | None = None) -> SsoProvi
 
 
 def create_provider(data):
-    """Create an SSO provider."""
-    existing_provider = _find_provider_by_slug(data["slug"])
+    """Create or restore an SSO provider by global slug."""
+    existing_provider = SsoProvider.get_or_none(SsoProvider.slug == data["slug"])
 
-    if existing_provider:
+    if existing_provider and not existing_provider.deleted:
         raise ValueError("SSO provider with this slug already exists")
+
+    if existing_provider and existing_provider.deleted:
+        # Provider recreation is a new trust relationship. Never revive old
+        # external identity links automatically. Group mappings stay disabled
+        # by the delete path and may be reviewed/re-enabled explicitly.
+        SsoIdentity.delete().where(SsoIdentity.provider == existing_provider.id).execute()
+        _apply_provider_data(existing_provider, data, update_secret=True)
+        existing_provider.deleted = False
+        existing_provider.deleted_at = None
+        existing_provider.enabled = data.get("enabled", True)
+        existing_provider.updated_at = utc_now()
+        existing_provider.save()
+        return existing_provider
 
     provider = SsoProvider()
     _apply_provider_data(provider, data, update_secret=True)
@@ -204,7 +217,21 @@ def _validate_group_mapping_team(data):
     if not team_id:
         return None
 
-    team = Team.get_by_id(team_id)
+    team = Team.get_or_none(
+        (Team.id == team_id)
+        & (Team.active == True)  # noqa: E712
+        & (Team.deleted == False)  # noqa: E712
+    )
+    if team is None:
+        raise ValueError("team_id must reference an active team")
+
+    group = Group.get_or_none(
+        (Group.id == data["group_id"])
+        & (Group.active == True)  # noqa: E712
+        & (Group.deleted == False)  # noqa: E712
+    )
+    if group is None:
+        raise ValueError("group_id must reference an active group")
 
     if int(team.group_id) != int(data["group_id"]):
         raise ValueError("team_id must belong to the selected IncidentRelay group")

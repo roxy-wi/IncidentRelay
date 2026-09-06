@@ -149,6 +149,27 @@ def create_webhook_action(
         issues = validate_template(body_template, path="body_template")
         if issues:
             raise WebhookValidationError(issues[0].message)
+    existing = OrchestrationWebhookAction.get_or_none(
+        (OrchestrationWebhookAction.group == group_id)
+        & (OrchestrationWebhookAction.name == name)
+    )
+    if existing is not None and existing.deleted:
+        existing.description = description
+        existing.url = url
+        existing.method = method
+        existing.headers_encrypted = encrypt_json(headers) if headers else None
+        existing.body_template = body_template
+        existing.timeout_seconds = int(timeout_seconds)
+        existing.retry_count = int(retry_count)
+        existing.private_network_policy = private_network_policy
+        existing.enabled = bool(enabled)
+        existing.created_by = actor_id
+        existing.deleted = False
+        existing.deleted_at = None
+        existing.updated_at = utc_now()
+        existing.save()
+        return existing
+
     return OrchestrationWebhookAction.create(
         group=group_id,
         name=name,
@@ -163,6 +184,26 @@ def create_webhook_action(
         enabled=bool(enabled),
         created_by=actor_id,
     )
+
+
+def soft_delete_webhook_action(action_id: int) -> OrchestrationWebhookAction:
+    """Soft-delete an action and cancel queued executions for it."""
+    action = OrchestrationWebhookAction.get_by_id(action_id)
+    now = utc_now()
+    action.enabled = False
+    action.deleted = True
+    action.deleted_at = now
+    action.updated_at = now
+    action.save()
+
+    from app.modules.db.soft_delete_hardening import cancel_pending_orchestration_work
+    cancel_pending_orchestration_work(
+        group_id=action.group_id,
+        action_ids=[action.id],
+        now=now,
+        reason="webhook_action_deleted",
+    )
+    return action
 
 
 def update_webhook_action(action_id: int, **changes) -> OrchestrationWebhookAction:

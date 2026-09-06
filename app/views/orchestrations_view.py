@@ -803,12 +803,7 @@ def delete_webhook_action(action_id):
     _, error = _require_group_permission(action.group_id, MANAGE_ACTIONS)
     if error:
         return error
-    action.enabled = False
-    action.deleted = True
-    from app.modules.common import utc_now
-
-    action.deleted_at = utc_now()
-    action.save()
+    action = webhooks.soft_delete_webhook_action(action.id)
     write_audit(
         "event_orchestration.webhook_action_delete",
         object_type="orchestration_webhook_action",
