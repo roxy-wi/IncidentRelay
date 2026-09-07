@@ -507,6 +507,11 @@ function openExistingSsoProviderModal(provider) {
   $("#sso-phone-claim").val(provider.phone_claim || "mobile");
   $("#sso-allowed-domains").val((provider.allowed_domains || []).join(", "));
 
+  const profileClaimMappings = provider.profile_claim_mappings || {};
+  $("#sso-slack-user-id-claim").val(profileClaimMappings.slack_user_id || "");
+  $("#sso-telegram-user-id-claim").val(profileClaimMappings.telegram_user_id || "");
+  $("#sso-mattermost-user-id-claim").val(profileClaimMappings.mattermost_user_id || "");
+
   $("#sso-auto-create-users").prop("checked", !!provider.auto_create_users);
   $("#sso-auto-link-by-email").prop("checked", !!provider.auto_link_by_email);
   $("#sso-require-verified-email").prop("checked", !!provider.require_verified_email);
@@ -562,6 +567,9 @@ function resetSsoProviderForm() {
   $("#sso-groups-claim").val("groups");
   $("#sso-phone-claim").val("mobile");
   $("#sso-allowed-domains").val("");
+  $("#sso-slack-user-id-claim").val("");
+  $("#sso-telegram-user-id-claim").val("");
+  $("#sso-mattermost-user-id-claim").val("");
 
   $("#sso-auto-create-users").prop("checked", false);
   $("#sso-auto-link-by-email").prop("checked", true);
@@ -608,6 +616,18 @@ function collectSsoProviderPayload() {
       })
       .filter(Boolean);
 
+  const profileClaimMappings = {};
+  [
+    ["slack_user_id", "#sso-slack-user-id-claim"],
+    ["telegram_user_id", "#sso-telegram-user-id-claim"],
+    ["mattermost_user_id", "#sso-mattermost-user-id-claim"],
+  ].forEach(function (entry) {
+    const claimName = ($(entry[1]).val() || "").trim();
+    if (claimName) {
+      profileClaimMappings[entry[0]] = claimName;
+    }
+  });
+
   const payload = {
     slug: $("#sso-provider-slug").val().trim(),
     label: $("#sso-provider-label").val().trim(),
@@ -622,6 +642,7 @@ function collectSsoProviderPayload() {
     phone_claim: $("#sso-phone-claim").val().trim() || "mobile",
 
     allowed_domains: domains.length ? domains : null,
+    profile_claim_mappings: Object.keys(profileClaimMappings).length ? profileClaimMappings : null,
 
     auto_create_users: $("#sso-auto-create-users").is(":checked"),
     auto_link_by_email: $("#sso-auto-link-by-email").is(":checked"),

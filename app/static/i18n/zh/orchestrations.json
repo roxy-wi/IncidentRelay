@@ -223,5 +223,6 @@
   "orchestrations.simulator.input_output_changes": "输入 → 结果",
   "orchestrations.simulator.active_draft_changes": "生效版本 → 草稿",
   "orchestrations.edit.title": "编辑事件编排",
-  "orchestrations.edit.help": "更新元数据、作用域和运行配置。"
+  "orchestrations.edit.help": "更新元数据、作用域和运行配置。",
+  "orchestrations.simulator.alert_event_history": "告警事件历史"
 }

@@ -49,7 +49,7 @@ def test_profile_updates_and_renders_chinese_locale(
 def test_profile_rejects_unsupported_locale_and_theme(client, auth_headers):
     locale_response = client.put(
         "/api/profile",
-        json={"locale": "es"},
+        json={"locale": "it"},
         headers=auth_headers,
     )
     theme_response = client.put(

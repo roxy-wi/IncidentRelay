@@ -13,6 +13,13 @@ from app.api.schemas.limits import normalize_phone
 from app.modules.common import utc_now
 
 
+SSO_PROFILE_CLAIM_TARGETS = (
+    "slack_user_id",
+    "telegram_user_id",
+    "mattermost_user_id",
+)
+
+
 class SsoLoginError(Exception):
     """SSO login error safe to return to API clients."""
 
@@ -380,6 +387,16 @@ def _fill_missing_user_fields(user, provider, claims):
         except ValueError:
             phone = None
         update_data["phone"] = phone
+
+    profile_claim_mappings = provider.profile_claim_mappings or {}
+    for target_field in SSO_PROFILE_CLAIM_TARGETS:
+        if getattr(user, target_field, None):
+            continue
+
+        claim_name = profile_claim_mappings.get(target_field)
+        claim_value = _claim_to_string(extract_claim(claims, claim_name))
+        if claim_value:
+            update_data[target_field] = claim_value
 
     if update_data:
         user = users_repo.update_user(user.id, update_data)

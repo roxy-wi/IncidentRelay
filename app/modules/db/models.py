@@ -2445,6 +2445,7 @@ class SsoProvider(SoftDeleteModel):
     phone_claim = CharField(default="mobile")
 
     allowed_domains = JSONTextField(null=True)
+    profile_claim_mappings = JSONTextField(null=True)
 
     auto_create_users = BooleanField(default=False)
     auto_link_by_email = BooleanField(default=True)

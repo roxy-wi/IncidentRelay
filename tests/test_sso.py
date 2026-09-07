@@ -203,6 +203,35 @@ def test_admin_can_create_oidc_provider(app):
     assert decrypt_secret(provider.client_secret_encrypted) == "secret-1"
 
 
+def test_admin_can_create_provider_with_profile_claim_mappings(app):
+    admin = make_admin()
+    mappings = {
+        "slack_user_id": "messaging.slack_id",
+        "telegram_user_id": "telegram_id",
+        "mattermost_user_id": "mattermost_id",
+    }
+
+    with app.test_request_context(
+        "/api/admin/sso/providers",
+        method="POST",
+        json=provider_payload(
+            slug="profile-claims",
+            profile_claim_mappings=mappings,
+        ),
+    ):
+        from flask import request
+
+        request.current_user = admin
+        response, status = create_provider()
+
+    data = response.get_json()
+    provider = SsoProvider.get_by_id(data["id"])
+
+    assert status == 201
+    assert data["profile_claim_mappings"] == mappings
+    assert provider.profile_claim_mappings == mappings
+
+
 def test_admin_can_create_saml_provider(app):
     admin = make_admin()
 
@@ -540,6 +569,32 @@ def test_sso_provider_schema_rejects_unknown_protocol():
         )
 
 
+def test_sso_provider_schema_rejects_unknown_profile_claim_target():
+    with pytest.raises(ValidationError):
+        SsoProviderCreateSchema.model_validate(
+            provider_payload(
+                slug="bad-profile-claim",
+                profile_claim_mappings={"email": "custom_email"},
+            )
+        )
+
+
+def test_sso_provider_schema_normalizes_profile_claim_names():
+    payload = SsoProviderCreateSchema.model_validate(
+        provider_payload(
+            slug="normalized-profile-claim",
+            profile_claim_mappings={
+                "slack_user_id": "  messaging.slack_id  ",
+                "telegram_user_id": "   ",
+            },
+        )
+    )
+
+    assert payload.profile_claim_mappings == {
+        "slack_user_id": "messaging.slack_id",
+    }
+
+
 def test_complete_sso_login_auto_creates_user_and_links_identity():
     provider = make_oidc_provider(
         slug="auto-create",
@@ -571,6 +626,83 @@ def test_complete_sso_login_auto_creates_user_and_links_identity():
     assert user.active is True
     assert identity.user.id == user.id
 
+
+def test_complete_sso_login_fills_empty_profile_ids_from_claim_mappings():
+    provider = make_oidc_provider(
+        slug="profile-claim-login",
+        auto_create_users=True,
+        sync_group_memberships=False,
+        profile_claim_mappings={
+            "slack_user_id": "messaging.slack_id",
+            "telegram_user_id": "telegram_id",
+            "mattermost_user_id": "mattermost_id",
+        },
+    )
+
+    user = complete_sso_login(
+        provider,
+        {
+            "sub": "profile-claim-user",
+            "email": "profile-claim-user@example.com",
+            "email_verified": True,
+            "preferred_username": "profile-claim-user",
+            "name": "Profile Claim User",
+            "messaging": {"slack_id": "U0123456789"},
+            "telegram_id": "123456789",
+            "mattermost_id": "mattermost-user-id",
+        },
+    )
+
+    assert user.slack_user_id == "U0123456789"
+    assert user.telegram_user_id == "123456789"
+    assert user.mattermost_user_id == "mattermost-user-id"
+
+
+def test_complete_sso_login_does_not_overwrite_manual_profile_ids():
+    provider = make_oidc_provider(
+        slug="profile-claim-preserve",
+        auto_create_users=False,
+        sync_group_memberships=False,
+        profile_claim_mappings={
+            "slack_user_id": "slack_id",
+            "telegram_user_id": "telegram_id",
+            "mattermost_user_id": "mattermost_id",
+        },
+    )
+    user = create_user(
+        username=unique("profile-claim-manual"),
+        email="profile-claim-manual@example.com",
+    )
+    user.slack_user_id = "manual-slack"
+    user.telegram_user_id = "manual-telegram"
+    user.mattermost_user_id = "manual-mattermost"
+    user.save()
+    SsoIdentity.create(
+        provider=provider.id,
+        user=user.id,
+        subject="profile-claim-manual-subject",
+        email=user.email,
+        username=user.username,
+        raw_claims={},
+    )
+
+    logged_in_user = complete_sso_login(
+        provider,
+        {
+            "sub": "profile-claim-manual-subject",
+            "email": user.email,
+            "email_verified": True,
+            "preferred_username": user.username,
+            "name": user.display_name,
+            "slack_id": "sso-slack",
+            "telegram_id": "sso-telegram",
+            "mattermost_id": "sso-mattermost",
+        },
+    )
+
+    assert logged_in_user.slack_user_id == "manual-slack"
+    assert logged_in_user.telegram_user_id == "manual-telegram"
+    assert logged_in_user.mattermost_user_id == "manual-mattermost"
 
 
 def test_complete_sso_login_restores_soft_deleted_linked_user():

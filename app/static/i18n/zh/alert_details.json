@@ -321,5 +321,6 @@
   "alert_details.manual.select_team_error": "请选择团队。",
   "alert_details.manual.title_required": "必须填写事件标题。",
   "alert_details.manual.permission": "你没有为此团队创建事件的权限。",
-  "alert_details.priority.current": "当前：{value}"
+  "alert_details.priority.current": "当前：{value}",
+  "alert_details.events.load_older": "加载更早的事件"
 }

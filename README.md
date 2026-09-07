@@ -460,4 +460,8 @@ See [Demo data](docs/administration/demo-data.md), [Schema check](docs/administr
 
 ## License
 
-IncidentRelay is licensed under the [MIT License](LICENSE).
+IncidentRelay is source-available under the [Elastic License 2.0](LICENSE) (`Elastic-2.0`). Self-hosted and internal use is available subject to ELv2. Offering IncidentRelay, or a service exposing a substantial set of its functionality, to third parties as a hosted or managed service requires rights permitted by ELv2 or a separate commercial license.
+
+See [LICENSING.md](LICENSING.md) for usage examples and [COMMERCIAL_LICENSE.md](COMMERCIAL_LICENSE.md) for commercial licensing. Contributions are subject to [CLA.md](CLA.md).
+
+Historical versions and copies previously released under MIT remain licensed under the MIT License that accompanied those versions.

@@ -10,7 +10,7 @@ from app.i18n import (
 )
 
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 
 
 def create_test_app():
@@ -91,7 +91,7 @@ def test_unsupported_language_falls_back_to_english():
 
     with app.test_request_context(
         "/",
-        headers={"Accept-Language": "it-IT,es;q=0.9"},
+        headers={"Accept-Language": "it-IT,pt-BR;q=0.9"},
     ):
         assert get_current_locale() == DEFAULT_LOCALE
 

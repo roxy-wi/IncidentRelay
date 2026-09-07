@@ -19,6 +19,42 @@ SSO_MAPPING_ROLES = {
 }
 
 SSO_PROTOCOL_PATTERN = r"^(oidc|saml)$"
+SSO_PROFILE_CLAIM_FIELDS = frozenset({
+    "slack_user_id",
+    "telegram_user_id",
+    "mattermost_user_id",
+})
+
+
+def _normalize_profile_claim_mappings(value):
+    if value is None:
+        return None
+
+    if not isinstance(value, dict):
+        raise ValueError("profile_claim_mappings must be an object")
+
+    result = {}
+    for target_field, claim_name in value.items():
+        if target_field not in SSO_PROFILE_CLAIM_FIELDS:
+            raise ValueError(
+                "profile_claim_mappings supports only slack_user_id, "
+                "telegram_user_id and mattermost_user_id"
+            )
+
+        if claim_name is None:
+            continue
+        if not isinstance(claim_name, str):
+            raise ValueError("profile claim names must be strings")
+
+        claim_name = claim_name.strip()
+        if not claim_name:
+            continue
+        if len(claim_name) > 128:
+            raise ValueError("profile claim names must be at most 128 characters")
+
+        result[target_field] = claim_name
+
+    return result or None
 
 
 class SsoProviderBaseSchema(ApiModel):
@@ -41,6 +77,7 @@ class SsoProviderBaseSchema(ApiModel):
     phone_claim: str = Field(default="mobile", min_length=1, max_length=20)
 
     allowed_domains: list[str] | None = None
+    profile_claim_mappings: dict[str, str] | None = None
 
     auto_create_users: bool = False
     auto_link_by_email: bool = True
@@ -94,6 +131,11 @@ class SsoProviderBaseSchema(ApiModel):
 
         return result or None
 
+    @field_validator("profile_claim_mappings", mode="before")
+    @classmethod
+    def normalize_profile_claim_mappings(cls, value):
+        return _normalize_profile_claim_mappings(value)
+
 
 class SsoProviderCreateSchema(SsoProviderBaseSchema):
     """Create SSO provider."""
@@ -117,6 +159,7 @@ class SsoProviderUpdateSchema(ApiModel):
     phone_claim: str | None = Field(default=None, min_length=1, max_length=20)
 
     allowed_domains: list[str] | None = None
+    profile_claim_mappings: dict[str, str] | None = None
 
     auto_create_users: bool | None = None
     auto_link_by_email: bool | None = None
@@ -165,6 +208,11 @@ class SsoProviderUpdateSchema(ApiModel):
                 result.append(domain)
 
         return result or None
+
+    @field_validator("profile_claim_mappings", mode="before")
+    @classmethod
+    def normalize_profile_claim_mappings(cls, value):
+        return _normalize_profile_claim_mappings(value)
 
 
 class SsoGroupMappingCreateSchema(ApiModel):

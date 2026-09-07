@@ -6,7 +6,7 @@ from pathlib import Path
 from app.i18n import SUPPORTED_LOCALES
 
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 CATALOG_ROOT = ROOT / "app" / "static" / "i18n"
 PLACEHOLDER_RE = re.compile(r"\{[A-Za-z0-9_]+\}")
 SRE_ABBREVIATION_RE = re.compile(

@@ -223,5 +223,6 @@
   "orchestrations.simulator.input_output_changes": "Entrada → resultado",
   "orchestrations.simulator.active_draft_changes": "Activa → borrador",
   "orchestrations.edit.title": "Editar orquestación de eventos",
-  "orchestrations.edit.help": "Actualiza metadatos, ámbito y configuración de runtime."
+  "orchestrations.edit.help": "Actualiza metadatos, ámbito y configuración de runtime.",
+  "orchestrations.simulator.alert_event_history": "Historial de eventos de alerta"
 }

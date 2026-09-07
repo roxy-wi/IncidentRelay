@@ -321,5 +321,6 @@
   "alert_details.manual.select_team_error": "Selecciona un equipo.",
   "alert_details.manual.title_required": "El título del incidente es obligatorio.",
   "alert_details.manual.permission": "No tienes permiso para crear incidentes para este equipo.",
-  "alert_details.priority.current": "Actual: {value}"
+  "alert_details.priority.current": "Actual: {value}",
+  "alert_details.events.load_older": "Cargar eventos anteriores"
 }

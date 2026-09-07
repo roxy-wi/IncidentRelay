@@ -17,6 +17,7 @@ PROVIDER_FIELDS = [
     "groups_claim",
     "phone_claim",
     "allowed_domains",
+    "profile_claim_mappings",
     "auto_create_users",
     "auto_link_by_email",
     "require_verified_email",
