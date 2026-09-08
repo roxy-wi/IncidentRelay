@@ -126,8 +126,8 @@ BROWSER_PUSH_ACTION_REQUEST_SCHEMA = {
         },
         "action": {
             "type": "string",
-            "enum": ["ack", "resolve"],
-            "description": "Alert action requested from the notification button.",
+            "enum": ["ack", "resolve", "shelve", "unshelve"],
+            "description": "Alert action requested from the notification button. Shelve uses the one-hour preset.",
             "example": "ack",
         },
     },
@@ -141,10 +141,24 @@ BROWSER_PUSH_ACTION_RESPONSE_SCHEMA = {
         "action": {
             "type": "string",
             "nullable": True,
-            "enum": ["ack", "resolve"],
+            "enum": ["ack", "resolve", "shelve", "unshelve"],
             "example": "ack",
         },
         "alert_id": {"type": "integer", "nullable": True, "example": 123},
+        "alert_group_id": {"type": "integer", "nullable": True, "example": 123},
+        "action_tokens": {
+            "type": "object",
+            "description": (
+                "Optional follow-up one-time action tokens. A successful Shelve "
+                "returns Unshelve and Resolve tokens so the confirmation "
+                "notification remains actionable during the one-hour shelf."
+            ),
+            "additionalProperties": {"type": "string"},
+            "example": {
+                "unshelve": "one-time-unshelve-token",
+                "resolve": "one-time-resolve-token",
+            },
+        },
         "status": {
             "type": "string",
             "nullable": True,
@@ -156,8 +170,8 @@ BROWSER_PUSH_ACTION_RESPONSE_SCHEMA = {
             "nullable": True,
             "description": (
                 "Error code when ok=false. Possible values include invalid_action, "
-                "missing_token, invalid_token, token_already_used, token_expired "
-                "and action_mismatch."
+                "missing_token, invalid_token, token_already_used, token_expired, "
+                "action_mismatch and action_not_authorized."
             ),
             "example": "token_expired",
         },
@@ -289,7 +303,7 @@ def paths():
                 "tags": ["browser-push"],
                 "summary": "Execute browser push alert action",
                 "description": (
-                    "Executes ACK or Resolve from a browser push notification button. "
+                    "Executes ACK, Resolve, Shelve or Unshelve from a browser push notification button. "
                     "This endpoint is intentionally public and authenticates the action "
                     "using a one-time action token embedded into the notification payload. "
                     "It does not require a JWT or personal API token."

@@ -4,6 +4,7 @@ from datetime import timedelta
 from app import Config
 from app.modules.db import alerts_repo
 from app.services.notifications.delivery import notify_alert
+from app.services.alerts.shelving import is_alert_group_shelved
 from app.services.alerts.maintenance_state import (
     is_notification_lifecycle_suppressed,
     pause_notification_lifecycle,
@@ -26,6 +27,14 @@ def schedule_group_notification(group, reason="notification", now=None):
     """Schedule group notification according to group_wait/group_interval."""
 
     now = now or utc_now()
+
+    if is_alert_group_shelved(group, now=now):
+        alerts_repo.clear_alert_group_notification(group)
+        if group.next_escalation_at is not None:
+            group.next_escalation_at = None
+            group.updated_at = now
+            group.save()
+        return group
 
     if is_notification_lifecycle_suppressed(group, now=now):
         pause_notification_lifecycle(group)
@@ -83,6 +92,11 @@ def process_due_alert_group_notifications(limit=100):
                 continue
 
             group = alerts_repo.recalculate_alert_group(group)
+
+            if is_alert_group_shelved(group, now=now):
+                alerts_repo.clear_alert_group_notification(group)
+                skipped += 1
+                continue
 
             if is_notification_lifecycle_suppressed(group, now=now):
                 pause_notification_lifecycle(group)

@@ -74,7 +74,7 @@ Adding an existing user to a group changes the group boundary and is global-admi
 | Role | UI label | Purpose |
 |---|---|---|
 | `viewer` | Team Viewer | Can see team resources and alerts |
-| `responder` | Team Responder | Can see team resources and acknowledge or resolve alerts |
+| `responder` | Team Responder | Can see team resources and acknowledge, resolve or temporarily shelve alerts |
 | `manager` | Team Manager | Can manage team resources, team users, channels, routes, rotations and silences |
 
 A group `editor` does not automatically become manager of every team in the group. Team write access requires the `manager` team role.

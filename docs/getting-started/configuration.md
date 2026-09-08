@@ -193,6 +193,18 @@ Supported values are `full`, `initial` and `disabled`. `full` stores incoming ch
 Global and service Event Orchestration can override the configured default for matching events with `set_alert_event_history`. If several matching actions set a level, the last applied action wins.
 
 
+## Alert shelving scheduler
+
+Timed AlertGroup shelves are expired by the scheduler:
+
+```ini
+[alerts]
+shelve_lifecycle_check_interval_seconds = 30
+shelve_lifecycle_batch_size = 100
+```
+
+`check_interval_seconds` controls how often due shelves are reconciled. `batch_size` bounds one scheduler pass. Keep the scheduler service running whenever timed shelving is used. Shelving pauses notifications, reminders and escalation but does not change the AlertGroup technical status or service/business impact. See [Alert shelving](../usage/shelving.md).
+
 ## Data retention
 
 IncidentRelay 2.1 keeps retention settings in one section:
@@ -280,7 +292,7 @@ action_token_ttl_seconds = 900
 | `vapid_public_key` | Public VAPID key returned to the browser for `PushManager.subscribe()` |
 | `vapid_private_key` | Private VAPID key or PEM file path used by the server to send Web Push messages |
 | `vapid_subject` | Contact URI included in VAPID claims, usually `mailto:admin@example.com` |
-| `action_token_ttl_seconds` | Lifetime of one-time ACK/Resolve tokens embedded into push notifications |
+| `action_token_ttl_seconds` | Lifetime of one-time ACK/Resolve/Shelve/Unshelve tokens embedded into push notifications |
 
 After changing browser push settings, restart the web service. Restart the scheduler too if it sends notifications in your installation.
 

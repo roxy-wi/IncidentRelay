@@ -18,6 +18,7 @@ from app.services.alerts.maintenance_state import (
     should_apply_window_to_group,
 )
 from app.services.alerts.notification_queue import schedule_group_notification
+from app.services.alerts.shelving import clear_shelve_on_resolve
 from app.services.alerts.priority import (
     apply_priority_resolution_to_group,
     apply_priority_to_existing_alert,
@@ -534,6 +535,9 @@ def _handle_existing_alert(
         group,
         priority_state_before_recalculate,
     )
+
+    if group.status == "resolved":
+        clear_shelve_on_resolve(group.id)
 
     if not created_group:
         group = apply_priority_resolution_to_group(

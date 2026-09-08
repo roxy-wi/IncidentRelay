@@ -15,7 +15,8 @@ It provides:
 - route-based alert intake tokens;
 - Alertmanager, Zabbix and generic webhook intake;
 - Mattermost, Telegram, email, webhook-based and voice call notification channels;
-- ACK and Resolve workflows;
+- ACK, Resolve and Alert Shelving workflows;
+- temporary per-AlertGroup shelving with automatic expiry and resume;
 - reminders and escalation;
 - silences and rotation overrides;
 - calendar view;
@@ -25,7 +26,7 @@ It provides:
 ## Core workflow
 
 ```text
-Monitoring system -> Route -> Service -> Team -> Rotation -> Notification channels -> ACK / Resolve
+Monitoring system -> Route -> Service -> Team -> Rotation -> Notification channels -> ACK / Resolve / Shelve
 ```
 
 Routes decide how alerts enter IncidentRelay. Services describe what logical system is affected.

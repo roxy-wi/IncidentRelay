@@ -8,6 +8,7 @@ from app.services.serializers.rotations import serialize_rotation_short, seriali
 from app.services.serializers.services import serialize_service_short, serialize_maintenance_window_occurrence
 from app.services.serializers.teams import serialize_team_short
 from app.services.serializers.users import serialize_user_short
+from app.services.alerts.shelving import serialize_shelve_state
 
 
 def extract_alert_event_link(alert):
@@ -507,6 +508,7 @@ def serialize_alert_group(
     route = group.route if getattr(group, "route_id", None) else None
     rotation = group.rotation if getattr(group, "rotation_id", None) else None
     service = group.service if getattr(group, "service_id", None) else None
+    shelf_state = serialize_shelve_state(group)
 
     data = {
         "id": group.id,
@@ -537,6 +539,8 @@ def serialize_alert_group(
         "status": group.status,
         "previous_status": group.previous_status,
         "silenced": bool(group.silenced),
+        "shelve": shelf_state,
+        "shelved": bool(shelf_state),
 
         "common_labels": group.common_labels or {},
         "label_values": group.label_values or {},

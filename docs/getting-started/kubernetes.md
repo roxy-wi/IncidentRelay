@@ -265,7 +265,7 @@ telegram:
   enabled: true
 ```
 
-The Slack worker holds the Socket Mode WebSocket that carries interactive `Acknowledge` and `Resolve` buttons. Slack messages themselves are sent by the web component, so without this worker notifications still arrive — only their buttons do nothing:
+The Slack worker holds the Socket Mode WebSocket that carries interactive `Acknowledge`, `Resolve`, `Shelve 1h` and `Unshelve` buttons. Slack messages themselves are sent by the web component, so without this worker notifications still arrive — only their buttons do nothing:
 
 ```yaml
 slack:

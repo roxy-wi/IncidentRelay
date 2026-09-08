@@ -15,6 +15,7 @@ from app.services.severity import normalize_severity, normalize_severity_list
 from app.modules.db import alerts_repo
 from app.modules.common import utc_now
 from app.services.alerts.maintenance_state import is_notification_lifecycle_suppressed
+from app.services.alerts.shelving import is_alert_group_shelved
 
 
 logger = logging.getLogger("oncall.notification_rules")
@@ -75,7 +76,7 @@ def should_skip_delivery_for_group_status(delivery):
 
     group = AlertGroup.get_by_id(delivery.group_id)
 
-    if is_notification_lifecycle_suppressed(group):
+    if is_notification_lifecycle_suppressed(group) or is_alert_group_shelved(group):
         return True
 
     return group.status != "firing"
@@ -306,7 +307,10 @@ def enqueue_user_notifications(group, event_type="notification"):
 
     if (
         event_type in SKIP_IF_NOT_FIRING_EVENT_TYPES
-        and is_notification_lifecycle_suppressed(group)
+        and (
+            is_notification_lifecycle_suppressed(group)
+            or is_alert_group_shelved(group)
+        )
     ):
         return 0
 

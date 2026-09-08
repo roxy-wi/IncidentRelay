@@ -5,9 +5,11 @@ from app.api.schemas.alerts import (
     AlertDetailQuerySchema,
     AlertEventListQuerySchema,
     AlertListQuerySchema,
+    AlertShelveSchema,
 )
 from app.modules.db import alerts_repo, notifications_repo
 from app.services.alerts.actions import acknowledge_alert, resolve_alert
+from app.services.alerts.shelving import shelve_alert_group, unshelve_alert_group
 from app.services.audit import write_audit
 from app.services.rbac import get_allowed_team_ids, require_team_read, require_team_respond
 from app.services.serializers.alerts import (
@@ -33,6 +35,7 @@ from app.services.incidents.responders import (
 from app.services.validation import (
     make_error_response,
     safe_exception_response,
+    validate_body,
     validate_query,
 )
 
@@ -124,6 +127,7 @@ def list_alerts():
         service_criticality=payload.service_criticality,
         search=payload.search,
         assigned_to_user_id=assigned_to_user_id,
+        shelved=payload.shelved,
         page=payload.page,
         page_size=payload.page_size,
         sort=payload.sort,
@@ -240,6 +244,53 @@ def resolve_alert_view(alert_id):
             current_user=_request_user(),
         )
     )
+
+
+@alerts_bp.route("/<int:alert_id>/shelve", methods=["POST"])
+def shelve_alert_view(alert_id):
+    """Temporarily shelve one AlertGroup without changing technical status."""
+    group_before, error = _require_alert_group_respond(alert_id)
+    if error:
+        return error
+
+    payload, error = validate_body(AlertShelveSchema)
+    if error:
+        return error
+
+    user_id = getattr(_request_user(), "id", None)
+    try:
+        group, _shelf = shelve_alert_group(
+            alert_id,
+            user_id=user_id,
+            duration_seconds=payload.duration_seconds,
+            reason=payload.reason,
+            source="ui",
+        )
+    except ValueError as exc:
+        return safe_exception_response(
+            exc,
+            error="validation_error",
+            message="Alert group could not be shelved.",
+            status_code=400,
+        )
+
+    return jsonify(serialize_alert_group(group, current_user=_request_user()))
+
+
+@alerts_bp.route("/<int:alert_id>/unshelve", methods=["POST"])
+def unshelve_alert_view(alert_id):
+    """End the current AlertGroup shelf and restart current-state delivery."""
+    _group_before, error = _require_alert_group_respond(alert_id)
+    if error:
+        return error
+
+    user_id = getattr(_request_user(), "id", None)
+    group, _shelf = unshelve_alert_group(
+        alert_id,
+        user_id=user_id,
+        source="ui",
+    )
+    return jsonify(serialize_alert_group(group, current_user=_request_user()))
 
 
 @alerts_bp.route("/<int:alert_id>/events", methods=["GET"])

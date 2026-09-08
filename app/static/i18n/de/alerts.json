@@ -89,5 +89,7 @@
   "alerts.summary.reminders_hint": "Wiederholte Meldungen",
   "alerts.summary.show_all": "Alle Warnmeldungen anzeigen",
   "alerts.summary.total": "Ausschreibungen insgesamt",
-  "alerts.summary.total_hint": "Aktuelle Auswahl"
+  "alerts.summary.total_hint": "Aktuelle Auswahl",
+  "alerts.status.shelved": "Zurückgestellt",
+  "alerts.filters.shelved_only": "Nur zurückgestellte"
 }

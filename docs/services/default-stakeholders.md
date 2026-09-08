@@ -74,7 +74,7 @@ Stakeholder notifications are sent through:
 - email, when the stakeholder has an email address
 - browser push, when the stakeholder is an active IncidentRelay user with browser push enabled
 
-Browser push notifications for stakeholders are informational. They do not include acknowledge or resolve action buttons.
+Browser push notifications for stakeholders are informational. They do not include acknowledge, resolve, shelve or unshelve action buttons.
 
 External stakeholders without an IncidentRelay user account can receive email notifications only.
 

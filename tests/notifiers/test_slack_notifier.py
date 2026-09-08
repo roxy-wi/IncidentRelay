@@ -388,12 +388,17 @@ def test_slack_buttons_contain_alert_context():
 
     buttons = actions_block["elements"]
 
-    assert len(buttons) == 2
+    assert len(buttons) == 3
 
     acknowledge_button = next(
         button
         for button in buttons
         if button["action_id"] == "incidentrelay_acknowledge"
+    )
+    shelve_button = next(
+        button
+        for button in buttons
+        if button["action_id"] == "incidentrelay_shelve"
     )
     resolve_button = next(
         button
@@ -404,12 +409,20 @@ def test_slack_buttons_contain_alert_context():
     acknowledge_context = json.loads(
         acknowledge_button["value"]
     )
+    shelve_context = json.loads(
+        shelve_button["value"]
+    )
     resolve_context = json.loads(
         resolve_button["value"]
     )
 
     assert acknowledge_context == {
         "action": "acknowledge",
+        "alert_id": 345,
+        "channel_id": 12,
+    }
+    assert shelve_context == {
+        "action": "shelve",
         "alert_id": 345,
         "channel_id": 12,
     }

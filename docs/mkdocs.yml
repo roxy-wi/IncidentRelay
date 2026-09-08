@@ -49,6 +49,7 @@ nav:
       - Incident Stakeholders: incidents/stakeholders.md
       - Alert Comments: usage/alert-comments.md
       - Silences: usage/silences.md
+      - Alert Shelving: usage/shelving.md
       - Maintenance Windows: concepts/maintenance-windows.md
   - Services:
       - Overview: services/index.md

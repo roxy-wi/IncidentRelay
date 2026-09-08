@@ -41,10 +41,10 @@ Monitoring system -> Incoming integration -> Route -> Notification channels -> U
 
 | Тип канала      | Назначение                                                                     | Документация                                  |
 |-----------------|--------------------------------------------------------------------------------|-----------------------------------------------|
-| Mattermost      | Уведомления в чате, опциональные кнопки ACK/Resolve, обновления сообщений       | [Канал Mattermost](mattermost.md)             |
+| Mattermost      | Уведомления в чате, опциональные кнопки ACK/Resolve/Shelve, обновления сообщений       | [Канал Mattermost](mattermost.md)             |
 | Telegram        | Уведомления через Telegram Bot API, опциональные inline-действия                | [Канал Telegram](telegram.md)                 |
 | Email           | Отправляет письмо на email из профиля назначенного пользователя                 | [Канал Email](email.md)                       |
-| Slack           | Уведомления через входящий webhook или Bot API с действиями ACK/Resolve и обновлениями | [Канал Slack](slack.md)                      |
+| Slack           | Уведомления через входящий webhook или Bot API с действиями ACK/Resolve/Shelve и обновлениями | [Канал Slack](slack.md)                      |
 | Discord         | Отправляет уведомления в вебхук Discord                                         | [Каналы на основе вебхуков](webhook-channels.md) |
 | Microsoft Teams | Отправляет уведомления в вебхук Teams                                           | [Каналы на основе вебхуков](webhook-channels.md) |
 | Webhook         | Отправляет payload уведомления на пользовательский HTTP-эндпоинт                | [Каналы на основе вебхуков](webhook-channels.md) |
@@ -65,7 +65,7 @@ Monitoring system -> Incoming integration -> Route -> Notification channels -> U
 8. Copy the route intake token
 9. Configure Alertmanager, Zabbix, or webhook sender
 10. Send a test alert
-11. Verify notification delivery and ACK/Resolve flow
+11. Verify notification delivery and ACK/Resolve/Shelve flow
 ```
 
 ## Направление устранения неполадок

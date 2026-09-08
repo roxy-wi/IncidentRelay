@@ -16,6 +16,7 @@ Use this section for responder workflows:
 - [Incident stakeholders](stakeholders.md)
 - [Alert comments](../usage/alert-comments.md)
 - [Silences](../usage/silences.md)
+- [Alert Shelving](../usage/shelving.md)
 - [Maintenance Windows](../concepts/maintenance-windows.md)
 - [Explain Trace](explain-trace.md)
 

@@ -73,17 +73,17 @@ def test_build_alert_push_payload_creates_group_action_tokens_for_firing_group(d
     assert payload["alert_group_id"] == alert_group.id
     assert payload["alert_id"] == alert_group.id
     assert payload["status"] == "firing"
-    assert set(payload["action_tokens"].keys()) == {"ack", "resolve"}
+    assert set(payload["action_tokens"].keys()) == {"ack", "shelve"}
 
     tokens = list(BrowserPushActionToken.select())
 
     assert len(tokens) == 2
     assert {token.group_id for token in tokens} == {alert_group.id}
     assert {token.user_id for token in tokens} == {user.id}
-    assert {token.action for token in tokens} == {"ack", "resolve"}
+    assert {token.action for token in tokens} == {"ack", "shelve"}
 
 
-def test_build_alert_push_payload_creates_only_resolve_token_for_acknowledged_group(db):
+def test_build_alert_push_payload_creates_shelve_and_resolve_tokens_for_acknowledged_group(db):
     alert_group, user = _group_with_user(status="acknowledged")
 
     payload = browser_push.build_alert_push_payload(
@@ -93,13 +93,13 @@ def test_build_alert_push_payload_creates_only_resolve_token_for_acknowledged_gr
     )
 
     assert payload["alert_group_id"] == alert_group.id
-    assert set(payload["action_tokens"].keys()) == {"resolve"}
+    assert set(payload["action_tokens"].keys()) == {"shelve", "resolve"}
 
-    token = BrowserPushActionToken.get()
-
-    assert token.group_id == alert_group.id
-    assert token.user_id == user.id
-    assert token.action == "resolve"
+    tokens = list(BrowserPushActionToken.select())
+    assert len(tokens) == 2
+    assert {token.group_id for token in tokens} == {alert_group.id}
+    assert {token.user_id for token in tokens} == {user.id}
+    assert {token.action for token in tokens} == {"shelve", "resolve"}
 
 
 def test_execute_push_action_acknowledges_group(db):
@@ -128,7 +128,7 @@ def test_execute_push_action_acknowledges_group(db):
 
 
 def test_execute_push_action_resolves_group(db):
-    alert_group, user = _group_with_user(status="firing")
+    alert_group, user = _group_with_user(status="acknowledged")
 
     payload = browser_push.build_alert_push_payload(
         alert_group,
@@ -150,6 +150,36 @@ def test_execute_push_action_resolves_group(db):
     assert stored.status == "resolved"
     assert stored.resolved_by_id == user.id
 
+
+
+def test_execute_push_shelve_returns_actionable_unshelve_token(db):
+    from app.services.alerts.shelving import is_alert_group_shelved
+
+    alert_group, user = _group_with_user(status="firing")
+    payload = browser_push.build_alert_push_payload(
+        alert_group,
+        user,
+        event_type="notification",
+    )
+
+    shelved = browser_push.execute_push_action(
+        payload["action_tokens"]["shelve"],
+        "shelve",
+    )
+
+    assert shelved["ok"] is True
+    assert shelved["action"] == "shelve"
+    assert set(shelved["action_tokens"]) == {"unshelve", "resolve"}
+    assert is_alert_group_shelved(alert_group.id) is True
+
+    unshelved = browser_push.execute_push_action(
+        shelved["action_tokens"]["unshelve"],
+        "unshelve",
+    )
+
+    assert unshelved["ok"] is True
+    assert unshelved["action"] == "unshelve"
+    assert is_alert_group_shelved(alert_group.id) is False
 
 def test_execute_push_action_rejects_token_reuse(db):
     alert_group, user = _group_with_user(status="firing")

@@ -25,7 +25,7 @@ It is designed for SRE, DevOps, platform, infrastructure and operations teams th
 ### Incident management
 
 - alert groups with child alerts, deduplication and grouping;
-- acknowledge and resolve workflows;
+- acknowledge, resolve and temporary alert shelving workflows;
 - incident priorities and priority policies;
 - responders, stakeholders and comments;
 - reminders and escalation policies;
@@ -52,7 +52,8 @@ It is designed for SRE, DevOps, platform, infrastructure and operations teams th
 - on-call calendar, ICS feeds and CalDAV access;
 - route channels and service Notification Policies;
 - Mattermost, Slack, Telegram, Discord, Microsoft Teams, email and generic webhook delivery;
-- interactive ACK / Resolve actions for supported chat providers;
+- interactive ACK / Resolve / Shelve actions for supported chat providers;
+- temporary per-AlertGroup shelving with automatic expiry, notification/escalation pause and responder-audited Unshelve;
 - profile-level browser/PWA push notifications;
 - personal notification rules for browser push, email and voice-call follow-up;
 - pluggable self-hosted voice providers.
@@ -89,7 +90,7 @@ Rotation / escalation + notification policy
       ↓
 Shared channels + personal notification rules
       ↓
-ACK / Resolve / responders / stakeholders
+ACK / Resolve / Shelve / responders / stakeholders
 ```
 
 Routes control how alerts enter IncidentRelay and provide the security boundary for intake tokens. Services describe **what** is affected. Notification delivery can come directly from route channels, from a service Notification Policy, or from both, depending on route configuration. Event Orchestration can override routing, service and policy decisions for matching events.
@@ -152,9 +153,9 @@ Incoming integrations use route intake credentials. The generated endpoint/help 
 
 | Channel | Notes |
 |---|---|
-| Mattermost | Incoming webhook or Bot API; Bot API supports interactive actions and message updates |
-| Slack | Incoming webhook or Bot API; interactive actions can use HTTP callbacks or Socket Mode worker |
-| Telegram | Bot notifications with optional action buttons |
+| Mattermost | Incoming webhook or Bot API; Bot API supports interactive ACK / Resolve / Shelve actions and message updates |
+| Slack | Incoming webhook or Bot API; interactive ACK / Resolve / Shelve actions can use HTTP callbacks or Socket Mode worker |
+| Telegram | Bot notifications with optional ACK / Resolve / Shelve action buttons |
 | Discord | Webhook delivery |
 | Microsoft Teams | Webhook delivery |
 | Email | Delivered through global SMTP configuration |
@@ -352,7 +353,7 @@ A typical UI setup is:
 8. Create a route and select its service/channel mode
 9. Optionally configure Global or Service Event Orchestration
 10. Copy the route intake credential into the monitoring system
-11. Send a test alert and verify ACK / Resolve
+11. Send a test alert and verify ACK / Resolve / Shelve
 ```
 
 Detailed guide: [First login and initial setup](docs/getting-started/first-login.md).
@@ -419,6 +420,7 @@ Read more: [API documentation](docs/api/index.md) and [Profile/API tokens](docs/
 | Groups and RBAC | [Groups and RBAC](docs/concepts/groups-and-rbac.md) |
 | Teams, rotations and routes | [Teams, rotations and routes](docs/concepts/teams-rotations-routes.md) |
 | Alerts and incidents | [Alerts](docs/usage/alerts.md) |
+| Alert shelving | [Shelving](docs/usage/shelving.md) |
 | Event Orchestration | [Event Orchestration](docs/usage/event-orchestration.md) |
 | Explain Trace | [Explain Trace](docs/incidents/explain-trace.md) |
 | Incident priorities | [Priorities](docs/incidents/priorities.md) |

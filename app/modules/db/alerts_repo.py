@@ -9,6 +9,7 @@ from app.modules.db.models import (
     Alert,
     AlertEvent,
     AlertGroup,
+    AlertGroupShelve,
     AlertGroupMerge,
     AlertRoute,
     AlertComment,
@@ -123,6 +124,7 @@ def build_alert_groups_query(
     service_criticality=None,
     search=None,
     assigned_to_user_id=None,
+    shelved=False,
     include_merged=False,
 ):
     """Build the base alert groups query with filters."""
@@ -153,6 +155,21 @@ def build_alert_groups_query(
 
     if assigned_to_user_id:
         query = query.where(AlertGroup.assignee == assigned_to_user_id)
+
+    if shelved:
+        now = utc_now()
+        active_shelved_group_ids = (
+            AlertGroupShelve
+            .select(AlertGroupShelve.alert_group)
+            .where(
+                (AlertGroupShelve.active == True)  # noqa: E712
+                & (
+                    AlertGroupShelve.ends_at.is_null(True)
+                    | (AlertGroupShelve.ends_at > now)
+                )
+            )
+        )
+        query = query.where(AlertGroup.id.in_(active_shelved_group_ids))
 
     query = apply_field_values_filter(
         query,
@@ -366,6 +383,7 @@ def paginate_alert_groups(
     service_criticality=None,
     search=None,
     assigned_to_user_id=None,
+    shelved=False,
     page=1,
     page_size=25,
     sort="activity",
@@ -392,6 +410,7 @@ def paginate_alert_groups(
         service_criticality=service_criticality,
         search=search,
         assigned_to_user_id=assigned_to_user_id,
+        shelved=shelved,
         include_merged=include_merged,
     )
 
@@ -774,6 +793,22 @@ def merge_alert_groups(target_group_id, source_group_ids, user_id=None, reason=N
         source.merge_reason = reason
         source.updated_at = now
         source.save()
+
+        (
+            AlertGroupShelve
+            .update(
+                active=False,
+                unshelved_at=now,
+                unshelved_by=user_id,
+                unshelve_reason="alert_group_merged",
+                updated_at=now,
+            )
+            .where(
+                (AlertGroupShelve.alert_group == source.id)
+                & (AlertGroupShelve.active == True)  # noqa: E712
+            )
+            .execute()
+        )
 
         AlertGroupMerge.create(
             source_group=source.id,

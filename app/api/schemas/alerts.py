@@ -33,6 +33,7 @@ class AlertListQuerySchema(ApiModel):
     service_criticality: str | None = Field(default=None, min_length=1, max_length=120)
     search: str | None = Field(default=None, max_length=300)
     assigned_to_me: bool = False
+    shelved: bool = False
     page: int = Field(default=1, ge=1)
     page_size: int = Field(default=25, ge=1, le=100)
     sort: str = Field(
@@ -73,3 +74,10 @@ class AlertListQuerySchema(ApiModel):
             result.append(int(item))
 
         return result
+
+
+class AlertShelveSchema(ApiModel):
+    """Validate one temporary AlertGroup shelf request."""
+
+    duration_seconds: int = Field(default=3600, ge=60, le=604800)
+    reason: str | None = Field(default=None, max_length=1000)

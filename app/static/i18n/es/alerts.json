@@ -89,5 +89,7 @@
   "alerts.summary.reminders_hint": "Notificaciones repetidas",
   "alerts.summary.show_all": "Mostrar todas las alertas",
   "alerts.summary.total": "Alertas totales",
-  "alerts.summary.total_hint": "Selección actual"
+  "alerts.summary.total_hint": "Selección actual",
+  "alerts.status.shelved": "Pospuesta",
+  "alerts.filters.shelved_only": "Solo pospuestas"
 }

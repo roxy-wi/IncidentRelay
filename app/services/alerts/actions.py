@@ -1,6 +1,7 @@
 from app.modules.db import alerts_repo
 from app.modules.db.models import AlertGroup
 from app.services.alerts.correlation import refresh_alert_group_correlations_safely
+from app.services.alerts.shelving import clear_shelve_on_resolve
 from app.services.incidents.stakeholders import notify_stakeholders
 from app.services.notifications.delivery import update_alert_messages
 from app.services.notifications.rules import cancel_pending_group_deliveries
@@ -87,6 +88,7 @@ def resolve_alert(
         return group_before
 
     group = alerts_repo.resolve_alert_group(alert_id, user_id=user_id)
+    clear_shelve_on_resolve(group.id, user_id=user_id)
 
     alerts_repo.create_alert_event(
         group_id=group.id,

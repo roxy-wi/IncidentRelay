@@ -81,7 +81,7 @@ Do not use old or channel-specific severity fields such as `severities` or `call
 
 ## Notification updates
 
-Some channels can update an existing notification after ACK or Resolve.
+Some channels can update an existing notification after ACK, Resolve, Shelve or Unshelve.
 
 | Channel | Supports updates | Notes |
 |---|---:|---|

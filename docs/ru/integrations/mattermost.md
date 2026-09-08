@@ -12,7 +12,7 @@ IncidentRelay поддерживает два стиля доставки в Mat
 1. Режим входящего вебхука.
 2. Режим Bot API с интерактивными кнопками и обновлениями сообщений.
 
-Режим Bot API рекомендуется, когда вам нужны кнопки ACK/Resolve.
+Режим Bot API рекомендуется, когда вам нужны действия ACK/Resolve/Shelve.
 
 ## Режим входящего вебхука
 
@@ -30,9 +30,10 @@ IncidentRelay поддерживает два стиля доставки в Mat
 
 Используйте этот режим для:
 
-- кнопки Acknowledge;
-- кнопки Resolve;
-- обновлений сообщений после ACK/Resolve;
+- кнопка Acknowledge;
+- кнопка Resolve;
+- кнопки Shelve 1h / Unshelve;
+- обновления сообщений после ACK/Resolve/Shelve;
 - лучшей атрибуции пользователей.
 
 Типичные поля конфигурации:
@@ -50,7 +51,7 @@ IncidentRelay поддерживает два стиля доставки в Mat
 
 ## Mattermost user ID
 
-У пользователя в профиле может быть Mattermost user ID. Это полезно для атрибуции, когда пользователь нажимает кнопки ACK/Resolve.
+У пользователя в профиле может быть Mattermost user ID. Это полезно для атрибуции, когда пользователь нажимает кнопки ACK/Resolve/Shelve.
 
 ## Кнопка теста
 
@@ -65,3 +66,7 @@ IncidentRelay поддерживает два стиля доставки в Mat
 3. Фильтр важности разрешает уровень важности алерта.
 4. Bot token или webhook URL корректны.
 5. `public_base_url` доступен из Mattermost для кнопок.
+
+## Shelving
+
+Mattermost Bot API поддерживает подписанные действия **Shelve 1h** и **Unshelve**. Incoming webhook остаётся односторонним. Mattermost user ID должен быть связан с IncidentRelay user с responder-доступом. Подробнее: [Shelving](../usage/shelving.md).

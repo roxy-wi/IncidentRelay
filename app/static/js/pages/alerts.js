@@ -1,5 +1,6 @@
 let currentDetailsAlertId = null;
 let currentDetailsAlertCanRespond = false;
+let currentDetailsAlertShelved = false;
 const ALERT_EVENTS_PAGE_SIZE = 50;
 let currentDetailsActiveTab = "summary";
 let currentDetailsExplainLoadedAlertId = null;
@@ -410,6 +411,10 @@ function buildAlertsStateParams(options) {
 
     if ($("#assigned-to-me-filter").is(":checked")) {
         params.set("assigned_to_me", "1");
+    }
+
+    if ($("#shelved-only-filter").is(":checked")) {
+        params.set("shelved", "1");
     }
 
     params.set("page", String(alertsCurrentPage || 1));
@@ -893,6 +898,7 @@ function renderActiveAlertFilters() {
     const priorities = getTableFilterValues("#priority-filter");
     const serviceIds = getTableFilterValues("#alerts-service-filter");
     const assignedToMe = $("#assigned-to-me-filter").is(":checked");
+    const shelvedOnly = $("#shelved-only-filter").is(":checked");
 
     if (search) {
         chips.push({label: i18n.t("alerts.filters.search"), value: search});
@@ -945,6 +951,13 @@ function renderActiveAlertFilters() {
         chips.push({
             label: i18n.t("alerts.filters.assignee"),
             value: i18n.t("alerts.filters.me")
+        });
+    }
+
+    if (shelvedOnly) {
+        chips.push({
+            label: i18n.t("alerts.filters.status"),
+            value: i18n.t("alerts.status.shelved")
         });
     }
 
@@ -1059,6 +1072,7 @@ function renderAlertPageRow(alert) {
             [
                 $("<span>").addClass("status-dot dot-" + normalizeAlertValue(alert.status)),
                 makeAlertBadge(statusLabel(alert.status), statusBadgeClass(alert.status)),
+                ...(alert.shelved ? [makeAlertBadge(i18n.t("alerts.status.shelved"), "badge-muted")] : []),
             ],
             alert
         )
@@ -1519,6 +1533,7 @@ function showAlertDetails(alertId) {
 
         currentDetailsAlertId = alert.id;
         currentDetailsAlertCanRespond = canRespondObject(alert);
+        currentDetailsAlertShelved = Boolean(alert.shelved || (alert.shelve && alert.shelve.active));
         resetAlertDetailsTabs(alert.id);
 
         modal.find("#alert-details-title").text(alert.title || i18n.t("alert_details.entity.alert_number", {id: alert.id}));
@@ -1556,9 +1571,15 @@ function showAlertDetails(alertId) {
 
         if (!currentDetailsAlertCanRespond || normalizeAlertValue(alert.status) === "resolved") {
             modal.find("#modal-alert-ack").hide();
+            modal.find("#modal-alert-shelve").hide();
+            modal.find("#modal-alert-unshelve").hide();
             modal.find("#modal-alert-resolve").hide();
         } else {
-            modal.find("#modal-alert-ack").toggle(normalizeAlertValue(alert.status) === "firing");
+            modal.find("#modal-alert-ack").toggle(
+                normalizeAlertValue(alert.status) === "firing" && !currentDetailsAlertShelved
+            );
+            modal.find("#modal-alert-shelve").toggle(!currentDetailsAlertShelved);
+            modal.find("#modal-alert-unshelve").toggle(currentDetailsAlertShelved);
             modal.find("#modal-alert-resolve").show();
         }
 
@@ -1812,6 +1833,7 @@ function renderAlertPrimaryDetails(alert, modal) {
     const primaryBadges = $("<div>")
     .addClass("badge-success")
     .append(makeAlertBadge(statusLabel(alert.status), statusBadgeClass(alert.status)))
+    .append(alert.shelved ? makeAlertBadge(i18n.t("alerts.status.shelved"), "badge-muted") : $())
     .append(makeAlertBadge(severityLabel(alert.severity), severityBadgeClass(alert.severity)))
     .append($("<span>").addClass("pill badge-muted").text("#" + alert.id));
 
@@ -1832,6 +1854,29 @@ function renderAlertPrimaryDetails(alert, modal) {
             .addClass("alert-primary-title")
             .text(alert.title || i18n.t("alert_details.entity.alert_number", {id: alert.id}))
     );
+
+    if (alert.shelved && alert.shelve) {
+        const shelfSummary = $("<div>").addClass("help-text alert-shelve-summary");
+        const until = formatDateTimeMinutes(alert.shelve.until);
+        shelfSummary.append(
+            $("<strong>").text(i18n.t("alerts.status.shelved"))
+        );
+        if (until) {
+            shelfSummary.append(
+                document.createTextNode(
+                    " · " + i18n.t("alert_details.shelve.until", {time: until})
+                )
+            );
+        }
+        if (alert.shelve.reason) {
+            shelfSummary.append(
+                document.createTextNode(
+                    " · " + i18n.t("alert_details.shelve.reason") + ": " + alert.shelve.reason
+                )
+            );
+        }
+        target.append(shelfSummary);
+    }
 
     if (message) {
         target.append(
@@ -2806,6 +2851,11 @@ function applyAlertsQueryParams() {
         isAlertBoolQueryParamEnabled(params, "assigned_to_me")
     );
 
+    $("#shelved-only-filter").prop(
+        "checked",
+        isAlertBoolQueryParamEnabled(params, "shelved")
+    );
+
     alertsCurrentPage = parseInt(params.get("page") || "1", 10) || 1;
     alertsPageSize = parseInt(params.get("page_size") || "25", 10) || 25;
 
@@ -2821,11 +2871,11 @@ $(document).on("click", "#reload-alerts", function () {
 $(document)
     .off(
         "change.tableFilters",
-        "#status-filter, #severity-filter, #priority-filter, #alerts-service-filter, #assigned-to-me-filter"
+        "#status-filter, #severity-filter, #priority-filter, #alerts-service-filter, #assigned-to-me-filter, #shelved-only-filter"
     )
     .on(
         "change.tableFilters",
-        "#status-filter, #severity-filter, #priority-filter, #alerts-service-filter, #assigned-to-me-filter",
+        "#status-filter, #severity-filter, #priority-filter, #alerts-service-filter, #assigned-to-me-filter, #shelved-only-filter",
         function () {
             if (
                 typeof isTableFilterSilent === "function"
@@ -2950,6 +3000,42 @@ $(document).on("click", "#modal-alert-ack", function () {
     }
 
     apiPost("/api/alerts/" + currentDetailsAlertId + "/ack", {}, function () {
+        showAlertDetails(currentDetailsAlertId);
+        loadAlerts();
+    });
+});
+$(document).on("click", "#modal-alert-shelve", function () {
+    if (!currentDetailsAlertId || !currentDetailsAlertCanRespond) {
+        return;
+    }
+    $("#alert-shelve-duration").val("3600");
+    $("#alert-shelve-reason").val("");
+    openAppModal("#alert-shelve-modal");
+});
+$(document).on("click", "#close-alert-shelve, #cancel-alert-shelve", function () {
+    closeAppModal("#alert-shelve-modal");
+});
+$(document).on("click", "#confirm-alert-shelve", function () {
+    if (!currentDetailsAlertId || !currentDetailsAlertCanRespond) {
+        return;
+    }
+    const durationSeconds = Number($("#alert-shelve-duration").val() || 3600);
+    const reason = String($("#alert-shelve-reason").val() || "").trim();
+    apiPost(
+        "/api/alerts/" + currentDetailsAlertId + "/shelve",
+        {duration_seconds: durationSeconds, reason: reason || null},
+        function () {
+            closeAppModal("#alert-shelve-modal");
+            showAlertDetails(currentDetailsAlertId);
+            loadAlerts();
+        }
+    );
+});
+$(document).on("click", "#modal-alert-unshelve", function () {
+    if (!currentDetailsAlertId || !currentDetailsAlertCanRespond) {
+        return;
+    }
+    apiPost("/api/alerts/" + currentDetailsAlertId + "/unshelve", {}, function () {
         showAlertDetails(currentDetailsAlertId);
         loadAlerts();
     });

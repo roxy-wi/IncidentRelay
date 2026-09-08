@@ -47,5 +47,5 @@ They can be delivered through:
 - email, when the stakeholder has an email address;
 - browser push, when the stakeholder is an active IncidentRelay user with browser push enabled.
 
-Stakeholder browser push notifications do not include ACK or Resolve action buttons.
+Stakeholder browser push notifications do not include ACK, Resolve, Shelve or Unshelve action buttons.
 

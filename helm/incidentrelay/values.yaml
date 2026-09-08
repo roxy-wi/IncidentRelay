@@ -100,6 +100,8 @@ config:
     alert_group_notification_check_interval_seconds: 10
     alert_group_notification_batch_size: 100
     silence_lifecycle_check_interval_seconds: 30
+    shelve_lifecycle_check_interval_seconds: 30
+    shelve_lifecycle_batch_size: 100
   incidents:
     responder_default_expires_after_minutes: 30
     responder_expire_check_interval_seconds: 30

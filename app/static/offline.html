@@ -131,6 +131,18 @@
             description: "IncidentRelay benötigt eine Netzwerkverbindung, um aktuelle Alarme, Rotationen und Auswirkungen auf Services anzuzeigen. Überprüfen Sie Ihre Verbindung und versuchen Sie es erneut.",
             retry: "Erneut versuchen"
         },
+        fr: {
+            title: "IncidentRelay hors ligne",
+            heading: "Vous êtes hors ligne",
+            description: "IncidentRelay nécessite une connexion réseau pour afficher les alertes actuelles, les rotations d’astreinte et l’impact sur les services. Vérifiez votre connexion et réessayez.",
+            retry: "Réessayer"
+        },
+        es: {
+            title: "IncidentRelay sin conexión",
+            heading: "Estás sin conexión",
+            description: "IncidentRelay necesita una conexión de red para mostrar las alertas actuales, las rotaciones de guardia y el impacto en los servicios. Comprueba tu conexión e inténtalo de nuevo.",
+            retry: "Reintentar"
+        },
         zh: {
             title: "IncidentRelay 离线",
             heading: "当前处于离线状态",
@@ -149,13 +161,13 @@
     const requestedLocale = String(cookieLocale || browserLocale)
         .toLowerCase()
         .replace("_", "-");
-    const locale = requestedLocale.startsWith("ru")
-        ? "ru"
-        : requestedLocale.startsWith("de")
-            ? "de"
-            : requestedLocale.startsWith("zh")
-                ? "zh"
-                : "en";
+
+    const supportedLocales = ["en", "ru", "de", "fr", "es", "zh"];
+    const language = requestedLocale.split("-")[0];
+    const locale = supportedLocales.includes(language)
+        ? language
+        : "en";
+
     const selected = messages[locale];
 
     document.documentElement.lang = locale;

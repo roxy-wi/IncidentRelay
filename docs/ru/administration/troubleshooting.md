@@ -143,7 +143,7 @@ GET /api/profile/push/vapid-public-key
 
 ## Действие браузерного push возвращает token_expired
 
-Одноразовый токен ACK/Resolve был старше `[browser_push] action_token_ttl_seconds`, когда браузер отправил действие.
+Одноразовый токен ACK/Resolve/Shelve/Unshelve был старше `[browser_push] action_token_ttl_seconds`, когда браузер отправил действие.
 
 ## Действие браузерного push возвращает token_already_used
 

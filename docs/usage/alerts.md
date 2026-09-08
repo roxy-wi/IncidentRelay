@@ -7,7 +7,7 @@ description: Alert group lifecycle, grouping, comments and API examples.
 
 IncidentRelay stores every incoming monitoring signal as an **alert** and shows operators an **alert group** in the Alerts page.
 
-An alert group is the incident-level object. It is the object that users acknowledge, resolve, notify, remind, escalate, and merge.
+An alert group is the incident-level object. It is the object that users acknowledge, resolve, temporarily shelve, notify, remind, escalate, and merge.
 
 A child alert is the concrete signal inside the group. For example, three `DiskFull` alerts from three hosts can be shown as one alert group with three child alerts.
 
@@ -176,7 +176,7 @@ A manual incident is stored as a normal alert group with one child alert:
 - alert group `source` is `manual`;
 - child alert `source` is `manual`;
 - status starts as `firing`;
-- acknowledge, resolve, responders, stakeholders, comments, priority and timeline work the same way as for integration-created alert groups.
+- acknowledge, resolve, shelving, responders, stakeholders, comments, priority and timeline work the same way as for integration-created alert groups.
 
 Manual incidents do not require an intake route. The creator selects the team directly, and may optionally select a service.
 
@@ -338,3 +338,7 @@ If the group resolved before the first delayed notification was sent, IncidentRe
 ### A group disappeared after merge
 
 The source group was marked as `merged`. Open the target group to see moved child alerts.
+
+## Shelving
+
+A responder can temporarily shelve one open AlertGroup without changing `firing`/`acknowledged` technical status. Shelving pauses notification/update/reminder/escalation work, while ingestion and impact calculation continue. See [Alert shelving](shelving.md).

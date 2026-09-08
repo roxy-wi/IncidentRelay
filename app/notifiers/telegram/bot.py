@@ -8,6 +8,7 @@ from telebot.apihelper import ApiTelegramException
 from app.settings import Config
 from app.notifiers.telegram.actions import build_telegram_action_data
 from app.services.links import build_alert_web_url
+from app.services.alerts.shelving import is_alert_group_shelved
 
 
 logger = logging.getLogger("oncall.telegram")
@@ -93,16 +94,37 @@ def build_alert_keyboard(channel, alert):
     has_buttons = False
 
     if actions_enabled and alert.status in {"firing", "acknowledged"}:
-        if alert.status == "acknowledged":
+        shelved = is_alert_group_shelved(alert)
+        if shelved:
             keyboard.add(
+                types.InlineKeyboardButton(
+                    "Unshelve",
+                    callback_data=build_telegram_action_data(
+                        "uns", alert.id, channel.id
+                    ),
+                ),
                 types.InlineKeyboardButton(
                     "Resolve",
                     callback_data=build_telegram_action_data(
-                        "resolve",
-                        alert.id,
-                        channel.id,
+                        "resolve", alert.id, channel.id
                     ),
-                )
+                ),
+            )
+            has_buttons = True
+        elif alert.status == "acknowledged":
+            keyboard.add(
+                types.InlineKeyboardButton(
+                    "Shelve 1h",
+                    callback_data=build_telegram_action_data(
+                        "s1h", alert.id, channel.id
+                    ),
+                ),
+                types.InlineKeyboardButton(
+                    "Resolve",
+                    callback_data=build_telegram_action_data(
+                        "resolve", alert.id, channel.id
+                    ),
+                ),
             )
             has_buttons = True
         else:
@@ -110,19 +132,23 @@ def build_alert_keyboard(channel, alert):
                 types.InlineKeyboardButton(
                     "Acknowledge",
                     callback_data=build_telegram_action_data(
-                        "ack",
-                        alert.id,
-                        channel.id,
+                        "ack", alert.id, channel.id
                     ),
                 ),
                 types.InlineKeyboardButton(
                     "Resolve",
                     callback_data=build_telegram_action_data(
-                        "resolve",
-                        alert.id,
-                        channel.id,
+                        "resolve", alert.id, channel.id
                     ),
                 ),
+            )
+            keyboard.add(
+                types.InlineKeyboardButton(
+                    "Shelve 1h",
+                    callback_data=build_telegram_action_data(
+                        "s1h", alert.id, channel.id
+                    ),
+                )
             )
             has_buttons = True
 

@@ -9,6 +9,8 @@ from peewee import DoesNotExist
 from app.modules.db import alerts_repo, channels_repo, users_repo
 from app.notifiers.types import SLACK_CHANNEL
 from app.services.alerts.actions import acknowledge_alert, resolve_alert
+from app.services.alerts.shelving import shelve_alert_group, unshelve_alert_group
+from app.services.rbac import can_respond_team
 
 
 SLACK_SIGNATURE_VERSION = "v0"
@@ -98,12 +100,26 @@ def _process_slack_action(
 
     slack_user_id = (payload.get("user") or {}).get("id")
     user = users_repo.get_user_by_slack_id(slack_user_id)
-    user_id = user.id if user else None
+    if not user or not alert.team_id or not can_respond_team(user, alert.team_id):
+        raise SlackActionError(
+            "action_rejected",
+            "Slack user is not authorized to act on this alert.",
+            status_code=403,
+        )
+    user_id = user.id
 
     if action == "acknowledge":
         alert = acknowledge_alert(alert.id, user_id=user_id)
-    else:
+    elif action == "resolve":
         alert = resolve_alert(alert.id, user_id=user_id)
+    elif action == "shelve":
+        alert, _ = shelve_alert_group(
+            alert.id, user_id=user_id, duration_seconds=3600, source="slack"
+        )
+    else:
+        alert, _ = unshelve_alert_group(
+            alert.id, user_id=user_id, source="slack"
+        )
 
     return {
         "ok": True,
@@ -188,7 +204,7 @@ def parse_slack_action_payload_dict(payload):
         ) from exc
 
     action = context.get("action")
-    if action not in {"acknowledge", "resolve"}:
+    if action not in {"acknowledge", "resolve", "shelve", "unshelve"}:
         raise SlackActionError(
             "invalid_action",
             "Unsupported Slack alert action.",

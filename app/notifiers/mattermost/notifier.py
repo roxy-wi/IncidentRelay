@@ -14,6 +14,7 @@ from app.services.alerts.priority import (
     format_alert_title_with_priority,
 )
 from app.services.alerts.correlation import format_correlation_markdown
+from app.services.alerts.shelving import get_active_shelve, is_alert_group_shelved
 
 
 class MattermostNotifier(IncomingWebhookNotifier):
@@ -264,6 +265,8 @@ class MattermostNotifier(IncomingWebhookNotifier):
         title = format_alert_title_with_priority(alert)
         if alert.status == "resolved" or event_type == "resolved":
             return f"RESOLVED: {title}"
+        if event_type == "shelved" or is_alert_group_shelved(alert):
+            return f"SHELVED: {title}"
         if alert.status == "acknowledged" or event_type == "acknowledged":
             return f"ACKNOWLEDGED: {title}"
         if event_type == "reminder":
@@ -277,6 +280,16 @@ class MattermostNotifier(IncomingWebhookNotifier):
         """Return the main attachment text."""
         if alert.status == "resolved" or event_type == "resolved":
             return f"The alert has been resolved.\n\n{alert.message or ''}"
+        shelf = get_active_shelve(alert)
+        if event_type == "shelved" or shelf:
+            until = getattr(shelf, "ends_at", None) if shelf else None
+            reason = getattr(shelf, "reason", None) if shelf else None
+            line = "This alert is temporarily shelved."
+            if until:
+                line += f" Until {until.isoformat()} UTC."
+            if reason:
+                line += f" Reason: {reason}"
+            return f"{line}\n\n{alert.message or ''}"
         if alert.status == "acknowledged" or event_type == "acknowledged":
             user = alert.acknowledged_by.username if alert.acknowledged_by else "unknown"
             return f"The alert was acknowledged by {user}.\n\n{alert.message or ''}"
@@ -361,19 +374,32 @@ class MattermostNotifier(IncomingWebhookNotifier):
         if not secret:
             return []
 
+        if is_alert_group_shelved(alert):
+            return [
+                self._button("unshelve", "Unshelve", "default", action_url, alert.id, channel.id, secret),
+                self._button("resolve", "Resolve", "success", action_url, alert.id, channel.id, secret),
+            ]
+
         if alert.status == "acknowledged":
             return [
+                self._button("shelve", "Shelve 1h", "default", action_url, alert.id, channel.id, secret),
                 self._button("resolve", "Resolve", "success", action_url, alert.id, channel.id, secret),
             ]
 
         return [
             self._button("acknowledge", "Acknowledge", "primary", action_url, alert.id, channel.id, secret),
+            self._button("shelve", "Shelve 1h", "default", action_url, alert.id, channel.id, secret),
             self._button("resolve", "Resolve", "success", action_url, alert.id, channel.id, secret),
         ]
 
     def _button(self, action, name, style, action_url, alert_id, channel_id, secret):
         """Build one Mattermost button definition with a per-action HMAC."""
-        action_prefix = "ack" if action == "acknowledge" else "resolve"
+        action_prefix = {
+            "acknowledge": "ack",
+            "resolve": "resolve",
+            "shelve": "shelve",
+            "unshelve": "unshelve",
+        }[action]
         signature = build_mattermost_action_signature(
             secret,
             action,

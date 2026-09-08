@@ -16,6 +16,7 @@ from app.services.routing.service_context import (
     runbook_display_label,
 )
 from app.services.alerts.correlation import format_correlation_markdown
+from app.services.alerts.shelving import get_active_shelve, is_alert_group_shelved
 
 
 class SlackNotifier(IncomingWebhookNotifier):
@@ -445,6 +446,9 @@ class SlackNotifier(IncomingWebhookNotifier):
         if event_type == "resolved" or status == "resolved":
             return f"✅ RESOLVED: {title}"
 
+        if event_type == "shelved" or is_alert_group_shelved(alert):
+            return f"🔕 SHELVED: {title}"
+
         if event_type == "acknowledged" or status == "acknowledged":
             return f"🟡 ACKNOWLEDGED: {title}"
 
@@ -481,6 +485,17 @@ class SlackNotifier(IncomingWebhookNotifier):
 
         if event_type == "resolved" or status == "resolved":
             return f"The alert has been resolved.\n\n{message}"
+
+        shelf = get_active_shelve(alert)
+        if event_type == "shelved" or shelf:
+            until = getattr(shelf, "ends_at", None) if shelf else None
+            reason = getattr(shelf, "reason", None) if shelf else None
+            details = "This alert is temporarily shelved."
+            if until:
+                details += f" Until {until.isoformat()} UTC."
+            if reason:
+                details += f" Reason: {reason}"
+            return f"{details}\n\n{message}"
 
         if event_type == "acknowledged" or status == "acknowledged":
             acknowledged_by = getattr(
@@ -599,13 +614,34 @@ class SlackNotifier(IncomingWebhookNotifier):
     def _actions(self, channel, alert):
         """Build a Slack Block Kit actions block."""
         elements = []
+        shelved = is_alert_group_shelved(alert)
 
-        if alert.status == "firing":
+        if shelved:
             elements.append(
                 self._action_button(
-                    action="acknowledge",
-                    label="Acknowledge",
-                    style="primary",
+                    action="unshelve",
+                    label="Unshelve",
+                    style=None,
+                    channel=channel,
+                    alert=alert,
+                )
+            )
+        else:
+            if alert.status == "firing":
+                elements.append(
+                    self._action_button(
+                        action="acknowledge",
+                        label="Acknowledge",
+                        style="primary",
+                        channel=channel,
+                        alert=alert,
+                    )
+                )
+            elements.append(
+                self._action_button(
+                    action="shelve",
+                    label="Shelve 1h",
+                    style=None,
                     channel=channel,
                     alert=alert,
                 )
@@ -643,7 +679,7 @@ class SlackNotifier(IncomingWebhookNotifier):
             "channel_id": channel.id,
         }
 
-        return {
+        button = {
             "type": "button",
             "text": {
                 "type": "plain_text",
@@ -655,5 +691,7 @@ class SlackNotifier(IncomingWebhookNotifier):
                 context,
                 separators=(",", ":"),
             ),
-            "style": style,
         }
+        if style:
+            button["style"] = style
+        return button

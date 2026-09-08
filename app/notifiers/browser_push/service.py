@@ -23,6 +23,8 @@ from app.services.alerts.priority import (
     format_alert_title_with_priority,
 )
 from app.modules.common import utc_now
+from app.services.rbac import can_respond_team
+from app.services.alerts.shelving import is_alert_group_shelved
 
 
 logger = logging.getLogger("oncall.notifications")
@@ -128,9 +130,13 @@ def _hash_token(token):
     return hashlib.sha256(token.encode("utf-8")).hexdigest()
 
 
-def create_action_token(user, group, action):
+def create_action_token(user, group, action, *, ttl_seconds=None):
     raw_token = secrets.token_urlsafe(32)
-    ttl = int(getattr(Config, "BROWSER_PUSH_ACTION_TOKEN_TTL_SECONDS", 900))
+    ttl = int(
+        ttl_seconds
+        if ttl_seconds is not None
+        else getattr(Config, "BROWSER_PUSH_ACTION_TOKEN_TTL_SECONDS", 900)
+    )
 
     BrowserPushActionToken.create(
         user=user.id,
@@ -209,10 +215,16 @@ def can_send_alert_push(group):
 def build_alert_push_payload(group, user, event_type="notification"):
     action_tokens = {}
 
-    if group.status == "firing":
-        action_tokens["ack"] = create_action_token(user, group, "ack")
+    if is_alert_group_shelved(group):
+        action_tokens["unshelve"] = create_action_token(user, group, "unshelve")
         action_tokens["resolve"] = create_action_token(user, group, "resolve")
+    elif group.status == "firing":
+        # Browser/OS surfaces commonly display only two actions. Keep the
+        # highest-value one-click controls visible for a firing alert.
+        action_tokens["ack"] = create_action_token(user, group, "ack")
+        action_tokens["shelve"] = create_action_token(user, group, "shelve")
     elif group.status == "acknowledged":
+        action_tokens["shelve"] = create_action_token(user, group, "shelve")
         action_tokens["resolve"] = create_action_token(user, group, "resolve")
 
     return {
@@ -501,7 +513,7 @@ def send_test_push(user):
 
 
 def execute_push_action(token, action):
-    if action not in {"ack", "resolve"}:
+    if action not in {"ack", "resolve", "shelve", "unshelve"}:
         return {"ok": False, "error": "invalid_action"}
 
     if not token:
@@ -547,28 +559,51 @@ def execute_push_action(token, action):
         if not group:
             return {"ok": False, "error": "alert_group_not_found"}
 
+        user = User.get_or_none(User.id == record.user_id)
+        if (
+            not user
+            or not group.team_id
+            or not can_respond_team(user, group.team_id)
+        ):
+            return {"ok": False, "error": "action_not_authorized"}
+
         result_group = _run_alert_push_action(
             group.id,
             user_id=record.user_id,
             action=action,
         )
 
-    if action == "ack":
-        audit_event = "alert_group.ack.browser_push"
-    else:
-        audit_event = "alert_group.resolve.browser_push"
+    if action in {"ack", "resolve"}:
+        audit_event = (
+            "alert_group.ack.browser_push"
+            if action == "ack"
+            else "alert_group.resolve.browser_push"
+        )
+        write_audit(
+            audit_event,
+            object_type="alert_group",
+            object_id=result_group.id,
+            team_id=result_group.team_id,
+            user_id=record.user_id,
+            data={
+                "source": "browser_push",
+                "action": action,
+            },
+        )
 
-    write_audit(
-        audit_event,
-        object_type="alert_group",
-        object_id=result_group.id,
-        team_id=result_group.team_id,
-        user_id=record.user_id,
-        data={
-            "source": "browser_push",
-            "action": action,
-        },
-    )
+    follow_up_action_tokens = {}
+    if action == "shelve":
+        # Keep the confirmation notification actionable for the whole 1-hour
+        # shelf. These are distinct one-time tokens from the consumed Shelve
+        # token and are still re-authorized when used.
+        follow_up_action_tokens = {
+            "unshelve": create_action_token(
+                user, result_group, "unshelve", ttl_seconds=3600
+            ),
+            "resolve": create_action_token(
+                user, result_group, "resolve", ttl_seconds=3600
+            ),
+        }
 
     return {
         "ok": True,
@@ -576,6 +611,7 @@ def execute_push_action(token, action):
         "alert_group_id": result_group.id,
         "alert_id": result_group.id,
         "status": result_group.status,
+        "action_tokens": follow_up_action_tokens,
     }
 
 
@@ -583,12 +619,25 @@ def _run_alert_push_action(group_id, user_id, action):
     """Run alert group action from browser push."""
 
     from app.services.alerts.actions import acknowledge_alert, resolve_alert
+    from app.services.alerts.shelving import shelve_alert_group, unshelve_alert_group
 
     if action == "ack":
         return acknowledge_alert(group_id, user_id=user_id)
 
     if action == "resolve":
         return resolve_alert(group_id, user_id=user_id)
+
+    if action == "shelve":
+        group, _ = shelve_alert_group(
+            group_id, user_id=user_id, duration_seconds=3600, source="browser_push"
+        )
+        return group
+
+    if action == "unshelve":
+        group, _ = unshelve_alert_group(
+            group_id, user_id=user_id, source="browser_push"
+        )
+        return group
 
     raise ValueError(f"unsupported browser push action: {action}")
 
@@ -600,6 +649,8 @@ def _build_alert_push_title(alert, event_type):
 
     if normalized_event_type in {"resolved", "resolve"} or status == "resolved":
         return f"RESOLVED: {title}"
+    if normalized_event_type == "shelved" or is_alert_group_shelved(alert):
+        return f"SHELVED: {title}"
     if normalized_event_type in {"acknowledged", "ack"} or status == "acknowledged":
         return f"ACKNOWLEDGED: {title}"
     if normalized_event_type == "reminder":

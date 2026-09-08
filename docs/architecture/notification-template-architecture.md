@@ -14,7 +14,7 @@ The first implementation should remain relatively small, but its data model and 
 1. Notification templates are a separate domain entity, not an embedded part of `NotificationChannel.config`.
 2. Channels select templates; they do not own the rendering implementation.
 3. All outbound notifiers use one normalized notification context and one common renderer.
-4. Templates customize notification content only. Provider-specific controls, callbacks, message metadata, ACK/Resolve buttons, and delivery tracking remain owned by the notifier.
+4. Templates customize notification content only. Provider-specific controls, callbacks, message metadata, ACK/Resolve/Shelve buttons, and delivery tracking remain owned by the notifier.
 5. The template language is intentionally limited and deterministic. It is not a general-purpose Jinja environment.
 6. Existing built-in notification behavior remains the default when no custom template is selected.
 7. The architecture must allow future template resolution rules without requiring notifier rewrites.
@@ -304,6 +304,7 @@ The following remain outside user templates:
 
 - Acknowledge controls;
 - Resolve controls;
+- Shelve / Unshelve controls;
 - escalation controls;
 - callback payloads;
 - Slack block/action identifiers;
@@ -324,7 +325,7 @@ IncidentRelay system controls
 Provider payload
 ```
 
-This prevents a custom template from accidentally breaking ACK/Resolve or message update behavior.
+This prevents a custom template from accidentally breaking ACK/Resolve/Shelve or message update behavior.
 
 ## Template resolution
 

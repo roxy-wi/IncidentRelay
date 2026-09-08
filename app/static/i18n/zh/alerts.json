@@ -89,5 +89,7 @@
   "alerts.summary.reminders_hint": "重复通知",
   "alerts.summary.show_all": "显示全部告警",
   "alerts.summary.total": "告警总数",
-  "alerts.summary.total_hint": "当前筛选结果"
+  "alerts.summary.total_hint": "当前筛选结果",
+  "alerts.status.shelved": "已搁置",
+  "alerts.filters.shelved_only": "仅已搁置"
 }

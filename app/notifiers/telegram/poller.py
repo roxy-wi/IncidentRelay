@@ -10,6 +10,7 @@ from app.settings import Config
 from app.db import database_proxy as db
 from app.modules.db import alerts_repo, channels_repo, users_repo
 from app.services.alerts.actions import acknowledge_alert, resolve_alert
+from app.services.alerts.shelving import shelve_alert_group, unshelve_alert_group
 from app.services.rbac import can_respond_team
 from app.notifiers.telegram.templates import format_telegram_alert_message
 from app.notifiers.telegram.actions import parse_telegram_action_data
@@ -307,6 +308,23 @@ def handle_telegram_callback(channel, callback):
             alert = resolve_alert(alert_id, user_id=user.id)
             event_type = "resolved"
             answer_text = f"Alert #{alert.id} resolved"
+        elif action == "shelve":
+            alert, _ = shelve_alert_group(
+                alert_id,
+                user_id=user.id,
+                duration_seconds=action_data.get("duration_seconds") or 3600,
+                source="telegram",
+            )
+            event_type = "shelved"
+            answer_text = f"Alert #{alert.id} shelved for 1 hour"
+        elif action == "unshelve":
+            alert, _ = unshelve_alert_group(
+                alert_id,
+                user_id=user.id,
+                source="telegram",
+            )
+            event_type = "unshelved"
+            answer_text = f"Alert #{alert.id} unshelved"
         else:
             answer_telegram_callback(
                 channel,
@@ -322,16 +340,21 @@ def handle_telegram_callback(channel, callback):
             f"Telegram action by {user.username}",
         )
 
-        update_telegram_alert(
-            channel=channel,
-            alert=alert,
-            text=format_telegram_alert_message(alert, event_type, actor=user),
-            delivery=type("TelegramDelivery", (), {
-                "external_channel_id": str(callback.message.chat.id),
-                "external_message_id": str(callback.message.message_id),
-            })(),
-            event_type=event_type,
-        )
+        # Shelve/Unshelve already update every stored provider message from
+        # the shared shelving service. Avoid issuing a second Telegram edit
+        # for the same callback message. ACK/Resolve keep the existing direct
+        # callback update behavior.
+        if action not in {"shelve", "unshelve"}:
+            update_telegram_alert(
+                channel=channel,
+                alert=alert,
+                text=format_telegram_alert_message(alert, event_type, actor=user),
+                delivery=type("TelegramDelivery", (), {
+                    "external_channel_id": str(callback.message.chat.id),
+                    "external_message_id": str(callback.message.message_id),
+                })(),
+                event_type=event_type,
+            )
 
         answer_telegram_callback(channel, callback.id, answer_text)
 

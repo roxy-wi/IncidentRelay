@@ -370,6 +370,16 @@ class Config:
         100,
     )
 
+    SHELVE_LIFECYCLE_CHECK_INTERVAL_SECONDS = settings.get_int(
+        "alerts",
+        "shelve_lifecycle_check_interval_seconds",
+        30,
+    )
+    SHELVE_LIFECYCLE_BATCH_SIZE = settings.get_int(
+        "alerts",
+        "shelve_lifecycle_batch_size",
+        100,
+    )
 
     SILENCE_LIFECYCLE_CHECK_INTERVAL_SECONDS = settings.get_int(
         "alerts",

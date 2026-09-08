@@ -194,6 +194,18 @@ event_history = full
 Global и Service Event Orchestration могут переопределить значение для совпавших событий действием `set_alert_event_history`. Если несколько совпавших actions задают уровень, применяется последнее действие.
 
 
+## Scheduler для Alert Shelving
+
+Временные shelves AlertGroup завершаются scheduler-процессом:
+
+```ini
+[alerts]
+shelve_lifecycle_check_interval_seconds = 30
+shelve_lifecycle_batch_size = 100
+```
+
+`check_interval_seconds` задаёт частоту обработки истёкших shelves, а `batch_size` ограничивает один проход. Scheduler должен быть запущен, если используется timed shelving. Shelving приостанавливает notifications, reminders и escalation, но не меняет технический status AlertGroup и service/business impact. Подробнее: [Shelving](../usage/shelving.md).
+
 ## Политика хранения данных
 
 В IncidentRelay 2.1 все новые retention-настройки находятся в одной секции:
@@ -281,7 +293,7 @@ action_token_ttl_seconds = 900
 | `vapid_public_key` | Публичный ключ VAPID, возвращаемый браузеру для `PushManager.subscribe()` |
 | `vapid_private_key` | Приватный ключ VAPID или путь к PEM-файлу, используемый сервером для отправки сообщений Web Push |
 | `vapid_subject` | Контактный URI, включаемый в claims VAPID, обычно `mailto:admin@example.com` |
-| `action_token_ttl_seconds` | Время жизни одноразовых токенов ACK/Resolve, встраиваемых в push-уведомления |
+| `action_token_ttl_seconds` | Время жизни одноразовых токенов ACK/Resolve/Shelve/Unshelve, встраиваемых в push-уведомления |
 
 После изменения настроек браузерных push-уведомлений перезапустите веб-сервис. Перезапустите также планировщик, если в вашей инсталляции он отправляет уведомления.
 

@@ -16,3 +16,4 @@ description: Типовые повседневные рабочие сценар
 - [Управление инцидентами](../incidents/index.md)
 - [Сервисы](../services/index.md)
 - [Планирование](../scheduling/index.md)
+- [Shelving алертов](shelving.md)
