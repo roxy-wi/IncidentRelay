@@ -214,16 +214,25 @@ def can_send_alert_push(group):
 
 def build_alert_push_payload(group, user, event_type="notification"):
     action_tokens = {}
+    shelved = is_alert_group_shelved(group)
+    team_id = getattr(group, "team_id", None)
+    actionable = shelved or group.status in {"firing", "acknowledged"}
+    authorized = bool(
+        actionable
+        and user
+        and team_id
+        and can_respond_team(user, team_id)
+    )
 
-    if is_alert_group_shelved(group):
+    if authorized and shelved:
         action_tokens["unshelve"] = create_action_token(user, group, "unshelve")
         action_tokens["resolve"] = create_action_token(user, group, "resolve")
-    elif group.status == "firing":
+    elif authorized and group.status == "firing":
         # Browser/OS surfaces commonly display only two actions. Keep the
         # highest-value one-click controls visible for a firing alert.
         action_tokens["ack"] = create_action_token(user, group, "ack")
         action_tokens["shelve"] = create_action_token(user, group, "shelve")
-    elif group.status == "acknowledged":
+    elif authorized and group.status == "acknowledged":
         action_tokens["shelve"] = create_action_token(user, group, "shelve")
         action_tokens["resolve"] = create_action_token(user, group, "resolve")
 

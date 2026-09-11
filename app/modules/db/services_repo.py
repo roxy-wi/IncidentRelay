@@ -176,6 +176,31 @@ def soft_delete_service(service_id):
     database = Service._meta.database
 
     with database.atomic():
+        orchestration_ids = [
+            row.id for row in EventOrchestration.select(EventOrchestration.id).where(
+                (EventOrchestration.service == service.id)
+                & (EventOrchestration.deleted == False)  # noqa: E712
+            )
+        ]
+
+        # Cancel before detaching AlertGroup.service. Global orchestration work
+        # is associated with the service through the alert group rather than
+        # EventOrchestration.service.
+        cancel_pending_orchestration_work(
+            service_id=service.id,
+            orchestration_ids=orchestration_ids,
+            now=now,
+            reason="service_deleted",
+        )
+
+        for orchestration_id in orchestration_ids:
+            orchestrations_repo.archive_orchestration(orchestration_id)
+
+        orchestrations_repo.revoke_intake_tokens_for_scope(
+            service_id=service.id,
+            now=now,
+        )
+
         # Prevent current incidents from silently inheriting configuration if
         # this service row is restored later. Historical resolved incidents keep
         # their original service reference.
@@ -264,27 +289,6 @@ def soft_delete_service(service_id):
             (BusinessServiceComponent.service == service.id)
             & (BusinessServiceComponent.deleted == False)  # noqa: E712
         ).execute()
-
-        orchestration_ids = [
-            row.id for row in EventOrchestration.select(EventOrchestration.id).where(
-                (EventOrchestration.service == service.id)
-                & (EventOrchestration.deleted == False)  # noqa: E712
-            )
-        ]
-        for orchestration_id in orchestration_ids:
-            orchestrations_repo.archive_orchestration(orchestration_id)
-
-        orchestrations_repo.revoke_intake_tokens_for_scope(
-            service_id=service.id,
-            now=now,
-        )
-
-        cancel_pending_orchestration_work(
-            service_id=service.id,
-            orchestration_ids=orchestration_ids,
-            now=now,
-            reason="service_deleted",
-        )
 
         service.enabled = False
         service.deleted = True

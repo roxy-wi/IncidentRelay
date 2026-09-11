@@ -55,7 +55,7 @@ def test_openapi_browser_push_subscription_schema_has_required_fields():
     assert schema["properties"]["keys"]["required"] == ["p256dh", "auth"]
 
 
-def test_openapi_browser_push_action_schema_has_ack_resolve_enum():
+def test_openapi_browser_push_action_schema_has_all_supported_actions():
     spec = build_openapi_spec()
 
     schema = spec["paths"]["/api/push/actions"]["post"]["requestBody"]["content"][
@@ -63,7 +63,12 @@ def test_openapi_browser_push_action_schema_has_ack_resolve_enum():
     ]["schema"]
 
     assert schema["required"] == ["token", "action"]
-    assert schema["properties"]["action"]["enum"] == ["ack", "resolve"]
+    assert schema["properties"]["action"]["enum"] == [
+        "ack",
+        "resolve",
+        "shelve",
+        "unshelve",
+    ]
 
 
 def test_openapi_has_browser_push_tag():

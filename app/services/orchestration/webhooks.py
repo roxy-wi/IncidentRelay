@@ -198,7 +198,6 @@ def soft_delete_webhook_action(action_id: int) -> OrchestrationWebhookAction:
 
     from app.modules.db.soft_delete_hardening import cancel_pending_orchestration_work
     cancel_pending_orchestration_work(
-        group_id=action.group_id,
         action_ids=[action.id],
         now=now,
         reason="webhook_action_deleted",
@@ -698,6 +697,26 @@ def _mark_failed(row: AutomationExecution, exc: Exception, *, now):
 
 
 def _deliver_claimed(row: AutomationExecution, *, now):
+    # A soft-delete can cancel a running execution after this worker claimed
+    # it. Re-check ownership immediately before the external side effect so a
+    # stale ORM object cannot deliver after its DB claim was cancelled/stolen.
+    current_claim = (
+        AutomationExecution
+        .select(
+            AutomationExecution.status,
+            AutomationExecution.claim_token,
+        )
+        .where(AutomationExecution.id == row.id)
+        .dicts()
+        .first()
+    )
+    if (
+        not current_claim
+        or current_claim["status"] != "running"
+        or current_claim["claim_token"] != row.claim_token
+    ):
+        return "cancelled"
+
     action = row.action
     if not action.enabled or action.deleted or action.deleted_at is not None:
         AutomationExecution.update(

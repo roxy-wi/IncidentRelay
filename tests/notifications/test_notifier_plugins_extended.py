@@ -29,9 +29,14 @@ def test_mattermost_bot_payload_contains_action_context(db):
     actions = attachment["actions"]
 
     assert payload["channel_id"] == "mm-channel"
-    assert [action["name"] for action in actions] == ["Acknowledge", "Resolve"]
+    assert [action["name"] for action in actions] == [
+        "Acknowledge",
+        "Shelve 1h",
+        "Resolve",
+    ]
     assert actions[0]["id"] == f"ack{alert.id}"
-    assert actions[1]["id"] == f"resolve{alert.id}"
+    assert actions[1]["id"] == f"shelve{alert.id}"
+    assert actions[2]["id"] == f"resolve{alert.id}"
 
     for action in actions:
         context = action["integration"]["context"]
@@ -41,7 +46,7 @@ def test_mattermost_bot_payload_contains_action_context(db):
         assert len(context["signature"]) == 64
 
 
-def test_mattermost_acknowledged_payload_keeps_only_resolve_action(db):
+def test_mattermost_acknowledged_payload_keeps_shelve_and_resolve_actions(db):
     group = create_group(slug="infra")
     team = create_team(group, slug="sre")
     route = create_route(team)
@@ -58,7 +63,7 @@ def test_mattermost_acknowledged_payload_keeps_only_resolve_action(db):
     )
 
     actions = payload["props"]["attachments"][0]["actions"]
-    assert [action["name"] for action in actions] == ["Resolve"]
+    assert [action["name"] for action in actions] == ["Shelve 1h", "Resolve"]
 
 
 def test_mattermost_resolved_payload_has_no_actions(db):

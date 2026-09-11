@@ -1,17 +1,12 @@
-
 from app.api.schemas.roles import TEAM_VIEWER_ROLE
 from app.db import database_proxy
 from app.modules.db.models import (
     AlertRoute,
-    AlertRouteChannel,
-    NotificationChannel,
     Rotation,
     RotationMember,
     RotationOverride,
     RotationLayer,
     RotationLayerMember,
-    RotationLayerRestriction,
-    Silence,
     Team,
     TeamUser,
 )

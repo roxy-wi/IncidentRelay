@@ -167,6 +167,14 @@ def resolve_team_runtime_alerts(team_id, *, now=None):
     ).execute()
 
 
+def _combine_or_conditions(conditions):
+    """Return one OR expression for non-empty Peewee conditions."""
+    combined = None
+    for condition in conditions:
+        combined = condition if combined is None else (combined | condition)
+    return combined
+
+
 def cancel_pending_orchestration_work(
     *,
     group_id=None,
@@ -177,72 +185,111 @@ def cancel_pending_orchestration_work(
     now=None,
     reason="resource_deleted",
 ):
-    """Cancel queued orchestration work affected by a deleted resource."""
+    """Cancel queued/running orchestration work affected by any supplied scope.
+
+    Scope selectors are intentionally combined as a union. A service or route
+    deletion must also cancel work produced by a global orchestration when that
+    work belongs to an affected alert group.
+    """
     now = now or utc_now()
+    orchestration_ids = (
+        list(dict.fromkeys(orchestration_ids))
+        if orchestration_ids is not None
+        else None
+    )
+    action_ids = (
+        list(dict.fromkeys(action_ids))
+        if action_ids is not None
+        else None
+    )
 
-    pending_query = PendingOrchestratedEvent.status.in_(_PENDING_ORCHESTRATION_STATUSES)
+    pending_scopes = []
     if group_id is not None:
-        pending_query &= PendingOrchestratedEvent.group == group_id
+        pending_scopes.append(PendingOrchestratedEvent.group == group_id)
     if service_id is not None:
-        pending_query &= PendingOrchestratedEvent.service == service_id
+        pending_scopes.append(PendingOrchestratedEvent.service == service_id)
     if route_id is not None:
-        pending_query &= PendingOrchestratedEvent.route == route_id
-    if orchestration_ids is not None:
-        orchestration_ids = list(orchestration_ids)
-        if orchestration_ids:
-            pending_query &= PendingOrchestratedEvent.orchestration.in_(orchestration_ids)
-        else:
-            pending_query &= PendingOrchestratedEvent.id == -1
+        pending_scopes.append(PendingOrchestratedEvent.route == route_id)
+    if orchestration_ids:
+        pending_scopes.append(
+            PendingOrchestratedEvent.orchestration.in_(orchestration_ids)
+        )
 
-    PendingOrchestratedEvent.update(
-        status="cancelled",
-        active_key=None,
-        last_error=reason,
-        claim_token=None,
-        claimed_at=None,
-        next_attempt_at=None,
-        resolved_at=now,
-        updated_at=now,
-    ).where(pending_query).execute()
+    pending_scope = _combine_or_conditions(pending_scopes)
+    if pending_scope is not None:
+        PendingOrchestratedEvent.update(
+            status="cancelled",
+            active_key=None,
+            last_error=reason,
+            claim_token=None,
+            claimed_at=None,
+            next_attempt_at=None,
+            resolved_at=now,
+            updated_at=now,
+        ).where(
+            PendingOrchestratedEvent.status.in_(_PENDING_ORCHESTRATION_STATUSES)
+            & pending_scope
+        ).execute()
 
-    automation_query = AutomationExecution.status.in_(_PENDING_AUTOMATION_STATUSES)
+    automation_scopes = []
     if group_id is not None:
-        automation_query &= AutomationExecution.group == group_id
-    if action_ids is not None:
-        action_ids = list(action_ids)
-        if action_ids:
-            automation_query &= AutomationExecution.action.in_(action_ids)
-        else:
-            automation_query &= AutomationExecution.id == -1
-    if orchestration_ids is not None:
-        orchestration_ids = list(orchestration_ids)
-        if orchestration_ids:
-            execution_ids = OrchestrationExecution.select(OrchestrationExecution.id).where(
-                OrchestrationExecution.orchestration.in_(orchestration_ids)
+        automation_scopes.append(AutomationExecution.group == group_id)
+    if action_ids:
+        automation_scopes.append(AutomationExecution.action.in_(action_ids))
+    if orchestration_ids:
+        orchestration_execution_ids = OrchestrationExecution.select(
+            OrchestrationExecution.id
+        ).where(
+            OrchestrationExecution.orchestration.in_(orchestration_ids)
+        )
+        automation_scopes.append(
+            AutomationExecution.orchestration_execution.in_(
+                orchestration_execution_ids
             )
-            automation_query &= AutomationExecution.orchestration_execution.in_(execution_ids)
-        else:
-            automation_query &= AutomationExecution.id == -1
+        )
 
-    # Service/route are represented on the alert group attached to an
-    # automation execution. This also catches queued work created before the
-    # soft-delete cascade was introduced.
-    if service_id is not None or route_id is not None:
-        group_ids = AlertGroup.select(AlertGroup.id)
-        if service_id is not None:
-            group_ids = group_ids.where(AlertGroup.service == service_id)
-        if route_id is not None:
-            group_ids = group_ids.where(AlertGroup.route == route_id)
-        automation_query &= AutomationExecution.alert_group_id.in_(group_ids)
+    # Service/route live on AlertGroup rather than AutomationExecution. Build
+    # one affected AlertGroup union before the caller detaches those FKs. Check
+    # both the denormalized automation alert_group_id and the immutable
+    # OrchestrationExecution.alert_group_id for older queued rows.
+    alert_group_scopes = []
+    if service_id is not None:
+        alert_group_scopes.append(AlertGroup.service == service_id)
+    if route_id is not None:
+        alert_group_scopes.append(AlertGroup.route == route_id)
 
-    AutomationExecution.update(
-        status="cancelled",
-        error_safe=reason,
-        claim_token=None,
-        claimed_at=None,
-        next_attempt_at=None,
-        finished_at=now,
-    ).where(automation_query).execute()
+    alert_group_scope = _combine_or_conditions(alert_group_scopes)
+    if alert_group_scope is not None:
+        affected_alert_group_ids = AlertGroup.select(AlertGroup.id).where(
+            alert_group_scope
+        )
+        automation_scopes.append(
+            AutomationExecution.alert_group_id.in_(affected_alert_group_ids)
+        )
+        affected_execution_ids = OrchestrationExecution.select(
+            OrchestrationExecution.id
+        ).where(
+            OrchestrationExecution.alert_group_id.in_(affected_alert_group_ids)
+        )
+        automation_scopes.append(
+            AutomationExecution.orchestration_execution.in_(
+                affected_execution_ids
+            )
+        )
+
+    automation_scope = _combine_or_conditions(automation_scopes)
+    if automation_scope is not None:
+        AutomationExecution.update(
+            status="cancelled",
+            error_safe=reason,
+            claim_token=None,
+            claimed_at=None,
+            next_attempt_at=None,
+            finished_at=now,
+        ).where(
+            AutomationExecution.status.in_(_PENDING_AUTOMATION_STATUSES)
+            & automation_scope
+        ).execute()
 
 
 def deactivate_sso_mappings(*, group_id=None, team_id=None):

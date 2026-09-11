@@ -118,6 +118,25 @@ missing nested map.
 {{- end }}
 
 {{/*
+Render Helm config values without scientific notation for whole-number floats.
+Helm can deserialize large YAML numbers as float64, and Go's default formatting
+may render values such as 1048576 as 1.048576e+06. The application intentionally
+parses integer settings strictly, so keep integer-valued floats in decimal form.
+*/}}
+{{- define "incidentrelay.configValue" -}}
+{{- $value := . -}}
+{{- if kindIs "float64" $value -}}
+{{- if eq $value (floor $value) -}}
+{{- printf "%.0f" $value -}}
+{{- else -}}
+{{- $value -}}
+{{- end -}}
+{{- else -}}
+{{- $value -}}
+{{- end -}}
+{{- end }}
+
+{{/*
 Return a normalized 2.0 config map. This makes old Helm values safe to reuse:
 security-related options introduced after 1.x are materialized before the INI
 file is rendered, so the container entrypoint never generates different keys
@@ -161,7 +180,7 @@ inside separate PostgreSQL/multi-node pods.
 {{ range $section, $options := $config -}}
 [{{ $section }}]
 {{ range $key, $value := $options -}}
-{{ $key }} = {{ $value }}
+{{ $key }} = {{ include "incidentrelay.configValue" $value }}
 {{ end }}
 {{ end -}}
 {{- end }}

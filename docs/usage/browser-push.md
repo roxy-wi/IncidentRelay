@@ -129,7 +129,7 @@ Browser push is considered a deliverable target for reminders and escalations wh
 
 ## ACK, Resolve and Shelve buttons
 
-Alert push notifications can include `Acknowledge`, `Resolve`, `Shelve 1h` and `Unshelve` actions. These buttons use short-lived one-time action tokens embedded in the notification payload.
+Alert push notifications can include `Acknowledge`, `Resolve`, `Shelve 1h` and `Unshelve` actions. These buttons use short-lived one-time action tokens embedded in the notification payload. Action tokens are generated only when the assigned user currently has responder permission for the AlertGroup team. A user without responder permission still receives the informational push, but `action_tokens` is empty and no action buttons are shown. Permission is checked again when an action token is used.
 
 The action endpoint is intentionally public:
 

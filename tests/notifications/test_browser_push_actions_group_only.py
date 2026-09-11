@@ -2,7 +2,7 @@ from datetime import timedelta
 
 import pytest
 
-from app.modules.db.models import AlertGroup, BrowserPushActionToken
+from app.modules.db.models import AlertGroup, BrowserPushActionToken, TeamUser
 from app.notifiers.browser_push import service as browser_push
 from app.services.alerts.lifecycle import upsert_alert
 from tests.factories import add_user_to_team, create_group, create_route, create_team, create_user
@@ -180,6 +180,31 @@ def test_execute_push_shelve_returns_actionable_unshelve_token(db):
     assert unshelved["ok"] is True
     assert unshelved["action"] == "unshelve"
     assert is_alert_group_shelved(alert_group.id) is False
+
+
+def test_execute_push_action_rechecks_permission_after_token_creation(db, monkeypatch):
+    alert_group, user = _group_with_user(status="firing")
+    payload = browser_push.build_alert_push_payload(
+        alert_group,
+        user,
+        event_type="notification",
+    )
+    token = payload["action_tokens"]["ack"]
+
+    TeamUser.update(active=False).where(
+        (TeamUser.team == alert_group.team_id)
+        & (TeamUser.user == user.id)
+    ).execute()
+    monkeypatch.setattr(
+        browser_push,
+        "_run_alert_push_action",
+        lambda *args, **kwargs: pytest.fail("revoked responder must not execute"),
+    )
+
+    result = browser_push.execute_push_action(token, "ack")
+
+    assert result == {"ok": False, "error": "action_not_authorized"}
+
 
 def test_execute_push_action_rejects_token_reuse(db):
     alert_group, user = _group_with_user(status="firing")

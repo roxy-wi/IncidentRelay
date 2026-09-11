@@ -318,6 +318,14 @@ def soft_delete_route(route_id):
     database = AlertRoute._meta.database
 
     with database.atomic():
+        # Cancel before detaching AlertGroup.route so global/service
+        # orchestration work can still be matched through the alert group.
+        cancel_pending_orchestration_work(
+            route_id=route.id,
+            now=now,
+            reason="route_deleted",
+        )
+
         # Active incidents must not start using a newly restored route later.
         Alert.update(route=None).where(
             (Alert.route == route.id)
@@ -349,12 +357,6 @@ def soft_delete_route(route_id):
         AlertRouteChannel.delete().where(
             AlertRouteChannel.route == route.id
         ).execute()
-
-        cancel_pending_orchestration_work(
-            route_id=route.id,
-            now=now,
-            reason="route_deleted",
-        )
 
         route.enabled = False
         route.deleted = True
