@@ -7,6 +7,7 @@ from pydantic import ValidationError
 from app.api.schemas.sso import (
     SsoGroupMappingCreateSchema,
     SsoProviderCreateSchema,
+    SsoProviderUpdateSchema
 )
 from app.modules.db import users_repo
 from app.modules.db.models import (
@@ -1198,3 +1199,134 @@ def test_sso_json_loader_does_not_expose_network_exception(monkeypatch):
     assert error.message == "Could not load OIDC metadata"
     assert error.status_code == 502
     assert "internal-idp-secret-detail" not in str(error)
+
+
+@pytest.mark.parametrize(
+    "mapping",
+    [
+        {"slack_user_id": None},
+        {"slack_user_id": ""},
+        {"slack_user_id": "   "},
+        {"slack_user_id": "\t\n"},
+    ],
+)
+def test_sso_profile_claim_mapping_ignores_empty_claim_names(mapping):
+    payload = SsoProviderUpdateSchema(
+        profile_claim_mappings=mapping,
+    )
+
+    assert payload.profile_claim_mappings is None
+
+
+@pytest.mark.parametrize(
+    "claim_name",
+    [
+        123,
+        True,
+        [],
+        {},
+    ],
+)
+def test_sso_profile_claim_mapping_rejects_non_string_claim_name(
+    claim_name,
+):
+    with pytest.raises(ValidationError):
+        SsoProviderUpdateSchema(
+            profile_claim_mappings={
+                "slack_user_id": claim_name,
+            },
+        )
+
+
+def test_sso_profile_claim_mapping_accepts_128_character_claim_name():
+    claim_name = "x" * 128
+
+    payload = SsoProviderUpdateSchema(
+        profile_claim_mappings={
+            "slack_user_id": claim_name,
+        },
+    )
+
+    assert payload.profile_claim_mappings == {
+        "slack_user_id": claim_name,
+    }
+
+
+def test_sso_profile_claim_mapping_rejects_129_character_claim_name():
+    with pytest.raises(ValidationError):
+        SsoProviderUpdateSchema(
+            profile_claim_mappings={
+                "slack_user_id": "x" * 129,
+            },
+        )
+
+
+def test_sso_profile_claim_mapping_preserves_unicode_claim_name():
+    claim_name = "профиль.slack"
+
+    payload = SsoProviderUpdateSchema(
+        profile_claim_mappings={
+            "slack_user_id": claim_name,
+        },
+    )
+
+    assert payload.profile_claim_mappings == {
+        "slack_user_id": claim_name,
+    }
+
+
+def test_sso_profile_claim_mapping_strips_claim_name():
+    payload = SsoProviderUpdateSchema(
+        profile_claim_mappings={
+            "slack_user_id": "  slack_id  ",
+        },
+    )
+
+    assert payload.profile_claim_mappings == {
+        "slack_user_id": "slack_id",
+    }
+
+
+@pytest.mark.parametrize(
+    "target_field",
+    [
+        "phone",
+        "email",
+        "username",
+        "unknown",
+    ],
+)
+def test_sso_profile_claim_mapping_rejects_unsupported_target_field(
+    target_field,
+):
+    with pytest.raises(
+        ValidationError,
+        match="profile_claim_mappings supports only",
+    ):
+        SsoProviderUpdateSchema(
+            profile_claim_mappings={
+                target_field: "external_claim",
+            },
+        )
+
+
+@pytest.mark.parametrize(
+    "target_field",
+    [
+        "slack_user_id",
+        "telegram_user_id",
+        "mattermost_user_id",
+    ],
+)
+def test_sso_profile_claim_mapping_accepts_supported_target_fields(
+    target_field,
+):
+    payload = SsoProviderUpdateSchema(
+        profile_claim_mappings={
+            target_field: "external_user_id",
+        },
+    )
+
+    assert payload.profile_claim_mappings == {
+        target_field: "external_user_id",
+    }

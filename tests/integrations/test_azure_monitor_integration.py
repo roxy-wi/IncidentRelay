@@ -1,5 +1,7 @@
 from copy import deepcopy
 
+import pytest
+
 from app.api.schemas.routes import RouteCreateSchema
 from app.modules.db.models import Alert, AlertGroup
 from app.services.integrations.auth import hash_token
@@ -286,3 +288,163 @@ def test_azure_monitor_fired_and_resolved_update_existing_alert(
     assert alert.status == "resolved"
     assert alert.route_id == route.id
     assert alert_group.status == "resolved"
+
+
+@pytest.mark.parametrize(
+    "data",
+    [
+        None,
+        "invalid",
+        [],
+        123,
+        True,
+    ],
+)
+def test_azure_monitor_handles_non_mapping_data(data):
+    payload = azure_monitor_payload()
+    payload["data"] = data
+
+    alert = normalize_azure_monitor(payload)[0]
+
+    assert alert["source"] == "azure_monitor"
+    assert alert["status"] == "firing"
+    assert alert["severity"] == "info"
+    assert alert["title"] == "Azure Monitor alert"
+    assert alert["external_id"] is None
+    assert alert["dedup_key"]
+
+
+@pytest.mark.parametrize(
+    "essentials",
+    [
+        None,
+        "invalid",
+        [],
+        123,
+        True,
+    ],
+)
+def test_azure_monitor_handles_non_mapping_essentials(essentials):
+    payload = azure_monitor_payload()
+    payload["data"]["essentials"] = essentials
+
+    alert = normalize_azure_monitor(payload)[0]
+
+    assert alert["source"] == "azure_monitor"
+    assert alert["status"] == "firing"
+    assert alert["severity"] == "info"
+    assert alert["title"] == "Azure Monitor alert"
+    assert alert["external_id"] is None
+    assert alert["dedup_key"]
+
+
+@pytest.mark.parametrize(
+    "custom_properties",
+    [
+        None,
+        "invalid",
+        [],
+        123,
+        True,
+    ],
+)
+def test_azure_monitor_handles_non_mapping_custom_properties(
+    custom_properties,
+):
+    payload = azure_monitor_payload()
+    payload["data"]["customProperties"] = custom_properties
+
+    alert = normalize_azure_monitor(payload)[0]
+
+    assert alert["source"] == "azure_monitor"
+    assert "team" not in alert["labels"]
+    assert "service" not in alert["labels"]
+    assert "environment" not in alert["labels"]
+
+
+def test_azure_monitor_unknown_condition_defaults_to_firing():
+    alert = normalize_azure_monitor(
+        azure_monitor_payload(
+            monitorCondition="FutureAzureStatus",
+        )
+    )[0]
+
+    assert alert["status"] == "firing"
+    assert (
+        alert["labels"]["azure_monitor_condition"]
+        == "FutureAzureStatus"
+    )
+
+
+def test_azure_monitor_missing_condition_defaults_to_firing():
+    alert = normalize_azure_monitor(
+        azure_monitor_payload(
+            monitorCondition=None,
+        )
+    )[0]
+
+    assert alert["status"] == "firing"
+    assert "azure_monitor_condition" not in alert["labels"]
+
+
+def test_azure_monitor_unknown_severity_defaults_to_info():
+    alert = normalize_azure_monitor(
+        azure_monitor_payload(
+            severity="Sev999",
+        )
+    )[0]
+
+    assert alert["severity"] == "info"
+    assert alert["labels"]["azure_severity"] == "Sev999"
+
+
+def test_azure_monitor_duplicate_firing_delivery_updates_same_alert(
+    client,
+    db,
+):
+    raw_token = "azure-monitor-duplicate-token"
+    group = create_group(slug="platform")
+    team = create_team(group, slug="sre")
+
+    create_route(
+        team,
+        source="azure_monitor",
+        token_hash=hash_token(raw_token),
+        group_by=["azure_alert_id"],
+    )
+
+    headers = {
+        "Authorization": f"Bearer {raw_token}",
+    }
+    payload = azure_monitor_payload()
+
+    first_response = client.post(
+        "/api/integrations/azure-monitor",
+        headers=headers,
+        json=payload,
+    )
+    second_response = client.post(
+        "/api/integrations/azure-monitor",
+        headers=headers,
+        json=payload,
+    )
+
+    assert first_response.status_code == 200
+    assert second_response.status_code == 200
+
+    first = first_response.get_json()[0]
+    second = second_response.get_json()[0]
+
+    assert first["created"] is True
+    assert second["created"] is False
+
+    assert second["alert_id"] == first["alert_id"]
+    assert second["group_id"] == first["group_id"]
+    assert second["status"] == "firing"
+
+    alert = Alert.get_by_id(first["alert_id"])
+    alert_group = AlertGroup.get_by_id(first["group_id"])
+
+    assert alert.source == "azure_monitor"
+    assert alert.status == "firing"
+    assert alert_group.status == "firing"

@@ -239,3 +239,84 @@ def test_merge_closes_source_group_shelf_without_resume(db):
     assert source.status == "merged"
     assert shelf.active is False
     assert shelf.unshelve_reason == "alert_group_merged"
+
+
+@pytest.mark.parametrize("duration_seconds", [60, 604800])
+def test_shelve_accepts_duration_boundaries(db, duration_seconds):
+    group, user = _open_group()
+
+    _, shelf = shelving.shelve_alert_group(
+        group.id,
+        user_id=user.id,
+        duration_seconds=duration_seconds,
+    )
+
+    assert shelf.active is True
+    assert (
+        shelf.ends_at - shelf.shelved_at
+    ).total_seconds() == duration_seconds
+
+
+@pytest.mark.parametrize(
+    ("duration_seconds", "error"),
+    [
+        (59, "duration_seconds must be at least 60"),
+        (604801, "duration_seconds must not exceed 604800"),
+    ],
+)
+def test_shelve_rejects_duration_outside_boundaries(
+    db,
+    duration_seconds,
+    error,
+):
+    group, user = _open_group()
+
+    with pytest.raises(ValueError, match=error):
+        shelving.shelve_alert_group(
+            group.id,
+            user_id=user.id,
+            duration_seconds=duration_seconds,
+        )
+
+    assert (
+        AlertGroupShelve
+        .select()
+        .where(AlertGroupShelve.alert_group == group.id)
+        .count()
+    ) == 0
+
+
+def test_shelve_accepts_reason_with_1000_characters(db):
+    group, user = _open_group()
+    reason = "x" * 1000
+
+    _, shelf = shelving.shelve_alert_group(
+        group.id,
+        user_id=user.id,
+        duration_seconds=60,
+        reason=reason,
+    )
+
+    assert shelf.reason == reason
+
+
+def test_shelve_rejects_reason_with_1001_characters(db):
+    group, user = _open_group()
+
+    with pytest.raises(
+        ValueError,
+        match="reason must not exceed 1000 characters",
+    ):
+        shelving.shelve_alert_group(
+            group.id,
+            user_id=user.id,
+            duration_seconds=60,
+            reason="x" * 1001,
+        )
+
+    assert (
+        AlertGroupShelve
+        .select()
+        .where(AlertGroupShelve.alert_group == group.id)
+        .count()
+    ) == 0

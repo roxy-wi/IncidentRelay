@@ -82,6 +82,10 @@ def test_services_runtime_contains_chinese_dynamic_translations():
 
 
 def test_services_runtime_executes_chinese_dynamic_translations():
+    node = shutil.which("node")
+    if node is None:
+        pytest.skip("Node.js is required for JavaScript runtime translation test")
+
     runtime = ROOT / "app" / "static" / "js" / "pages" / "services" / "i18n_runtime.js"
     catalog = CATALOG_ROOT / "zh" / "services_full.json"
     cases = {
