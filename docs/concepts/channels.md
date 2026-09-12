@@ -66,17 +66,17 @@ For channel tests, IncidentRelay should use the current user's matching profile 
 
 ## Channels that support actions
 
-Some channels can support ACK/Resolve actions from the message itself.
+Some channels can support ACK/Resolve/Shelve actions from the message itself.
 
 | Channel | Action support |
 |---|---|
-| Mattermost Bot API | ACK/Resolve buttons and message updates |
-| Slack Bot API | ACK/Resolve buttons and message updates through HTTP actions or Socket Mode |
+| Mattermost Bot API | ACK/Resolve/Shelve buttons and message updates |
+| Slack Bot API | ACK/Resolve/Shelve buttons and message updates through HTTP actions or Socket Mode |
 | Telegram | Inline actions and message updates |
 | Voice call | DTMF actions if provider supports callbacks |
 | Email | No interactive actions |
 | Slack incoming webhook, Discord, Teams, generic webhook | One-way notification only |
 
-Browser push notifications can also include ACK/Resolve actions, but browser push is profile-level and is not configured as a channel.
+Browser push notifications can also include ACK/Resolve/Shelve actions, but browser push is profile-level and is not configured as a channel.
 
 Read more in [Notification channels](../integrations/channels.md).

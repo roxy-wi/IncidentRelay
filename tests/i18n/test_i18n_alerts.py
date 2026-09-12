@@ -2,8 +2,10 @@ from pathlib import Path
 import json
 import re
 
+from app.i18n import SUPPORTED_LOCALES
 
-ROOT = Path(__file__).resolve().parents[1]
+
+ROOT = Path(__file__).resolve().parents[2]
 
 
 def load_catalog(locale):
@@ -19,9 +21,8 @@ def load_catalog(locale):
 def test_alert_catalogs_have_matching_keys():
     english_keys = set(load_catalog("en"))
 
-    assert english_keys == set(load_catalog("ru"))
-    assert english_keys == set(load_catalog("de"))
-    assert english_keys == set(load_catalog("fr"))
+    for locale in SUPPORTED_LOCALES:
+        assert english_keys == set(load_catalog(locale)), locale
 
 
 def test_alert_templates_reference_existing_keys():

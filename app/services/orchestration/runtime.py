@@ -26,6 +26,7 @@ from app.services.orchestration.cache import published_definition_cache
 from app.services.orchestration.engine import execute_rule_tree
 from app.services.orchestration.fields import build_context
 from app.services.orchestration.safety import safe_trace_value
+from app.services.alerts.event_history import ALERT_EVENT_HISTORY_LEVELS
 
 logger = logging.getLogger("oncall.orchestration.runtime")
 
@@ -79,6 +80,7 @@ class RuntimeResult:
     group_key: Optional[str] = None
     grouping_window_seconds: Optional[int] = None
     trace_level: Optional[str] = None
+    alert_event_history: Optional[str] = None
     route_selected_by_orchestration: bool = False
     steps: List[RuntimeStep] = field(default_factory=list)
     blocked: bool = False
@@ -109,6 +111,7 @@ class RuntimeResult:
             "group_key": self.group_key,
             "grouping_window_seconds": self.grouping_window_seconds,
             "trace_level": self.trace_level,
+            "alert_event_history": self.alert_event_history,
             "blocked": self.blocked,
             "reason": self.reason,
             "disposition": self.disposition,
@@ -613,6 +616,10 @@ def _evaluate_orchestrations(
         ):
             runtime.trace_level = trace_level
 
+        alert_event_history = result_state.get("alert_event_history")
+        if alert_event_history in ALERT_EVENT_HISTORY_LEVELS:
+            runtime.alert_event_history = alert_event_history
+
         disposition = result_state.get("disposition") or "process"
         if disposition in {"suppress", "pause", "drop"}:
             runtime.disposition = disposition
@@ -1012,6 +1019,7 @@ def restore_runtime_result(data: Mapping[str, Any]) -> RuntimeResult:
         group_key=payload.get("group_key"),
         grouping_window_seconds=payload.get("grouping_window_seconds"),
         trace_level=payload.get("trace_level"),
+        alert_event_history=payload.get("alert_event_history"),
         route_selected_by_orchestration=bool(
             payload.get("route_selected_by_orchestration")
         ),

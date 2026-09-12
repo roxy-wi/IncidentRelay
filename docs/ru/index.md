@@ -5,7 +5,7 @@ description: Документация по self-hosted сервису IncidentRe
 
 # Документация IncidentRelay
 
-IncidentRelay — это self-hosted сервис для планирования дежурств (on-call), маршрутизации алертов и уведомлений. Он хранит команды, ротации, маршруты, каналы уведомлений, подписки на браузерные push-уведомления, подтверждения (ACK), разрешения (Resolve), напоминания и эскалации внутри вашей собственной инфраструктуры.
+IncidentRelay — это self-hosted сервис для планирования дежурств (on-call), маршрутизации алертов и уведомлений. Он хранит команды, ротации, маршруты, каналы уведомлений, подписки на браузерные push-уведомления, подтверждения (ACK), разрешения (Resolve), временное откладывание алертов (Shelve), напоминания и эскалации внутри вашей собственной инфраструктуры.
 
 ## Поток алертов
 
@@ -18,7 +18,7 @@ Monitoring system
   -> Team and rotation
   -> Assigned on-call user
   -> Notification channels and profile browser push
-  -> ACK / Resolve
+  -> ACK / Resolve / Shelve
 ```
 
 Браузерные push-уведомления включаются пользователями в профиле и доставляются автоматически назначенным пользователям. Они не являются каналами маршрута.
@@ -75,6 +75,7 @@ export INCIDENTRELAY_CONFIG_FILE=/etc/incidentrelay/incidentrelay.conf
 | Browser push | Доставка браузерных/PWA-уведомлений на уровне профиля для назначенных пользователей |
 | Alert | Алерт IncidentRelay, созданный из входящей интеграции |
 | Silence | Правило, подавляющее уведомления для совпадающих новых алертов |
+| Shelve | Временная responder-пауза для одного существующего AlertGroup без изменения технического статуса и impact |
 | Override | Временная замена участника ротации |
 
 Подробнее:
@@ -84,6 +85,7 @@ export INCIDENTRELAY_CONFIG_FILE=/etc/incidentrelay/incidentrelay.conf
 - [Токены приёма маршрутов](concepts/route-intake-tokens.md)
 - [Каналы](concepts/channels.md)
 - [Браузерные push-уведомления](usage/browser-push.md)
+- [Shelving алертов](usage/shelving.md)
 - [Напоминания и эскалации](concepts/reminders-and-escalations.md)
 - [Event Orchestration](usage/event-orchestration.md)
 
@@ -110,7 +112,7 @@ Team roles:  viewer, responder, manager
 - `user_admin` может создавать пользователей только в пределах границы выбранной группы.
 - `editor` может создавать команды в группе, но не управляет автоматически всеми командами.
 - `manager` — это роль записи для конкретной команды.
-- `responder` может подтверждать и разрешать алерты без изменения настроек команды.
+- `responder` может подтверждать, разрешать или временно откладывать алерты без изменения настроек команды.
 
 Подробнее: [Группы и RBAC](concepts/groups-and-rbac.md).
 
@@ -204,6 +206,7 @@ OpenAPI JSON:
 - [API интеграции с Sentry](api/sentry-integration.md)
 - [Профиль и личные API-токены](usage/profile-and-tokens.md)
 - [Браузерные push-уведомления](usage/browser-push.md)
+- [Shelving алертов](usage/shelving.md)
 - [Заметки по OpenAPI для голосовых вызовов](api/voice-call-openapi.md)
 
 ## Процесс первичной настройки
@@ -231,7 +234,7 @@ OpenAPI JSON:
 20. Copy the route intake token
 21. Configure Alertmanager, Zabbix or webhook sender
 22. Send a test alert
-23. Acknowledge or resolve the alert
+23. Подтвердите, разрешите или временно отложите алерт
 ```
 
 Подробнее: [Первый вход и настройка](getting-started/first-login.md).

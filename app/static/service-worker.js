@@ -1,4 +1,4 @@
-const IR_PWA_VERSION = "incidentrelay-pwa-v1.0.3";
+const IR_PWA_VERSION = "incidentrelay-pwa-v1.0.4";
 const IR_STATIC_CACHE = IR_PWA_VERSION + "-static";
 const IR_OFFLINE_CACHE = IR_PWA_VERSION + "-offline";
 const OFFLINE_URL = "/static/offline.html";
@@ -128,32 +128,86 @@ const IR_SW_MESSAGES = {
     en: {
         acknowledge: "Acknowledge",
         resolve: "Resolve",
+        shelve: "Shelve 1h",
+        unshelve: "Unshelve",
         alert: "Alert",
         action_failed: "Action failed: {error}",
         unknown_error: "unknown error",
         network_error: "network error",
         acknowledged: "{alert} acknowledged",
-        resolved: "{alert} resolved"
+        resolved: "{alert} resolved",
+        shelved: "{alert} shelved for 1 hour",
+        unshelved: "{alert} unshelved"
     },
     ru: {
         acknowledge: "Подтвердить",
         resolve: "Закрыть",
+        shelve: "Отложить на 1 ч",
+        unshelve: "Вернуть",
         alert: "Алерт",
         action_failed: "Не удалось выполнить действие: {error}",
         unknown_error: "неизвестная ошибка",
         network_error: "ошибка сети",
         acknowledged: "{alert} подтверждён",
-        resolved: "{alert} закрыт"
+        resolved: "{alert} закрыт",
+        shelved: "{alert} отложен на 1 час",
+        unshelved: "{alert} возвращён"
     },
     de: {
         acknowledge: "Bestätigen",
         resolve: "Lösen",
+        shelve: "1 Std. zurückstellen",
+        unshelve: "Zurückholen",
         alert: "Alarm",
         action_failed: "Aktion fehlgeschlagen: {error}",
         unknown_error: "unbekannter Fehler",
         network_error: "Netzwerkfehler",
         acknowledged: "{alert} bestätigt",
-        resolved: "{alert} gelöst"
+        resolved: "{alert} gelöst",
+        shelved: "{alert} für 1 Stunde zurückgestellt",
+        unshelved: "{alert} wieder aktiviert"
+    },
+    fr: {
+        acknowledge: "Acquitter",
+        resolve: "Résoudre",
+        shelve: "Reporter 1 h",
+        unshelve: "Réactiver",
+        alert: "Alerte",
+        action_failed: "Échec de l’action : {error}",
+        unknown_error: "erreur inconnue",
+        network_error: "erreur réseau",
+        acknowledged: "{alert} acquittée",
+        resolved: "{alert} résolue",
+        shelved: "{alert} reportée pendant 1 heure",
+        unshelved: "{alert} réactivée"
+    },
+    es: {
+        acknowledge: "Reconocer",
+        resolve: "Resolver",
+        shelve: "Posponer 1 h",
+        unshelve: "Reactivar",
+        alert: "Alerta",
+        action_failed: "La acción falló: {error}",
+        unknown_error: "error desconocido",
+        network_error: "error de red",
+        acknowledged: "{alert} reconocida",
+        resolved: "{alert} resuelta",
+        shelved: "{alert} pospuesta durante 1 hora",
+        unshelved: "{alert} reactivada"
+    },
+    zh: {
+        acknowledge: "确认",
+        resolve: "解决",
+        shelve: "搁置 1 小时",
+        unshelve: "取消搁置",
+        alert: "告警",
+        action_failed: "操作失败：{error}",
+        unknown_error: "未知错误",
+        network_error: "网络错误",
+        acknowledged: "已确认 {alert}",
+        resolved: "已解决 {alert}",
+        shelved: "已搁置 {alert} 1 小时",
+        unshelved: "已取消搁置 {alert}"
     }
 };
 
@@ -167,6 +221,15 @@ function normalizeIncidentRelayLocale(value) {
     }
     if (locale.startsWith("de")) {
         return "de";
+    }
+    if (locale.startsWith("fr")) {
+        return "fr";
+    }
+    if (locale.startsWith("es")) {
+        return "es";
+    }
+    if (locale.startsWith("zh")) {
+        return "zh";
     }
     return "en";
 }
@@ -298,6 +361,20 @@ self.addEventListener("push", function (event) {
             });
         }
 
+        if (actionTokens.shelve) {
+            actions.push({
+                action: "shelve",
+                title: incidentRelaySwText(locale, "shelve")
+            });
+        }
+
+        if (actionTokens.unshelve) {
+            actions.push({
+                action: "unshelve",
+                title: incidentRelaySwText(locale, "unshelve")
+            });
+        }
+
         const options = {
             body: payload.body || "",
             tag: payload.tag || `incidentrelay-${Date.now()}`,
@@ -361,7 +438,7 @@ self.addEventListener("notificationclick", function (event) {
 
     notification.close();
 
-    if (action !== "ack" && action !== "resolve") {
+    if (!["ack", "resolve", "shelve", "unshelve"].includes(action)) {
         event.waitUntil(openIncidentRelayUrl(url));
         return;
     }
@@ -413,24 +490,46 @@ self.addEventListener("notificationclick", function (event) {
                 data.alert_title
                 || `${incidentRelaySwText(locale, "alert")} #${result.alert_id || data.alert_id || ""}`.trim()
             );
-            const body = action === "ack"
-                ? incidentRelaySwText(
-                    locale,
-                    "acknowledged",
-                    {alert: alertTitle}
-                )
-                : incidentRelaySwText(
-                    locale,
-                    "resolved",
-                    {alert: alertTitle}
-                );
+            const messageKey = {
+                ack: "acknowledged",
+                resolve: "resolved",
+                shelve: "shelved",
+                unshelve: "unshelved"
+            }[action] || "resolved";
+            const body = incidentRelaySwText(
+                locale,
+                messageKey,
+                {alert: alertTitle}
+            );
+
+            const followUpTokens = result.action_tokens || {};
+            const followUpActions = [];
+            if (followUpTokens.unshelve) {
+                followUpActions.push({
+                    action: "unshelve",
+                    title: incidentRelaySwText(locale, "unshelve")
+                });
+            }
+            if (followUpTokens.resolve) {
+                followUpActions.push({
+                    action: "resolve",
+                    title: incidentRelaySwText(locale, "resolve")
+                });
+            }
 
             return self.registration.showNotification("IncidentRelay", {
                 body,
                 tag: `incidentrelay-alert-${result.alert_id || data.alert_id || Date.now()}`,
                 renotify: true,
                 silent: false,
-                data: {url, locale}
+                actions: followUpActions,
+                data: {
+                    url,
+                    locale,
+                    alert_id: result.alert_id || data.alert_id,
+                    alert_title: alertTitle,
+                    action_tokens: followUpTokens
+                }
             });
         } catch (error) {
             return self.registration.showNotification("IncidentRelay", {

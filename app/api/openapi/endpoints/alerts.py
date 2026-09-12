@@ -471,6 +471,24 @@ def alert_group_schema(include_details=False):
         },
         "previous_status": {"type": "string", "nullable": True},
         "silenced": {"type": "boolean"},
+        "shelved": {
+            "type": "boolean",
+            "description": "Whether this alert group is temporarily shelved.",
+        },
+        "shelve": {
+            "type": "object",
+            "nullable": True,
+            "description": "Current effective shelf. Shelving does not change technical status.",
+            "properties": {
+                "active": {"type": "boolean"},
+                "id": {"type": "integer"},
+                "shelved_at": date_time_property("Shelf start timestamp in UTC."),
+                "until": date_time_property("Automatic shelf expiry timestamp in UTC."),
+                "reason": {"type": "string", "nullable": True},
+                "source": {"type": "string"},
+                "shelved_by": user_short_schema(),
+            },
+        },
         "common_labels": {
             "type": "object",
             "nullable": True,
@@ -545,6 +563,10 @@ def alert_group_schema(include_details=False):
         properties["events"] = {
             "type": "array",
             "items": alert_event_schema(),
+        }
+        properties["events_pagination"] = {
+            "type": "object",
+            "additionalProperties": True,
         }
         properties["notifications"] = {
             "type": "array",
@@ -799,6 +821,11 @@ def paths():
                         {"type": "string", "enum": ["0", "1"], "default": "0"},
                     ),
                     query_param(
+                        "shelved",
+                        "Set to 1 to return only currently shelved alert groups.",
+                        {"type": "string", "enum": ["0", "1"], "default": "0"},
+                    ),
+                    query_param(
                         "sort",
                         "Sort field.",
                         {
@@ -890,6 +917,16 @@ def paths():
                 "security": bearer_security(),
                 "parameters": [
                     path_param("alert_id", "Alert group id."),
+                    query_param(
+                        "events_page",
+                        "Optional embedded event-history page. Supplying this or events_page_size enables bounded event history in the detail response.",
+                        {"type": "integer", "minimum": 1},
+                    ),
+                    query_param(
+                        "events_page_size",
+                        "Optional embedded event-history page size. Maximum 100.",
+                        {"type": "integer", "minimum": 1, "maximum": 100},
+                    ),
                 ],
                 "responses": {
                     "200": response(
@@ -998,6 +1035,57 @@ def paths():
                 },
             }
         },
+        "/api/alerts/{alert_id}/shelve": {
+            "post": {
+                "tags": ["alerts"],
+                "summary": "Shelve alert group",
+                "description": (
+                    "Temporarily pauses notification, update, reminder and escalation delivery "
+                    "for one open alert group without changing its technical status or service impact."
+                ),
+                "operationId": "shelveAlertGroup",
+                "security": bearer_security(),
+                "parameters": [path_param("alert_id", "Alert group id.")],
+                "requestBody": json_body(
+                    "Shelf duration and optional reason.",
+                    {
+                        "type": "object",
+                        "properties": {
+                            "duration_seconds": {
+                                "type": "integer", "minimum": 60, "maximum": 604800, "default": 3600
+                            },
+                            "reason": {"type": "string", "nullable": True, "maxLength": 1000},
+                        },
+                    },
+                ),
+                "responses": {
+                    "200": response("Alert group shelved.", alert_group_schema()),
+                    "400": response("Invalid shelf request."),
+                    "401": response("Authentication required."),
+                    "403": response("Access denied."),
+                    "404": response("Alert group not found."),
+                },
+            }
+        },
+        "/api/alerts/{alert_id}/unshelve": {
+            "post": {
+                "tags": ["alerts"],
+                "summary": "Unshelve alert group",
+                "description": (
+                    "Ends the current shelf. If the group is still firing, IncidentRelay sends "
+                    "the current state and restarts escalation from the unshelve time."
+                ),
+                "operationId": "unshelveAlertGroup",
+                "security": bearer_security(),
+                "parameters": [path_param("alert_id", "Alert group id.")],
+                "responses": {
+                    "200": response("Alert group unshelved.", alert_group_schema()),
+                    "401": response("Authentication required."),
+                    "403": response("Access denied."),
+                    "404": response("Alert group not found."),
+                },
+            }
+        },
         "/api/alerts/{alert_id}/resolve": {
             "post": {
                 "tags": ["alerts"],
@@ -1045,13 +1133,40 @@ def paths():
                 "security": bearer_security(),
                 "parameters": [
                     path_param("alert_id", "Alert group id."),
+                    query_param(
+                        "page",
+                        "Optional page number. Supplying page or page_size enables paginated object response.",
+                        {"type": "integer", "minimum": 1, "default": 1},
+                    ),
+                    query_param(
+                        "page_size",
+                        "Optional page size. Maximum 100.",
+                        {"type": "integer", "minimum": 1, "maximum": 100, "default": 50},
+                    ),
                 ],
                 "responses": {
                     "200": response(
-                        "Alert group event history.",
+                        "Alert group event history. Without pagination parameters the legacy array response is preserved.",
                         {
-                            "type": "array",
-                            "items": alert_event_schema(),
+                            "oneOf": [
+                                {
+                                    "type": "array",
+                                    "items": alert_event_schema(),
+                                },
+                                {
+                                    "type": "object",
+                                    "properties": {
+                                        "items": {
+                                            "type": "array",
+                                            "items": alert_event_schema(),
+                                        },
+                                        "pagination": {
+                                            "type": "object",
+                                            "additionalProperties": True,
+                                        },
+                                    },
+                                },
+                            ]
                         },
                     ),
                     "401": response("Authentication required."),

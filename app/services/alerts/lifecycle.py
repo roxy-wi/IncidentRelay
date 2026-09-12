@@ -4,6 +4,7 @@ from app import Config
 from app.modules.common import utc_now
 from app.modules.db import alerts_repo, incidents_repo
 from app.services.alerts.escalation import apply_initial_escalation_policy_assignment
+from app.services.alerts.event_history import should_record_incoming_alert_event
 from app.services.alerts.explain import (
     AlertExplainTrace,
     resolve_alert_explain_trace_level,
@@ -17,6 +18,7 @@ from app.services.alerts.maintenance_state import (
     should_apply_window_to_group,
 )
 from app.services.alerts.notification_queue import schedule_group_notification
+from app.services.alerts.shelving import clear_shelve_on_resolve
 from app.services.alerts.priority import (
     apply_priority_resolution_to_group,
     apply_priority_to_existing_alert,
@@ -387,6 +389,7 @@ def _handle_existing_alert(
     notification_policy_override=None,
     orchestration_suppressed=False,
     orchestration_suppress_reason=None,
+    runtime=None,
 ):
     group = existing_alert.group or existing_group
     priority = priority_resolution.priority
@@ -511,14 +514,15 @@ def _handle_existing_alert(
         )
 
     if status == "resolved" and previous_status != "resolved":
-        alerts_repo.create_alert_event(
-            alert_id=existing_alert.id,
-            group_id=group.id,
-            event_type="resolved",
-            message="Alert resolved by incoming payload",
-        )
+        if should_record_incoming_alert_event("resolved", runtime=runtime):
+            alerts_repo.create_alert_event(
+                alert_id=existing_alert.id,
+                group_id=group.id,
+                event_type="resolved",
+                message="Alert resolved by incoming payload",
+            )
         trace.alert_resolved(existing_alert, group)
-    else:
+    elif should_record_incoming_alert_event("updated", runtime=runtime):
         alerts_repo.create_alert_event(
             alert_id=existing_alert.id,
             group_id=group.id,
@@ -531,6 +535,9 @@ def _handle_existing_alert(
         group,
         priority_state_before_recalculate,
     )
+
+    if group.status == "resolved":
+        clear_shelve_on_resolve(group.id)
 
     if not created_group:
         group = apply_priority_resolution_to_group(
@@ -885,6 +892,7 @@ def _upsert_alert(alert_data, trace, runtime=None):
             ),
             orchestration_suppressed=orchestration_suppressed,
             orchestration_suppress_reason=orchestration_suppress_reason,
+            runtime=runtime,
         )
 
     if status == "resolved":
@@ -1107,12 +1115,13 @@ def _upsert_alert(alert_data, trace, runtime=None):
     if silences:
         record_new_alert_silences(alert, silences, now=now)
 
-    alerts_repo.create_alert_event(
-        alert_id=alert.id,
-        group_id=group.id,
-        event_type="created",
-        message="Alert created",
-    )
+    if should_record_incoming_alert_event("created", runtime=runtime):
+        alerts_repo.create_alert_event(
+            alert_id=alert.id,
+            group_id=group.id,
+            event_type="created",
+            message="Alert created",
+        )
 
     if maintenance_decision.matched:
         record_maintenance_match(

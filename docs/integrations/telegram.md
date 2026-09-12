@@ -7,7 +7,7 @@ description: Telegram Bot notification setup and troubleshooting.
 
 Telegram is an outgoing notification channel based on Telegram Bot API.
 
-It can send alert notifications and can support inline actions when polling/callback handling is enabled.
+It can send alert notifications and supports inline Acknowledge, Resolve, Shelve 1h and Unshelve actions when polling/callback handling is enabled.
 
 ## Required channel config
 
@@ -53,3 +53,7 @@ Check:
 3. `chat_id` is correct.
 4. Worker is running if actions are expected.
 5. Proxy is configured if the server cannot reach Telegram directly.
+
+## Shelving
+
+Interactive alert messages include **Shelve 1h** for open groups and **Unshelve** while a shelf is active. The Telegram account must be linked to an IncidentRelay user with responder access to the alert team. Shelving does not change the technical alert status. See [Alert shelving](../usage/shelving.md).

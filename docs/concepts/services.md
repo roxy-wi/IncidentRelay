@@ -92,7 +92,7 @@ Impact combines:
 - disabled state;
 - cycle and depth-limit detection.
 
-Impact is intentionally based on `AlertGroup`, not raw alert events. A grouped alert represents the operational state that users acknowledge, resolve, silence and investigate.
+Impact is intentionally based on `AlertGroup`, not raw alert events. A grouped alert represents the operational state that users acknowledge, resolve, temporarily shelve, silence and investigate.
 
 Each impact item contains:
 

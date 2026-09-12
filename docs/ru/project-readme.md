@@ -15,7 +15,8 @@ IncidentRelay — это self-hosted сервис для планировани�
 - токены приёма алертов на основе маршрутов;
 - приём из Alertmanager, Zabbix и обобщённых вебхуков;
 - каналы уведомлений Mattermost, Telegram, email, на основе вебхуков и голосовых вызовов;
-- рабочие процессы ACK и Resolve;
+- рабочие процессы ACK, Resolve и Alert Shelving;
+- временный Shelve отдельных AlertGroup с автоматическим expiry и resume;
 - напоминания и эскалацию;
 - заглушки (silences) и переопределения ротаций;
 - представление календаря;
@@ -25,7 +26,7 @@ IncidentRelay — это self-hosted сервис для планировани�
 ## Основной рабочий процесс
 
 ```text
-Monitoring system -> Route -> Service -> Team -> Rotation -> Notification channels -> ACK / Resolve
+Monitoring system -> Route -> Service -> Team -> Rotation -> Notification channels -> ACK / Resolve / Shelve
 ```
 
 Маршруты определяют, как алерты попадают в IncidentRelay. Сервисы описывают, какая логическая система затронута.

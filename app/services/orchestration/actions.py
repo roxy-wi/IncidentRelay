@@ -18,6 +18,10 @@ from .errors import OrchestrationEvaluationError, ValidationIssue
 from .fields import MISSING, resolve_field
 from .templates import render_template, validate_template
 from .variables import EXTRACTION_TYPES, extract_variables, validate_extractor
+from app.services.alerts.event_history import (
+    ALERT_EVENT_HISTORY_LEVELS,
+    resolve_alert_event_history_level,
+)
 
 
 MAX_ACTIONS_PER_RULE = 128
@@ -63,6 +67,7 @@ SUPPORTED_ACTION_TYPES = frozenset(
     | {
         "set_event_action",
         "set_trace_level",
+        "set_alert_event_history",
         "set_label",
         "remove_label",
         "set_custom_field",
@@ -109,6 +114,10 @@ class EventActionState:
         result.setdefault("disposition", "process")
         result.setdefault("suppress_notifications", False)
         result.setdefault("trace_level", None)
+        result.setdefault(
+            "alert_event_history",
+            resolve_alert_event_history_level(),
+        )
         result.setdefault("dropped", False)
         result.setdefault("pause_seconds", None)
         result.setdefault("pause_retrigger", "preserve")
@@ -435,6 +444,16 @@ def validate_action(action: Any, *, path: str = "action") -> List[ValidationIssu
                     "trace level must be full, compact or disabled",
                 )
             )
+    elif action_type == "set_alert_event_history":
+        level = action.get("level")
+        if level not in ALERT_EVENT_HISTORY_LEVELS:
+            issues.append(
+                ValidationIssue(
+                    f"{path}.level",
+                    "invalid_alert_event_history",
+                    "alert event history must be full, initial or disabled",
+                )
+            )
     elif action_type in {"set_label", "remove_label"}:
         try:
             _validate_name(action.get("name", action.get("label")), path=f"{path}.name", max_length=MAX_LABEL_NAME_LENGTH)
@@ -585,6 +604,17 @@ def _execute_action(action: Mapping[str, Any], state: EventActionState, *, path:
                 path=f"{path}.level",
             )
         state.result["trace_level"] = level
+        return before, level, (), "continue"
+
+    if action_type == "set_alert_event_history":
+        before = state.result.get("alert_event_history")
+        level = str(action.get("level") or "").strip().lower()
+        if level not in ALERT_EVENT_HISTORY_LEVELS:
+            raise ActionValidationError(
+                "alert event history must be full, initial or disabled",
+                path=f"{path}.level",
+            )
+        state.result["alert_event_history"] = level
         return before, level, (), "continue"
 
     if action_type == "set_label":

@@ -19,6 +19,7 @@ def serialize_sso_provider(provider):
         "phone_claim": provider.phone_claim,
 
         "allowed_domains": provider.allowed_domains or [],
+        "profile_claim_mappings": provider.profile_claim_mappings or {},
 
         "auto_create_users": provider.auto_create_users,
         "auto_link_by_email": provider.auto_link_by_email,

@@ -40,6 +40,23 @@ def get_bearer_token():
     return auth_header.split(" ", 1)[1].strip()
 
 
+def get_basic_route_token():
+    """Return a route token from HTTP Basic auth used by Azure webhooks."""
+
+    authorization = request.authorization
+    if not authorization:
+        return None
+
+    if str(authorization.type or "").lower() != "basic":
+        return None
+
+    if str(authorization.username or "") != "incidentrelay":
+        return None
+
+    raw_token = str(authorization.password or "").strip()
+    return raw_token or None
+
+
 def get_json_routing_key():
     """Return PagerDuty-compatible routing_key from a JSON request body."""
 
@@ -169,14 +186,16 @@ def require_api_token(scopes=None, required=None):
     return decorator
 
 
-def require_alert_token(allow_json_routing_key=False):
+def require_alert_token(allow_json_routing_key=False, allow_basic_route_token=False):
     """
     Require a token that can submit incoming alerts.
 
     Accepted tokens:
     - personal/API token with alerts:write scope;
     - route intake token created on the Routes page;
-    - PagerDuty-compatible JSON routing_key when explicitly enabled.
+    - PagerDuty-compatible JSON routing_key when explicitly enabled;
+    - HTTP Basic auth with username ``incidentrelay`` and the route token as
+      password when explicitly enabled for providers that only support URI auth.
 
     routing_key is checked before Authorization so it remains the routing
     boundary for PagerDuty Events API v2-compatible requests.
@@ -197,6 +216,18 @@ def require_alert_token(allow_json_routing_key=False):
 
                     # Do not silently fall back to another credential when a
                     # sender explicitly supplied a PagerDuty routing key.
+                    return jsonify({"error": "Route intake token is required"}), 401
+
+            if allow_basic_route_token:
+                basic_token = get_basic_route_token()
+
+                if basic_token:
+                    route = authenticate_route_token(basic_token)
+
+                    if route:
+                        request.current_auth_type = "basic_route_token"
+                        return func(*args, **kwargs)
+
                     return jsonify({"error": "Route intake token is required"}), 401
 
             raw_token = get_bearer_token()

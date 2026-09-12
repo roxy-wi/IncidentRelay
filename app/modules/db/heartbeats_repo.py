@@ -75,6 +75,12 @@ def list_due_heartbeat_candidates(now, limit=100, team_ids=None):
             (Heartbeat.deleted == False)
             & (Heartbeat.enabled == True)
             & (Heartbeat.status != "paused")
+            & (Team.deleted == False)
+            & (Team.active == True)
+            & (
+                Heartbeat.group.is_null(True)
+                | ((Group.deleted == False) & (Group.active == True))
+            )
             & (Heartbeat.instance_tracking_enabled == False)
             & (
                 (Heartbeat.next_expected_at.is_null(True))
@@ -108,6 +114,12 @@ def list_due_heartbeat_instance_candidates(now, limit=100, team_ids=None):
             (Heartbeat.deleted == False)
             & (Heartbeat.enabled == True)
             & (Heartbeat.status != "paused")
+            & (Team.deleted == False)
+            & (Team.active == True)
+            & (
+                Heartbeat.group.is_null(True)
+                | ((Group.deleted == False) & (Group.active == True))
+            )
             & (Heartbeat.instance_tracking_enabled == True)
             & (HeartbeatInstance.enabled == True)
             & (HeartbeatInstance.status != "paused")
@@ -179,12 +191,44 @@ def get_heartbeat_by_token(raw_token):
             & (Heartbeat.enabled == True)
             & (Team.deleted == False)
             & (Team.active == True)
+            & (
+                Heartbeat.group.is_null(True)
+                | ((Group.deleted == False) & (Group.active == True))
+            )
         )
         .first()
     )
 
 
 def create_heartbeat(data):
+    """Create or restore a heartbeat by team/slug with fresh runtime state."""
+    data = dict(data)
+    existing = get_heartbeat_by_slug(
+        data["team"],
+        data["slug"],
+        include_deleted=True,
+    )
+    if existing is not None and existing.deleted:
+        now = utc_now()
+        HeartbeatInstance.delete().where(HeartbeatInstance.heartbeat == existing.id).execute()
+        for field, value in data.items():
+            setattr(existing, field, value)
+        existing.status = "new"
+        existing.last_seen_at = None
+        existing.last_payload = None
+        existing.last_remote_addr = None
+        existing.last_user_agent = None
+        existing.next_expected_at = None
+        existing.overdue_since = None
+        existing.last_overdue_at = None
+        existing.last_recovered_at = None
+        existing.current_alert_group = None
+        existing.enabled = data.get("enabled", True)
+        existing.deleted = False
+        existing.deleted_at = None
+        existing.updated_at = now
+        existing.save()
+        return existing
     return Heartbeat.create(**data)
 
 
@@ -198,10 +242,33 @@ def update_heartbeat(heartbeat, data):
 
 
 def soft_delete_heartbeat(heartbeat):
+    """Soft-delete a heartbeat and terminate its current runtime state."""
+    from app.modules.db.soft_delete_hardening import resolve_alert_groups_by_ids
+
     now = utc_now()
+    group_ids = {getattr(heartbeat, "current_alert_group_id", None)}
+    group_ids.update(
+        row.current_alert_group_id
+        for row in HeartbeatInstance.select(HeartbeatInstance.current_alert_group).where(
+            HeartbeatInstance.heartbeat == heartbeat.id
+        )
+        if row.current_alert_group_id
+    )
+    resolve_alert_groups_by_ids(
+        group_ids,
+        now=now,
+        reason="heartbeat_deleted",
+    )
+    # Instances are mutable scheduler state. Ping history remains preserved.
+    HeartbeatInstance.delete().where(HeartbeatInstance.heartbeat == heartbeat.id).execute()
+
     heartbeat.deleted = True
     heartbeat.deleted_at = now
     heartbeat.enabled = False
+    heartbeat.status = "paused"
+    heartbeat.next_expected_at = None
+    heartbeat.overdue_since = None
+    heartbeat.current_alert_group = None
     heartbeat.updated_at = now
     heartbeat.save()
     return heartbeat

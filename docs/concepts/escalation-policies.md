@@ -111,7 +111,7 @@ If a route uses an escalation policy:
 If a route does not use a policy:
 
 - the old reminder-based rotation behavior is used;
-- reminders can continue indefinitely until the alert is acknowledged, resolved, silenced or assigned through a rotation with reminder interval `0`.
+- reminders can continue indefinitely until the alert is acknowledged, resolved, silenced, shelved or assigned through a rotation with reminder interval `0`.
 
 ## Alert state
 

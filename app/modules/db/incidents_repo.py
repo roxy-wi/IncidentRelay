@@ -6,6 +6,7 @@ from app.modules.db.models import (
     IncidentResponder,
     IncidentStakeholder,
     ServiceOwner,
+    User,
 )
 from app.modules.db import alerts_repo
 from app.modules.common import utc_now
@@ -464,10 +465,13 @@ def add_service_stakeholders_to_incident(group):
 
     owners = (
         ServiceOwner
-        .select()
+        .select(ServiceOwner, User)
+        .join(User)
         .where(
             ServiceOwner.service == group.service_id,
             ServiceOwner.active == True,  # noqa: E712
+            User.active == True,  # noqa: E712
+            User.deleted == False,  # noqa: E712
         )
         .order_by(ServiceOwner.id)
     )

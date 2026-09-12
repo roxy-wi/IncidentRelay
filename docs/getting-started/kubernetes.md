@@ -265,7 +265,7 @@ telegram:
   enabled: true
 ```
 
-The Slack worker holds the Socket Mode WebSocket that carries interactive `Acknowledge` and `Resolve` buttons. Slack messages themselves are sent by the web component, so without this worker notifications still arrive — only their buttons do nothing:
+The Slack worker holds the Socket Mode WebSocket that carries interactive `Acknowledge`, `Resolve`, `Shelve 1h` and `Unshelve` buttons. Slack messages themselves are sent by the web component, so without this worker notifications still arrive — only their buttons do nothing:
 
 ```yaml
 slack:
@@ -316,6 +316,35 @@ extraVolumeMounts:
 ```
 
 ## Upgrade and uninstall
+
+### Upgrading from 1.2 to 2.1 or later
+
+!!! warning
+    IncidentRelay 2.1 blocks private/loopback/link-local/reserved outbound HTTP
+    destinations unless they are explicitly allowed. Internal OIDC
+    metadata/JWKS endpoints and outgoing webhook/API integrations that worked in
+    1.2 can therefore stop working after the chart upgrade.
+
+For chart-rendered configuration, add the required internal CIDRs/IPs before
+the upgrade:
+
+```yaml
+config:
+  security:
+    outbound_private_network_allowlist: "10.20.0.0/16,192.168.50.10/32"
+```
+
+If you use `existingConfigSecret`, update its `incidentrelay.conf` instead:
+
+```ini
+[security]
+outbound_private_network_allowlist = 10.20.0.0/16,192.168.50.10/32
+```
+
+Resolve internal hostnames from the cluster and allow only the addresses that
+IncidentRelay actually needs. See
+[Outbound HTTP network policy](configuration.md#outbound-http-network-policy)
+for DNS fail-closed behavior and additional examples.
 
 ### Upgrading from 1.x to 2.0
 

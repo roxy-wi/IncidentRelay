@@ -598,8 +598,11 @@ Actions run in the order displayed inside a matching rule. An earlier action can
 | `set_group_key` | Decide which child alerts belong to the same alert group. | `{{ labels.alertname }}:{{ labels.environment }}` |
 | `set_event_action` | Force trigger or resolve semantics. | `trigger` or `resolve` |
 | `set_trace_level` | Override Alert Explain Trace detail for this event. Global orchestrations only. | `full`, `compact` or `disabled` |
+| `set_alert_event_history` | Override incoming child-alert event history without changing alert lifecycle processing. Available in global and service orchestrations. | `full`, `initial` or `disabled` |
 
 `set_trace_level` controls Alert Explain Trace storage before the alert lifecycle writes the trace. `compact` keeps ordered steps without detailed JSON payload data; `disabled` stores no Alert Explain Trace rows. Service-scoped orchestrations cannot use this action because they may execute after lifecycle processing has already started.
+
+`set_alert_event_history` controls only incoming child-alert history rows. `full` stores `created`, `updated` and `resolved`; `initial` stores only the first `created`; `disabled` stores none of those three incoming event types. Operational incident timeline events remain enabled in every mode. Both global and service orchestrations may set this value, and the last applied matching action wins.
 
 Use stable values for deduplication and grouping. Do not include timestamps or other values that change on every request unless you intentionally want a new alert every time.
 

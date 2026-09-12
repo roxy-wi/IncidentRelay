@@ -364,8 +364,11 @@ def update_maintenance_window(window, **fields):
 
 
 def soft_delete_maintenance_window(window):
+    now = utc_now()
     window.deleted = True
+    window.deleted_at = now
     window.enabled = False
+    window.updated_at = now
     window.save()
 
     return MaintenanceWindow.get_by_id(window.id)

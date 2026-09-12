@@ -10,7 +10,7 @@ Slack is an outgoing notification channel.
 IncidentRelay supports two Slack delivery modes:
 
 1. Incoming webhook mode for one-way notifications.
-2. Bot API mode with interactive `Acknowledge` and `Resolve` buttons and message updates.
+2. Bot API mode with interactive `Acknowledge`, `Resolve`, `Shelve 1h` and `Unshelve` buttons and message updates.
 
 Bot API interactive actions can be received in two ways:
 
@@ -32,17 +32,17 @@ Create an incoming webhook in Slack and configure the channel with:
 }
 ```
 
-Incoming webhook messages cannot be updated by IncidentRelay after an alert is acknowledged or resolved.
+Incoming webhook messages cannot be updated by IncidentRelay after ACK, Resolve, Shelve or Unshelve state changes.
 
 ## Bot API mode
 
 Bot API mode supports:
 
 - sending alert notifications with Block Kit;
-- `Acknowledge` and `Resolve` buttons;
-- updating the original Slack message after ACK or resolve;
+- `Acknowledge`, `Resolve`, `Shelve 1h` and `Unshelve` buttons;
+- updating the original Slack message after ACK, Resolve, Shelve or Unshelve;
 - removing actions after the alert is resolved;
-- optional attribution to an IncidentRelay user.
+- authorization and attribution through the mapped IncidentRelay user.
 
 HTTP actions configuration:
 
@@ -184,9 +184,9 @@ For HTTP interactive actions, ensure Slack can reach `POST /api/integrations/sla
 
 An IncidentRelay user can have a Slack user ID in their profile.
 
-When a responder clicks `Acknowledge` or `Resolve`, IncidentRelay reads the Slack user ID from the interaction payload and tries to match it to an active IncidentRelay user.
+When a responder clicks `Acknowledge`, `Resolve`, `Shelve 1h` or `Unshelve`, IncidentRelay reads the Slack user ID from the interaction payload and tries to match it to an active IncidentRelay user.
 
-If no matching user exists, the action can still be processed, but it will not be attributed to a local user.
+Interactive actions require a Slack user ID mapped to an active IncidentRelay user with responder access to the alert team. Unmapped or unauthorized users are rejected.
 
 ## Message behavior
 
@@ -197,14 +197,14 @@ For a firing alert, the Slack message contains:
 - team, service and assignee;
 - service links and runbooks when configured;
 - a link to the alert in IncidentRelay;
-- `Acknowledge` and `Resolve` buttons.
+- `Acknowledge`, `Resolve` and `Shelve 1h` buttons.
 
 After acknowledgment:
 
 - the original message is updated;
 - the status changes to acknowledged;
 - the `Acknowledge` button is removed;
-- the `Resolve` button remains.
+- `Shelve 1h` and `Resolve` remain available.
 
 After resolution:
 
@@ -334,3 +334,7 @@ For Docker Compose:
 docker compose exec incidentrelay-slack \
   tail -f /var/log/incidentrelay/incidentrelay-slack-worker.log
 ```
+
+## Shelving
+
+Slack Bot API messages support **Shelve 1h** and **Unshelve** in addition to lifecycle actions. Slack Incoming Webhook mode remains one-way and cannot provide interactive shelving. The Slack user must be linked to an IncidentRelay user with responder access to the target team. See [Alert shelving](../usage/shelving.md).

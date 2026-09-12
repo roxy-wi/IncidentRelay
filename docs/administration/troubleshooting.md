@@ -143,7 +143,7 @@ Browser push is not a channel, so it does not appear in route channel bindings.
 
 ## Browser push action returns token_expired
 
-The one-time ACK/Resolve token was older than `[browser_push] action_token_ttl_seconds` when the browser sent the action.
+The one-time ACK/Resolve/Shelve/Unshelve token was older than `[browser_push] action_token_ttl_seconds` when the browser sent the action.
 
 ## Browser push action returns token_already_used
 

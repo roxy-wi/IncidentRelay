@@ -3,6 +3,8 @@ from peewee import fn
 
 from app.db import database_proxy
 from app.modules.db.models import (
+    Alert,
+    AlertGroup,
     NotificationChannel,
     NotificationPolicy,
     NotificationPolicyRule,
@@ -188,24 +190,32 @@ def update_notification_policy(policy_id, data):
 
 
 def soft_delete_notification_policy(policy_id):
-    """Soft-delete policy and its active rules."""
+    """Soft-delete policy, rules, and active runtime references."""
     policy = get_notification_policy(policy_id)
     now = utc_now()
 
     with database_proxy.atomic():
-        (
-            NotificationPolicyRule
-            .update(
-                enabled=False,
-                deleted=True,
-                updated_at=now,
-            )
-            .where(
-                (NotificationPolicyRule.policy == policy.id)
-                & (NotificationPolicyRule.deleted == False)
-            )
-            .execute()
-        )
+        NotificationPolicyRule.update(
+            enabled=False,
+            deleted=True,
+            deleted_at=now,
+            updated_at=now,
+        ).where(
+            (NotificationPolicyRule.policy == policy.id)
+            & (NotificationPolicyRule.deleted == False)  # noqa: E712
+        ).execute()
+
+        Service.update(notification_policy=None, updated_at=now).where(
+            Service.notification_policy == policy.id
+        ).execute()
+        Alert.update(notification_policy=None).where(
+            (Alert.notification_policy == policy.id)
+            & (Alert.status != "resolved")
+        ).execute()
+        AlertGroup.update(notification_policy=None, updated_at=now).where(
+            (AlertGroup.notification_policy == policy.id)
+            & (~AlertGroup.status.in_(("resolved", "merged")))
+        ).execute()
 
         policy.enabled = False
         policy.deleted = True

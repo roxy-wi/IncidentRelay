@@ -312,6 +312,27 @@ sudo journalctl -u incidentrelay-telegram-worker -f
 
 ## 10. Обновление IncidentRelay
 
+!!! warning "Обновление с 1.2 на 2.1 или новее"
+    IncidentRelay 2.1 блокирует private/loopback/link-local/reserved адреса
+    исходящих HTTP-запросов, если они не разрешены явно. Поэтому существующие
+    внутренние OIDC metadata/JWKS endpoints и исходящие webhook/API-интеграции
+    могут перестать работать сразу после обновления.
+
+До обновления определите внутренние endpoints, к которым обращается
+IncidentRelay, и добавьте минимально необходимые CIDR/IP в текущую конфигурацию:
+
+```ini
+[security]
+outbound_private_network_allowlist = 10.20.0.0/16,192.168.50.10/32
+```
+
+RPM устанавливает `incidentrelay.conf` как конфигурацию `noreplace`, поэтому
+существующий файл сохраняется при обновлении. Проверьте наличие
+`/etc/incidentrelay/incidentrelay.conf.rpmnew`, но не рассчитывайте, что новый
+security-параметр автоматически попадёт в активный конфиг. Подробности о DNS и
+дополнительные примеры см. в разделе
+[Политика исходящих HTTP-подключений](configuration.md#политика-исходящих-http-подключений).
+
 ```bash
 sudo dnf update -y incidentrelay
 ```

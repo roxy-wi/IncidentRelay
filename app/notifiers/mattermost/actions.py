@@ -4,7 +4,7 @@ import hashlib
 import hmac
 
 
-ALLOWED_MATTERMOST_ACTIONS = {"acknowledge", "resolve"}
+ALLOWED_MATTERMOST_ACTIONS = {"acknowledge", "resolve", "shelve", "unshelve"}
 
 
 def _action_payload(action, alert_id, channel_id):

@@ -117,6 +117,11 @@ def install_action_mocks(
         "get_user_by_slack_id",
         lambda slack_user_id: user,
     )
+    monkeypatch.setattr(
+        slack_actions,
+        "can_respond_team",
+        lambda candidate, team_id: candidate.id == user.id and team_id == alert_team_id,
+    )
 
     return channel, alert, user
 
@@ -425,3 +430,57 @@ def test_slack_socket_action_rejects_other_app(monkeypatch):
         assert exc.error == "action_rejected"
     else:
         raise AssertionError("expected SlackActionError")
+
+
+def test_slack_action_shelves_alert(client, monkeypatch):
+    _, alert, user = install_action_mocks(monkeypatch)
+    calls = []
+
+    def fake_shelve(alert_id, *, user_id=None, duration_seconds=None, source=None):
+        calls.append((alert_id, user_id, duration_seconds, source))
+        return alert, SimpleNamespace(id=1)
+
+    monkeypatch.setattr(slack_actions, "shelve_alert_group", fake_shelve)
+
+    timestamp = str(int(time.time()))
+    body = make_action_body(action="shelve")
+    response = client.post(
+        "/api/integrations/slack/actions",
+        data=body,
+        content_type="application/x-www-form-urlencoded",
+        headers={
+            "X-Slack-Request-Timestamp": timestamp,
+            "X-Slack-Signature": sign_body(body, timestamp),
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.get_json()["action"] == "shelve"
+    assert calls == [(alert.id, user.id, 3600, "slack")]
+
+
+def test_slack_action_unshelves_alert(client, monkeypatch):
+    _, alert, user = install_action_mocks(monkeypatch)
+    calls = []
+
+    def fake_unshelve(alert_id, *, user_id=None, source=None):
+        calls.append((alert_id, user_id, source))
+        return alert, SimpleNamespace(id=1)
+
+    monkeypatch.setattr(slack_actions, "unshelve_alert_group", fake_unshelve)
+
+    timestamp = str(int(time.time()))
+    body = make_action_body(action="unshelve")
+    response = client.post(
+        "/api/integrations/slack/actions",
+        data=body,
+        content_type="application/x-www-form-urlencoded",
+        headers={
+            "X-Slack-Request-Timestamp": timestamp,
+            "X-Slack-Signature": sign_body(body, timestamp),
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.get_json()["action"] == "unshelve"
+    assert calls == [(alert.id, user.id, "slack")]

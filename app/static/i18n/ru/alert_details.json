@@ -321,5 +321,20 @@
   "alert_details.manual.select_team_error": "Выберите команду.",
   "alert_details.manual.title_required": "Укажите название инцидента.",
   "alert_details.manual.permission": "У вас нет права создавать инциденты для этой команды.",
-  "alert_details.priority.current": "Текущий: {value}"
+  "alert_details.priority.current": "Текущий: {value}",
+  "alert_details.events.load_older": "Загрузить более старые события",
+  "alert_details.actions.shelve": "Отложить",
+  "alert_details.actions.unshelve": "Вернуть",
+  "alert_details.shelve.title": "Отложить алерт",
+  "alert_details.shelve.help": "Временно приостановить уведомления, напоминания и эскалацию для этой группы алертов, не меняя её технический статус.",
+  "alert_details.shelve.duration": "Длительность",
+  "alert_details.shelve.reason": "Причина",
+  "alert_details.shelve.reason_placeholder": "Необязательная причина откладывания алерта",
+  "alert_details.shelve.30m": "30 минут",
+  "alert_details.shelve.1h": "1 час",
+  "alert_details.shelve.2h": "2 часа",
+  "alert_details.shelve.4h": "4 часа",
+  "alert_details.shelve.8h": "8 часов",
+  "alert_details.shelve.24h": "24 часа",
+  "alert_details.shelve.until": "До: {time}"
 }

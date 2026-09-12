@@ -1,0 +1,21 @@
+{
+  "notification_center.notifications": "Notificaciones",
+  "notification_center.title": "Solicitudes de respuesta",
+  "notification_center.empty": "No hay solicitudes pendientes",
+  "notification_center.notification": "Notificación",
+  "notification_center.responder_requested": "Se solicitó un respondedor",
+  "notification_center.help_requested": "{requester} solicitó tu ayuda con este incidente.",
+  "notification_center.accept": "Aceptar",
+  "notification_center.decline": "Rechazar",
+  "notification_center.open_incident": "Abrir incidente",
+  "notification_center.unknown_user": "Usuario desconocido",
+  "notification_center.user_id": "Usuario #{id}",
+  "notification_center.no_team": "Sin equipo",
+  "notification_center.no_service": "Sin servicio",
+  "notification_center.status.firing": "Activa",
+  "notification_center.status.acknowledged": "Confirmada",
+  "notification_center.status.resolved": "Resuelta",
+  "notification_center.status.maintenance": "Mantenimiento",
+  "notification_center.status.open": "Abierto",
+  "notification_center.status.closed": "Cerrado"
+}

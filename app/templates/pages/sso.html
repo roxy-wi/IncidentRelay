@@ -180,6 +180,27 @@
           </div>
 
           <div class="form-section">
+            <h4>{{ _('sso.profile_claims.title') }}</h4>
+            <p class="empty-muted">{{ _('sso.profile_claims.help') }}</p>
+            <div class="grid-two">
+              <label>
+                <span>{{ _('sso.profile_claims.slack_user_id') }}</span>
+                <input id="sso-slack-user-id-claim" type="text" placeholder="slack_id">
+              </label>
+
+              <label>
+                <span>{{ _('sso.profile_claims.telegram_user_id') }}</span>
+                <input id="sso-telegram-user-id-claim" type="text" placeholder="telegram_id">
+              </label>
+
+              <label>
+                <span>{{ _('sso.profile_claims.mattermost_user_id') }}</span>
+                <input id="sso-mattermost-user-id-claim" type="text" placeholder="mattermost_id">
+              </label>
+            </div>
+          </div>
+
+          <div class="form-section">
             <h4>{{ _('sso.policy.title') }}</h4>
             <div class="checkbox-grid">
               <label class="md-checkbox">

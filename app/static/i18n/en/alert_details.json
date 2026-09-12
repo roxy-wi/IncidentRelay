@@ -321,5 +321,20 @@
   "alert_details.manual.select_team_error": "Select a team.",
   "alert_details.manual.title_required": "Incident title is required.",
   "alert_details.manual.permission": "You do not have permission to create incidents for this team.",
-  "alert_details.priority.current": "Current: {value}"
+  "alert_details.priority.current": "Current: {value}",
+  "alert_details.events.load_older": "Load older events",
+  "alert_details.actions.shelve": "Shelve",
+  "alert_details.actions.unshelve": "Unshelve",
+  "alert_details.shelve.title": "Shelve alert",
+  "alert_details.shelve.help": "Temporarily pause notifications, reminders, and escalation for this alert group without changing its technical status.",
+  "alert_details.shelve.duration": "Duration",
+  "alert_details.shelve.reason": "Reason",
+  "alert_details.shelve.reason_placeholder": "Optional reason for shelving this alert",
+  "alert_details.shelve.30m": "30 minutes",
+  "alert_details.shelve.1h": "1 hour",
+  "alert_details.shelve.2h": "2 hours",
+  "alert_details.shelve.4h": "4 hours",
+  "alert_details.shelve.8h": "8 hours",
+  "alert_details.shelve.24h": "24 hours",
+  "alert_details.shelve.until": "Until: {time}"
 }

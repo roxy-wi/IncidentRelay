@@ -321,5 +321,20 @@
   "alert_details.manual.select_team_error": "Wählen Sie ein Team.",
   "alert_details.manual.title_required": "Incident Title ist erforderlich.",
   "alert_details.manual.permission": "Sie haben keine Erlaubnis, Vorfälle für dieses Team zu erstellen.",
-  "alert_details.priority.current": "Aktuell: {value}"
+  "alert_details.priority.current": "Aktuell: {value}",
+  "alert_details.events.load_older": "Ältere Ereignisse laden",
+  "alert_details.actions.shelve": "Zurückstellen",
+  "alert_details.actions.unshelve": "Zurückholen",
+  "alert_details.shelve.title": "Alarm zurückstellen",
+  "alert_details.shelve.help": "Benachrichtigungen, Erinnerungen und Eskalation für diese Alarmgruppe vorübergehend pausieren, ohne ihren technischen Status zu ändern.",
+  "alert_details.shelve.duration": "Dauer",
+  "alert_details.shelve.reason": "Grund",
+  "alert_details.shelve.reason_placeholder": "Optionaler Grund für das Zurückstellen",
+  "alert_details.shelve.30m": "30 Minuten",
+  "alert_details.shelve.1h": "1 Stunde",
+  "alert_details.shelve.2h": "2 Stunden",
+  "alert_details.shelve.4h": "4 Stunden",
+  "alert_details.shelve.8h": "8 Stunden",
+  "alert_details.shelve.24h": "24 Stunden",
+  "alert_details.shelve.until": "Bis: {time}"
 }

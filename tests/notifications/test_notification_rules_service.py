@@ -1,7 +1,10 @@
 from datetime import timedelta
 
+from app.modules.db import users_repo
 from app.modules.db.models import (
+    BrowserPushSubscription,
     UserNotificationDelivery,
+    UserNotificationRule,
 )
 from app.services.notifications import rules
 from app.services.alerts.lifecycle import upsert_alert
@@ -407,3 +410,56 @@ def test_process_due_user_notifications_does_not_send_already_processing_deliver
     )
 
     assert rules.process_due_user_notifications() == 0
+
+
+def test_soft_deleted_user_cannot_receive_personal_notifications(db, monkeypatch):
+    group = create_group()
+    user = create_user("delete-notify-user", group)
+    alert_group = create_assigned_group(user)
+    rule = rules.create_user_rule(
+        user,
+        method="browser_push",
+        delay_seconds=300,
+        severities=["critical"],
+        event_types=["notification"],
+    )
+    subscription = BrowserPushSubscription.create(
+        user=user,
+        endpoint=f"https://push.example/{user.id}",
+        p256dh="p256dh",
+        auth="auth",
+        enabled=True,
+    )
+    delivery = UserNotificationDelivery.create(
+        group=alert_group,
+        user=user,
+        rule=rule,
+        method="browser_push",
+        event_type="notification",
+        status="processing",
+        scheduled_at=utc_now(),
+    )
+
+    users_repo.soft_delete_user(user.id)
+
+    rule = UserNotificationRule.get_by_id(rule.id)
+    subscription = BrowserPushSubscription.get_by_id(subscription.id)
+    delivery = UserNotificationDelivery.get_by_id(delivery.id)
+    assert rule.deleted is True
+    assert rule.enabled is False
+    assert rule.deleted_at is not None
+    assert subscription.deleted is True
+    assert subscription.enabled is False
+    assert delivery.status == "skipped"
+    assert delivery.provider_status == "skipped"
+    assert delivery.last_error == "user_deleted"
+
+    called = []
+    monkeypatch.setattr(
+        rules.browser_push,
+        "send_alert_push_to_user",
+        lambda *args, **kwargs: called.append(True) or 1,
+    )
+    assert rules.has_deliverable_user_notification(alert_group) is False
+    assert rules.enqueue_user_notifications(alert_group) == 0
+    assert called == []

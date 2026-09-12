@@ -2,14 +2,19 @@ from peewee import IntegrityError, prefetch
 
 from app.db import database_proxy
 from app.modules.db.models import (
+    Alert,
+    AlertGroup,
     AlertRoute,
+    EscalationPolicyRule,
     Group,
+    IncidentResponder,
     Rotation,
     RotationMember,
     RotationOverride,
     RotationLayer,
     RotationLayerMember,
     RotationLayerRestriction,
+    Service,
     Team,
     TeamUser,
     User
@@ -285,6 +290,7 @@ def soft_delete_rotation(rotation_id):
 
     with db.atomic():
         rotation = get_rotation(rotation_id)
+        now = utc_now()
 
         layer_ids = [
             layer.id
@@ -307,7 +313,7 @@ def soft_delete_rotation(rotation_id):
             RotationLayer.update(
                 enabled=False,
                 deleted=True,
-                deleted_at=utc_now(),
+                deleted_at=now,
             ).where(
                 RotationLayer.id.in_(layer_ids)
             ).execute()
@@ -322,16 +328,43 @@ def soft_delete_rotation(rotation_id):
             RotationOverride.rotation == rotation
         ).execute()
 
-        # Чтобы alert routes не ссылались на удаленную rotation.
-        AlertRoute.update(
-            rotation=None,
-        ).where(
+        # Active configuration must not reconnect if the same rotation row is
+        # restored later. Resolved incidents keep their historical reference.
+        AlertRoute.update(rotation=None).where(
             AlertRoute.rotation == rotation
+        ).execute()
+        Service.update(default_rotation=None, updated_at=now).where(
+            Service.default_rotation == rotation
+        ).execute()
+        EscalationPolicyRule.update(
+            target_rotation=None,
+            enabled=False,
+            updated_at=now,
+        ).where(
+            (EscalationPolicyRule.target_rotation == rotation)
+            & (EscalationPolicyRule.enabled == True)  # noqa: E712
+        ).execute()
+        IncidentResponder.update(
+            status="expired",
+            response_message="Target rotation was deleted",
+            responded_at=now,
+            updated_at=now,
+        ).where(
+            (IncidentResponder.target_rotation == rotation)
+            & (IncidentResponder.status == "requested")
+        ).execute()
+        Alert.update(rotation=None).where(
+            (Alert.rotation == rotation)
+            & (Alert.status != "resolved")
+        ).execute()
+        AlertGroup.update(rotation=None, updated_at=now).where(
+            (AlertGroup.rotation == rotation)
+            & (~AlertGroup.status.in_(("resolved", "merged")))
         ).execute()
 
         rotation.enabled = False
         rotation.deleted = True
-        rotation.deleted_at = utc_now()
+        rotation.deleted_at = now
         rotation.save()
 
         return rotation

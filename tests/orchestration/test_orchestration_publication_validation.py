@@ -122,3 +122,35 @@ def test_service_orchestration_cannot_change_alert_trace_level(db):
     )
     with pytest.raises(OrchestrationValidationError):
         publish_draft(orchestration.id, actor_id=user.id)
+
+
+def test_service_orchestration_can_change_alert_event_history(db):
+    group = create_group()
+    team = create_team(group)
+    service = create_service(team, name="History service", slug="history-service")
+    user = create_user(group=group)
+    orchestration = create_orchestration(
+        group_id=group.id,
+        name="Service history validation",
+        scope="service",
+        service_id=service.id,
+        created_by_id=user.id,
+    )
+    draft = get_or_create_draft(orchestration.id, actor_id=user.id)
+    replace_draft_rules(
+        draft.id,
+        [
+            {
+                "name": "Bound noisy history",
+                "condition_tree": {},
+                "actions": [
+                    {"type": "set_alert_event_history", "level": "initial"}
+                ],
+            }
+        ],
+    )
+
+    validation = validate_version(draft.id)
+
+    assert validation["valid"] is True
+    assert not validation["errors"]

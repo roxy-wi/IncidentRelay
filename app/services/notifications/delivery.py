@@ -8,6 +8,7 @@ from app.services.routing.service_context import format_service_context_plain, s
 from app.services.notifications import rules
 from app.services.alerts.priority import alert_priority_label, format_alert_title_with_priority
 from app.services.alerts.maintenance_state import is_notification_lifecycle_suppressed
+from app.services.alerts.shelving import is_alert_group_shelved
 from app.services.notifications.policies.resolver import resolve_notification_channels
 from app.services.alerts.correlation import format_correlation_plain
 from app.modules.common import utc_now
@@ -215,15 +216,19 @@ def notify_alert(group, event_type="notification"):
 
     if (
         event_type in {"notification", "update", "reminder", "escalation"}
-        and is_notification_lifecycle_suppressed(group)
+        and (
+            is_notification_lifecycle_suppressed(group)
+            or is_alert_group_shelved(group)
+        )
     ):
         logger.info(
-            "notification skipped during maintenance",
+            "notification skipped because alert group delivery is suppressed",
             extra={
                 "extra": {
                     "alert_group_id": group.id,
                     "event_type": event_type,
                     "maintenance_window_id": group.maintenance_window_id,
+                    "shelved": is_alert_group_shelved(group),
                 }
             },
         )

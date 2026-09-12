@@ -7,6 +7,8 @@ from app.settings import Config
 ALLOWED_TELEGRAM_ACTIONS = {
     "ack": "acknowledge",
     "resolve": "resolve",
+    "s1h": "shelve",
+    "uns": "unshelve",
 }
 
 
@@ -53,8 +55,11 @@ def parse_telegram_action_data(value):
     if not hmac.compare_digest(signature, expected):
         return None
 
-    return {
+    result = {
         "action": ALLOWED_TELEGRAM_ACTIONS[action],
         "alert_id": int(alert_id),
         "channel_id": int(channel_id),
     }
+    if action == "s1h":
+        result["duration_seconds"] = 3600
+    return result

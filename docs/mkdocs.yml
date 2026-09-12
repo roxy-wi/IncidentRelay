@@ -49,6 +49,7 @@ nav:
       - Incident Stakeholders: incidents/stakeholders.md
       - Alert Comments: usage/alert-comments.md
       - Silences: usage/silences.md
+      - Alert Shelving: usage/shelving.md
       - Maintenance Windows: concepts/maintenance-windows.md
   - Services:
       - Overview: services/index.md
@@ -65,6 +66,7 @@ nav:
       - Incoming alert sources:
           - Alertmanager: integrations/alertmanager.md
           - New Relic: integrations/new-relic.md
+          - Azure Monitor: integrations/azure-monitor.md
           - Nagios: integrations/nagios.md
           - Zabbix: integrations/zabbix.md
           - Sentry: integrations/sentry.md

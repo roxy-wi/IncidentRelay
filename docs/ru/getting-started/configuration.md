@@ -101,6 +101,74 @@ password = change-me
 
 Используйте PostgreSQL для более крупных инсталляций, высокого объёма алертов, нескольких веб-воркеров или долгосрочных продакшен-развёртываний.
 
+## Политика исходящих HTTP-подключений
+
+IncidentRelay защищает исходящие HTTP-запросы к адресам, заданным
+администратором, от SSRF. По умолчанию запрещены private, loopback, link-local,
+multicast, reserved и unspecified адреса назначения.
+
+Политика задаётся в секции `[security]`:
+
+```ini
+[security]
+outbound_private_network_allowlist =
+outbound_http_max_redirects = 3
+outbound_http_max_response_bytes = 1048576
+```
+
+`outbound_private_network_allowlist` — список IPv4/IPv6-адресов и CIDR-сетей,
+разделённых запятыми или точками с запятой. Эти адреса явно разрешаются для
+исходящих запросов, даже если они относятся к private или другим обычно
+запрещённым диапазонам.
+
+Примеры:
+
+```ini
+# Только один внутренний сервис.
+outbound_private_network_allowlist = 192.168.50.10/32
+```
+
+```ini
+# Несколько разрешённых внутренних сетей/адресов.
+outbound_private_network_allowlist = 10.20.0.0/16,192.168.50.10/32,fd00:1234::/48
+```
+
+Отдельный IP можно указать и без длины префикса, однако `/32` для IPv4 и `/128`
+для IPv6 явно показывают область разрешения. Используйте максимально узкие
+диапазоны вместо разрешения всей private-сети.
+
+Эта политика используется общим клиентом исходящих HTTP-запросов, в том числе
+при загрузке OIDC metadata и JWKS, а также для исходящих интеграций:
+generic/Teams/Discord webhooks, Slack webhooks и запросов к Mattermost API.
+Это не allowlist имён хостов: IncidentRelay сначала разрешает DNS-имя, затем
+проверяет полученные IP-адреса.
+
+Для DNS-имени **каждый адрес, возвращённый DNS, должен быть публичным или явно
+разрешённым**. Если хотя бы один адрес запрещён, запрос блокируется целиком.
+Целевой адрес каждого redirect разрешается через DNS и проверяется повторно.
+
+!!! warning "Влияние обновления на 2.1"
+    В IncidentRelay 2.1 эта политика применяется к исходящим запросам.
+    Поэтому после обновления с 1.2 существующий внутренний OIDC metadata/JWKS
+    endpoint или исходящая интеграция может перестать работать, даже если URL
+    не менялся. До обновления разрешите внутренние endpoints с хоста/pod
+    IncidentRelay и добавьте только необходимые IP или CIDR.
+
+Например, если внутренний identity provider разрешается в `10.42.7.15`:
+
+```ini
+[security]
+outbound_private_network_allowlist = 10.42.7.15/32
+```
+
+После изменения настройки перезапустите все процессы IncidentRelay, которые
+могут выполнять исходящие запросы.
+
+Allowlist меняет только сетевую политику назначения. Он **не** отключает
+проверку HTTPS-сертификата и не добавляет доверие к приватному центру
+сертификации. Для внутренних HTTPS endpoints с private CA этот CA также должен
+быть установлен в trust store операционной системы или контейнера.
+
 ## Trace обработки алертов
 
 Глобальный уровень детализации Explain Trace задаётся в `[alerts]`:
@@ -112,6 +180,31 @@ explain_trace_level = full
 
 Поддерживаются `full`, `compact` и `disabled`. `full` сохраняет текущее подробное поведение. `compact` сохраняет последовательность шагов обработки, но не записывает `input_summary`, payload результата и `data` отдельных шагов. `disabled` вообще не создаёт строки Alert Explain Trace. Глобальное правило Event Orchestration может переопределить значение для совпавших событий действием `set_trace_level`.
 
+## История событий алерта
+
+Историю входящих событий дочерних алертов можно настраивать независимо от самого lifecycle:
+
+```ini
+[alerts]
+event_history = full
+```
+
+Поддерживаются `full`, `initial` и `disabled`. `full` сохраняет входящие события `created`, `updated` и `resolved` дочерних алертов. `initial` сохраняет только первое событие `created`. `disabled` не сохраняет эти входящие history-записи. При этом обновление состояния алерта, grouping, notifications, escalation и resolution продолжают работать во всех режимах. Operational timeline — acknowledgement, comments, reminders, maintenance, correlations, responders и stakeholders — сохраняется всегда.
+
+Global и Service Event Orchestration могут переопределить значение для совпавших событий действием `set_alert_event_history`. Если несколько совпавших actions задают уровень, применяется последнее действие.
+
+
+## Scheduler для Alert Shelving
+
+Временные shelves AlertGroup завершаются scheduler-процессом:
+
+```ini
+[alerts]
+shelve_lifecycle_check_interval_seconds = 30
+shelve_lifecycle_batch_size = 100
+```
+
+`check_interval_seconds` задаёт частоту обработки истёкших shelves, а `batch_size` ограничивает один проход. Scheduler должен быть запущен, если используется timed shelving. Shelving приостанавливает notifications, reminders и escalation, но не меняет технический status AlertGroup и service/business impact. Подробнее: [Shelving](../usage/shelving.md).
 
 ## Политика хранения данных
 
@@ -200,7 +293,7 @@ action_token_ttl_seconds = 900
 | `vapid_public_key` | Публичный ключ VAPID, возвращаемый браузеру для `PushManager.subscribe()` |
 | `vapid_private_key` | Приватный ключ VAPID или путь к PEM-файлу, используемый сервером для отправки сообщений Web Push |
 | `vapid_subject` | Контактный URI, включаемый в claims VAPID, обычно `mailto:admin@example.com` |
-| `action_token_ttl_seconds` | Время жизни одноразовых токенов ACK/Resolve, встраиваемых в push-уведомления |
+| `action_token_ttl_seconds` | Время жизни одноразовых токенов ACK/Resolve/Shelve/Unshelve, встраиваемых в push-уведомления |
 
 После изменения настроек браузерных push-уведомлений перезапустите веб-сервис. Перезапустите также планировщик, если в вашей инсталляции он отправляет уведомления.
 

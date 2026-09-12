@@ -18,7 +18,14 @@ const calendarWeekdaysShort = [
 ];
 
 function getCalendarLocale() {
-    return i18n.locale === "ru" ? "ru-RU" : "en-GB";
+    const locales = {
+        ru: "ru-RU",
+        de: "de-DE",
+        fr: "fr-FR",
+        es: "es-ES",
+    };
+
+    return locales[i18n.locale] || "en-GB";
 }
 
 function formatCalendarDateForTitle(date, options) {

@@ -14,6 +14,7 @@ def test_registry_contains_all_supported_integration_normalizers():
     assert SUPPORTED_NORMALIZER_SOURCES == {
         "alertmanager",
         "aws_sns",
+        "azure_monitor",
         "datadog",
         "grafana",
         "librenms",

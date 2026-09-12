@@ -6,17 +6,13 @@ from app.api.schemas.roles import (
     GROUP_VIEWER_ROLE,
 )
 from app.modules.db.models import (
-    AlertRoute,
     ApiToken,
     Group,
-    NotificationChannel,
     Rotation,
     RotationLayer,
     RotationLayerMember,
-    RotationLayerRestriction,
     RotationMember,
     RotationOverride,
-    Silence,
     Team,
     TeamUser,
     User,
@@ -77,7 +73,17 @@ def get_group(group_id, include_deleted=False):
 
 
 def create_group(slug, name, description=None, active=True):
-    """Create a group."""
+    """Create a group or restore the deleted row occupying its slug."""
+    existing = Group.get_or_none(Group.slug == slug)
+    if existing is not None and existing.deleted:
+        existing.name = name
+        existing.description = description
+        existing.active = active
+        existing.deleted = False
+        existing.deleted_at = None
+        existing.save()
+        return existing
+
     return Group.create(
         slug=slug,
         name=name,
@@ -164,160 +170,129 @@ def update_group_membership(membership_id, role, active=True):
 
 
 def soft_delete_group(group_id):
-    """Soft-delete a group and disable all resources under it.
+    """Soft-delete a group and stop all active resources owned by it."""
+    from app.modules.db import (
+        business_services_repo,
+        channels_repo,
+        maintenance_repo,
+        orchestrations_repo,
+        teams_repo,
+    )
+    from app.modules.db.models import (
+        BusinessService,
+        EventOrchestration,
+        MaintenanceWindow,
+        NotificationChannel,
+        OrchestrationWebhookAction,
+        ServiceStandard,
+    )
+    from app.modules.db.soft_delete_hardening import (
+        cancel_pending_orchestration_work,
+        deactivate_sso_mappings,
+    )
+    from app.services.service_catalog.standards import delete_service_standard
 
-    The operation is intentionally soft-delete based:
-    - historical alerts and audit logs stay readable;
-    - teams/routes/rotations/channels/silences are disabled;
-    - users are not deleted;
-    - group memberships are disabled.
-    """
     now = utc_now()
     with db.atomic():
         group = get_group(group_id)
+
+        # Team deletion owns all team-scoped cascades (services, policies,
+        # routes, heartbeats, calendars, memberships and tokens).
+        teams = list(
+            Team.select().where(
+                (Team.group == group.id)
+                & (Team.deleted == False)  # noqa: E712
+            )
+        )
+        for team in teams:
+            teams_repo.soft_delete_team(team.id)
+
+        for business_service in list(
+            BusinessService.select().where(
+                (BusinessService.group == group.id)
+                & (BusinessService.deleted == False)  # noqa: E712
+            )
+        ):
+            business_services_repo.soft_delete_business_service(business_service.id)
+
+        for standard in list(
+            ServiceStandard.select().where(
+                (ServiceStandard.group == group.id)
+                & (ServiceStandard.deleted == False)  # noqa: E712
+            )
+        ):
+            delete_service_standard(standard)
+
+        for window in list(
+            MaintenanceWindow.select().where(
+                (MaintenanceWindow.group == group.id)
+                & (MaintenanceWindow.deleted == False)  # noqa: E712
+            )
+        ):
+            maintenance_repo.soft_delete_maintenance_window(window)
+
+        # Group-only channels are not reached through team deletion.
+        for channel in list(
+            NotificationChannel.select().where(
+                (NotificationChannel.group == group.id)
+                & NotificationChannel.team.is_null(True)
+                & (NotificationChannel.deleted == False)  # noqa: E712
+            )
+        ):
+            channels_repo.delete_channel(channel.id)
+
+        orchestrations = list(
+            EventOrchestration.select(EventOrchestration.id).where(
+                (EventOrchestration.group == group.id)
+                & (EventOrchestration.deleted == False)  # noqa: E712
+            )
+        )
+        for orchestration in orchestrations:
+            orchestrations_repo.archive_orchestration(orchestration.id)
+
+        orchestrations_repo.revoke_intake_tokens_for_scope(
+            group_id=group.id,
+            now=now,
+        )
+
+        action_ids = [
+            row.id for row in OrchestrationWebhookAction.select(
+                OrchestrationWebhookAction.id
+            ).where(
+                (OrchestrationWebhookAction.group == group.id)
+                & (OrchestrationWebhookAction.deleted == False)  # noqa: E712
+            )
+        ]
+        if action_ids:
+            OrchestrationWebhookAction.update(
+                enabled=False,
+                deleted=True,
+                deleted_at=now,
+                updated_at=now,
+            ).where(OrchestrationWebhookAction.id.in_(action_ids)).execute()
+
+        cancel_pending_orchestration_work(
+            group_id=group.id,
+            now=now,
+            reason="group_deleted",
+        )
+        deactivate_sso_mappings(group_id=group.id)
+
+        UserGroup.update(active=False).where(UserGroup.group == group.id).execute()
+        User.update(active_group=None).where(User.active_group == group.id).execute()
+        ApiToken.update(
+            deleted=True,
+            deleted_at=now,
+            active=False,
+        ).where(
+            (ApiToken.group == group.id)
+            & (ApiToken.deleted == False)  # noqa: E712
+        ).execute()
+
         group.deleted = True
         group.deleted_at = now
         group.active = False
         group.save()
-
-        team_ids = [
-            team.id for team in (
-                Team
-                .select(Team.id)
-                .where(
-                    (Team.group == group_id)
-                    & (Team.deleted == False)
-                )
-            )
-        ]
-
-        Team.update(
-            deleted=True,
-            deleted_at=now,
-            active=False,
-        ).where(
-            (Team.group == group_id)
-            & (Team.deleted == False)
-        ).execute()
-
-        UserGroup.update(
-            active=False,
-        ).where(
-            UserGroup.group == group_id
-        ).execute()
-
-        User.update(
-            active_group=None,
-        ).where(
-            User.active_group == group_id
-        ).execute()
-
-        if team_ids:
-            rotation_ids = [
-                rotation.id
-                for rotation in (
-                    Rotation
-                    .select(Rotation.id)
-                    .where(Rotation.team.in_(team_ids))
-                )
-            ]
-
-            layer_ids = [
-                layer.id
-                for layer in (
-                    RotationLayer
-                    .select(RotationLayer.id)
-                    .where(RotationLayer.rotation.in_(rotation_ids))
-                )
-            ]
-
-            if layer_ids:
-                RotationLayerRestriction.delete().where(
-                    RotationLayerRestriction.layer.in_(layer_ids)
-                ).execute()
-
-                RotationLayerMember.delete().where(
-                    RotationLayerMember.layer.in_(layer_ids)
-                ).execute()
-
-                RotationLayer.update(
-                    deleted=True,
-                    deleted_at=now,
-                    enabled=False,
-                ).where(
-                    RotationLayer.id.in_(layer_ids)
-                ).execute()
-            Rotation.update(
-                deleted=True,
-                deleted_at=now,
-                enabled=False,
-            ).where(
-                (Rotation.team.in_(team_ids))
-                & (Rotation.deleted == False)
-            ).execute()
-
-            AlertRoute.update(
-                deleted=True,
-                deleted_at=now,
-                enabled=False,
-            ).where(
-                (AlertRoute.team.in_(team_ids))
-                & (AlertRoute.deleted == False)
-            ).execute()
-
-            NotificationChannel.update(
-                deleted=True,
-                deleted_at=now,
-                enabled=False,
-            ).where(
-                (NotificationChannel.team.in_(team_ids))
-                & (NotificationChannel.deleted == False)
-            ).execute()
-
-            Silence.update(
-                deleted=True,
-                deleted_at=now,
-                enabled=False,
-            ).where(
-                (Silence.team.in_(team_ids))
-                & (Silence.deleted == False)
-            ).execute()
-
-            TeamUser.update(
-                active=False,
-            ).where(
-                TeamUser.team.in_(team_ids)
-            ).execute()
-
-            ApiToken.update(
-                deleted=True,
-                deleted_at=now,
-                active=False,
-            ).where(
-                (
-                    (ApiToken.team.in_(team_ids))
-                    | (ApiToken.group == group_id)
-                )
-                & (ApiToken.deleted == False)
-            ).execute()
-        else:
-            ApiToken.update(
-                deleted=True,
-                deleted_at=now,
-                active=False,
-            ).where(
-                (ApiToken.group == group_id)
-                & (ApiToken.deleted == False)
-            ).execute()
-
-        NotificationChannel.update(
-            deleted=True,
-            deleted_at=now,
-            enabled=False,
-        ).where(
-            (NotificationChannel.group == group_id)
-            & (NotificationChannel.deleted == False)
-        ).execute()
 
     return group
 

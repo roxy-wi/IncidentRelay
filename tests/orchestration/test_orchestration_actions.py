@@ -273,3 +273,31 @@ def test_set_trace_level_rejects_unknown_level():
     )
 
     assert any(issue.code == "invalid_trace_level" for issue in issues)
+
+
+def test_set_alert_event_history_records_explicit_result():
+    result = execute_actions(
+        [{"type": "set_alert_event_history", "level": "initial"}],
+        build_context(event={"title": "noisy"}),
+    )
+
+    assert result.context["result"]["alert_event_history"] == "initial"
+    assert result.steps[0].before == "full"
+    assert result.steps[0].after == "initial"
+
+
+@pytest.mark.parametrize("level", ["full", "initial", "disabled"])
+def test_set_alert_event_history_accepts_supported_levels(level):
+    issues = validate_action_list(
+        [{"type": "set_alert_event_history", "level": level}]
+    )
+
+    assert issues == []
+
+
+def test_set_alert_event_history_rejects_unknown_level():
+    issues = validate_action_list(
+        [{"type": "set_alert_event_history", "level": "compact"}]
+    )
+
+    assert any(issue.code == "invalid_alert_event_history" for issue in issues)

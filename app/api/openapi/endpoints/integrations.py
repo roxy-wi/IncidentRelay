@@ -148,6 +148,94 @@ def incoming_alert_responses(success_description="Alerts accepted."):
     }
 
 
+AZURE_MONITOR_WEBHOOK_BODY_SCHEMA = {
+    "type": "object",
+    "required": ["schemaId", "data"],
+    "additionalProperties": True,
+    "description": "Azure Monitor Common Alert Schema webhook payload.",
+    "properties": {
+        "schemaId": {
+            "type": "string",
+            "enum": ["azureMonitorCommonAlertSchema"],
+        },
+        "data": {
+            "type": "object",
+            "required": ["essentials"],
+            "additionalProperties": True,
+            "properties": {
+                "essentials": {
+                    "type": "object",
+                    "required": ["monitorCondition"],
+                    "additionalProperties": True,
+                    "properties": {
+                        "alertId": {"type": "string", "nullable": True},
+                        "alertRule": {"type": "string", "nullable": True},
+                        "alertRuleId": {"type": "string", "nullable": True},
+                        "severity": {
+                            "type": "string",
+                            "enum": ["Sev0", "Sev1", "Sev2", "Sev3", "Sev4"],
+                        },
+                        "signalType": {"type": "string", "nullable": True},
+                        "monitorCondition": {
+                            "type": "string",
+                            "enum": ["Fired", "Resolved"],
+                        },
+                        "monitoringService": {"type": "string", "nullable": True},
+                        "alertTargetIDs": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                        },
+                        "configurationItems": {
+                            "type": "array",
+                            "items": {"type": "string"},
+                        },
+                        "originAlertId": {"type": "string", "nullable": True},
+                        "description": {"type": "string", "nullable": True},
+                        "targetResourceGroup": {"type": "string", "nullable": True},
+                        "targetResourceType": {"type": "string", "nullable": True},
+                        "investigationLink": {"type": "string", "nullable": True},
+                    },
+                },
+                "alertContext": {
+                    "type": "object",
+                    "additionalProperties": True,
+                },
+                "customProperties": {
+                    "type": "object",
+                    "additionalProperties": True,
+                    "description": (
+                        "Custom Azure alert properties copied to matcher-friendly labels."
+                    ),
+                },
+            },
+        },
+    },
+    "example": {
+        "schemaId": "azureMonitorCommonAlertSchema",
+        "data": {
+            "essentials": {
+                "alertId": (
+                    "/subscriptions/example/providers/"
+                    "Microsoft.AlertsManagement/alerts/example-1"
+                ),
+                "alertRule": "Checkout API latency",
+                "severity": "Sev1",
+                "signalType": "Metric",
+                "monitorCondition": "Fired",
+                "monitoringService": "Platform",
+                "configurationItems": ["checkout-api"],
+                "description": "p95 latency exceeded 2 seconds",
+            },
+            "customProperties": {
+                "team": "sre",
+                "service": "checkout",
+                "environment": "production",
+            },
+        },
+    },
+}
+
+
 SENTRY_WEBHOOK_BODY_SCHEMA = {
     "type": "object",
     "description": (
@@ -451,6 +539,8 @@ SLACK_ACTION_RESPONSE_SCHEMA = {
             "enum": [
                 "acknowledge",
                 "resolve",
+                "shelve",
+                "unshelve",
             ],
             "description": "Alert action performed by IncidentRelay.",
             "example": "acknowledge",
@@ -462,10 +552,9 @@ SLACK_ACTION_RESPONSE_SCHEMA = {
         },
         "user_id": {
             "type": "integer",
-            "nullable": True,
             "description": (
-                "IncidentRelay user matched by Slack user ID. "
-                "Null when the Slack user is not linked."
+                "IncidentRelay user matched by Slack user ID and authorized "
+                "as a responder for the alert team."
             ),
             "example": 7,
         },
@@ -2531,6 +2620,32 @@ def paths():
                 ),
             },
         },
+        "/api/integrations/azure-monitor": {
+            "post": {
+                "tags": ["integrations"],
+                "summary": "Receive Azure Monitor alerts",
+                "description": (
+                    "Receives Azure Monitor Common Alert Schema webhook payloads. "
+                    "The route must use source=azure_monitor. Native Azure Action "
+                    "Group Webhook actions can authenticate with HTTP Basic using "
+                    "username incidentrelay and the route intake token as password. "
+                    "Bearer route tokens remain supported for clients that can set "
+                    "custom Authorization headers."
+                ),
+                "operationId": "receiveAzureMonitorAlerts",
+                "security": [
+                    {"bearerAuth": []},
+                    {"basicRouteAuth": []},
+                ],
+                "requestBody": json_body(
+                    "Azure Monitor Common Alert Schema payload.",
+                    AZURE_MONITOR_WEBHOOK_BODY_SCHEMA,
+                ),
+                "responses": incoming_alert_responses(
+                    "Azure Monitor alert accepted."
+                ),
+            },
+        },
         "/api/integrations/nagios": {
             "post": {
                 "tags": ["integrations"],
@@ -2758,8 +2873,8 @@ def paths():
                 "summary": "Handle Mattermost interactive buttons",
                 "description": (
                     "Receives Mattermost interactive message button callbacks. The endpoint validates "
-                    "the callback secret from the action context, acknowledges or resolves the alert, "
-                    "and updates the original Mattermost post when the channel is configured in Bot API mode."
+                    "the signed action context, resolves the Mattermost user to an authorized IncidentRelay responder, "
+                    "performs acknowledge, resolve, shelve or unshelve, and updates stored Bot API messages."
                 ),
                 "operationId": "handleMattermostAction",
                 "requestBody": json_body("Mattermost interactive action payload.", {
@@ -2770,8 +2885,8 @@ def paths():
                             "properties": {
                                 "alert_id": {"type": "integer"},
                                 "channel_id": {"type": "integer"},
-                                "action": {"type": "string", "enum": ["acknowledge", "resolve"]},
-                                "secret": {"type": "string"},
+                                "action": {"type": "string", "enum": ["acknowledge", "resolve", "shelve", "unshelve"]},
+                                "signature": {"type": "string"},
                             },
                         }
                     },
@@ -2779,7 +2894,7 @@ def paths():
                 "responses": {
                     "200": response("Action processed."),
                     "400": response("Invalid action payload."),
-                    "403": response("Invalid callback secret."),
+                    "403": response("Invalid action signature or unauthorized Mattermost user."),
                 },
             }
         },
@@ -2789,7 +2904,7 @@ def paths():
                 "summary": "Handle Slack alert action",
                 "description": (
                     "Receives Slack Block Kit button interactions for alert "
-                    "acknowledgement and resolution. "
+                    "acknowledgement, resolution, shelving and unshelving. "
                     "The request body is application/x-www-form-urlencoded "
                     "and contains a JSON-encoded payload field. "
                     "IncidentRelay verifies the raw request body using the "
@@ -2863,8 +2978,8 @@ def paths():
                     "403": response(
                         (
                             "Missing or invalid Slack signature, expired request, "
-                            "disabled or mismatched Slack channel, or alert and "
-                            "channel belong to different teams."
+                            "disabled or mismatched Slack channel, unauthorized or "
+                            "unmapped Slack user, or alert and channel belong to different teams."
                         ),
                         SLACK_ACTION_ERROR_SCHEMA,
                     ),

@@ -24,6 +24,7 @@ Incoming integrations create or update alerts in IncidentRelay. They are selecte
 | Grafana             | `POST /api/integrations/grafana`           | [Grafana](grafana.md)                                     |
 | Datadog             | `POST /api/integrations/datadog`           | [Datadog](datadog.md)                                     |
 | New Relic           | `POST /api/integrations/new-relic`         | [New Relic](new-relic.md)                                 |
+| Azure Monitor       | `POST /api/integrations/azure-monitor`      | [Azure Monitor](azure-monitor.md)                         |
 | Nagios              | `POST /api/integrations/nagios`            | [Nagios](nagios.md)                                       |
 | Uptime Kuma         | `POST /api/integrations/uptime-kuma`       | [Uptime Kuma](uptime-kuma.md)                             |
 | RMON                | `POST /api/integrations/rmon`              | [Grafana](rmon.md)                                        |
@@ -40,10 +41,10 @@ Notification channels deliver alerts after a route has matched an incoming alert
 
 | Channel type    | Purpose                                                                        | Documentation                                 |
 |-----------------|--------------------------------------------------------------------------------|-----------------------------------------------|
-| Mattermost      | Chat notifications, optional ACK/Resolve buttons, message updates              | [Mattermost channel](mattermost.md)           |
+| Mattermost      | Chat notifications, optional ACK/Resolve/Shelve buttons, message updates              | [Mattermost channel](mattermost.md)           |
 | Telegram        | Telegram Bot API notifications, optional inline actions                        | [Telegram channel](telegram.md)               |
 | Email           | Sends email to the assigned user's profile email                               | [Email channel](email.md)                     |
-| Slack           | Incoming webhook or Bot API notifications with ACK/Resolve actions and updates   | [Slack channel](slack.md)                      |
+| Slack           | Incoming webhook or Bot API notifications with ACK/Resolve/Shelve actions and updates   | [Slack channel](slack.md)                      |
 | Discord         | Sends notifications to a Discord webhook                                       | [Webhook-based channels](webhook-channels.md) |
 | Microsoft Teams | Sends notifications to a Teams webhook                                         | [Webhook-based channels](webhook-channels.md) |
 | Webhook         | Sends notification payloads to a custom HTTP endpoint                          | [Webhook-based channels](webhook-channels.md) |
@@ -64,7 +65,7 @@ Read the common channel behavior first: [Notification channels](channels.md).
 8. Copy the route intake token
 9. Configure Alertmanager, Zabbix, or webhook sender
 10. Send a test alert
-11. Verify notification delivery and ACK/Resolve flow
+11. Verify notification delivery and ACK/Resolve/Shelve flow
 ```
 
 ## Troubleshooting direction

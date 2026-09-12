@@ -1,12 +1,17 @@
 from datetime import timedelta
 
-from app.modules.db import channels_repo, groups_repo, locks_repo, routes_repo, teams_repo, tokens_repo
+from app.modules.db import channels_repo, groups_repo, locks_repo, rotations_repo, routes_repo, teams_repo, tokens_repo, users_repo
 from app.modules.db.models import (
     AlertRouteChannel,
     ApiToken,
     AppLock,
+    EscalationPolicyRule,
+    Heartbeat,
+    NotificationPolicyRule,
+    NotificationPolicyRuleChannel,
     RotationMember,
     RotationOverride,
+    ServiceChannel,
     TeamUser,
     UserGroup,
 )
@@ -14,6 +19,11 @@ from tests.factories import (
     add_user_to_team,
     attach_channel,
     create_channel,
+    create_escalation_policy,
+    create_escalation_policy_rule,
+    create_heartbeat,
+    create_notification_policy,
+    create_notification_policy_rule,
     create_rotation,
     create_rotation_override,
     create_silence,
@@ -142,12 +152,16 @@ def test_route_channel_link_helpers_replace_and_unlink_links(db):
     assert AlertRouteChannel.select().where(AlertRouteChannel.route == route.id).count() == 0
 
 
-def test_delete_channel_soft_deletes_channel_and_removes_route_links(db):
+def test_delete_channel_soft_deletes_channel_and_removes_active_links(db):
     group = create_group(slug="infra")
     team = create_team(group, slug="sre")
     route = create_route(team)
+    service = create_service(team, name="API", slug="api-channel-links")
     channel = create_channel(group, team)
     attach_channel(route, channel)
+    policy = create_notification_policy(team, name="Channel links")
+    rule = create_notification_policy_rule(policy, channels=[channel])
+    ServiceChannel.create(service=service, channel=channel, purpose="default")
 
     deleted = channels_repo.delete_channel(channel.id)
 
@@ -155,6 +169,11 @@ def test_delete_channel_soft_deletes_channel_and_removes_route_links(db):
     assert deleted.enabled is False
     assert deleted.deleted_at is not None
     assert AlertRouteChannel.select().where(AlertRouteChannel.channel == channel.id).count() == 0
+    assert NotificationPolicyRuleChannel.select().where(
+        NotificationPolicyRuleChannel.channel == channel.id
+    ).count() == 0
+    assert ServiceChannel.select().where(ServiceChannel.channel == channel.id).count() == 0
+    assert NotificationPolicyRule.get_by_id(rule.id).deleted is False
 
 
 def test_soft_delete_route_disables_route_and_removes_channel_links(db):
@@ -172,6 +191,27 @@ def test_soft_delete_route_disables_route_and_removes_channel_links(db):
     assert AlertRouteChannel.select().where(AlertRouteChannel.route == route.id).count() == 0
 
 
+def test_soft_delete_rotation_detaches_active_configuration(db):
+    group = create_group(slug="rotation-delete-group")
+    team = create_team(group, slug="rotation-delete-team")
+    rotation = create_rotation(team)
+    service = create_service(team, name="API", slug="rotation-api")
+    service.default_rotation = rotation
+    service.save()
+    policy = create_escalation_policy(team, name="Rotation policy")
+    rule = create_escalation_policy_rule(policy, rotation=rotation)
+
+    deleted = rotations_repo.soft_delete_rotation(rotation.id)
+
+    service = type(service).get_by_id(service.id)
+    rule = EscalationPolicyRule.get_by_id(rule.id)
+    assert deleted.deleted is True
+    assert deleted.enabled is False
+    assert service.default_rotation_id is None
+    assert rule.target_rotation_id is None
+    assert rule.enabled is False
+
+
 def test_soft_delete_group_disables_child_resources_and_tokens(db):
     group = create_group(slug="infra")
     team = create_team(group, slug="sre")
@@ -180,6 +220,24 @@ def test_soft_delete_group_disables_child_resources_and_tokens(db):
     route = create_route(team, rotation=rotation)
     channel = create_channel(group, team)
     silence = create_silence(team)
+    service = create_service(team, name="API", slug="api")
+    heartbeat = create_heartbeat(team, route, service=service, slug="api-heartbeat")
+    escalation_policy = create_escalation_policy(team, name="Primary escalation")
+    escalation_rule = create_escalation_policy_rule(
+        escalation_policy,
+        rotation=rotation,
+    )
+    notification_policy = create_notification_policy(team, name="Primary notifications")
+    notification_rule = create_notification_policy_rule(notification_policy)
+    firing_group = _create_repo_alert_group(
+        team,
+        route,
+        service,
+        "group delete incident",
+        "firing",
+        "critical",
+        "group-delete-runtime",
+    )
     token = ApiToken.create(
         user=user,
         group=group,
@@ -205,6 +263,18 @@ def test_soft_delete_group_disables_child_resources_and_tokens(db):
     assert type(channel).get_by_id(channel.id).enabled is False
     assert type(silence).get_by_id(silence.id).deleted is True
     assert type(silence).get_by_id(silence.id).enabled is False
+    assert type(service).get_by_id(service.id).deleted is True
+    assert type(service).get_by_id(service.id).enabled is False
+    assert Heartbeat.get_by_id(heartbeat.id).deleted is True
+    assert Heartbeat.get_by_id(heartbeat.id).enabled is False
+    assert type(escalation_policy).get_by_id(escalation_policy.id).deleted is True
+    assert type(escalation_policy).get_by_id(escalation_policy.id).enabled is False
+    assert EscalationPolicyRule.get_by_id(escalation_rule.id).enabled is False
+    assert type(notification_policy).get_by_id(notification_policy.id).deleted is True
+    assert type(notification_policy).get_by_id(notification_policy.id).enabled is False
+    assert NotificationPolicyRule.get_by_id(notification_rule.id).deleted is True
+    assert NotificationPolicyRule.get_by_id(notification_rule.id).deleted_at is not None
+    assert alerts_repo.get_alert_group(firing_group.id).status == "resolved"
     assert ApiToken.get_by_id(token.id).deleted is True
     assert ApiToken.get_by_id(token.id).active is False
 
@@ -295,3 +365,44 @@ def test_create_team_respects_active_flag(db):
 
     assert team.active is False
     assert teams_repo.get_team(team.id).active is False
+
+
+def test_soft_deleted_group_team_and_user_restore_same_natural_key_rows(db):
+    group = create_group(slug="restore-group", name="Old Group")
+    team = create_team(group, slug="restore-team", name="Old Team")
+    user = create_user("restore-user", group)
+
+    original_group_id = group.id
+    original_team_id = team.id
+    original_user_id = user.id
+
+    users_repo.soft_delete_user(user.id)
+    groups_repo.soft_delete_group(group.id)
+
+    restored_group = groups_repo.create_group(
+        slug="restore-group",
+        name="Restored Group",
+        description="fresh configuration",
+    )
+    restored_team = teams_repo.create_team(
+        slug="restore-team",
+        name="Restored Team",
+        group_id=restored_group.id,
+    )
+    restored_user = users_repo.create_user(
+        username="restore-user",
+        display_name="Restored User",
+        active=True,
+    )
+
+    assert restored_group.id == original_group_id
+    assert restored_group.deleted is False
+    assert restored_group.active is True
+    assert restored_group.name == "Restored Group"
+    assert restored_team.id == original_team_id
+    assert restored_team.deleted is False
+    assert restored_team.active is True
+    assert restored_user.id == original_user_id
+    assert restored_user.deleted is False
+    assert restored_user.active is True
+    assert restored_user.active_group_id is None

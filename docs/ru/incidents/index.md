@@ -16,6 +16,7 @@ IncidentRelay группирует входящие сигналы в групп
 - [Заинтересованные стороны инцидента](stakeholders.md)
 - [Комментарии к алертам](../usage/alert-comments.md)
 - [Заглушки](../usage/silences.md)
+- [Shelving алертов](../usage/shelving.md)
 - [Окна обслуживания](../concepts/maintenance-windows.md)
 - [Трассировка объяснения](explain-trace.md)
 

@@ -1,0 +1,468 @@
+name: CLA
+
+on:
+  pull_request_target:
+    branches:
+      - main
+      - "release/**"
+    types:
+      - opened
+      - synchronize
+      - reopened
+      - ready_for_review
+  issue_comment:
+    types:
+      - created
+  push:
+    paths:
+      - CLA.md
+  workflow_dispatch:
+
+permissions: {}
+
+concurrency:
+  group: incidentrelay-cla-registry
+  cancel-in-progress: false
+
+jobs:
+  evaluate:
+    name: Update CLA status
+    if: github.event_name == 'pull_request_target'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+      statuses: write
+
+    steps:
+      - name: Evaluate contributor acceptance
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const pr = context.payload.pull_request;
+            const registryTitle = "[CLA] Signature Registry";
+            const markerPrefix = "<!-- incidentrelay-cla-signature ";
+            const exemptLogins = new Set([
+              "dependabot[bot]",
+              "github-actions[bot]",
+            ]);
+
+            async function currentClaSha() {
+              const repository = await github.rest.repos.get({ owner, repo });
+              const defaultBranch = repository.data.default_branch;
+              const response = await github.rest.repos.getContent({
+                owner,
+                repo,
+                path: "CLA.md",
+                ref: defaultBranch,
+              });
+
+              if (Array.isArray(response.data) || response.data.type !== "file") {
+                throw new Error("CLA.md is not a file on the default branch");
+              }
+
+              return {
+                sha: response.data.sha,
+                defaultBranch,
+              };
+            }
+
+            async function registryIssues() {
+              const query = `repo:${owner}/${repo} is:issue in:title \"${registryTitle}\"`;
+              const response = await github.rest.search.issuesAndPullRequests({
+                q: query,
+                per_page: 100,
+              });
+
+              return response.data.items.filter((issue) =>
+                issue.title === registryTitle &&
+                issue.user &&
+                issue.user.login === "github-actions[bot]"
+              );
+            }
+
+            async function hasSignature(githubId, claSha) {
+              for (const issue of await registryIssues()) {
+                const comments = await github.paginate(
+                  github.rest.issues.listComments,
+                  {
+                    owner,
+                    repo,
+                    issue_number: issue.number,
+                    per_page: 100,
+                  }
+                );
+
+                for (const comment of comments) {
+                  if (!comment.user || comment.user.login !== "github-actions[bot]") {
+                    continue;
+                  }
+
+                  const body = comment.body || "";
+                  const start = body.indexOf(markerPrefix);
+                  if (start === -1) {
+                    continue;
+                  }
+
+                  const jsonStart = start + markerPrefix.length;
+                  const jsonEnd = body.indexOf(" -->", jsonStart);
+                  if (jsonEnd === -1) {
+                    continue;
+                  }
+
+                  try {
+                    const record = JSON.parse(body.slice(jsonStart, jsonEnd));
+                    if (
+                      record.version === 1 &&
+                      Number(record.github_id) === Number(githubId) &&
+                      record.cla_sha === claSha
+                    ) {
+                      return true;
+                    }
+                  } catch (error) {
+                    core.warning(`Ignoring malformed CLA registry record in comment ${comment.id}`);
+                  }
+                }
+              }
+
+              return false;
+            }
+
+            const { sha: claSha, defaultBranch } = await currentClaSha();
+            const login = pr.user.login;
+            const isExempt = exemptLogins.has(login);
+            const accepted = isExempt || await hasSignature(pr.user.id, claSha);
+
+            await github.rest.repos.createCommitStatus({
+              owner,
+              repo,
+              sha: pr.head.sha,
+              state: accepted ? "success" : "failure",
+              context: "CLA",
+              description: isExempt
+                ? "Automated dependency account is exempt from CLA"
+                : accepted
+                  ? "Contributor accepted the current CLA"
+                  : "Comment /sign-cla on the PR to accept the current CLA",
+              target_url: `${context.serverUrl}/${owner}/${repo}/blob/${defaultBranch}/CLA.md`,
+            });
+
+            if (!accepted) {
+              core.notice(`@${login} has not accepted CLA ${claSha}. Comment /sign-cla on PR #${pr.number}.`);
+            }
+
+  sign:
+    name: Record CLA acceptance
+    if: >-
+      github.event_name == 'issue_comment' &&
+      github.event.issue.pull_request &&
+      github.event.comment.body == '/sign-cla'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: write
+      pull-requests: read
+      statuses: write
+
+    steps:
+      - name: Record acceptance
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const issueNumber = context.payload.issue.number;
+            const commenter = context.payload.comment.user;
+            const registryTitle = "[CLA] Signature Registry";
+            const markerPrefix = "<!-- incidentrelay-cla-signature ";
+
+            const { data: pr } = await github.rest.pulls.get({
+              owner,
+              repo,
+              pull_number: issueNumber,
+            });
+
+            if (Number(commenter.id) !== Number(pr.user.id)) {
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: issueNumber,
+                body: `Only the pull request author (@${pr.user.login}) can accept the CLA for this contribution.`,
+              });
+              return;
+            }
+
+            if (commenter.type === "Bot") {
+              return;
+            }
+
+            const repository = await github.rest.repos.get({ owner, repo });
+            const defaultBranch = repository.data.default_branch;
+            const claResponse = await github.rest.repos.getContent({
+              owner,
+              repo,
+              path: "CLA.md",
+              ref: defaultBranch,
+            });
+
+            if (Array.isArray(claResponse.data) || claResponse.data.type !== "file") {
+              throw new Error("CLA.md is not a file on the default branch");
+            }
+
+            const claSha = claResponse.data.sha;
+
+            async function findRegistryIssues() {
+              const query = `repo:${owner}/${repo} is:issue in:title \"${registryTitle}\"`;
+              const response = await github.rest.search.issuesAndPullRequests({
+                q: query,
+                per_page: 100,
+              });
+
+              return response.data.items.filter((issue) =>
+                issue.title === registryTitle &&
+                issue.user &&
+                issue.user.login === "github-actions[bot]"
+              );
+            }
+
+            async function alreadyAccepted(issues) {
+              for (const issue of issues) {
+                const comments = await github.paginate(
+                  github.rest.issues.listComments,
+                  {
+                    owner,
+                    repo,
+                    issue_number: issue.number,
+                    per_page: 100,
+                  }
+                );
+
+                for (const comment of comments) {
+                  if (!comment.user || comment.user.login !== "github-actions[bot]") {
+                    continue;
+                  }
+
+                  const body = comment.body || "";
+                  const start = body.indexOf(markerPrefix);
+                  if (start === -1) {
+                    continue;
+                  }
+
+                  const jsonStart = start + markerPrefix.length;
+                  const jsonEnd = body.indexOf(" -->", jsonStart);
+                  if (jsonEnd === -1) {
+                    continue;
+                  }
+
+                  try {
+                    const record = JSON.parse(body.slice(jsonStart, jsonEnd));
+                    if (
+                      record.version === 1 &&
+                      Number(record.github_id) === Number(commenter.id) &&
+                      record.cla_sha === claSha
+                    ) {
+                      return true;
+                    }
+                  } catch (error) {
+                    core.warning(`Ignoring malformed CLA registry record in comment ${comment.id}`);
+                  }
+                }
+              }
+
+              return false;
+            }
+
+            let registries = await findRegistryIssues();
+            const accepted = await alreadyAccepted(registries);
+
+            if (!accepted) {
+              let registry = registries.find((issue) => issue.state === "open");
+
+              if (!registry) {
+                const created = await github.rest.issues.create({
+                  owner,
+                  repo,
+                  title: registryTitle,
+                  body: [
+                    "This issue is an automated public registry of IncidentRelay CLA acceptances.",
+                    "",
+                    "Do not edit or manually add signature records. Only records posted by `github-actions[bot]` are trusted by the CLA workflow.",
+                    "",
+                    "Each record is bound to the contributor's numeric GitHub user ID and the Git blob SHA of the accepted `CLA.md` version.",
+                  ].join("\n"),
+                });
+                registry = created.data;
+              }
+
+              const record = {
+                version: 1,
+                github_id: commenter.id,
+                github_login: commenter.login,
+                cla_sha: claSha,
+                accepted_at: context.payload.comment.created_at,
+                source_pr: issueNumber,
+                source_comment_id: context.payload.comment.id,
+                command: "/sign-cla",
+              };
+
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: registry.number,
+                body: [
+                  `${markerPrefix}${JSON.stringify(record)} -->`,
+                  `✅ @${commenter.login} accepted IncidentRelay CLA \`${claSha}\` on ${context.payload.comment.created_at}.`,
+                  `Source: #${issueNumber}, comment ${context.payload.comment.id}.`,
+                ].join("\n"),
+              });
+            }
+
+            await github.rest.repos.createCommitStatus({
+              owner,
+              repo,
+              sha: pr.head.sha,
+              state: "success",
+              context: "CLA",
+              description: "Contributor accepted the current CLA",
+              target_url: `${context.serverUrl}/${owner}/${repo}/blob/${defaultBranch}/CLA.md`,
+            });
+
+            await github.rest.issues.createComment({
+              owner,
+              repo,
+              issue_number: issueNumber,
+              body: accepted
+                ? `✅ @${commenter.login}, you already accepted the current IncidentRelay CLA (\`${claSha}\`).`
+                : `✅ @${commenter.login}, your IncidentRelay CLA acceptance has been recorded for version \`${claSha}\`.`,
+            });
+
+  refresh:
+    name: Refresh open PR CLA statuses
+    if: github.event_name == 'push' || github.event_name == 'workflow_dispatch'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      issues: read
+      pull-requests: read
+      statuses: write
+
+    steps:
+      - name: Refresh statuses
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const registryTitle = "[CLA] Signature Registry";
+            const markerPrefix = "<!-- incidentrelay-cla-signature ";
+            const exemptLogins = new Set([
+              "dependabot[bot]",
+              "github-actions[bot]",
+            ]);
+
+            const repository = await github.rest.repos.get({ owner, repo });
+            const defaultBranch = repository.data.default_branch;
+
+            if (context.eventName === "push" && context.ref !== `refs/heads/${defaultBranch}`) {
+              core.notice("CLA.md changed outside the default branch; open PR statuses were not refreshed.");
+              return;
+            }
+
+            const claResponse = await github.rest.repos.getContent({
+              owner,
+              repo,
+              path: "CLA.md",
+              ref: defaultBranch,
+            });
+
+            if (Array.isArray(claResponse.data) || claResponse.data.type !== "file") {
+              throw new Error("CLA.md is not a file on the default branch");
+            }
+
+            const claSha = claResponse.data.sha;
+            const query = `repo:${owner}/${repo} is:issue in:title \"${registryTitle}\"`;
+            const registryResponse = await github.rest.search.issuesAndPullRequests({
+              q: query,
+              per_page: 100,
+            });
+            const registries = registryResponse.data.items.filter((issue) =>
+              issue.title === registryTitle &&
+              issue.user &&
+              issue.user.login === "github-actions[bot]"
+            );
+
+            const acceptedIds = new Set();
+
+            for (const issue of registries) {
+              const comments = await github.paginate(
+                github.rest.issues.listComments,
+                {
+                  owner,
+                  repo,
+                  issue_number: issue.number,
+                  per_page: 100,
+                }
+              );
+
+              for (const comment of comments) {
+                if (!comment.user || comment.user.login !== "github-actions[bot]") {
+                  continue;
+                }
+
+                const body = comment.body || "";
+                const start = body.indexOf(markerPrefix);
+                if (start === -1) {
+                  continue;
+                }
+
+                const jsonStart = start + markerPrefix.length;
+                const jsonEnd = body.indexOf(" -->", jsonStart);
+                if (jsonEnd === -1) {
+                  continue;
+                }
+
+                try {
+                  const record = JSON.parse(body.slice(jsonStart, jsonEnd));
+                  if (record.version === 1 && record.cla_sha === claSha) {
+                    acceptedIds.add(Number(record.github_id));
+                  }
+                } catch (error) {
+                  core.warning(`Ignoring malformed CLA registry record in comment ${comment.id}`);
+                }
+              }
+            }
+
+            const pulls = await github.paginate(
+              github.rest.pulls.list,
+              {
+                owner,
+                repo,
+                state: "open",
+                per_page: 100,
+              }
+            );
+
+            for (const pr of pulls) {
+              const accepted =
+                exemptLogins.has(pr.user.login) ||
+                acceptedIds.has(Number(pr.user.id));
+
+              await github.rest.repos.createCommitStatus({
+                owner,
+                repo,
+                sha: pr.head.sha,
+                state: accepted ? "success" : "failure",
+                context: "CLA",
+                description: exemptLogins.has(pr.user.login)
+                  ? "Automated dependency account is exempt from CLA"
+                  : accepted
+                    ? "Contributor accepted the current CLA"
+                    : "Comment /sign-cla on the PR to accept the current CLA",
+                target_url: `${context.serverUrl}/${owner}/${repo}/blob/${defaultBranch}/CLA.md`,
+              });
+            }
+
+            core.notice(`Refreshed CLA status for ${pulls.length} open pull request(s).`);

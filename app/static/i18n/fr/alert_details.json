@@ -321,5 +321,20 @@
   "alert_details.manual.select_team_error": "Sélectionnez une équipe.",
   "alert_details.manual.title_required": "Le titre de l’incident est requis.",
   "alert_details.manual.permission": "Vous n’avez pas l’autorisation de créer des incidents pour cette équipe.",
-  "alert_details.priority.current": "Actuelle : {value}"
+  "alert_details.priority.current": "Actuelle : {value}",
+  "alert_details.events.load_older": "Charger les événements plus anciens",
+  "alert_details.actions.shelve": "Mettre en attente",
+  "alert_details.actions.unshelve": "Réactiver",
+  "alert_details.shelve.title": "Mettre l’alerte en attente",
+  "alert_details.shelve.help": "Suspend temporairement les notifications, rappels et escalades pour ce groupe d’alertes sans modifier son état technique.",
+  "alert_details.shelve.duration": "Durée",
+  "alert_details.shelve.reason": "Raison",
+  "alert_details.shelve.reason_placeholder": "Raison facultative de la mise en attente",
+  "alert_details.shelve.30m": "30 minutes",
+  "alert_details.shelve.1h": "1 heure",
+  "alert_details.shelve.2h": "2 heures",
+  "alert_details.shelve.4h": "4 heures",
+  "alert_details.shelve.8h": "8 heures",
+  "alert_details.shelve.24h": "24 heures",
+  "alert_details.shelve.until": "Jusqu’au : {time}"
 }

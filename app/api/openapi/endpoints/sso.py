@@ -67,6 +67,32 @@ SSO_PROVIDER_SCHEMA = {
             "items": {"type": "string"},
             "example": ["example.com"],
         },
+        "profile_claim_mappings": {
+            "type": "object",
+            "nullable": True,
+            "additionalProperties": False,
+            "description": (
+                "Map supported IncidentRelay profile fields to SSO claim names. "
+                "Mapped values only fill empty local profile fields."
+            ),
+            "properties": {
+                "slack_user_id": {
+                    "type": "string",
+                    "maxLength": 128,
+                    "example": "slack_id",
+                },
+                "telegram_user_id": {
+                    "type": "string",
+                    "maxLength": 128,
+                    "example": "telegram_id",
+                },
+                "mattermost_user_id": {
+                    "type": "string",
+                    "maxLength": 128,
+                    "example": "mattermost_id",
+                },
+            },
+        },
 
         "auto_create_users": {"type": "boolean", "default": False},
         "auto_link_by_email": {"type": "boolean", "default": True},

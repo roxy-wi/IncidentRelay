@@ -1,5 +1,7 @@
 from pathlib import Path
 
+from app.i18n import SUPPORTED_LOCALES
+
 
 ROOT = Path(__file__).resolve().parents[2]
 
@@ -29,7 +31,7 @@ def test_audit_log_translations_exist_for_all_supported_locales():
 
     import json
 
-    for locale in ("en", "de", "fr", "ru"):
+    for locale in SUPPORTED_LOCALES:
         path = ROOT / "app/static/i18n" / locale / "audit_logs.json"
         payload = json.loads(path.read_text(encoding="utf-8"))
         assert required_keys <= payload.keys()

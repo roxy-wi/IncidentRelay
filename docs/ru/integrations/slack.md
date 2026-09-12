@@ -10,7 +10,7 @@ Slack — это исходящий канал уведомлений.
 IncidentRelay поддерживает два режима доставки в Slack:
 
 1. Режим входящего вебхука для односторонних уведомлений.
-2. Режим Bot API с интерактивными кнопками `Acknowledge` и `Resolve` и обновлением сообщений.
+2. Режим Bot API с интерактивными кнопками `Acknowledge`, `Resolve`, `Shelve 1h` и `Unshelve` и обновлением сообщений.
 
 Интерактивные действия Bot API можно получать двумя способами:
 
@@ -39,8 +39,8 @@ IncidentRelay поддерживает два режима доставки в S
 Режим Bot API поддерживает:
 
 - отправку уведомлений об алертах с помощью Block Kit;
-- кнопки `Acknowledge` и `Resolve`;
-- обновление исходного сообщения Slack после ACK или разрешения;
+- кнопки `Acknowledge`, `Resolve`, `Shelve 1h` и `Unshelve`;
+- обновление исходного сообщения Slack после ACK, Resolve, Shelve или Unshelve;
 - удаление действий после разрешения алерта;
 - опциональную атрибуцию пользователю IncidentRelay.
 
@@ -184,9 +184,9 @@ C0123456789
 
 Пользователь IncidentRelay может иметь ID пользователя Slack в своём профиле.
 
-Когда ответственный нажимает `Acknowledge` или `Resolve`, IncidentRelay считывает ID пользователя Slack из полезной нагрузки взаимодействия и пытается сопоставить его с активным пользователем IncidentRelay.
+Когда ответственный нажимает `Acknowledge`, `Resolve`, `Shelve 1h` или `Unshelve`, IncidentRelay считывает ID пользователя Slack из полезной нагрузки взаимодействия и пытается сопоставить его с активным пользователем IncidentRelay.
 
-Если соответствующего пользователя нет, действие всё равно может быть обработано, но не будет отнесено к локальному пользователю.
+Интерактивные действия требуют Slack user ID, связанного с активным IncidentRelay user с responder-доступом к команде алерта. Несвязанные или неавторизованные пользователи отклоняются.
 
 ## Поведение сообщений
 
@@ -197,14 +197,14 @@ C0123456789
 - команду, сервис и назначенного ответственного;
 - ссылки на сервис и runbook, когда они настроены;
 - ссылку на алерт в IncidentRelay;
-- кнопки `Acknowledge` и `Resolve`.
+- кнопки `Acknowledge`, `Resolve` и `Shelve 1h`.
 
 После подтверждения:
 
 - исходное сообщение обновляется;
 - статус меняется на acknowledged;
 - кнопка `Acknowledge` удаляется;
-- кнопка `Resolve` остаётся.
+- кнопки `Shelve 1h` и `Resolve` остаются доступными.
 
 После разрешения:
 
@@ -334,3 +334,7 @@ journalctl -u incidentrelay-slack-worker -f
 docker compose exec incidentrelay-slack \
   tail -f /var/log/incidentrelay/incidentrelay-slack-worker.log
 ```
+
+## Shelving
+
+Slack Bot API поддерживает **Shelve 1h** и **Unshelve**. Incoming Webhook остаётся односторонним и интерактивный Shelve не поддерживает. Slack user должен быть связан с IncidentRelay user и иметь responder-права. Подробнее: [Shelving](../usage/shelving.md).

@@ -89,5 +89,7 @@
   "alerts.summary.reminders_hint": "Повторные уведомления",
   "alerts.summary.show_all": "Показать все алерты",
   "alerts.summary.total": "Всего алертов",
-  "alerts.summary.total_hint": "Текущая выборка"
+  "alerts.summary.total_hint": "Текущая выборка",
+  "alerts.status.shelved": "Отложен",
+  "alerts.filters.shelved_only": "Только отложенные"
 }

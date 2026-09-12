@@ -12,9 +12,11 @@ The default Compose setup starts:
 ```text
 incidentrelay             # HTTP API, UI, incoming webhooks
 incidentrelay-scheduler   # reminders, escalations, periodic jobs
+incidentrelay-telegram    # Telegram callbacks / polling worker
+incidentrelay-slack       # Slack Socket Mode worker
 ```
 
-PostgreSQL is optional. SQLite is suitable for small installations and quick starts.
+The Telegram and Slack workers are harmless when the corresponding integrations are not configured. PostgreSQL is optional. SQLite is suitable for small installations and quick starts.
 
 ## Default architecture
 
@@ -24,6 +26,10 @@ Docker Compose
 │   └── Gunicorn + Flask application
 ├── incidentrelay-scheduler
 │   └── standalone scheduler worker
+├── incidentrelay-telegram
+│   └── Telegram callbacks / polling
+├── incidentrelay-slack
+│   └── Slack Socket Mode interactions
 └── incidentrelay-data
     └── SQLite database volume
 ```
@@ -49,7 +55,7 @@ INCIDENTRELAY_CONFIG_FILE
 ## Quick start with SQLite
 
 ```bash
-docker compose up -d --build
+docker compose up -d
 ```
 
 Open the UI:
@@ -107,7 +113,7 @@ public_base_url = http://localhost:8080
 
 [database]
 type = sqlite
-path = /var/lib/incidentrelay/incidentrelay.db
+name = /var/lib/incidentrelay/incidentrelay.db
 
 [sqlite]
 wal = true

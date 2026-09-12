@@ -10,7 +10,7 @@ from app.i18n import (
 )
 
 
-ROOT = Path(__file__).resolve().parents[1]
+ROOT = Path(__file__).resolve().parents[2]
 
 
 def create_test_app():
@@ -34,10 +34,12 @@ def test_normalize_locale_accepts_region_variants():
     assert normalize_locale("en_US") == "en"
     assert normalize_locale("de-DE") == "de"
     assert normalize_locale("fr-FR") == "fr"
+    assert normalize_locale("es-ES") == "es"
+    assert normalize_locale("zh-ZH") == "zh"
 
 
 def test_normalize_locale_rejects_unsupported_values():
-    assert normalize_locale("es") is None
+    assert normalize_locale("it") is None
     assert normalize_locale("../../ru") is None
 
 
@@ -89,7 +91,7 @@ def test_unsupported_language_falls_back_to_english():
 
     with app.test_request_context(
         "/",
-        headers={"Accept-Language": "es-ES,es;q=0.9"},
+        headers={"Accept-Language": "it-IT,pt-BR;q=0.9"},
     ):
         assert get_current_locale() == DEFAULT_LOCALE
 

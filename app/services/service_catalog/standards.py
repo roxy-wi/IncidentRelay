@@ -419,10 +419,25 @@ def create_service_standard(data, actor_user=None):
     values["applies_to"] = validate_standard_applies_to(
         values.get("applies_to")
     )
-    values["created_by"] = actor_user.id if actor_user else None
-    values["created_at"] = utc_now()
-    values["updated_at"] = utc_now()
+    now = utc_now()
+    existing = ServiceStandard.get_or_none(
+        (ServiceStandard.group == values["group"])
+        & (ServiceStandard.slug == values["slug"])
+    )
+    if existing is not None and existing.deleted:
+        for field, value in values.items():
+            setattr(existing, field, value)
+        existing.created_by = actor_user.id if actor_user else None
+        existing.enabled = values.get("enabled", True)
+        existing.deleted = False
+        existing.deleted_at = None
+        existing.updated_at = now
+        existing.save()
+        return existing
 
+    values["created_by"] = actor_user.id if actor_user else None
+    values["created_at"] = now
+    values["updated_at"] = now
     return ServiceStandard.create(**values)
 
 
@@ -450,6 +465,7 @@ def delete_service_standard(standard):
     with database.atomic():
         ServiceStandardCheck.update(
             deleted=True,
+            deleted_at=now,
             enabled=False,
             updated_at=now,
         ).where(
@@ -458,6 +474,7 @@ def delete_service_standard(standard):
         ).execute()
 
         standard.deleted = True
+        standard.deleted_at = now
         standard.enabled = False
         standard.updated_at = now
         standard.save()
@@ -496,10 +513,25 @@ def create_standard_check(standard, data):
         values["check_type"],
         values.get("configuration"),
     )
-    values["standard"] = standard.id
-    values["created_at"] = utc_now()
-    values["updated_at"] = utc_now()
+    now = utc_now()
+    existing = ServiceStandardCheck.get_or_none(
+        (ServiceStandardCheck.standard == standard.id)
+        & (ServiceStandardCheck.slug == values["slug"])
+    )
+    if existing is not None and existing.deleted:
+        for field, value in values.items():
+            setattr(existing, field, value)
+        existing.standard = standard.id
+        existing.enabled = values.get("enabled", True)
+        existing.deleted = False
+        existing.deleted_at = None
+        existing.updated_at = now
+        existing.save()
+        return existing
 
+    values["standard"] = standard.id
+    values["created_at"] = now
+    values["updated_at"] = now
     return ServiceStandardCheck.create(**values)
 
 
@@ -523,9 +555,11 @@ def update_standard_check(check, data):
 
 
 def delete_standard_check(check):
+    now = utc_now()
     check.deleted = True
+    check.deleted_at = now
     check.enabled = False
-    check.updated_at = utc_now()
+    check.updated_at = now
     check.save()
 
     return check

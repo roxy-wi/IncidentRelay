@@ -16,6 +16,20 @@ serviceAccount:
   # Defaults to the fullname when empty.
   name: ""
 
+# Optional private PKI trust. When configured, the chart builds a combined CA
+# bundle from the system trust store in the IncidentRelay image plus these
+# custom PEM certificates, then uses it in web, scheduler, Telegram and Slack.
+# Set either `bundle` or `existingConfigMap`, not both.
+customCA:
+  # One or more PEM certificates. The chart renders a ConfigMap when non-empty.
+  bundle: ""
+  # Use an existing ConfigMap instead of rendering one. Its content is appended
+  # to the image system trust store when each pod starts.
+  existingConfigMap: ""
+  existingConfigMapKey: ca.crt
+  # python:3.12-slim with ca-certificates uses this system bundle path.
+  systemBundlePath: /etc/ssl/certs/ca-certificates.crt
+
 # IncidentRelay reads every setting from a single INI file mounted at
 # /etc/incidentrelay/incidentrelay.conf. The map below is rendered into
 # that file: top-level keys become INI sections, nested keys become options.
@@ -67,14 +81,18 @@ config:
     wal: true
     busy_timeout: 5000
   security:
-    # Private/loopback/link-local outbound notification targets are denied by default.
-    # Add only operator-approved CIDRs when internal webhooks are required.
+    # Private/loopback/link-local/multicast/reserved/unspecified outbound HTTP
+    # targets are denied by default, including OIDC metadata/JWKS and webhooks.
+    # Add only operator-approved CIDRs or IPs for internal destinations.
+    # Example: "10.20.0.0/16,192.168.50.10/32"
     outbound_private_network_allowlist: ""
     outbound_http_max_redirects: 3
     outbound_http_max_response_bytes: 1048576
   alerts:
     # Processing trace detail: full, compact or disabled. Global Event Orchestration may override it.
     explain_trace_level: full
+    # Incoming child-alert history: full, initial or disabled. Event Orchestration may override it.
+    event_history: full
     reminder_interval_seconds: 60
     alert_group_window_seconds: 3600
     alert_group_wait_seconds: 30
@@ -82,6 +100,8 @@ config:
     alert_group_notification_check_interval_seconds: 10
     alert_group_notification_batch_size: 100
     silence_lifecycle_check_interval_seconds: 30
+    shelve_lifecycle_check_interval_seconds: 30
+    shelve_lifecycle_batch_size: 100
   incidents:
     responder_default_expires_after_minutes: 30
     responder_expire_check_interval_seconds: 30

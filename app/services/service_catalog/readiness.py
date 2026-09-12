@@ -24,6 +24,7 @@ from app.modules.db.models import (
     ServiceReadinessState,
     ServiceRunbook,
     ServiceStandardCheck,
+    User,
 )
 from app.services.service_catalog.standards import list_applicable_standards
 from app.services.service_catalog.timeline import publish_service_event
@@ -587,9 +588,16 @@ def _check_owner_exists(service, configuration):
     roles = configuration.get("roles") or []
     minimum = max(1, int(configuration.get("minimum", 1)))
 
-    query = ServiceOwner.select().where(
-        ServiceOwner.service == service.id,
-        ServiceOwner.active == True,
+    query = (
+        ServiceOwner
+        .select(ServiceOwner)
+        .join(User)
+        .where(
+            ServiceOwner.service == service.id,
+            ServiceOwner.active == True,
+            User.active == True,
+            User.deleted == False,
+        )
     )
 
     if roles:

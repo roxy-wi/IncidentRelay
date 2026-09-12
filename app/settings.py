@@ -163,6 +163,7 @@ class Config:
     REMINDER_INTERVAL_SECONDS = settings.get_int("alerts", "reminder_interval_seconds", 60)
     ALERT_GROUP_WINDOW_SECONDS = settings.get_int("alerts", "alert_group_window_seconds", 3600)
     ALERT_EXPLAIN_TRACE_LEVEL = settings.get("alerts", "explain_trace_level", "full")
+    ALERT_EVENT_HISTORY = settings.get("alerts", "event_history", "full")
     MAINTENANCE_LIFECYCLE_CHECK_INTERVAL_SECONDS = settings.get_int(
         "maintenance", "lifecycle_check_interval_seconds", 30
     )
@@ -369,6 +370,16 @@ class Config:
         100,
     )
 
+    SHELVE_LIFECYCLE_CHECK_INTERVAL_SECONDS = settings.get_int(
+        "alerts",
+        "shelve_lifecycle_check_interval_seconds",
+        30,
+    )
+    SHELVE_LIFECYCLE_BATCH_SIZE = settings.get_int(
+        "alerts",
+        "shelve_lifecycle_batch_size",
+        100,
+    )
 
     SILENCE_LIFECYCLE_CHECK_INTERVAL_SECONDS = settings.get_int(
         "alerts",

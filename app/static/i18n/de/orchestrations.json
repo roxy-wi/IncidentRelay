@@ -223,5 +223,6 @@
   "orchestrations.simulator.input_output_changes": "Eingabe → Ergebnis",
   "orchestrations.simulator.active_draft_changes": "Aktiv → Entwurf",
   "orchestrations.edit.title": "Ereignis-Orchestrierung bearbeiten",
-  "orchestrations.edit.help": "Metadaten, Geltungsbereich und Laufzeiteinstellungen ändern."
+  "orchestrations.edit.help": "Metadaten, Geltungsbereich und Laufzeiteinstellungen ändern.",
+  "orchestrations.simulator.alert_event_history": "Alarmereignisverlauf"
 }

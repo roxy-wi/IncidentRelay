@@ -74,7 +74,7 @@ CHANNEL_TYPES = (
     "email",
 )
 
-LOCALES = ("en", "ru", "de", "fr")
+LOCALES = ("en", "ru", "de", "fr", "es", "zh")
 THEMES = ("system", "light", "dark")
 TIMEZONES = (
     "UTC",

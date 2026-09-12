@@ -15,6 +15,7 @@ from app.services.severity import normalize_severity, normalize_severity_list
 from app.modules.db import alerts_repo
 from app.modules.common import utc_now
 from app.services.alerts.maintenance_state import is_notification_lifecycle_suppressed
+from app.services.alerts.shelving import is_alert_group_shelved
 
 
 logger = logging.getLogger("oncall.notification_rules")
@@ -47,6 +48,16 @@ SKIP_IF_NOT_FIRING_EVENT_TYPES = {
 }
 
 
+def _active_notification_user(user_id):
+    if not user_id:
+        return None
+    return User.get_or_none(
+        (User.id == user_id)
+        & (User.active == True)  # noqa: E712
+        & (User.deleted == False)  # noqa: E712
+    )
+
+
 def _ensure_alert_group(group):
     if group.__class__.__name__ != "AlertGroup":
         raise TypeError(
@@ -65,7 +76,7 @@ def should_skip_delivery_for_group_status(delivery):
 
     group = AlertGroup.get_by_id(delivery.group_id)
 
-    if is_notification_lifecycle_suppressed(group):
+    if is_notification_lifecycle_suppressed(group) or is_alert_group_shelved(group):
         return True
 
     return group.status != "firing"
@@ -280,7 +291,7 @@ def has_deliverable_user_notification(group, event_type="notification"):
 
     user_id = getattr(group, "assignee_id", None)
 
-    if not user_id:
+    if not user_id or _active_notification_user(user_id) is None:
         return False
 
     if not has_custom_user_rules(user_id):
@@ -296,7 +307,10 @@ def enqueue_user_notifications(group, event_type="notification"):
 
     if (
         event_type in SKIP_IF_NOT_FIRING_EVENT_TYPES
-        and is_notification_lifecycle_suppressed(group)
+        and (
+            is_notification_lifecycle_suppressed(group)
+            or is_alert_group_shelved(group)
+        )
     ):
         return 0
 
@@ -306,11 +320,9 @@ def enqueue_user_notifications(group, event_type="notification"):
     if not assignee_id:
         return 0
 
-    if not assignee:
-        try:
-            assignee = User.get_by_id(assignee_id)
-        except User.DoesNotExist:
-            return 0
+    assignee = _active_notification_user(assignee_id)
+    if assignee is None:
+        return 0
 
     now = utc_now()
 
@@ -436,6 +448,10 @@ def process_due_user_notifications(limit=100):
 
         delivery = UserNotificationDelivery.get_by_id(due_delivery.id)
 
+        if _active_notification_user(delivery.user_id) is None:
+            mark_delivery_skipped(delivery, "user_inactive")
+            continue
+
         group = AlertGroup.get_by_id(delivery.group_id)
 
         if (
@@ -517,6 +533,10 @@ def send_browser_push_delivery(delivery):
 
 def send_delivery(delivery):
     """Send pending user notification delivery."""
+
+    if _active_notification_user(delivery.user_id) is None:
+        mark_delivery_skipped(delivery, "user_inactive")
+        return 0
 
     group = AlertGroup.get_or_none(AlertGroup.id == delivery.group_id)
 

@@ -23,7 +23,7 @@ Fill contact fields used by notification channels.
 | Phone | Voice call channel |
 | Mattermost user ID | Mattermost action attribution |
 | Telegram user ID | Telegram actions |
-| Slack user ID | Attribution of Slack ACK/Resolve actions; also used by Slack usergroup admin sync |
+| Slack user ID | Attribution of Slack ACK/Resolve/Shelve actions; also used by Slack usergroup admin sync |
 
 Email and voice call channels send to the assigned user's profile contact data, not to channel-level recipient lists.
 
@@ -39,7 +39,7 @@ Send test push
 Disable
 ```
 
-Browser push is not a notification channel. When an alert is assigned to the user, IncidentRelay can send push notifications to the user's active browser/PWA devices. ACK and Resolve buttons use short-lived one-time action tokens.
+Browser push is not a notification channel. When an alert is assigned to the user, IncidentRelay can send push notifications to the user's active browser/PWA devices. ACK, Resolve, Shelve and Unshelve buttons use short-lived one-time action tokens.
 
 Read more: [Browser Push](browser-push.md).
 

@@ -14,6 +14,7 @@ from app.services.alerts.priority import (
 )
 from app.services.links import build_source_event_url
 from app.services.alerts.correlation import format_correlation_plain
+from app.services.alerts.shelving import get_active_shelve
 
 MAX_TELEGRAM_MESSAGE_LENGTH = 4096
 MAX_ALERT_MESSAGE_LENGTH = 1600
@@ -215,6 +216,9 @@ def _title(alert: Any, event_type: str) -> str:
     if event_type == "resolved" or status == "resolved":
         return f"🟢 <b>RESOLVED · {title}</b>"
 
+    if event_type == "shelved" or get_active_shelve(alert):
+        return f"🔕 <b>SHELVED · {title}</b>"
+
     if event_type == "acknowledged" or status == "acknowledged":
         return f"✅ <b>ACKNOWLEDGED · {title}</b>"
 
@@ -244,6 +248,18 @@ def _state_note(alert: Any, event_type: str, actor: Any = None) -> list[str]:
             f"👤 <b>Resolved by:</b> {_person_name(user)}",
             f"🕒 <b>Resolved at:</b> {_html(_format_dt(getattr(alert, 'resolved_at', None)))}",
         ]
+
+    shelf = get_active_shelve(alert)
+    if event_type == "shelved" or shelf:
+        until = _format_dt(getattr(shelf, "ends_at", None)) if shelf else "-"
+        reason = getattr(shelf, "reason", None) if shelf else None
+        lines = [
+            "🔕 <b>Alert is temporarily shelved.</b>",
+            f"🕒 <b>Until:</b> {_html(until)}",
+        ]
+        if reason:
+            lines.append(f"📝 <b>Reason:</b> {_html(reason)}")
+        return lines
 
     if event_type == "acknowledged" or status == "acknowledged":
         return [
@@ -326,7 +342,10 @@ def format_telegram_alert_message(
         ]
     )
 
-    if getattr(alert, "status", None) == "firing":
+    if (
+        getattr(alert, "status", None) == "firing"
+        and not get_active_shelve(alert)
+    ):
         ack_url = _ack_url(alert)
         if ack_url:
             lines.extend(

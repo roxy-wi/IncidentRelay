@@ -2,6 +2,7 @@ from datetime import timedelta
 
 import pytest
 
+from app.api.schemas.roles import TEAM_RESPONDER_ROLE, TEAM_VIEWER_ROLE
 from app.modules.db.models import (
     AlertGroup,
     BrowserPushActionToken,
@@ -10,6 +11,7 @@ from app.modules.db.models import (
 from app.notifiers.browser_push import service as browser_push
 from app.services.alerts.lifecycle import upsert_alert
 from tests.factories import (
+    add_user_to_team,
     create_group,
     create_route,
     create_team,
@@ -42,9 +44,15 @@ def create_push_subscription(
     )
 
 
-def create_assigned_group(user, *, status="firing"):
-    group = create_group()
+def create_assigned_group(
+    user,
+    *,
+    status="firing",
+    team_role=TEAM_RESPONDER_ROLE,
+):
+    group = user.active_group
     team = create_team(group)
+    add_user_to_team(team, user, role=team_role)
     route = create_route(team, group_by=["alertname", "severity"])
 
     result = upsert_alert(
@@ -221,7 +229,7 @@ def test_disable_user_subscription_does_not_disable_other_user_device(db):
     assert subscription.deleted is False
 
 
-def test_build_alert_push_payload_for_firing_group_creates_ack_and_resolve_tokens(db, monkeypatch):
+def test_build_alert_push_payload_for_firing_group_creates_ack_and_shelve_tokens(db, monkeypatch):
     monkeypatch.setattr(
         browser_push.Config,
         "BROWSER_PUSH_ACTION_TOKEN_TTL_SECONDS",
@@ -247,7 +255,8 @@ def test_build_alert_push_payload_for_firing_group_creates_ack_and_resolve_token
     assert payload["renotify"] is True
     assert payload["silent"] is False
     assert payload["action_tokens"]["ack"]
-    assert payload["action_tokens"]["resolve"]
+    assert payload["action_tokens"]["shelve"]
+    assert "resolve" not in payload["action_tokens"]
     assert payload["priority"] == "P1"
     assert payload["priority_label"] == "P1 Critical"
 
@@ -262,7 +271,7 @@ def test_build_alert_push_payload_for_firing_group_creates_ack_and_resolve_token
     ) == 2
 
 
-def test_build_alert_push_payload_for_acknowledged_group_creates_only_resolve_token(db):
+def test_build_alert_push_payload_for_acknowledged_group_creates_shelve_and_resolve_tokens(db):
     group = create_group()
     user = create_user("alice", group)
     alert_group = create_assigned_group(user, status="acknowledged")
@@ -274,6 +283,7 @@ def test_build_alert_push_payload_for_acknowledged_group_creates_only_resolve_to
     )
 
     assert "ack" not in payload["action_tokens"]
+    assert payload["action_tokens"]["shelve"]
     assert payload["action_tokens"]["resolve"]
 
     tokens = list(
@@ -282,8 +292,90 @@ def test_build_alert_push_payload_for_acknowledged_group_creates_only_resolve_to
         .where(BrowserPushActionToken.group == alert_group.id)
     )
 
-    assert len(tokens) == 1
-    assert tokens[0].action == "resolve"
+    assert len(tokens) == 2
+    assert {token.action for token in tokens} == {"shelve", "resolve"}
+
+
+@pytest.mark.parametrize("status", ["firing", "acknowledged"])
+def test_build_alert_push_payload_for_non_responder_has_no_action_tokens(
+    db,
+    status,
+):
+    group = create_group()
+    user = create_user("viewer", group)
+    alert_group = create_assigned_group(
+        user,
+        status=status,
+        team_role=TEAM_VIEWER_ROLE,
+    )
+
+    payload = browser_push.build_alert_push_payload(
+        alert_group,
+        user,
+        event_type="notification",
+    )
+
+    assert payload["action_tokens"] == {}
+    assert (
+        BrowserPushActionToken
+        .select()
+        .where(
+            BrowserPushActionToken.group == alert_group.id,
+            BrowserPushActionToken.user == user.id,
+        )
+        .count()
+    ) == 0
+
+
+def test_send_alert_push_to_non_responder_is_informational(db, monkeypatch):
+    monkeypatch.setattr(browser_push.Config, "BROWSER_PUSH_ENABLED", True, raising=False)
+
+    group = create_group()
+    user = create_user("viewer", group)
+    alert_group = create_assigned_group(
+        user,
+        status="firing",
+        team_role=TEAM_VIEWER_ROLE,
+    )
+    create_push_subscription(user)
+
+    payloads = []
+    monkeypatch.setattr(
+        browser_push,
+        "_webpush",
+        lambda subscription, payload: payloads.append(payload),
+    )
+
+    assert browser_push.send_alert_push_to_user(user, alert_group) == 1
+    assert len(payloads) == 1
+    assert payloads[0]["alert_group_id"] == alert_group.id
+    assert payloads[0]["action_tokens"] == {}
+    assert BrowserPushActionToken.select().count() == 0
+
+
+def test_execute_push_action_rechecks_non_responder_permission(db, monkeypatch):
+    group = create_group()
+    user = create_user("viewer", group)
+    alert_group = create_assigned_group(
+        user,
+        status="firing",
+        team_role=TEAM_VIEWER_ROLE,
+    )
+    token = browser_push.create_action_token(user, alert_group, "ack")
+
+    monkeypatch.setattr(
+        browser_push,
+        "_run_alert_push_action",
+        lambda *args, **kwargs: pytest.fail("unauthorized action must not execute"),
+    )
+
+    result = browser_push.execute_push_action(token, "ack")
+
+    assert result == {"ok": False, "error": "action_not_authorized"}
+    record = BrowserPushActionToken.get(
+        BrowserPushActionToken.token_hash == browser_push._hash_token(token)
+    )
+    assert record.used_at is not None
 
 
 def test_build_alert_push_payload_for_resolved_group_creates_no_action_tokens(db):
@@ -432,6 +524,7 @@ def test_execute_push_action_ack_uses_token_once(db, monkeypatch):
         "alert_group_id": alert_group.id,
         "alert_id": alert_group.id,
         "status": "acknowledged",
+        "action_tokens": {},
     }
 
     record = BrowserPushActionToken.get(

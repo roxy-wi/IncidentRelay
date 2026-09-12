@@ -47,7 +47,7 @@ action_token_ttl_seconds = 900
 | `vapid_public_key` | Public VAPID key returned to the browser for `PushManager.subscribe()` |
 | `vapid_private_key` | Private VAPID key or PEM file path used by the server to send Web Push messages |
 | `vapid_subject` | Contact URI included in VAPID claims, usually `mailto:admin@example.com` |
-| `action_token_ttl_seconds` | Lifetime of one-time ACK/Resolve action tokens embedded into push notifications |
+| `action_token_ttl_seconds` | Lifetime of one-time ACK/Resolve/Shelve/Unshelve action tokens embedded into push notifications |
 
 Restart the web service after changing the config. Restart the scheduler too if alert notifications are sent by the scheduler process in your installation.
 
@@ -127,9 +127,9 @@ If a test push works but a real alert does not, check that:
 
 Browser push is considered a deliverable target for reminders and escalations when the assigned user has active push subscriptions.
 
-## ACK and Resolve buttons
+## ACK, Resolve and Shelve buttons
 
-Alert push notifications can include `Acknowledge` and `Resolve` actions. These buttons use short-lived one-time action tokens embedded in the notification payload.
+Alert push notifications can include `Acknowledge`, `Resolve`, `Shelve 1h` and `Unshelve` actions. These buttons use short-lived one-time action tokens embedded in the notification payload. Action tokens are generated only when the assigned user currently has responder permission for the AlertGroup team. A user without responder permission still receives the informational push, but `action_tokens` is empty and no action buttons are shown. Permission is checked again when an action token is used.
 
 The action endpoint is intentionally public:
 
@@ -152,7 +152,7 @@ Change it with:
 action_token_ttl_seconds = 900
 ```
 
-`token_expired` means the action token is older than `action_token_ttl_seconds`. `token_already_used` means the same notification action token was already consumed.
+`token_expired` normally means the action token is older than `action_token_ttl_seconds`. The fresh **Unshelve** and **Resolve** tokens returned after **Shelve 1h** are valid for the one-hour shelf period so the confirmation notification remains actionable until automatic expiry. `token_already_used` means the same notification action token was already consumed.
 
 ## Notification sound and vibration
 
@@ -245,4 +245,8 @@ The one-time action token was older than `action_token_ttl_seconds` when the bro
 
 ### Push action returns token_already_used
 
-The same ACK/Resolve action token was already used. This can happen after a double click, browser retry, or if the user clicked the same notification action more than once.
+The same ACK/Resolve/Shelve/Unshelve action token was already used. This can happen after a double click, browser retry, or if the user clicked the same notification action more than once.
+
+## Shelve actions
+
+Actionable alert push notifications can include **Shelve 1h**. After a one-click **Shelve 1h**, the confirmation notification carries fresh **Unshelve** and **Resolve** one-time tokens for the shelf period. Browser/OS notification surfaces commonly expose only two buttons, so a firing alert prioritizes Acknowledge and Shelve. All actions are re-authorized against the target team when used. See [Alert shelving](shelving.md).

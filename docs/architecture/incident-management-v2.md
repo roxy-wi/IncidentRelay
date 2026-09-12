@@ -604,119 +604,153 @@ Every mutation must write both:
 - a user-visible timeline event where operationally useful;
 - an `AuditLog` entry with group/team scope and redacted data.
 
-## 17. Migration and compatibility
+## 17. Migration and breaking compatibility policy
+
+Incident Management Core is an intentional breaking change in IncidentRelay 2.3.
+
+Backward API compatibility is not preserved.
+
+The project will not introduce:
+
+```text
+/api/managed-incidents
+/api/v2/incidents
+legacy /api/incidents AlertGroup aliases
+runtime compatibility switches
+```
 
 Recommended migration strategy:
 
-- add nullable classification fields;
 - add new Incident and Incident-to-AlertGroup relation tables;
 - do not rename or rebuild `AlertGroup`;
 - preserve every existing Alert Group and child Alert;
 - move current Alert Group API behavior to `/api/alert-groups`;
-- replace `/api/incidents` with the actual Incident API in the same release;
+- replace `/api/incidents` with the actual Incident API in 2.3;
 - rename the current manual incident action to **Create Alert Group** without changing its behavior;
 - keep records created by the old manual action as manual Alert Groups with their child Alerts;
 - make **Create Incident** create only an Incident;
 - do not backfill Incidents for every historical Alert Group;
 - create or link historical Incidents only through an explicit migration rule or administrator action;
-- update OpenAPI, frontend calls, tests and documentation as part of the breaking release;
-- use feature flags only for automatic synchronization, not for preserving conflicting API semantics.
+- update OpenAPI, frontend calls, tests and documentation atomically with the 2.3 breaking release.
 
-## 18. Delivery phases
+Database migration must preserve supported historical data, but preserving data does not imply preserving old API semantics.
 
-### Phase 1: Classification foundation
+## 18. Versioned delivery roadmap
 
-- classification fields and validation;
-- timeline and audit;
-- UI action and filters;
-- optional classification policy;
-- duplicate target selection;
-- reporting counts;
-- OpenAPI and documentation.
+### IncidentRelay 2.3: Incident Management Core
 
-### Phase 2: Incident core
+Goal: ship a minimal but production-usable first-class Incident workflow.
+
+Scope:
 
 - separate `Incident` model;
-- `IncidentAlertGroupLink` relation;
+- `IncidentAlertGroupLink`;
 - manual standalone Incident creation;
-- creation or linking from an Alert Group;
-- workflow statuses;
-- root cause and resolution fields;
-- lifecycle synchronization hooks.
+- **Create Incident** from AlertGroup;
+- link/unlink AlertGroups;
+- independent Incident workflow status;
+- Incident team, service, priority and assignee;
+- explicit close/reopen flow;
+- move AlertGroup API to `/api/alert-groups`;
+- replace `/api/incidents` with the first-class Incident API;
+- dedicated Incidents list;
+- minimal Incident workspace;
+- RBAC, audit, timeline, migration, OpenAPI, UI tests and documentation.
 
-### Phase 3: API and workspace
+Explicitly deferred from 2.3:
 
-- move current Alert Group API to `/api/alert-groups`;
-- preserve manual Alert Group creation with one child Alert;
-- replace `/api/incidents` with the Incident API;
-- add separate Alert Group and Incident workspaces;
-- responders, stakeholders and comments reuse;
-- service/runbook/dashboard context;
-- close and reopen flows;
-- review queue.
+- AlertGroup classification;
+- duplicate review workflow;
+- full responders/stakeholders/comments workspace;
+- role-aware on-call scheduling;
+- Incident merge/split;
+- Event Orchestration Incident actions;
+- Jira/JSM automation;
+- Incident analytics;
+- full post-incident review.
 
-### Phase 4: Related alert groups
+### IncidentRelay 2.4: Incident Operations
 
-- non-destructive group links;
-- duplicate links;
-- add/remove related group;
-- overlap and permission checks;
-- improved merge flow;
-- safe split design and implementation.
+Goal: expand the 2.3 Incident record into the operational collaboration workspace.
 
-### Phase 5: Automation
+Scope:
 
-- Event Orchestration actions;
-- automatic declaration rules;
-- draft-and-confirm mode;
-- duration and escalation hooks;
-- idempotency and duplicate prevention.
-
-### Phase 6: External ITSM foundation
-
-- external reference model;
-- connector configuration;
-- outbox and retries;
-- link-only generic integration;
-- Jira Service Management create/update;
-- webhook authentication and mapping.
-
-### Phase 7: Reporting and post-incident workflow
-
-- incident metrics dashboard;
-- classification and quality reports;
-- export API;
-- post-incident review fields;
-- follow-up actions and ownership.
-
-### Phase 8: Production hardening
-
-- load and permission tests;
-- audit coverage;
-- structured logs and metrics;
-- sync-loop prevention;
-- OpenAPI completeness;
-- user and administrator documentation;
-- migration and rollback testing.
-
-## 19. Recommended first production scope
-
-The first production release should include Phases 1-3 and the non-destructive part of Phase 4:
-
-- optional classification;
-- separate Incident entity;
-- manual Alert Group creation with one child Alert;
-- manual standalone Incident creation;
-- Incident creation or linking from an Alert Group;
-- `/api/alert-groups` and the replaced `/api/incidents` API;
-- dedicated Alert Group and Incident pages;
-- workflow status;
+- AlertGroup classification and review policy;
+- review-required queue;
+- duplicate canonical targets;
+- related AlertGroup relation types;
+- Incident merge and split;
+- responders and stakeholders;
+- Incident comments and richer activity;
 - root cause and resolution summary;
-- manual related-group links;
-- manual external ticket URL;
-- complete RBAC, audit and documentation.
+- runbook/dashboard/service/impact context;
+- lifecycle synchronization for linked AlertGroups;
+- On-call Roles and role-aware Incident participant assignment;
+- RBAC, audit, migration, OpenAPI, localization and regression coverage for the new scope.
 
-It should not wait for full automatic correlation or bidirectional ITSM synchronization.
+### IncidentRelay 2.5: Incident Automation and ITSM
+
+Goal: automate Incident declaration and integrate Incidents with external ticketing.
+
+Scope:
+
+- Event Orchestration Incident actions;
+- automatic declaration and linking;
+- draft-and-confirm mode;
+- idempotency and duplicate prevention;
+- duration and escalation hooks;
+- `IncidentExternalReference`;
+- provider-neutral ITSM integration;
+- outbox, retries and dead-letter visibility;
+- Jira/Jira Service Management create/update;
+- shared Jira connection/client infrastructure;
+- security, secret-redaction and SSRF/private-network controls.
+
+### IncidentRelay 2.6: Analytics and Post-Incident Workflow
+
+Goal: use stable Incident lifecycle data for reporting and post-incident improvement.
+
+Scope:
+
+- Incident metrics dashboard;
+- classification and alert-quality reporting;
+- export API;
+- exact lifecycle timing metrics;
+- post-incident review fields;
+- follow-up actions and ownership;
+- inbound Jira/JSM synchronization;
+- loop prevention;
+- configurable source-of-truth and conflict handling.
+
+### Cross-release hardening rule
+
+Production hardening is not deferred to a final phase.
+
+Every release must include the RBAC, audit, timeline, tests, migrations, OpenAPI, localization and documentation required by the functionality shipped in that release.
+
+Later releases may additionally expand load, concurrency, reconciliation, sync-loop and rollback-boundary testing.
+
+## 19. IncidentRelay 2.3 release gate
+
+Incident Management Core is ready to ship in 2.3 when:
+
+- Alert, AlertGroup and Incident boundaries are explicit and tested;
+- `/api/alert-groups` exposes AlertGroups;
+- `/api/incidents` exposes only first-class Incidents;
+- no backward-compatible AlertGroup alias remains under `/api/incidents`;
+- manual AlertGroup creation creates one AlertGroup and one child Alert atomically;
+- manual Incident creation creates only an Incident;
+- an Incident can exist with zero linked AlertGroups;
+- one Incident can link multiple independent AlertGroups;
+- linked AlertGroups retain their technical lifecycle;
+- Incident lifecycle does not overwrite linked AlertGroup lifecycle;
+- operators can create and operate Incidents from the UI;
+- close and reopen flows are explicit;
+- RBAC and audit coverage are complete for the 2.3 scope;
+- migration preserves supported historical AlertGroup data;
+- OpenAPI and bundled UI use only the final 2.3 contracts.
+
+Classification, role-aware scheduling, automation, Jira/JSM and analytics are not release blockers for 2.3.
 
 ## 20. Success criteria
 

@@ -7,6 +7,7 @@ from peewee import DoesNotExist
 from app.api.schemas.integrations import (
     AlertmanagerWebhookSchema,
     AwsSnsEnvelopeSchema,
+    AzureMonitorWebhookSchema,
     DatadogWebhookSchema,
     NewRelicWebhookSchema,
     NagiosWebhookSchema,
@@ -22,6 +23,7 @@ from app.services.serializers.alerts import serialize_alert_processing_result
 from app.settings import Config
 from app.modules.db import channels_repo, users_repo, alerts_repo, routes_repo
 from app.services.alerts.actions import acknowledge_alert, resolve_alert
+from app.services.alerts.shelving import shelve_alert_group, unshelve_alert_group
 from app.services.alerts.lifecycle import upsert_alert
 from app.services.integrations.auth import require_alert_token
 from app.services.integrations.normalizers.registry import normalize_for_source
@@ -118,6 +120,32 @@ def new_relic_webhook():
     return process_incoming_alerts(
         normalize_for_source(
             "new_relic",
+            payload.model_dump(exclude_none=True),
+        )
+    )
+
+
+@integrations_bp.route("/azure-monitor", methods=["POST"])
+@require_alert_token(allow_basic_route_token=True)
+def azure_monitor_webhook():
+    """Receive Azure Monitor Common Alert Schema notifications."""
+
+    intake_route = getattr(request, "current_intake_route", None)
+
+    if intake_route and intake_route.source != "azure_monitor":
+        return make_error_response(
+            error="route_source_mismatch",
+            message="Route source must be azure_monitor.",
+            status_code=400,
+        )
+
+    payload, error = validate_body(AzureMonitorWebhookSchema)
+    if error:
+        return error
+
+    return process_incoming_alerts(
+        normalize_for_source(
+            "azure_monitor",
             payload.model_dump(exclude_none=True),
         )
     )
@@ -635,7 +663,7 @@ def mattermost_action():
     action = context.get("action")
     signature = context.get("signature")
 
-    if not alert_id or not channel_id or action not in {"acknowledge", "resolve"}:
+    if not alert_id or not channel_id or action not in {"acknowledge", "resolve", "shelve", "unshelve"}:
         return jsonify({"ephemeral_text": "Invalid action payload"}), 400
 
     try:
@@ -671,14 +699,28 @@ def mattermost_action():
 
     if action == "acknowledge":
         alert = acknowledge_alert(int(alert_id), user_id=user.id)
-        return jsonify({
-            "ephemeral_text": f"Alert #{alert.id} acknowledged",
-            "skip_slack_parsing": True,
-        })
+        text = f"Alert #{alert.id} acknowledged"
+    elif action == "resolve":
+        alert = resolve_alert(int(alert_id), user_id=user.id)
+        text = f"Alert #{alert.id} resolved"
+    elif action == "shelve":
+        alert, _ = shelve_alert_group(
+            int(alert_id),
+            user_id=user.id,
+            duration_seconds=3600,
+            source="mattermost",
+        )
+        text = f"Alert #{alert.id} shelved for 1 hour"
+    else:
+        alert, _ = unshelve_alert_group(
+            int(alert_id),
+            user_id=user.id,
+            source="mattermost",
+        )
+        text = f"Alert #{alert.id} unshelved"
 
-    alert = resolve_alert(int(alert_id), user_id=user.id)
     return jsonify({
-        "ephemeral_text": f"Alert #{alert.id} resolved",
+        "ephemeral_text": text,
         "skip_slack_parsing": True,
     })
 

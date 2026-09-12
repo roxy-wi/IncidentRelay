@@ -2,9 +2,14 @@
 from peewee import IntegrityError
 
 from app.modules.db.models import (
+    Alert,
+    AlertGroup,
+    AlertRoute,
     EscalationPolicy,
     EscalationPolicyRule,
+    IncidentResponder,
     Rotation,
+    Service,
     Team,
     TeamUser,
     User,
@@ -56,7 +61,21 @@ def get_policy_or_none(policy_id, include_deleted=False):
 
 
 def create_policy(team_id, name, description=None, enabled=True, repeat_count=0):
-    """Create an escalation policy."""
+    """Create or restore an escalation policy by team/name."""
+    existing = EscalationPolicy.get_or_none(
+        (EscalationPolicy.team == team_id)
+        & (EscalationPolicy.name == name)
+    )
+    if existing is not None and existing.deleted:
+        existing.description = description
+        existing.enabled = enabled
+        existing.repeat_count = repeat_count
+        existing.deleted = False
+        existing.deleted_at = None
+        existing.updated_at = utc_now()
+        existing.save()
+        return existing
+
     return EscalationPolicy.create(
         team=team_id,
         name=name,
@@ -80,13 +99,56 @@ def update_policy(policy_id, data):
 
 
 def soft_delete_policy(policy_id):
-    """Soft-delete an escalation policy."""
+    """Soft-delete a policy and detach it from active configuration."""
     policy = get_policy(policy_id)
-    policy.enabled = False
-    policy.deleted = True
-    policy.deleted_at = utc_now()
-    policy.updated_at = utc_now()
-    policy.save()
+    now = utc_now()
+    database = EscalationPolicy._meta.database
+
+    with database.atomic():
+        EscalationPolicyRule.update(
+            enabled=False,
+            updated_at=now,
+        ).where(EscalationPolicyRule.policy == policy.id).execute()
+
+        AlertRoute.update(escalation_policy=None).where(
+            AlertRoute.escalation_policy == policy.id
+        ).execute()
+        Service.update(default_escalation_policy=None, updated_at=now).where(
+            Service.default_escalation_policy == policy.id
+        ).execute()
+        Alert.update(
+            escalation_policy=None,
+            escalation_rule=None,
+            next_escalation_at=None,
+        ).where(
+            (Alert.escalation_policy == policy.id)
+            & (Alert.status != "resolved")
+        ).execute()
+        AlertGroup.update(
+            escalation_policy=None,
+            escalation_rule=None,
+            next_escalation_at=None,
+            updated_at=now,
+        ).where(
+            (AlertGroup.escalation_policy == policy.id)
+            & (~AlertGroup.status.in_(("resolved", "merged")))
+        ).execute()
+        IncidentResponder.update(
+            status="expired",
+            response_message="Escalation policy was deleted",
+            responded_at=now,
+            updated_at=now,
+        ).where(
+            (IncidentResponder.target_escalation_policy == policy.id)
+            & (IncidentResponder.status == "requested")
+        ).execute()
+
+        policy.enabled = False
+        policy.deleted = True
+        policy.deleted_at = now
+        policy.updated_at = now
+        policy.save()
+
     return policy
 
 

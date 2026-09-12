@@ -18,7 +18,7 @@ Monitoring system
   -> Team and rotation
   -> Assigned on-call user
   -> Notification channels and profile browser push
-  -> ACK / Resolve
+  -> ACK / Resolve / Shelve
 ```
 
 Browser push notifications are enabled by users in Profile and are delivered automatically to assigned users. They are not route channels.
@@ -75,6 +75,7 @@ For browser/PWA notifications, configure `[browser_push]` and VAPID keys. Read m
 | Browser push | Profile-level browser/PWA notification delivery for assigned users |
 | Alert | IncidentRelay alert created from an incoming integration |
 | Silence | Rule that suppresses notifications for matching new alerts |
+| Shelve | Temporary responder-controlled pause for one existing AlertGroup; technical status and impact continue |
 | Override | Temporary replacement for a rotation member |
 
 Read more:
@@ -84,6 +85,7 @@ Read more:
 - [Route Intake Tokens](concepts/route-intake-tokens.md)
 - [Channels](concepts/channels.md)
 - [Browser Push Notifications](usage/browser-push.md)
+- [Alert Shelving](usage/shelving.md)
 - [Reminders and Escalations](concepts/reminders-and-escalations.md)
 - [Event Orchestration](usage/event-orchestration.md)
 
@@ -110,7 +112,7 @@ Important rules:
 - `user_admin` can create users only inside the selected group boundary.
 - `editor` can create teams in a group, but does not automatically manage all teams.
 - `manager` is the write role for a specific team.
-- `responder` can acknowledge and resolve alerts without changing team settings.
+- `responder` can acknowledge, resolve or temporarily shelve alerts without changing team settings.
 
 Read more: [Groups and RBAC](concepts/groups-and-rbac.md).
 
@@ -204,6 +206,7 @@ Useful pages:
 - [Sentry Integration API](api/sentry-integration.md)
 - [Profile and Personal API Tokens](usage/profile-and-tokens.md)
 - [Browser Push Notifications](usage/browser-push.md)
+- [Alert Shelving](usage/shelving.md)
 - [Voice Call OpenAPI Notes](api/voice-call-openapi.md)
 
 ## First setup flow

@@ -223,5 +223,6 @@
   "orchestrations.simulator.input_output_changes": "Entrée → résultat",
   "orchestrations.simulator.active_draft_changes": "Active → brouillon",
   "orchestrations.edit.title": "Modifier l’orchestration d’événements",
-  "orchestrations.edit.help": "Mettez à jour les métadonnées, la portée et les paramètres d’exécution."
+  "orchestrations.edit.help": "Mettez à jour les métadonnées, la portée et les paramètres d’exécution.",
+  "orchestrations.simulator.alert_event_history": "Historique des événements d’alerte"
 }

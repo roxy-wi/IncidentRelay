@@ -1878,6 +1878,46 @@ class AlertGroup(BaseModel):
         )
 
 
+class AlertGroupShelve(BaseModel):
+    """Operator-controlled temporary suppression for one alert group."""
+
+    id = AutoField()
+    alert_group = ForeignKeyField(
+        AlertGroup,
+        backref="shelves",
+        on_delete="CASCADE",
+        index=True,
+    )
+    shelved_by = ForeignKeyField(
+        User,
+        null=True,
+        backref="alert_group_shelves",
+        on_delete="SET NULL",
+    )
+    reason = TextField(null=True)
+    source = CharField(default="ui")
+    shelved_at = DateTimeField(default=utc_now, index=True)
+    ends_at = DateTimeField(null=True, index=True)
+    active = BooleanField(default=True, index=True)
+    unshelved_at = DateTimeField(null=True)
+    unshelved_by = ForeignKeyField(
+        User,
+        null=True,
+        backref="alert_group_unshelves",
+        on_delete="SET NULL",
+    )
+    unshelve_reason = TextField(null=True)
+    created_at = DateTimeField(default=utc_now)
+    updated_at = DateTimeField(default=utc_now)
+
+    class Meta:
+        table_name = "alert_group_shelve"
+        indexes = (
+            (("alert_group", "active"), False),
+            (("active", "ends_at"), False),
+        )
+
+
 class Alert(BaseModel):
     """Alert stored after normalization and routing."""
 
@@ -2445,6 +2485,7 @@ class SsoProvider(SoftDeleteModel):
     phone_claim = CharField(default="mobile")
 
     allowed_domains = JSONTextField(null=True)
+    profile_claim_mappings = JSONTextField(null=True)
 
     auto_create_users = BooleanField(default=False)
     auto_link_by_email = BooleanField(default=True)

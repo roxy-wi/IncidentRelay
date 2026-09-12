@@ -1,9 +1,15 @@
 from peewee import DoesNotExist
 from flask import Blueprint, jsonify, request
 
-from app.api.schemas.alerts import AlertListQuerySchema
+from app.api.schemas.alerts import (
+    AlertDetailQuerySchema,
+    AlertEventListQuerySchema,
+    AlertListQuerySchema,
+    AlertShelveSchema,
+)
 from app.modules.db import alerts_repo, notifications_repo
 from app.services.alerts.actions import acknowledge_alert, resolve_alert
+from app.services.alerts.shelving import shelve_alert_group, unshelve_alert_group
 from app.services.audit import write_audit
 from app.services.rbac import get_allowed_team_ids, require_team_read, require_team_respond
 from app.services.serializers.alerts import (
@@ -29,6 +35,7 @@ from app.services.incidents.responders import (
 from app.services.validation import (
     make_error_response,
     safe_exception_response,
+    validate_body,
     validate_query,
 )
 
@@ -120,6 +127,7 @@ def list_alerts():
         service_criticality=payload.service_criticality,
         search=payload.search,
         assigned_to_user_id=assigned_to_user_id,
+        shelved=payload.shelved,
         page=payload.page,
         page_size=payload.page_size,
         sort=payload.sort,
@@ -148,21 +156,36 @@ def get_alert(alert_id):
     if error:
         return error
 
-    alerts = alerts_repo.list_alerts_for_group(group.id)
-    events = alerts_repo.list_group_events(group.id)
-    notifications = notifications_repo.list_notifications_for_group(group.id)
+    query, error = validate_query(AlertDetailQuerySchema)
+    if error:
+        return error
 
-    return jsonify(
-        serialize_alert_group(
-            group,
-            include_payload=True,
-            include_details=True,
-            alerts=alerts,
-            events=events,
-            notifications=notifications,
-            current_user=_request_user(),
+    alerts = alerts_repo.list_alerts_for_group(group.id)
+    notifications = notifications_repo.list_notifications_for_group(group.id)
+    events_page = None
+
+    if query.events_page is not None or query.events_page_size is not None:
+        events_page = alerts_repo.paginate_group_events(
+            group.id,
+            page=query.events_page or 1,
+            page_size=query.events_page_size or 50,
         )
+        events = events_page["items"]
+    else:
+        events = alerts_repo.list_group_events(group.id)
+
+    payload = serialize_alert_group(
+        group,
+        include_payload=True,
+        include_details=True,
+        alerts=alerts,
+        events=events,
+        notifications=notifications,
+        current_user=_request_user(),
     )
+    if events_page is not None:
+        payload["events_pagination"] = events_page["pagination"]
+    return jsonify(payload)
 
 
 @alerts_bp.route("/<int:alert_id>/ack", methods=["POST"])
@@ -223,6 +246,53 @@ def resolve_alert_view(alert_id):
     )
 
 
+@alerts_bp.route("/<int:alert_id>/shelve", methods=["POST"])
+def shelve_alert_view(alert_id):
+    """Temporarily shelve one AlertGroup without changing technical status."""
+    group_before, error = _require_alert_group_respond(alert_id)
+    if error:
+        return error
+
+    payload, error = validate_body(AlertShelveSchema)
+    if error:
+        return error
+
+    user_id = getattr(_request_user(), "id", None)
+    try:
+        group, _shelf = shelve_alert_group(
+            alert_id,
+            user_id=user_id,
+            duration_seconds=payload.duration_seconds,
+            reason=payload.reason,
+            source="ui",
+        )
+    except ValueError as exc:
+        return safe_exception_response(
+            exc,
+            error="validation_error",
+            message="Alert group could not be shelved.",
+            status_code=400,
+        )
+
+    return jsonify(serialize_alert_group(group, current_user=_request_user()))
+
+
+@alerts_bp.route("/<int:alert_id>/unshelve", methods=["POST"])
+def unshelve_alert_view(alert_id):
+    """End the current AlertGroup shelf and restart current-state delivery."""
+    _group_before, error = _require_alert_group_respond(alert_id)
+    if error:
+        return error
+
+    user_id = getattr(_request_user(), "id", None)
+    group, _shelf = unshelve_alert_group(
+        alert_id,
+        user_id=user_id,
+        source="ui",
+    )
+    return jsonify(serialize_alert_group(group, current_user=_request_user()))
+
+
 @alerts_bp.route("/<int:alert_id>/events", methods=["GET"])
 def list_alert_events(alert_id):
     """Return alert group events."""
@@ -230,10 +300,27 @@ def list_alert_events(alert_id):
     if error:
         return error
 
-    return jsonify([
-        serialize_alert_event(event)
-        for event in alerts_repo.list_group_events(group.id)
-    ])
+    # Preserve the pre-2.2 array response for API clients that do not request
+    # pagination explicitly. The web UI uses paginated mode.
+    if "page" not in request.args and "page_size" not in request.args:
+        return jsonify([
+            serialize_alert_event(event)
+            for event in alerts_repo.list_group_events(group.id)
+        ])
+
+    query, error = validate_query(AlertEventListQuerySchema)
+    if error:
+        return error
+
+    page = alerts_repo.paginate_group_events(
+        group.id,
+        page=query.page,
+        page_size=query.page_size,
+    )
+    return jsonify({
+        "items": [serialize_alert_event(event) for event in page["items"]],
+        "pagination": page["pagination"],
+    })
 
 
 @alerts_bp.route("/merge", methods=["POST"])

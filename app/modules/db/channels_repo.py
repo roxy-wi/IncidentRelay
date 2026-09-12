@@ -1,5 +1,12 @@
 
-from app.modules.db.models import AlertRouteChannel, Group, NotificationChannel, Team
+from app.modules.db.models import (
+    AlertRouteChannel,
+    Group,
+    NotificationChannel,
+    NotificationPolicyRuleChannel,
+    ServiceChannel,
+    Team,
+)
 from app.modules.common import utc_now
 
 
@@ -160,16 +167,25 @@ def soft_delete_channel(channel_id):
 
 
 def delete_channel(channel_id):
-    """Soft-delete a notification channel and remove active route links.
+    """Soft-delete a channel and remove every active configuration link.
 
-    Route/channel links are active configuration, so they are removed when the
-    channel is deleted. Historical alerts remain preserved.
+    Delivery history remains intact, while route, notification-policy and
+    service-channel links are removed so restoring the channel cannot silently
+    reactivate its previous delivery configuration.
     """
-    AlertRouteChannel.delete().where(
-        AlertRouteChannel.channel == channel_id
-    ).execute()
+    database = NotificationChannel._meta.database
+    with database.atomic():
+        AlertRouteChannel.delete().where(
+            AlertRouteChannel.channel == channel_id
+        ).execute()
+        NotificationPolicyRuleChannel.delete().where(
+            NotificationPolicyRuleChannel.channel == channel_id
+        ).execute()
+        ServiceChannel.delete().where(
+            ServiceChannel.channel == channel_id
+        ).execute()
 
-    return soft_delete_channel(channel_id)
+        return soft_delete_channel(channel_id)
 
 
 def restore_channel(

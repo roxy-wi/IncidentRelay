@@ -9,9 +9,11 @@ from app.modules.db.models import (
     Alert,
     AlertEvent,
     AlertGroup,
+    AlertGroupShelve,
     AlertGroupMerge,
     AlertRoute,
     AlertComment,
+    Group,
     Rotation,
     Service,
     Team,
@@ -122,6 +124,7 @@ def build_alert_groups_query(
     service_criticality=None,
     search=None,
     assigned_to_user_id=None,
+    shelved=False,
     include_merged=False,
 ):
     """Build the base alert groups query with filters."""
@@ -152,6 +155,21 @@ def build_alert_groups_query(
 
     if assigned_to_user_id:
         query = query.where(AlertGroup.assignee == assigned_to_user_id)
+
+    if shelved:
+        now = utc_now()
+        active_shelved_group_ids = (
+            AlertGroupShelve
+            .select(AlertGroupShelve.alert_group)
+            .where(
+                (AlertGroupShelve.active == True)  # noqa: E712
+                & (
+                    AlertGroupShelve.ends_at.is_null(True)
+                    | (AlertGroupShelve.ends_at > now)
+                )
+            )
+        )
+        query = query.where(AlertGroup.id.in_(active_shelved_group_ids))
 
     query = apply_field_values_filter(
         query,
@@ -365,6 +383,7 @@ def paginate_alert_groups(
     service_criticality=None,
     search=None,
     assigned_to_user_id=None,
+    shelved=False,
     page=1,
     page_size=25,
     sort="activity",
@@ -391,6 +410,7 @@ def paginate_alert_groups(
         service_criticality=service_criticality,
         search=search,
         assigned_to_user_id=assigned_to_user_id,
+        shelved=shelved,
         include_merged=include_merged,
     )
 
@@ -666,13 +686,19 @@ def resolve_alert_group(group_id, user_id=None):
 
 
 def list_firing_alert_groups():
-    """Return groups for reminder/escalation processing."""
-
+    """Return firing groups whose owning team/group is still active."""
     return list(
-        AlertGroup.select()
+        AlertGroup
+        .select(AlertGroup)
+        .join(Team, on=(AlertGroup.team == Team.id))
+        .join(Group, on=(Team.group == Group.id))
         .where(
             (AlertGroup.status == "firing")
             & (AlertGroup.merged_into.is_null(True))
+            & (Team.active == True)  # noqa: E712
+            & (Team.deleted == False)  # noqa: E712
+            & (Group.active == True)  # noqa: E712
+            & (Group.deleted == False)  # noqa: E712
         )
     )
 
@@ -690,19 +716,55 @@ def increment_group_reminder(group, now):
     return group
 
 
-def list_group_events(group_id):
-    """Return group-level and child alert events."""
+def _group_events_query(group_id):
+    """Build the query shared by full and paginated event history reads."""
 
     alert_ids = Alert.select(Alert.id).where(Alert.group == group_id)
-
-    return list(
-        AlertEvent.select()
-        .where(
-            (AlertEvent.group == group_id)
-            | (AlertEvent.alert.in_(alert_ids))
-        )
-        .order_by(AlertEvent.id.asc())
+    return AlertEvent.select().where(
+        (AlertEvent.group == group_id)
+        | (AlertEvent.alert.in_(alert_ids))
     )
+
+
+def list_group_events(group_id):
+    """Return group-level and child alert events in legacy chronological order."""
+
+    return list(_group_events_query(group_id).order_by(AlertEvent.id.asc()))
+
+
+def paginate_group_events(group_id, page=1, page_size=50):
+    """Return one newest-first page of group and child alert events."""
+
+    page = normalize_alert_page(page)
+    page_size = normalize_alert_page_size(page_size)
+    query = _group_events_query(group_id)
+    total_items = query.count()
+    total_pages = max(1, int(ceil(total_items / float(page_size))))
+
+    if page > total_pages:
+        page = total_pages
+
+    items = list(
+        query
+        .order_by(AlertEvent.id.desc())
+        .paginate(page, page_size)
+    )
+    start_index = (page - 1) * page_size
+    end_index = start_index + len(items)
+
+    return {
+        "items": items,
+        "pagination": {
+            "page": page,
+            "page_size": page_size,
+            "total_items": total_items,
+            "total_pages": total_pages,
+            "from": start_index + 1 if total_items else 0,
+            "to": end_index if total_items else 0,
+            "has_prev": page > 1,
+            "has_next": page < total_pages,
+        },
+    }
 
 
 def merge_alert_groups(target_group_id, source_group_ids, user_id=None, reason=None):
@@ -731,6 +793,22 @@ def merge_alert_groups(target_group_id, source_group_ids, user_id=None, reason=N
         source.merge_reason = reason
         source.updated_at = now
         source.save()
+
+        (
+            AlertGroupShelve
+            .update(
+                active=False,
+                unshelved_at=now,
+                unshelved_by=user_id,
+                unshelve_reason="alert_group_merged",
+                updated_at=now,
+            )
+            .where(
+                (AlertGroupShelve.alert_group == source.id)
+                & (AlertGroupShelve.active == True)  # noqa: E712
+            )
+            .execute()
+        )
 
         AlertGroupMerge.create(
             source_group=source.id,
