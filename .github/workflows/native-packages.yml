@@ -1,0 +1,172 @@
+name: IncidentRelay packages
+
+on:
+  push:
+    tags: ['v*']
+
+permissions:
+  contents: read
+
+concurrency:
+  group: incidentrelay-native-repository
+  cancel-in-progress: false
+  queue: max
+
+jobs:
+  metadata:
+    runs-on: ubuntu-24.04
+    outputs:
+      version: ${{ steps.release.outputs.version }}
+      tooling-revision: ${{ steps.tooling.outputs.revision }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Check out release tooling
+        uses: actions/checkout@v5
+        with:
+          repository: ${{ secrets.REPO_PACKAGING_REPOSITORY }}
+          ref: ${{ vars.REPO_PACKAGING_REF }}
+          ssh-key: ${{ secrets.REPO_PACKAGING_SSH_KEY }}
+          path: build-support
+          persist-credentials: false
+      - id: tooling
+        run: echo "revision=$(git -C build-support rev-parse HEAD)" >> "$GITHUB_OUTPUT"
+      - id: release
+        run: python3 build-support/package_tools/incidentrelay/build.py metadata
+
+  tests:
+    needs: metadata
+    uses: ./.github/workflows/tests.yml
+
+  build:
+    needs: [metadata, tests]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Check out release tooling
+        uses: actions/checkout@v5
+        with:
+          repository: ${{ secrets.REPO_PACKAGING_REPOSITORY }}
+          ref: ${{ needs.metadata.outputs.tooling-revision }}
+          ssh-key: ${{ secrets.REPO_PACKAGING_SSH_KEY }}
+          path: build-support
+          persist-credentials: false
+      - run: docker build -t incidentrelay-package-tools build-support/package_tools/incidentrelay
+      - name: Test package publication and reruns
+        run: docker run --rm -v "$PWD:/src:ro" incidentrelay-package-tools python3 -m pytest build-support/package_tools/incidentrelay/tests -q -p no:cacheprovider
+      - name: Build DEB and RPM from the tagged checkout
+        run: |
+          mkdir -p dist
+          docker run --rm -v "$PWD:/src:ro" -v "$PWD/dist:/output" incidentrelay-package-tools python3 build-support/package_tools/incidentrelay/build.py deb --output /output
+          docker run --rm -v "$PWD:/src:ro" -v "$PWD/dist:/output" incidentrelay-package-tools python3 build-support/package_tools/incidentrelay/build.py el9 --output /output
+          docker run --rm -v "$PWD:/src:ro" -v "$PWD/dist:/output" incidentrelay-package-tools python3 build-support/package_tools/incidentrelay/build.py el10 --output /output
+      - name: Verify installation on Ubuntu and Rocky Linux
+        run: |
+          docker run --rm -v "$PWD/dist:/packages:ro" -v "$PWD/build-support/package_tools/incidentrelay/tests:/checks:ro" ubuntu:24.04 bash /checks/install.sh deb
+          docker run --rm -v "$PWD/dist:/packages:ro" -v "$PWD/build-support/package_tools/incidentrelay/tests:/checks:ro" rockylinux:9 bash /checks/install.sh el9
+          docker run --rm -v "$PWD/dist:/packages:ro" -v "$PWD/build-support/package_tools/incidentrelay/tests:/checks:ro" rockylinux/rockylinux:10 bash /checks/install.sh el10
+      - uses: actions/upload-artifact@v4
+        with:
+          name: incidentrelay-native-packages
+          path: |
+            dist/*.deb
+            dist/*.rpm
+          if-no-files-found: error
+          retention-days: 7
+          overwrite: true
+
+  publish:
+    needs: [metadata, build]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    env:
+      REPO_S3_ENDPOINT: ${{ vars.REPO_S3_ENDPOINT }}
+      REPO_S3_BUCKET: ${{ vars.REPO_S3_BUCKET }}
+      REPO_S3_REGION: ${{ vars.REPO_S3_REGION }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.REPO_S3_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.REPO_S3_SECRET_ACCESS_KEY }}
+      REPO_GPG_KEY_ID: ${{ vars.REPO_GPG_KEY_ID }}
+      REPO_GPG_PRIVATE_KEY: ${{ secrets.REPO_GPG_PRIVATE_KEY }}
+      REPO_GPG_PASSPHRASE: ${{ secrets.REPO_GPG_PASSPHRASE }}
+      RELEASE_VERSION: ${{ needs.metadata.outputs.version }}
+      RELEASE_REVISION: ${{ github.sha }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Check out release tooling
+        uses: actions/checkout@v5
+        with:
+          repository: ${{ secrets.REPO_PACKAGING_REPOSITORY }}
+          ref: ${{ needs.metadata.outputs.tooling-revision }}
+          ssh-key: ${{ secrets.REPO_PACKAGING_SSH_KEY }}
+          path: build-support
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          name: incidentrelay-native-packages
+          path: dist
+      - name: Check publication configuration
+        run: |
+          python3 - <<'PY'
+          import os
+          required = ['REPO_S3_ENDPOINT','REPO_S3_BUCKET','AWS_ACCESS_KEY_ID','AWS_SECRET_ACCESS_KEY','REPO_GPG_KEY_ID','REPO_GPG_PRIVATE_KEY']
+          missing = [name for name in required if not os.environ.get(name)]
+          if missing:
+              raise SystemExit('Configure Actions settings: ' + ', '.join(missing))
+          PY
+      - run: docker build -t incidentrelay-package-tools build-support/package_tools/incidentrelay
+      - name: Sign packages and replace this release in S3
+        run: |
+          docker run --rm -v "$PWD:/src:ro" \
+            --env REPO_S3_ENDPOINT --env REPO_S3_BUCKET --env REPO_S3_REGION \
+            --env AWS_ACCESS_KEY_ID --env AWS_SECRET_ACCESS_KEY \
+            --env REPO_GPG_KEY_ID --env REPO_GPG_PRIVATE_KEY --env REPO_GPG_PASSPHRASE \
+            incidentrelay-package-tools python3 build-support/package_tools/incidentrelay/repository.py \
+            --artifacts /src/dist --version "$RELEASE_VERSION" --revision "$RELEASE_REVISION"
+
+  verify:
+    needs: [metadata, publish]
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - image: ubuntu:24.04
+            format: deb
+          - image: rockylinux:9
+            format: el9
+          - image: rockylinux/rockylinux:10
+            format: el10
+    env:
+      INCIDENTRELAY_PACKAGE_REPOSITORY: ${{ vars.REPO_S3_ENDPOINT }}/${{ vars.REPO_S3_BUCKET }}
+      INCIDENTRELAY_PACKAGE_VERSION: ${{ needs.metadata.outputs.version }}
+      REPO_GPG_KEY_ID: ${{ vars.REPO_GPG_KEY_ID }}
+      TEST_IMAGE: ${{ matrix.image }}
+      TEST_FORMAT: ${{ matrix.format }}
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          ref: ${{ github.sha }}
+          persist-credentials: false
+      - name: Check out release tooling
+        uses: actions/checkout@v5
+        with:
+          repository: ${{ secrets.REPO_PACKAGING_REPOSITORY }}
+          ref: ${{ needs.metadata.outputs.tooling-revision }}
+          ssh-key: ${{ secrets.REPO_PACKAGING_SSH_KEY }}
+          path: build-support
+          persist-credentials: false
+      - name: Install the published release from S3 with APT or DNF
+        run: |
+          docker run --rm -v "$PWD/build-support/package_tools/incidentrelay/tests:/checks:ro" \
+            --env INCIDENTRELAY_PACKAGE_REPOSITORY --env INCIDENTRELAY_PACKAGE_VERSION --env REPO_GPG_KEY_ID \
+            "$TEST_IMAGE" bash /checks/install.sh "$TEST_FORMAT"
