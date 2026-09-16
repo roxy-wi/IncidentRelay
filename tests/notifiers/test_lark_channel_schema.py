@@ -125,6 +125,60 @@ def test_lark_secret_placeholders_restore_stored_values():
     }
 
 
+def test_lark_channel_update_preserves_masked_secrets(
+    client,
+    auth_headers,
+    db,
+):
+    from app.modules.db import channels_repo
+    from tests.factories import create_group, create_team
+
+    group = create_group(slug="infra")
+    team = create_team(group, slug="sre")
+    channel = channels_repo.create_channel(
+        team_id=team.id,
+        group_id=group.id,
+        name="Feishu production",
+        channel_type="lark",
+        config={
+            "webhook_url": (
+                "https://open.feishu.cn/open-apis/bot/v2/hook/stored"
+            ),
+            "signing_secret": "stored-signing-secret",
+        },
+    )
+
+    response = client.put(
+        f"/api/channels/{channel.id}",
+        headers=auth_headers,
+        json={
+            "team_id": team.id,
+            "name": "Feishu production",
+            "channel_type": "lark",
+            "enabled": True,
+            "config": {
+                "webhook_url": CHANNEL_SECRET_PLACEHOLDER,
+                "signing_secret": CHANNEL_SECRET_PLACEHOLDER,
+            },
+        },
+    )
+
+    assert response.status_code == 200
+    response_config = response.get_json()["config"]
+    assert response_config == {
+        "webhook_url": CHANNEL_SECRET_PLACEHOLDER,
+        "signing_secret": CHANNEL_SECRET_PLACEHOLDER,
+    }
+
+    stored = channels_repo.get_channel(channel.id)
+    assert stored.config == {
+        "webhook_url": (
+            "https://open.feishu.cn/open-apis/bot/v2/hook/stored"
+        ),
+        "signing_secret": "stored-signing-secret",
+    }
+
+
 def test_lark_notifier_is_registered():
     assert "lark" in list_notifier_types()
     assert isinstance(get_notifier("lark"), LarkNotifier)
