@@ -8,6 +8,7 @@ CHANNEL_SECRET_PLACEHOLDER = "__INCIDENTRELAY_SECRET__"
 _CHANNEL_SECRET_KEYS = {
     "telegram": {"bot_token"},
     "slack": {"bot_token", "app_token", "signing_secret", "webhook_url"},
+    "lark": {"webhook_url", "signing_secret"},
     "mattermost": {"bot_token", "callback_secret", "webhook_url"},
     "webhook": {"webhook_url"},
     "discord": {"webhook_url"},

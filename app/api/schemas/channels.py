@@ -3,7 +3,12 @@ from typing import Any, ClassVar, Dict
 from pydantic import Field, model_validator
 
 from app.api.schemas.base import ApiModel
-from app.notifiers.types import CHANNEL_TYPE_PATTERN, WEBHOOK_STYLE_CHANNELS, SLACK_CHANNEL
+from app.notifiers.types import (
+    CHANNEL_TYPE_PATTERN,
+    LARK_CHANNEL,
+    SLACK_CHANNEL,
+    WEBHOOK_STYLE_CHANNELS,
+)
 from app.notifiers.email.email_templates import normalize_email_html_template
 from app.services.channel_config import (
     CHANNEL_SECRET_PLACEHOLDER,
@@ -158,6 +163,21 @@ class ChannelBaseSchema(ApiModel):
 
         if self.channel_type in WEBHOOK_STYLE_CHANNELS and not config.get("webhook_url"):
             raise ValueError(f"{self.channel_type} channel requires webhook_url")
+
+        if self.channel_type == LARK_CHANNEL:
+            webhook_url = str(
+                config.get("webhook_url") or ""
+            ).strip()
+            if not webhook_url:
+                raise ValueError("lark channel requires webhook_url")
+            config["webhook_url"] = webhook_url
+            signing_secret = str(
+                config.get("signing_secret") or ""
+            ).strip()
+            if signing_secret:
+                config["signing_secret"] = signing_secret
+            else:
+                config.pop("signing_secret", None)
 
         if self.channel_type == "mattermost":
             mode = config.get("mode") or ("bot_api" if config.get("api_url") else "webhook")

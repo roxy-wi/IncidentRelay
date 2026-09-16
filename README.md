@@ -51,7 +51,7 @@ It is designed for SRE, DevOps, platform, infrastructure and operations teams th
 - rotations, rotation layers, restrictions and temporary overrides;
 - on-call calendar, ICS feeds and CalDAV access;
 - route channels and service Notification Policies;
-- Mattermost, Slack, Telegram, Discord, Microsoft Teams, email and generic webhook delivery;
+- Mattermost, Slack, Feishu/Lark, Telegram, Discord, Microsoft Teams, email and generic webhook delivery;
 - interactive ACK / Resolve / Shelve actions for supported chat providers;
 - temporary per-AlertGroup shelving with automatic expiry, notification/escalation pause and responder-audited Unshelve;
 - profile-level browser/PWA push notifications;
@@ -155,6 +155,7 @@ Incoming integrations use route intake credentials. The generated endpoint/help 
 |---|---|
 | Mattermost | Incoming webhook or Bot API; Bot API supports interactive ACK / Resolve / Shelve actions and message updates |
 | Slack | Incoming webhook or Bot API; interactive ACK / Resolve / Shelve actions can use HTTP callbacks or Socket Mode worker |
+| Feishu / Lark | Custom bot webhook delivery with optional signature verification |
 | Telegram | Bot notifications with optional ACK / Resolve / Shelve action buttons |
 | Discord | Webhook delivery |
 | Microsoft Teams | Webhook delivery |

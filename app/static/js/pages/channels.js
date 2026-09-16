@@ -109,6 +109,10 @@ function showChannelFields() {
         showSlackModeFields();
         return;
     }
+    if (type === "lark") {
+        $('[data-channel-config="lark"]').show();
+        return;
+    }
 
     if (["webhook", "discord", "teams"].includes(type)) {
         $('[data-channel-config="webhook"]').show();
@@ -259,6 +263,22 @@ function buildChannelConfig() {
     }
     if (type === "slack") {
         return buildSlackConfig(config);
+    }
+    if (type === "lark") {
+        config.webhook_url = String(
+            $("#cfg-lark-webhook-url").val() || ""
+        ).trim();
+
+        const signingSecret = String(
+            $("#cfg-lark-signing-secret").val() || ""
+        ).trim();
+        if (signingSecret) {
+            config.signing_secret = signingSecret;
+        } else {
+            delete config.signing_secret;
+        }
+
+        return config;
     }
 
     if (["webhook", "discord", "teams"].includes(type)) {
@@ -536,6 +556,10 @@ function stripVisibleChannelConfig(type, config) {
         delete config.channel_id;
         delete config.webhook_url;
     }
+    if (type === "lark") {
+        delete config.webhook_url;
+        delete config.signing_secret;
+    }
     if (["webhook", "discord", "teams"].includes(type)) {
         delete config.webhook_url;
     }
@@ -594,6 +618,12 @@ function fillChannelFields(type, config) {
 
         showSlackModeFields();
     }
+    if (type === "lark") {
+        $("#cfg-lark-webhook-url").val(config.webhook_url || "");
+        $("#cfg-lark-signing-secret").val(
+            config.signing_secret || ""
+        );
+    }
     if (["webhook", "discord", "teams"].includes(type)) {
         $("#cfg-webhook-url").val(config.webhook_url || "");
         updateWebhookLabel(type);
@@ -621,6 +651,8 @@ function clearChannelFields() {
     $("#cfg-slack-signing-secret").val("");
     $("#cfg-slack-app-token").val("");
     $("#cfg-slack-webhook-url").val("");
+    $("#cfg-lark-webhook-url").val("");
+    $("#cfg-lark-signing-secret").val("");
 
     showSlackModeFields();
     resetEmailHtmlTemplate();
@@ -713,6 +745,7 @@ function getChannelTypeLabel(type) {
         telegram: "channels.type.telegram",
         mattermost: "channels.type.mattermost",
         slack: "channels.type.slack",
+        lark: "channels.type.lark",
         webhook: "channels.type.webhook",
         discord: "channels.type.discord",
         teams: "channels.type.teams",
@@ -752,7 +785,7 @@ function getChannelModeLabel(channel) {
     }
 
     if (
-        ["webhook", "discord", "teams"].includes(
+        ["lark", "webhook", "discord", "teams"].includes(
             channel.channel_type
         )
     ) {
@@ -806,7 +839,7 @@ function renderChannelsSummary(channels) {
         return !!channel.enabled;
     }).length;
     const webhooks = channels.filter(function (channel) {
-        return ["slack", "webhook", "discord", "teams"].includes(channel.channel_type);
+        return ["slack", "lark", "webhook", "discord", "teams"].includes(channel.channel_type);
     }).length;
 
     $("#channels-summary-webhooks").text(webhooks);
@@ -882,7 +915,7 @@ function getSafeChannelConfigSummary(channel) {
                 : i18n.t("channels.config.webhook_missing")
         );
     }
-    if (["webhook", "discord", "teams"].includes(channel.channel_type)) {
+    if (["lark", "webhook", "discord", "teams"].includes(channel.channel_type)) {
         return config.webhook_url ? i18n.t("channels.config.webhook_ready") : i18n.t("channels.config.webhook_missing");
     }
     if (channel.channel_type === "telegram") {
