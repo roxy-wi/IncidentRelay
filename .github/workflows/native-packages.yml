@@ -10,7 +10,6 @@ permissions:
 concurrency:
   group: incidentrelay-native-repository
   cancel-in-progress: false
-  queue: max
 
 jobs:
   metadata:
@@ -147,7 +146,7 @@ jobs:
           - image: rockylinux/rockylinux:10
             format: el10
     env:
-      INCIDENTRELAY_PACKAGE_REPOSITORY: ${{ vars.REPO_S3_ENDPOINT }}/${{ vars.REPO_S3_BUCKET }}
+      INCIDENTRELAY_PACKAGE_REPOSITORY: https://repo.incidentrelay.io
       INCIDENTRELAY_PACKAGE_VERSION: ${{ needs.metadata.outputs.version }}
       REPO_GPG_KEY_ID: ${{ vars.REPO_GPG_KEY_ID }}
       TEST_IMAGE: ${{ matrix.image }}
@@ -165,7 +164,7 @@ jobs:
           ssh-key: ${{ secrets.REPO_PACKAGING_SSH_KEY }}
           path: build-support
           persist-credentials: false
-      - name: Install the published release from S3 with APT or DNF
+      - name: Install the published release from the public repository with APT or DNF
         run: |
           docker run --rm -v "$PWD/build-support/package_tools/incidentrelay/tests:/checks:ro" \
             --env INCIDENTRELAY_PACKAGE_REPOSITORY --env INCIDENTRELAY_PACKAGE_VERSION --env REPO_GPG_KEY_ID \

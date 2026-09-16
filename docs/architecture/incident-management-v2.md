@@ -47,6 +47,31 @@ The missing part is a separate operational Incident entity. The current manual i
 
 This avoids a high-risk migration of the current technical lifecycle.
 
+#### Alert occurrence and reopen semantics
+
+A resolved child `Alert` remains a terminal technical occurrence and is never
+changed back to `firing`.
+
+A resolved `AlertGroup`, however, may be reused when a new matching firing
+occurrence arrives within a configurable reopen grace period.
+
+In that case:
+
+- the existing resolved child Alert remains resolved;
+- a new child Alert is created for the new occurrence;
+- the existing AlertGroup is reopened instead of creating another group;
+- notification and escalation state is restarted according to the current
+  lifecycle and acknowledgement rules;
+- the reopen creates timeline and audit events;
+- service and business impact are recalculated from the current child-alert
+  state.
+
+After the reopen grace period expires, a matching firing occurrence creates a
+new AlertGroup.
+
+`closed` is not added to the AlertGroup technical lifecycle. Terminal
+operational closure belongs to the first-class Incident workflow.
+
 ### 3.2 Add a separate `Incident`
 
 An `Incident` is a first-class operational record that may exist without Alert Groups or link one or more related Alert Groups.
@@ -135,6 +160,7 @@ The staged implementation should provide:
 12. Event Orchestration integration.
 13. Incident metrics and reports.
 14. Complete audit, timeline, RBAC, OpenAPI and user documentation.
+15. Flapping-safe AlertGroup reuse with Event Orchestration controlled resolved-group reopen semantics, disabled by default.
 
 ## 6. Non-goals for the first release
 
@@ -149,6 +175,7 @@ The first release should not include:
 - mandatory classification for every team;
 - blocking source-driven automatic resolution when classification is missing;
 - a complete post-incident review editor.
+- automatic resolution or closure of firing alerts solely because no new webhook/update has been received;
 
 ## 7. Domain model
 
@@ -299,7 +326,9 @@ Suggested capabilities:
 
 ## 8. Lifecycle model
 
-### 8.1 Alert lifecycle remains unchanged
+### 8.1 Alert and AlertGroup lifecycle
+
+Child Alert technical states remain:
 
 ```text
 firing
@@ -309,7 +338,32 @@ maintenance
 resolved
 ```
 
-This state controls notifications, escalation and technical impact.
+A resolved child Alert is a terminal occurrence.
+
+AlertGroup uses the same technical state model, but resolved is not
+necessarily the end of the group identity.
+
+firing / acknowledged / silenced
+              |
+              v
+           resolved
+              |
+              +---- new matching occurrence inside reopen grace ----+
+              |                                                     |
+              +------------------------------------------------> firing
+
+A reopened AlertGroup receives a new child Alert. Existing resolved child
+Alerts remain unchanged.
+
+Once the configured reopen grace period has elapsed, the resolved AlertGroup
+is no longer eligible for automatic reuse and a new matching occurrence
+creates a new AlertGroup.
+
+This behavior reduces AlertGroup/Incident churn caused by flapping while
+preserving individual occurrence history and lifecycle metrics.
+
+There is intentionally no closed AlertGroup state. closed belongs to the
+Incident workflow.
 
 ### 8.2 Incident workflow
 
@@ -343,6 +397,38 @@ Recommended first-version defaults:
 - if any linked group becomes unresolved again, a resolved Incident reopens to `investigating`;
 - classification remains unchanged when status changes;
 - closing may require classification according to group settings.
+- a new firing occurrence may reopen a recently resolved AlertGroup within the configured reopen grace period;
+- reopening an AlertGroup creates a new child Alert and never mutates an older resolved Alert back to firing;
+- an AlertGroup reopened after resolution causes a linked `resolved` or`monitoring` Incident to return to `investigating`;
+- expiration of the AlertGroup reopen grace period does not automatically
+  close a linked Incident;
+- Incident `closed` remains an explicit operational transition;
+- inactivity alone never implies technical recovery unless an explicit stale-alert policy is configured.
+
+### 8.4 Flapping and recovery policy
+
+IncidentRelay must distinguish three separate concepts:
+
+1. **Technical occurrence resolution**
+   - one child Alert reached `resolved`;
+   - the occurrence remains immutable afterwards.
+
+2. **AlertGroup reopen eligibility**
+   - a resolved AlertGroup may accept a new matching occurrence for a limited configurable period;
+   - this prevents flapping sources from producing excessive AlertGroups.
+
+3. **Incident closure**
+   - an operational Incident may move from `resolved` to `closed`;
+   - `closed` is not inferred from AlertGroup inactivity;
+   - automatic Incident closure, if introduced later, must be an explicit configurable policy.
+
+A future notification-recovery grace period may suppress short
+`resolved -> firing` notification pairs without changing the persisted Alert
+or AlertGroup history.
+
+A future stale-alert policy may act on a firing signal that has not been
+updated for a configured duration. Such behavior must be opt-in because
+absence of webhook traffic does not generally prove recovery.
 
 ## 9. Classification policy
 
