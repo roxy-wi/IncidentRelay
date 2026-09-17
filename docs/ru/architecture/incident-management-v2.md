@@ -98,6 +98,111 @@ Create Incident
 
 Группа может иметь состояние `resolved` и классификацию `False Positive`. Группа может иметь состояние `firing` и уже быть классифицирована как `Incident`.
 
+### 3.5 Разделить техническое назначение и операционное владение
+
+Назначение в AlertGroup и Incident отвечает на разные вопросы.
+
+```text
+AlertGroup.assignee
+  Кто сейчас является технической целью уведомлений и эскалации?
+
+Incident.assignee
+  Кто сейчас владеет операционным расследованием?
+```
+
+Правила:
+
+- после появления полноценных Incident сущность `AlertGroup` остаётся полноценным техническим эпизодом сигнала;
+- `AlertGroup.assignee` по-прежнему выбирается и меняется маршрутом, расписанием и эскалацией;
+- `Incident.assignee` хранит конкретного пользователя и может быть назначен, переназначен или очищен вручную;
+- изменение `Incident.assignee` не должно менять исполнителя связанных AlertGroup, ротацию, состояние уведомлений или ход эскалации;
+- изменение технического исполнителя AlertGroup не должно незаметно заменять исполнителя Incident;
+- назначение Incident остаётся стабильным при обычной смене дежурства;
+- в 2.4 On-call Roles могут определить текущих пользователей и скопировать конкретных пользователей в Incident;
+- будущая автоматизация может явно переназначить Incident, но ротация расписания сама по себе не является живой ссылкой на владение Incident.
+
+Это архитектурное решение для предложения #83.
+
+### 3.6 Безопасное повторное использование AlertGroup при flapping
+
+Разрешённый дочерний `Alert` остаётся финальным техническим occurrence и никогда не переводится обратно в `firing`.
+
+При этом разрешённая `AlertGroup` может быть повторно использована, если приходит новый подходящий firing occurrence и Event Orchestration явно разрешает окно повторного открытия.
+
+Правила:
+
+- политикой управляет Event Orchestration через `set_grouping.reopen_window_seconds`;
+- отсутствие поля или `0` означает disabled и сохраняет текущее поведение;
+- `set_grouping.window_seconds` и `reopen_window_seconds` — разные понятия;
+- повторное открытие создаёт новый дочерний Alert occurrence;
+- старые resolved Alert остаются resolved и сохраняют свои timestamps;
+- после истечения reopen window новый matching firing создаёт новую AlertGroup;
+- состояние `closed` не добавляется в технический state machine AlertGroup;
+- `closed` остаётся финальным операционным состоянием полноценного Incident;
+- отсутствие webhook/update не считается recovery по умолчанию.
+
+Это архитектурное решение для предложения #84 и workstream #85.
+
+### Граница ответственности AlertGroup и Incident
+
+Целевая модель сохраняет обе сущности полноценными:
+
+```text
+Alert -> AlertGroup        технический эпизод сигнала
+             -> Incident   необязательное операционное расследование
+```
+
+`AlertGroup` продолжает отвечать за:
+
+- child Alert occurrence, grouping и deduplication;
+- technical lifecycle и source state;
+- routing, notification и escalation;
+- technical assignee и ручное переназначение AlertGroup;
+- technical priority/context, Silence, maintenance и shelving;
+- impact, correlation и source context;
+- technical timeline;
+- **технические комментарии**.
+
+`Incident` отвечает за:
+
+- независимый operational workflow;
+- operational assignee и ручное переназначение Incident;
+- Incident Commander и responders;
+- stakeholders;
+- affected-service context;
+- **операционные комментарии**;
+- root cause и resolution summary;
+- external ITSM references;
+- postmortem и corrective actions.
+
+```text
+AlertGroup.assignee = текущая техническая ответственность / paging target
+Incident.assignee   = владелец операционного расследования
+```
+
+Оба назначения можно менять вручную, но они независимы. AlertGroup reassignment
+не означает ACK и не сбрасывает escalation policy, escalation level, rotation
+или next scheduled escalation.
+
+#83 трактуется прежде всего как ручное переназначение текущего
+`AlertGroup.assignee`, потому что текущий UI называет AlertGroup инцидентом.
+Ручное переназначение first-class Incident остаётся отдельной capability 2.3.
+
+Комментарии:
+
+- AlertGroup comments остаются техническими заметками;
+- Incident comments используются для operational collaboration;
+- combined Incident activity может показывать комментарии linked AlertGroup с
+  явным source/target;
+- комментарии не копируются автоматически между объектами.
+
+Responders/stakeholders:
+
+- canonical ownership переходит в Incident;
+- legacy AlertGroup records сохраняются во время staged migration;
+- окончательное удаление legacy operational storage относится к 2.9;
+- technical comments AlertGroup cleanup не удаляет.
+
 ## 4. Терминология
 
 ```text
@@ -622,101 +727,120 @@ incident_resolution_updated
 - обновить OpenAPI, вызовы frontend, тесты и документацию в составе несовместимого релиза;
 - использовать feature flags только для автоматической синхронизации, а не для сохранения конфликтующей семантики API.
 
-## 18. Этапы поставки
+## 18. Версионированный план поставки
 
-### Этап 1: основа классификации
+### IncidentRelay 2.3: Incident Core и ownership
 
-- поля классификации и валидация;
-- временная шкала и аудит;
-- действие и фильтры UI;
-- необязательная политика классификации;
-- выбор цели дубликата;
-- счётчики отчётности;
-- OpenAPI и документация.
+- first-class `Incident` и `IncidentAlertGroupLink`;
+- manual Incident, Create Incident from AlertGroup, basic link/unlink;
+- independent Incident lifecycle, team/service/priority;
+- manual Incident assign/reassign/unassign и **Assign to me**;
+- manual AlertGroup assign/reassign и **Assign to me** для #83;
+- AlertGroup reassignment не делает ACK и не сбрасывает escalation state;
+- breaking `/api/alert-groups` vs `/api/incidents` split;
+- отдельные Alerts/Incidents UI и минимальный Incident workspace;
+- technical comments AlertGroup сохраняются;
+- RBAC, audit, timeline, migrations, concurrency, OpenAPI и docs.
 
-### Этап 2: основа Incident
+### IncidentRelay 2.4: Lifecycle resilience и flapping
 
-- отдельная модель `Incident`;
-- отношение `IncidentAlertGroupLink`;
-- ручное создание самостоятельного Incident;
-- создание или связывание из Alert Group;
-- состояния рабочего процесса;
-- поля первопричины и разрешения;
-- хуки синхронизации жизненного цикла.
+- #84/#85 Event Orchestration `set_grouping.reopen_window_seconds`;
+- disabled by default;
+- reopen создаёт новый child Alert, старые resolved child Alert остаются terminal;
+- concurrency для resolve/reopen и duplicate delivery;
+- linked resolved/monitoring Incident может вернуться в `investigating`;
+- recovery notification hysteresis / delayed resolved notification;
+- отмена pending recovery notification при быстром reopen;
+- Explain, audit, timeline и UI context.
 
-### Этап 3: API и рабочее пространство
+### IncidentRelay 2.5: Incident collaboration
 
-- перенос текущего API Alert Group в `/api/alert-groups`;
-- сохранение ручного создания Alert Group с одним дочерним Alert;
-- замена `/api/incidents` на API Incident;
-- отдельные рабочие пространства Alert Group и Incident;
-- переиспользование ответственных, заинтересованных лиц и комментариев;
-- контекст сервиса, runbook'а и дашборда;
-- процессы закрытия и повторного открытия;
-- очередь проверки.
+- Incident Commander и responders;
+- Incident stakeholders и snapshot service-default stakeholders;
+- operational comments Incident и richer activity;
+- root cause и resolution summary;
+- affected services и runbook/dashboard/dependency/impact context;
+- technical comments AlertGroup остаются отдельным target;
+- combined Incident activity может показывать comments linked AlertGroup с
+  явным source attribution;
+- staged migration legacy AlertGroup responder/stakeholder data при наличии
+  однозначного Incident mapping;
+- Incident не создаётся задним числом только ради migration collaboration data.
 
-### Этап 4: связанные группы алертов
+### IncidentRelay 2.6: Classification, relations и merge/split
 
-- неразрушительные связи групп;
-- связи дубликатов;
-- добавление и удаление связанной группы;
-- проверки пересечений и разрешений;
-- улучшенный процесс объединения;
-- безопасное проектирование и реализация разделения.
+- AlertGroup classification и review policy;
+- review-required queue;
+- duplicate canonical AlertGroup/Incident targets;
+- relation types `primary`, `related`, `symptom`, `duplicate`;
+- Incident merge/split;
+- technical AlertGroup merge/link reconciliation;
+- RBAC, audit, history и concurrency.
 
-### Этап 5: автоматизация
+### IncidentRelay 2.7: On-call Roles и Incident automation
 
-- действия Event Orchestration;
-- правила автоматического объявления;
-- режим черновика с подтверждением;
-- хуки длительности и эскалации;
-- идемпотентность и предотвращение дубликатов.
+- #59 On-call Roles и concurrent role-aware coverage;
+- role-aware suggestions assignee/commander/responders;
+- concrete users вместо live schedule ownership links;
+- #51 Event Orchestration Incident actions;
+- draft-and-confirm, similar-open-Incident checks, idempotency;
+- async duration/escalation hooks;
+- optional stale-signal policy, disabled by default;
+- inactivity сама по себе не означает recovery.
 
-### Этап 6: основа внешней ITSM
+### IncidentRelay 2.8: ITSM и Jira
 
-- модель внешней ссылки;
-- конфигурация коннектора;
-- outbox и повторные попытки;
-- универсальная интеграция только для привязки;
-- создание и обновление Jira Service Management;
-- аутентификация и сопоставление webhook.
+- #52 `IncidentExternalReference` и provider-neutral ITSM;
+- manual external references, protected connector config;
+- outbox, retries, idempotency, dead-letter;
+- #53 Jira/JSM create/update;
+- authenticated inbound events, source-of-truth/conflict handling;
+- sync-loop prevention, secret redaction, SSRF/private-network controls.
 
-### Этап 7: отчётность и процесс после инцидента
+### IncidentRelay 2.9: Analytics, Postmortems и final cleanup
 
-- дашборд метрик инцидентов;
-- отчёты по классификации и качеству;
-- API экспорта;
-- поля разбора инцидента;
-- последующие действия и их владельцы.
+- #54 analytics Incident/AlertGroup с точными lifecycle definitions;
+- отдельные Incident reopen и AlertGroup reopen/flapping metrics;
+- classification, alert-quality и external-ticket metrics;
+- #60 configurable Postmortems / Incident Reviews;
+- corrective actions с owner/due date и export/reporting;
+- final Incident v2 cleanup;
+- deprecated AlertGroup responder/stakeholder write flows удаляются только после
+  reconciliation;
+- technical comments AlertGroup и operational comments Incident сохраняются;
+- удаляются legacy Incident-as-AlertGroup terminology/helpers/adapters;
+- obsolete compatibility DB structures удаляются только explicit idempotent
+  migrations с reconciliation и rollback boundary;
+- historical Incident не создаются только ради cleanup.
 
-### Этап 8: подготовка к production
+### Cross-release hardening rule
 
-- нагрузочные тесты и тесты разрешений;
-- покрытие аудита;
-- структурированные логи и метрики;
-- предотвращение циклов синхронизации;
-- полнота OpenAPI;
-- пользовательская и административная документация;
-- тестирование миграции и отката.
+Каждый релиз включает RBAC, audit, timeline, migrations, concurrency, OpenAPI,
+localization, tests и docs для собственного scope.
 
-## 19. Рекомендуемый объём первого production-релиза
+## 19. Release gate IncidentRelay 2.3
 
-Первый production-релиз должен включать этапы 1-3 и неразрушительную часть этапа 4:
+Incident Core готов к 2.3, когда:
 
-- необязательная классификация;
-- отдельная сущность Incident;
-- ручное создание Alert Group с одним дочерним Alert;
-- ручное создание самостоятельного Incident;
-- создание Incident или связывание с ним из Alert Group;
-- `/api/alert-groups` и заменённый API `/api/incidents`;
-- отдельные страницы Alert Group и Incident;
-- состояние рабочего процесса;
-- сводка первопричины и разрешения;
-- ручные связи относящихся к инциденту групп;
-- URL внешнего тикета, добавляемый вручную;
-- полная поддержка RBAC, аудита и документации.
+- границы Alert, AlertGroup и Incident явны и протестированы;
+- AlertGroup остаётся полноценным technical signal episode;
+- `/api/alert-groups` представляет AlertGroup, `/api/incidents` — только
+  first-class Incident;
+- manual AlertGroup атомарно создаёт group и один child Alert;
+- manual Incident создаёт только Incident;
+- Incident может иметь ноль или несколько linked AlertGroup;
+- linked AlertGroup сохраняют собственный technical lifecycle;
+- authorized operator может вручную reassign AlertGroup assignee;
+- AlertGroup reassignment не делает ACK и не сбрасывает escalation state;
+- authorized operator может assign/reassign/unassign Incident ownership;
+- AlertGroup и Incident assignments независимы;
+- technical comments AlertGroup остаются поддерживаемыми;
+- минимальный Incident UI, RBAC, audit, migration, concurrency и OpenAPI
+  production-ready;
+- flapping/reopen behavior 2.4 не блокирует 2.3.
 
-Он не должен ждать полной автоматической корреляции или двусторонней синхронизации с ITSM.
+Collaboration, classification, role-aware scheduling, automation, ITSM,
+analytics, postmortems и cleanup более поздних релизов не блокируют 2.3.
 
 ## 20. Критерии успеха
 

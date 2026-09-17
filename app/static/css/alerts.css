@@ -145,9 +145,9 @@
     flex-direction: column;
     gap: 1rem;
     padding: 1rem;
-    margin-bottom: 1rem;
+    margin: 16px 0;
     border: 1px solid var(--border-color);
-    border-radius: var(--radius-lg);
+    border-radius: var(--md-radius-md);
     background: var(--surface-elevated);
 }
 

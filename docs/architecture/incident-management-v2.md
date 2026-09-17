@@ -43,7 +43,8 @@ The missing part is a separate operational Incident entity. The current manual i
 - assignee and priority;
 - service impact;
 - child alerts;
-- existing responders, stakeholders, comments and timeline.
+- technical comments and technical timeline;
+- legacy responder/stakeholder data only during staged migration.
 
 This avoids a high-risk migration of the current technical lifecycle.
 
@@ -122,6 +123,118 @@ Examples:
 - Other.
 
 A group may be `resolved` and classified as `False Positive`. A group may be `firing` and already classified as `Incident`.
+
+### 3.5 Separate technical assignment from operational ownership
+
+AlertGroup and Incident assignment intentionally answer different questions.
+
+```text
+AlertGroup.assignee
+  Who is the current technical notification/escalation target?
+
+Incident.assignee
+  Who currently owns the operational investigation?
+```
+
+Rules:
+
+- `AlertGroup` remains a first-class technical signal episode after first-class Incidents are introduced;
+- `AlertGroup.assignee` continues to be selected and changed by route, schedule and escalation behavior;
+- `Incident.assignee` is a concrete user assignment and may be manually assigned, reassigned or cleared;
+- changing `Incident.assignee` must not mutate linked AlertGroup assignees, rotations, notification state or escalation progress;
+- changing an AlertGroup assignee must not silently replace the Incident assignee;
+- Incident assignment remains stable when the source on-call schedule rotates;
+- in 2.4, On-call Roles may resolve current users and copy concrete users into Incident ownership/participant records;
+- future automation may explicitly reassign an Incident, but schedule rotation alone is never a live ownership link.
+
+This is the architectural direction for proposal #83.
+
+### 3.6 Flapping-safe AlertGroup reuse
+
+A resolved child `Alert` remains a terminal technical occurrence and is never changed back to `firing`.
+
+A resolved `AlertGroup` may, however, be reused when a new matching firing occurrence arrives and Event Orchestration explicitly enables a reopen window.
+
+Rules:
+
+- Event Orchestration controls the policy through `set_grouping.reopen_window_seconds`;
+- missing or `0` means disabled and preserves current behavior;
+- `set_grouping.window_seconds` and `reopen_window_seconds` are separate concepts;
+- reopening creates a new child Alert occurrence;
+- older resolved child Alerts remain resolved and keep their timestamps;
+- after the reopen window expires, a matching firing occurrence creates a new AlertGroup;
+- `closed` is not added to the AlertGroup technical state machine;
+- `closed` remains a terminal operational state of first-class Incident;
+- inactivity or absence of webhook traffic is not recovery by default.
+
+This is the architectural direction for proposal #84 and workstream #85.
+
+### AlertGroup and Incident responsibility boundary
+
+The target model intentionally keeps both objects useful:
+
+```text
+Alert -> AlertGroup        technical signal episode
+             -> Incident   optional operational investigation
+```
+
+`AlertGroup` remains responsible for technical signal processing:
+
+- child Alert occurrences, grouping and deduplication;
+- technical lifecycle and source state;
+- routing, notification and escalation;
+- technical assignee and manual AlertGroup reassignment;
+- technical priority/context, Silence, maintenance and shelving;
+- impact, correlation and source context;
+- technical timeline;
+- **technical comments**.
+
+`Incident` owns operational response:
+
+- independent operational workflow;
+- operational assignee and manual Incident reassignment;
+- Incident Commander and responders;
+- stakeholders;
+- affected-service context;
+- **operational comments**;
+- root cause and resolution summary;
+- external ITSM references;
+- postmortem and corrective actions.
+
+Assignment rules:
+
+```text
+AlertGroup.assignee = current technical responsibility / paging target
+Incident.assignee   = owner of the operational investigation
+```
+
+Both assignments may be changed manually, but they are independent. Changing
+one must not silently mutate the other. AlertGroup reassignment does not imply
+ACK and does not reset escalation policy, escalation level, rotation or the
+next scheduled escalation.
+
+Proposal #83 is interpreted primarily as manual reassignment of the current
+AlertGroup assignee because the current product exposes AlertGroups as
+"incidents". First-class Incident reassignment remains a separate required
+Incident Core capability.
+
+Comment rules:
+
+- AlertGroup comments remain supported as technical investigation notes;
+- Incident comments are operational collaboration;
+- a combined Incident activity view may surface comments from linked
+  AlertGroups, but must identify the original target/source;
+- comments are not automatically copied between AlertGroup and Incident;
+- original author, timestamp and target remain canonical.
+
+Responder/stakeholder rules:
+
+- responders and stakeholders become canonical Incident collaboration data;
+- service default stakeholders are copied as Incident snapshots;
+- legacy AlertGroup responder/stakeholder records are preserved during staged
+  migration;
+- final removal of legacy operational AlertGroup storage belongs to 2.9;
+- AlertGroup technical comments are explicitly not removed by that cleanup.
 
 ## 4. Terminology
 
@@ -244,7 +357,7 @@ created_at
 updated_at
 ```
 
-Responders, stakeholders, comments and operational timeline belong to the Incident. Notification and escalation state remain on `AlertGroup`.
+Responders, stakeholders and operational timeline belong to the Incident. Incident comments are operational collaboration; AlertGroup technical comments remain on AlertGroup. Notification and escalation state remain on `AlertGroup`.
 
 Rules:
 
@@ -723,120 +836,118 @@ Database migration must preserve supported historical data, but preserving data 
 
 ## 18. Versioned delivery roadmap
 
-### IncidentRelay 2.3: Incident Management Core
+### IncidentRelay 2.3: Incident Core and ownership
 
-Goal: ship a minimal but production-usable first-class Incident workflow.
+- first-class `Incident` and `IncidentAlertGroupLink`;
+- manual Incident creation, Create Incident from AlertGroup, basic link/unlink;
+- independent Incident lifecycle, team/service/priority;
+- manual Incident assign/reassign/unassign and **Assign to me**;
+- manual AlertGroup assign/reassign and **Assign to me** for #83;
+- AlertGroup reassignment does not ACK or reset escalation state;
+- breaking `/api/alert-groups` vs `/api/incidents` split;
+- separate Alerts/Incidents navigation and minimal Incident workspace;
+- preserve AlertGroup technical comments;
+- RBAC, audit, timeline, migrations, concurrency, OpenAPI and docs.
 
-Scope:
+### IncidentRelay 2.4: Lifecycle resilience and flapping
 
-- separate `Incident` model;
-- `IncidentAlertGroupLink`;
-- manual standalone Incident creation;
-- **Create Incident** from AlertGroup;
-- link/unlink AlertGroups;
-- independent Incident workflow status;
-- Incident team, service, priority and assignee;
-- explicit close/reopen flow;
-- move AlertGroup API to `/api/alert-groups`;
-- replace `/api/incidents` with the first-class Incident API;
-- dedicated Incidents list;
-- minimal Incident workspace;
-- RBAC, audit, timeline, migration, OpenAPI, UI tests and documentation.
+- #84/#85 `set_grouping.reopen_window_seconds` controlled by Event Orchestration;
+- disabled by default;
+- reopen creates a new child Alert; older resolved child Alerts remain terminal;
+- resolve/reopen and duplicate-delivery concurrency protection;
+- linked resolved/monitoring Incident may return to `investigating`;
+- recovery notification hysteresis / delayed resolved notification;
+- cancel pending recovery notification on quick reopen;
+- Explain, audit, timeline and UI context.
 
-Explicitly deferred from 2.3:
+### IncidentRelay 2.5: Incident collaboration
 
-- AlertGroup classification;
-- duplicate review workflow;
-- full responders/stakeholders/comments workspace;
-- role-aware on-call scheduling;
-- Incident merge/split;
-- Event Orchestration Incident actions;
-- Jira/JSM automation;
-- Incident analytics;
-- full post-incident review.
+- Incident Commander and responders;
+- Incident stakeholders and service-default stakeholder snapshots;
+- Incident operational comments and richer activity;
+- root cause and resolution summary;
+- affected services and runbook/dashboard/dependency/impact context;
+- preserve AlertGroup technical comments as a separate target;
+- combined Incident activity may show linked AlertGroup comments with explicit
+  source attribution;
+- staged migration of legacy AlertGroup responder/stakeholder data when an
+  unambiguous Incident mapping exists;
+- never backfill an Incident solely to move legacy collaboration data.
 
-### IncidentRelay 2.4: Incident Operations
-
-Goal: expand the 2.3 Incident record into the operational collaboration workspace.
-
-Scope:
+### IncidentRelay 2.6: Classification, relations and merge/split
 
 - AlertGroup classification and review policy;
 - review-required queue;
-- duplicate canonical targets;
-- related AlertGroup relation types;
+- duplicate canonical AlertGroup/Incident targets;
+- `primary`, `related`, `symptom`, `duplicate` relations;
 - Incident merge and split;
-- responders and stakeholders;
-- Incident comments and richer activity;
-- root cause and resolution summary;
-- runbook/dashboard/service/impact context;
-- lifecycle synchronization for linked AlertGroups;
-- On-call Roles and role-aware Incident participant assignment;
-- RBAC, audit, migration, OpenAPI, localization and regression coverage for the new scope.
+- technical AlertGroup merge/link reconciliation;
+- RBAC, audit, history and concurrency coverage.
 
-### IncidentRelay 2.5: Incident Automation and ITSM
+### IncidentRelay 2.7: On-call Roles and Incident automation
 
-Goal: automate Incident declaration and integrate Incidents with external ticketing.
+- #59 On-call Roles and concurrent role-aware coverage;
+- role-aware Incident assignee/commander/responder suggestions;
+- persist concrete users rather than live schedule ownership links;
+- #51 Event Orchestration Incident declaration/linking/assignment actions;
+- draft-and-confirm, similar-open-Incident checks and idempotency;
+- asynchronous duration/escalation hooks;
+- optional stale-signal policy, disabled by default;
+- inactivity alone never means technical recovery.
 
-Scope:
+### IncidentRelay 2.8: ITSM and Jira
 
-- Event Orchestration Incident actions;
-- automatic declaration and linking;
-- draft-and-confirm mode;
-- idempotency and duplicate prevention;
-- duration and escalation hooks;
-- `IncidentExternalReference`;
-- provider-neutral ITSM integration;
-- outbox, retries and dead-letter visibility;
-- Jira/Jira Service Management create/update;
-- shared Jira connection/client infrastructure;
-- security, secret-redaction and SSRF/private-network controls.
+- #52 `IncidentExternalReference` and provider-neutral ITSM framework;
+- manual external references, protected connector configuration;
+- outbox, retries, idempotency and dead-letter visibility;
+- #53 Jira/Jira Service Management create/update;
+- authenticated inbound events, source-of-truth/conflict handling;
+- sync-loop prevention, secret redaction and SSRF/private-network controls.
 
-### IncidentRelay 2.6: Analytics and Post-Incident Workflow
+### IncidentRelay 2.9: Analytics, Postmortems and final cleanup
 
-Goal: use stable Incident lifecycle data for reporting and post-incident improvement.
-
-Scope:
-
-- Incident metrics dashboard;
-- classification and alert-quality reporting;
-- export API;
-- exact lifecycle timing metrics;
-- post-incident review fields;
-- follow-up actions and ownership;
-- inbound Jira/JSM synchronization;
-- loop prevention;
-- configurable source-of-truth and conflict handling.
+- #54 Incident and AlertGroup analytics with exact lifecycle definitions;
+- separate Incident reopen and AlertGroup reopen/flapping metrics;
+- classification, alert-quality and external-ticket metrics;
+- #60 configurable Postmortems / Incident Reviews;
+- corrective actions with owner/due date and export/reporting;
+- final Incident v2 cleanup;
+- remove deprecated AlertGroup responder/stakeholder write flows only after
+  reconciliation;
+- preserve AlertGroup technical comments and Incident operational comments;
+- remove legacy Incident-as-AlertGroup terminology/helpers/adapters;
+- remove obsolete compatibility DB structures only through explicit,
+  idempotent migrations with reconciliation and documented rollback boundary;
+- never create historical Incidents solely to simplify cleanup.
 
 ### Cross-release hardening rule
 
-Production hardening is not deferred to a final phase.
-
-Every release must include the RBAC, audit, timeline, tests, migrations, OpenAPI, localization and documentation required by the functionality shipped in that release.
-
-Later releases may additionally expand load, concurrency, reconciliation, sync-loop and rollback-boundary testing.
+Every release includes the RBAC, audit, timeline, migrations, concurrency,
+OpenAPI, localization, tests and documentation required by its own scope.
 
 ## 19. IncidentRelay 2.3 release gate
 
-Incident Management Core is ready to ship in 2.3 when:
+Incident Core is ready to ship in 2.3 when:
 
 - Alert, AlertGroup and Incident boundaries are explicit and tested;
-- `/api/alert-groups` exposes AlertGroups;
-- `/api/incidents` exposes only first-class Incidents;
-- no backward-compatible AlertGroup alias remains under `/api/incidents`;
-- manual AlertGroup creation creates one AlertGroup and one child Alert atomically;
+- AlertGroup remains a first-class technical signal episode;
+- `/api/alert-groups` exposes AlertGroups and `/api/incidents` exposes only
+  first-class Incidents;
+- manual AlertGroup creation creates one group and one child Alert atomically;
 - manual Incident creation creates only an Incident;
-- an Incident can exist with zero linked AlertGroups;
-- one Incident can link multiple independent AlertGroups;
+- Incidents can exist with zero or multiple linked AlertGroups;
 - linked AlertGroups retain their technical lifecycle;
-- Incident lifecycle does not overwrite linked AlertGroup lifecycle;
-- operators can create and operate Incidents from the UI;
-- close and reopen flows are explicit;
-- RBAC and audit coverage are complete for the 2.3 scope;
-- migration preserves supported historical AlertGroup data;
-- OpenAPI and bundled UI use only the final 2.3 contracts.
+- authorized operators can manually reassign AlertGroup assignee;
+- AlertGroup reassignment does not ACK or reset escalation policy/state;
+- authorized operators can assign/reassign/unassign Incident ownership;
+- AlertGroup and Incident assignments are independent;
+- AlertGroup technical comments remain supported;
+- minimal Incident UI, RBAC, audit, migration, concurrency and OpenAPI are
+  production-ready;
+- 2.4 flapping/reopen behavior is not required to ship 2.3.
 
-Classification, role-aware scheduling, automation, Jira/JSM and analytics are not release blockers for 2.3.
+Later collaboration, classification, role-aware scheduling, automation, ITSM,
+analytics, postmortems and cleanup are not blockers for 2.3.
 
 ## 20. Success criteria
 

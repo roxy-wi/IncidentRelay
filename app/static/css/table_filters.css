@@ -26,7 +26,7 @@
 .ts-control {
     min-height: 2.5rem;
     border: 1px solid var(--border-color);
-    border-radius: var(--radius-md, 0.75rem);
+    border-radius: var(--md-radius-md, 0.75rem);
     background: var(--surface-elevated);
     color: var(--text-primary);
     box-shadow: none;
@@ -41,7 +41,7 @@
 
 .ts-dropdown {
     border: 1px solid var(--border-color);
-    border-radius: var(--radius-lg, 1rem);
+    border-radius: var(--md-radius-md, 1rem);
     background: var(--surface-elevated);
     box-shadow: var(--shadow-lg, 0 16px 40px rgba(15, 23, 42, 0.16));
     overflow: hidden;
