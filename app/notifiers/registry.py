@@ -5,12 +5,14 @@ from app.notifiers.plugins import (
 )
 from app.notifiers.mattermost.notifier import MattermostNotifier
 from app.notifiers.email.notifier import EmailNotifier
+from app.notifiers.lark.notifier import LarkNotifier
 from app.notifiers.telegram.notifier import TelegramNotifier
 from app.notifiers.slack.notifier import SlackNotifier
 from app.notifiers.types import (
     CHANNEL_TYPE_VALUES,
     DISCORD_CHANNEL,
     EMAIL_CHANNEL,
+    LARK_CHANNEL,
     MATTERMOST_CHANNEL,
     SLACK_CHANNEL,
     TEAMS_CHANNEL,
@@ -21,6 +23,7 @@ from app.notifiers.types import (
 NOTIFIERS = {
     TELEGRAM_CHANNEL: TelegramNotifier(),
     SLACK_CHANNEL: SlackNotifier(),
+    LARK_CHANNEL: LarkNotifier(),
     MATTERMOST_CHANNEL: MattermostNotifier(),
     WEBHOOK_CHANNEL: IncomingWebhookNotifier(),
     DISCORD_CHANNEL: DiscordNotifier(),

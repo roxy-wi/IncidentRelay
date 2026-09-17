@@ -80,6 +80,7 @@ nav:
       - Notification channels:
           - Common Behavior: integrations/channels.md
           - Mattermost: integrations/mattermost.md
+          - Feishu / Lark: integrations/lark.md
           - Telegram: integrations/telegram.md
           - Email: integrations/email.md
           - Email Templates: integrations/email-channel-templates.md

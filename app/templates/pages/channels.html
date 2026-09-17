@@ -454,6 +454,34 @@
                     </div>
                 </div>
 
+              <div class="channel-config" data-channel-config="lark">
+                <div class="form-section">
+                  <label for="cfg-lark-webhook-url">{{ _('channels.lark.webhook_url') }}</label>
+                  <input
+                    id="cfg-lark-webhook-url"
+                    class="input"
+                    type="url"
+                    autocomplete="off"
+                    placeholder="https://open.feishu.cn/open-apis/bot/v2/hook/..."
+                  >
+
+                  <label for="cfg-lark-signing-secret">{{ _('channels.lark.signing_secret') }}</label>
+                  <input
+                    id="cfg-lark-signing-secret"
+                    class="input"
+                    type="password"
+                    autocomplete="new-password"
+                  >
+                  <div class="field-help">
+                    {{ _('channels.lark.signing_secret_help') }}
+                  </div>
+
+                  <div class="help-text">
+                    {{ _('channels.lark.help') }}
+                  </div>
+                </div>
+              </div>
+
               <div class="channel-config" data-channel-config="webhook">
                 <div class="form-section">
                   <label id="cfg-webhook-label" for="cfg-webhook-url">{{ _('channels.webhook.url') }}</label>

@@ -38,6 +38,7 @@ For each channel IncidentRelay checks:
 | `telegram` | `bot_token`, `chat_id` | Telegram user ID for actions | Optional Telegram proxy |
 | `email` | Optional `html_template` | Assigned user must have `email` | SMTP settings |
 | `slack` | Webhook mode: `webhook_url`; Bot API: `bot_token`, `channel_id`, and either `signing_secret` or `app_token` | Optional Slack user ID for action attribution | Public HTTPS endpoint for HTTP actions, or Slack worker for Socket Mode |
+| `lark` | `webhook_url`, optional `signing_secret` | None | None |
 | `discord` | `webhook_url` | None | None |
 | `teams` | `webhook_url` | None | None |
 | `webhook` | `webhook_url` | None | None |
@@ -90,12 +91,13 @@ Some channels can update an existing notification after ACK, Resolve, Shelve or 
 | Telegram | Yes | Requires stored Telegram message metadata and polling for actions |
 | Email | No | New email can be sent for notification events |
 | Voice call | No | Calls are one-way notifications |
-| Slack incoming webhook, Discord, Teams, generic webhook | No | Webhook delivery creates new messages and cannot update the original notification |
+| Feishu/Lark, Slack incoming webhook, Discord, Teams, generic webhook | No | Webhook delivery creates new messages and cannot update the original notification |
 
 ## Channel-specific pages
 
 - [Mattermost](mattermost.md)
 - [Slack](slack.md)
+- [Feishu / Lark](lark.md)
 - [Telegram](telegram.md)
 - [Email](email.md)
 - [Email templates](email-channel-templates.md)
