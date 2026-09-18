@@ -1637,6 +1637,12 @@ body.md-theme .status-text {
 
 /* Modals */
 
+html.modal-open,
+body.modal-open {
+  overflow: hidden;
+  overscroll-behavior: none;
+}
+
 body.md-theme .app-modal,
 body.md-theme .modal {
   position: fixed;
@@ -1648,6 +1654,7 @@ body.md-theme .modal {
   padding: 24px;
   background: rgba(15, 23, 42, 0.48);
   backdrop-filter: blur(8px);
+  overscroll-behavior: none;
 }
 
 body.md-theme .app-modal.is-hidden,
@@ -1705,6 +1712,8 @@ body.md-theme .app-modal-body,
 body.md-theme .modal-body {
   padding: 22px 24px;
   overflow: auto;
+  overscroll-behavior: contain;
+  -webkit-overflow-scrolling: touch;
 }
 
 body.md-theme .app-modal-footer,
