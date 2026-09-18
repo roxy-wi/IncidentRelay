@@ -1,4 +1,4 @@
-const IR_PWA_VERSION = "incidentrelay-pwa-v1.0.4";
+const IR_PWA_VERSION = "incidentrelay-pwa-v1.0.5";
 const IR_STATIC_CACHE = IR_PWA_VERSION + "-static";
 const IR_OFFLINE_CACHE = IR_PWA_VERSION + "-offline";
 const OFFLINE_URL = "/static/offline.html";
@@ -405,24 +405,33 @@ self.addEventListener("push", function (event) {
 });
 
 function openIncidentRelayUrl(url) {
+    const targetUrl = new URL(url || "/alerts", self.location.origin).href;
+
     return clients.matchAll({
         type: "window",
         includeUncontrolled: true
-    }).then(function (clientList) {
+    }).then(async function (clientList) {
         for (const client of clientList) {
-            if ("focus" in client) {
-                client.focus();
+            if (!("navigate" in client)) {
+                continue;
+            }
 
-                if ("navigate" in client) {
-                    return client.navigate(url);
+            try {
+                const navigatedClient = await client.navigate(targetUrl);
+                const focusedClient = navigatedClient || client;
+
+                if ("focus" in focusedClient) {
+                    return focusedClient.focus();
                 }
 
-                return client;
+                return focusedClient;
+            } catch (error) {
+                // Try opening a new window below when an existing client cannot navigate.
             }
         }
 
         if (clients.openWindow) {
-            return clients.openWindow(url);
+            return clients.openWindow(targetUrl);
         }
 
         return null;
