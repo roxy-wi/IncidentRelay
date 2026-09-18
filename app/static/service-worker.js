@@ -1,4 +1,4 @@
-const IR_PWA_VERSION = "incidentrelay-pwa-v1.0.5";
+const IR_PWA_VERSION = "incidentrelay-pwa-v1.0.8";
 const IR_STATIC_CACHE = IR_PWA_VERSION + "-static";
 const IR_OFFLINE_CACHE = IR_PWA_VERSION + "-offline";
 const OFFLINE_URL = "/static/offline.html";
@@ -404,6 +404,60 @@ self.addEventListener("push", function (event) {
     })());
 });
 
+function requestClientMessage(client, type, targetUrl) {
+    return new Promise(function (resolve) {
+        const channel = new MessageChannel();
+        let settled = false;
+
+        const finish = function (handled) {
+            if (settled) {
+                return;
+            }
+
+            settled = true;
+            resolve(handled);
+        };
+
+        const timeout = setTimeout(function () {
+            finish(false);
+        }, 500);
+
+        channel.port1.onmessage = function (event) {
+            clearTimeout(timeout);
+            finish(Boolean(event.data && event.data.handled));
+        };
+
+        try {
+            client.postMessage(
+                {
+                    type,
+                    url: targetUrl
+                },
+                [channel.port2]
+            );
+        } catch (error) {
+            clearTimeout(timeout);
+            finish(false);
+        }
+    });
+}
+
+function requestClientNavigation(client, targetUrl) {
+    return requestClientMessage(
+        client,
+        "INCIDENTRELAY_NAVIGATE",
+        targetUrl
+    );
+}
+
+function prepareClientNavigation(client, targetUrl) {
+    return requestClientMessage(
+        client,
+        "INCIDENTRELAY_PREPARE_NAVIGATION",
+        targetUrl
+    );
+}
+
 function openIncidentRelayUrl(url) {
     const targetUrl = new URL(url || "/alerts", self.location.origin).href;
 
@@ -412,11 +466,32 @@ function openIncidentRelayUrl(url) {
         includeUncontrolled: true
     }).then(async function (clientList) {
         for (const client of clientList) {
+            const canUseRunningApp = (
+                client.focused === true
+                || client.visibilityState === "visible"
+            );
+
+            if (
+                canUseRunningApp
+                && "postMessage" in client
+                && await requestClientNavigation(client, targetUrl)
+            ) {
+                if ("focus" in client) {
+                    return client.focus();
+                }
+
+                return client;
+            }
+
             if (!("navigate" in client)) {
                 continue;
             }
 
             try {
+                if ("postMessage" in client) {
+                    await prepareClientNavigation(client, targetUrl);
+                }
+
                 const navigatedClient = await client.navigate(targetUrl);
                 const focusedClient = navigatedClient || client;
 

@@ -1,5 +1,6 @@
 let incidentRelayInstallPrompt = null;
 let incidentRelayPwaRefreshing = false;
+let incidentRelayPwaTransitionTimer = null;
 
 function currentIncidentRelayLocale() {
     if (window.i18n && i18n.locale) {
@@ -29,6 +30,53 @@ function isIncidentRelayPwaStandalone() {
         window.matchMedia("(display-mode: standalone)").matches
         || window.navigator.standalone === true
     );
+}
+
+function beginIncidentRelayPwaTransition() {
+    if (!isIncidentRelayPwaStandalone()) {
+        return;
+    }
+
+    if (incidentRelayPwaTransitionTimer) {
+        clearTimeout(incidentRelayPwaTransitionTimer);
+        incidentRelayPwaTransitionTimer = null;
+    }
+
+    document.documentElement.classList.add("incidentrelay-pwa-transition");
+}
+
+function finishIncidentRelayPwaTransition(delay) {
+    if (incidentRelayPwaTransitionTimer) {
+        clearTimeout(incidentRelayPwaTransitionTimer);
+    }
+
+    incidentRelayPwaTransitionTimer = setTimeout(function () {
+        document.documentElement.classList.remove("incidentrelay-pwa-transition");
+        incidentRelayPwaTransitionTimer = null;
+    }, delay || 0);
+}
+
+function setupIncidentRelayPwaTransitionMask() {
+    if (!isIncidentRelayPwaStandalone()) {
+        document.documentElement.classList.remove("incidentrelay-pwa-transition");
+        return;
+    }
+
+    document.addEventListener("visibilitychange", function () {
+        if (document.visibilityState === "hidden") {
+            beginIncidentRelayPwaTransition();
+            return;
+        }
+
+        finishIncidentRelayPwaTransition(300);
+    });
+
+    window.addEventListener("pagehide", beginIncidentRelayPwaTransition);
+    window.addEventListener("pageshow", function () {
+        finishIncidentRelayPwaTransition(300);
+    });
+
+    finishIncidentRelayPwaTransition(300);
 }
 
 function setPwaInstallButtonVisible(visible) {
@@ -101,6 +149,55 @@ function registerIncidentRelayServiceWorker() {
 
         window.location.reload();
     });
+
+    navigator.serviceWorker.addEventListener("message", function (event) {
+        const data = event.data || {};
+        const replyPort = event.ports && event.ports[0];
+
+        if (data.type === "INCIDENTRELAY_PREPARE_NAVIGATION") {
+            beginIncidentRelayPwaTransition();
+
+            if (replyPort) {
+                replyPort.postMessage({handled: true});
+            }
+            return;
+        }
+
+        if (data.type !== "INCIDENTRELAY_NAVIGATE") {
+            return;
+        }
+
+        let targetUrl;
+
+        try {
+            targetUrl = new URL(data.url || "/alerts", window.location.origin);
+        } catch (error) {
+            if (replyPort) {
+                replyPort.postMessage({handled: false});
+            }
+            return;
+        }
+
+        if (
+            targetUrl.origin !== window.location.origin
+            || typeof navigate !== "function"
+        ) {
+            if (replyPort) {
+                replyPort.postMessage({handled: false});
+            }
+            return;
+        }
+
+        navigate(
+            targetUrl.pathname + targetUrl.search + targetUrl.hash,
+            true
+        );
+        finishIncidentRelayPwaTransition();
+
+        if (replyPort) {
+            replyPort.postMessage({handled: true});
+        }
+    });
 }
 
 function setupIncidentRelayPwaInstallPrompt() {
@@ -126,6 +223,7 @@ function setupIncidentRelayPwaInstallPrompt() {
 }
 
 $(document).ready(function () {
+    setupIncidentRelayPwaTransitionMask();
     setupIncidentRelayPwaInstallPrompt();
     registerIncidentRelayServiceWorker();
 });

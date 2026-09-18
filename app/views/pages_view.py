@@ -153,5 +153,6 @@ def app_page(alert_id=None):
     return render_template(
         "index.html",
         initial_page=request.path,
+        initial_alert_id=alert_id,
         current_theme=get_current_theme(),
     )
