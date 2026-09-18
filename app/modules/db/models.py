@@ -1803,6 +1803,25 @@ class Incident(BaseModel):
         )
 
 
+class IncidentEvent(BaseModel):
+    """Immutable operational timeline event for a first-class Incident."""
+
+    id = AutoField()
+    incident = ForeignKeyField(Incident, backref="events", on_delete="CASCADE")
+    event_type = CharField(index=True)
+    user = ForeignKeyField(User, null=True, backref="incident_events", on_delete="SET NULL")
+    message = TextField(null=True)
+    data = JSONTextField(default=dict)
+    created_at = DateTimeField(default=utc_now, index=True)
+
+    class Meta:
+        table_name = "incident_event"
+        indexes = (
+            (("incident", "created_at"), False),
+            (("incident", "event_type"), False),
+        )
+
+
 class AlertGroup(BaseModel):
     """Logical incident/group containing one or more concrete alerts."""
 

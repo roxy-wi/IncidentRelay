@@ -965,3 +965,22 @@ The architecture is successful when:
 - external ticketing can be added without provider-specific fields in the core model;
 - the current notification and escalation lifecycle remains stable;
 - all access is enforced using existing group/team RBAC.
+
+### 2.3 implementation note: Incident Core persistence and concurrency
+
+The 2.3 Incident Core implementation uses a dedicated first-class `Incident`
+row and historical `IncidentAlertGroupLink` rows. Operational mutations are
+serialized with optimistic concurrency using `Incident.row_version`: clients
+must submit the version they read, and stale writes are rejected instead of
+silently overwriting a newer Incident state.
+
+The core service centrally validates Incident workflow transitions. Incident
+assignment changes only `Incident.assignee`; it does not acknowledge a linked
+AlertGroup and does not change AlertGroup rotation, escalation state, or
+technical assignee. Basic 2.3 linking supports `primary` and `related`
+relations. Unlinking marks a link historical (`removed_at`) rather than deleting
+it, so a later re-link creates a new auditable relation row.
+
+Every core mutation writes an `IncidentEvent` operational timeline record and
+an `AuditLog` entry. AlertGroup technical comments and technical timeline remain
+separate and unchanged.
