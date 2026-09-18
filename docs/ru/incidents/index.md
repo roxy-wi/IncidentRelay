@@ -1,43 +1,36 @@
 ---
 title: Управление инцидентами
-description: Процессы управления инцидентами для алертов, приоритетов, ответственных, заинтересованных сторон, комментариев и заглушек.
+description: Граница first-class Incident и технических AlertGroup в IncidentRelay 2.3.
 ---
 
 # Управление инцидентами
 
-IncidentRelay группирует входящие сигналы в группы алертов, которые выступают инцидентами для повседневного реагирования.
-
-Используйте этот раздел для рабочих процессов ответственных:
-
-- [Алерты и группы алертов](../usage/alerts.md)
-- [Приоритеты инцидентов](priorities.md)
-- [Ответственные за инцидент](responders.md)
-- [Центр уведомлений](notification-center.md)
-- [Заинтересованные стороны инцидента](stakeholders.md)
-- [Комментарии к алертам](../usage/alert-comments.md)
-- [Заглушки](../usage/silences.md)
-- [Shelving алертов](../usage/shelving.md)
-- [Окна обслуживания](../concepts/maintenance-windows.md)
-- [Трассировка объяснения](explain-trace.md)
-
-## Модель реагирования
+IncidentRelay 2.3 разделяет обработку технических сигналов и операционное расследование:
 
 ```text
-Incoming alert
-  -> route match
-  -> alert group / incident
-  -> priority and service context
-  -> assignee and responders
-  -> notifications, comments, ACK and resolve
+Alert -> AlertGroup -> optional Incident
 ```
 
-Назначенный (assignee) — это основной владелец инцидента. Ответственные (responders) — это дополнительные люди или команды, привлечённые для помощи. Заинтересованные стороны (stakeholders) — это люди, которые должны оставаться в курсе изменений жизненного цикла инцидента.
+AlertGroup отвечает за grouping, технический статус, ACK/resolve, уведомления, эскалацию, технического assignee и технические комментарии. First-class Incident имеет независимый workflow, priority, service context и операционного assignee.
 
-## Рекомендуемый порядок чтения
+AlertGroup может существовать без Incident. Incident может существовать без AlertGroup, а один Incident может недеструктивно связывать несколько AlertGroup.
 
-1. Прочитайте [Алерты и группы алертов](../usage/alerts.md), чтобы понять группировку, жизненный цикл и совместимость API.
-2. Прочитайте [Приоритеты инцидентов](priorities.md), чтобы понять шкалу P1-P5 и поведение автоматического приоритета.
-3. Прочитайте [Ответственные за инцидент](responders.md) о процессах запроса, принятия и отклонения.
-4. Прочитайте [Центр уведомлений](notification-center.md) о находящихся в ожидании запросах ответственных и действиях пользователя.
-5. Прочитайте [Заинтересованные стороны инцидента](stakeholders.md) об уведомлениях о жизненном цикле и значениях по умолчанию для сервиса.
-6. Прочитайте [Комментарии к алертам](../usage/alert-comments.md) о заметках ответственных и контексте передачи дежурства.
+## API
+
+- `/api/alert-groups` — технические AlertGroup.
+- `/api/incidents` — first-class операционные Incident.
+- [Миграция API 2.3](api-migration-2.3.md) — несовместимые изменения endpoint'ов и идентификаторов.
+
+Старый контракт `/api/incidents == AlertGroup` не сохраняется.
+
+## Граница collaboration в 2.3
+
+Технические комментарии остаются на AlertGroup. Legacy responders и stakeholders в 2.3 также остаются AlertGroup-scoped; их канонический перенос в Incident относится к 2.5.
+
+## Рекомендуемое чтение
+
+1. [Алерты и AlertGroup](../usage/alerts.md)
+2. [Миграция API 2.3](api-migration-2.3.md)
+3. [Архитектура Incident Management v2](../architecture/incident-management-v2.md)
+4. [Приоритеты Incident](priorities.md)
+5. [Комментарии AlertGroup](../usage/alert-comments.md)

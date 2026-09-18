@@ -134,3 +134,25 @@ def create_event(incident_id: int, event_type: str, *, user_id=None, message=Non
         message=message,
         data=data or {},
     )
+
+
+def list_active_links(incident_id: int):
+    return list(
+        IncidentAlertGroupLink.select(IncidentAlertGroupLink, AlertGroup)
+        .join(AlertGroup)
+        .where(
+            IncidentAlertGroupLink.incident == int(incident_id),
+            IncidentAlertGroupLink.removed_at.is_null(True),
+        )
+        .order_by(IncidentAlertGroupLink.id.asc())
+    )
+
+
+def list_events(incident_id: int, *, limit: int = 200):
+    limit = max(1, min(int(limit), 500))
+    return list(
+        IncidentEvent.select()
+        .where(IncidentEvent.incident == int(incident_id))
+        .order_by(IncidentEvent.created_at.desc(), IncidentEvent.id.desc())
+        .limit(limit)
+    )

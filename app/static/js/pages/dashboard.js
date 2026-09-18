@@ -115,7 +115,7 @@ function loadDashboard() {
     params.push("sort=activity");
     params.push("order=desc");
 
-    apiGet("/api/alerts?" + params.join("&"), function (response) {
+    apiGet("/api/alert-groups?" + params.join("&"), function (response) {
         const alerts = dashboardAsArray(response);
         const activeAlerts = dashboardActiveAlerts(alerts);
         const sortedAlerts = dashboardSortByActivity(alerts);
@@ -215,7 +215,7 @@ function renderDashboardAlertRow(alert) {
                     .addClass("btn btn-warning btn-small")
                     .text(i18n.t("overview.actions.ack"))
                     .on("click", function () {
-                        apiPost("/api/alerts/" + alert.id + "/ack", {}, loadDashboard);
+                        apiPost("/api/alert-groups/" + alert.id + "/ack", {}, loadDashboard);
                     })
             );
         }
@@ -226,7 +226,7 @@ function renderDashboardAlertRow(alert) {
                     .addClass("btn btn-resolve btn-small")
                     .text(i18n.t("overview.actions.resolve"))
                     .on("click", function () {
-                        apiPost("/api/alerts/" + alert.id + "/resolve", {}, loadDashboard);
+                        apiPost("/api/alert-groups/" + alert.id + "/resolve", {}, loadDashboard);
                     })
             );
         }

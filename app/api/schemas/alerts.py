@@ -76,6 +76,25 @@ class AlertListQuerySchema(ApiModel):
         return result
 
 
+class AlertGroupCreateSchema(ApiModel):
+    """Validate explicit manual AlertGroup creation."""
+
+    team_id: int = Field(ge=1)
+    service_id: int | None = Field(default=None, ge=1)
+    title: str = Field(min_length=1, max_length=500)
+    message: str | None = Field(default=None, max_length=5000)
+    severity: str = Field(default="critical", pattern=r"^(critical|high|medium|low|warning|info)$")
+    priority: str | None = Field(default=None, pattern=r"^p[1-5]$")
+    notify: bool = True
+
+    @field_validator("title", "message", mode="before")
+    @classmethod
+    def strip_text(cls, value):
+        if value is None:
+            return value
+        return str(value).strip()
+
+
 class AlertShelveSchema(ApiModel):
     """Validate one temporary AlertGroup shelf request."""
 

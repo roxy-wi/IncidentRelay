@@ -167,36 +167,36 @@ alert_group_notification_check_interval_seconds = 10
 alert_group_notification_batch_size = 100
 ```
 
-## Manual incidents
+## Manual AlertGroups
 
-Manual incidents allow responders and editors to create an incident directly from the UI or API when the problem is known before an external monitoring system sends an alert.
+Manual AlertGroups allow responders and editors to create a technical alert episode directly from the UI or API when a problem is known before an external monitoring system sends an alert.
 
-A manual incident is stored as a normal alert group with one child alert:
+A manual AlertGroup is stored as one technical AlertGroup with one child Alert:
 
 - alert group `source` is `manual`;
 - child alert `source` is `manual`;
 - status starts as `firing`;
 - acknowledge, resolve, shelving, responders, stakeholders, comments, priority and timeline work the same way as for integration-created alert groups.
 
-Manual incidents do not require an intake route. The creator selects the team directly, and may optionally select a service.
+Manual AlertGroups do not require an intake route. The creator selects the team directly, and may optionally select a service.
 
-If a service is selected, IncidentRelay can use the service ownership, default rotation, escalation policy and notification policy. Route channels are not used for route-less manual incidents.
+If a service is selected, IncidentRelay can use the service ownership, default rotation, escalation policy and notification policy. Route channels are not used for route-less manual AlertGroups.
 
 ### Permissions
 
-A user may create a manual incident for a team when they are one of:
+A user may create a manual AlertGroup for a team when they are one of:
 
 - global admin;
 - group editor or group admin for the team group;
 - team manager;
 - team responder.
 
-Viewers cannot create manual incidents.
+Viewers cannot create manual AlertGroups.
 
 ### API example
 
 ```bash
-curl -X POST https://incidentrelay.example.com/api/incidents \
+curl -X POST https://incidentrelay.example.com/api/alert-groups \
   -H "Authorization: Bearer TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -212,9 +212,9 @@ curl -X POST https://incidentrelay.example.com/api/incidents \
 
 Notification behavior
 
-When notifying is true, IncidentRelay schedules the normal alert group notification. For route-less manual incidents, delivery is resolved through the selected service notification policy.
+When notifying is true, IncidentRelay schedules the normal alert group notification. For route-less manual AlertGroups, delivery is resolved through the selected service notification policy.
 
-If no service is selected, or the selected service has no matching notification policy rule, the incident is still created but no notification target may be found.
+If no service is selected, or the selected service has no matching notification policy rule, the AlertGroup is still created but no notification target may be found.
 
 ## Manual merge
 
@@ -225,7 +225,7 @@ The UI can merge selected alert groups. The target is the group that remains vis
 API example:
 
 ```bash
-curl -X POST https://incidentrelay.example.com/api/alerts/merge \
+curl -X POST https://incidentrelay.example.com/api/alert-groups/merge \
   -H "Authorization: Bearer TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -237,25 +237,17 @@ curl -X POST https://incidentrelay.example.com/api/alerts/merge \
 
 Response is the target alert group with recalculated counters.
 
-## API compatibility
+## AlertGroup API
 
-The Alerts API path remains:
+IncidentRelay 2.3 exposes technical AlertGroups only under `/api/alert-groups`. The old `/api/alerts` path is removed as part of the intentional 2.3 breaking API split.
 
-```text
-/api/alerts
-```
-
-For compatibility with the existing UI and clients, response items are still returned from `/api/alerts`, but each item is now an alert group.
-
-The `id` field in `/api/alerts` responses is the alert group id.
-
-Details are available at:
+The `id` field is always an AlertGroup id. Details are available at:
 
 ```text
-GET /api/alerts/{alert_id}
+GET /api/alert-groups/{id}
 ```
 
-The path parameter name is kept as `alert_id` for compatibility, but it should be treated as an alert group id.
+See [IncidentRelay 2.3 API migration](../incidents/api-migration-2.3.md) for the complete endpoint mapping.
 
 ## API examples
 
@@ -263,14 +255,14 @@ The path parameter name is kept as `alert_id` for compatibility, but it should b
 
 ```bash
 curl -H "Authorization: Bearer TOKEN" \
-  "https://incidentrelay.example.com/api/alerts?status=firing&severity=critical"
+  "https://incidentrelay.example.com/api/alert-groups?status=firing&severity=critical"
 ```
 
 ### Get group details
 
 ```bash
 curl -H "Authorization: Bearer TOKEN" \
-  "https://incidentrelay.example.com/api/alerts/101"
+  "https://incidentrelay.example.com/api/alert-groups/101"
 ```
 
 The detail response contains:
@@ -302,7 +294,7 @@ The detail response contains:
 ### Acknowledge group
 
 ```bash
-curl -X POST https://incidentrelay.example.com/api/alerts/101/ack \
+curl -X POST https://incidentrelay.example.com/api/alert-groups/101/ack \
   -H "Authorization: Bearer TOKEN" \
   -H "Content-Type: application/json" \
   -d '{}'
@@ -311,7 +303,7 @@ curl -X POST https://incidentrelay.example.com/api/alerts/101/ack \
 ### Resolve group
 
 ```bash
-curl -X POST https://incidentrelay.example.com/api/alerts/101/resolve \
+curl -X POST https://incidentrelay.example.com/api/alert-groups/101/resolve \
   -H "Authorization: Bearer TOKEN" \
   -H "Content-Type: application/json" \
   -d '{}'

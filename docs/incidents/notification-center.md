@@ -56,14 +56,14 @@ Example response:
           "label": "Accept",
           "status": "accepted",
           "method": "PUT",
-          "url": "/api/incidents/14784/responders/15"
+          "url": "/api/alert-groups/14784/responders/15"
         },
         {
           "id": "decline",
           "label": "Decline",
           "status": "declined",
           "method": "PUT",
-          "url": "/api/incidents/14784/responders/15"
+          "url": "/api/alert-groups/14784/responders/15"
         }
       ]
     }

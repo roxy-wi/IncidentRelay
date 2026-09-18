@@ -125,7 +125,7 @@ def test_alerts_api_returns_groups(client, admin_headers, db):
 
 
     response = client.get(
-        "/api/alerts",
+        "/api/alert-groups",
         headers=admin_headers,
     )
 
@@ -153,7 +153,7 @@ def test_alert_group_details_include_child_alerts(client, admin_headers, db):
     upsert_alert(_alert(route, "DiskFull", "host2"))
 
     response = client.get(
-        f"/api/alerts/{group1.id}",
+        f"/api/alert-groups/{group1.id}",
         headers=admin_headers,
     )
 
@@ -560,7 +560,7 @@ def test_alert_event_endpoint_supports_paginated_response(client, admin_headers,
         )
 
     response = client.get(
-        f"/api/alerts/{group.id}/events?page=1&page_size=25",
+        f"/api/alert-groups/{group.id}/events?page=1&page_size=25",
         headers=admin_headers,
     )
 
@@ -578,7 +578,7 @@ def test_alert_event_endpoint_preserves_legacy_array_response(client, admin_head
     result = upsert_alert(_alert(route, "DiskFull", "host1"))
 
     response = client.get(
-        f"/api/alerts/{result.group.id}/events",
+        f"/api/alert-groups/{result.group.id}/events",
         headers=admin_headers,
     )
 
@@ -599,7 +599,7 @@ def test_alert_group_details_bound_initial_event_history(client, admin_headers, 
         )
 
     response = client.get(
-        f"/api/alerts/{group.id}?events_page=1&events_page_size=50",
+        f"/api/alert-groups/{group.id}?events_page=1&events_page_size=50",
         headers=admin_headers,
     )
 

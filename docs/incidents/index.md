@@ -1,43 +1,36 @@
 ---
 title: Incident Management
-description: Incident management workflows for alerts, priorities, responders, stakeholders, comments and silences.
+description: First-class operational Incidents and technical AlertGroup boundaries in IncidentRelay 2.3.
 ---
 
 # Incident Management
 
-IncidentRelay groups incoming signals into alert groups that act as incidents for day-to-day response.
-
-Use this section for responder workflows:
-
-- [Alerts and alert groups](../usage/alerts.md)
-- [Incident priorities](priorities.md)
-- [Incident responders](responders.md)
-- [Notification Center](notification-center.md)
-- [Incident stakeholders](stakeholders.md)
-- [Alert comments](../usage/alert-comments.md)
-- [Silences](../usage/silences.md)
-- [Alert Shelving](../usage/shelving.md)
-- [Maintenance Windows](../concepts/maintenance-windows.md)
-- [Explain Trace](explain-trace.md)
-
-## Response model
+IncidentRelay 2.3 separates technical signal processing from operational incident response:
 
 ```text
-Incoming alert
-  -> route match
-  -> alert group / incident
-  -> priority and service context
-  -> assignee and responders
-  -> notifications, comments, ACK and resolve
+Alert -> AlertGroup -> optional Incident
 ```
 
-The assignee is the primary owner of the incident. Responders are additional people or teams requested to help. Stakeholders are people who should stay informed about incident lifecycle changes.
+An AlertGroup owns grouping, source state, ACK/resolve, notification, escalation, technical assignment and technical comments. A first-class Incident owns an independent operational workflow, priority, service context and operational assignee.
 
-## Recommended reading order
+An AlertGroup can exist without an Incident. An Incident can exist without an AlertGroup, and one Incident can link multiple AlertGroups without merging their technical history.
 
-1. Read [Alerts and alert groups](../usage/alerts.md) to understand grouping, lifecycle and API compatibility.
-2. Read [Incident priorities](priorities.md) to understand the P1-P5 scale and automatic priority behavior.
-3. Read [Incident responders](responders.md) for request, accept and decline flows.
-4. Read [Notification Center](notification-center.md) for pending responder requests and user actions.
-5. Read [Incident stakeholders](stakeholders.md) for lifecycle notifications and service defaults.
-6. Read [Alert comments](../usage/alert-comments.md) for responder notes and handover context.
+## APIs
+
+- `/api/alert-groups` — technical AlertGroups.
+- `/api/incidents` — first-class operational Incidents.
+- [2.3 API migration](api-migration-2.3.md) — breaking endpoint and identifier changes.
+
+The old `/api/incidents == AlertGroup` contract is not preserved.
+
+## 2.3 collaboration boundary
+
+AlertGroup technical comments remain on AlertGroup. Legacy responders and stakeholders also remain AlertGroup-scoped during 2.3 and move to canonical Incident collaboration in the staged 2.5 work.
+
+## Recommended reading
+
+1. [Alerts and AlertGroups](../usage/alerts.md)
+2. [2.3 API migration](api-migration-2.3.md)
+3. [Incident Management v2 architecture](../architecture/incident-management-v2.md)
+4. [Incident priorities](priorities.md)
+5. [Alert comments](../usage/alert-comments.md)

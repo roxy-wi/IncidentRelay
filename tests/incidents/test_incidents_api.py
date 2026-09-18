@@ -120,7 +120,7 @@ def test_list_incident_priorities(client, db):
     )
 
     response = client.get(
-        "/api/incidents/priorities",
+        "/api/alert-groups/priorities",
         headers=make_headers(user),
     )
 
@@ -137,7 +137,7 @@ def test_list_incidents_returns_incident_shape(client, db):
     headers, user = create_viewer_headers(group, team)
 
     response = client.get(
-        f"/api/incidents?team_id={team.id}",
+        f"/api/alert-groups?team_id={team.id}",
         headers=headers,
     )
 
@@ -148,9 +148,9 @@ def test_list_incidents_returns_incident_shape(client, db):
 
     item = payload["items"][0]
     assert item["id"] == incident.id
-    assert item["incident_id"] == incident.id
-    assert item["priority"]["slug"] == "p3"
-    assert item["maintenance"]["suppressed"] is False
+    assert item["id"] == incident.id
+    assert item["priority"] == "p3"
+    assert item["maintenance_suppressed"] is False
 
 
 def test_get_incident_includes_responders_and_stakeholders(client, db):
@@ -158,14 +158,14 @@ def test_get_incident_includes_responders_and_stakeholders(client, db):
     headers, user = create_viewer_headers(group, team)
 
     response = client.get(
-        f"/api/incidents/{incident.id}",
+        f"/api/alert-groups/{incident.id}",
         headers=headers,
     )
 
     assert response.status_code == 200, response.get_json()
 
     payload = response.get_json()
-    assert payload["incident_id"] == incident.id
+    assert payload["id"] == incident.id
     assert "responders" in payload
     assert "stakeholders" in payload
     assert "events" in payload
@@ -177,7 +177,7 @@ def test_update_incident_priority(client, db):
     headers, user = create_responder_headers(group, team)
 
     response = client.put(
-        f"/api/incidents/{incident.id}/priority",
+        f"/api/alert-groups/{incident.id}/priority",
         json={"priority": "p1"},
         headers=headers,
     )
@@ -185,8 +185,9 @@ def test_update_incident_priority(client, db):
     assert response.status_code == 200, response.get_json()
 
     payload = response.get_json()
-    assert payload["priority"]["slug"] == "p1"
-    assert payload["priority"]["set_manually"] is True
+    assert payload["priority"] == "p1"
+    incident = AlertGroup.get_by_id(incident.id)
+    assert incident.priority_set_manually is True
 
     event = (
         AlertEvent
@@ -206,7 +207,7 @@ def test_update_incident_priority_rejects_unknown_priority(client, db):
     headers, user = create_responder_headers(group, team)
 
     response = client.put(
-        f"/api/incidents/{incident.id}/priority",
+        f"/api/alert-groups/{incident.id}/priority",
         json={"priority": "p99"},
         headers=headers,
     )
@@ -220,7 +221,7 @@ def test_viewer_cannot_update_incident_priority(client, db):
     headers, user = create_viewer_headers(group, team)
 
     response = client.put(
-        f"/api/incidents/{incident.id}/priority",
+        f"/api/alert-groups/{incident.id}/priority",
         json={"priority": "p1"},
         headers=headers,
     )
@@ -240,7 +241,7 @@ def test_add_user_responder_to_incident(client, db):
     add_user_to_team(team, target, role="responder")
 
     response = client.post(
-        f"/api/incidents/{incident.id}/responders",
+        f"/api/alert-groups/{incident.id}/responders",
         json={
             "target_type": "user",
             "target_user_id": target.id,
@@ -253,7 +254,7 @@ def test_add_user_responder_to_incident(client, db):
     assert response.status_code == 201, response.get_json()
 
     payload = response.get_json()
-    assert payload["incident_id"] == incident.id
+    assert payload["alert_group_id"] == incident.id
     assert payload["target_type"] == "user"
     assert payload["target_user_id"] == target.id
     assert payload["status"] == "requested"
@@ -276,7 +277,7 @@ def test_add_responder_requires_matching_target_id(client, db):
     headers, requester = create_responder_headers(group, team)
 
     response = client.post(
-        f"/api/incidents/{incident.id}/responders",
+        f"/api/alert-groups/{incident.id}/responders",
         json={
             "target_type": "user",
         },
@@ -299,7 +300,7 @@ def test_update_responder_status(client, db):
     add_user_to_team(team, target, role="responder")
 
     create_response = client.post(
-        f"/api/incidents/{incident.id}/responders",
+        f"/api/alert-groups/{incident.id}/responders",
         json={
             "target_type": "user",
             "target_user_id": target.id,
@@ -312,7 +313,7 @@ def test_update_responder_status(client, db):
     responder_id = create_response.get_json()["id"]
 
     response = client.put(
-        f"/api/incidents/{incident.id}/responders/{responder_id}",
+        f"/api/alert-groups/{incident.id}/responders/{responder_id}",
         json={
             "status": "accepted",
             "response_message": "I am joining",
@@ -344,7 +345,7 @@ def test_add_email_stakeholder_to_incident(client, db):
     headers, user = create_responder_headers(group, team)
 
     response = client.post(
-        f"/api/incidents/{incident.id}/stakeholders",
+        f"/api/alert-groups/{incident.id}/stakeholders",
         json={
             "email": "manager@example.com",
             "display_name": "Manager",
@@ -360,7 +361,7 @@ def test_add_email_stakeholder_to_incident(client, db):
     assert response.status_code == 201, response.get_json()
 
     payload = response.get_json()
-    assert payload["incident_id"] == incident.id
+    assert payload["alert_group_id"] == incident.id
     assert payload["email"] == "manager@example.com"
     assert payload["role"] == "business_owner"
     assert payload["active"] is True
@@ -371,7 +372,7 @@ def test_remove_incident_stakeholder(client, db):
     headers, user = create_responder_headers(group, team)
 
     create_response = client.post(
-        f"/api/incidents/{incident.id}/stakeholders",
+        f"/api/alert-groups/{incident.id}/stakeholders",
         json={
             "email": "manager@example.com",
             "display_name": "Manager",
@@ -385,7 +386,7 @@ def test_remove_incident_stakeholder(client, db):
     stakeholder_id = create_response.get_json()["id"]
 
     response = client.delete(
-        f"/api/incidents/{incident.id}/stakeholders/{stakeholder_id}",
+        f"/api/alert-groups/{incident.id}/stakeholders/{stakeholder_id}",
         headers=headers,
     )
 
@@ -393,7 +394,7 @@ def test_remove_incident_stakeholder(client, db):
     assert response.get_json()["deleted"] is True
 
     list_response = client.get(
-        f"/api/incidents/{incident.id}/stakeholders",
+        f"/api/alert-groups/{incident.id}/stakeholders",
         headers=headers,
     )
 
@@ -418,7 +419,7 @@ def test_list_incidents_filters_by_priority(client, db):
     headers, user = create_viewer_headers(group, team)
 
     response = client.get(
-        f"/api/incidents?team_id={team.id}&priority=p1",
+        f"/api/alert-groups?team_id={team.id}&priority=p1",
         headers=headers,
     )
 
@@ -429,7 +430,7 @@ def test_list_incidents_filters_by_priority(client, db):
 
     assert ids == [p1_incident.id]
     assert p3_incident.id not in ids
-    assert payload["items"][0]["priority"]["slug"] == "p1"
+    assert payload["items"][0]["priority"] == "p1"
 
 
 def test_list_incidents_filters_by_multiple_priorities(client, db):
@@ -456,7 +457,7 @@ def test_list_incidents_filters_by_multiple_priorities(client, db):
     headers, user = create_viewer_headers(group, team)
 
     response = client.get(
-        f"/api/incidents?team_id={team.id}&priority=p1,p3",
+        f"/api/alert-groups?team_id={team.id}&priority=p1,p3",
         headers=headers,
     )
 
@@ -493,7 +494,7 @@ def test_list_incidents_sorts_by_priority(client, db):
     headers, user = create_viewer_headers(group, team)
 
     response = client.get(
-        f"/api/incidents?team_id={team.id}&sort=priority&order=asc",
+        f"/api/alert-groups?team_id={team.id}&sort=priority&order=asc",
         headers=headers,
     )
 
@@ -501,7 +502,7 @@ def test_list_incidents_sorts_by_priority(client, db):
 
     payload = response.get_json()
     ids = [item["id"] for item in payload["items"]]
-    priorities = [item["priority"]["slug"] for item in payload["items"]]
+    priorities = [item["priority"] for item in payload["items"]]
 
     assert ids == [
         p1_incident.id,
@@ -532,7 +533,7 @@ def test_update_incident_priority_updates_existing_messages(client, db, monkeypa
     )
 
     response = client.put(
-        f"/api/incidents/{incident.id}/priority",
+        f"/api/alert-groups/{incident.id}/priority",
         json={
             "priority": "p1",
         },
@@ -543,7 +544,7 @@ def test_update_incident_priority_updates_existing_messages(client, db, monkeypa
 
     payload = response.get_json()
 
-    assert payload["priority"]["slug"] == "p1"
+    assert payload["priority"] == "p1"
     assert calls == [
         (incident.id, "priority_changed"),
     ]
@@ -570,7 +571,7 @@ def test_update_incident_priority_does_not_update_messages_when_unchanged(
     )
 
     response = client.put(
-        f"/api/incidents/{incident.id}/priority",
+        f"/api/alert-groups/{incident.id}/priority",
         json={
             "priority": "p1",
         },
@@ -578,7 +579,7 @@ def test_update_incident_priority_does_not_update_messages_when_unchanged(
     )
 
     assert response.status_code == 200, response.get_json()
-    assert response.get_json()["priority"]["slug"] == "p1"
+    assert response.get_json()["priority"] == "p1"
     assert calls == []
 
 
@@ -626,7 +627,7 @@ def test_update_incident_priority_notifies_stakeholders(client, db, monkeypatch)
     )
 
     response = client.put(
-        f"/api/incidents/{incident.id}/priority",
+        f"/api/alert-groups/{incident.id}/priority",
         json={
             "priority": "p1",
         },
@@ -634,7 +635,7 @@ def test_update_incident_priority_notifies_stakeholders(client, db, monkeypatch)
     )
 
     assert response.status_code == 200, response.get_json()
-    assert response.get_json()["priority"]["slug"] == "p1"
+    assert response.get_json()["priority"] == "p1"
 
     assert len(emails) == 1
     assert emails[0]["recipient"] == "stakeholder@example.com"
@@ -685,7 +686,7 @@ def test_update_incident_priority_does_not_notify_opted_out_stakeholders(
     )
 
     response = client.put(
-        f"/api/incidents/{incident.id}/priority",
+        f"/api/alert-groups/{incident.id}/priority",
         json={
             "priority": "p1",
         },
@@ -716,14 +717,14 @@ def test_add_duplicate_open_responder_is_rejected(client, db, monkeypatch):
     }
 
     first_response = client.post(
-        f"/api/incidents/{incident.id}/responders",
+        f"/api/alert-groups/{incident.id}/responders",
         json=payload,
         headers=headers,
     )
     assert first_response.status_code == 201, first_response.get_json()
 
     second_response = client.post(
-        f"/api/incidents/{incident.id}/responders",
+        f"/api/alert-groups/{incident.id}/responders",
         json=payload,
         headers=headers,
     )
@@ -748,7 +749,7 @@ def test_responder_declined_cannot_be_accepted_later(client, db, monkeypatch):
     add_user_to_team(team, target, role="responder")
 
     create_response = client.post(
-        f"/api/incidents/{incident.id}/responders",
+        f"/api/alert-groups/{incident.id}/responders",
         json={
             "target_type": "user",
             "target_user_id": target.id,
@@ -759,7 +760,7 @@ def test_responder_declined_cannot_be_accepted_later(client, db, monkeypatch):
     responder_id = create_response.get_json()["id"]
 
     decline_response = client.put(
-        f"/api/incidents/{incident.id}/responders/{responder_id}",
+        f"/api/alert-groups/{incident.id}/responders/{responder_id}",
         json={
             "status": "declined",
             "response_message": "Busy",
@@ -770,7 +771,7 @@ def test_responder_declined_cannot_be_accepted_later(client, db, monkeypatch):
     assert decline_response.get_json()["status"] == "declined"
 
     accept_response = client.put(
-        f"/api/incidents/{incident.id}/responders/{responder_id}",
+        f"/api/alert-groups/{incident.id}/responders/{responder_id}",
         json={
             "status": "accepted",
             "response_message": "Actually joining",
@@ -800,7 +801,7 @@ def test_target_user_can_accept_own_responder_request(client, db, monkeypatch):
     add_user_to_team(team, target, role="viewer")
 
     create_response = client.post(
-        f"/api/incidents/{incident.id}/responders",
+        f"/api/alert-groups/{incident.id}/responders",
         json={
             "target_type": "user",
             "target_user_id": target.id,
@@ -813,7 +814,7 @@ def test_target_user_can_accept_own_responder_request(client, db, monkeypatch):
     target_headers = make_headers(target)
 
     accept_response = client.put(
-        f"/api/incidents/{incident.id}/responders/{responder_id}",
+        f"/api/alert-groups/{incident.id}/responders/{responder_id}",
         json={
             "status": "accepted",
             "response_message": "I am joining",
@@ -862,7 +863,7 @@ def test_non_target_viewer_cannot_accept_responder_request(client, db, monkeypat
     add_user_to_team(team, stranger, role="viewer")
 
     create_response = client.post(
-        f"/api/incidents/{incident.id}/responders",
+        f"/api/alert-groups/{incident.id}/responders",
         json={
             "target_type": "user",
             "target_user_id": target.id,
@@ -873,7 +874,7 @@ def test_non_target_viewer_cannot_accept_responder_request(client, db, monkeypat
     responder_id = create_response.get_json()["id"]
 
     response = client.put(
-        f"/api/incidents/{incident.id}/responders/{responder_id}",
+        f"/api/alert-groups/{incident.id}/responders/{responder_id}",
         json={
             "status": "accepted",
         },
@@ -898,7 +899,7 @@ def test_add_responder_rejects_extra_target_id(client, db, monkeypatch):
     add_user_to_team(team, target, role="responder")
 
     response = client.post(
-        f"/api/incidents/{incident.id}/responders",
+        f"/api/alert-groups/{incident.id}/responders",
         json={
             "target_type": "user",
             "target_user_id": target.id,
@@ -987,7 +988,7 @@ def test_incident_details_responder_contains_target_label(
     add_user_to_team(team, target, role="responder")
 
     response = client.post(
-        f"/api/incidents/{incident.id}/responders",
+        f"/api/alert-groups/{incident.id}/responders",
         json={
             "target_type": "user",
             "target_user_id": target.id,
@@ -998,7 +999,7 @@ def test_incident_details_responder_contains_target_label(
     assert response.status_code == 201, response.get_json()
 
     details_response = client.get(
-        f"/api/incidents/{incident.id}",
+        f"/api/alert-groups/{incident.id}",
         headers=headers,
     )
     assert details_response.status_code == 200, details_response.get_json()
@@ -1033,7 +1034,7 @@ def test_add_responder_event_mentions_target_name(
     add_user_to_team(team, target, role="responder")
 
     response = client.post(
-        f"/api/incidents/{incident.id}/responders",
+        f"/api/alert-groups/{incident.id}/responders",
         json={
             "target_type": "user",
             "target_user_id": target.id,
@@ -1078,7 +1079,7 @@ def test_decline_responder_event_mentions_actor_and_target(
     add_user_to_team(team, target, role="responder")
 
     response = client.post(
-        f"/api/incidents/{incident.id}/responders",
+        f"/api/alert-groups/{incident.id}/responders",
         json={
             "target_type": "user",
             "target_user_id": target.id,
@@ -1093,7 +1094,7 @@ def test_decline_responder_event_mentions_actor_and_target(
     target_headers = make_headers(target)
 
     decline_response = client.put(
-        f"/api/incidents/{incident.id}/responders/{responder_id}",
+        f"/api/alert-groups/{incident.id}/responders/{responder_id}",
         json={
             "status": "declined",
             "response_message": "Busy now",
@@ -1137,7 +1138,7 @@ def test_list_incident_responders_contains_target_label(
     add_user_to_team(team, target, role="responder")
 
     create_response = client.post(
-        f"/api/incidents/{incident.id}/responders",
+        f"/api/alert-groups/{incident.id}/responders",
         json={
             "target_type": "user",
             "target_user_id": target.id,
@@ -1148,7 +1149,7 @@ def test_list_incident_responders_contains_target_label(
     assert create_response.status_code == 201, create_response.get_json()
 
     response = client.get(
-        f"/api/incidents/{incident.id}/responders",
+        f"/api/alert-groups/{incident.id}/responders",
         headers=headers,
     )
     assert response.status_code == 200, response.get_json()
@@ -1182,7 +1183,7 @@ def test_notification_center_shows_pending_responder_request(
     add_user_to_team(team, target, role="responder")
 
     create_response = client.post(
-        f"/api/incidents/{incident.id}/responders",
+        f"/api/alert-groups/{incident.id}/responders",
         json={
             "target_type": "user",
             "target_user_id": target.id,
@@ -1206,7 +1207,7 @@ def test_notification_center_shows_pending_responder_request(
     item = payload["items"][0]
 
     assert item["type"] == "responder_request"
-    assert item["incident_id"] == incident.id
+    assert item["alert_group_id"] == incident.id
     assert item["responder"]["id"] == create_response.get_json()["id"]
     assert item["responder"]["target"]["label"] == "Alice Smith"
     assert "Please help with database." in item["body"]
@@ -1236,7 +1237,7 @@ def test_notification_center_hides_responder_request_after_accept(
     add_user_to_team(team, target, role="responder")
 
     create_response = client.post(
-        f"/api/incidents/{incident.id}/responders",
+        f"/api/alert-groups/{incident.id}/responders",
         json={
             "target_type": "user",
             "target_user_id": target.id,
@@ -1256,7 +1257,7 @@ def test_notification_center_hides_responder_request_after_accept(
     assert before_response.get_json()["unread_count"] == 1
 
     accept_response = client.put(
-        f"/api/incidents/{incident.id}/responders/{responder_id}",
+        f"/api/alert-groups/{incident.id}/responders/{responder_id}",
         json={
             "status": "accepted",
         },
@@ -1282,15 +1283,16 @@ def test_reset_incident_priority_returns_to_automatic_mode(client, db):
 
     incidents_repo.set_incident_priority(incident.id, "p1", user_id=user.id, manual=True)
 
-    response = client.delete(f"/api/incidents/{incident.id}/priority", headers=headers)
+    response = client.delete(f"/api/alert-groups/{incident.id}/priority", headers=headers)
 
     assert response.status_code == 200, response.get_json()
 
     payload = response.get_json()
-    assert payload["priority"]["slug"] == "p3"
-    assert payload["priority"]["set_manually"] is False
-    assert payload["priority"]["set_by_id"] is None
-    assert payload["priority"]["set_at"] is None
+    assert payload["priority"] == "p3"
+    incident = AlertGroup.get_by_id(incident.id)
+    assert incident.priority_set_manually is False
+    assert incident.priority_set_by_id is None
+    assert incident.priority_set_at is None
 
     event = (
         AlertEvent
@@ -1309,6 +1311,6 @@ def test_viewer_cannot_reset_incident_priority(client, db):
     group, team, route, incident = create_incident_fixture()
     headers, user = create_viewer_headers(group, team)
 
-    response = client.delete(f"/api/incidents/{incident.id}/priority", headers=headers)
+    response = client.delete(f"/api/alert-groups/{incident.id}/priority", headers=headers)
 
     assert response.status_code == 403

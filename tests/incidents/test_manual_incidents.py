@@ -16,7 +16,7 @@ def auth_headers_for(user):
     }
 
 
-def test_group_editor_can_create_manual_incident_for_group_team(client, db):
+def test_group_editor_can_create_manual_alert_group_for_group_team(client, db):
     group = create_group()
     team = create_team(group)
     service = create_service(team)
@@ -27,7 +27,7 @@ def test_group_editor_can_create_manual_incident_for_group_team(client, db):
     )
 
     response = client.post(
-        "/api/incidents",
+        "/api/alert-groups",
         json={
             "team_id": team.id,
             "service_id": service.id,
@@ -48,10 +48,10 @@ def test_group_editor_can_create_manual_incident_for_group_team(client, db):
     assert data["source"] == "manual"
     assert data["status"] == "firing"
     assert data["severity"] == "critical"
-    assert data["priority"]["slug"] == "p1"
-    assert data["priority"]["set_manually"] is True
+    assert data["priority"] == "p1"
 
     group_row = AlertGroup.get_by_id(data["id"])
+    assert group_row.priority_set_manually is True
     assert group_row.team_id == team.id
     assert group_row.service_id == service.id
     assert group_row.source == "manual"
@@ -67,7 +67,7 @@ def test_group_editor_can_create_manual_incident_for_group_team(client, db):
     assert any(event.event_type == "manual_created" for event in events)
 
 
-def test_team_responder_can_create_manual_incident(client, db):
+def test_team_responder_can_create_manual_alert_group(client, db):
     group = create_group()
     team = create_team(group)
 
@@ -78,7 +78,7 @@ def test_team_responder_can_create_manual_incident(client, db):
     add_user_to_team(team, user, role="responder")
 
     response = client.post(
-        "/api/incidents",
+        "/api/alert-groups",
         json={
             "team_id": team.id,
             "title": "Manual responder incident",
@@ -97,7 +97,7 @@ def test_team_responder_can_create_manual_incident(client, db):
     assert data["severity"] == "warning"
 
 
-def test_group_viewer_cannot_create_manual_incident(client, db):
+def test_group_viewer_cannot_create_manual_alert_group(client, db):
     group = create_group()
     team = create_team(group)
 
@@ -107,7 +107,7 @@ def test_group_viewer_cannot_create_manual_incident(client, db):
     )
 
     response = client.post(
-        "/api/incidents",
+        "/api/alert-groups",
         json={
             "team_id": team.id,
             "title": "Viewer incident",
@@ -119,7 +119,7 @@ def test_group_viewer_cannot_create_manual_incident(client, db):
     assert response.status_code == 403
 
 
-def test_group_editor_cannot_create_manual_incident_for_foreign_team(client, db):
+def test_group_editor_cannot_create_manual_alert_group_for_foreign_team(client, db):
     group = create_group()
     foreign_group = create_group()
 
@@ -132,7 +132,7 @@ def test_group_editor_cannot_create_manual_incident_for_foreign_team(client, db)
     )
 
     response = client.post(
-        "/api/incidents",
+        "/api/alert-groups",
         json={
             "team_id": foreign_team.id,
             "title": "Foreign team incident",
@@ -156,7 +156,7 @@ def test_manual_incident_rejects_service_from_another_team(client, db):
     )
 
     response = client.post(
-        "/api/incidents",
+        "/api/alert-groups",
         json={
             "team_id": team.id,
             "service_id": foreign_service.id,
@@ -180,7 +180,7 @@ def test_manual_incident_with_notify_true_schedules_notification(client, db):
     )
 
     response = client.post(
-        "/api/incidents",
+        "/api/alert-groups",
         json={
             "team_id": team.id,
             "service_id": service.id,

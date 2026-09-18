@@ -3,8 +3,7 @@ from app.services.incidents.responders import (
     can_user_act_as_responder_target,
 )
 from app.services.links import build_alert_web_url
-from app.services.serializers.incidents import serialize_incident
-from app.services.serializers.alerts import serialize_incident_responder
+from app.services.serializers.alerts import serialize_alert_group, serialize_incident_responder
 from app.services.incidents.responder_display import user_display_name
 
 
@@ -41,11 +40,10 @@ def serialize_notification_center_responder_item(responder, current_user=None):
             else None
         ),
         "url": build_alert_web_url(group),
-        "incident_id": group.id if group else None,
-        "incident": serialize_incident(
+        "alert_group_id": group.id if group else None,
+        "alert_group": serialize_alert_group(
             group,
             current_user=current_user,
-            include_details=False,
         ) if group else None,
         "responder": serialize_incident_responder(responder),
         "actions": [
@@ -55,7 +53,7 @@ def serialize_notification_center_responder_item(responder, current_user=None):
                 "status": "accepted",
                 "method": "PUT",
                 "url": (
-                    f"/api/incidents/{group.id}/responders/{responder.id}"
+                    f"/api/alert-groups/{group.id}/responders/{responder.id}"
                     if group
                     else None
                 ),
@@ -66,7 +64,7 @@ def serialize_notification_center_responder_item(responder, current_user=None):
                 "status": "declined",
                 "method": "PUT",
                 "url": (
-                    f"/api/incidents/{group.id}/responders/{responder.id}"
+                    f"/api/alert-groups/{group.id}/responders/{responder.id}"
                     if group
                     else None
                 ),

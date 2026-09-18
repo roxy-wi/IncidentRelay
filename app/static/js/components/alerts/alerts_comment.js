@@ -11,7 +11,7 @@ function loadAlertComments(groupId) {
             .text(i18n.t("alert_details.loading.comments"))
     );
 
-    apiGet("/api/alerts/" + groupId + "/comments", function (comments) {
+    apiGet("/api/alert-groups/" + groupId + "/comments", function (comments) {
         comments = asArray(comments);
         list.empty();
 
@@ -87,7 +87,7 @@ $(document)
         }
 
         apiPost(
-            "/api/alerts/" + groupId + "/comments",
+            "/api/alert-groups/" + groupId + "/comments",
             {
                 body: body
             },
@@ -268,7 +268,7 @@ $(document)
         }
 
         apiPut(
-            "/api/alerts/" + groupId + "/comments/" + commentId,
+            "/api/alert-groups/" + groupId + "/comments/" + commentId,
             {
                 body: body
             },
@@ -293,7 +293,7 @@ $(document)
 
         confirmDeleteAlertComment(function () {
             apiDelete(
-                "/api/alerts/" + groupId + "/comments/" + commentId,
+                "/api/alert-groups/" + groupId + "/comments/" + commentId,
                 function () {
                     refreshAlertCommentsAndEvents(groupId);
                 }

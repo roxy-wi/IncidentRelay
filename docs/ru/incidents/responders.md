@@ -5,6 +5,9 @@ description: Запрос дополнительных ответственны�
 
 # Ответственные за инцидент
 
+> **Граница 2.3:** responders на этой странице пока привязаны к техническим AlertGroup. Канонические responders first-class Incident запланированы на этап collaboration 2.5.
+
+
 Ответственные за инцидент (responders) — это люди, команды, ротации или политики эскалации, явно привлечённые для помощи с активным инцидентом.
 
 Ответственные отличаются от назначенного (assignee) инцидента:
@@ -29,7 +32,7 @@ description: Запрос дополнительных ответственны�
 ## Запросить ответственного
 
 ```http
-POST /api/incidents/{incident_id}/responders
+POST /api/alert-groups/{alert_group_id}/responders
 ```
 
 Тело запроса:
@@ -93,7 +96,7 @@ POST /api/incidents/{incident_id}/responders
 ## Список ответственных за инцидент
 
 ```http
-GET /api/incidents/{incident_id}/responders
+GET /api/alert-groups/{alert_group_id}/responders
 ```
 
 Возвращает все запросы ответственных для инцидента.
@@ -132,7 +135,7 @@ GET /api/incidents/{incident_id}/responders
 ## Обновить статус ответственного
 
 ```http
-PUT /api/incidents/{incident_id}/responders/{responder_id}
+PUT /api/alert-groups/{alert_group_id}/responders/{responder_id}
 ```
 
 Тело запроса:

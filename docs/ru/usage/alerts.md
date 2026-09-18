@@ -167,24 +167,24 @@ alert_group_notification_check_interval_seconds = 10
 alert_group_notification_batch_size = 100
 ```
 
-## Ручные инциденты
+## Ручные AlertGroup
 
-Ручные инциденты позволяют ответственным и редакторам создать инцидент напрямую из UI или API, когда проблема известна до того, как внешняя система мониторинга отправит алерт.
+Ручные AlertGroup позволяют ответственным и редакторам создать техническую группу алертов напрямую из UI или API, когда проблема известна до того, как внешняя система мониторинга отправит алерт.
 
-Ручной инцидент сохраняется как обычная группа алертов с одним дочерним алертом:
+Ручная AlertGroup сохраняется как техническая группа алертов с одним дочерним Alert:
 
 - `source` группы алертов — `manual`;
 - `source` дочернего алерта — `manual`;
 - статус начинается как `firing`;
 - подтверждение, разрешение, shelving, ответственные, заинтересованные стороны, комментарии, приоритет и хронология работают так же, как для групп алертов, созданных интеграцией.
 
-Ручные инциденты не требуют маршрута приёма. Создатель выбирает команду напрямую и может дополнительно выбрать сервис.
+Ручные AlertGroup не требуют маршрута приёма. Создатель выбирает команду напрямую и может дополнительно выбрать сервис.
 
-Если сервис выбран, IncidentRelay может использовать принадлежность сервиса, ротацию по умолчанию, политику эскалации и политику уведомлений. Каналы маршрута не используются для ручных инцидентов без маршрута.
+Если сервис выбран, IncidentRelay может использовать принадлежность сервиса, ротацию по умолчанию, политику эскалации и политику уведомлений. Каналы маршрута не используются для ручных AlertGroup без маршрута.
 
 ### Разрешения
 
-Пользователь может создать ручной инцидент для команды, если он является одним из:
+Пользователь может создать ручную AlertGroup для команды, если он является одним из:
 
 - глобальный администратор;
 - редактор группы или администратор группы для группы команды;
@@ -196,7 +196,7 @@ alert_group_notification_batch_size = 100
 ### Пример API
 
 ```bash
-curl -X POST https://incidentrelay.example.com/api/incidents \
+curl -X POST https://incidentrelay.example.com/api/alert-groups \
   -H "Authorization: Bearer TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -212,9 +212,9 @@ curl -X POST https://incidentrelay.example.com/api/incidents \
 
 Поведение уведомлений
 
-Когда `notify` равно true, IncidentRelay планирует обычное уведомление группы алертов. Для ручных инцидентов без маршрута доставка определяется через политику уведомлений выбранного сервиса.
+Когда `notify` равно true, IncidentRelay планирует обычное уведомление группы алертов. Для ручных AlertGroup без маршрута доставка определяется через политику уведомлений выбранного сервиса.
 
-Если сервис не выбран или у выбранного сервиса нет подходящего правила политики уведомлений, инцидент всё равно создаётся, но цель уведомления может быть не найдена.
+Если сервис не выбран или у выбранного сервиса нет подходящего правила политики уведомлений, AlertGroup всё равно создаётся, но цель уведомления может быть не найдена.
 
 ## Ручное объединение
 
@@ -225,7 +225,7 @@ UI может объединять выбранные группы алерто�
 Пример API:
 
 ```bash
-curl -X POST https://incidentrelay.example.com/api/alerts/merge \
+curl -X POST https://incidentrelay.example.com/api/alert-groups/merge \
   -H "Authorization: Bearer TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
@@ -237,25 +237,17 @@ curl -X POST https://incidentrelay.example.com/api/alerts/merge \
 
 Ответ — целевая группа алертов с пересчитанными счётчиками.
 
-## Совместимость API
+## API AlertGroup
 
-Путь Alerts API остаётся:
+IncidentRelay 2.3 предоставляет технические AlertGroup только через `/api/alert-groups`. Старый `/api/alerts` удалён как часть намеренно несовместимого API split 2.3.
 
-```text
-/api/alerts
-```
-
-Для совместимости с существующими UI и клиентами элементы ответа по-прежнему возвращаются из `/api/alerts`, но каждый элемент теперь является группой алертов.
-
-Поле `id` в ответах `/api/alerts` — это идентификатор группы алертов.
-
-Детали доступны по адресу:
+Поле `id` всегда является идентификатором AlertGroup. Детали доступны по адресу:
 
 ```text
-GET /api/alerts/{alert_id}
+GET /api/alert-groups/{id}
 ```
 
-Имя параметра пути сохранено как `alert_id` для совместимости, но его следует рассматривать как идентификатор группы алертов.
+Полное сопоставление endpoint’ов приведено в [руководстве по миграции API 2.3](../incidents/api-migration-2.3.md).
 
 ## Примеры API
 
@@ -263,14 +255,14 @@ GET /api/alerts/{alert_id}
 
 ```bash
 curl -H "Authorization: Bearer TOKEN" \
-  "https://incidentrelay.example.com/api/alerts?status=firing&severity=critical"
+  "https://incidentrelay.example.com/api/alert-groups?status=firing&severity=critical"
 ```
 
 ### Получить детали группы
 
 ```bash
 curl -H "Authorization: Bearer TOKEN" \
-  "https://incidentrelay.example.com/api/alerts/101"
+  "https://incidentrelay.example.com/api/alert-groups/101"
 ```
 
 Ответ с деталями содержит:
@@ -302,7 +294,7 @@ curl -H "Authorization: Bearer TOKEN" \
 ### Подтвердить группу
 
 ```bash
-curl -X POST https://incidentrelay.example.com/api/alerts/101/ack \
+curl -X POST https://incidentrelay.example.com/api/alert-groups/101/ack \
   -H "Authorization: Bearer TOKEN" \
   -H "Content-Type: application/json" \
   -d '{}'
@@ -311,7 +303,7 @@ curl -X POST https://incidentrelay.example.com/api/alerts/101/ack \
 ### Разрешить группу
 
 ```bash
-curl -X POST https://incidentrelay.example.com/api/alerts/101/resolve \
+curl -X POST https://incidentrelay.example.com/api/alert-groups/101/resolve \
   -H "Authorization: Bearer TOKEN" \
   -H "Content-Type: application/json" \
   -d '{}'

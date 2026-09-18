@@ -1,9 +1,15 @@
 from app.api.openapi.common import ERROR_SCHEMA, query_param, response
-from app.api.openapi.endpoints.incidents import (
-    INCIDENT_RESPONDER_SCHEMA,
-    INCIDENT_SUMMARY_SCHEMA,
-    date_time_schema,
-)
+
+
+def date_time_schema(description, nullable=True):
+    schema = {"type": "string", "format": "date-time", "description": description}
+    if nullable:
+        schema["nullable"] = True
+    return schema
+
+
+ALERT_GROUP_SUMMARY_SCHEMA = {"type": "object", "nullable": True}
+RESPONDER_SCHEMA = {"type": "object"}
 
 
 NOTIFICATION_CENTER_ACTION_SCHEMA = {
@@ -28,7 +34,7 @@ NOTIFICATION_CENTER_ACTION_SCHEMA = {
         },
         "url": {
             "type": "string",
-            "example": "/api/incidents/14784/responders/15",
+            "example": "/api/alert-groups/14784/responders/15",
         },
     },
 }
@@ -60,13 +66,13 @@ NOTIFICATION_CENTER_ITEM_SCHEMA = {
             "nullable": True,
             "example": "/alerts/14784",
         },
-        "incident_id": {
+        "alert_group_id": {
             "type": "integer",
             "nullable": True,
             "example": 14784,
         },
-        "incident": INCIDENT_SUMMARY_SCHEMA,
-        "responder": INCIDENT_RESPONDER_SCHEMA,
+        "alert_group": ALERT_GROUP_SUMMARY_SCHEMA,
+        "responder": RESPONDER_SCHEMA,
         "actions": {
             "type": "array",
             "items": NOTIFICATION_CENTER_ACTION_SCHEMA,
@@ -102,7 +108,7 @@ def tags():
             "description": (
                 "Current user's in-app notification center. "
                 "The first implementation exposes actionable pending "
-                "incident responder requests."
+                "AlertGroup responder requests."
             ),
         }
     ]
@@ -117,7 +123,7 @@ def paths():
                 "summary": "List notification center items",
                 "description": (
                     "Returns actionable notification center items for the "
-                    "current user. Pending incident responder requests are "
+                    "current user. Pending AlertGroup responder requests are "
                     "shown until they are accepted, declined, resolved or expired."
                 ),
                 "operationId": "listNotificationCenterItems",

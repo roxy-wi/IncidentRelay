@@ -393,10 +393,10 @@ def serialize_incident_responder_target(responder):
 
 
 def serialize_incident_responder(responder):
-    """Serialize incident responder request."""
+    """Serialize legacy AlertGroup responder request."""
     return {
         "id": responder.id,
-        "incident_id": responder.group_id,
+        "alert_group_id": responder.group_id,
         "group_id": responder.group_id,
 
         "target_type": responder.target_type,
@@ -502,7 +502,7 @@ def serialize_alert_group(
     responders=None,
     current_user=None,
 ):
-    """Serialize an alert group as the primary incident object."""
+    """Serialize a technical AlertGroup."""
 
     team = group.team if getattr(group, "team_id", None) else None
     route = group.route if getattr(group, "route_id", None) else None

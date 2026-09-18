@@ -78,7 +78,7 @@ def test_create_alert_group_comment_returns_201(client, db):
     headers = create_responder_headers(group, team)
 
     response = client.post(
-        f"/api/alerts/{alert_group.id}/comments",
+        f"/api/alert-groups/{alert_group.id}/comments",
         json={"body": "Investigating this incident"},
         headers=headers,
     )
@@ -97,7 +97,7 @@ def test_create_alert_group_comment_rejects_empty_body(client, db):
     headers = create_responder_headers(group, team)
 
     response = client.post(
-        f"/api/alerts/{alert_group.id}/comments",
+        f"/api/alert-groups/{alert_group.id}/comments",
         json={"body": "   "},
         headers=headers,
     )
@@ -111,7 +111,7 @@ def test_viewer_cannot_create_alert_group_comment(client, db):
     headers = create_viewer_headers(group, team)
 
     response = client.post(
-        f"/api/alerts/{alert_group.id}/comments",
+        f"/api/alert-groups/{alert_group.id}/comments",
         json={"body": "test"},
         headers=headers,
     )
@@ -124,7 +124,7 @@ def test_list_alert_group_comments(client, db):
     headers = create_responder_headers(group, team)
 
     create_response = client.post(
-        f"/api/alerts/{alert_group.id}/comments",
+        f"/api/alert-groups/{alert_group.id}/comments",
         json={"body": "First comment"},
         headers=headers,
     )
@@ -132,7 +132,7 @@ def test_list_alert_group_comments(client, db):
     assert create_response.status_code == 201
 
     response = client.get(
-        f"/api/alerts/{alert_group.id}/comments",
+        f"/api/alert-groups/{alert_group.id}/comments",
         headers=headers,
     )
 
@@ -150,7 +150,7 @@ def test_comment_creates_alert_event(client, db):
     headers = create_responder_headers(group, team)
 
     response = client.post(
-        f"/api/alerts/{alert_group.id}/comments",
+        f"/api/alert-groups/{alert_group.id}/comments",
         json={"body": "Added context"},
         headers=headers,
     )
@@ -176,7 +176,7 @@ def test_update_alert_group_comment(client, db):
     headers = create_responder_headers(group, team)
 
     create_response = client.post(
-        f"/api/alerts/{alert_group.id}/comments",
+        f"/api/alert-groups/{alert_group.id}/comments",
         json={"body": "Initial comment"},
         headers=headers,
     )
@@ -185,7 +185,7 @@ def test_update_alert_group_comment(client, db):
     comment_id = create_response.get_json()["id"]
 
     response = client.put(
-        f"/api/alerts/{alert_group.id}/comments/{comment_id}",
+        f"/api/alert-groups/{alert_group.id}/comments/{comment_id}",
         json={"body": "Updated comment"},
         headers=headers,
     )
@@ -203,7 +203,7 @@ def test_update_alert_group_comment_rejects_empty_body(client, db):
     headers = create_responder_headers(group, team)
 
     create_response = client.post(
-        f"/api/alerts/{alert_group.id}/comments",
+        f"/api/alert-groups/{alert_group.id}/comments",
         json={"body": "Initial comment"},
         headers=headers,
     )
@@ -212,7 +212,7 @@ def test_update_alert_group_comment_rejects_empty_body(client, db):
     comment_id = create_response.get_json()["id"]
 
     response = client.put(
-        f"/api/alerts/{alert_group.id}/comments/{comment_id}",
+        f"/api/alert-groups/{alert_group.id}/comments/{comment_id}",
         json={"body": "   "},
         headers=headers,
     )
@@ -226,7 +226,7 @@ def test_delete_alert_group_comment(client, db):
     headers = create_responder_headers(group, team)
 
     create_response = client.post(
-        f"/api/alerts/{alert_group.id}/comments",
+        f"/api/alert-groups/{alert_group.id}/comments",
         json={"body": "Comment to delete"},
         headers=headers,
     )
@@ -235,7 +235,7 @@ def test_delete_alert_group_comment(client, db):
     comment_id = create_response.get_json()["id"]
 
     response = client.delete(
-        f"/api/alerts/{alert_group.id}/comments/{comment_id}",
+        f"/api/alert-groups/{alert_group.id}/comments/{comment_id}",
         headers=headers,
     )
 
@@ -243,7 +243,7 @@ def test_delete_alert_group_comment(client, db):
     assert response.get_json()["deleted"] is True
 
     list_response = client.get(
-        f"/api/alerts/{alert_group.id}/comments",
+        f"/api/alert-groups/{alert_group.id}/comments",
         headers=headers,
     )
 
@@ -256,7 +256,7 @@ def test_delete_alert_group_comment_creates_event(client, db):
     headers = create_responder_headers(group, team)
 
     create_response = client.post(
-        f"/api/alerts/{alert_group.id}/comments",
+        f"/api/alert-groups/{alert_group.id}/comments",
         json={"body": "Comment to delete"},
         headers=headers,
     )
@@ -264,7 +264,7 @@ def test_delete_alert_group_comment_creates_event(client, db):
     comment_id = create_response.get_json()["id"]
 
     response = client.delete(
-        f"/api/alerts/{alert_group.id}/comments/{comment_id}",
+        f"/api/alert-groups/{alert_group.id}/comments/{comment_id}",
         headers=headers,
     )
 

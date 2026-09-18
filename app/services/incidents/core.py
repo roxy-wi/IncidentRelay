@@ -259,3 +259,38 @@ def unlink_alert_group(incident_id, alert_group_id, *, user_id=None):
         incident_core_repo.create_event(incident.id, "incident_group_unlinked", user_id=user_id, data=data)
         _audit("incident_group_unlinked", incident, user_id=user_id, data=data)
     return removed
+
+
+def create_incident_from_alert_group(
+    alert_group_id,
+    *,
+    user_id=None,
+    title=None,
+    description=None,
+    priority_slug=None,
+    assignee_id=None,
+):
+    """Create a first-class Incident and primary-link one AlertGroup atomically."""
+    group = AlertGroup.get_or_none(AlertGroup.id == int(alert_group_id))
+    if not group:
+        raise IncidentValidationError("alert group not found")
+    if not group.team_id:
+        raise IncidentValidationError("alert group has no owning team")
+    effective_priority = priority_slug or getattr(group, "priority_slug", None)
+    with db.atomic():
+        incident = create_incident(
+            team_id=group.team_id,
+            service_id=group.service_id,
+            title=(title or group.title),
+            description=description,
+            priority_slug=effective_priority,
+            assignee_id=assignee_id,
+            user_id=user_id,
+        )
+        link_alert_group(
+            incident.id,
+            group.id,
+            relation_type="primary",
+            user_id=user_id,
+        )
+    return incident

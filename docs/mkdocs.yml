@@ -42,6 +42,7 @@ nav:
       - Escalation Policies: concepts/escalation-policies.md
   - Incident Management:
       - Overview: incidents/index.md
+      - API migration 2.3: incidents/api-migration-2.3.md
       - Alerts and Alert Groups: usage/alerts.md
       - Incident Priorities: incidents/priorities.md
       - Incident Responders: incidents/responders.md

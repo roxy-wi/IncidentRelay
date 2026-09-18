@@ -292,7 +292,7 @@ def _ack_url(alert: Any) -> str:
     if not base_url or not alert_id:
         return ""
 
-    return f"{base_url}/api/alerts/{alert_id}/ack"
+    return f"{base_url}/api/alert-groups/{alert_id}/ack"
 
 
 def format_telegram_alert_message(

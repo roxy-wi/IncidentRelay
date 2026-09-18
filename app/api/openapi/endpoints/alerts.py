@@ -437,7 +437,7 @@ def alert_group_business_impact_summary_schema():
 def alert_group_schema(include_details=False):
     """Build an alert group response schema.
 
-    /api/alerts keeps the historical URL, but items are alert groups.
+    /api/alert-groups keeps the historical URL, but items are alert groups.
     """
 
     properties = {
@@ -751,7 +751,7 @@ def tags():
         {
             "name": "alerts",
             "description": (
-                "Alert group lifecycle endpoints. /api/alerts returns incident-level "
+                "Alert group lifecycle endpoints. /api/alert-groups returns incident-level "
                 "alert groups. Each group contains one or more child alerts."
             ),
         }
@@ -775,13 +775,13 @@ def paths():
     severity_schema = {"type": "string"}
 
     return {
-        "/api/alerts": {
+        "/api/alert-groups": {
             "get": {
                 "tags": ["alerts"],
                 "summary": "List alert groups",
                 "description": (
                     "Returns alert groups with optional filtering and sorting. "
-                    "The URL is kept as /api/alerts for compatibility, but each item is an alert group. "
+                    ""
                     "Use repeated query parameters for multi-value filters, for example "
                     "?status=firing&status=acknowledged."
                 ),
@@ -879,9 +879,35 @@ def paths():
                     "401": response("Authentication required."),
                     "403": response("Access denied."),
                 },
+            },
+            "post": {
+                "tags": ["alerts"],
+                "summary": "Create manual AlertGroup",
+                "description": "Creates exactly one technical AlertGroup and one manual child Alert in the same transaction. It does not create a first-class Incident.",
+                "operationId": "createManualAlertGroup",
+                "security": bearer_security(),
+                "requestBody": json_body("Manual AlertGroup fields.", {
+                    "type": "object",
+                    "required": ["team_id", "title"],
+                    "properties": {
+                        "team_id": {"type": "integer", "minimum": 1},
+                        "service_id": {"type": "integer", "minimum": 1, "nullable": True},
+                        "title": {"type": "string", "minLength": 1, "maxLength": 500},
+                        "message": {"type": "string", "nullable": True},
+                        "severity": {"type": "string"},
+                        "priority": {"type": "string", "enum": ["p1", "p2", "p3", "p4", "p5"], "nullable": True},
+                        "notify": {"type": "boolean", "default": True},
+                    },
+                }),
+                "responses": {
+                    "201": response("Manual AlertGroup created.", alert_group_schema(include_details=True)),
+                    "400": response("Validation error."),
+                    "403": response("Access denied."),
+                    "404": response("Team or service not found."),
+                },
             }
         },
-        "/api/alerts/merge": {
+        "/api/alert-groups/merge": {
             "post": {
                 "tags": ["alerts"],
                 "summary": "Merge alert groups",
@@ -904,7 +930,7 @@ def paths():
                 },
             }
         },
-        "/api/alerts/{alert_id}": {
+        "/api/alert-groups/{alert_id}": {
             "get": {
                 "tags": ["alerts"],
                 "summary": "Get alert group",
@@ -939,7 +965,7 @@ def paths():
                 },
             }
         },
-        "/api/alerts/{alert_id}/explain": {
+        "/api/alert-groups/{alert_id}/explain": {
             "get": {
                 "tags": ["alerts"],
                 "summary": "List alert explain traces",
@@ -969,7 +995,7 @@ def paths():
             },
         },
 
-        "/api/alerts/explain/{trace_id}": {
+        "/api/alert-groups/explain/{trace_id}": {
             "get": {
                 "tags": ["alerts"],
                 "summary": "Get alert explain trace",
@@ -997,7 +1023,7 @@ def paths():
                 },
             },
         },
-        "/api/alerts/{alert_id}/ack": {
+        "/api/alert-groups/{alert_id}/ack": {
             "post": {
                 "tags": ["alerts"],
                 "summary": "Acknowledge alert group",
@@ -1035,7 +1061,7 @@ def paths():
                 },
             }
         },
-        "/api/alerts/{alert_id}/shelve": {
+        "/api/alert-groups/{alert_id}/shelve": {
             "post": {
                 "tags": ["alerts"],
                 "summary": "Shelve alert group",
@@ -1067,7 +1093,7 @@ def paths():
                 },
             }
         },
-        "/api/alerts/{alert_id}/unshelve": {
+        "/api/alert-groups/{alert_id}/unshelve": {
             "post": {
                 "tags": ["alerts"],
                 "summary": "Unshelve alert group",
@@ -1086,7 +1112,7 @@ def paths():
                 },
             }
         },
-        "/api/alerts/{alert_id}/resolve": {
+        "/api/alert-groups/{alert_id}/resolve": {
             "post": {
                 "tags": ["alerts"],
                 "summary": "Resolve alert group",
@@ -1121,7 +1147,7 @@ def paths():
                 },
             }
         },
-        "/api/alerts/{alert_id}/events": {
+        "/api/alert-groups/{alert_id}/events": {
             "get": {
                 "tags": ["alerts"],
                 "summary": "List alert group events",
@@ -1175,7 +1201,7 @@ def paths():
                 },
             }
         },
-        "/api/alerts/{alert_id}/comments": {
+        "/api/alert-groups/{alert_id}/comments": {
             "get": {
                 "tags": ["alerts"],
                 "summary": "List alert group comments",
@@ -1230,7 +1256,7 @@ def paths():
                 },
             },
         },
-        "/api/alerts/{alert_id}/comments/{comment_id}": {
+        "/api/alert-groups/{alert_id}/comments/{comment_id}": {
             "put": {
                 "tags": ["alerts"],
                 "summary": "Update alert group comment",
@@ -1283,4 +1309,63 @@ def paths():
                 },
             },
         },
+        "/api/alert-groups/priorities": {
+            "get": {
+                "tags": ["alerts"],
+                "summary": "List AlertGroup priority definitions",
+                "security": bearer_security(),
+                "responses": {"200": response("Priority definitions.", {"type": "array", "items": {"type": "object"}})},
+            }
+        },
+        "/api/alert-groups/{alert_id}/assignee": {
+            "put": {
+                "tags": ["alerts"],
+                "summary": "Assign, reassign or unassign technical AlertGroup responsibility",
+                "description": "Changes only AlertGroup.assignee. It does not acknowledge the group or reset escalation state.",
+                "security": bearer_security(),
+                "parameters": [path_param("alert_id", "AlertGroup id.")],
+                "requestBody": json_body("Technical assignee.", {
+                    "type": "object",
+                    "properties": {"assignee_id": {"type": "integer", "minimum": 1, "nullable": True}},
+                }),
+                "responses": {
+                    "200": response("AlertGroup assignment updated.", alert_group_schema()),
+                    "400": response("Invalid assignee."),
+                    "403": response("Access denied."),
+                    "404": response("AlertGroup not found."),
+                },
+            }
+        },
+        "/api/alert-groups/{alert_id}/assignee/me": {
+            "put": {
+                "tags": ["alerts"],
+                "summary": "Assign AlertGroup to current user",
+                "description": "Changes only the technical assignee and leaves ACK/escalation state untouched.",
+                "security": bearer_security(),
+                "parameters": [path_param("alert_id", "AlertGroup id.")],
+                "responses": {"200": response("AlertGroup assigned.", alert_group_schema())},
+            }
+        },
+        "/api/alert-groups/{alert_id}/create-incident": {
+            "post": {
+                "tags": ["alerts"],
+                "summary": "Create first-class Incident from AlertGroup",
+                "description": "Creates an operational Incident and a primary non-destructive link. The AlertGroup technical lifecycle is unchanged.",
+                "security": bearer_security(),
+                "parameters": [path_param("alert_id", "AlertGroup id.")],
+                "requestBody": json_body("Optional Incident overrides.", {"type": "object", "properties": {
+                    "title": {"type": "string", "maxLength": 255},
+                    "description": {"type": "string", "nullable": True},
+                    "priority": {"type": "string", "enum": ["p1", "p2", "p3", "p4", "p5"]},
+                    "assignee_id": {"type": "integer", "minimum": 1, "nullable": True},
+                }}, required=False),
+                "responses": {
+                    "201": response("Incident created.", {"type": "object"}),
+                    "400": response("Validation error."),
+                    "403": response("Access denied."),
+                    "409": response("AlertGroup is already linked to another open Incident."),
+                },
+            }
+        },
+
     }

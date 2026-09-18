@@ -1,883 +1,213 @@
 from app.api.openapi.common import ERROR_SCHEMA, json_body, path_param, query_param, response
 
 
-RESPONDER_TARGET_TYPES = [
-    "user",
-    "team",
-    "rotation",
-    "escalation_policy",
-]
-
-RESPONDER_STATUSES = [
-    "requested",
-    "accepted",
-    "declined",
+INCIDENT_STATUS_VALUES = [
+    "declared",
+    "investigating",
+    "identified",
+    "monitoring",
     "resolved",
-    "expired",
+    "closed",
+    "cancelled",
 ]
 
-RESPONDER_UPDATE_STATUSES = [
-    "accepted",
-    "declined",
-    "resolved",
-    "expired",
-]
-
-
-def date_time_schema(description, nullable=True):
-    schema = {
-        "type": "string",
-        "format": "date-time",
-        "description": description,
-    }
-
-    if nullable:
-        schema["nullable"] = True
-
-    return schema
-
-
-USER_SHORT_SCHEMA = {
+INCIDENT_SCHEMA = {
     "type": "object",
-    "nullable": True,
+    "required": ["id", "type", "workflow_status", "title", "row_version"],
     "properties": {
-        "id": {"type": "integer", "example": 42},
-        "username": {"type": "string", "nullable": True, "example": "alice"},
-        "display_name": {
-            "type": "string",
-            "nullable": True,
-            "example": "Alice Smith",
-        },
-        "email": {
-            "type": "string",
-            "format": "email",
-            "nullable": True,
-            "example": "alice@example.com",
-        },
-        "telegram_user_id": {"type": "string", "nullable": True},
-        "slack_user_id": {"type": "string", "nullable": True},
-        "mattermost_user_id": {"type": "string", "nullable": True},
-    },
-}
-
-TEAM_SHORT_SCHEMA = {
-    "type": "object",
-    "nullable": True,
-    "properties": {
-        "id": {"type": "integer", "example": 7},
-        "slug": {"type": "string", "nullable": True, "example": "infra"},
-        "name": {"type": "string", "nullable": True, "example": "Infrastructure"},
-        "active": {"type": "boolean", "nullable": True, "example": True},
-        "group_id": {"type": "integer", "nullable": True, "example": 1},
-        "group_slug": {"type": "string", "nullable": True, "example": "default"},
-    },
-}
-
-ROTATION_SHORT_SCHEMA = {
-    "type": "object",
-    "nullable": True,
-    "properties": {
-        "id": {"type": "integer", "example": 11},
-        "name": {"type": "string", "nullable": True, "example": "Primary on-call"},
-        "team_id": {"type": "integer", "nullable": True, "example": 7},
-        "team_slug": {"type": "string", "nullable": True, "example": "infra"},
-        "team_name": {
-            "type": "string",
-            "nullable": True,
-            "example": "Infrastructure",
-        },
-        "enabled": {"type": "boolean", "nullable": True, "example": True},
-        "timezone": {"type": "string", "nullable": True, "example": "UTC"},
-    },
-}
-
-ESCALATION_POLICY_SHORT_SCHEMA = {
-    "type": "object",
-    "nullable": True,
-    "properties": {
-        "id": {"type": "integer", "example": 5},
-        "name": {
-            "type": "string",
-            "nullable": True,
-            "example": "Critical incidents",
-        },
-        "team_id": {"type": "integer", "nullable": True, "example": 7},
-        "team_slug": {"type": "string", "nullable": True, "example": "infra"},
-        "team_name": {
-            "type": "string",
-            "nullable": True,
-            "example": "Infrastructure",
-        },
-        "enabled": {"type": "boolean", "nullable": True, "example": True},
-    },
-}
-
-INCIDENT_RESPONDER_TARGET_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "type": {
-            "type": "string",
-            "enum": RESPONDER_TARGET_TYPES,
-            "example": "user",
-        },
-        "id": {"type": "integer", "nullable": True, "example": 42},
-        "label": {
-            "type": "string",
-            "description": "Human-readable responder target label.",
-            "example": "Alice Smith",
-        },
-        "user": USER_SHORT_SCHEMA,
-        "team": TEAM_SHORT_SCHEMA,
-        "rotation": ROTATION_SHORT_SCHEMA,
-        "escalation_policy": ESCALATION_POLICY_SHORT_SCHEMA,
-    },
-}
-
-INCIDENT_RESPONDER_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "id": {"type": "integer", "readOnly": True, "example": 15},
-        "incident_id": {"type": "integer", "example": 14784},
-        "group_id": {"type": "integer", "example": 14784},
-
-        "target_type": {
-            "type": "string",
-            "enum": RESPONDER_TARGET_TYPES,
-            "example": "user",
-        },
-        "target_user_id": {"type": "integer", "nullable": True, "example": 42},
-        "target_team_id": {"type": "integer", "nullable": True},
-        "target_rotation_id": {"type": "integer", "nullable": True},
-        "target_escalation_policy_id": {"type": "integer", "nullable": True},
-        "target": INCIDENT_RESPONDER_TARGET_SCHEMA,
-
-        "requested_by_id": {"type": "integer", "nullable": True, "example": 1},
-        "requested_by": USER_SHORT_SCHEMA,
-
-        "accepted_by_id": {"type": "integer", "nullable": True},
-        "accepted_by": USER_SHORT_SCHEMA,
-
-        "declined_by_id": {"type": "integer", "nullable": True},
-        "declined_by": USER_SHORT_SCHEMA,
-
-        "status": {
-            "type": "string",
-            "enum": RESPONDER_STATUSES,
-            "example": "requested",
-        },
-        "message": {
-            "type": "string",
-            "nullable": True,
-            "example": "Please help with database checks.",
-        },
-        "response_message": {
-            "type": "string",
-            "nullable": True,
-            "example": "I am joining.",
-        },
-
-        "notification_status": {
-            "type": "string",
-            "nullable": True,
-            "example": "sent",
-        },
-        "notification_error": {
-            "type": "string",
-            "nullable": True,
-            "example": None,
-        },
-
-        "requested_at": date_time_schema("Responder request timestamp in UTC."),
-        "responded_at": date_time_schema("Responder response timestamp in UTC."),
-        "expires_at": date_time_schema("Responder request expiration timestamp in UTC."),
-        "created_at": date_time_schema("Responder record creation timestamp in UTC."),
-        "updated_at": date_time_schema("Responder record update timestamp in UTC."),
-    },
-}
-
-INCIDENT_RESPONDER_CREATE_SCHEMA = {
-    "type": "object",
-    "required": ["target_type"],
-    "additionalProperties": False,
-    "properties": {
-        "target_type": {
-            "type": "string",
-            "enum": RESPONDER_TARGET_TYPES,
-            "description": (
-                "Responder target type. Exactly one matching target_*_id "
-                "field must be provided."
-            ),
-            "example": "user",
-        },
-        "target_user_id": {
-            "type": "integer",
-            "minimum": 1,
-            "nullable": True,
-            "example": 42,
-        },
-        "target_team_id": {
-            "type": "integer",
-            "minimum": 1,
-            "nullable": True,
-        },
-        "target_rotation_id": {
-            "type": "integer",
-            "minimum": 1,
-            "nullable": True,
-        },
-        "target_escalation_policy_id": {
-            "type": "integer",
-            "minimum": 1,
-            "nullable": True,
-        },
-        "message": {
-            "type": "string",
-            "nullable": True,
-            "maxLength": 2000,
-            "example": "Please help with database checks.",
-        },
-        "expires_after_minutes": {
-            "type": "integer",
-            "minimum": 1,
-            "maximum": 10080,
-            "nullable": True,
-            "description": "Optional request lifetime in minutes.",
-            "example": 30,
-        },
-    },
-}
-
-INCIDENT_RESPONDER_UPDATE_SCHEMA = {
-    "type": "object",
-    "required": ["status"],
-    "additionalProperties": False,
-    "properties": {
-        "status": {
-            "type": "string",
-            "enum": RESPONDER_UPDATE_STATUSES,
-            "example": "accepted",
-        },
-        "response_message": {
-            "type": "string",
-            "nullable": True,
-            "maxLength": 2000,
-            "example": "I am joining.",
-        },
-    },
-}
-
-INCIDENT_PRIORITY_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "id": {"type": "integer", "nullable": True, "example": 1},
-        "slug": {"type": "string", "example": "p1"},
-        "name": {"type": "string", "nullable": True, "example": "P1 Critical"},
+        "id": {"type": "integer"},
+        "type": {"type": "string", "enum": ["incident"]},
+        "team_id": {"type": "integer", "nullable": True},
+        "service_id": {"type": "integer", "nullable": True},
+        "priority": {"type": "string", "nullable": True, "example": "p2"},
+        "assignee_id": {"type": "integer", "nullable": True},
+        "workflow_status": {"type": "string", "enum": INCIDENT_STATUS_VALUES},
+        "title": {"type": "string"},
         "description": {"type": "string", "nullable": True},
-        "level": {"type": "integer", "nullable": True, "example": 1},
-        "color": {"type": "string", "nullable": True, "example": "#d93025"},
-        "enabled": {"type": "boolean", "nullable": True, "example": True},
-        "default": {"type": "boolean", "nullable": True, "example": False},
+        "row_version": {"type": "integer", "minimum": 1},
+        "declared_at": {"type": "string", "format": "date-time"},
+        "resolved_at": {"type": "string", "format": "date-time", "nullable": True},
+        "closed_at": {"type": "string", "format": "date-time", "nullable": True},
+        "created_at": {"type": "string", "format": "date-time"},
+        "updated_at": {"type": "string", "format": "date-time"},
     },
 }
 
-INCIDENT_PRIORITY_STATE_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "id": {"type": "integer", "nullable": True, "example": 1},
-        "slug": {"type": "string", "example": "p1"},
-        "order": {"type": "integer", "nullable": True, "example": 1},
-        "set_manually": {"type": "boolean", "example": True},
-        "set_by_id": {"type": "integer", "nullable": True, "example": 42},
-        "set_at": date_time_schema("Timestamp of the manual priority override."),
-    },
-}
-
-INCIDENT_PRIORITY_UPDATE_SCHEMA = {
-    "type": "object",
-    "required": ["priority"],
-    "additionalProperties": False,
-    "properties": {
-        "priority": {
-            "type": "string",
-            "description": "Priority slug.",
-            "example": "p1",
-        },
-    },
-}
-
-MANUAL_INCIDENT_CREATE_SCHEMA = {
+INCIDENT_CREATE_SCHEMA = {
     "type": "object",
     "required": ["team_id", "title"],
     "additionalProperties": False,
     "properties": {
-        "team_id": {
-            "type": "integer",
-            "minimum": 1,
-            "description": "Team that owns the manual incident.",
-            "example": 7,
-        },
-        "service_id": {
-            "type": "integer",
-            "minimum": 1,
-            "nullable": True,
-            "description": (
-                "Optional affected service. When selected, service ownership, "
-                "default rotation, escalation policy and notification policy "
-                "can be used."
-            ),
-            "example": 3,
-        },
-        "title": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 500,
-            "description": "Manual incident title.",
-            "example": "Storage API is unavailable",
-        },
-        "message": {
-            "type": "string",
-            "nullable": True,
-            "maxLength": 5000,
-            "description": "Incident description, impact, links or first observations.",
-            "example": "Customers are receiving 5xx from storage-api.",
-        },
-        "severity": {
-            "type": "string",
-            "enum": [
-                "critical",
-                "high",
-                "warning",
-                "medium",
-                "low",
-                "info",
-            ],
-            "default": "critical",
-            "description": "Initial incident severity.",
-            "example": "critical",
-        },
-        "priority": {
-            "type": "string",
-            "nullable": True,
-            "enum": ["p1", "p2", "p3", "p4", "p5"],
-            "description": (
-                "Optional manual priority slug. Omit or pass null to use "
-                "automatic priority resolution."
-            ),
-            "example": "p1",
-        },
-        "notify": {
-            "type": "boolean",
-            "default": True,
-            "description": (
-                "When true, schedule normal alert group notification after creation."
-            ),
-            "example": True,
-        },
+        "team_id": {"type": "integer", "minimum": 1},
+        "service_id": {"type": "integer", "minimum": 1, "nullable": True},
+        "title": {"type": "string", "minLength": 1, "maxLength": 255},
+        "description": {"type": "string", "nullable": True, "maxLength": 10000},
+        "priority": {"type": "string", "enum": ["p1", "p2", "p3", "p4", "p5"], "nullable": True},
+        "assignee_id": {"type": "integer", "minimum": 1, "nullable": True},
     },
 }
 
-INCIDENT_STAKEHOLDER_SCHEMA = {
+INCIDENT_UPDATE_SCHEMA = {
     "type": "object",
-    "properties": {
-        "id": {"type": "integer", "readOnly": True, "example": 9},
-        "incident_id": {"type": "integer", "example": 14784},
-        "user_id": {"type": "integer", "nullable": True, "example": 42},
-        "user": USER_SHORT_SCHEMA,
-        "email": {
-            "type": "string",
-            "format": "email",
-            "nullable": True,
-            "example": "manager@example.com",
-        },
-        "display_name": {
-            "type": "string",
-            "nullable": True,
-            "example": "Manager",
-        },
-        "role": {"type": "string", "nullable": True, "example": "stakeholder"},
-        "source": {"type": "string", "nullable": True, "example": "manual"},
-        "notify_on_created": {"type": "boolean", "example": True},
-        "notify_on_priority_change": {"type": "boolean", "example": True},
-        "notify_on_status_change": {"type": "boolean", "example": True},
-        "notify_on_resolved": {"type": "boolean", "example": True},
-        "notify_on_comment": {"type": "boolean", "example": True},
-        "active": {"type": "boolean", "example": True},
-        "created_by_id": {"type": "integer", "nullable": True},
-        "created_at": date_time_schema("Stakeholder creation timestamp in UTC."),
-        "updated_at": date_time_schema("Stakeholder update timestamp in UTC."),
-    },
-}
-
-INCIDENT_STAKEHOLDER_CREATE_SCHEMA = {
-    "type": "object",
+    "required": ["row_version"],
     "additionalProperties": False,
     "properties": {
-        "user_id": {"type": "integer", "minimum": 1, "nullable": True},
-        "email": {
-            "type": "string",
-            "format": "email",
-            "nullable": True,
-            "example": "manager@example.com",
-        },
-        "display_name": {
-            "type": "string",
-            "nullable": True,
-            "example": "Manager",
-        },
-        "role": {"type": "string", "nullable": True, "example": "stakeholder"},
-        "notify_on_created": {"type": "boolean", "default": True},
-        "notify_on_priority_change": {"type": "boolean", "default": True},
-        "notify_on_status_change": {"type": "boolean", "default": True},
-        "notify_on_resolved": {"type": "boolean", "default": True},
-        "notify_on_comment": {"type": "boolean", "default": True},
+        "row_version": {"type": "integer", "minimum": 1},
+        "title": {"type": "string", "minLength": 1, "maxLength": 255},
+        "description": {"type": "string", "nullable": True},
+        "service_id": {"type": "integer", "minimum": 1, "nullable": True},
+        "priority": {"type": "string", "enum": ["p1", "p2", "p3", "p4", "p5"]},
     },
 }
 
-DELETE_RESPONSE_SCHEMA = {
+INCIDENT_LINK_SCHEMA = {
     "type": "object",
+    "required": ["alert_group_id"],
+    "additionalProperties": False,
     "properties": {
-        "deleted": {"type": "boolean", "example": True},
-        "id": {"type": "integer", "example": 9},
+        "alert_group_id": {"type": "integer", "minimum": 1},
+        "relation_type": {"type": "string", "enum": ["primary", "related"], "default": "related"},
     },
-}
-
-INCIDENT_SUMMARY_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "id": {"type": "integer", "example": 14784},
-        "incident_id": {"type": "integer", "example": 14784},
-        "type": {"type": "string", "example": "alert_group"},
-        "team_id": {"type": "integer", "nullable": True, "example": 7},
-        "team_slug": {"type": "string", "nullable": True, "example": "infra"},
-        "team_name": {
-            "type": "string",
-            "nullable": True,
-            "example": "Infrastructure",
-        },
-        "service_id": {"type": "integer", "nullable": True, "example": 3},
-        "service_slug": {"type": "string", "nullable": True, "example": "postgres"},
-        "service_name": {"type": "string", "nullable": True, "example": "PostgreSQL"},
-        "title": {"type": "string", "example": "DiskFull"},
-        "message": {"type": "string", "nullable": True, "example": "/var is 95% full"},
-        "severity": {"type": "string", "nullable": True, "example": "critical"},
-        "status": {
-            "type": "string",
-            "example": "firing",
-        },
-        "priority": INCIDENT_PRIORITY_STATE_SCHEMA,
-        "maintenance": {
-            "type": "object",
-            "additionalProperties": True,
-            "description": "Maintenance status attached to this incident.",
-        },
-        "permissions": {
-            "type": "object",
-            "additionalProperties": True,
-            "description": "Current user's permissions for this incident/team.",
-        },
-    },
-    "additionalProperties": True,
-}
-
-INCIDENT_LIST_SCHEMA = {
-    "type": "object",
-    "properties": {
-        "items": {
-            "type": "array",
-            "items": INCIDENT_SUMMARY_SCHEMA,
-        },
-        "pagination": {"type": "object", "additionalProperties": True},
-        "summary": {"type": "object", "additionalProperties": True},
-        "sort": {"type": "object", "additionalProperties": True},
-    },
-}
-
-INCIDENT_DETAILS_SCHEMA = {
-    "allOf": [
-        INCIDENT_SUMMARY_SCHEMA,
-        {
-            "type": "object",
-            "properties": {
-                "alerts": {
-                    "type": "array",
-                    "items": {"type": "object", "additionalProperties": True},
-                },
-                "events": {
-                    "type": "array",
-                    "items": {"type": "object", "additionalProperties": True},
-                },
-                "responders": {
-                    "type": "array",
-                    "items": INCIDENT_RESPONDER_SCHEMA,
-                },
-                "stakeholders": {
-                    "type": "array",
-                    "items": INCIDENT_STAKEHOLDER_SCHEMA,
-                },
-            },
-        },
-    ],
 }
 
 
 def tags():
-    """Return OpenAPI tags."""
-    return [
-        {
-            "name": "incidents",
-            "description": (
-                "Incident-level API for alert groups, priorities, stakeholders "
-                "and responder requests."
-            ),
-        }
-    ]
+    return [{
+        "name": "incidents",
+        "description": "First-class operational Incidents, independent from AlertGroup technical lifecycle.",
+    }]
 
 
 def paths():
-    """Return OpenAPI paths for incident endpoints."""
+    auth = [{"bearerAuth": []}]
+    standard_errors = {
+        "400": response("Validation error.", ERROR_SCHEMA),
+        "401": response("Authentication required.", ERROR_SCHEMA),
+        "403": response("Access denied.", ERROR_SCHEMA),
+        "404": response("Incident not found.", ERROR_SCHEMA),
+        "409": response("Optimistic concurrency conflict.", ERROR_SCHEMA),
+    }
     return {
         "/api/incidents": {
             "get": {
                 "tags": ["incidents"],
-                "summary": "List incidents",
-                "description": (
-                    "Returns alert groups using the incident API shape. "
-                    "Supports filtering by team, status, source, severity, "
-                    "priority, service and search text."
-                ),
-                "operationId": "listIncidents",
-                "security": [{"bearerAuth": []}],
+                "summary": "List first-class Incidents",
+                "security": auth,
                 "parameters": [
-                    query_param(
-                        "team_id",
-                        "Filter incidents by team id.",
-                        {"type": "integer", "minimum": 1},
-                    ),
-                    query_param("status", "Filter by incident status."),
-                    query_param("source", "Filter by alert source."),
-                    query_param("severity", "Filter by severity."),
-                    query_param("priority", "Filter by priority slug."),
-                    query_param(
-                        "service_id",
-                        "Filter by service id.",
-                        {"type": "integer", "minimum": 1},
-                    ),
-                    query_param("service_slug", "Filter by service slug."),
-                    query_param("service_status", "Filter by service status."),
-                    query_param(
-                        "service_criticality",
-                        "Filter by service criticality.",
-                    ),
-                    query_param("search", "Search incident fields."),
-                    query_param(
-                        "page",
-                        "Page number.",
-                        {"type": "integer", "minimum": 1, "default": 1},
-                    ),
-                    query_param(
-                        "page_size",
-                        "Rows per page.",
-                        {
-                            "type": "integer",
-                            "minimum": 1,
-                            "maximum": 100,
-                            "default": 25,
-                        },
-                    ),
-                    query_param(
-                        "sort",
-                        "Sort field.",
-                        {"type": "string", "default": "activity"},
-                    ),
-                    query_param(
-                        "order",
-                        "Sort order.",
-                        {
-                            "type": "string",
-                            "enum": ["asc", "desc"],
-                            "default": "desc",
-                        },
-                    ),
-                    query_param(
-                        "include_merged",
-                        "Set to 1 to include merged incidents.",
-                        {
-                            "type": "string",
-                            "enum": ["0", "1"],
-                            "default": "0",
-                        },
-                    ),
+                    query_param("team_id", "Owning team id.", {"type": "integer", "minimum": 1}),
+                    query_param("status", "Incident workflow status.", {"type": "string", "enum": INCIDENT_STATUS_VALUES}),
+                    query_param("search", "Case-insensitive title search."),
+                    query_param("page", "Page number.", {"type": "integer", "minimum": 1, "default": 1}),
+                    query_param("page_size", "Items per page.", {"type": "integer", "minimum": 1, "maximum": 100, "default": 25}),
                 ],
-                "responses": {
-                    "200": response("Incidents returned.", INCIDENT_LIST_SCHEMA),
-                    "401": response("Valid JWT token is required.", ERROR_SCHEMA),
-                    "403": response("Access denied.", ERROR_SCHEMA),
-                },
+                "responses": {"200": response("Incident page.", {"type": "object"}), **standard_errors},
             },
             "post": {
                 "tags": ["incidents"],
-                "summary": "Create manual incident",
-                "description": (
-                    "Creates a manual incident as a normal alert group with one child "
-                    "alert. The incident starts in firing status and can be "
-                    "acknowledged, resolved, assigned responders, updated with "
-                    "stakeholders, prioritized and notified through the normal alert "
-                    "group workflow."
-                ),
-                "operationId": "createManualIncident",
-                "security": [{"bearerAuth": []}],
-                "requestBody": json_body(
-                    "Manual incident creation payload.",
-                    MANUAL_INCIDENT_CREATE_SCHEMA,
-                ),
-                "responses": {
-                    "201": response("Manual incident created.", INCIDENT_DETAILS_SCHEMA),
-                    "400": response("Validation error.", ERROR_SCHEMA),
-                    "401": response("Valid JWT token is required.", ERROR_SCHEMA),
-                    "403": response("Access denied.", ERROR_SCHEMA),
-                    "404": response("Team or service not found.", ERROR_SCHEMA),
-                },
-            },
-        },
-        "/api/incidents/{incident_id}": {
-            "get": {
-                "tags": ["incidents"],
-                "summary": "Get incident details",
-                "description": (
-                    "Returns one incident with child alerts, events, responders "
-                    "and stakeholders."
-                ),
-                "operationId": "getIncident",
-                "security": [{"bearerAuth": []}],
-                "parameters": [
-                    path_param("incident_id", "Incident id."),
-                ],
-                "responses": {
-                    "200": response("Incident details returned.", INCIDENT_DETAILS_SCHEMA),
-                    "401": response("Valid JWT token is required.", ERROR_SCHEMA),
-                    "403": response("Access denied.", ERROR_SCHEMA),
-                    "404": response("Incident not found.", ERROR_SCHEMA),
-                },
+                "summary": "Create a first-class Incident",
+                "description": "Creates only an operational Incident. No Alert or AlertGroup is created implicitly.",
+                "security": auth,
+                "requestBody": json_body("Incident fields.", INCIDENT_CREATE_SCHEMA),
+                "responses": {"201": response("Incident created.", INCIDENT_SCHEMA), **standard_errors},
             },
         },
         "/api/incidents/priorities": {
             "get": {
                 "tags": ["incidents"],
-                "summary": "List incident priorities",
-                "description": "Returns configured incident priorities.",
-                "operationId": "listIncidentPriorities",
-                "security": [{"bearerAuth": []}],
-                "parameters": [
-                    query_param(
-                        "include_disabled",
-                        "Set to 1 to include disabled priorities.",
-                        {
-                            "type": "string",
-                            "enum": ["0", "1"],
-                            "default": "0",
-                        },
-                    ),
-                ],
-                "responses": {
-                    "200": response(
-                        "Incident priorities returned.",
-                        {"type": "array", "items": INCIDENT_PRIORITY_SCHEMA},
-                    ),
-                    "401": response("Valid JWT token is required.", ERROR_SCHEMA),
-                },
-            },
+                "summary": "List Incident priority definitions",
+                "security": auth,
+                "responses": {"200": response("Priority definitions.", {"type": "array", "items": {"type": "object"}})},
+            }
         },
-        "/api/incidents/{incident_id}/priority": {
-            "put": {
-                "tags": ["incidents"],
-                "summary": "Update incident priority",
-                "description": (
-                    "Sets incident priority manually and records a priority "
-                    "change event."
-                ),
-                "operationId": "updateIncidentPriority",
-                "security": [{"bearerAuth": []}],
-                "parameters": [
-                    path_param("incident_id", "Incident id."),
-                ],
-                "requestBody": json_body(
-                    "Priority update payload.",
-                    INCIDENT_PRIORITY_UPDATE_SCHEMA,
-                ),
-                "responses": {
-                    "200": response("Incident priority updated.", INCIDENT_DETAILS_SCHEMA),
-                    "400": response("Validation error.", ERROR_SCHEMA),
-                    "401": response("Valid JWT token is required.", ERROR_SCHEMA),
-                    "403": response("Access denied.", ERROR_SCHEMA),
-                    "404": response("Incident not found.", ERROR_SCHEMA),
-                },
-            },
-            "delete": {
-                "tags": ["incidents"],
-                "summary": "Reset incident priority",
-                "description": (
-                    "Removes the manual priority override and restores automatic "
-                    "priority management according to the effective priority policy."
-                ),
-                "operationId": "resetIncidentPriority",
-                "security": [{"bearerAuth": []}],
-                "parameters": [
-                    path_param("incident_id", "Incident id."),
-                ],
-                "responses": {
-                    "200": response("Automatic incident priority restored.", INCIDENT_DETAILS_SCHEMA),
-                    "400": response("Automatic priority could not be resolved.", ERROR_SCHEMA),
-                    "401": response("Valid JWT token is required.", ERROR_SCHEMA),
-                    "403": response("Access denied.", ERROR_SCHEMA),
-                    "404": response("Incident not found.", ERROR_SCHEMA),
-                },
-            },
-        },
-        "/api/incidents/{incident_id}/responders": {
+        "/api/incidents/{incident_id}": {
             "get": {
-                "tags": ["incidents"],
-                "summary": "List incident responders",
-                "description": "Returns responder requests for one incident.",
-                "operationId": "listIncidentResponders",
-                "security": [{"bearerAuth": []}],
-                "parameters": [
-                    path_param("incident_id", "Incident id."),
-                ],
-                "responses": {
-                    "200": response(
-                        "Incident responders returned.",
-                        {"type": "array", "items": INCIDENT_RESPONDER_SCHEMA},
-                    ),
-                    "401": response("Valid JWT token is required.", ERROR_SCHEMA),
-                    "403": response("Access denied.", ERROR_SCHEMA),
-                    "404": response("Incident not found.", ERROR_SCHEMA),
-                },
+                "tags": ["incidents"], "summary": "Get Incident", "security": auth,
+                "parameters": [path_param("incident_id", "Incident id.")],
+                "responses": {"200": response("Incident details.", INCIDENT_SCHEMA), **standard_errors},
+            },
+            "patch": {
+                "tags": ["incidents"], "summary": "Update Incident", "security": auth,
+                "parameters": [path_param("incident_id", "Incident id.")],
+                "requestBody": json_body("Mutable fields and current row_version.", INCIDENT_UPDATE_SCHEMA),
+                "responses": {"200": response("Incident updated.", INCIDENT_SCHEMA), **standard_errors},
+            },
+        },
+        "/api/incidents/{incident_id}/status": {
+            "post": {
+                "tags": ["incidents"], "summary": "Transition Incident workflow status", "security": auth,
+                "parameters": [path_param("incident_id", "Incident id.")],
+                "requestBody": json_body("Target status and current row_version.", {
+                    "type": "object", "required": ["status", "row_version"],
+                    "properties": {"status": {"type": "string", "enum": INCIDENT_STATUS_VALUES}, "row_version": {"type": "integer", "minimum": 1}},
+                }),
+                "responses": {"200": response("Incident transitioned.", INCIDENT_SCHEMA), **standard_errors},
+            }
+        },
+        "/api/incidents/{incident_id}/close": _simple_transition_path("Close Incident", "Explicitly closes a resolved Incident."),
+        "/api/incidents/{incident_id}/reopen": _simple_transition_path("Reopen Incident", "Explicitly reopens a closed/resolved Incident into investigating."),
+        "/api/incidents/{incident_id}/assignee": {
+            "put": {
+                "tags": ["incidents"], "summary": "Assign, reassign or unassign Incident", "security": auth,
+                "parameters": [path_param("incident_id", "Incident id.")],
+                "requestBody": json_body("Concrete operational assignee and row_version.", {
+                    "type": "object", "required": ["row_version"],
+                    "properties": {"row_version": {"type": "integer", "minimum": 1}, "assignee_id": {"type": "integer", "minimum": 1, "nullable": True}},
+                }),
+                "responses": {"200": response("Incident assignment updated.", INCIDENT_SCHEMA), **standard_errors},
+            }
+        },
+        "/api/incidents/{incident_id}/assignee/me": {
+            "put": {
+                "tags": ["incidents"], "summary": "Assign Incident to current user", "security": auth,
+                "parameters": [path_param("incident_id", "Incident id.")],
+                "requestBody": json_body("Current row_version.", {"type": "object", "required": ["row_version"], "properties": {"row_version": {"type": "integer", "minimum": 1}}}),
+                "responses": {"200": response("Incident assigned.", INCIDENT_SCHEMA), **standard_errors},
+            }
+        },
+        "/api/incidents/{incident_id}/alert-groups": {
+            "get": {
+                "tags": ["incidents"], "summary": "List linked AlertGroups", "security": auth,
+                "parameters": [path_param("incident_id", "Incident id.")],
+                "responses": {"200": response("Active links.", {"type": "array", "items": {"type": "object"}}), **standard_errors},
             },
             "post": {
-                "tags": ["incidents"],
-                "summary": "Request incident responder",
-                "description": (
-                    "Creates a responder request for a user, team, rotation or "
-                    "escalation policy. Accepting a responder request does not "
-                    "assign the incident to that user."
-                ),
-                "operationId": "createIncidentResponder",
-                "security": [{"bearerAuth": []}],
-                "parameters": [
-                    path_param("incident_id", "Incident id."),
-                ],
-                "requestBody": json_body(
-                    "Responder request payload.",
-                    INCIDENT_RESPONDER_CREATE_SCHEMA,
-                ),
-                "responses": {
-                    "201": response(
-                        "Responder request created.",
-                        INCIDENT_RESPONDER_SCHEMA,
-                    ),
-                    "400": response("Validation error.", ERROR_SCHEMA),
-                    "401": response("Valid JWT token is required.", ERROR_SCHEMA),
-                    "403": response("Access denied.", ERROR_SCHEMA),
-                    "404": response("Incident or responder target not found.", ERROR_SCHEMA),
-                },
+                "tags": ["incidents"], "summary": "Link AlertGroup", "security": auth,
+                "parameters": [path_param("incident_id", "Incident id.")],
+                "requestBody": json_body("AlertGroup link.", INCIDENT_LINK_SCHEMA),
+                "responses": {"201": response("AlertGroup linked.", {"type": "object"}), **standard_errors},
             },
         },
-        "/api/incidents/{incident_id}/responders/{responder_id}": {
-            "put": {
-                "tags": ["incidents"],
-                "summary": "Update incident responder status",
-                "description": (
-                    "Accepts, declines, resolves or expires a responder request. "
-                    "Only the requested user or an authorized responder for the "
-                    "target can update the request."
-                ),
-                "operationId": "updateIncidentResponderStatus",
-                "security": [{"bearerAuth": []}],
-                "parameters": [
-                    path_param("incident_id", "Incident id."),
-                    path_param("responder_id", "Responder request id."),
-                ],
-                "requestBody": json_body(
-                    "Responder status update payload.",
-                    INCIDENT_RESPONDER_UPDATE_SCHEMA,
-                ),
-                "responses": {
-                    "200": response(
-                        "Responder request updated.",
-                        INCIDENT_RESPONDER_SCHEMA,
-                    ),
-                    "400": response("Validation error.", ERROR_SCHEMA),
-                    "401": response("Valid JWT token is required.", ERROR_SCHEMA),
-                    "403": response("Access denied.", ERROR_SCHEMA),
-                    "404": response("Incident or responder request not found.", ERROR_SCHEMA),
-                },
-            },
-        },
-        "/api/incidents/{incident_id}/stakeholders": {
-            "get": {
-                "tags": ["incidents"],
-                "summary": "List incident stakeholders",
-                "description": "Returns stakeholders attached to one incident.",
-                "operationId": "listIncidentStakeholders",
-                "security": [{"bearerAuth": []}],
-                "parameters": [
-                    path_param("incident_id", "Incident id."),
-                ],
-                "responses": {
-                    "200": response(
-                        "Incident stakeholders returned.",
-                        {"type": "array", "items": INCIDENT_STAKEHOLDER_SCHEMA},
-                    ),
-                    "401": response("Valid JWT token is required.", ERROR_SCHEMA),
-                    "403": response("Access denied.", ERROR_SCHEMA),
-                    "404": response("Incident not found.", ERROR_SCHEMA),
-                },
-            },
-            "post": {
-                "tags": ["incidents"],
-                "summary": "Add incident stakeholder",
-                "description": "Adds a user or email stakeholder to an incident.",
-                "operationId": "createIncidentStakeholder",
-                "security": [{"bearerAuth": []}],
-                "parameters": [
-                    path_param("incident_id", "Incident id."),
-                ],
-                "requestBody": json_body(
-                    "Stakeholder properties.",
-                    INCIDENT_STAKEHOLDER_CREATE_SCHEMA,
-                ),
-                "responses": {
-                    "201": response(
-                        "Incident stakeholder created.",
-                        INCIDENT_STAKEHOLDER_SCHEMA,
-                    ),
-                    "400": response("Validation error.", ERROR_SCHEMA),
-                    "401": response("Valid JWT token is required.", ERROR_SCHEMA),
-                    "403": response("Access denied.", ERROR_SCHEMA),
-                    "404": response("Incident or stakeholder user not found.", ERROR_SCHEMA),
-                },
-            },
-        },
-        "/api/incidents/{incident_id}/stakeholders/{stakeholder_id}": {
+        "/api/incidents/{incident_id}/alert-groups/{group_id}": {
             "delete": {
-                "tags": ["incidents"],
-                "summary": "Remove incident stakeholder",
-                "description": "Removes a stakeholder from an incident.",
-                "operationId": "deleteIncidentStakeholder",
-                "security": [{"bearerAuth": []}],
-                "parameters": [
-                    path_param("incident_id", "Incident id."),
-                    path_param("stakeholder_id", "Stakeholder id."),
-                ],
-                "responses": {
-                    "200": response(
-                        "Incident stakeholder removed.",
-                        DELETE_RESPONSE_SCHEMA,
-                    ),
-                    "401": response("Valid JWT token is required.", ERROR_SCHEMA),
-                    "403": response("Access denied.", ERROR_SCHEMA),
-                    "404": response("Incident or stakeholder not found.", ERROR_SCHEMA),
-                },
-            },
+                "tags": ["incidents"], "summary": "Unlink AlertGroup", "security": auth,
+                "parameters": [path_param("incident_id", "Incident id."), path_param("group_id", "AlertGroup id.")],
+                "responses": {"200": response("AlertGroup unlinked.", {"type": "object"}), **standard_errors},
+            }
         },
+        "/api/incidents/{incident_id}/events": {
+            "get": {
+                "tags": ["incidents"], "summary": "List operational Incident events", "security": auth,
+                "parameters": [path_param("incident_id", "Incident id.")],
+                "responses": {"200": response("Incident events.", {"type": "array", "items": {"type": "object"}}), **standard_errors},
+            }
+        },
+    }
+
+
+def _simple_transition_path(summary, description):
+    return {
+        "post": {
+            "tags": ["incidents"], "summary": summary, "description": description,
+            "security": [{"bearerAuth": []}],
+            "parameters": [path_param("incident_id", "Incident id.")],
+            "requestBody": json_body("Current row_version.", {"type": "object", "required": ["row_version"], "properties": {"row_version": {"type": "integer", "minimum": 1}}}),
+            "responses": {
+                "200": response("Incident transitioned.", INCIDENT_SCHEMA),
+                "400": response("Invalid transition.", ERROR_SCHEMA),
+                "401": response("Authentication required.", ERROR_SCHEMA),
+                "403": response("Access denied.", ERROR_SCHEMA),
+                "404": response("Incident not found.", ERROR_SCHEMA),
+                "409": response("Optimistic concurrency conflict.", ERROR_SCHEMA),
+            },
+        }
     }

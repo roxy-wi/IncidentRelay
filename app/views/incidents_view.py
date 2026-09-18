@@ -1,15 +1,23 @@
 from flask import Blueprint, jsonify, request
 
-from app.modules.db.models import Alert
-from app.modules.db import alerts_repo
-from app.modules.db import incidents_repo
-from app.services.audit import write_audit
-from app.services.incidents.stakeholders import (
-    create_incident_stakeholder,
-    remove_incident_stakeholder,
+from app.api.schemas.incidents import (
+    IncidentAssignmentSchema,
+    IncidentCreateSchema,
+    IncidentLinkSchema,
+    IncidentTransitionSchema,
+    IncidentUpdateSchema,
 )
-from app.services.incidents.priorities import reset_incident_priority, set_incident_priority
-from app.services.incidents.responders import create_incident_responder, set_incident_responder_status
+from app.modules.db import incident_core_repo, incidents_repo
+from app.services.incidents.core import (
+    IncidentConflictError,
+    IncidentValidationError,
+    assign_incident,
+    create_incident,
+    link_alert_group,
+    transition_incident,
+    unlink_alert_group,
+    update_incident,
+)
 from app.services.rbac import (
     can_access_team_or_group_resource,
     can_respond_team,
@@ -18,40 +26,16 @@ from app.services.rbac import (
     require_team_read,
     require_team_respond,
 )
-from app.services.serializers.alerts import (
-    serialize_alert_event,
-    serialize_incident_priority,
-    serialize_incident_responder,
+from app.services.serializers.alerts import serialize_incident_priority
+from app.services.serializers.incidents import (
+    serialize_incident,
+    serialize_incident_event,
+    serialize_incident_link,
 )
-from app.services.serializers.incidents import serialize_incident, serialize_incident_stakeholder, serialize_incident_alert
-from app.services.validation import (
-    make_error_response,
-    safe_exception_response,
-    validate_body,
-)
-from app.api.schemas.incidents import IncidentResponderCreateSchema, IncidentResponderUpdateSchema, IncidentCreateSchema
-from app.services.incidents.manual import create_manual_incident
+from app.services.validation import make_error_response, validate_body
 
 
 incidents_bp = Blueprint("incidents_api", __name__)
-
-
-def _can_create_manual_incident(user, team_id):
-    """Return True when user may create a manual incident for a team."""
-    if not user:
-        return False
-
-    if is_admin_user(user):
-        return True
-
-    return (
-        can_respond_team(user, team_id)
-        or can_access_team_or_group_resource(
-            user,
-            team_id,
-            write_required=True,
-        )
-    )
 
 
 def _request_user():
@@ -59,519 +43,282 @@ def _request_user():
 
 
 def _request_user_id():
-    user = _request_user()
-    return getattr(user, "id", None)
+    return getattr(_request_user(), "id", None)
 
 
-def _get_query_values(name, cast=None):
-    values = request.args.getlist(name)
-
-    if not values:
-        value = request.args.get(name)
-        values = [value] if value else []
-
-    result = []
-
-    for value in values:
-        if value is None or value == "":
-            continue
-
-        try:
-            result.append(cast(value) if cast else value)
-        except (TypeError, ValueError):
-            continue
-
-    return result
+def _can_create_incident(user, team_id):
+    if not user:
+        return False
+    if is_admin_user(user):
+        return True
+    return can_respond_team(user, team_id) or can_access_team_or_group_resource(
+        user,
+        team_id,
+        write_required=True,
+    )
 
 
 def _get_incident_or_error(incident_id, *, respond=False):
-    group = alerts_repo.get_alert_group(incident_id)
-
-    if not group:
-        return None, make_error_response(
-            "not_found",
-            "Incident not found",
-            404,
-        )
-
-    if group.team_id:
-        error = (
-            require_team_respond(group.team_id)
-            if respond
-            else require_team_read(group.team_id)
-        )
-
+    incident = incident_core_repo.get_incident(incident_id)
+    if not incident:
+        return None, make_error_response("not_found", "Incident not found", 404)
+    if incident.team_id:
+        error = require_team_respond(incident.team_id) if respond else require_team_read(incident.team_id)
         if error:
             return None, error
+    elif not is_admin_user(_request_user()):
+        return None, make_error_response("forbidden", "Incident is outside your team scope", 403)
+    return incident, None
 
-    return group, None
+
+def _service_error(exc):
+    if isinstance(exc, IncidentConflictError):
+        return make_error_response("conflict", str(exc), 409)
+    return make_error_response("validation_error", str(exc), 400)
 
 
 @incidents_bp.route("", methods=["GET"])
 def list_incidents():
     team_id = request.args.get("team_id", type=int)
+    statuses = [value for value in request.args.getlist("status") if value]
+    if not statuses and request.args.get("status"):
+        statuses = [request.args.get("status")]
 
     if team_id:
         error = require_team_read(team_id)
         if error:
             return error
-
-        team_ids = None
+        team_ids = [team_id]
     else:
         team_ids = get_allowed_team_ids()
 
-    page = alerts_repo.paginate_alert_groups(
-        team_id=team_id,
-        team_ids=team_ids,
-        status=_get_query_values("status"),
-        source=_get_query_values("source"),
-        severity=_get_query_values("severity"),
-        priority=_get_query_values("priority"),
-        service_id=_get_query_values("service_id", int),
-        service_slug=request.args.get("service_slug"),
-        service_status=request.args.get("service_status"),
-        service_criticality=request.args.get("service_criticality"),
-        search=request.args.get("search"),
-        page=request.args.get("page", 1, type=int),
-        page_size=request.args.get("page_size", 25, type=int),
-        sort=request.args.get("sort", "activity"),
-        order=request.args.get("order", "desc"),
-        include_merged=request.args.get("include_merged") == "1",
-    )
+    incidents = incident_core_repo.list_incidents(team_ids=team_ids, statuses=statuses)
+    search = (request.args.get("search") or "").strip().lower()
+    if search:
+        incidents = [item for item in incidents if search in (item.title or "").lower()]
 
-    user = _request_user()
+    page = max(request.args.get("page", 1, type=int), 1)
+    page_size = min(max(request.args.get("page_size", 25, type=int), 1), 100)
+    total = len(incidents)
+    start = (page - 1) * page_size
+    items = incidents[start:start + page_size]
 
     return jsonify({
-        "items": [
-            serialize_incident(group, current_user=user)
-            for group in page["items"]
-        ],
-        "pagination": page["pagination"],
-        "summary": page["summary"],
-        "sort": page["sort"],
+        "items": [serialize_incident(item, current_user=_request_user()) for item in items],
+        "pagination": {
+            "page": page,
+            "page_size": page_size,
+            "total": total,
+            "pages": (total + page_size - 1) // page_size if total else 0,
+        },
     })
 
 
 @incidents_bp.route("", methods=["POST"])
-def create_incident():
+def create_incident_view():
     payload, error = validate_body(IncidentCreateSchema)
     if error:
         return error
-
-    if not _can_create_manual_incident(_request_user(), payload.team_id):
-        return jsonify({
-            "error": "manual_incident_create_denied",
-            "message": (
-                "Team responder, team manager or group editor role "
-                "is required to create an incident for this team"
-            ),
-        }), 403
-
+    if not _can_create_incident(_request_user(), payload.team_id):
+        return make_error_response("forbidden", "Incident create permission is required for this team", 403)
     try:
-        group = create_manual_incident(payload.model_dump(), user_id=_request_user_id())
-    except LookupError as exc:
-        return safe_exception_response(
-            exc,
-            error="not_found",
-            message="Manual incident target not found.",
-            status_code=404,
+        incident = create_incident(
+            team_id=payload.team_id,
+            service_id=payload.service_id,
+            title=payload.title,
+            description=payload.description,
+            priority_slug=payload.priority,
+            assignee_id=payload.assignee_id,
+            user_id=_request_user_id(),
         )
-    except ValueError as exc:
-        return safe_exception_response(
-            exc,
-            error="validation_error",
-            message="Invalid manual incident request.",
-            status_code=400,
-        )
-
-    write_audit(
-        "incident.manual.create",
-        object_type="incident",
-        object_id=group.id,
-        team_id=group.team_id,
-        user_id=_request_user_id(),
-        data={
-            "team_id": group.team_id,
-            "service_id": group.service_id,
-            "title": group.title,
-            "severity": group.severity,
-            "priority": group.priority_slug,
-        },
-    )
-
-    return jsonify(
-        serialize_incident(
-            group,
-            current_user=_request_user(),
-            include_details=True,
-        )
-    ), 201
-
-
-@incidents_bp.route("/<int:incident_id>", methods=["GET"])
-def get_incident(incident_id):
-    group, error = _get_incident_or_error(incident_id)
-
-    if error:
-        return error
-
-    events = alerts_repo.list_group_events(group.id)
-
-    payload = serialize_incident(
-        group,
-        current_user=_request_user(),
-        include_details=True,
-    )
-
-    payload["alerts"] = [
-        serialize_incident_alert(alert)
-        for alert in group.alerts.order_by(Alert.first_seen_at.asc(), Alert.id.asc())
-    ]
-
-    payload["events"] = [
-        serialize_alert_event(event)
-        for event in events
-    ]
-
-    payload["responders"] = [
-        serialize_incident_responder(responder)
-        for responder in incidents_repo.list_incident_responders(group.id)
-    ]
-
-    payload["stakeholders"] = [
-        serialize_incident_stakeholder(stakeholder)
-        for stakeholder in incidents_repo.list_incident_stakeholders(group.id)
-    ]
-
-    return jsonify(payload)
+    except (IncidentValidationError, IncidentConflictError) as exc:
+        return _service_error(exc)
+    return jsonify(serialize_incident(incident, current_user=_request_user(), include_details=True)), 201
 
 
 @incidents_bp.route("/priorities", methods=["GET"])
 def list_incident_priorities():
     include_disabled = request.args.get("include_disabled") == "1"
-
     return jsonify([
         serialize_incident_priority(priority)
-        for priority in incidents_repo.list_priorities(
-            include_disabled=include_disabled,
-        )
+        for priority in incidents_repo.list_priorities(include_disabled=include_disabled)
     ])
 
 
-@incidents_bp.route("/<int:incident_id>/priority", methods=["PUT"])
-def update_incident_priority(incident_id):
-    group, error = _get_incident_or_error(incident_id, respond=True)
-
+@incidents_bp.route("/<int:incident_id>", methods=["GET"])
+def get_incident(incident_id):
+    incident, error = _get_incident_or_error(incident_id)
     if error:
         return error
+    payload = serialize_incident(incident, current_user=_request_user(), include_details=True)
+    payload["alert_groups"] = [serialize_incident_link(link) for link in incident_core_repo.list_active_links(incident.id)]
+    payload["events"] = [serialize_incident_event(event) for event in incident_core_repo.list_events(incident.id)]
+    return jsonify(payload)
 
+
+@incidents_bp.route("/<int:incident_id>", methods=["PATCH"])
+def update_incident_view(incident_id):
+    incident, error = _get_incident_or_error(incident_id, respond=True)
+    if error:
+        return error
+    payload, error = validate_body(IncidentUpdateSchema)
+    if error:
+        return error
+    try:
+        incident = update_incident(
+            incident.id,
+            expected_version=payload.row_version,
+            user_id=_request_user_id(),
+            title=payload.title,
+            description=payload.description,
+            service_id=payload.service_id,
+            priority_slug=payload.priority,
+        )
+    except (IncidentValidationError, IncidentConflictError) as exc:
+        return _service_error(exc)
+    return jsonify(serialize_incident(incident, current_user=_request_user(), include_details=True))
+
+
+@incidents_bp.route("/<int:incident_id>/status", methods=["POST"])
+def transition_incident_view(incident_id):
+    incident, error = _get_incident_or_error(incident_id, respond=True)
+    if error:
+        return error
+    payload, error = validate_body(IncidentTransitionSchema)
+    if error:
+        return error
+    try:
+        incident = transition_incident(
+            incident.id,
+            payload.status,
+            expected_version=payload.row_version,
+            user_id=_request_user_id(),
+        )
+    except (IncidentValidationError, IncidentConflictError) as exc:
+        return _service_error(exc)
+    return jsonify(serialize_incident(incident, current_user=_request_user(), include_details=True))
+
+
+@incidents_bp.route("/<int:incident_id>/close", methods=["POST"])
+def close_incident_view(incident_id):
+    incident, error = _get_incident_or_error(incident_id, respond=True)
+    if error:
+        return error
     payload = request.get_json(silent=True) or {}
-
+    row_version = payload.get("row_version")
+    if not isinstance(row_version, int) or row_version < 1:
+        return make_error_response("validation_error", "row_version is required", 400)
     try:
-        group = set_incident_priority(
-            group_id=group.id,
-            priority=payload.get("priority"),
-            user_id=_request_user_id(),
-        )
-    except ValueError as exc:
-        return safe_exception_response(
-            exc,
-            error="validation_error",
-            message="Invalid incident priority request.",
-            status_code=400,
-        )
-    except LookupError as exc:
-        return safe_exception_response(
-            exc,
-            error="not_found",
-            message="Incident priority target not found.",
-            status_code=404,
-        )
-
-    write_audit(
-        "incident.priority.update",
-        object_type="incident",
-        object_id=group.id,
-        team_id=group.team_id,
-        user_id=_request_user_id(),
-        data={
-            "priority": payload.get("priority"),
-        },
-    )
-
-    return jsonify(
-        serialize_incident(
-            group,
-            current_user=_request_user(),
-            include_details=True,
-        )
-    )
+        incident = transition_incident(incident.id, "closed", expected_version=row_version, user_id=_request_user_id())
+    except (IncidentValidationError, IncidentConflictError) as exc:
+        return _service_error(exc)
+    return jsonify(serialize_incident(incident, current_user=_request_user(), include_details=True))
 
 
-@incidents_bp.route("/<int:incident_id>/priority", methods=["DELETE"])
-def reset_incident_priority_override(incident_id):
-    group, error = _get_incident_or_error(incident_id, respond=True)
-
+@incidents_bp.route("/<int:incident_id>/reopen", methods=["POST"])
+def reopen_incident_view(incident_id):
+    incident, error = _get_incident_or_error(incident_id, respond=True)
     if error:
         return error
-
-    try:
-        group = reset_incident_priority(group_id=group.id)
-    except ValueError as exc:
-        return safe_exception_response(
-            exc,
-            error="validation_error",
-            message="Incident priority could not be returned to automatic mode.",
-            status_code=400,
-        )
-    except LookupError as exc:
-        return safe_exception_response(
-            exc,
-            error="not_found",
-            message="Incident priority target not found.",
-            status_code=404,
-        )
-
-    write_audit(
-        "incident.priority.reset",
-        object_type="incident",
-        object_id=group.id,
-        team_id=group.team_id,
-        user_id=_request_user_id(),
-        data={
-            "priority": group.priority_slug,
-            "set_manually": False,
-        },
-    )
-
-    return jsonify(serialize_incident(group, current_user=_request_user(), include_details=True))
-
-
-@incidents_bp.route("/<int:incident_id>/responders", methods=["GET"])
-def list_incident_responders(incident_id):
-    group, error = _get_incident_or_error(incident_id)
-
-    if error:
-        return error
-
-    responders = incidents_repo.list_incident_responders(group.id)
-
-    return jsonify([
-        serialize_incident_responder(responder)
-        for responder in responders
-    ])
-
-
-@incidents_bp.route("/<int:incident_id>/responders", methods=["POST"])
-def add_incident_responder(incident_id):
-    group, error = _get_incident_or_error(incident_id, respond=True)
-
-    if error:
-        return error
-
-    payload, error = validate_body(IncidentResponderCreateSchema)
-    if error:
-        return error
-
-    try:
-        responder = create_incident_responder(
-            group_id=group.id,
-            payload=payload.model_dump(),
-            user_id=_request_user_id(),
-        )
-    except ValueError as exc:
-        return safe_exception_response(
-            exc,
-            error="validation_error",
-            message="Invalid incident responder request.",
-            status_code=400,
-        )
-    except LookupError as exc:
-        return safe_exception_response(
-            exc,
-            error="not_found",
-            message="Incident responder target not found.",
-            status_code=404,
-        )
-
-    write_audit(
-        "incident.responder.add",
-        object_type="incident",
-        object_id=group.id,
-        team_id=group.team_id,
-        user_id=_request_user_id(),
-        data={
-            "responder_id": responder.id,
-            "target_type": responder.target_type,
-            "target_user_id": responder.target_user_id,
-            "target_team_id": responder.target_team_id,
-            "target_rotation_id": responder.target_rotation_id,
-            "target_escalation_policy_id": (
-                responder.target_escalation_policy_id
-            ),
-            "status": responder.status,
-        },
-    )
-
-    return jsonify(serialize_incident_responder(responder)), 201
-
-
-@incidents_bp.route(
-    "/<int:incident_id>/responders/<int:responder_id>",
-    methods=["PUT"],
-)
-def update_incident_responder(incident_id, responder_id):
-    group = alerts_repo.get_alert_group(incident_id)
-    if not group:
-        return make_error_response(
-            "not_found",
-            "Incident not found",
-            404,
-        )
-
-    payload, error = validate_body(IncidentResponderUpdateSchema)
-    if error:
-        return error
-
-    try:
-        responder = set_incident_responder_status(
-            group_id=group.id,
-            responder_id=responder_id,
-            status=payload.status,
-            response_message=payload.response_message,
-            user_id=_request_user_id(),
-            user=_request_user(),
-        )
-    except PermissionError as exc:
-        return safe_exception_response(
-            exc,
-            error="access_denied",
-            message="You do not have permission to update this responder.",
-            status_code=403,
-        )
-    except ValueError as exc:
-        return safe_exception_response(
-            exc,
-            error="validation_error",
-            message="Invalid incident responder update request.",
-            status_code=400,
-        )
-    except LookupError as exc:
-        return safe_exception_response(
-            exc,
-            error="not_found",
-            message="Incident responder not found.",
-            status_code=404,
-        )
-
-    write_audit(
-        "incident.responder.update",
-        object_type="incident",
-        object_id=group.id,
-        team_id=group.team_id,
-        user_id=_request_user_id(),
-        data={
-            "responder_id": responder.id,
-            "status": responder.status,
-        },
-    )
-
-    return jsonify(serialize_incident_responder(responder))
-
-
-@incidents_bp.route("/<int:incident_id>/stakeholders", methods=["GET"])
-def list_incident_stakeholders(incident_id):
-    group, error = _get_incident_or_error(incident_id)
-
-    if error:
-        return error
-
-    return jsonify([
-        serialize_incident_stakeholder(stakeholder)
-        for stakeholder in incidents_repo.list_incident_stakeholders(group.id)
-    ])
-
-
-@incidents_bp.route("/<int:incident_id>/stakeholders", methods=["POST"])
-def add_incident_stakeholder(incident_id):
-    group, error = _get_incident_or_error(incident_id, respond=True)
-
-    if error:
-        return error
-
     payload = request.get_json(silent=True) or {}
-
+    row_version = payload.get("row_version")
+    if not isinstance(row_version, int) or row_version < 1:
+        return make_error_response("validation_error", "row_version is required", 400)
     try:
-        stakeholder = create_incident_stakeholder(
-            group_id=group.id,
-            payload=payload,
-            user_id=_request_user_id(),
-        )
-    except ValueError as exc:
-        return safe_exception_response(
-            exc,
-            error="validation_error",
-            message="Invalid incident stakeholder request.",
-            status_code=400,
-        )
-    except LookupError as exc:
-        return safe_exception_response(
-            exc,
-            error="not_found",
-            message="Incident stakeholder target not found.",
-            status_code=404,
-        )
-
-    write_audit(
-        "incident.stakeholder.add",
-        object_type="incident",
-        object_id=group.id,
-        team_id=group.team_id,
-        user_id=_request_user_id(),
-        data={
-            "stakeholder_id": stakeholder.id,
-        },
-    )
-
-    return jsonify(serialize_incident_stakeholder(stakeholder)), 201
+        incident = transition_incident(incident.id, "investigating", expected_version=row_version, user_id=_request_user_id())
+    except (IncidentValidationError, IncidentConflictError) as exc:
+        return _service_error(exc)
+    return jsonify(serialize_incident(incident, current_user=_request_user(), include_details=True))
 
 
-@incidents_bp.route(
-    "/<int:incident_id>/stakeholders/<int:stakeholder_id>",
-    methods=["DELETE"],
-)
-def delete_incident_stakeholder(incident_id, stakeholder_id):
-    group, error = _get_incident_or_error(incident_id, respond=True)
-
+@incidents_bp.route("/<int:incident_id>/assignee", methods=["PUT"])
+def assign_incident_view(incident_id):
+    incident, error = _get_incident_or_error(incident_id, respond=True)
     if error:
         return error
-
+    payload, error = validate_body(IncidentAssignmentSchema)
+    if error:
+        return error
     try:
-        stakeholder = remove_incident_stakeholder(
-            group_id=group.id,
-            stakeholder_id=stakeholder_id,
+        incident = assign_incident(
+            incident.id,
+            assignee_id=payload.assignee_id,
+            expected_version=payload.row_version,
             user_id=_request_user_id(),
         )
-    except LookupError as exc:
-        return safe_exception_response(
-            exc,
-            error="not_found",
-            message="Incident stakeholder not found.",
-            status_code=404,
+    except (IncidentValidationError, IncidentConflictError) as exc:
+        return _service_error(exc)
+    return jsonify(serialize_incident(incident, current_user=_request_user(), include_details=True))
+
+
+@incidents_bp.route("/<int:incident_id>/assignee/me", methods=["PUT"])
+def assign_incident_to_me_view(incident_id):
+    incident, error = _get_incident_or_error(incident_id, respond=True)
+    if error:
+        return error
+    payload = request.get_json(silent=True) or {}
+    row_version = payload.get("row_version")
+    if not isinstance(row_version, int) or row_version < 1:
+        return make_error_response("validation_error", "row_version is required", 400)
+    if not _request_user_id():
+        return make_error_response("forbidden", "Authenticated user is required", 403)
+    try:
+        incident = assign_incident(
+            incident.id,
+            assignee_id=_request_user_id(),
+            expected_version=row_version,
+            user_id=_request_user_id(),
         )
+    except (IncidentValidationError, IncidentConflictError) as exc:
+        return _service_error(exc)
+    return jsonify(serialize_incident(incident, current_user=_request_user(), include_details=True))
 
-    write_audit(
-        "incident.stakeholder.remove",
-        object_type="incident",
-        object_id=group.id,
-        team_id=group.team_id,
-        user_id=_request_user_id(),
-        data={
-            "stakeholder_id": stakeholder.id,
-        },
-    )
 
-    return jsonify({
-        "deleted": True,
-        "id": stakeholder.id,
-    })
+@incidents_bp.route("/<int:incident_id>/alert-groups", methods=["GET"])
+def list_incident_alert_groups(incident_id):
+    incident, error = _get_incident_or_error(incident_id)
+    if error:
+        return error
+    return jsonify([serialize_incident_link(link) for link in incident_core_repo.list_active_links(incident.id)])
+
+
+@incidents_bp.route("/<int:incident_id>/alert-groups", methods=["POST"])
+def link_incident_alert_group(incident_id):
+    incident, error = _get_incident_or_error(incident_id, respond=True)
+    if error:
+        return error
+    payload, error = validate_body(IncidentLinkSchema)
+    if error:
+        return error
+    try:
+        link = link_alert_group(
+            incident.id,
+            payload.alert_group_id,
+            relation_type=payload.relation_type,
+            user_id=_request_user_id(),
+        )
+    except (IncidentValidationError, IncidentConflictError) as exc:
+        return _service_error(exc)
+    return jsonify(serialize_incident_link(link)), 201
+
+
+@incidents_bp.route("/<int:incident_id>/alert-groups/<int:group_id>", methods=["DELETE"])
+def unlink_incident_alert_group(incident_id, group_id):
+    incident, error = _get_incident_or_error(incident_id, respond=True)
+    if error:
+        return error
+    try:
+        link = unlink_alert_group(incident.id, group_id, user_id=_request_user_id())
+    except (IncidentValidationError, IncidentConflictError) as exc:
+        return _service_error(exc)
+    if not link:
+        return make_error_response("not_found", "Active Incident/AlertGroup link not found", 404)
+    return jsonify({"unlinked": True, "link": serialize_incident_link(link)})
+
+
+@incidents_bp.route("/<int:incident_id>/events", methods=["GET"])
+def list_incident_events(incident_id):
+    incident, error = _get_incident_or_error(incident_id)
+    if error:
+        return error
+    return jsonify([serialize_incident_event(event) for event in incident_core_repo.list_events(incident.id)])

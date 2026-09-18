@@ -27,7 +27,7 @@ IncidentRelay already provides most of the technical foundation:
 - acknowledgement, resolution, escalation and notification delivery are supported;
 - service and business impact are calculated from alert groups;
 - audit events are already written for many incident actions;
-- `/api/incidents` currently exposes alert groups as incidents.
+- Before 2.3, `/api/incidents` exposed AlertGroups as incidents; 2.3 replaces that contract with first-class Incidents and moves technical operations to `/api/alert-groups`.
 
 The missing part is a separate operational Incident entity. The current manual incident workflow must remain available as manual Alert Group creation, while manual Incident creation must create an actual Incident.
 

@@ -52,8 +52,8 @@ def _add_service_stakeholders_for_manual_incident(group):
         pass
 
 
-def create_manual_incident(payload, *, user_id=None):
-    """Create a manual incident as AlertGroup + child Alert."""
+def create_manual_alert_group(payload, *, user_id=None):
+    """Create an explicit manual AlertGroup with one child Alert."""
 
     team_id = payload["team_id"]
     service_id = payload.get("service_id")
@@ -82,6 +82,7 @@ def create_manual_incident(payload, *, user_id=None):
             "severity": severity,
             "source": "manual",
             "manual": "true",
+            "manual_alert_group_id": manual_id,
             "manual_incident_id": manual_id,
             "team": team.slug,
             "team_id": str(team.id),
@@ -175,7 +176,7 @@ def create_manual_incident(payload, *, user_id=None):
             alert_id=alert.id,
             group_id=group.id,
             event_type="manual_created",
-            message="Manual incident created",
+            message="Manual alert group created",
             user_id=user_id,
         )
 
@@ -191,3 +192,7 @@ def create_manual_incident(payload, *, user_id=None):
             )
 
     return group
+
+
+# Internal compatibility for older tests/helpers; public API compatibility is intentionally not preserved.
+create_manual_incident = create_manual_alert_group

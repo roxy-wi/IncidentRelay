@@ -5,6 +5,9 @@ description: Incident stakeholder snapshots, lifecycle notifications and service
 
 # Incident Stakeholders
 
+> **2.3 boundary:** stakeholder records on this page are still attached to technical AlertGroups. Canonical first-class Incident stakeholders are planned for the 2.5 collaboration stage.
+
+
 Incident stakeholders are people who should stay informed about an incident without necessarily being the active responder or assignee.
 
 Stakeholders are useful for:

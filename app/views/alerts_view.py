@@ -4,30 +4,54 @@ from flask import Blueprint, jsonify, request
 from app.api.schemas.alerts import (
     AlertDetailQuerySchema,
     AlertEventListQuerySchema,
+    AlertGroupCreateSchema,
     AlertListQuerySchema,
     AlertShelveSchema,
 )
-from app.modules.db import alerts_repo, notifications_repo
+from app.modules.db import alerts_repo, incidents_repo, notifications_repo
 from app.services.alerts.actions import acknowledge_alert, resolve_alert
+from app.services.alerts.assignment import set_alert_group_assignee
 from app.services.alerts.shelving import shelve_alert_group, unshelve_alert_group
 from app.services.audit import write_audit
-from app.services.rbac import get_allowed_team_ids, require_team_read, require_team_respond
+from app.services.rbac import (
+    can_access_team_or_group_resource,
+    can_respond_team,
+    get_allowed_team_ids,
+    is_admin_user,
+    require_team_read,
+    require_team_respond,
+)
 from app.services.serializers.alerts import (
     serialize_alert_event,
     serialize_alert_comment,
     serialize_alert_group,
+    serialize_incident_priority,
     serialize_incident_responder,
     serialize_alert_explain_trace,
 )
-from app.services.serializers.incidents import serialize_incident_stakeholder
+from app.services.serializers.incidents import serialize_incident, serialize_incident_stakeholder
 from app.services.alerts.alert_comments import (
     create_group_comment,
     create_child_alert_comment,
     update_group_comment,
     delete_group_comment,
 )
-from app.services.incidents.stakeholders import create_incident_stakeholder
-from app.services.incidents.priorities import set_incident_priority
+from app.services.incidents.stakeholders import (
+    create_incident_stakeholder,
+    remove_incident_stakeholder,
+)
+from app.services.incidents.manual import create_manual_alert_group
+from app.services.incidents.core import (
+    IncidentConflictError,
+    IncidentValidationError,
+    create_incident_from_alert_group,
+)
+from app.api.schemas.incidents import (
+    IncidentFromAlertGroupSchema,
+    IncidentResponderCreateSchema,
+    IncidentResponderUpdateSchema,
+)
+from app.services.incidents.priorities import reset_incident_priority, set_incident_priority
 from app.services.incidents.responders import (
     create_incident_responder,
     set_incident_responder_status,
@@ -44,6 +68,20 @@ alerts_bp = Blueprint("alerts_api", __name__)
 
 def _request_user():
     return getattr(request, "current_user", None)
+
+
+def _request_user_id():
+    return getattr(_request_user(), "id", None)
+
+
+def _can_create_manual_alert_group(user, team_id):
+    if not user:
+        return False
+    if is_admin_user(user):
+        return True
+    return can_respond_team(user, team_id) or can_access_team_or_group_resource(
+        user, team_id, write_required=True
+    )
 
 
 def _not_found(message="Alert group not found."):
@@ -149,6 +187,45 @@ def list_alerts():
     })
 
 
+@alerts_bp.route("", methods=["POST"])
+def create_alert_group():
+    """Create one explicit manual AlertGroup and one child Alert atomically."""
+    payload, error = validate_body(AlertGroupCreateSchema)
+    if error:
+        return error
+    if not _can_create_manual_alert_group(_request_user(), payload.team_id):
+        return make_error_response(
+            "forbidden",
+            "AlertGroup create permission is required for this team",
+            403,
+        )
+    try:
+        group = create_manual_alert_group(payload.model_dump(), user_id=_request_user_id())
+    except LookupError as exc:
+        return safe_exception_response(exc, error="not_found", message="Manual AlertGroup target not found.", status_code=404)
+    except ValueError as exc:
+        return safe_exception_response(exc, error="validation_error", message="Invalid manual AlertGroup request.", status_code=400)
+
+    write_audit(
+        "alert_group.manual.create",
+        object_type="alert_group",
+        object_id=group.id,
+        team_id=group.team_id,
+        user_id=_request_user_id(),
+        data={"team_id": group.team_id, "service_id": group.service_id, "title": group.title},
+    )
+    return jsonify(serialize_alert_group(group, current_user=_request_user(), include_details=True)), 201
+
+
+@alerts_bp.route("/priorities", methods=["GET"])
+def list_alert_group_priorities():
+    include_disabled = request.args.get("include_disabled") == "1"
+    return jsonify([
+        serialize_incident_priority(priority)
+        for priority in incidents_repo.list_priorities(include_disabled=include_disabled)
+    ])
+
+
 @alerts_bp.route("/<int:alert_id>", methods=["GET"])
 def get_alert(alert_id):
     """Return a single alert group with child alerts, events and delivery records."""
@@ -183,6 +260,10 @@ def get_alert(alert_id):
         notifications=notifications,
         current_user=_request_user(),
     )
+    payload["stakeholders"] = [
+        serialize_incident_stakeholder(item)
+        for item in incidents_repo.list_incident_stakeholders(group.id)
+    ]
     if events_page is not None:
         payload["events_pagination"] = events_page["pagination"]
     return jsonify(payload)
@@ -244,6 +325,65 @@ def resolve_alert_view(alert_id):
             current_user=_request_user(),
         )
     )
+
+
+@alerts_bp.route("/<int:alert_id>/assignee", methods=["PUT"])
+def update_alert_group_assignee(alert_id):
+    group, error = _require_alert_group_respond(alert_id)
+    if error:
+        return error
+    data = request.get_json(silent=True) or {}
+    try:
+        group = set_alert_group_assignee(
+            group,
+            data.get("assignee_id"),
+            actor_user_id=_request_user_id(),
+        )
+    except ValueError as exc:
+        return safe_exception_response(exc, error="validation_error", message="Invalid AlertGroup assignee.", status_code=400)
+    return jsonify(serialize_alert_group(group, current_user=_request_user()))
+
+
+@alerts_bp.route("/<int:alert_id>/assignee/me", methods=["PUT"])
+def assign_alert_group_to_me(alert_id):
+    group, error = _require_alert_group_respond(alert_id)
+    if error:
+        return error
+    if not _request_user_id():
+        return make_error_response("forbidden", "Authenticated user is required", 403)
+    try:
+        group = set_alert_group_assignee(
+            group,
+            _request_user_id(),
+            actor_user_id=_request_user_id(),
+        )
+    except ValueError as exc:
+        return safe_exception_response(exc, error="validation_error", message="Invalid AlertGroup assignee.", status_code=400)
+    return jsonify(serialize_alert_group(group, current_user=_request_user()))
+
+
+@alerts_bp.route("/<int:alert_id>/create-incident", methods=["POST"])
+def create_incident_from_alert_group_view(alert_id):
+    group, error = _require_alert_group_respond(alert_id)
+    if error:
+        return error
+    payload, error = validate_body(IncidentFromAlertGroupSchema)
+    if error:
+        return error
+    try:
+        incident = create_incident_from_alert_group(
+            group.id,
+            user_id=_request_user_id(),
+            title=payload.title,
+            description=payload.description,
+            priority_slug=payload.priority,
+            assignee_id=payload.assignee_id,
+        )
+    except IncidentConflictError as exc:
+        return make_error_response("conflict", str(exc), 409)
+    except IncidentValidationError as exc:
+        return make_error_response("validation_error", str(exc), 400)
+    return jsonify(serialize_incident(incident, current_user=_request_user(), include_details=True)), 201
 
 
 @alerts_bp.route("/<int:alert_id>/shelve", methods=["POST"])
@@ -616,6 +756,23 @@ def update_incident_priority(alert_id):
     return jsonify(serialize_alert_group(group, current_user=user))
 
 
+@alerts_bp.route("/<int:alert_id>/priority", methods=["DELETE"])
+def reset_alert_group_priority(alert_id):
+    group, error = _require_alert_group_respond(alert_id)
+    if error:
+        return error
+    try:
+        group = reset_incident_priority(group_id=group.id)
+    except (ValueError, LookupError) as exc:
+        return safe_exception_response(
+            exc,
+            error="validation_error",
+            message="AlertGroup priority could not be returned to automatic mode.",
+            status_code=400,
+        )
+    return jsonify(serialize_alert_group(group, current_user=_request_user()))
+
+
 @alerts_bp.route("/<int:alert_id>/responders", methods=["GET"])
 def list_incident_responders(alert_id):
     group, error = _require_alert_group_read(alert_id)
@@ -634,14 +791,18 @@ def add_incident_responder(alert_id):
     if error:
         return error
 
-    payload = request.get_json(silent=True) or {}
+    payload, error = validate_body(IncidentResponderCreateSchema)
+    if error:
+        return error
+
     user = _request_user()
+    user_id = getattr(user, "id", None)
 
     try:
         responder = create_incident_responder(
             group_id=group.id,
-            payload=payload,
-            user_id=getattr(user, "id", None),
+            payload=payload.model_dump(),
+            user_id=user_id,
         )
     except ValueError as exc:
         return safe_exception_response(
@@ -650,25 +811,65 @@ def add_incident_responder(alert_id):
             message="Invalid incident responder request.",
             status_code=400,
         )
+    except LookupError as exc:
+        return safe_exception_response(
+            exc,
+            error="not_found",
+            message="AlertGroup responder target not found.",
+            status_code=404,
+        )
+
+    write_audit(
+        "alert_group.responder.add",
+        object_type="alert_group",
+        object_id=group.id,
+        team_id=group.team_id,
+        user_id=user_id,
+        data={
+            "responder_id": responder.id,
+            "target_type": responder.target_type,
+            "target_user_id": responder.target_user_id,
+            "target_team_id": responder.target_team_id,
+            "target_rotation_id": responder.target_rotation_id,
+            "target_escalation_policy_id": responder.target_escalation_policy_id,
+            "status": responder.status,
+        },
+    )
 
     return jsonify(serialize_incident_responder(responder)), 201
 
 
 @alerts_bp.route("/<int:alert_id>/responders/<int:responder_id>", methods=["PUT"])
 def update_incident_responder(alert_id, responder_id):
-    group, error = _require_alert_group_respond(alert_id)
+    # A requested user may accept/decline their own request even when they are
+    # only a team viewer, so read access is sufficient here. The responder
+    # service performs the action-specific authorization check.
+    group, error = _require_alert_group_read(alert_id)
     if error:
         return error
 
-    payload = request.get_json(silent=True) or {}
+    payload, error = validate_body(IncidentResponderUpdateSchema)
+    if error:
+        return error
+
     user = _request_user()
+    user_id = getattr(user, "id", None)
 
     try:
         responder = set_incident_responder_status(
             group_id=group.id,
             responder_id=responder_id,
-            status=payload.get("status"),
-            user_id=getattr(user, "id", None),
+            status=payload.status,
+            response_message=payload.response_message,
+            user_id=user_id,
+            user=user,
+        )
+    except PermissionError as exc:
+        return safe_exception_response(
+            exc,
+            error="access_denied",
+            message="You do not have permission to update this responder.",
+            status_code=403,
         )
     except ValueError as exc:
         return safe_exception_response(
@@ -681,9 +882,21 @@ def update_incident_responder(alert_id, responder_id):
         return safe_exception_response(
             exc,
             error="not_found",
-            message="Incident responder not found.",
+            message="AlertGroup responder not found.",
             status_code=404,
         )
+
+    write_audit(
+        "alert_group.responder.update",
+        object_type="alert_group",
+        object_id=group.id,
+        team_id=group.team_id,
+        user_id=user_id,
+        data={
+            "responder_id": responder.id,
+            "status": responder.status,
+        },
+    )
 
     return jsonify(serialize_incident_responder(responder))
 
@@ -708,12 +921,13 @@ def add_incident_stakeholder(alert_id):
 
     payload = request.get_json(silent=True) or {}
     user = _request_user()
+    user_id = getattr(user, "id", None)
 
     try:
         stakeholder = create_incident_stakeholder(
             group_id=group.id,
             payload=payload,
-            user_id=getattr(user, "id", None),
+            user_id=user_id,
         )
     except ValueError as exc:
         return safe_exception_response(
@@ -722,8 +936,60 @@ def add_incident_stakeholder(alert_id):
             message="Invalid incident stakeholder request.",
             status_code=400,
         )
+    except LookupError as exc:
+        return safe_exception_response(
+            exc,
+            error="not_found",
+            message="AlertGroup stakeholder target not found.",
+            status_code=404,
+        )
+
+    write_audit(
+        "alert_group.stakeholder.add",
+        object_type="alert_group",
+        object_id=group.id,
+        team_id=group.team_id,
+        user_id=user_id,
+        data={"stakeholder_id": stakeholder.id},
+    )
 
     return jsonify(serialize_incident_stakeholder(stakeholder)), 201
+
+
+@alerts_bp.route(
+    "/<int:alert_id>/stakeholders/<int:stakeholder_id>",
+    methods=["DELETE"],
+)
+def delete_incident_stakeholder(alert_id, stakeholder_id):
+    group, error = _require_alert_group_respond(alert_id)
+    if error:
+        return error
+
+    user_id = _request_user_id()
+    try:
+        stakeholder = remove_incident_stakeholder(
+            group_id=group.id,
+            stakeholder_id=stakeholder_id,
+            user_id=user_id,
+        )
+    except LookupError as exc:
+        return safe_exception_response(
+            exc,
+            error="not_found",
+            message="AlertGroup stakeholder not found.",
+            status_code=404,
+        )
+
+    write_audit(
+        "alert_group.stakeholder.remove",
+        object_type="alert_group",
+        object_id=group.id,
+        team_id=group.team_id,
+        user_id=user_id,
+        data={"stakeholder_id": stakeholder.id},
+    )
+
+    return jsonify({"deleted": True, "id": stakeholder.id})
 
 
 @alerts_bp.route("/<int:alert_id>/explain", methods=["GET"])

@@ -8,7 +8,7 @@ def _json_schema(operation):
 def test_openapi_alerts_are_documented_as_groups():
     spec = build_openapi_spec()
 
-    operation = spec["paths"]["/api/alerts"]["get"]
+    operation = spec["paths"]["/api/alert-groups"]["get"]
 
     assert operation["operationId"] == "listAlertGroups"
     assert operation["security"] == [{"bearerAuth": []}]
@@ -25,7 +25,7 @@ def test_openapi_alerts_are_documented_as_groups():
 def test_openapi_alert_group_detail_contains_child_alerts():
     spec = build_openapi_spec()
 
-    operation = spec["paths"]["/api/alerts/{alert_id}"]["get"]
+    operation = spec["paths"]["/api/alert-groups/{alert_id}"]["get"]
 
     assert operation["operationId"] == "getAlertGroup"
     assert operation["security"] == [{"bearerAuth": []}]
@@ -41,7 +41,7 @@ def test_openapi_alert_group_detail_contains_child_alerts():
 def test_openapi_alert_group_merge_endpoint():
     spec = build_openapi_spec()
 
-    operation = spec["paths"]["/api/alerts/merge"]["post"]
+    operation = spec["paths"]["/api/alert-groups/merge"]["post"]
 
     assert operation["operationId"] == "mergeAlertGroups"
     assert operation["security"] == [{"bearerAuth": []}]
@@ -57,7 +57,7 @@ def test_openapi_alert_list_supports_multi_value_filters():
 
     parameters = {
         parameter["name"]: parameter
-        for parameter in spec["paths"]["/api/alerts"]["get"]["parameters"]
+        for parameter in spec["paths"]["/api/alert-groups"]["get"]["parameters"]
     }
 
     assert parameters["status"]["schema"]["type"] == "array"
@@ -91,7 +91,7 @@ def test_openapi_alert_comment_schema_keeps_validation_constraints():
 
 def test_openapi_alert_events_documents_optional_pagination():
     spec = build_openapi_spec()
-    operation = spec["paths"]["/api/alerts/{alert_id}/events"]["get"]
+    operation = spec["paths"]["/api/alert-groups/{alert_id}/events"]["get"]
     parameters = {item["name"]: item for item in operation["parameters"]}
 
     assert parameters["page"]["schema"]["minimum"] == 1
@@ -102,7 +102,7 @@ def test_openapi_alert_events_documents_optional_pagination():
 
 def test_openapi_alert_group_detail_exposes_event_pagination():
     spec = build_openapi_spec()
-    operation = spec["paths"]["/api/alerts/{alert_id}"]["get"]
+    operation = spec["paths"]["/api/alert-groups/{alert_id}"]["get"]
     schema = _json_schema(operation)
     parameters = {item["name"]: item for item in operation["parameters"]}
 

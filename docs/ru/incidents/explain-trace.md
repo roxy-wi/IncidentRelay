@@ -81,7 +81,7 @@ IncidentRelay создаёт трассировку объяснения для 
 ### Список трассировок для группы алертов
 
 ```http
-GET /api/alerts/{alert_group_id}/explain
+GET /api/alert-groups/{alert_group_id}/explain
 ```
 
 Возвращает трассировки объяснения, связанные с существующей группой алертов.
@@ -113,7 +113,7 @@ GET /api/alerts/{alert_group_id}/explain
 ### Получить одну трассировку с шагами
 
 ```http
-GET /api/alerts/explain/{trace_id}
+GET /api/alert-groups/explain/{trace_id}
 ```
 
 Возвращает одну трассировку с упорядоченными шагами обработки.
@@ -264,7 +264,7 @@ IncidentRelay 2.1 читает старый `[alerts] alert_explain_trace_retent
 Убедитесь, что у группы алертов есть хотя бы одна связанная трассировка:
 
 ```http
-GET /api/alerts/{alert_group_id}/explain
+GET /api/alert-groups/{alert_group_id}/explain
 ```
 
 Если возвращается пустой список, группа алертов, вероятно, была создана до включения Explain Trace.

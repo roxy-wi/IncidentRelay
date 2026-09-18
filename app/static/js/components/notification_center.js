@@ -177,13 +177,13 @@
             .text(notificationCenterItemBody(item))
             .appendTo(row);
 
-        if (item.incident) {
+        if (item.alert_group) {
             $("<div>")
                 .addClass("notification-center-item-meta")
                 .text([
-                    item.incident.team_name || i18n.t("notification_center.no_team"),
-                    item.incident.service_name || i18n.t("notification_center.no_service"),
-                    notificationCenterIncidentStatus(item.incident.status),
+                    item.alert_group.team_name || i18n.t("notification_center.no_team"),
+                    item.alert_group.service_name || i18n.t("notification_center.no_service"),
+                    notificationCenterIncidentStatus(item.alert_group.status),
                 ].join(" · "))
                 .appendTo(row);
         }

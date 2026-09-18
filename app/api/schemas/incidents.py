@@ -38,24 +38,53 @@ IncidentResponderUpdateStatus = Literal[
 
 
 class IncidentCreateSchema(ApiModel):
-    """Validate manual incident creation payload."""
+    """Validate first-class operational Incident creation."""
 
     team_id: int = Field(ge=1)
     service_id: int | None = Field(default=None, ge=1)
-    title: str = Field(min_length=1, max_length=500)
-    message: str | None = Field(default=None, max_length=5000)
-    severity: IncidentSeverity = "critical"
+    title: str = Field(min_length=1, max_length=255)
+    description: str | None = Field(default=None, max_length=10000)
     priority: IncidentPrioritySlug | None = None
-    notify: bool = True
+    assignee_id: int | None = Field(default=None, ge=1)
 
     @model_validator(mode="after")
     def normalize_text(self):
         self.title = self.title.strip()
-
-        if self.message is not None:
-            self.message = self.message.strip()
-
+        if self.description is not None:
+            self.description = self.description.strip() or None
         return self
+
+
+class IncidentUpdateSchema(ApiModel):
+    """Mutable Incident fields guarded by row_version."""
+
+    row_version: int = Field(ge=1)
+    title: str | None = Field(default=None, min_length=1, max_length=255)
+    description: str | None = Field(default=None, max_length=10000)
+    service_id: int | None = Field(default=None, ge=1)
+    priority: IncidentPrioritySlug | None = None
+
+
+class IncidentTransitionSchema(ApiModel):
+    row_version: int = Field(ge=1)
+    status: Literal["declared", "investigating", "identified", "monitoring", "resolved", "closed", "cancelled"]
+
+
+class IncidentAssignmentSchema(ApiModel):
+    row_version: int = Field(ge=1)
+    assignee_id: int | None = Field(default=None, ge=1)
+
+
+class IncidentLinkSchema(ApiModel):
+    alert_group_id: int = Field(ge=1)
+    relation_type: Literal["primary", "related"] = "related"
+
+
+class IncidentFromAlertGroupSchema(ApiModel):
+    title: str | None = Field(default=None, min_length=1, max_length=255)
+    description: str | None = Field(default=None, max_length=10000)
+    priority: IncidentPrioritySlug | None = None
+    assignee_id: int | None = Field(default=None, ge=1)
 
 
 class IncidentResponderCreateSchema(ApiModel):

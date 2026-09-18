@@ -74,7 +74,7 @@ When a shelf expires or is manually removed:
 ## API
 
 ```http
-POST /api/alerts/{alert_group_id}/shelve
+POST /api/alert-groups/{alert_group_id}/shelve
 Content-Type: application/json
 ```
 
@@ -88,13 +88,13 @@ Content-Type: application/json
 To end a shelf:
 
 ```http
-POST /api/alerts/{alert_group_id}/unshelve
+POST /api/alert-groups/{alert_group_id}/unshelve
 ```
 
 List only currently shelved groups with:
 
 ```text
-GET /api/alerts?shelved=1
+GET /api/alert-groups?shelved=1
 ```
 
 The serialized AlertGroup keeps its normal `status` and adds `shelved` plus the current `shelve` object.

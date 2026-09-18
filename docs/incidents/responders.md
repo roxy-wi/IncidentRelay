@@ -5,6 +5,9 @@ description: Request and manage additional responders for active incidents.
 
 # Incident Responders
 
+> **2.3 boundary:** responder records on this page are still attached to technical AlertGroups. Canonical first-class Incident responders are planned for the 2.5 collaboration stage.
+
+
 Incident responders are people, teams, rotations, or escalation policies explicitly requested to help with an active incident.
 
 Responders are different from the incident assignee:
@@ -29,7 +32,7 @@ Only one target id must be provided for the selected `target_type`.
 ## Request a responder
 
 ```http
-POST /api/incidents/{incident_id}/responders
+POST /api/alert-groups/{alert_group_id}/responders
 ```
 
 Request body:
@@ -93,7 +96,7 @@ Response:
 ## List incident responders
 
 ```http
-GET /api/incidents/{incident_id}/responders
+GET /api/alert-groups/{alert_group_id}/responders
 ```
 
 Returns all responder requests for the incident.
@@ -132,7 +135,7 @@ Example response:
 ## Update responder status
 
 ```http
-PUT /api/incidents/{incident_id}/responders/{responder_id}
+PUT /api/alert-groups/{alert_group_id}/responders/{responder_id}
 ```
 
 Request body:

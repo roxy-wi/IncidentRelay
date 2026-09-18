@@ -9,7 +9,7 @@ def serialize_incident_stakeholder(stakeholder):
 
     return {
         "id": stakeholder.id,
-        "incident_id": stakeholder.group_id,
+        "alert_group_id": stakeholder.group_id,
         "user_id": stakeholder.user_id,
         "user": {
             "id": user.id,
@@ -33,33 +33,94 @@ def serialize_incident_stakeholder(stakeholder):
     }
 
 
-def serialize_incident(group, *, current_user=None, include_details=False):
-    data = serialize_alert_group(
-        group,
-        current_user=current_user,
-        include_details=include_details,
-        include_payload=include_details,
-    )
+def serialize_incident(incident, *, current_user=None, include_details=False):
+    """Serialize a first-class operational Incident."""
+    team = incident.team if getattr(incident, "team_id", None) else None
+    service = incident.service if getattr(incident, "service_id", None) else None
+    priority = incident.priority if getattr(incident, "priority_id", None) else None
+    assignee = incident.assignee if getattr(incident, "assignee_id", None) else None
 
-    data["incident_id"] = group.id
-    data["priority"] = {
-        "id": group.priority_id,
-        "slug": group.priority_slug,
-        "order": group.priority_order,
-        "set_manually": group.priority_set_manually,
-        "set_by_id": group.priority_set_by_id,
-        "set_at": serialize_utc_datetime(group.priority_set_at),
+    data = {
+        "id": incident.id,
+        "type": "incident",
+        "team_id": incident.team_id,
+        "team_name": getattr(team, "name", None),
+        "team_slug": getattr(team, "slug", None),
+        "service_id": incident.service_id,
+        "service_name": getattr(service, "name", None),
+        "service_slug": getattr(service, "slug", None),
+        "priority": getattr(priority, "slug", None),
+        "priority_id": incident.priority_id,
+        "assignee_id": incident.assignee_id,
+        "assignee": ({
+            "id": assignee.id,
+            "username": assignee.username,
+            "display_name": assignee.display_name,
+            "email": assignee.email,
+        } if assignee else None),
+        "workflow_status": incident.workflow_status,
+        "title": incident.title,
+        "description": incident.description,
+        "row_version": incident.row_version,
+        "declared_by_id": incident.declared_by_id,
+        "declared_at": serialize_utc_datetime(incident.declared_at),
+        "investigation_started_at": serialize_utc_datetime(incident.investigation_started_at),
+        "identified_at": serialize_utc_datetime(incident.identified_at),
+        "monitoring_at": serialize_utc_datetime(incident.monitoring_at),
+        "resolved_at": serialize_utc_datetime(incident.resolved_at),
+        "closed_by_id": incident.closed_by_id,
+        "closed_at": serialize_utc_datetime(incident.closed_at),
+        "created_at": serialize_utc_datetime(incident.created_at),
+        "updated_at": serialize_utc_datetime(incident.updated_at),
     }
-
-    data["maintenance"] = {
-        "window_id": group.maintenance_window_id,
-        "behavior": group.maintenance_behavior,
-        "suppressed": group.maintenance_suppressed,
-    }
-
-    data["active_maintenance"] = serialize_attached_maintenance_ref(group)
-
+    if include_details:
+        data.update({
+            "summary": incident.summary,
+            "root_cause": incident.root_cause,
+            "resolution_summary": incident.resolution_summary,
+        })
+    if current_user is not None and incident.team_id:
+        from app.services.serializers.common import attach_team_permissions
+        attach_team_permissions(data, incident.team_id, current_user=current_user)
     return data
+
+
+def serialize_incident_link(link):
+    group = link.alert_group
+    return {
+        "id": link.id,
+        "incident_id": link.incident_id,
+        "alert_group_id": link.alert_group_id,
+        "relation_type": link.relation_type,
+        "active": link.removed_at is None,
+        "linked_by_id": link.linked_by_id,
+        "linked_at": serialize_utc_datetime(link.linked_at),
+        "removed_by_id": link.removed_by_id,
+        "removed_at": serialize_utc_datetime(link.removed_at),
+        "alert_group": {
+            "id": group.id,
+            "title": group.title,
+            "status": group.status,
+            "severity": group.severity,
+            "priority": group.priority_slug,
+            "source": group.source,
+            "service_id": group.service_id,
+            "assignee_id": group.assignee_id,
+            "last_seen_at": serialize_utc_datetime(group.last_seen_at),
+        } if group else None,
+    }
+
+
+def serialize_incident_event(event):
+    return {
+        "id": event.id,
+        "incident_id": event.incident_id,
+        "event_type": event.event_type,
+        "user_id": event.user_id,
+        "message": event.message,
+        "data": event.data or {},
+        "created_at": serialize_utc_datetime(event.created_at),
+    }
 
 
 def _as_dict(value):

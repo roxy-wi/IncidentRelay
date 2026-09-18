@@ -62,7 +62,7 @@ window.AlertIncidentManagement = (function () {
     }
 
     function loadIncident(incidentId, callback) {
-        apiGet("/api/incidents/" + incidentId, function (incident) {
+        apiGet("/api/alert-groups/" + incidentId, function (incident) {
             callback(incident || {});
         });
     }
@@ -73,7 +73,7 @@ window.AlertIncidentManagement = (function () {
             return;
         }
 
-        apiGet("/api/incidents/priorities", function (items) {
+        apiGet("/api/alert-groups/priorities", function (items) {
             priorityCache.loaded = true;
             priorityCache.items = Array.isArray(items) ? items : [];
             callback(priorityCache.items);
@@ -714,7 +714,7 @@ window.AlertIncidentManagement = (function () {
         const incidentId = section.data("incident-id");
 
         apiPut(
-            "/api/incidents/" + incidentId + "/priority",
+            "/api/alert-groups/" + incidentId + "/priority",
             {priority: priority},
             function () {
                 refreshIncident(section);
@@ -735,7 +735,7 @@ window.AlertIncidentManagement = (function () {
             confirmText: i18n.t("alert_details.priority.reset_auto"),
             confirmClass: "btn-primary",
         }).done(function () {
-            apiDelete("/api/incidents/" + incidentId + "/priority", function () {
+            apiDelete("/api/alert-groups/" + incidentId + "/priority", function () {
                 refreshIncident(section);
             });
         });
@@ -750,7 +750,7 @@ window.AlertIncidentManagement = (function () {
             confirmClass: "btn-danger",
         }).done(function () {
             apiDelete(
-                "/api/incidents/" + section.data("incident-id") + "/stakeholders/" + stakeholderId,
+                "/api/alert-groups/" + section.data("incident-id") + "/stakeholders/" + stakeholderId,
                 function () {
                     refreshIncident(section);
                 }
@@ -767,7 +767,7 @@ window.AlertIncidentManagement = (function () {
 
         const runUpdate = function () {
             apiPut(
-                "/api/incidents/" + incidentId + "/responders/" + responderId,
+                "/api/alert-groups/" + incidentId + "/responders/" + responderId,
                 {
                     status: status,
                 },
@@ -1039,7 +1039,7 @@ window.AlertIncidentManagement = (function () {
         }
 
         apiPost(
-            "/api/incidents/" + incidentId + "/responders",
+            "/api/alert-groups/" + incidentId + "/responders",
             payload,
             function () {
                 closeAppModal(modal);
@@ -1138,7 +1138,7 @@ window.AlertIncidentManagement = (function () {
         }
 
         apiPost(
-            "/api/incidents/" + incidentId + "/stakeholders",
+            "/api/alert-groups/" + incidentId + "/stakeholders",
             payload,
             function () {
                 closeAppModal(modal);
