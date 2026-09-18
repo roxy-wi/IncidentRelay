@@ -22,7 +22,7 @@ class RouteBaseSchema(ApiModel):
     name: str = Field(min_length=2, max_length=120)
     source: str = Field(
         pattern=(
-            r"^(alertmanager|aws_sns|azure_monitor|datadog|grafana|"
+            r"^(alertmanager|aws_sns|azure_monitor|cloud_ru|datadog|grafana|"
             r"zabbix|webhook|sentry|librenms|new_relic|nagios|"
             r"rmon|uptime_kuma|heartbeat)$"
         )
@@ -55,10 +55,20 @@ class RouteBaseSchema(ApiModel):
 
     @model_validator(mode="after")
     def validate_integration_config(self):
+        config = self.integration_config or {}
+
+        if self.source == "cloud_ru":
+            cloud_ru = config.get("cloud_ru")
+            if not isinstance(cloud_ru, dict):
+                raise ValueError("Cloud.ru SMN Topic URN is required")
+            topic_urn = str(cloud_ru.get("topic_urn") or "").strip()
+            if not topic_urn or not topic_urn.startswith("urn:smn:"):
+                raise ValueError("Cloud.ru SMN Topic URN is invalid")
+            return self
+
         if self.source != "aws_sns":
             return self
 
-        config = self.integration_config or {}
         aws_sns = config.get("aws_sns")
 
         if not isinstance(aws_sns, dict):

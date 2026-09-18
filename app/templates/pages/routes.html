@@ -194,6 +194,7 @@
                   <option value="datadog">Datadog</option>
                   <option value="new_relic">New Relic</option>
                   <option value="azure_monitor">Azure Monitor</option>
+                  <option value="cloud_ru">Cloud.ru Cloud Eye / SMN</option>
                   <option value="nagios">Nagios</option>
                   <option value="rmon">RMON</option>
                   <option value="heartbeat">Heartbeat</option>
@@ -214,6 +215,9 @@
               </div>
               <div id="route-azure-monitor-help" class="help-text is-hidden">
                 {{ _("routes.form.azure_monitor_help") }}
+              </div>
+              <div id="route-cloud-ru-help" class="help-text is-hidden">
+                {{ _("routes.form.cloud_ru_help") }}
               </div>
               <div id="route-nagios-help" class="help-text is-hidden">
                 {{ _("routes.form.nagios_help") }}
@@ -260,6 +264,32 @@
                         >
                         <div class="help-text">
                             {{ _("routes.form.sentry_org_help") }}
+                        </div>
+                    </div>
+                </div>
+                <div id="route-cloud-ru-settings" class="is-hidden">
+                    <div class="form-group">
+                        <label for="route-cloud-ru-topic-urn">
+                            {{ _("routes.form.cloud_ru_topic_urn") }}
+                        </label>
+                        <input
+                            id="route-cloud-ru-topic-urn"
+                            type="text"
+                            autocomplete="off"
+                            spellcheck="false"
+                            placeholder="urn:smn:region:project-id:incidentrelay"
+                        >
+                        <div class="form-help">
+                            {{ _("routes.form.cloud_ru_topic_urn_help") }}
+                        </div>
+                    </div>
+                    <div id="route-cloud-ru-webhook-group" class="form-group is-hidden">
+                        <label for="route-cloud-ru-webhook-url">
+                            {{ _("routes.form.cloud_ru_webhook") }}
+                        </label>
+                        <input id="route-cloud-ru-webhook-url" type="text" readonly>
+                        <div class="form-help">
+                            {{ _("routes.form.cloud_ru_webhook_help") }}
                         </div>
                     </div>
                 </div>

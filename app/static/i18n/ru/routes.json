@@ -216,5 +216,13 @@
   "routes.intake.datadog_help": "Настройте JSON custom payload с ALERT_CYCLE_KEY и ALERT_TRANSITION, чтобы recovery обновлял тот же алерт IncidentRelay.",
   "routes.intake.uptime_kuma_example_comment": "Пример стандартного Webhook payload Uptime Kuma",
   "routes.intake.uptime_kuma_subtitle": "Используйте этот endpoint и token маршрута в Webhook notification Uptime Kuma.",
-  "routes.intake.uptime_kuma_help": "В Uptime Kuma создайте Webhook notification с методом POST, типом application/json, intake URL маршрута и дополнительным заголовком Authorization. Оставьте стандартный request body."
+  "routes.intake.uptime_kuma_help": "В Uptime Kuma создайте Webhook notification с методом POST, типом application/json, intake URL маршрута и дополнительным заголовком Authorization. Оставьте стандартный request body.",
+  "routes.form.cloud_ru_help": "Cloud.ru Advanced Cloud Eye отправляет аварийные сигналы через Simple Message Notification (SMN). Укажите сгенерированный webhook URL как HTTP/HTTPS-подписку и задайте точный Topic URN ниже.",
+  "routes.form.cloud_ru_topic_urn": "Cloud.ru SMN Topic URN",
+  "routes.form.cloud_ru_topic_urn_help": "Точный URN топика SMN, которому разрешено отправлять подписанные уведомления в этот маршрут, например urn:smn:region:project-id:incidentrelay.",
+  "routes.form.cloud_ru_webhook": "Cloud.ru SMN webhook URL",
+  "routes.form.cloud_ru_webhook_help": "Добавьте этот HTTPS URL как endpoint HTTP/HTTPS-подписки SMN. IncidentRelay проверяет подпись SMN и автоматически подтверждает подписку.",
+  "routes.intake.cloud_ru_example_comment": "Endpoint Cloud.ru SMN / Cloud Eye (запрос должен содержать корректную подпись SMN)",
+  "routes.intake.cloud_ru_subtitle": "Используйте этот route-scoped HTTPS URL как endpoint HTTP/HTTPS-подписки Cloud.ru Advanced SMN.",
+  "routes.intake.cloud_ru_help": "SMN не отправляет токен IncidentRelay. Перед приемом Cloud Eye alarm IncidentRelay проверяет SMN V1 signature, сертификат Cloud.ru и точное совпадение Topic URN."
 }

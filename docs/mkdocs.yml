@@ -67,6 +67,7 @@ nav:
           - Alertmanager: integrations/alertmanager.md
           - New Relic: integrations/new-relic.md
           - Azure Monitor: integrations/azure-monitor.md
+          - Cloud.ru: integrations/cloud-ru.md
           - Nagios: integrations/nagios.md
           - Zabbix: integrations/zabbix.md
           - Sentry: integrations/sentry.md

@@ -25,6 +25,7 @@ Monitoring system -> Incoming integration -> Route -> Notification channels -> U
 | Datadog             | `POST /api/integrations/datadog`           | [Datadog](datadog.md)                                     |
 | New Relic           | `POST /api/integrations/new-relic`         | [New Relic](new-relic.md)                                 |
 | Azure Monitor       | `POST /api/integrations/azure-monitor`      | [Azure Monitor](azure-monitor.md)                         |
+| Cloud.ru Cloud Eye / SMN | `POST /api/integrations/cloud-ru/<route_id>` | [Cloud.ru](cloud-ru.md) |
 | Nagios              | `POST /api/integrations/nagios`            | [Nagios](nagios.md)                                       |
 | Uptime Kuma         | `POST /api/integrations/uptime-kuma`       | [Uptime Kuma](uptime-kuma.md)                             |
 | RMON                | `POST /api/integrations/rmon`              | [Grafana](rmon.md)                                        |

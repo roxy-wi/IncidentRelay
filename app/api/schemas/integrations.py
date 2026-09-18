@@ -275,6 +275,33 @@ class AzureMonitorWebhookSchema(ApiModel):
         return self
 
 
+class CloudRuSmnEnvelopeSchema(ApiModel):
+    """Validate a Cloud.ru SMN HTTP/HTTPS message envelope."""
+
+    model_config = ConfigDict(extra="allow")
+
+    type: str = Field(
+        pattern=r"^(Notification|SubscriptionConfirmation|UnsubscribeConfirmation)$"
+    )
+    message_id: str = Field(min_length=1)
+    topic_urn: str = Field(min_length=1)
+    message: Any
+    timestamp: str = Field(min_length=1)
+    signature_version: str = Field(pattern=r"^[vV]1$")
+    signature: str = Field(min_length=1)
+    signing_cert_url: str = Field(min_length=1)
+    subject: str | None = None
+    subscribe_url: str | None = None
+    unsubscribe_url: str | None = None
+
+    @model_validator(mode="after")
+    def validate_confirmation_fields(self):
+        if self.type in {"SubscriptionConfirmation", "UnsubscribeConfirmation"}:
+            if not str(self.subscribe_url or "").strip():
+                raise ValueError("subscribe_url is required for SMN confirmation messages")
+        return self
+
+
 class NewRelicWebhookSchema(ApiModel):
     """Validate a New Relic Alerts Workflows webhook payload."""
 

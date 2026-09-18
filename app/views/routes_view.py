@@ -158,6 +158,15 @@ def build_route_integration_config(payload, current_route=None):
             "sentry": sentry_config,
         }
 
+    if payload.source == "cloud_ru":
+        incoming_cloud_ru = dict(incoming.get("cloud_ru") or {})
+        topic_urn = str(incoming_cloud_ru.get("topic_urn") or "").strip()
+        return {
+            "cloud_ru": {
+                "topic_urn": topic_urn,
+            },
+        }
+
     if payload.source == "aws_sns":
         incoming_aws_sns = dict(
             incoming.get("aws_sns") or {}

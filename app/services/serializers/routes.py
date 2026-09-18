@@ -25,6 +25,15 @@ def serialize_route_integration_config(route):
             }
         }
 
+    if route.source == "cloud_ru":
+        cloud_ru = dict(config.get("cloud_ru") or {})
+        return {
+            "cloud_ru": {
+                "topic_urn": cloud_ru.get("topic_urn"),
+                "webhook_path": f"/api/integrations/cloud-ru/{route.id}",
+            }
+        }
+
     if route.source == "aws_sns":
         aws_sns = dict(
             config.get("aws_sns") or {}

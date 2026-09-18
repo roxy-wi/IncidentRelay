@@ -15,7 +15,7 @@ It is designed for SRE, DevOps, platform, infrastructure and operations teams th
 ### Alert intake, routing and orchestration
 
 - route-based intake tokens and source-specific webhook endpoints;
-- native integrations for Alertmanager, AWS SNS / CloudWatch, Azure Monitor, Datadog, Grafana, LibreNMS, Nagios, New Relic, RMON, Sentry, Uptime Kuma and Zabbix;
+- native integrations for Alertmanager, AWS SNS / CloudWatch, Azure Monitor, Cloud.ru Cloud Eye / SMN, Datadog, Grafana, LibreNMS, Nagios, New Relic, RMON, Sentry, Uptime Kuma and Zabbix;
 - generic webhook intake with PagerDuty Events API v2-compatible trigger, acknowledge and resolve events;
 - Global and Service Event Orchestration;
 - orchestration Builder and JSON editor, validation, simulation, shadow mode, replay, immutable published versions and rollback;
@@ -136,6 +136,7 @@ Read more: [Event Orchestration](docs/usage/event-orchestration.md) and [Explain
 | Alertmanager | `POST /api/integrations/alertmanager` | [Alertmanager](docs/integrations/alertmanager.md) |
 | AWS SNS / CloudWatch | `POST /api/integrations/aws-sns/<route_id>` | [AWS SNS / CloudWatch](docs/integrations/aws-sns-cloudwatch.md) |
 | Azure Monitor | `POST /api/integrations/azure-monitor` | [Azure Monitor](docs/integrations/azure-monitor.md) |
+| Cloud.ru Cloud Eye / SMN | `POST /api/integrations/cloud-ru/<route_id>` | [Cloud.ru](docs/integrations/cloud-ru.md) |
 | Datadog | `POST /api/integrations/datadog` | [Datadog](docs/integrations/datadog.md) |
 | Grafana | `POST /api/integrations/grafana` | [Grafana](docs/integrations/grafana.md) |
 | LibreNMS | `POST /api/integrations/librenms` | [LibreNMS](docs/integrations/librenms.md) |
@@ -147,7 +148,7 @@ Read more: [Event Orchestration](docs/usage/event-orchestration.md) and [Explain
 | Zabbix | `POST /api/integrations/zabbix` | [Zabbix](docs/integrations/zabbix.md) |
 | Generic / PagerDuty Events API v2 | `POST /api/integrations/webhook` | [Generic webhook](docs/integrations/generic-webhook.md) |
 
-Incoming integrations use route intake credentials. The generated endpoint/help text on the Routes page shows the authentication form supported by each source.
+Most incoming integrations use route intake credentials. Signed provider transports such as AWS SNS and Cloud.ru SMN use provider signatures plus route-scoped configuration instead. The generated endpoint/help text on the Routes page shows the authentication form supported by each source.
 
 ### Shared notification channels
 

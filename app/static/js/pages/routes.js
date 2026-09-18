@@ -1098,6 +1098,16 @@ function getSentryWebhookUrl(route) {
     return window.location.origin + path;
 }
 
+function getRouteCloudRuConfig(route) {
+    const integrationConfig = (
+        route && route.integration_config
+            ? route.integration_config
+            : {}
+    );
+
+    return integrationConfig.cloud_ru || {};
+}
+
 function getRouteAwsSnsConfig(route) {
     const integrationConfig = (
         route && route.integration_config
@@ -1118,6 +1128,7 @@ function updateRouteSourceUi() {
     const isDatadog = source === "datadog";
     const isNewRelic = source === "new_relic";
     const isAzureMonitor = source === "azure_monitor";
+    const isCloudRu = source === "cloud_ru";
     const isNagios = source === "nagios";
     const isUptimeKuma = source === "uptime_kuma";
     const isWebhook = source === "webhook";
@@ -1139,6 +1150,10 @@ function updateRouteSourceUi() {
         "is-hidden",
         !isAzureMonitor
     );
+    $("#route-cloud-ru-help").toggleClass(
+        "is-hidden",
+        !isCloudRu
+    );
     $("#route-nagios-help").toggleClass(
         "is-hidden",
         !isNagios
@@ -1146,6 +1161,17 @@ function updateRouteSourceUi() {
     $("#route-uptime-kuma-help").toggleClass(
         "is-hidden",
         !isUptimeKuma
+    );
+
+    $("#route-cloud-ru-settings").toggleClass("is-hidden", !isCloudRu);
+    $("#route-cloud-ru-topic-urn").prop("required", isCloudRu);
+
+    const hasCloudRuWebhook = Boolean(
+        String($("#route-cloud-ru-webhook-url").val() || "").trim()
+    );
+    $("#route-cloud-ru-webhook-group").toggleClass(
+        "is-hidden",
+        !isCloudRu || !hasCloudRuWebhook
     );
 
     $("#route-aws-sns-settings").toggleClass("is-hidden", !isAwsSns);
@@ -1184,6 +1210,10 @@ function updateRouteSourceUi() {
             $("#route-group-by").val(
                 '["azure_alert_id"]'
             );
+        } else if (source === "cloud_ru") {
+            $("#route-group-by").val(
+                '["cloud_ru_alarm_id"]'
+            );
         } else if (source === "nagios") {
             $("#route-group-by").val(
                 '["nagios_host","nagios_service"]'
@@ -1206,6 +1236,16 @@ function updateRouteSourceUi() {
 
 function collectRouteIntegrationConfig() {
     const source = $("#route-source").val();
+
+    if (source === "cloud_ru") {
+        return {
+            cloud_ru: {
+                topic_urn: String(
+                    $("#route-cloud-ru-topic-urn").val() || ""
+                ).trim()
+            }
+        };
+    }
 
     if (source === "aws_sns") {
         return {
@@ -1376,6 +1416,10 @@ function editRoute(id) {
         route.integration_config || {}
     );
 
+    const cloudRuConfig = (
+        integrationConfig.cloud_ru || {}
+    );
+
     const awsSnsConfig = (
         integrationConfig.aws_sns || {}
     );
@@ -1383,6 +1427,20 @@ function editRoute(id) {
     const sentryConfig = (
         integrationConfig.sentry || {}
     );
+
+    $("#route-cloud-ru-topic-urn").val(
+        cloudRuConfig.topic_urn || ""
+    );
+    const cloudRuWebhookPath = cloudRuConfig.webhook_path || "";
+    if (route.source === "cloud_ru" && cloudRuWebhookPath) {
+        $("#route-cloud-ru-webhook-url").val(
+            window.location.origin + cloudRuWebhookPath
+        );
+        $("#route-cloud-ru-webhook-group").removeClass("is-hidden");
+    } else {
+        $("#route-cloud-ru-webhook-url").val("");
+        $("#route-cloud-ru-webhook-group").addClass("is-hidden");
+    }
 
     $("#route-aws-sns-topic-arn").val(
         awsSnsConfig.topic_arn || ""
@@ -1510,6 +1568,9 @@ function resetRouteForm() {
     $("#route-service").val("");
     fillMatcherPresetSelect("#route-matcher-preset", routeMatcherPresetsCache, null);
     updateRouteMatcherPresetHint();
+    $("#route-cloud-ru-topic-urn").val("");
+    $("#route-cloud-ru-webhook-url").val("");
+    $("#route-cloud-ru-webhook-group").addClass("is-hidden");
     $("#route-aws-sns-topic-arn").val("");
     $("#route-aws-sns-webhook-url").val("");
     $("#route-aws-sns-webhook-group").addClass("is-hidden");
@@ -1530,6 +1591,14 @@ function getRouteIntakePath(route) {
         return "/api/integrations/sentry/" + route.id;
     }
 
+    if (source === "cloud_ru") {
+        const cloudRuConfig = getRouteCloudRuConfig(route);
+        return (
+            cloudRuConfig.webhook_path
+            || ("/api/integrations/cloud-ru/" + route.id)
+        );
+    }
+
     if (source === "aws_sns") {
         const awsSnsConfig = getRouteAwsSnsConfig(route);
 
@@ -1541,6 +1610,14 @@ function getRouteIntakePath(route) {
 
     if (source === "alertmanager") {
         return "/api/integrations/alertmanager";
+    }
+
+    if (source === "cloud_ru") {
+        return [
+            "# " + i18n.t("routes.intake.cloud_ru_example_comment"),
+            "# " + i18n.t("routes.intake.cloud_ru_help"),
+            "# Endpoint: " + url
+        ].join("\n");
     }
 
     if (source === "heartbeat") {
@@ -1688,6 +1765,7 @@ function showRouteIntakeDetails(route) {
     const isDatadog = source === "datadog";
     const isNewRelic = source === "new_relic";
     const isAzureMonitor = source === "azure_monitor";
+    const isCloudRu = source === "cloud_ru";
     const isNagios = source === "nagios";
     const isUptimeKuma = source === "uptime_kuma";
     const isWebhook = source === "webhook";
@@ -1714,6 +1792,9 @@ function showRouteIntakeDetails(route) {
     } else if (isAzureMonitor) {
         subtitleKey = "routes.intake.azure_monitor_subtitle";
         helpKey = "routes.intake.azure_monitor_help";
+    } else if (isCloudRu) {
+        subtitleKey = "routes.intake.cloud_ru_subtitle";
+        helpKey = "routes.intake.cloud_ru_help";
     } else if (isNagios) {
         subtitleKey = "routes.intake.nagios_subtitle";
         helpKey = "routes.intake.nagios_help";
@@ -1736,8 +1817,8 @@ function showRouteIntakeDetails(route) {
     $("#route-intake-token").val(token);
     $("#route-intake-curl").val(buildRouteIntakeCurl(route, token));
 
-    $("#route-intake-token-group").toggleClass("is-hidden", isSentry || isHeartbeat);
-    $("#copy-route-intake-token").toggleClass("is-hidden", isSentry || isHeartbeat);
+    $("#route-intake-token-group").toggleClass("is-hidden", isSentry || isHeartbeat || isCloudRu);
+    $("#copy-route-intake-token").toggleClass("is-hidden", isSentry || isHeartbeat || isCloudRu);
     $("#route-intake-url-help").text(i18n.t(helpKey));
 
     openAppModal("#route-token-box");

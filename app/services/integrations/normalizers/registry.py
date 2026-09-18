@@ -12,6 +12,7 @@ from typing import Any, Callable, Dict, Mapping, Optional
 from app.services.integrations.normalizers.alertmanager import normalize_alertmanager
 from app.services.integrations.normalizers.aws_sns import normalize_aws_sns
 from app.services.integrations.normalizers.azure_monitor import normalize_azure_monitor
+from app.services.integrations.normalizers.cloud_ru import normalize_cloud_ru
 from app.services.integrations.normalizers.datadog import normalize_datadog
 from app.services.integrations.normalizers.grafana import normalize_grafana
 from app.services.integrations.normalizers.librenms import normalize_librenms
@@ -62,6 +63,7 @@ _NORMALIZERS: Dict[str, Normalizer] = {
     "alertmanager": _payload_only(normalize_alertmanager),
     "aws_sns": _payload_only(normalize_aws_sns),
     "azure_monitor": _payload_only(normalize_azure_monitor),
+    "cloud_ru": _payload_only(normalize_cloud_ru),
     "datadog": _payload_only(normalize_datadog),
     "grafana": _payload_only(normalize_grafana),
     "librenms": _payload_only(normalize_librenms),

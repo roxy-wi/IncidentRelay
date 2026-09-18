@@ -8,6 +8,7 @@ from app.api.schemas.integrations import (
     AlertmanagerWebhookSchema,
     AwsSnsEnvelopeSchema,
     AzureMonitorWebhookSchema,
+    CloudRuSmnEnvelopeSchema,
     DatadogWebhookSchema,
     NewRelicWebhookSchema,
     NagiosWebhookSchema,
@@ -32,6 +33,11 @@ from app.services.validation import make_error_response, validate_body
 from app.notifiers.voice.loader import create_voice_provider
 from app.modules.db.models import UserNotificationDelivery
 from app.services.integrations.sentry import validate_sentry_route_signature
+from app.services.integrations.cloud_ru_smn import (
+    CloudRuSmnError,
+    confirm_cloud_ru_smn_subscription,
+    validate_cloud_ru_smn_message,
+)
 from app.services.integrations.aws_sns import (
     AwsSnsError,
     confirm_aws_sns_subscription,
@@ -192,6 +198,102 @@ def _process_nagios_lifecycle(alert_data):
         "alert_id": existing_alert.id,
         "group_id": group.id,
     }), 200
+
+
+@integrations_bp.route("/cloud-ru/<int:route_id>", methods=["POST"])
+def cloud_ru_smn_webhook(route_id):
+    """Receive signed Cloud.ru Advanced SMN / Cloud Eye notifications."""
+    try:
+        route = routes_repo.get_route(route_id)
+    except DoesNotExist:
+        return make_error_response(
+            error="not_found",
+            message="Cloud.ru route was not found.",
+            status_code=404,
+        )
+
+    if route.source != "cloud_ru":
+        return make_error_response(
+            error="route_source_mismatch",
+            message="Route source must be cloud_ru.",
+            status_code=400,
+        )
+
+    if not route.enabled or route.deleted:
+        return make_error_response(
+            error="route_disabled",
+            message="Cloud.ru route is disabled.",
+            status_code=403,
+        )
+
+    if not route.team or route.team.deleted or not route.team.active:
+        return make_error_response(
+            error="route_team_inactive",
+            message="Cloud.ru route team is inactive.",
+            status_code=403,
+        )
+
+    if route.team.group and (route.team.group.deleted or not route.team.group.active):
+        return make_error_response(
+            error="route_group_inactive",
+            message="Cloud.ru route group is inactive.",
+            status_code=403,
+        )
+
+    payload, error = validate_body(CloudRuSmnEnvelopeSchema)
+    if error:
+        return error
+
+    envelope = payload.model_dump(exclude_none=True)
+
+    header_type = request.headers.get("X-SMN-MESSAGE-TYPE")
+    header_message_id = request.headers.get("X-SMN-MESSAGE-ID")
+    header_topic_urn = request.headers.get("X-SMN-TOPIC-URN")
+
+    if header_type and header_type != envelope["type"]:
+        return make_error_response(
+            error="cloud_ru_smn_header_mismatch",
+            message="Cloud.ru SMN message type header does not match the payload.",
+            status_code=400,
+        )
+    if header_message_id and header_message_id != envelope["message_id"]:
+        return make_error_response(
+            error="cloud_ru_smn_header_mismatch",
+            message="Cloud.ru SMN message ID header does not match the payload.",
+            status_code=400,
+        )
+    if header_topic_urn and header_topic_urn != envelope["topic_urn"]:
+        return make_error_response(
+            error="cloud_ru_smn_header_mismatch",
+            message="Cloud.ru SMN Topic URN header does not match the payload.",
+            status_code=400,
+        )
+
+    cloud_config = dict((route.integration_config or {}).get("cloud_ru") or {})
+    expected_topic_urn = str(cloud_config.get("topic_urn") or "").strip()
+
+    try:
+        validate_cloud_ru_smn_message(envelope, expected_topic_urn)
+
+        if envelope["type"] == "SubscriptionConfirmation":
+            confirm_cloud_ru_smn_subscription(envelope.get("subscribe_url"))
+            return jsonify({"status": "subscription_confirmed"}), 200
+
+        if envelope["type"] == "UnsubscribeConfirmation":
+            return jsonify({"status": "unsubscribe_confirmed"}), 200
+    except CloudRuSmnError as exc:
+        return make_error_response(
+            error=exc.code,
+            message=exc.message,
+            status_code=exc.status_code,
+        )
+
+    request.current_intake_route = route
+    request.current_auth_type = "cloud_ru_smn_signature"
+
+    return process_incoming_alerts(
+        normalize_for_source("cloud_ru", envelope)
+    )
 
 
 @integrations_bp.route("/nagios", methods=["POST"])

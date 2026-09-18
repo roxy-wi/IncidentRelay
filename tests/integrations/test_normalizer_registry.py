@@ -15,6 +15,7 @@ def test_registry_contains_all_supported_integration_normalizers():
         "alertmanager",
         "aws_sns",
         "azure_monitor",
+        "cloud_ru",
         "datadog",
         "grafana",
         "librenms",

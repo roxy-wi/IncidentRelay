@@ -2646,6 +2646,32 @@ def paths():
                 ),
             },
         },
+        "/api/integrations/cloud-ru/{route_id}": {
+            "post": {
+                "tags": ["integrations"],
+                "summary": "Receive Cloud.ru Cloud Eye alarms through SMN",
+                "description": (
+                    "Receives signed Cloud.ru Advanced Simple Message Notification "
+                    "messages for one route. The route must use source=cloud_ru and "
+                    "configure the exact SMN Topic URN. IncidentRelay verifies the SMN "
+                    "V1 signature, Cloud.ru certificate URL, Topic URN and X-SMN headers "
+                    "before processing Cloud Eye alarms. Subscription confirmations are "
+                    "verified and confirmed automatically."
+                ),
+                "operationId": "receiveCloudRuSmnNotification",
+                "security": [],
+                "parameters": [path_param("route_id", "IncidentRelay route configured for this Cloud.ru SMN topic.")],
+                "requestBody": json_body(
+                    "Signed Cloud.ru SMN HTTP/HTTPS message envelope.",
+                    CLOUD_RU_SMN_WEBHOOK_BODY_SCHEMA,
+                ),
+                "responses": {
+                    **incoming_alert_responses("Cloud.ru Cloud Eye alarm accepted."),
+                    "403": response("SMN signature, Topic URN, certificate URL, or route state was rejected."),
+                    "502": response("Cloud.ru signing certificate or subscription confirmation endpoint was unavailable."),
+                },
+            },
+        },
         "/api/integrations/nagios": {
             "post": {
                 "tags": ["integrations"],
@@ -3028,3 +3054,30 @@ def paths():
             }
         },
     }
+
+CLOUD_RU_SMN_WEBHOOK_BODY_SCHEMA = {
+    "type": "object",
+    "required": [
+        "type", "message_id", "topic_urn", "message", "timestamp",
+        "signature_version", "signature", "signing_cert_url",
+    ],
+    "additionalProperties": True,
+    "properties": {
+        "type": {
+            "type": "string",
+            "enum": ["Notification", "SubscriptionConfirmation", "UnsubscribeConfirmation"],
+        },
+        "message_id": {"type": "string", "minLength": 1},
+        "topic_urn": {"type": "string", "minLength": 1},
+        "subject": {"type": "string", "nullable": True},
+        "message": {
+            "description": "SMN message body. Cloud Eye notifications normally contain a JSON alarm object or JSON-encoded string."
+        },
+        "timestamp": {"type": "string", "minLength": 1},
+        "signature_version": {"type": "string", "enum": ["v1", "V1"]},
+        "signature": {"type": "string", "minLength": 1},
+        "signing_cert_url": {"type": "string", "minLength": 1},
+        "subscribe_url": {"type": "string", "nullable": True},
+        "unsubscribe_url": {"type": "string", "nullable": True},
+    },
+}

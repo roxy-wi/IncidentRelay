@@ -2,7 +2,7 @@ from app.api.openapi.common import json_body, path_param, query_param, response
 
 SOURCE_SCHEMA_WITH_SENTRY = {
     "type": "string",
-    "enum": ["alertmanager", "aws_sns", "azure_monitor", "datadog", "grafana", "nagios", "rmon", "zabbix", "webhook", "sentry", "librenms", "new_relic", "uptime_kuma", "heartbeat"],
+    "enum": ["alertmanager", "aws_sns", "azure_monitor", "cloud_ru", "datadog", "grafana", "nagios", "rmon", "zabbix", "webhook", "sentry", "librenms", "new_relic", "uptime_kuma", "heartbeat"],
     "description": "Incoming alert source type.",
 }
 
@@ -15,6 +15,24 @@ ROUTE_INTEGRATION_CONFIG_SCHEMA = {
     ),
     "additionalProperties": True,
     "properties": {
+        "cloud_ru": {
+            "type": "object",
+            "description": "Cloud.ru Advanced SMN route settings.",
+            "additionalProperties": False,
+            "properties": {
+                "topic_urn": {
+                    "type": "string",
+                    "description": "Exact Cloud.ru SMN Topic URN accepted by this route.",
+                    "example": "urn:smn:region:project-id:incidentrelay",
+                },
+                "webhook_path": {
+                    "type": "string",
+                    "readOnly": True,
+                    "description": "Route-scoped Cloud.ru SMN webhook path.",
+                    "example": "/api/integrations/cloud-ru/42",
+                },
+            },
+        },
         "sentry": {
             "type": "object",
             "description": "Sentry-specific route integration settings.",
@@ -68,7 +86,7 @@ ROUTE_SCHEMA = {
     "properties": {
         "team_id": {"type": "integer", "minimum": 1},
         "name": {"type": "string", "example": "infra-alertmanager"},
-        "source": {"type": "string", "enum": ["alertmanager", "aws_sns", "azure_monitor", "datadog", "grafana", "new_relic", "nagios", "rmon", "zabbix", "webhook", "sentry", "librenms", "uptime_kuma", "heartbeat"]},
+        "source": {"type": "string", "enum": ["alertmanager", "aws_sns", "azure_monitor", "cloud_ru", "datadog", "grafana", "new_relic", "nagios", "rmon", "zabbix", "webhook", "sentry", "librenms", "uptime_kuma", "heartbeat"]},
         "rotation_id": {"type": "integer", "nullable": True, "description": "Rotation that receives alerts for this route."},
         "service_id": {
             "type": "integer",
