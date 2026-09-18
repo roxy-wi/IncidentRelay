@@ -236,7 +236,7 @@ function closeAppModal(selectorOrElement) {
         .attr("aria-hidden", "true");
 
     if (!hasOpenAppModals()) {
-        $("body").removeClass("modal-open");
+        $("html, body").removeClass("modal-open");
     }
 
     resetAppOverlayZIndexIfIdle();
@@ -264,7 +264,7 @@ function openAppModal(selectorOrElement) {
         })
         .attr("aria-hidden", "false");
 
-    $("body").addClass("modal-open");
+    $("html, body").addClass("modal-open");
 
     return modal;
 }

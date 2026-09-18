@@ -1,9 +1,14 @@
-<div id="alert-details-modal" class="app-modal" style="display: none;">
+<div
+  id="alert-details-modal"
+  class="app-modal{% if initial_alert_id %} is-open{% endif %}"
+  style="display: {{ 'flex' if initial_alert_id else 'none' }};"
+  aria-hidden="{{ 'false' if initial_alert_id else 'true' }}"
+>
   <div class="app-modal-dialog app-modal-dialog-wide">
     <div class="app-modal-header">
       <div>
-        <h2 id="alert-details-title">{{ _('alert_details.title') }}</h2>
-        <div id="alert-details-subtitle" class="card-subtitle"></div>
+        <h2 id="alert-details-title">{{ _('alert_details.entity.alert_number', id=initial_alert_id) if initial_alert_id else _('alert_details.title') }}</h2>
+        <div id="alert-details-subtitle" class="card-subtitle">{% if initial_alert_id %}{{ _('alert_details.loading') }}{% endif %}</div>
       </div>
 
       <button
@@ -86,7 +91,11 @@
           data-alert-details-panel="summary"
           role="tabpanel"
         >
-          <div id="alert-details-overview"></div>
+          <div id="alert-details-overview">
+            {% if initial_alert_id %}
+              <div class="help-text">{{ _('alert_details.loading') }}</div>
+            {% endif %}
+          </div>
 
           <section class="details-section alert-comments-section">
             <div class="details-section-header">
@@ -206,11 +215,11 @@
     </div>
 
     <div class="app-modal-footer">
-      <button id="modal-alert-ack" type="button" class="btn btn-warning btn-small">
+      <button id="modal-alert-ack" type="button" class="btn btn-warning btn-small"{% if initial_alert_id %} style="display: none;"{% endif %}>
         {{ _('alert_details.actions.acknowledge') }}
       </button>
 
-      <button id="modal-alert-shelve" type="button" class="btn btn-secondary btn-small">
+      <button id="modal-alert-shelve" type="button" class="btn btn-secondary btn-small"{% if initial_alert_id %} style="display: none;"{% endif %}>
         {{ _('alert_details.actions.shelve') }}
       </button>
 
@@ -218,7 +227,7 @@
         {{ _('alert_details.actions.unshelve') }}
       </button>
 
-      <button id="modal-alert-resolve" type="button" class="btn btn-resolve btn-small">
+      <button id="modal-alert-resolve" type="button" class="btn btn-resolve btn-small"{% if initial_alert_id %} style="display: none;"{% endif %}>
         {{ _('alert_details.actions.resolve') }}
       </button>
 

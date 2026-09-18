@@ -174,6 +174,42 @@ def test_alert_group_details_include_child_alerts(client, admin_headers, db):
     assert child_instances == {"host1", "host2"}
 
 
+def test_alert_group_acknowledge_uses_2_3_contract_path(
+    client,
+    admin_headers,
+    db,
+):
+    route = _route(group_by=["alertname", "severity"])
+    result = upsert_alert(_alert(route, "DiskFull", "host1"))
+
+    response = client.post(
+        f"/api/alert-groups/{result.group.id}/acknowledge",
+        headers=admin_headers,
+    )
+
+    assert response.status_code == 200
+    assert response.get_json()["status"] == "acknowledged"
+
+
+def test_alert_group_merge_uses_2_3_contract_path(client, admin_headers, db):
+    route = _route(group_by=["alertname", "severity", "instance"])
+    target = upsert_alert(_alert(route, "DiskFull", "host1")).group
+    source = upsert_alert(_alert(route, "DiskFull", "host2")).group
+
+    response = client.post(
+        f"/api/alert-groups/{target.id}/merge",
+        headers=admin_headers,
+        json={
+            "source_group_ids": [source.id],
+            "reason": "same incident",
+        },
+    )
+
+    assert response.status_code == 200
+    assert response.get_json()["id"] == target.id
+    assert AlertGroup.get_by_id(source.id).status == "merged"
+
+
 def test_empty_group_by_uses_dedup_key_instead_of_default_labels(db):
     route = _route(group_by=[])
 

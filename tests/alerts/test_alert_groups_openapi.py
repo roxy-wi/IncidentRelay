@@ -41,14 +41,16 @@ def test_openapi_alert_group_detail_contains_child_alerts():
 def test_openapi_alert_group_merge_endpoint():
     spec = build_openapi_spec()
 
-    operation = spec["paths"]["/api/alert-groups/merge"]["post"]
+    operation = spec["paths"][
+        "/api/alert-groups/{target_group_id}/merge"
+    ]["post"]
 
     assert operation["operationId"] == "mergeAlertGroups"
     assert operation["security"] == [{"bearerAuth": []}]
 
     request_schema = operation["requestBody"]["content"]["application/json"]["schema"]
 
-    assert request_schema["required"] == ["target_group_id", "source_group_ids"]
+    assert request_schema["required"] == ["source_group_ids"]
     assert request_schema["properties"]["source_group_ids"]["type"] == "array"
 
 
