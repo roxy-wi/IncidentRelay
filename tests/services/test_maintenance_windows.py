@@ -987,7 +987,7 @@ def test_team_maintenance_does_not_mark_existing_alert_groups(client, db):
     )
 
     response = client.get(
-        "/api/alerts",
+        "/api/alert-groups",
         headers=headers,
     )
 
@@ -1019,7 +1019,7 @@ def test_team_maintenance_attaches_to_new_alert_groups(client, db):
     assert new_group.maintenance_behavior == "create_maintenance_incident"
 
     response = client.get(
-        "/api/alerts",
+        "/api/alert-groups",
         headers=headers,
     )
 

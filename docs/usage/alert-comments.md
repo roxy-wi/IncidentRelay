@@ -72,7 +72,7 @@ After creating, editing or deleting a comment, the UI should refresh both:
 
 ### List comments
 
-    GET /api/alerts/{alert_id}/comments
+    GET /api/alert-groups/{alert_id}/comments
 
 Returns comments for the alert group.
 
@@ -83,7 +83,7 @@ Required permission:
 Example:
 
     curl -X GET \
-      http://127.0.0.1:8080/api/alerts/123/comments \
+      http://127.0.0.1:8080/api/alert-groups/123/comments \
       -H 'Authorization: Bearer API_TOKEN'
 
 Example response:
@@ -109,7 +109,7 @@ Example response:
 
 ### Create comment
 
-    POST /api/alerts/{alert_id}/comments
+    POST /api/alert-groups/{alert_id}/comments
 
 Required permission:
 
@@ -124,7 +124,7 @@ Request body:
 Example:
 
     curl -X POST \
-      http://127.0.0.1:8080/api/alerts/123/comments \
+      http://127.0.0.1:8080/api/alert-groups/123/comments \
       -H 'Authorization: Bearer API_TOKEN' \
       -H 'Content-Type: application/json' \
       -d '{"body":"Investigating. Disk usage increased after backup job."}'
@@ -161,7 +161,7 @@ Validation error:
 
 ### Update comment
 
-    PUT /api/alerts/{alert_id}/comments/{comment_id}
+    PUT /api/alert-groups/{alert_id}/comments/{comment_id}
 
 Updates an existing non-deleted comment in the alert group.
 
@@ -178,7 +178,7 @@ Request body:
 Example:
 
     curl -X PUT \
-      http://127.0.0.1:8080/api/alerts/123/comments/11 \
+      http://127.0.0.1:8080/api/alert-groups/123/comments/11 \
       -H 'Authorization: Bearer API_TOKEN' \
       -H 'Content-Type: application/json' \
       -d '{"body":"Updated investigation note. Backup job is confirmed as the trigger."}'
@@ -206,7 +206,7 @@ Success response:
 
 ### Delete comment
 
-    DELETE /api/alerts/{alert_id}/comments/{comment_id}
+    DELETE /api/alert-groups/{alert_id}/comments/{comment_id}
 
 Deletes a comment from the visible comments list. The recommended implementation is soft delete, so historical integrity is preserved.
 
@@ -217,7 +217,7 @@ Required permission:
 Example:
 
     curl -X DELETE \
-      http://127.0.0.1:8080/api/alerts/123/comments/11 \
+      http://127.0.0.1:8080/api/alert-groups/123/comments/11 \
       -H 'Authorization: Bearer API_TOKEN'
 
 Success response:
@@ -253,7 +253,7 @@ If comments are not visible:
 2. Check that the user can read the alert group team.
 3. Check that deleted comments are filtered from the default list query.
 4. Check browser console for frontend errors.
-5. Check that `GET /api/alerts/{alert_id}/comments` returns JSON.
+5. Check that `GET /api/alert-groups/{alert_id}/comments` returns JSON.
 
 If creating, editing or deleting comments fails:
 

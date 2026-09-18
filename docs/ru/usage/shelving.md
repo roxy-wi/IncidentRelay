@@ -49,7 +49,7 @@ Shelving специально не является новым статусом 
 ## API
 
 ```http
-POST /api/alerts/{alert_group_id}/shelve
+POST /api/alert-groups/{alert_group_id}/shelve
 ```
 
 ```json
@@ -60,11 +60,11 @@ POST /api/alerts/{alert_group_id}/shelve
 ```
 
 ```http
-POST /api/alerts/{alert_group_id}/unshelve
+POST /api/alert-groups/{alert_group_id}/unshelve
 ```
 
 ```text
-GET /api/alerts?shelved=1
+GET /api/alert-groups?shelved=1
 ```
 
 ## Настройки scheduler

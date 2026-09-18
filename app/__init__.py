@@ -117,7 +117,7 @@ def register_blueprints(flask_app):
     flask_app.register_blueprint(oncall_health_bp, url_prefix="/api/oncall-health")
     flask_app.register_blueprint(calendar_bp, url_prefix="/api/calendar")
     flask_app.register_blueprint(caldav_bp)
-    flask_app.register_blueprint(alerts_bp, url_prefix="/api/alerts")
+    flask_app.register_blueprint(alerts_bp, url_prefix="/api/alert-groups")
     flask_app.register_blueprint(incidents_bp, url_prefix="/api/incidents")
     flask_app.register_blueprint(maintenance_bp, url_prefix="/api/maintenance-windows")
     flask_app.register_blueprint(channels_bp, url_prefix="/api/channels")

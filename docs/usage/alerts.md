@@ -225,11 +225,10 @@ The UI can merge selected alert groups. The target is the group that remains vis
 API example:
 
 ```bash
-curl -X POST https://incidentrelay.example.com/api/alerts/merge \
+curl -X POST https://incidentrelay.example.com/api/alert-groups/101/merge \
   -H "Authorization: Bearer TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "target_group_id": 101,
     "source_group_ids": [102, 103],
     "reason": "Same customer-facing incident"
   }'
@@ -237,22 +236,20 @@ curl -X POST https://incidentrelay.example.com/api/alerts/merge \
 
 Response is the target alert group with recalculated counters.
 
-## API compatibility
+## API contract
 
-The Alerts API path remains:
+The AlertGroup API path is:
 
 ```text
-/api/alerts
+/api/alert-groups
 ```
 
-For compatibility with the existing UI and clients, response items are still returned from `/api/alerts`, but each item is now an alert group.
-
-The `id` field in `/api/alerts` responses is the alert group id.
+The `id` field in `/api/alert-groups` responses is the alert group id.
 
 Details are available at:
 
 ```text
-GET /api/alerts/{alert_id}
+GET /api/alert-groups/{alert_id}
 ```
 
 The path parameter name is kept as `alert_id` for compatibility, but it should be treated as an alert group id.
@@ -263,14 +260,14 @@ The path parameter name is kept as `alert_id` for compatibility, but it should b
 
 ```bash
 curl -H "Authorization: Bearer TOKEN" \
-  "https://incidentrelay.example.com/api/alerts?status=firing&severity=critical"
+  "https://incidentrelay.example.com/api/alert-groups?status=firing&severity=critical"
 ```
 
 ### Get group details
 
 ```bash
 curl -H "Authorization: Bearer TOKEN" \
-  "https://incidentrelay.example.com/api/alerts/101"
+  "https://incidentrelay.example.com/api/alert-groups/101"
 ```
 
 The detail response contains:
@@ -302,7 +299,7 @@ The detail response contains:
 ### Acknowledge group
 
 ```bash
-curl -X POST https://incidentrelay.example.com/api/alerts/101/ack \
+curl -X POST https://incidentrelay.example.com/api/alert-groups/101/acknowledge \
   -H "Authorization: Bearer TOKEN" \
   -H "Content-Type: application/json" \
   -d '{}'
@@ -311,7 +308,7 @@ curl -X POST https://incidentrelay.example.com/api/alerts/101/ack \
 ### Resolve group
 
 ```bash
-curl -X POST https://incidentrelay.example.com/api/alerts/101/resolve \
+curl -X POST https://incidentrelay.example.com/api/alert-groups/101/resolve \
   -H "Authorization: Bearer TOKEN" \
   -H "Content-Type: application/json" \
   -d '{}'

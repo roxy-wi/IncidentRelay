@@ -79,7 +79,7 @@ ALERT_PROCESSING_RESULT_SCHEMA = {
             "type": "string",
             "nullable": True,
             "description": (
-                "Explain trace id. Use GET /api/alerts/explain/{trace_id} "
+                "Explain trace id. Use GET /api/alert-groups/explain/{trace_id} "
                 "to inspect routing and processing steps."
             ),
             "example": "4fd2a8c9-8c2f-44e8-96fd-77b7f03e72f2",

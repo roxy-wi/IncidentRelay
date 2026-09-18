@@ -115,7 +115,7 @@ API_SCOPE_RULES = (
     ("/api/teams", "teams"),
     ("/api/groups", "groups"),
     ("/api/users", "users"),
-    ("/api/alerts", "alerts"),
+    ("/api/alert-groups", "alerts"),
     ("/api/profile", "profile"),
     # /api/auth/me and /api/auth/change-password are JWT-only at the view
     # layer. Mapping them to profile still keeps middleware fail-closed and

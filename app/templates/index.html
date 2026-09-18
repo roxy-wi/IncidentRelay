@@ -1,5 +1,6 @@
+{% set initial_alert_page = initial_page in ("/alerts", "/alerts/") or initial_alert_id %}
 <!doctype html>
-<html lang="{{ current_locale }}" data-theme="{{ current_theme }}">
+<html lang="{{ current_locale }}" data-theme="{{ current_theme }}"{% if initial_alert_id %} class="modal-open"{% endif %}>
 <head>
     <link rel="manifest" href="/manifest.webmanifest?v=1.0.3">
 
@@ -16,6 +17,59 @@
     <meta charset="utf-8">
     <title>IncidentRelay</title>
     <meta name="viewport" content="width=device-width, initial-scale=1">
+    <style>
+    #pwa-navigation-mask {
+      display: none;
+    }
+
+    html.incidentrelay-pwa-transition #pwa-navigation-mask {
+      align-items: center;
+      background: var(--md-surface, #ffffff);
+      color: var(--md-primary, #0b5cff);
+      display: flex;
+      flex-direction: column;
+      gap: 14px;
+      inset: 0;
+      justify-content: center;
+      position: fixed;
+      z-index: 2147483647;
+    }
+
+    html.incidentrelay-pwa-transition .layout {
+      visibility: hidden;
+    }
+
+    #pwa-navigation-mask img {
+      height: 52px;
+      width: 52px;
+    }
+
+    #pwa-navigation-mask::after {
+      animation: incidentrelay-pwa-spin 0.8s linear infinite;
+      border: 3px solid color-mix(in srgb, currentColor 22%, transparent);
+      border-radius: 50%;
+      border-top-color: currentColor;
+      content: "";
+      height: 22px;
+      width: 22px;
+    }
+
+    @keyframes incidentrelay-pwa-spin {
+      to { transform: rotate(360deg); }
+    }
+    </style>
+    <script>
+    (function () {
+      var standalone = (
+        window.matchMedia("(display-mode: standalone)").matches
+        || window.navigator.standalone === true
+      );
+
+      if (standalone) {
+        document.documentElement.classList.add("incidentrelay-pwa-transition");
+      }
+    }());
+    </script>
     <script>
     window.__INCIDENTRELAY_UI__ = {
       theme: {{ current_theme | tojson }}
@@ -49,7 +103,10 @@
     <script>window.AppTheme && window.AppTheme.applyChartDefaults();</script>
     <script src="{{ url_for('static', filename='js/vendor/cytoscape.min.js') }}"></script>
 </head>
-<body class="md-theme">
+<body class="md-theme{% if initial_alert_id %} modal-open{% endif %}">
+<div id="pwa-navigation-mask" aria-hidden="true">
+    <img src="/static/images/incidentrelay-icon.svg" alt="">
+</div>
 <section class="layout">
     <aside id="app-sidebar" class="sidebar">
         {% include "pages/include/menu_svg.html" %}
@@ -206,8 +263,8 @@
             <div class="topbar-main">
                 <div class="topbar-title-block">
                     <div class="topbar-kicker">IncidentRelay</div>
-                    <h1 id="page-title">{{ _('pages.dashboard.title') }}</h1>
-                    <div id="page-subtitle" class="page-subtitle">{{ _('pages.dashboard.subtitle') }}</div>
+                    <h1 id="page-title">{{ _('pages.alerts.title') if initial_alert_page else _('pages.dashboard.title') }}</h1>
+                    <div id="page-subtitle" class="page-subtitle">{{ _('pages.alerts.subtitle') if initial_alert_page else _('pages.dashboard.subtitle') }}</div>
                 </div>
 
                 <div class="topbar-actions">
@@ -257,8 +314,8 @@
         </header>
 
         <section class="page">
-            <div id="view-dashboard" class="view">{% include "pages/dashboard.html" %}</div>
-            <div id="view-alerts" class="view">{% include "pages/alerts.html" %}</div>
+            <div id="view-dashboard" class="view{% if initial_page == '/' %} view-visible{% endif %}">{% include "pages/dashboard.html" %}</div>
+            <div id="view-alerts" class="view{% if initial_alert_page %} view-visible{% endif %}">{% include "pages/alerts.html" %}</div>
             <div id="view-rotations" class="view">{% include "pages/rotations.html" %}</div>
             <div id="view-calendar" class="view">{% include "pages/calendar.html" %}</div>
             <div id="view-routes" class="view">{% include "pages/routes.html" %}</div>

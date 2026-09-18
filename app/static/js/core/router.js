@@ -3,10 +3,16 @@ function normalizeAppRoutePath(pathname) {
      * Convert detail URLs to their SPA route.
      * Example: /alerts/123 -> /alerts
      */
-    if (/^\/alerts\/\d+\/?$/.test(pathname || "")) {
+    let normalizedPath = pathname || "/";
+
+    if (normalizedPath !== "/") {
+        normalizedPath = normalizedPath.replace(/\/+$/, "");
+    }
+
+    if (/^\/alerts\/\d+$/.test(normalizedPath)) {
         return "/alerts";
     }
-    return pathname || "/";
+    return normalizedPath || "/";
 }
 
 function splitAppPath(path) {
@@ -22,6 +28,54 @@ function splitAppPath(path) {
         routePath: normalizeAppRoutePath(url.pathname),
         fullPath: url.pathname + url.search + url.hash,
     };
+}
+
+function renderAppRoute(routePath) {
+    /*
+     * Render the route shell without loading its data.
+     *
+     * Direct links use this before authentication bootstrap finishes so the
+     * server-rendered dashboard title never flashes ahead of the target page.
+     */
+    const selectedRoute = routes[routePath] || routes["/"];
+
+    $(".view").removeClass("view-visible").css("display", "none");
+    $("#view-" + selectedRoute.page).addClass("view-visible").css("display", "block");
+    const pageTranslationKey = "pages." + selectedRoute.page;
+    $("#page-title").text(
+      i18n.t(pageTranslationKey + ".title", {}, selectedRoute.title)
+    );
+    $("#page-subtitle").text(
+      i18n.t(pageTranslationKey + ".subtitle", {}, selectedRoute.subtitle)
+    );
+
+    $(".menu-link").removeClass("active");
+    $(".menu-group").removeClass("is-active");
+
+    const activeMenuLink = $(
+        '.menu-link[href="' + routePath + '"]'
+    );
+
+    activeMenuLink.addClass("active");
+
+    const activeMenuGroup = activeMenuLink.closest(".menu-group");
+
+    if (activeMenuGroup.length) {
+        activeMenuGroup.addClass("is-active is-expanded");
+        activeMenuGroup
+            .children(".menu-group-toggle")
+            .attr("aria-expanded", "true");
+    }
+
+    return selectedRoute;
+}
+
+if (window.location.pathname !== "/login") {
+    /*
+     * This script is loaded after the application markup, so the requested
+     * route can be painted before the remaining page scripts finish loading.
+     */
+    renderAppRoute(normalizeAppRoutePath(window.location.pathname));
 }
 
 function navigate(path, pushState) {
@@ -52,38 +106,17 @@ function navigate(path, pushState) {
     }
 
     const normalizedPath = splitAppPath(path);
-    const selectedRoute = routes[normalizedPath.routePath] || routes["/"];
-
-    $(".view").removeClass("view-visible").css("display", "none");
-    $("#view-" + selectedRoute.page).addClass("view-visible").css("display", "block");
-    const pageTranslationKey = "pages." + selectedRoute.page;
-    $("#page-title").text(
-      i18n.t(pageTranslationKey + ".title", {}, selectedRoute.title)
-    );
-    $("#page-subtitle").text(
-      i18n.t(pageTranslationKey + ".subtitle", {}, selectedRoute.subtitle)
-    );
-
-    $(".menu-link").removeClass("active");
-    $(".menu-group").removeClass("is-active");
-
-    const activeMenuLink = $(
-        '.menu-link[href="' + normalizedPath.routePath + '"]'
-    );
-
-    activeMenuLink.addClass("active");
-
-    const activeMenuGroup = activeMenuLink.closest(".menu-group");
-
-    if (activeMenuGroup.length) {
-        activeMenuGroup.addClass("is-active is-expanded");
-        activeMenuGroup
-            .children(".menu-group-toggle")
-            .attr("aria-expanded", "true");
-    }
+    const selectedRoute = renderAppRoute(normalizedPath.routePath);
 
     if (pushState) {
         history.pushState({path: normalizedPath.fullPath}, "", normalizedPath.fullPath);
+    }
+
+    if (
+        normalizedPath.routePath === "/alerts"
+        && typeof syncAlertDetailsFromUrl === "function"
+    ) {
+        syncAlertDetailsFromUrl();
     }
 
     if (window.PageUrlState && typeof window.PageUrlState.restorePath === "function") {
@@ -230,6 +263,7 @@ $(document).ready(function () {
     if (window.location.pathname === "/login") {
         navigate("/login", false);
     } else {
+        renderAppRoute(normalizeAppRoutePath(window.location.pathname));
         startAuthenticatedApp();
     }
 

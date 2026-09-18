@@ -110,8 +110,8 @@ def test_legacy_aggregate_can_delegate_granular_scope_but_not_reverse():
 @pytest.mark.parametrize(
     ("path", "method", "expected"),
     [
-        ("/api/alerts", "GET", ["alerts:read"]),
-        ("/api/alerts/10", "POST", ["alerts:write"]),
+        ("/api/alert-groups", "GET", ["alerts:read"]),
+        ("/api/alert-groups/10", "POST", ["alerts:write"]),
         ("/api/incidents", "GET", ["incidents:read"]),
         ("/api/services", "GET", ["services:read"]),
         ("/api/business-services", "GET", ["services:read"]),
