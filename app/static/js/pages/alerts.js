@@ -1518,12 +1518,49 @@ function loadAlertExplainForCurrentDetails() {
 }
 
 function showAlertDetails(alertId) {
+    const isDifferentAlert = currentDetailsAlertId !== alertId;
     currentDetailsAlertId = alertId;
+
+    const initialModal = alertDetailsModal();
+
+    if (
+        initialModal.length
+        && (isDifferentAlert || !initialModal.hasClass("is-open"))
+    ) {
+        currentDetailsAlertCanRespond = false;
+        resetAlertDetailsTabs(alertId);
+
+        initialModal.find("#alert-details-title").text(
+            i18n.t("alert_details.entity.alert_number", {id: alertId})
+        );
+        initialModal.find("#alert-details-subtitle").text(i18n.t("alert_details.loading"));
+        initialModal.find("#alert-details-overview").empty().append(
+            $("<div>").addClass("help-text").text(i18n.t("alert_details.loading"))
+        );
+        initialModal.find([
+            "#alert-details-summary",
+            "#alert-group-children",
+            "#alert-details-events",
+            "#alert-details-notifications",
+            "#alert-details-labels",
+            "#alert-details-payload",
+            "#alert-comments-list"
+        ].join(", ")).empty();
+        initialModal.find(
+            "#modal-alert-ack, #modal-alert-shelve, #modal-alert-unshelve, #modal-alert-resolve"
+        ).hide();
+
+        openAlertDetailsModal();
+    }
 
     apiGet(
         "/api/alerts/" + alertId
         + "?events_page=1&events_page_size=" + ALERT_EVENTS_PAGE_SIZE,
         function (alert) {
+        if (currentDetailsAlertId !== alertId) {
+            return;
+        }
+
         const modal = alertDetailsModal();
 
         if (!modal.length) {
@@ -1584,6 +1621,13 @@ function showAlertDetails(alertId) {
         }
 
         openAlertDetailsModal();
+    }, function (xhr) {
+        if (currentDetailsAlertId !== alertId) {
+            return;
+        }
+
+        closeAlertDetailsModal({updateUrl: false});
+        showApiError(xhr);
     });
 }
 

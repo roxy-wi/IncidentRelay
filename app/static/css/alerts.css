@@ -259,6 +259,30 @@
 }
 
 @media (max-width: 640px) {
+    body.md-theme #alert-details-modal {
+        padding: 0;
+        background: var(--md-surface);
+        backdrop-filter: none;
+    }
+
+    body.md-theme #alert-details-modal .app-modal-dialog {
+        width: 100vw;
+        height: 100vh;
+        height: 100dvh;
+        max-height: none;
+        border: 0;
+        border-radius: 0;
+        box-shadow: none;
+    }
+
+    body.md-theme #alert-details-modal .app-modal-header {
+        padding-top: max(16px, env(safe-area-inset-top));
+    }
+
+    body.md-theme #alert-details-modal .app-modal-footer {
+        padding-bottom: max(16px, env(safe-area-inset-bottom));
+    }
+
     .alert-primary-context {
         grid-template-columns: 1fr;
     }
