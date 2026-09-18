@@ -397,7 +397,7 @@ def test_alert_details_include_policy_state(client, admin_headers, monkeypatch, 
     assert created is True
 
     response = client.get(
-        f"/api/alerts/{alert_group.id}",
+        f"/api/alert-groups/{alert_group.id}",
         headers=admin_headers,
     )
 

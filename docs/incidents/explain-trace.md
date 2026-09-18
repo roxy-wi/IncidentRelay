@@ -81,7 +81,7 @@ If a batch contains both successful and failed items, the API returns HTTP `207`
 ### List traces for an alert group
 
 ```http
-GET /api/alerts/{alert_group_id}/explain
+GET /api/alert-groups/{alert_group_id}/explain
 ```
 
 Returns explain traces linked to an existing alert group.
@@ -114,7 +114,7 @@ Example response:
 ### Get one trace with steps
 
 ```http
-GET /api/alerts/explain/{trace_id}
+GET /api/alert-groups/explain/{trace_id}
 ```
 
 Returns a single trace with ordered processing steps.
@@ -264,7 +264,7 @@ This is expected for stopped processing paths, for example:
 Check that the alert group has at least one linked trace:
 
 ```http
-GET /api/alerts/{alert_group_id}/explain
+GET /api/alert-groups/{alert_group_id}/explain
 ```
 
 If this returns an empty list, the alert group was probably created before Explain Trace was enabled.

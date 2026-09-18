@@ -3,10 +3,16 @@ function normalizeAppRoutePath(pathname) {
      * Convert detail URLs to their SPA route.
      * Example: /alerts/123 -> /alerts
      */
-    if (/^\/alerts\/\d+\/?$/.test(pathname || "")) {
+    let normalizedPath = pathname || "/";
+
+    if (normalizedPath !== "/") {
+        normalizedPath = normalizedPath.replace(/\/+$/, "");
+    }
+
+    if (/^\/alerts\/\d+$/.test(normalizedPath)) {
         return "/alerts";
     }
-    return pathname || "/";
+    return normalizedPath || "/";
 }
 
 function splitAppPath(path) {
@@ -226,13 +232,6 @@ function startAuthenticatedApp() {
     apiGet("/api/auth/me", function (user) {
         currentUser = user;
         updateAuthUi();
-
-        if (
-            normalizeAppRoutePath(window.location.pathname) === "/alerts"
-            && typeof syncAlertDetailsFromUrl === "function"
-        ) {
-            syncAlertDetailsFromUrl();
-        }
 
         if (typeof startTopbarOncallStatusRefresh === "function") {
             startTopbarOncallStatusRefresh();

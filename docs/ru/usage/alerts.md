@@ -225,11 +225,10 @@ UI может объединять выбранные группы алерто�
 Пример API:
 
 ```bash
-curl -X POST https://incidentrelay.example.com/api/alerts/merge \
+curl -X POST https://incidentrelay.example.com/api/alert-groups/101/merge \
   -H "Authorization: Bearer TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "target_group_id": 101,
     "source_group_ids": [102, 103],
     "reason": "Same customer-facing incident"
   }'
@@ -237,22 +236,20 @@ curl -X POST https://incidentrelay.example.com/api/alerts/merge \
 
 Ответ — целевая группа алертов с пересчитанными счётчиками.
 
-## Совместимость API
+## Контракт API
 
-Путь Alerts API остаётся:
+Путь AlertGroup API:
 
 ```text
-/api/alerts
+/api/alert-groups
 ```
 
-Для совместимости с существующими UI и клиентами элементы ответа по-прежнему возвращаются из `/api/alerts`, но каждый элемент теперь является группой алертов.
-
-Поле `id` в ответах `/api/alerts` — это идентификатор группы алертов.
+Поле `id` в ответах `/api/alert-groups` — это идентификатор группы алертов.
 
 Детали доступны по адресу:
 
 ```text
-GET /api/alerts/{alert_id}
+GET /api/alert-groups/{alert_id}
 ```
 
 Имя параметра пути сохранено как `alert_id` для совместимости, но его следует рассматривать как идентификатор группы алертов.
@@ -263,14 +260,14 @@ GET /api/alerts/{alert_id}
 
 ```bash
 curl -H "Authorization: Bearer TOKEN" \
-  "https://incidentrelay.example.com/api/alerts?status=firing&severity=critical"
+  "https://incidentrelay.example.com/api/alert-groups?status=firing&severity=critical"
 ```
 
 ### Получить детали группы
 
 ```bash
 curl -H "Authorization: Bearer TOKEN" \
-  "https://incidentrelay.example.com/api/alerts/101"
+  "https://incidentrelay.example.com/api/alert-groups/101"
 ```
 
 Ответ с деталями содержит:
@@ -302,7 +299,7 @@ curl -H "Authorization: Bearer TOKEN" \
 ### Подтвердить группу
 
 ```bash
-curl -X POST https://incidentrelay.example.com/api/alerts/101/ack \
+curl -X POST https://incidentrelay.example.com/api/alert-groups/101/acknowledge \
   -H "Authorization: Bearer TOKEN" \
   -H "Content-Type: application/json" \
   -d '{}'
@@ -311,7 +308,7 @@ curl -X POST https://incidentrelay.example.com/api/alerts/101/ack \
 ### Разрешить группу
 
 ```bash
-curl -X POST https://incidentrelay.example.com/api/alerts/101/resolve \
+curl -X POST https://incidentrelay.example.com/api/alert-groups/101/resolve \
   -H "Authorization: Bearer TOKEN" \
   -H "Content-Type: application/json" \
   -d '{}'

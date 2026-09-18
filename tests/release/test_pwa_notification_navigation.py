@@ -30,6 +30,32 @@ def test_direct_route_shell_is_rendered_before_authenticated_bootstrap():
     assert render_route < start_app
 
 
+def test_frontend_routes_normalize_trailing_slashes():
+    assert 'normalizedPath.replace(/\\/+$/, "")' in ROUTER
+    assert 'if (/^\\/alerts\\/\\d+$/.test(normalizedPath))' in ROUTER
+
+
+def test_alert_details_sync_once_during_authenticated_navigation():
+    navigate_start = ROUTER.index("function navigate(path, pushState)")
+    authenticated_start = ROUTER.index("function startAuthenticatedApp()")
+    ready_start = ROUTER.index("$(document).ready(function ()")
+
+    assert ROUTER[navigate_start:authenticated_start].count(
+        "syncAlertDetailsFromUrl();"
+    ) == 1
+    assert "syncAlertDetailsFromUrl();" not in ROUTER[
+        authenticated_start:ready_start
+    ]
+
+    render_alerts_start = ALERTS.index("function renderAlertsPage()")
+    render_pagination_start = ALERTS.index(
+        "function renderAlertsPagination", render_alerts_start
+    )
+    assert "syncAlertDetailsFromUrl();" not in ALERTS[
+        render_alerts_start:render_pagination_start
+    ]
+
+
 def test_server_renders_alert_details_shell_for_direct_links():
     assert "initial_alert_id=alert_id" in PAGES_VIEW
     assert "initial_alert_page" in INDEX_TEMPLATE
@@ -57,6 +83,7 @@ def test_notification_navigation_reuses_the_running_spa_when_available():
     assert 'client.visibilityState === "visible"' in SERVICE_WORKER
     assert "await requestClientNavigation(client, targetUrl)" in SERVICE_WORKER
     assert "client.navigate(targetUrl)" in SERVICE_WORKER
+    assert "target.origin !== self.location.origin" in SERVICE_WORKER
 
     running_app_check = SERVICE_WORKER.index("if (\n                canUseRunningApp")
     hard_navigation = SERVICE_WORKER.index(

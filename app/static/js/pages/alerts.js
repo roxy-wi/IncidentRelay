@@ -446,7 +446,7 @@ function buildAlertsApiUrl() {
 
     const query = params.toString();
 
-    return "/api/alerts" + (query ? "?" + query : "");
+    return "/api/alert-groups" + (query ? "?" + query : "");
 }
 
 
@@ -866,7 +866,6 @@ function renderAlertsPage() {
     // the same "alerts" prefix, so update the counter last.
     renderAlertsInboxCounter(alertsPagination);
 
-    syncAlertDetailsFromUrl();
     renderAlertsBulkActions();
     renderManualIncidentCreateButton();
 }
@@ -1481,7 +1480,7 @@ function loadAlertExplainTrace(traceId) {
 
     renderAlertExplainLoading(i18n.t("alert_details.explain.loading"));
 
-    apiGet("/api/alerts/explain/" + encodeURIComponent(traceId), function (trace) {
+    apiGet("/api/alert-groups/explain/" + encodeURIComponent(traceId), function (trace) {
         currentDetailsExplainTraceId = trace.trace_id;
         renderAlertExplainSummary(trace);
         renderAlertExplainSteps(trace.steps || []);
@@ -1505,7 +1504,7 @@ function loadAlertExplainForCurrentDetails() {
     currentDetailsExplainLoadedAlertId = currentDetailsAlertId;
     renderAlertExplainLoading(i18n.t("alert_details.explain.loading_many"));
 
-    apiGet("/api/alerts/" + encodeURIComponent(currentDetailsAlertId) + "/explain", function (traces) {
+    apiGet("/api/alert-groups/" + encodeURIComponent(currentDetailsAlertId) + "/explain", function (traces) {
         const latestTrace = pickLatestAlertExplainTrace(traces);
 
         if (!latestTrace) {
@@ -1554,7 +1553,7 @@ function showAlertDetails(alertId) {
     }
 
     apiGet(
-        "/api/alerts/" + alertId
+        "/api/alert-groups/" + alertId
         + "?events_page=1&events_page_size=" + ALERT_EVENTS_PAGE_SIZE,
         function (alert) {
         if (currentDetailsAlertId !== alertId) {
@@ -2626,7 +2625,7 @@ function loadAlertEventsPage(groupId, page, append) {
     }
 
     apiGet(
-        "/api/alerts/" + groupId
+        "/api/alert-groups/" + groupId
         + "/events?page=" + encodeURIComponent(page || 1)
         + "&page_size=" + ALERT_EVENTS_PAGE_SIZE,
         function (response) {
@@ -3043,7 +3042,7 @@ $(document).on("click", "#modal-alert-ack", function () {
         return;
     }
 
-    apiPost("/api/alerts/" + currentDetailsAlertId + "/ack", {}, function () {
+    apiPost("/api/alert-groups/" + currentDetailsAlertId + "/acknowledge", {}, function () {
         showAlertDetails(currentDetailsAlertId);
         loadAlerts();
     });
@@ -3066,7 +3065,7 @@ $(document).on("click", "#confirm-alert-shelve", function () {
     const durationSeconds = Number($("#alert-shelve-duration").val() || 3600);
     const reason = String($("#alert-shelve-reason").val() || "").trim();
     apiPost(
-        "/api/alerts/" + currentDetailsAlertId + "/shelve",
+        "/api/alert-groups/" + currentDetailsAlertId + "/shelve",
         {duration_seconds: durationSeconds, reason: reason || null},
         function () {
             closeAppModal("#alert-shelve-modal");
@@ -3079,7 +3078,7 @@ $(document).on("click", "#modal-alert-unshelve", function () {
     if (!currentDetailsAlertId || !currentDetailsAlertCanRespond) {
         return;
     }
-    apiPost("/api/alerts/" + currentDetailsAlertId + "/unshelve", {}, function () {
+    apiPost("/api/alert-groups/" + currentDetailsAlertId + "/unshelve", {}, function () {
         showAlertDetails(currentDetailsAlertId);
         loadAlerts();
     });
@@ -3093,7 +3092,7 @@ $(document).on("click", "#modal-alert-resolve", function () {
         return;
     }
 
-    apiPost("/api/alerts/" + currentDetailsAlertId + "/resolve", {}, function () {
+    apiPost("/api/alert-groups/" + currentDetailsAlertId + "/resolve", {}, function () {
         showAlertDetails(currentDetailsAlertId);
         loadAlerts();
     });
@@ -3252,7 +3251,8 @@ function runAlertGroupBulkAction(action, ids, onDone) {
             return;
         }
 
-        apiPost("/api/alerts/" + id + "/" + action, {}, next);
+        const endpointAction = action === "ack" ? "acknowledge" : action;
+        apiPost("/api/alert-groups/" + id + "/" + endpointAction, {}, next);
     }
 
     next();
@@ -3327,8 +3327,7 @@ function mergeSelectedAlertGroups() {
         confirmText: i18n.t("alert_details.merge.confirm"),
         confirmClass: "btn-warning"
     }).done(function () {
-        apiPost("/api/alerts/merge", {
-            target_group_id: targetId,
+        apiPost("/api/alert-groups/" + targetId + "/merge", {
             source_group_ids: sourceIds,
             reason: i18n.t("alert_details.merge.reason")
         }, function () {
@@ -3360,7 +3359,7 @@ function openAlertDetailsForTrace(traceId) {
         return;
     }
 
-    $.getJSON(`/api/alerts/explain/${encodeURIComponent(traceId)}`)
+    $.getJSON(`/api/alert-groups/explain/${encodeURIComponent(traceId)}`)
         .done((trace) => {
             closeAlertExplainLookupModal();
 

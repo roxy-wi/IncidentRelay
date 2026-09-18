@@ -202,7 +202,7 @@ def test_alert_group_explain_api_lists_traces(client, admin_headers, db):
     assert result.trace_id
 
     response = client.get(
-        f"/api/alerts/{result.group.id}/explain",
+        f"/api/alert-groups/{result.group.id}/explain",
         headers=admin_headers,
     )
 
@@ -234,7 +234,7 @@ def test_alert_explain_api_returns_trace_with_steps(client, admin_headers, db):
     assert result.trace_id
 
     response = client.get(
-        f"/api/alerts/explain/{result.trace_id}",
+        f"/api/alert-groups/explain/{result.trace_id}",
         headers=admin_headers,
     )
 
@@ -261,7 +261,7 @@ def test_alert_explain_api_returns_trace_with_steps(client, admin_headers, db):
 
 def test_alert_explain_api_returns_404_for_missing_trace(client, admin_headers, db):
     response = client.get(
-        "/api/alerts/explain/missing-trace-id",
+        "/api/alert-groups/explain/missing-trace-id",
         headers=admin_headers,
     )
 
@@ -275,7 +275,7 @@ def test_alert_explain_api_returns_404_for_missing_trace(client, admin_headers, 
 
 def test_alert_group_explain_api_returns_404_for_missing_group(client, admin_headers, db):
     response = client.get(
-        "/api/alerts/999999/explain",
+        "/api/alert-groups/999999/explain",
         headers=admin_headers,
     )
 
@@ -384,7 +384,7 @@ def test_alertmanager_ingest_response_includes_trace_id(client, admin_headers, d
     assert item["trace_id"]
 
     trace_response = client.get(
-        f"/api/alerts/explain/{item['trace_id']}",
+        f"/api/alert-groups/explain/{item['trace_id']}",
         headers=admin_headers,
     )
 
@@ -483,7 +483,7 @@ def test_alertmanager_routing_failure_trace_can_be_read_by_admin(
     item = response.get_json()[0]
 
     trace_response = client.get(
-        f"/api/alerts/explain/{item['trace_id']}",
+        f"/api/alert-groups/explain/{item['trace_id']}",
         headers=admin_headers,
     )
 

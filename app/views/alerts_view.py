@@ -188,7 +188,7 @@ def get_alert(alert_id):
     return jsonify(payload)
 
 
-@alerts_bp.route("/<int:alert_id>/ack", methods=["POST"])
+@alerts_bp.route("/<int:alert_id>/acknowledge", methods=["POST"])
 def ack_alert(alert_id):
     """Acknowledge an alert group."""
     group_before, error = _require_alert_group_respond(alert_id)
@@ -323,20 +323,12 @@ def list_alert_events(alert_id):
     })
 
 
-@alerts_bp.route("/merge", methods=["POST"])
-def merge_alert_groups_view():
+@alerts_bp.route("/<int:target_group_id>/merge", methods=["POST"])
+def merge_alert_groups_view(target_group_id):
     """Merge selected alert groups into one group."""
     data = request.get_json(silent=True) or {}
-    target_group_id = data.get("target_group_id")
     source_group_ids = data.get("source_group_ids") or []
     reason = data.get("reason")
-
-    if not target_group_id:
-        return make_error_response(
-            error="validation_error",
-            message="target_group_id is required.",
-            status_code=400,
-        )
 
     if not source_group_ids:
         return make_error_response(

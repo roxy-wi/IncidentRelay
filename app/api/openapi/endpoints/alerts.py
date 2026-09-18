@@ -435,10 +435,7 @@ def alert_group_business_impact_summary_schema():
 
 
 def alert_group_schema(include_details=False):
-    """Build an alert group response schema.
-
-    /api/alerts keeps the historical URL, but items are alert groups.
-    """
+    """Build an alert group response schema."""
 
     properties = {
         "type": {"type": "string", "enum": ["alert_group"]},
@@ -615,13 +612,8 @@ def alert_group_merge_request_schema():
 
     return {
         "type": "object",
-        "required": ["target_group_id", "source_group_ids"],
+        "required": ["source_group_ids"],
         "properties": {
-            "target_group_id": {
-                "type": "integer",
-                "minimum": 1,
-                "description": "Target alert group id. This group remains visible after merge.",
-            },
             "source_group_ids": {
                 "type": "array",
                 "minItems": 1,
@@ -751,7 +743,7 @@ def tags():
         {
             "name": "alerts",
             "description": (
-                "Alert group lifecycle endpoints. /api/alerts returns incident-level "
+                "Alert group lifecycle endpoints. /api/alert-groups returns "
                 "alert groups. Each group contains one or more child alerts."
             ),
         }
@@ -775,13 +767,12 @@ def paths():
     severity_schema = {"type": "string"}
 
     return {
-        "/api/alerts": {
+        "/api/alert-groups": {
             "get": {
                 "tags": ["alerts"],
                 "summary": "List alert groups",
                 "description": (
                     "Returns alert groups with optional filtering and sorting. "
-                    "The URL is kept as /api/alerts for compatibility, but each item is an alert group. "
                     "Use repeated query parameters for multi-value filters, for example "
                     "?status=firing&status=acknowledged."
                 ),
@@ -881,7 +872,7 @@ def paths():
                 },
             }
         },
-        "/api/alerts/merge": {
+        "/api/alert-groups/{target_group_id}/merge": {
             "post": {
                 "tags": ["alerts"],
                 "summary": "Merge alert groups",
@@ -891,6 +882,9 @@ def paths():
                 ),
                 "operationId": "mergeAlertGroups",
                 "security": bearer_security(),
+                "parameters": [
+                    path_param("target_group_id", "Target alert group id."),
+                ],
                 "requestBody": json_body(
                     "Merge target and source alert groups.",
                     alert_group_merge_request_schema(),
@@ -904,14 +898,13 @@ def paths():
                 },
             }
         },
-        "/api/alerts/{alert_id}": {
+        "/api/alert-groups/{alert_id}": {
             "get": {
                 "tags": ["alerts"],
                 "summary": "Get alert group",
                 "description": (
                     "Returns a single alert group with child alerts, group-level events and "
-                    "notification delivery records. The path parameter is named alert_id for "
-                    "backwards compatibility, but it is an alert group id."
+                    "notification delivery records."
                 ),
                 "operationId": "getAlertGroup",
                 "security": bearer_security(),
@@ -939,7 +932,7 @@ def paths():
                 },
             }
         },
-        "/api/alerts/{alert_id}/explain": {
+        "/api/alert-groups/{alert_id}/explain": {
             "get": {
                 "tags": ["alerts"],
                 "summary": "List alert explain traces",
@@ -969,7 +962,7 @@ def paths():
             },
         },
 
-        "/api/alerts/explain/{trace_id}": {
+        "/api/alert-groups/explain/{trace_id}": {
             "get": {
                 "tags": ["alerts"],
                 "summary": "Get alert explain trace",
@@ -997,7 +990,7 @@ def paths():
                 },
             },
         },
-        "/api/alerts/{alert_id}/ack": {
+        "/api/alert-groups/{alert_id}/acknowledge": {
             "post": {
                 "tags": ["alerts"],
                 "summary": "Acknowledge alert group",
@@ -1035,7 +1028,7 @@ def paths():
                 },
             }
         },
-        "/api/alerts/{alert_id}/shelve": {
+        "/api/alert-groups/{alert_id}/shelve": {
             "post": {
                 "tags": ["alerts"],
                 "summary": "Shelve alert group",
@@ -1067,7 +1060,7 @@ def paths():
                 },
             }
         },
-        "/api/alerts/{alert_id}/unshelve": {
+        "/api/alert-groups/{alert_id}/unshelve": {
             "post": {
                 "tags": ["alerts"],
                 "summary": "Unshelve alert group",
@@ -1086,7 +1079,7 @@ def paths():
                 },
             }
         },
-        "/api/alerts/{alert_id}/resolve": {
+        "/api/alert-groups/{alert_id}/resolve": {
             "post": {
                 "tags": ["alerts"],
                 "summary": "Resolve alert group",
@@ -1121,7 +1114,7 @@ def paths():
                 },
             }
         },
-        "/api/alerts/{alert_id}/events": {
+        "/api/alert-groups/{alert_id}/events": {
             "get": {
                 "tags": ["alerts"],
                 "summary": "List alert group events",
@@ -1175,14 +1168,12 @@ def paths():
                 },
             }
         },
-        "/api/alerts/{alert_id}/comments": {
+        "/api/alert-groups/{alert_id}/comments": {
             "get": {
                 "tags": ["alerts"],
                 "summary": "List alert group comments",
                 "description": (
-                    "Returns non-deleted human comments attached to an alert group. "
-                    "The path parameter is named alert_id for backwards compatibility, "
-                    "but it is an alert group id."
+                    "Returns non-deleted human comments attached to an alert group."
                 ),
                 "operationId": "listAlertGroupComments",
                 "security": bearer_security(),
@@ -1230,7 +1221,7 @@ def paths():
                 },
             },
         },
-        "/api/alerts/{alert_id}/comments/{comment_id}": {
+        "/api/alert-groups/{alert_id}/comments/{comment_id}": {
             "put": {
                 "tags": ["alerts"],
                 "summary": "Update alert group comment",

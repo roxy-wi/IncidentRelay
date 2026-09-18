@@ -459,7 +459,19 @@ function prepareClientNavigation(client, targetUrl) {
 }
 
 function openIncidentRelayUrl(url) {
-    const targetUrl = new URL(url || "/alerts", self.location.origin).href;
+    let target;
+
+    try {
+        target = new URL(url || "/alerts", self.location.origin);
+    } catch (error) {
+        return Promise.resolve(null);
+    }
+
+    if (target.origin !== self.location.origin) {
+        return Promise.resolve(null);
+    }
+
+    const targetUrl = target.href;
 
     return clients.matchAll({
         type: "window",

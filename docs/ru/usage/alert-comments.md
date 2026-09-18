@@ -72,7 +72,7 @@ description: Создание, просмотр, редактирование и
 
 ### Список комментариев
 
-    GET /api/alerts/{alert_id}/comments
+    GET /api/alert-groups/{alert_id}/comments
 
 Возвращает комментарии для группы алертов.
 
@@ -83,7 +83,7 @@ description: Создание, просмотр, редактирование и
 Пример:
 
     curl -X GET \
-      http://127.0.0.1:8080/api/alerts/123/comments \
+      http://127.0.0.1:8080/api/alert-groups/123/comments \
       -H 'Authorization: Bearer API_TOKEN'
 
 Пример ответа:
@@ -109,7 +109,7 @@ description: Создание, просмотр, редактирование и
 
 ### Создать комментарий
 
-    POST /api/alerts/{alert_id}/comments
+    POST /api/alert-groups/{alert_id}/comments
 
 Требуемое разрешение:
 
@@ -124,7 +124,7 @@ description: Создание, просмотр, редактирование и
 Пример:
 
     curl -X POST \
-      http://127.0.0.1:8080/api/alerts/123/comments \
+      http://127.0.0.1:8080/api/alert-groups/123/comments \
       -H 'Authorization: Bearer API_TOKEN' \
       -H 'Content-Type: application/json' \
       -d '{"body":"Investigating. Disk usage increased after backup job."}'
@@ -161,7 +161,7 @@ description: Создание, просмотр, редактирование и
 
 ### Обновить комментарий
 
-    PUT /api/alerts/{alert_id}/comments/{comment_id}
+    PUT /api/alert-groups/{alert_id}/comments/{comment_id}
 
 Обновляет существующий неудалённый комментарий в группе алертов.
 
@@ -178,7 +178,7 @@ description: Создание, просмотр, редактирование и
 Пример:
 
     curl -X PUT \
-      http://127.0.0.1:8080/api/alerts/123/comments/11 \
+      http://127.0.0.1:8080/api/alert-groups/123/comments/11 \
       -H 'Authorization: Bearer API_TOKEN' \
       -H 'Content-Type: application/json' \
       -d '{"body":"Updated investigation note. Backup job is confirmed as the trigger."}'
@@ -206,7 +206,7 @@ description: Создание, просмотр, редактирование и
 
 ### Удалить комментарий
 
-    DELETE /api/alerts/{alert_id}/comments/{comment_id}
+    DELETE /api/alert-groups/{alert_id}/comments/{comment_id}
 
 Удаляет комментарий из видимого списка комментариев. Рекомендуемая реализация — мягкое удаление, чтобы сохранялась историческая целостность.
 
@@ -217,7 +217,7 @@ description: Создание, просмотр, редактирование и
 Пример:
 
     curl -X DELETE \
-      http://127.0.0.1:8080/api/alerts/123/comments/11 \
+      http://127.0.0.1:8080/api/alert-groups/123/comments/11 \
       -H 'Authorization: Bearer API_TOKEN'
 
 Успешный ответ:
@@ -253,7 +253,7 @@ Delete `alert_group.comment.delete`
 2. Проверьте, что пользователь может читать команду группы алертов.
 3. Проверьте, что удалённые комментарии отфильтрованы из запроса списка по умолчанию.
 4. Проверьте консоль браузера на наличие ошибок фронтенда.
-5. Проверьте, что `GET /api/alerts/{alert_id}/comments` возвращает JSON.
+5. Проверьте, что `GET /api/alert-groups/{alert_id}/comments` возвращает JSON.
 
 Если создание, редактирование или удаление комментариев завершается ошибкой:
 
