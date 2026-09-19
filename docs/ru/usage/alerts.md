@@ -225,11 +225,10 @@ UI может объединять выбранные группы алерто�
 Пример API:
 
 ```bash
-curl -X POST https://incidentrelay.example.com/api/alert-groups/merge \
+curl -X POST https://incidentrelay.example.com/api/alert-groups/101/merge \
   -H "Authorization: Bearer TOKEN" \
   -H "Content-Type: application/json" \
   -d '{
-    "target_group_id": 101,
     "source_group_ids": [102, 103],
     "reason": "Same customer-facing incident"
   }'
@@ -294,7 +293,7 @@ curl -H "Authorization: Bearer TOKEN" \
 ### Подтвердить группу
 
 ```bash
-curl -X POST https://incidentrelay.example.com/api/alert-groups/101/ack \
+curl -X POST https://incidentrelay.example.com/api/alert-groups/101/acknowledge \
   -H "Authorization: Bearer TOKEN" \
   -H "Content-Type: application/json" \
   -d '{}'

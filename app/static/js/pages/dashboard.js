@@ -1,3 +1,8 @@
+let dashboardHasLoaded = false;
+let dashboardLoadGeneration = 0;
+let dashboardImpactHasLoaded = false;
+let dashboardImpactLoadGeneration = 0;
+
 function dashboardAsArray(value) {
     /*
      * Return alerts from both old array responses and new paginated responses.
@@ -107,6 +112,9 @@ function dashboardEscalationText(alert) {
 }
 function loadDashboard() {
     const params = [];
+    const generation = ++dashboardLoadGeneration;
+    let delayedIndicator = null;
+
     if (typeof selectedTeamId === "function" && selectedTeamId()) {
         params.push("team_id=" + encodeURIComponent(selectedTeamId()));
     }
@@ -115,12 +123,49 @@ function loadDashboard() {
     params.push("sort=activity");
     params.push("order=desc");
 
+    if (window.AppLoading) {
+        if (!dashboardHasLoaded) {
+            AppLoading.showTableSkeleton("#dashboard-alerts", {columns: 9, rows: 6});
+        } else {
+            AppLoading.clear("#dashboard-loading-indicator");
+            delayedIndicator = AppLoading.delayed(function () {
+                if (generation === dashboardLoadGeneration) {
+                    AppLoading.showInline(
+                        "#dashboard-loading-indicator",
+                        i18n.t("common.updating")
+                    );
+                }
+            });
+        }
+    }
+
+    function finishDashboardLoading() {
+        if (generation !== dashboardLoadGeneration || !window.AppLoading) {
+            return;
+        }
+
+        AppLoading.clearTableBusy("#dashboard-alerts");
+        if (delayedIndicator) {
+            delayedIndicator.finish(function () {
+                AppLoading.clear("#dashboard-loading-indicator");
+            });
+        } else {
+            AppLoading.clear("#dashboard-loading-indicator");
+        }
+    }
+
     apiGet("/api/alert-groups?" + params.join("&"), function (response) {
+        if (generation !== dashboardLoadGeneration) {
+            return;
+        }
+
         const alerts = dashboardAsArray(response);
         const activeAlerts = dashboardActiveAlerts(alerts);
         const sortedAlerts = dashboardSortByActivity(alerts);
         const sortedActiveAlerts = dashboardSortByActivity(activeAlerts);
 
+        dashboardHasLoaded = true;
+        finishDashboardLoading();
         renderAlertsSummaryGrid("#overview-alerts-summary", alerts);
         renderDashboardAlertsTable(sortedActiveAlerts.slice(0, 15));
         renderDashboardRecentAlerts(sortedAlerts.slice(0, 5));
@@ -129,6 +174,16 @@ function loadDashboard() {
         renderDashboardPrioritySplit(alerts);
         renderDashboardTeamSummary(alerts);
         renderDashboardSystemStatus(alerts, activeAlerts);
+    }, function (xhr) {
+        if (generation !== dashboardLoadGeneration) {
+            return;
+        }
+
+        finishDashboardLoading();
+        if (!dashboardHasLoaded) {
+            $("#dashboard-alerts").empty();
+        }
+        showApiError(xhr);
     });
     loadDashboardServiceImpact();
 }
@@ -215,7 +270,26 @@ function renderDashboardAlertRow(alert) {
                     .addClass("btn btn-warning btn-small")
                     .text(i18n.t("overview.actions.ack"))
                     .on("click", function () {
-                        apiPost("/api/alert-groups/" + alert.id + "/ack", {}, loadDashboard);
+                        const button = $(this);
+                        if (window.AppLoading) {
+                            AppLoading.setButtonLoading(button, true);
+                        }
+                        apiPost(
+                            "/api/alert-groups/" + alert.id + "/acknowledge",
+                            {},
+                            function () {
+                                if (window.AppLoading) {
+                                    AppLoading.setButtonLoading(button, false);
+                                }
+                                loadDashboard();
+                            },
+                            function (xhr) {
+                                if (window.AppLoading) {
+                                    AppLoading.setButtonLoading(button, false);
+                                }
+                                showApiError(xhr);
+                            }
+                        );
                     })
             );
         }
@@ -226,7 +300,26 @@ function renderDashboardAlertRow(alert) {
                     .addClass("btn btn-resolve btn-small")
                     .text(i18n.t("overview.actions.resolve"))
                     .on("click", function () {
-                        apiPost("/api/alert-groups/" + alert.id + "/resolve", {}, loadDashboard);
+                        const button = $(this);
+                        if (window.AppLoading) {
+                            AppLoading.setButtonLoading(button, true);
+                        }
+                        apiPost(
+                            "/api/alert-groups/" + alert.id + "/resolve",
+                            {},
+                            function () {
+                                if (window.AppLoading) {
+                                    AppLoading.setButtonLoading(button, false);
+                                }
+                                loadDashboard();
+                            },
+                            function (xhr) {
+                                if (window.AppLoading) {
+                                    AppLoading.setButtonLoading(button, false);
+                                }
+                                showApiError(xhr);
+                            }
+                        );
                     })
             );
         }
@@ -535,8 +628,32 @@ function dashboardImpactRows(rows) {
 }
 
 function loadDashboardServiceImpact() {
+    const generation = ++dashboardImpactLoadGeneration;
+
+    if (window.AppLoading && !dashboardImpactHasLoaded) {
+        AppLoading.showBlock(
+            "#dashboard-service-impact",
+            i18n.t("common.loading"),
+            {compact: true}
+        );
+    }
+
     apiGet("/api/services/impact" + dashboardSelectedTeamQuery(), function (rows) {
+        if (generation !== dashboardImpactLoadGeneration) {
+            return;
+        }
+
+        dashboardImpactHasLoaded = true;
         renderDashboardServiceImpact(dashboardImpactRows(rows));
+    }, function (xhr) {
+        if (generation !== dashboardImpactLoadGeneration) {
+            return;
+        }
+
+        if (!dashboardImpactHasLoaded && window.AppLoading) {
+            AppLoading.clear("#dashboard-service-impact");
+        }
+        showApiError(xhr);
     });
 }
 

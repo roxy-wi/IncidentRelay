@@ -7,6 +7,8 @@ let currentDetailsExplainLoadedAlertId = null;
 let currentDetailsExplainTraceId = null;
 let alertsCache = [];
 let alertsAutoRefreshTimer = null;
+let alertsHasLoaded = false;
+let alertsLoadGeneration = 0;
 let alertsLastAppliedQueryString = null;
 let alertsCurrentPage = 1;
 let alertsPageSize = 25;
@@ -836,18 +838,71 @@ function loadAlerts() {
     applyAlertsQueryParams();
     initAlertsTableSorting();
 
+    const generation = ++alertsLoadGeneration;
+    let delayedIndicator = null;
+
+    if (window.AppLoading) {
+        if (!alertsHasLoaded) {
+            AppLoading.showTableSkeleton("#alerts-table", {columns: 10, rows: 7});
+        } else {
+            AppLoading.clear("#alerts-loading-indicator");
+            delayedIndicator = AppLoading.delayed(function () {
+                if (generation === alertsLoadGeneration) {
+                    AppLoading.showInline(
+                        "#alerts-loading-indicator",
+                        i18n.t("common.updating")
+                    );
+                }
+            });
+        }
+    }
+
+    function finishAlertsLoading() {
+        if (generation !== alertsLoadGeneration || !window.AppLoading) {
+            return;
+        }
+
+        AppLoading.clearTableBusy("#alerts-table");
+
+        if (delayedIndicator) {
+            delayedIndicator.finish(function () {
+                AppLoading.clear("#alerts-loading-indicator");
+            });
+        } else {
+            AppLoading.clear("#alerts-loading-indicator");
+        }
+    }
+
     loadAlertServiceFilter(function () {
+        if (generation !== alertsLoadGeneration) {
+            return;
+        }
+
         apiGet(buildAlertsApiUrl(), function (response) {
+            if (generation !== alertsLoadGeneration) {
+                return;
+            }
+
             alertsCache = alertsResponseItems(response);
             alertsPagination = alertsResponsePagination(response);
             alertsSummary = alertsResponseSummary(response);
 
             alertsCurrentPage = alertsPagination.page || alertsCurrentPage || 1;
             alertsPageSize = alertsPagination.page_size || alertsPageSize || 25;
+            alertsHasLoaded = true;
 
+            finishAlertsLoading();
             renderAlertsPage();
             writeAlertsQueryParams();
             updateSortableTableHeaders("#alerts-table-view", alertsSortState);
+        }, function (xhr) {
+            if (generation !== alertsLoadGeneration) {
+                return;
+            }
+
+            finishAlertsLoading();
+            $("#alerts-table").empty();
+            showApiError(xhr);
         });
     });
 }
@@ -1533,9 +1588,17 @@ function showAlertDetails(alertId) {
             i18n.t("alert_details.entity.alert_number", {id: alertId})
         );
         initialModal.find("#alert-details-subtitle").text(i18n.t("alert_details.loading"));
-        initialModal.find("#alert-details-overview").empty().append(
-            $("<div>").addClass("help-text").text(i18n.t("alert_details.loading"))
-        );
+        if (window.AppLoading) {
+            AppLoading.showBlock(
+                initialModal.find("#alert-details-overview"),
+                i18n.t("alert_details.loading"),
+                {compact: true}
+            );
+        } else {
+            initialModal.find("#alert-details-overview").empty().append(
+                $("<div>").addClass("help-text").text(i18n.t("alert_details.loading"))
+            );
+        }
         initialModal.find([
             "#alert-details-summary",
             "#alert-group-children",
@@ -3042,9 +3105,22 @@ $(document).on("click", "#modal-alert-ack", function () {
         return;
     }
 
-    apiPost("/api/alert-groups/" + currentDetailsAlertId + "/ack", {}, function () {
+    const button = $(this);
+    if (window.AppLoading) {
+        AppLoading.setButtonLoading(button, true);
+    }
+
+    apiPost("/api/alert-groups/" + currentDetailsAlertId + "/acknowledge", {}, function () {
+        if (window.AppLoading) {
+            AppLoading.setButtonLoading(button, false);
+        }
         showAlertDetails(currentDetailsAlertId);
         loadAlerts();
+    }, function (xhr) {
+        if (window.AppLoading) {
+            AppLoading.setButtonLoading(button, false);
+        }
+        showApiError(xhr);
     });
 });
 $(document).on("click", "#modal-alert-shelve", function () {
@@ -3062,15 +3138,30 @@ $(document).on("click", "#confirm-alert-shelve", function () {
     if (!currentDetailsAlertId || !currentDetailsAlertCanRespond) {
         return;
     }
+    const button = $(this);
     const durationSeconds = Number($("#alert-shelve-duration").val() || 3600);
     const reason = String($("#alert-shelve-reason").val() || "").trim();
+
+    if (window.AppLoading) {
+        AppLoading.setButtonLoading(button, true);
+    }
+
     apiPost(
         "/api/alert-groups/" + currentDetailsAlertId + "/shelve",
         {duration_seconds: durationSeconds, reason: reason || null},
         function () {
+            if (window.AppLoading) {
+                AppLoading.setButtonLoading(button, false);
+            }
             closeAppModal("#alert-shelve-modal");
             showAlertDetails(currentDetailsAlertId);
             loadAlerts();
+        },
+        function (xhr) {
+            if (window.AppLoading) {
+                AppLoading.setButtonLoading(button, false);
+            }
+            showApiError(xhr);
         }
     );
 });
@@ -3078,9 +3169,23 @@ $(document).on("click", "#modal-alert-unshelve", function () {
     if (!currentDetailsAlertId || !currentDetailsAlertCanRespond) {
         return;
     }
+
+    const button = $(this);
+    if (window.AppLoading) {
+        AppLoading.setButtonLoading(button, true);
+    }
+
     apiPost("/api/alert-groups/" + currentDetailsAlertId + "/unshelve", {}, function () {
+        if (window.AppLoading) {
+            AppLoading.setButtonLoading(button, false);
+        }
         showAlertDetails(currentDetailsAlertId);
         loadAlerts();
+    }, function (xhr) {
+        if (window.AppLoading) {
+            AppLoading.setButtonLoading(button, false);
+        }
+        showApiError(xhr);
     });
 });
 $(document).on("click", "#modal-alert-resolve", function () {
@@ -3092,9 +3197,22 @@ $(document).on("click", "#modal-alert-resolve", function () {
         return;
     }
 
+    const button = $(this);
+    if (window.AppLoading) {
+        AppLoading.setButtonLoading(button, true);
+    }
+
     apiPost("/api/alert-groups/" + currentDetailsAlertId + "/resolve", {}, function () {
+        if (window.AppLoading) {
+            AppLoading.setButtonLoading(button, false);
+        }
         showAlertDetails(currentDetailsAlertId);
         loadAlerts();
+    }, function (xhr) {
+        if (window.AppLoading) {
+            AppLoading.setButtonLoading(button, false);
+        }
+        showApiError(xhr);
     });
 });
 function loadAlertServiceFilter(callback) {
@@ -3162,6 +3280,13 @@ function loadAlertServiceFilter(callback) {
         alertsServiceFilterLoaded = true;
         alertsServiceFilterTeamKey = teamKey;
         alertsServiceFilterApplying = false;
+
+        if (typeof callback === "function") {
+            callback();
+        }
+    }, function (xhr) {
+        alertsServiceFilterApplying = false;
+        showApiError(xhr);
 
         if (typeof callback === "function") {
             callback();
@@ -3327,8 +3452,7 @@ function mergeSelectedAlertGroups() {
         confirmText: i18n.t("alert_details.merge.confirm"),
         confirmClass: "btn-warning"
     }).done(function () {
-        apiPost("/api/alert-groups/merge", {
-            target_group_id: targetId,
+        apiPost("/api/alert-groups/" + targetId + "/merge", {
             source_group_ids: sourceIds,
             reason: i18n.t("alert_details.merge.reason")
         }, function () {
