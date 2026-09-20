@@ -141,7 +141,7 @@ function selectedAlertGroupsForBulkAction(action) {
             return status === "firing";
         }
 
-        if (action === i18n.t("alert_details.bulk.resolve_action")) {
+        if (action === "resolve") {
             return status !== "resolved" && status !== "merged";
         }
 
@@ -256,7 +256,7 @@ function renderAlertsBulkActions() {
     const bar = ensureAlertsBulkActionsBar();
     const count = selectedAlertGroupIds.size;
     const ackCount = selectedAlertGroupsForBulkAction("ack").length;
-    const resolveCount = selectedAlertGroupsForBulkAction(i18n.t("alert_details.bulk.resolve_action")).length;
+    const resolveCount = selectedAlertGroupsForBulkAction("resolve").length;
 
     bar.toggle(count > 0);
     bar.find("#alerts-bulk-selected-count").text(i18n.t("alerts.bulk.selected", {count: count}));
@@ -3188,7 +3188,7 @@ $(document).on("click", "#alerts-ack-selected", function () {
 });
 
 $(document).on("click", "#alerts-resolve-selected", function () {
-    bulkUpdateSelectedAlertGroups(i18n.t("alert_details.bulk.resolve_action"));
+    bulkUpdateSelectedAlertGroups("resolve");
 });
 
 $(document).on("click", "#alerts-merge-selected", function () {
