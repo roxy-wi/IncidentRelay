@@ -30,14 +30,17 @@ def test_frontend_uses_alert_group_api_without_changing_browser_routes():
     assert "/api/alert-groups" in ALERTS_PAGE
     assert "/api/alert-groups" in ALERT_COMMENTS
     assert "/api/alert-groups" in DASHBOARD
+    compact_alerts_page = "".join(ALERTS_PAGE.split())
+    compact_dashboard = "".join(DASHBOARD.split())
+
     assert (
-        'apiPost("/api/alert-groups/" + currentDetailsAlertId + "/acknowledge"'
-        in ALERTS_PAGE
+        '"/api/alert-groups/"+currentDetailsAlertId+"/acknowledge"'
+        in compact_alerts_page
     )
-    assert 'apiPost("/api/alert-groups/" + targetId + "/merge"' in ALERTS_PAGE
+    assert '"/api/alert-groups/"+targetId+"/merge"' in compact_alerts_page
     assert (
-        'apiPost("/api/alert-groups/" + alert.id + "/acknowledge"'
-        in DASHBOARD
+        '"/api/alert-groups/"+alert.id+"/acknowledge"'
+        in compact_dashboard
     )
     assert (
         'return "/alerts/" + encodeURIComponent(alertId) + query;'

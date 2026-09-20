@@ -9,6 +9,8 @@
   "common.install_app": "App installieren",
   "common.collapse_sidebar": "Seitenleiste einklappen",
   "common.loading_oncall_status": "Bereitschaftsstatus wird geladen...",
+  "common.loading": "Wird geladen...",
+  "common.updating": "Wird aktualisiert...",
   "nav.overview": "Übersicht",
   "nav.alerts": "Alarme",
   "nav.rotations": "Rotationen",

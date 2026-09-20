@@ -9,6 +9,8 @@
   "common.install_app": "Instalar aplicación",
   "common.collapse_sidebar": "Contraer barra lateral",
   "common.loading_oncall_status": "Cargando estado de guardia...",
+  "common.loading": "Cargando...",
+  "common.updating": "Actualizando...",
   "nav.overview": "Resumen",
   "nav.alerts": "Alertas",
   "nav.rotations": "Rotaciones",

@@ -52,6 +52,12 @@ function loadServiceDetails(serviceId) {
         function (payload) {
             serviceDetailsCache[cacheKey] = payload;
             renderServiceDetailsPayload(payload);
+        },
+        function (xhr) {
+            if (window.AppLoading) {
+                AppLoading.clear("#service-details-modal-body");
+            }
+            showApiError(xhr);
         }
     );
 }
@@ -67,11 +73,19 @@ function renderServiceDetailsLoading(service) {
         (service.status || "unknown")
     );
 
+    const loadingMessage =
+        "Loading service details for " + (service.name || service.slug || "service") + "...";
+
+    if (window.AppLoading) {
+        AppLoading.showBlock(body, loadingMessage);
+        return;
+    }
+
     body.empty();
     body.append(
         $("<div>")
             .addClass("empty-state")
-            .text("Loading service details for " + (service.name || service.slug || "service") + "...")
+            .text(loadingMessage)
     );
 }
 

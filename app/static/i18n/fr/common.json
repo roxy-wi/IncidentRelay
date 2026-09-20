@@ -9,6 +9,8 @@
   "common.install_app": "Installer l’application",
   "common.collapse_sidebar": "Réduire la barre latérale",
   "common.loading_oncall_status": "Chargement du statut d’astreinte...",
+  "common.loading": "Chargement...",
+  "common.updating": "Mise à jour...",
   "nav.overview": "Vue d’ensemble",
   "nav.alerts": "Alertes",
   "nav.rotations": "Rotations",

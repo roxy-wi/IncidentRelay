@@ -93,7 +93,10 @@
         >
           <div id="alert-details-overview">
             {% if initial_alert_id %}
-              <div class="help-text">{{ _('alert_details.loading') }}</div>
+              <div class="ui-loading-state ui-loading-state-compact" role="status" aria-live="polite">
+                <span class="ui-loading-spinner ui-loading-spinner-small" aria-hidden="true"></span>
+                <span class="ui-loading-message">{{ _('alert_details.loading') }}</span>
+              </div>
             {% endif %}
           </div>
 

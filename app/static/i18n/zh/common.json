@@ -9,6 +9,8 @@
   "common.install_app": "安装应用",
   "common.collapse_sidebar": "收起侧边栏",
   "common.loading_oncall_status": "正在加载值班状态...",
+  "common.loading": "加载中...",
+  "common.updating": "更新中...",
   "nav.overview": "概览",
   "nav.alerts": "告警",
   "nav.rotations": "轮班",

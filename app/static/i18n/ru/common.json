@@ -9,6 +9,8 @@
   "common.install_app": "Установить приложение",
   "common.collapse_sidebar": "Свернуть боковую панель",
   "common.loading_oncall_status": "Загрузка статуса дежурства...",
+  "common.loading": "Загрузка...",
+  "common.updating": "Обновление...",
   "nav.overview": "Обзор",
   "nav.alerts": "Алерты",
   "nav.rotations": "Ротации",

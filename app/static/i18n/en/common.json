@@ -9,6 +9,8 @@
   "common.install_app": "Install app",
   "common.collapse_sidebar": "Collapse sidebar",
   "common.loading_oncall_status": "Loading on-call status...",
+  "common.loading": "Loading...",
+  "common.updating": "Updating...",
   "nav.overview": "Overview",
   "nav.alerts": "Alerts",
   "nav.rotations": "Rotations",

@@ -1,6 +1,8 @@
 // Service catalog core: global state, service list, service form and details modal entry points.
 
 let servicesCache = [];
+let servicesHasLoaded = false;
+let servicesLoadGeneration = 0;
 let selectedServiceDetailsId = null;
 let servicesPageTab = "services";
 let allServiceLinksCache = [];
@@ -420,10 +422,51 @@ function loadServices() {
 
 
 function refreshServices() {
+    const generation = ++servicesLoadGeneration;
+    let delayedIndicator = null;
+
     serviceDetailsCache = {};
+
+    if (window.AppLoading) {
+        if (!servicesHasLoaded) {
+            AppLoading.showTableSkeleton("#services-table", {columns: 8, rows: 6});
+        } else {
+            AppLoading.clear("#services-loading-indicator");
+            delayedIndicator = AppLoading.delayed(function () {
+                if (generation === servicesLoadGeneration) {
+                    AppLoading.showInline(
+                        "#services-loading-indicator",
+                        i18n.t("common.updating")
+                    );
+                }
+            });
+        }
+    }
+
+    function finishServicesLoading() {
+        if (generation !== servicesLoadGeneration || !window.AppLoading) {
+            return;
+        }
+
+        AppLoading.clearTableBusy("#services-table");
+        if (delayedIndicator) {
+            delayedIndicator.finish(function () {
+                AppLoading.clear("#services-loading-indicator");
+            });
+        } else {
+            AppLoading.clear("#services-loading-indicator");
+        }
+    }
+
     apiGet("/api/services" + selectedTeamQuery(), function (services) {
+        if (generation !== servicesLoadGeneration) {
+            return;
+        }
+
         servicesCache = asArray(services);
         window.servicesCache = servicesCache;
+        servicesHasLoaded = true;
+        finishServicesLoading();
 
         renderServicesSummary();
         renderServicesTable();
@@ -435,6 +478,16 @@ function refreshServices() {
         refreshAllServiceContext();
         refreshServiceImpact({ refreshDetails: false });
         refreshServiceAnalytics();
+    }, function (xhr) {
+        if (generation !== servicesLoadGeneration) {
+            return;
+        }
+
+        finishServicesLoading();
+        if (!servicesHasLoaded) {
+            $("#services-table").empty();
+        }
+        showApiError(xhr);
     });
 }
 

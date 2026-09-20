@@ -1630,6 +1630,10 @@ function showAlertDetails(alertId) {
             return;
         }
 
+        const overview = modal.find("#alert-details-overview");
+        overview.removeAttr("aria-busy");
+        overview.children(".ui-loading-state, .help-text").remove();
+
         currentDetailsAlertId = alert.id;
         currentDetailsAlertCanRespond = canRespondObject(alert);
         currentDetailsAlertShelved = Boolean(alert.shelved || (alert.shelve && alert.shelve.active));
