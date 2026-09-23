@@ -47,6 +47,38 @@ def serialize_alert_event(event):
     }
 
 
+def serialize_alert_activity_event(event, group, user=None):
+    """Serialize one compact cross-group activity feed item."""
+
+    team = group.team if getattr(group, "team_id", None) else None
+
+    actor = None
+    if user:
+        actor = {
+            "id": user.id,
+            "username": user.username,
+            "display_name": user.display_name,
+        }
+
+    return {
+        "id": event.id,
+        "event_type": event.event_type,
+        "message": event.message,
+        "created_at": serialize_utc_datetime(event.created_at),
+        "user": actor,
+        "alert_group": {
+            "id": group.id,
+            "title": group.title,
+            "status": group.status,
+            "severity": group.severity,
+            "priority": getattr(group, "priority_slug", None),
+            "team_id": getattr(team, "id", None),
+            "team_name": getattr(team, "name", None),
+            "team_slug": getattr(team, "slug", None),
+        },
+    }
+
+
 def serialize_correlation_alert_group_ref(group):
     """Serialize compact alert group reference for correlation UI."""
     if not group:

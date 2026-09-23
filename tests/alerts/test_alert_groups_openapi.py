@@ -111,3 +111,18 @@ def test_openapi_alert_group_detail_exposes_event_pagination():
     assert "events_pagination" in schema["properties"]
     assert parameters["events_page"]["schema"]["minimum"] == 1
     assert parameters["events_page_size"]["schema"]["maximum"] == 100
+
+
+def test_openapi_documents_recent_alert_group_activity():
+    spec = build_openapi_spec()
+    operation = spec["paths"]["/api/alert-groups/activity"]["get"]
+
+    assert operation["operationId"] == "listAlertGroupActivity"
+    parameters = {item["name"]: item for item in operation["parameters"]}
+    assert parameters["limit"]["schema"]["maximum"] == 25
+    assert parameters["team_id"]["schema"]["minimum"] == 1
+
+    schema = _json_schema(operation)
+    item = schema["properties"]["items"]["items"]
+    assert "alert_group" in item["properties"]
+    assert "event_type" in item["properties"]

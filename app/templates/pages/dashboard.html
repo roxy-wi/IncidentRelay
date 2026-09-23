@@ -1,11 +1,64 @@
 <script src="/static/js/pages/dashboard.js"></script>
 <link rel="stylesheet" href="{{ url_for('static', filename='css/overview.css') }}">
-<div class="first-div-page-layout page-stack">
+<div class="first-div-page-layout page-stack dashboard-page">
   {% set summary_id = "overview-alerts-summary" %}
   {% include 'pages/include/alerts_summary_grid.html' %}
 
-  <section class="page-layout-grid">
-    <div class="card dashboard-active-card">
+  <section class="dashboard-overview-grid">
+    <div class="card dashboard-chart-card dashboard-area-trend">
+      <div class="card-header">
+        <div>
+          <h2>{{ _('overview.charts.activity_title') }}</h2>
+          <div class="card-subtitle">{{ _('overview.charts.activity_subtitle') }}</div>
+        </div>
+
+        <div class="card-header-actions">
+          <span id="dashboard-loading-indicator"></span>
+          <button id="reload-dashboard" type="button" class="btn btn-primary btn-small">
+            {{ _('overview.actions.reload') }}
+          </button>
+        </div>
+      </div>
+
+      <div class="dashboard-chart-host dashboard-chart-host-trend">
+        <canvas id="dashboard-activity-chart"></canvas>
+        <div id="dashboard-activity-chart-empty" class="overview-empty is-hidden">
+          {{ _('overview.empty.no_data') }}
+        </div>
+      </div>
+    </div>
+
+    <div class="card dashboard-chart-card dashboard-area-health">
+      <div class="card-header">
+        <div>
+          <h2>{{ _('overview.charts.service_health_title') }}</h2>
+          <div class="card-subtitle">{{ _('overview.charts.service_health_subtitle') }}</div>
+        </div>
+
+        <a href="/services" class="btn btn-small">
+          {{ _('overview.actions.view_all') }}
+        </a>
+      </div>
+
+      <div class="dashboard-chart-host dashboard-chart-host-donut dashboard-health-chart-host">
+        <canvas id="dashboard-service-health-chart"></canvas>
+        <div id="dashboard-service-health-chart-empty" class="overview-empty is-hidden">
+          {{ _('overview.empty.no_data') }}
+        </div>
+      </div>
+
+      <div class="dashboard-health-summary">
+        <div class="dashboard-status-icon">●</div>
+        <div>
+          <div class="dashboard-health-summary-label">{{ _('overview.system.title') }}</div>
+          <div id="dashboard-system-status" class="dashboard-status-text">
+            {{ _('overview.system.waiting') }}
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="card dashboard-active-card dashboard-area-active">
       <div class="card-header">
         <div>
           <h2>{{ _('overview.active.title') }}</h2>
@@ -15,14 +68,9 @@
         </div>
 
         <div class="card-header-actions">
-          <span id="dashboard-loading-indicator"></span>
           <a href="/alerts" class="btn btn-small">
             {{ _('overview.actions.view_all') }}
           </a>
-
-          <button id="reload-dashboard" type="button" class="btn btn-primary btn-small">
-            {{ _('overview.actions.reload') }}
-          </button>
         </div>
       </div>
 
@@ -47,98 +95,60 @@
       </div>
     </div>
 
-    <aside class="side-column">
-        <div class="card dashboard-status-card">
-            <div class="card-header">
-                <div>
-                    <h2>{{ _('overview.system.title') }}</h2>
-                    <div class="card-subtitle">
-                        {{ _('overview.system.subtitle') }}
-                    </div>
-                </div>
-            </div>
-
-            <div class="dashboard-status-body">
-                <div class="dashboard-status-icon">●</div>
-
-                <div id="dashboard-system-status" class="dashboard-status-text">
-                    {{ _('overview.system.waiting') }}
-                </div>
-            </div>
-        </div>
-
-        <div class="card dashboard-list-card dashboard-impact-card">
-            <div class="card-header">
-                <div>
-                    <h2>{{ _('overview.impact.title') }}</h2>
-                    <div class="card-subtitle">
-                        {{ _('overview.impact.subtitle') }}
-                        <span id="dashboard-impacted-services-count" class="overview-count-badge">0</span>
-                    </div>
-                </div>
-
-                <a href="/services" class="btn btn-small">
-                    {{ _('overview.actions.view_all') }}
-                </a>
-            </div>
-
-            <div id="dashboard-service-impact" class="dashboard-list"></div>
-        </div>
-
-        <div class="card dashboard-list-card">
-            <div class="card-header">
-                <div>
-                    <h2>{{ _('overview.recent.title') }}</h2>
-                    <div class="card-subtitle">
-                        {{ _('overview.recent.subtitle') }}
-                    </div>
-                </div>
-
-                <a href="/alerts" class="btn btn-small">
-                    {{ _('overview.actions.view_all') }}
-                </a>
-            </div>
-
-            <div id="dashboard-recent-alerts" class="dashboard-list"></div>
-        </div>
-
-        <div class="card dashboard-list-card">
-            <div class="card-header">
-                <div>
-                    <h2>{{ _('overview.teams.title') }}</h2>
-
-                    <div class="card-subtitle">
-                        {{ _('overview.teams.subtitle') }}
-                    </div>
-                </div>
-            </div>
-
-            <div id="dashboard-teams-now" class="dashboard-list"></div>
-        </div>
-    </aside>
-  </section>
-
-  <section class="bottom-grid">
-      <div class="card dashboard-chart-card">
-          <div class="card-header">
-              <div>
-                  <h2>{{ _('overview.charts.severity_title') }}</h2>
-                  <div class="card-subtitle">{{ _('overview.charts.severity_subtitle') }}</div>
-              </div>
+    <div class="card dashboard-list-card dashboard-impact-card dashboard-area-impact">
+      <div class="card-header">
+        <div>
+          <h2>{{ _('overview.impact.title') }}</h2>
+          <div class="card-subtitle">
+            {{ _('overview.impact.subtitle') }}
+            <span id="dashboard-impacted-services-count" class="overview-count-badge">0</span>
           </div>
-          <div id="dashboard-severity-split" class="dashboard-bars"></div>
-      </div>
-      <div class="card dashboard-chart-card">
-          <div class="card-header">
-              <div>
-                  <h2>{{ _('overview.charts.priority_title') }}</h2>
-                  <div class="card-subtitle">{{ _('overview.charts.priority_subtitle') }}</div>
-              </div>
-          </div>
-          <div id="dashboard-priority-split" class="dashboard-bars"></div>
+        </div>
+
+        <a href="/services" class="btn btn-small">
+          {{ _('overview.actions.view_all') }}
+        </a>
       </div>
 
-    <div class="card dashboard-chart-card">
+      <div id="dashboard-service-impact" class="dashboard-list"></div>
+    </div>
+
+    <div class="card dashboard-chart-card dashboard-area-distribution">
+      <div class="card-header">
+        <div>
+          <h2>{{ _('overview.charts.distribution_title') }}</h2>
+          <div class="card-subtitle">{{ _('overview.charts.distribution_subtitle') }}</div>
+        </div>
+      </div>
+
+      <div class="dashboard-distribution-grid">
+        <section class="dashboard-distribution-item" aria-labelledby="dashboard-severity-title">
+          <div id="dashboard-severity-title" class="dashboard-distribution-title">
+            {{ _('overview.charts.severity_title') }}
+          </div>
+          <div class="dashboard-chart-host dashboard-chart-host-distribution">
+            <canvas id="dashboard-severity-chart"></canvas>
+            <div id="dashboard-severity-chart-empty" class="overview-empty is-hidden">
+              {{ _('overview.empty.no_data') }}
+            </div>
+          </div>
+        </section>
+
+        <section class="dashboard-distribution-item" aria-labelledby="dashboard-priority-title">
+          <div id="dashboard-priority-title" class="dashboard-distribution-title">
+            {{ _('overview.charts.priority_title') }}
+          </div>
+          <div class="dashboard-chart-host dashboard-chart-host-distribution">
+            <canvas id="dashboard-priority-chart"></canvas>
+            <div id="dashboard-priority-chart-empty" class="overview-empty is-hidden">
+              {{ _('overview.empty.no_data') }}
+            </div>
+          </div>
+        </section>
+      </div>
+    </div>
+
+    <div class="card dashboard-chart-card dashboard-area-team-summary">
       <div class="card-header">
         <div>
           <h2>{{ _('overview.charts.team_title') }}</h2>
@@ -148,7 +158,47 @@
         </div>
       </div>
 
-      <div id="dashboard-team-summary" class="dashboard-bars"></div>
+      <div class="dashboard-chart-host dashboard-chart-host-team">
+        <canvas id="dashboard-team-chart"></canvas>
+        <div id="dashboard-team-chart-empty" class="overview-empty is-hidden">
+          {{ _('overview.empty.no_data') }}
+        </div>
+      </div>
+    </div>
+
+    <div class="card dashboard-list-card dashboard-area-recent">
+      <div class="card-header">
+        <div>
+          <h2>{{ _('overview.recent.title') }}</h2>
+          <div class="card-subtitle">
+            {{ _('overview.recent.subtitle') }}
+          </div>
+        </div>
+
+        <a href="/alerts" class="btn btn-small">
+          {{ _('overview.actions.view_all') }}
+        </a>
+      </div>
+
+      <div id="dashboard-recent-activity" class="dashboard-list"></div>
+    </div>
+
+
+    <div class="card dashboard-list-card dashboard-area-oncall">
+      <div class="card-header">
+        <div>
+          <h2>{{ _('overview.oncall.title') }}</h2>
+          <div class="card-subtitle">
+            {{ _('overview.oncall.subtitle') }}
+          </div>
+        </div>
+
+        <a href="/calendar" class="btn btn-small">
+          {{ _('overview.actions.view_all') }}
+        </a>
+      </div>
+
+      <div id="dashboard-oncall-now" class="dashboard-list"></div>
     </div>
   </section>
 </div>

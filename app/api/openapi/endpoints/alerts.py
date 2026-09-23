@@ -118,6 +118,42 @@ def alert_child_schema(include_payload=False):
     }
 
 
+def alert_activity_schema():
+    """Build one cross-group activity feed item schema."""
+
+    return {
+        "type": "object",
+        "properties": {
+            "id": {"type": "integer"},
+            "event_type": {"type": "string"},
+            "message": {"type": "string", "nullable": True},
+            "created_at": date_time_property("Activity timestamp in UTC."),
+            "user": {
+                "type": "object",
+                "nullable": True,
+                "properties": {
+                    "id": {"type": "integer"},
+                    "username": {"type": "string"},
+                    "display_name": {"type": "string", "nullable": True},
+                },
+            },
+            "alert_group": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "integer"},
+                    "title": {"type": "string"},
+                    "status": {"type": "string"},
+                    "severity": {"type": "string", "nullable": True},
+                    "priority": {"type": "string", "nullable": True},
+                    "team_id": {"type": "integer", "nullable": True},
+                    "team_name": {"type": "string", "nullable": True},
+                    "team_slug": {"type": "string", "nullable": True},
+                },
+            },
+        },
+    }
+
+
 def alert_event_schema():
     """Build alert event response schema."""
 
@@ -921,6 +957,46 @@ def paths():
                     "401": response("Authentication required."),
                     "403": response("Access denied."),
                     "404": response("Alert group not found."),
+                },
+            }
+        },
+        "/api/alert-groups/activity": {
+            "get": {
+                "tags": ["alerts"],
+                "summary": "List recent alert group activity",
+                "description": (
+                    "Returns the newest meaningful lifecycle and operator events "
+                    "across AlertGroups visible to the current user."
+                ),
+                "operationId": "listAlertGroupActivity",
+                "security": bearer_security(),
+                "parameters": [
+                    query_param(
+                        "team_id",
+                        "Restrict activity to one readable team.",
+                        {"type": "integer", "minimum": 1},
+                    ),
+                    query_param(
+                        "limit",
+                        "Maximum number of activity entries.",
+                        {"type": "integer", "minimum": 1, "maximum": 25, "default": 6},
+                    ),
+                ],
+                "responses": {
+                    "200": response(
+                        "Recent alert group activity.",
+                        {
+                            "type": "object",
+                            "properties": {
+                                "items": {
+                                    "type": "array",
+                                    "items": alert_activity_schema(),
+                                },
+                            },
+                        },
+                    ),
+                    "401": response("Authentication required."),
+                    "403": response("Access denied."),
                 },
             }
         },

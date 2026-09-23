@@ -1,6 +1,9 @@
 let currentDetailsAlertId = null;
 let currentDetailsAlertCanRespond = false;
 let currentDetailsAlertShelved = false;
+let currentShelveAlertId = null;
+let currentShelveAlertCanRespond = false;
+let currentShelveSuccessCallback = null;
 const ALERT_EVENTS_PAGE_SIZE = 50;
 let currentDetailsActiveTab = "summary";
 let currentDetailsExplainLoadedAlertId = null;
@@ -76,6 +79,38 @@ const alertsSortColumns = {
         defaultDirection: "desc",
     },
 };
+function resetAlertShelveContext() {
+    currentShelveAlertId = null;
+    currentShelveAlertCanRespond = false;
+    currentShelveSuccessCallback = null;
+}
+
+function openAlertShelveModal(alertId, options) {
+    const settings = $.extend({
+        canRespond: true,
+        onSuccess: null,
+    }, options || {});
+    const targetId = Number(alertId) || null;
+
+    if (!targetId || !settings.canRespond) {
+        return;
+    }
+
+    currentShelveAlertId = targetId;
+    currentShelveAlertCanRespond = true;
+    currentShelveSuccessCallback = (
+        typeof settings.onSuccess === "function"
+            ? settings.onSuccess
+            : null
+    );
+
+    $("#alert-shelve-duration").val("3600");
+    $("#alert-shelve-reason").val("");
+    openAppModal("#alert-shelve-modal");
+}
+
+window.openAlertShelveModal = openAlertShelveModal;
+
 function isAlertGroup(alert) {
     return alert && alert.type === "alert_group";
 }
@@ -3131,18 +3166,23 @@ $(document).on("click", "#modal-alert-shelve", function () {
     if (!currentDetailsAlertId || !currentDetailsAlertCanRespond) {
         return;
     }
-    $("#alert-shelve-duration").val("3600");
-    $("#alert-shelve-reason").val("");
-    openAppModal("#alert-shelve-modal");
+
+    openAlertShelveModal(currentDetailsAlertId, {
+        canRespond: currentDetailsAlertCanRespond,
+    });
 });
 $(document).on("click", "#close-alert-shelve, #cancel-alert-shelve", function () {
+    resetAlertShelveContext();
     closeAppModal("#alert-shelve-modal");
 });
 $(document).on("click", "#confirm-alert-shelve", function () {
-    if (!currentDetailsAlertId || !currentDetailsAlertCanRespond) {
+    if (!currentShelveAlertId || !currentShelveAlertCanRespond) {
         return;
     }
+
     const button = $(this);
+    const targetId = currentShelveAlertId;
+    const onSuccess = currentShelveSuccessCallback;
     const durationSeconds = Number($("#alert-shelve-duration").val() || 3600);
     const reason = String($("#alert-shelve-reason").val() || "").trim();
 
@@ -3151,14 +3191,22 @@ $(document).on("click", "#confirm-alert-shelve", function () {
     }
 
     apiPost(
-        "/api/alert-groups/" + currentDetailsAlertId + "/shelve",
+        "/api/alert-groups/" + targetId + "/shelve",
         {duration_seconds: durationSeconds, reason: reason || null},
         function () {
             if (window.AppLoading) {
                 AppLoading.setButtonLoading(button, false);
             }
+
             closeAppModal("#alert-shelve-modal");
-            showAlertDetails(currentDetailsAlertId);
+            resetAlertShelveContext();
+
+            if (onSuccess) {
+                onSuccess(targetId);
+                return;
+            }
+
+            showAlertDetails(targetId);
             loadAlerts();
         },
         function (xhr) {

@@ -5,6 +5,13 @@ from pydantic import Field, field_validator
 from app.api.schemas.base import ApiModel
 
 
+class AlertActivityQuerySchema(ApiModel):
+    """Filters for the cross-group recent activity feed."""
+
+    team_id: int | None = Field(default=None, ge=1)
+    limit: int = Field(default=6, ge=1, le=25)
+
+
 class AlertEventListQuerySchema(ApiModel):
     """Pagination for alert event history."""
 

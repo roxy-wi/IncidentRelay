@@ -185,6 +185,91 @@ def test_grafana_endpoint_accepts_route_token(
     assert calls[0][0]["title"] == "Disk is full"
 
 
+def test_grafana_endpoint_accepts_explicit_null_values(
+    client,
+    db,
+):
+    raw_token = "grafana-null-values-token"
+
+    group = create_group(slug="platform")
+    team = create_team(group, slug="sre")
+    create_route(
+        team,
+        source="grafana",
+        token_hash=hash_token(raw_token),
+    )
+
+    payload = grafana_payload()
+    payload["alerts"][0]["values"] = None
+
+    response = client.post(
+        "/api/integrations/grafana",
+        headers={
+            "Authorization": f"Bearer {raw_token}",
+        },
+        json=payload,
+    )
+
+    assert response.status_code == 200
+    body = response.get_json()
+    assert len(body) == 1
+    assert body[0]["group_id"]
+    assert body[0]["alert_id"]
+
+    alert = Alert.get_by_id(body[0]["alert_id"])
+    assert alert.payload["alerts"][0]["values"] == {}
+
+
+def test_grafana_endpoint_accepts_explicit_null_optional_maps(
+    client,
+    monkeypatch,
+    db,
+):
+    raw_token = "grafana-null-maps-token"
+
+    group = create_group(slug="platform")
+    team = create_team(group, slug="sre")
+    create_route(
+        team,
+        source="grafana",
+        token_hash=hash_token(raw_token),
+    )
+
+    payload = grafana_payload()
+    payload["groupLabels"] = None
+    payload["commonLabels"] = None
+    payload["commonAnnotations"] = None
+    payload["alerts"][0]["labels"] = None
+    payload["alerts"][0]["annotations"] = None
+    payload["alerts"][0]["values"] = None
+
+    captured = []
+
+    def fake_process_incoming_alerts(alerts):
+        captured.extend(alerts)
+        return {"ok": True}, 200
+
+    monkeypatch.setattr(
+        "app.views.integrations_view.process_incoming_alerts",
+        fake_process_incoming_alerts,
+    )
+
+    response = client.post(
+        "/api/integrations/grafana",
+        headers={
+            "Authorization": f"Bearer {raw_token}",
+        },
+        json=payload,
+    )
+
+    assert response.status_code == 200
+    assert response.get_json() == {"ok": True}
+    assert len(captured) == 1
+    assert captured[0]["source"] == "grafana"
+    assert captured[0]["title"] == "[FIRING:1] DiskFull"
+    assert captured[0]["labels"]["grafana_org_id"] == "1"
+
+
 def test_grafana_endpoint_rejects_empty_alert_list(
     client,
     db,

@@ -1,8 +1,23 @@
-from typing import Any, Dict, List
+from typing import Annotated, Any, Dict, List
 
-from pydantic import ConfigDict, Field, model_validator
+from pydantic import BeforeValidator, ConfigDict, Field, model_validator
 
 from app.api.schemas.base import ApiModel
+
+
+def _empty_dict_if_none(value):
+    """Treat explicit JSON null like an omitted optional mapping."""
+    return {} if value is None else value
+
+
+StringPayloadMap = Annotated[
+    dict[str, str],
+    BeforeValidator(_empty_dict_if_none),
+]
+PayloadMap = Annotated[
+    Dict[str, Any],
+    BeforeValidator(_empty_dict_if_none),
+]
 
 
 class AlertmanagerAlertSchema(ApiModel):
@@ -13,8 +28,8 @@ class AlertmanagerAlertSchema(ApiModel):
     model_config = ConfigDict(extra="ignore")
 
     status: str = "firing"
-    labels: dict[str, str] = Field(default_factory=dict)
-    annotations: dict[str, str] = Field(default_factory=dict)
+    labels: StringPayloadMap = Field(default_factory=dict)
+    annotations: StringPayloadMap = Field(default_factory=dict)
     startsAt: str | None = None
     endsAt: str | None = None
     generatorURL: str | None = None
@@ -31,9 +46,9 @@ class AlertmanagerWebhookSchema(ApiModel):
     receiver: str | None = None
     status: str = "firing"
     alerts: list[AlertmanagerAlertSchema]
-    groupLabels: dict[str, str] = Field(default_factory=dict)
-    commonLabels: dict[str, str] = Field(default_factory=dict)
-    commonAnnotations: dict[str, str] = Field(default_factory=dict)
+    groupLabels: StringPayloadMap = Field(default_factory=dict)
+    commonLabels: StringPayloadMap = Field(default_factory=dict)
+    commonAnnotations: StringPayloadMap = Field(default_factory=dict)
     externalURL: str | None = None
     version: str | None = None
     groupKey: str | None = None
@@ -50,8 +65,8 @@ class GrafanaAlertSchema(ApiModel):
     model_config = ConfigDict(extra="allow")
 
     status: str = "firing"
-    labels: Dict[str, Any] = Field(default_factory=dict)
-    annotations: Dict[str, Any] = Field(default_factory=dict)
+    labels: PayloadMap = Field(default_factory=dict)
+    annotations: PayloadMap = Field(default_factory=dict)
 
     startsAt: str | None = None
     endsAt: str | None = None
@@ -62,7 +77,7 @@ class GrafanaAlertSchema(ApiModel):
     dashboardURL: str | None = None
     panelURL: str | None = None
 
-    values: Dict[str, Any] = Field(default_factory=dict)
+    values: PayloadMap = Field(default_factory=dict)
     valueString: str | None = None
 
 
@@ -77,9 +92,9 @@ class GrafanaWebhookSchema(ApiModel):
 
     alerts: List[GrafanaAlertSchema] = Field(min_length=1)
 
-    groupLabels: Dict[str, Any] = Field(default_factory=dict)
-    commonLabels: Dict[str, Any] = Field(default_factory=dict)
-    commonAnnotations: Dict[str, Any] = Field(default_factory=dict)
+    groupLabels: PayloadMap = Field(default_factory=dict)
+    commonLabels: PayloadMap = Field(default_factory=dict)
+    commonAnnotations: PayloadMap = Field(default_factory=dict)
 
     externalURL: str | None = None
     version: str | None = None
@@ -129,7 +144,7 @@ class ZabbixWebhookSchema(ApiModel):
     host_name: str | None = None
     hostname: str | None = None
 
-    labels: Dict[str, Any] = Field(default_factory=dict)
+    labels: PayloadMap = Field(default_factory=dict)
 
     # Can be a dict, a Zabbix EVENT.TAGSJSON array, or sometimes a raw string.
     tags: Any = None
@@ -211,7 +226,7 @@ class DatadogWebhookSchema(ApiModel):
     hostname: str | None = None
     link: str | None = None
     tags: Any = None
-    labels: Dict[str, Any] = Field(default_factory=dict)
+    labels: PayloadMap = Field(default_factory=dict)
     team: str | None = None
 
     @model_validator(mode="after")
@@ -327,11 +342,11 @@ class NewRelicWebhookSchema(ApiModel):
     entity_guid: str | None = None
     entity_name: str | None = None
     entity_type: str | None = None
-    labels: Dict[str, Any] = Field(default_factory=dict)
+    labels: PayloadMap = Field(default_factory=dict)
     tags: Any = None
     team: str | None = None
-    accumulations: Dict[str, Any] = Field(default_factory=dict)
-    entitiesData: Dict[str, Any] = Field(default_factory=dict)
+    accumulations: PayloadMap = Field(default_factory=dict)
+    entitiesData: PayloadMap = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def validate_not_empty(self):
@@ -368,7 +383,7 @@ class NagiosWebhookSchema(ApiModel):
     state_type: str | None = None
     event_link: str | None = None
     team: str | None = None
-    labels: Dict[str, Any] = Field(default_factory=dict)
+    labels: PayloadMap = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def validate_host_identity(self):
@@ -406,7 +421,7 @@ class UptimeKumaWebhookSchema(ApiModel):
     severity: str | None = None
     status: str | int | None = None
     team: str | None = None
-    labels: Dict[str, Any] = Field(default_factory=dict)
+    labels: PayloadMap = Field(default_factory=dict)
     event_link: str | None = None
     monitor_url: str | None = None
     monitor_id: str | int | None = None
@@ -443,7 +458,7 @@ class GenericWebhookSchema(ApiModel):
     severity: str | None = None
     status: str | None = None
     team: str | None = None
-    labels: Dict[str, Any] = Field(default_factory=dict)
+    labels: PayloadMap = Field(default_factory=dict)
     fingerprint: str | None = None
     external_id: str | None = None
 
@@ -531,7 +546,7 @@ class RmonWebhookSchema(ApiModel):
     external_id: str | int | None = None
 
     team: str | None = None
-    labels: Dict[str, Any] = Field(default_factory=dict)
+    labels: PayloadMap = Field(default_factory=dict)
 
     runbook: str | None = None
     runbook_url: str | None = None
@@ -560,7 +575,7 @@ class SentryWebhookSchema(ApiModel):
     action: str | None = None
     actor: Dict[str, Any] | None = None
     installation: Dict[str, Any] | None = None
-    data: Dict[str, Any] = Field(default_factory=dict)
+    data: PayloadMap = Field(default_factory=dict)
 
 
 class LibreNMSWebhookSchema(ApiModel):
@@ -604,7 +619,7 @@ class LibreNMSWebhookSchema(ApiModel):
     proc: str | None = None
 
     team: str | None = None
-    labels: Dict[str, Any] = Field(default_factory=dict)
+    labels: PayloadMap = Field(default_factory=dict)
 
     fingerprint: str | None = None
     event_link: str | None = None
@@ -711,7 +726,7 @@ class AwsSnsEnvelopeSchema(ApiModel):
         default=None,
         alias="UnsubscribeURL",
     )
-    message_attributes: Dict[str, Any] = Field(
+    message_attributes: PayloadMap = Field(
         default_factory=dict,
         alias="MessageAttributes",
     )

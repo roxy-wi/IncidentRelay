@@ -393,11 +393,11 @@ function loadNotificationPolicyRuleChannels(policy, callback) {
     apiGet(
         "/api/channels?team_id=" + encodeURIComponent(policy.team_id),
         function (channels) {
-            notificationPolicyChannelsCache = asArray(channels).filter(
-                function (channel) {
-                    return channel.enabled !== false;
-                }
-            );
+            // Keep disabled channels visible. Existing notification policy
+            // rules may legitimately reference a channel that is currently
+            // disabled, and hiding it here makes the editor look empty and
+            // can silently drop the relation on the next save.
+            notificationPolicyChannelsCache = asArray(channels);
 
             if (typeof callback === "function") {
                 callback();
@@ -868,6 +868,31 @@ function notificationPolicyRuleEventCheckbox(rule, eventType, label) {
 
 function notificationPolicyRuleChannelsField(rule) {
     const id = notificationPolicyRuleFieldId(rule.id, "channels");
+    const selectedChannelIds = new Set(
+        asArray(rule.channel_ids).map(function (channelId) {
+            return String(channelId);
+        })
+    );
+
+    // Prefer the team channel list, but merge in rule-embedded channel
+    // references as a defensive fallback. This preserves existing policy
+    // links even if the team channel request is temporarily incomplete.
+    const channelsById = new Map();
+
+    notificationPolicyChannelsCache.forEach(function (channel) {
+        channelsById.set(String(channel.id), channel);
+    });
+
+    asArray(rule.channels).forEach(function (channel) {
+        const channelId = String(channel.id);
+        if (!channelsById.has(channelId)) {
+            channelsById.set(channelId, channel);
+        }
+    });
+
+    const channels = Array.from(channelsById.values()).sort(function (left, right) {
+        return String(left.name || "").localeCompare(String(right.name || ""));
+    });
 
     const select = $("<select>")
         .attr("id", id)
@@ -875,19 +900,33 @@ function notificationPolicyRuleChannelsField(rule) {
         .attr("size", "6")
         .addClass("input");
 
-    notificationPolicyChannelsCache.forEach(function (channel) {
+    channels.forEach(function (channel) {
+        const disabledSuffix = channel.enabled === false
+            ? " · " + i18n.t("notification_policies.status.disabled")
+            : "";
+
         select.append(
             $("<option>")
                 .val(String(channel.id))
-                .text(channel.name + " (" + channel.channel_type + ")")
+                .text(
+                    (channel.name || i18n.t("notification_policies.rules.channel_number", {id: channel.id}))
+                    + " (" + (channel.channel_type || "-") + ")"
+                    + disabledSuffix
+                )
         );
     });
 
-    select.val(
-        asArray(rule.channel_ids).map(function (channelId) {
-            return String(channelId);
-        })
-    );
+    if (!channels.length) {
+        select
+            .prop("disabled", true)
+            .append(
+                $("<option>")
+                    .prop("disabled", true)
+                    .text(i18n.t("notification_policies.rules.no_channels"))
+            );
+    } else {
+        select.val(Array.from(selectedChannelIds));
+    }
 
     return $("<div>")
         .addClass("app-field layer-settings-col-12")

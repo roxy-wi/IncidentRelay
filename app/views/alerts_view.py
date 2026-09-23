@@ -2,6 +2,7 @@ from peewee import DoesNotExist
 from flask import Blueprint, jsonify, request
 
 from app.api.schemas.alerts import (
+    AlertActivityQuerySchema,
     AlertDetailQuerySchema,
     AlertEventListQuerySchema,
     AlertGroupCreateSchema,
@@ -22,6 +23,7 @@ from app.services.rbac import (
     require_team_respond,
 )
 from app.services.serializers.alerts import (
+    serialize_alert_activity_event,
     serialize_alert_event,
     serialize_alert_comment,
     serialize_alert_group,
@@ -64,6 +66,36 @@ from app.services.validation import (
 )
 
 alerts_bp = Blueprint("alerts_api", __name__)
+
+
+ALERT_GROUP_ACTIVITY_EVENT_TYPES = frozenset({
+    "created",
+    "manual_created",
+    "acknowledged",
+    "resolved",
+    "reopened",
+    "alert_group_shelved",
+    "alert_group_unshelved",
+    "alert_group_shelve_expired",
+    "assignee_changed",
+    "priority_changed",
+    "priority_auto_updated",
+    "priority_auto_recalculated",
+    "silenced",
+    "unsilenced",
+    "maintenance_applied",
+    "maintenance_released",
+    "escalated",
+    "escalation_stopped",
+    "merged",
+    "merge_target_updated",
+    "commented",
+    "comment_updated",
+    "comment_deleted",
+    "correlation_detected",
+    "correlation_deactivated",
+    "routing_error",
+})
 
 
 def _request_user():
@@ -215,6 +247,40 @@ def create_alert_group():
         data={"team_id": group.team_id, "service_id": group.service_id, "title": group.title},
     )
     return jsonify(serialize_alert_group(group, current_user=_request_user(), include_details=True)), 201
+
+
+@alerts_bp.route("/activity", methods=["GET"])
+def list_alert_group_activity():
+    """Return recent meaningful activity across visible AlertGroups."""
+
+    query, error = validate_query(AlertActivityQuerySchema)
+    if error:
+        return error
+
+    if query.team_id:
+        error = require_team_read(query.team_id)
+        if error:
+            return error
+        team_ids = [query.team_id]
+    else:
+        team_ids = get_allowed_team_ids()
+
+    activity = alerts_repo.list_recent_alert_group_activity(
+        team_ids=team_ids,
+        limit=query.limit,
+        event_types=ALERT_GROUP_ACTIVITY_EVENT_TYPES,
+    )
+
+    return jsonify({
+        "items": [
+            serialize_alert_activity_event(
+                item["event"],
+                item["group"],
+                item["user"],
+            )
+            for item in activity
+        ]
+    })
 
 
 @alerts_bp.route("/priorities", methods=["GET"])

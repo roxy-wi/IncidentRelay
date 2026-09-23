@@ -652,6 +652,16 @@ body.md-theme .summary-success .summary-icon {
   color: var(--md-success);
 }
 
+body.md-theme .summary-warning .summary-icon {
+  background: var(--md-warning-soft);
+  color: var(--md-warning);
+}
+
+body.md-theme .summary-danger .summary-icon {
+  background: var(--md-danger-soft);
+  color: var(--md-danger);
+}
+
 body.md-theme .summary-muted .summary-icon {
   background: var(--md-surface-soft);
   color: var(--md-muted);

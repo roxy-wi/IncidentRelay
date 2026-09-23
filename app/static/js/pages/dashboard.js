@@ -2,6 +2,43 @@ let dashboardHasLoaded = false;
 let dashboardLoadGeneration = 0;
 let dashboardImpactHasLoaded = false;
 let dashboardImpactLoadGeneration = 0;
+let dashboardCharts = {};
+let dashboardLastAlerts = [];
+let dashboardLastServiceRows = [];
+
+const dashboardDoughnutCenterPlugin = {
+    id: "dashboardDoughnutCenter",
+    afterDraw: function (chart, args, options) {
+        if (!options || options.text === undefined || options.text === null) {
+            return;
+        }
+
+        const area = chart.chartArea;
+        if (!area) {
+            return;
+        }
+
+        const ctx = chart.ctx;
+        const centerX = (area.left + area.right) / 2;
+        const centerY = (area.top + area.bottom) / 2;
+        const textColor = dashboardThemeToken("--md-text", "#0f172a");
+        const mutedColor = dashboardThemeToken("--md-muted", "#64748b");
+
+        ctx.save();
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillStyle = textColor;
+        ctx.font = "800 24px system-ui, -apple-system, BlinkMacSystemFont, sans-serif";
+        ctx.fillText(String(options.text), centerX, centerY - 7);
+
+        if (options.label) {
+            ctx.fillStyle = mutedColor;
+            ctx.font = "700 11px system-ui, -apple-system, BlinkMacSystemFont, sans-serif";
+            ctx.fillText(String(options.label), centerX, centerY + 15);
+        }
+        ctx.restore();
+    },
+};
 
 function dashboardAsArray(value) {
     /*
@@ -98,6 +135,42 @@ function dashboardActiveAlerts(alerts) {
         return alert.status === "firing" || alert.status === "acknowledged";
     });
 }
+
+function dashboardAlertIsShelved(alert) {
+    return Boolean(
+        alert
+        && (
+            alert.shelved
+            || (alert.shelve && alert.shelve.active)
+        )
+    );
+}
+
+function dashboardRunAlertAction(alertId, action) {
+    apiPost(
+        "/api/alert-groups/" + encodeURIComponent(alertId) + "/" + action,
+        {},
+        function () {
+            loadDashboard();
+        },
+        function (xhr) {
+            showApiError(xhr);
+        }
+    );
+}
+
+function dashboardShelveAlert(alert) {
+    if (typeof window.openAlertShelveModal !== "function") {
+        return;
+    }
+
+    window.openAlertShelveModal(alert.id, {
+        canRespond: true,
+        onSuccess: function () {
+            loadDashboard();
+        },
+    });
+}
 function dashboardEscalationText(alert) {
     if (alert.escalation_policy_name) {
         const rule = alert.escalation_rule_position
@@ -110,6 +183,212 @@ function dashboardEscalationText(alert) {
     }
     return i18n.t("overview.escalation.rotation", {name: alert.rotation_name || "-"});
 }
+function dashboardThemeToken(name, fallback) {
+    const value = window.getComputedStyle(document.documentElement)
+        .getPropertyValue(name)
+        .trim();
+
+    return value || fallback;
+}
+
+function dashboardDestroyChart(key) {
+    if (dashboardCharts[key]) {
+        dashboardCharts[key].destroy();
+        delete dashboardCharts[key];
+    }
+}
+
+function dashboardChartState(selector, hasData) {
+    const canvas = $(selector);
+    const empty = $(selector + "-empty");
+
+    canvas.toggleClass("is-hidden", !hasData);
+    empty.toggleClass("is-hidden", hasData);
+}
+
+function dashboardChartOptions() {
+    return {
+        responsive: true,
+        maintainAspectRatio: false,
+        animation: {
+            duration: 240,
+        },
+        interaction: {
+            mode: "index",
+            intersect: false,
+        },
+        plugins: {
+            legend: {
+                display: true,
+                position: "bottom",
+                labels: {
+                    usePointStyle: true,
+                    pointStyle: "circle",
+                    boxWidth: 8,
+                    boxHeight: 8,
+                    padding: 16,
+                },
+            },
+            tooltip: {
+                enabled: true,
+            },
+        },
+    };
+}
+
+function dashboardDoughnutOptions(total, label) {
+    const options = dashboardChartOptions();
+
+    options.cutout = "72%";
+    options.interaction = {
+        mode: "nearest",
+        intersect: true,
+    };
+    options.plugins.dashboardDoughnutCenter = {
+        text: total,
+        label: label,
+    };
+
+    return options;
+}
+
+function dashboardRenderChart(key, selector, config, hasData) {
+    const canvas = $(selector).get(0);
+
+    dashboardDestroyChart(key);
+    dashboardChartState(selector, Boolean(hasData));
+
+    if (!hasData || !canvas || typeof Chart === "undefined") {
+        return;
+    }
+
+    dashboardCharts[key] = new Chart(canvas, config);
+}
+
+function dashboardActivityBuckets(alerts) {
+    const points = alerts.map(function (alert) {
+        return {
+            alert: alert,
+            time: new Date(dashboardDateValue(alert) || 0).getTime(),
+        };
+    }).filter(function (item) {
+        return Number.isFinite(item.time) && item.time > 0;
+    });
+
+    if (!points.length) {
+        return null;
+    }
+
+    const bucketCount = 8;
+    const windowMs = 24 * 60 * 60 * 1000;
+    const end = Math.max.apply(null, points.map(function (item) { return item.time; }));
+    const start = end - windowMs;
+    const bucketMs = windowMs / bucketCount;
+    const labels = [];
+    const data = {
+        firing: Array(bucketCount).fill(0),
+        acknowledged: Array(bucketCount).fill(0),
+        resolved: Array(bucketCount).fill(0),
+    };
+    const formatter = new Intl.DateTimeFormat(document.documentElement.lang || undefined, {
+        month: "short",
+        day: "numeric",
+        hour: "2-digit",
+        minute: "2-digit",
+    });
+
+    for (let index = 0; index < bucketCount; index += 1) {
+        labels.push(formatter.format(new Date(start + (index + 1) * bucketMs)));
+    }
+
+    points.forEach(function (item) {
+        if (item.time < start || item.time > end) {
+            return;
+        }
+
+        const index = Math.min(
+            bucketCount - 1,
+            Math.max(0, Math.floor((item.time - start) / bucketMs))
+        );
+        const status = normalizeAlertValue(item.alert.status);
+
+        if (data[status]) {
+            data[status][index] += 1;
+        }
+    });
+
+    return {
+        labels: labels,
+        data: data,
+    };
+}
+
+function renderDashboardActivityTrend(alerts) {
+    const series = dashboardActivityBuckets(alerts);
+    const hasData = Boolean(series);
+    const options = dashboardChartOptions();
+
+    options.scales = {
+        x: {
+            grid: {display: false},
+            ticks: {
+                maxRotation: 0,
+                autoSkip: true,
+                maxTicksLimit: 6,
+            },
+        },
+        y: {
+            beginAtZero: true,
+            ticks: {precision: 0},
+        },
+    };
+
+    dashboardRenderChart(
+        "activity",
+        "#dashboard-activity-chart",
+        {
+            type: "line",
+            data: {
+                labels: series ? series.labels : [],
+                datasets: series ? [
+                    {
+                        label: dashboardAlertStatusLabel("firing"),
+                        data: series.data.firing,
+                        borderColor: dashboardThemeToken("--md-danger", "#dc2626"),
+                        backgroundColor: dashboardThemeToken("--md-danger", "#dc2626"),
+                        borderWidth: 2,
+                        tension: 0.35,
+                        pointRadius: 2,
+                        pointHoverRadius: 4,
+                    },
+                    {
+                        label: dashboardAlertStatusLabel("acknowledged"),
+                        data: series.data.acknowledged,
+                        borderColor: dashboardThemeToken("--md-warning", "#d97706"),
+                        backgroundColor: dashboardThemeToken("--md-warning", "#d97706"),
+                        borderWidth: 2,
+                        tension: 0.35,
+                        pointRadius: 2,
+                        pointHoverRadius: 4,
+                    },
+                    {
+                        label: dashboardAlertStatusLabel("resolved"),
+                        data: series.data.resolved,
+                        borderColor: dashboardThemeToken("--md-success", "#16a34a"),
+                        backgroundColor: dashboardThemeToken("--md-success", "#16a34a"),
+                        borderWidth: 2,
+                        tension: 0.35,
+                        pointRadius: 2,
+                        pointHoverRadius: 4,
+                    },
+                ] : [],
+            },
+            options: options,
+        },
+        hasData
+    );
+}
+
 function loadDashboard() {
     const params = [];
     const generation = ++dashboardLoadGeneration;
@@ -161,15 +440,14 @@ function loadDashboard() {
 
         const alerts = dashboardAsArray(response);
         const activeAlerts = dashboardActiveAlerts(alerts);
-        const sortedAlerts = dashboardSortByActivity(alerts);
         const sortedActiveAlerts = dashboardSortByActivity(activeAlerts);
 
         dashboardHasLoaded = true;
+        dashboardLastAlerts = alerts.slice();
         finishDashboardLoading();
         renderAlertsSummaryGrid("#overview-alerts-summary", alerts);
-        renderDashboardAlertsTable(sortedActiveAlerts.slice(0, 15));
-        renderDashboardRecentAlerts(sortedAlerts.slice(0, 5));
-        renderDashboardTeamsNow(activeAlerts);
+        renderDashboardActivityTrend(alerts);
+        renderDashboardAlertsTable(sortedActiveAlerts.slice(0, 8));
         renderDashboardSeveritySplit(alerts);
         renderDashboardPrioritySplit(alerts);
         renderDashboardTeamSummary(alerts);
@@ -186,6 +464,8 @@ function loadDashboard() {
         showApiError(xhr);
     });
     loadDashboardServiceImpact();
+    loadDashboardOncall();
+    loadDashboardActivity(generation);
 }
 
 function renderDashboardAlertsTable(alerts) {
@@ -262,67 +542,55 @@ function renderDashboardAlertRow(alert) {
     const actionsCell = $("<td>").addClass("actions-cell");
     const actions = $("<div>").addClass("table-actions");
 
-    if (canRespondObject(alert)) {
-        if (alert.status === "firing") {
-            actions.append(
-                $("<button>")
-                    .attr("type", "button")
-                    .addClass("btn btn-warning btn-small")
-                    .text(i18n.t("overview.actions.ack"))
-                    .on("click", function () {
-                        const button = $(this);
-                        if (window.AppLoading) {
-                            AppLoading.setButtonLoading(button, true);
-                        }
-                        apiPost(
-                            "/api/alert-groups/" + alert.id + "/acknowledge",
-                            {},
-                            function () {
-                                if (window.AppLoading) {
-                                    AppLoading.setButtonLoading(button, false);
-                                }
-                                loadDashboard();
-                            },
-                            function (xhr) {
-                                if (window.AppLoading) {
-                                    AppLoading.setButtonLoading(button, false);
-                                }
-                                showApiError(xhr);
-                            }
-                        );
-                    })
-            );
+    if (canRespondObject(alert) && typeof makeActionMenu === "function") {
+        const shelved = dashboardAlertIsShelved(alert);
+        const items = [];
+
+        if (alert.status === "firing" && !shelved) {
+            items.push({
+                label: i18n.t("overview.actions.ack"),
+                icon: "fas fa-check",
+                onClick: function () {
+                    dashboardRunAlertAction(alert.id, "acknowledge");
+                },
+            });
         }
+
+        if (shelved) {
+            items.push({
+                label: i18n.t("alert_details.actions.unshelve"),
+                icon: "fas fa-box-open",
+                onClick: function () {
+                    dashboardRunAlertAction(alert.id, "unshelve");
+                },
+            });
+        } else {
+            items.push({
+                label: i18n.t("alert_details.actions.shelve"),
+                icon: "fas fa-box-archive",
+                onClick: function () {
+                    dashboardShelveAlert(alert);
+                },
+            });
+        }
+
         if (alert.status !== "resolved") {
-            actions.append(
-                $("<button>")
-                    .attr("type", "button")
-                    .addClass("btn btn-resolve btn-small")
-                    .text(i18n.t("overview.actions.resolve"))
-                    .on("click", function () {
-                        const button = $(this);
-                        if (window.AppLoading) {
-                            AppLoading.setButtonLoading(button, true);
-                        }
-                        apiPost(
-                            "/api/alert-groups/" + alert.id + "/resolve",
-                            {},
-                            function () {
-                                if (window.AppLoading) {
-                                    AppLoading.setButtonLoading(button, false);
-                                }
-                                loadDashboard();
-                            },
-                            function (xhr) {
-                                if (window.AppLoading) {
-                                    AppLoading.setButtonLoading(button, false);
-                                }
-                                showApiError(xhr);
-                            }
-                        );
-                    })
-            );
+            items.push({
+                label: i18n.t("overview.actions.resolve"),
+                icon: "fas fa-check-double",
+                onClick: function () {
+                    dashboardRunAlertAction(alert.id, "resolve");
+                },
+            });
         }
+
+        actions.append(
+            makeActionMenu({
+                object: alert,
+                label: i18n.t("shared.actions"),
+                items: items,
+            })
+        );
     }
 
     actionsCell.append(actions);
@@ -330,166 +598,516 @@ function renderDashboardAlertRow(alert) {
     return row;
 }
 
-function renderDashboardRecentAlerts(alerts) {
-    const target = $("#dashboard-recent-alerts");
+function dashboardActivityEventLabel(eventType) {
+    if (typeof alertEventTypeLabel === "function") {
+        const existing = alertEventTypeLabel(eventType);
+        if (existing && existing !== eventType) {
+            return existing;
+        }
+    }
+
+    return String(eventType || "-")
+        .replace(/_/g, " ")
+        .replace(/\b\w/g, function (letter) {
+            return letter.toUpperCase();
+        });
+}
+
+function dashboardActivityDotClass(eventType) {
+    const normalized = String(eventType || "").toLowerCase();
+
+    if (["resolved", "alert_group_unshelved"].includes(normalized)) {
+        return "overview-dot-resolved";
+    }
+    if ([
+        "acknowledged",
+        "priority_changed",
+        "priority_auto_updated",
+        "priority_auto_recalculated",
+        "maintenance_applied",
+        "maintenance_released",
+    ].includes(normalized)) {
+        return "overview-dot-acknowledged";
+    }
+    if (["reopened", "escalated", "routing_error"].includes(normalized)) {
+        return "overview-dot-firing";
+    }
+    if ([
+        "alert_group_shelved",
+        "alert_group_shelve_expired",
+        "silenced",
+        "unsilenced",
+        "merged",
+        "merge_target_updated",
+    ].includes(normalized)) {
+        return "overview-dot-silenced";
+    }
+
+    return "overview-dot-activity";
+}
+
+function dashboardActivityActor(event) {
+    const user = event && event.user ? event.user : {};
+    return user.display_name || user.username || i18n.t("overview.activity.system");
+}
+
+function loadDashboardActivity(generation) {
+    const params = ["limit=6"];
+    if (typeof selectedTeamId === "function" && selectedTeamId()) {
+        params.push("team_id=" + encodeURIComponent(selectedTeamId()));
+    }
+
+    apiGet(
+        "/api/alert-groups/activity?" + params.join("&"),
+        function (response) {
+            if (generation !== dashboardLoadGeneration) {
+                return;
+            }
+            renderDashboardActivity(dashboardAsArray(response));
+        },
+        function () {
+            if (generation !== dashboardLoadGeneration) {
+                return;
+            }
+            renderDashboardActivity([], true);
+        }
+    );
+}
+
+function renderDashboardActivity(events, unavailable) {
+    const target = $("#dashboard-recent-activity");
     target.empty();
 
-    if (!alerts.length) {
-        target.append($("<div>").addClass("overview-empty").text(i18n.t("overview.empty.no_alerts")));
+    if (!events.length) {
+        target.append(
+            $("<div>")
+                .addClass("overview-empty")
+                .text(
+                    unavailable
+                        ? i18n.t("overview.activity.unavailable")
+                        : i18n.t("overview.activity.none")
+                )
+        );
         return;
     }
 
-    alerts.forEach(function (alert) {
+    events.forEach(function (event) {
+        const group = event.alert_group || {};
         const item = $("<button>")
             .attr("type", "button")
-            .addClass("overview-list-item overview-list-button")
+            .addClass("overview-list-item overview-list-button dashboard-activity-item")
             .on("click", function () {
-                if (typeof showAlertDetails === "function") {
-                    showAlertDetails(alert.id);
+                if (group.id && typeof showAlertDetails === "function") {
+                    showAlertDetails(group.id);
                 }
             });
 
         item.append(
             $("<span>")
                 .addClass("overview-list-dot")
-                .addClass("overview-dot-" + normalizeAlertValue(alert.status))
+                .addClass(dashboardActivityDotClass(event.event_type))
         );
-        item.append(
+
+        const main = $("<div>").addClass("list-main dashboard-activity-copy");
+        main.append(
             $("<div>")
-                .addClass("list-main")
-                .append($("<div>").addClass("list-title").text(alert.title || "-"))
-                .append(
-                    $("<div>")
-                        .addClass("list-subtitle")
-                        .text(
-                            (alert.team_name || alert.team_slug || "-")
-                            + " · "
-                            + dashboardSeverityDisplayLabel(alert.severity)
-                            + " · "
-                            + dashboardPriorityShortLabel(alert)
-                            + " · "
-                            + dashboardEscalationText(alert)
-                        )
+                .addClass("list-title")
+                .text((group.id ? "#" + group.id + " " : "") + (group.title || i18n.t("overview.alert.fallback")))
+        );
+        main.append(
+            $("<div>")
+                .addClass("list-subtitle")
+                .text(
+                    dashboardActivityEventLabel(event.event_type)
+                    + " · "
+                    + dashboardActivityActor(event)
                 )
         );
+
+        if (event.message) {
+            main.append(
+                $("<div>")
+                    .addClass("dashboard-activity-message")
+                    .text(event.message)
+            );
+        }
+
+        item.append(main);
         item.append(
             $("<span>")
-                .addClass("overview-list-time")
-                .text(formatDateTimeMinutes(dashboardDateValue(alert)))
+                .addClass("overview-list-time dashboard-activity-time")
+                .text(formatDateTimeMinutes(event.created_at))
         );
         target.append(item);
     });
 }
 
-function renderDashboardTeamsNow(activeAlerts) {
-    const target = $("#dashboard-teams-now");
+function loadDashboardOncall() {
+    apiGet(
+        "/api/rotations" + dashboardSelectedTeamQuery(),
+        function (rotations) {
+            renderDashboardOncall(rotations);
+        },
+        function () {
+            renderDashboardOncall([]);
+        }
+    );
+}
+
+function dashboardOncallInitials(value) {
+    const text = String(value || "?").trim();
+    const parts = text.split(/\s+/).filter(Boolean);
+
+    if (!parts.length) {
+        return "?";
+    }
+
+    if (parts.length > 1) {
+        return (parts[0][0] + parts[1][0]).toUpperCase();
+    }
+
+    return parts[0].slice(0, 2).toUpperCase();
+}
+
+function renderDashboardOncall(rotations) {
+    const target = $("#dashboard-oncall-now");
     target.empty();
 
-    if (!activeAlerts.length) {
-        target.append($("<div>").addClass("overview-empty").text(i18n.t("overview.empty.no_teams")));
+    const items = dashboardAsArray(rotations)
+        .filter(function (rotation) {
+            return rotation && rotation.enabled !== false;
+        })
+        .sort(function (left, right) {
+            return String(left.team_name || left.team_slug || "").localeCompare(
+                String(right.team_name || right.team_slug || "")
+            ) || String(left.name || "").localeCompare(String(right.name || ""));
+        });
+
+    if (!items.length) {
+        target.append(
+            $("<div>")
+                .addClass("overview-empty")
+                .text(i18n.t("overview.oncall.none"))
+        );
         return;
     }
 
-    const counts = dashboardGroupCount(activeAlerts, "team_slug", i18n.t("overview.labels.unknown_team"));
-    const items = Object.keys(counts)
-        .map(function (team) {
-            return { team: team, count: counts[team] };
-        })
-        .sort(function (left, right) {
-            return right.count - left.count;
-        });
+    items.slice(0, 6).forEach(function (rotation) {
+        const userName = rotation.current_oncall || i18n.t("overview.oncall.unassigned");
+        const hasOncall = Boolean(rotation.current_oncall);
+        const teamName = rotation.team_name || rotation.team_slug || "-";
+        const rotationName = rotation.name || i18n.t(
+            "overview.oncall.rotation_fallback",
+            {id: rotation.id}
+        );
 
-    items.slice(0, 6).forEach(function (item) {
         target.append(
-            $("<div>")
-                .addClass("list-item")
+            $("<button>")
+                .attr("type", "button")
+                .addClass("list-item overview-list-button dashboard-oncall-item")
+                .on("click", function () {
+                    navigate(
+                        "/calendar?team_id="
+                        + encodeURIComponent(rotation.team_id)
+                        + "&rotation_id="
+                        + encodeURIComponent(rotation.id),
+                        true
+                    );
+                })
                 .append(
                     $("<span>")
                         .addClass("avatar")
-                        .text(item.team.slice(0, 2).toUpperCase())
+                        .text(dashboardOncallInitials(userName))
                 )
                 .append(
                     $("<span>")
                         .addClass("list-main")
-                        .append($("<span>").addClass("list-title").text(item.team))
-                        .append($("<span>").addClass("list-subtitle").text(i18n.t("overview.teams.active_alerts")))
+                        .append(
+                            $("<span>")
+                                .addClass("list-title")
+                                .text(userName)
+                        )
+                        .append(
+                            $("<span>")
+                                .addClass("list-subtitle")
+                                .text(teamName + " · " + rotationName)
+                        )
                 )
                 .append(
                     $("<span>")
-                        .addClass("overview-team-count")
-                        .text(item.count)
-                )
-        );
-    });
-}
-
-function renderDashboardSeveritySplit(alerts) {
-    const target = $("#dashboard-severity-split");
-    target.empty();
-    const counts = dashboardGroupCount(alerts, "severity", "unknown");
-    const order = ["critical", "high", "medium", "low", "unknown"];
-    renderDashboardBars(target, counts, order, alerts.length, dashboardSeverityDisplayLabel);
-}
-function renderDashboardPrioritySplit(alerts) {
-    const target = $("#dashboard-priority-split");
-
-    target.empty();
-
-    const counts = dashboardPriorityCounts(alerts);
-    const order = ["p1", "p2", "p3", "p4", "p5"];
-
-    renderDashboardBars(
-        target,
-        counts,
-        order,
-        alerts.length,
-        dashboardPriorityLabel
-    );
-}
-function renderDashboardTeamSummary(alerts) {
-    const target = $("#dashboard-team-summary");
-    target.empty();
-    const counts = dashboardGroupCount(alerts, "team_slug", i18n.t("overview.labels.unknown_team"));
-    const order = Object.keys(counts).sort(function (left, right) {
-        return counts[right] - counts[left];
-    });
-    renderDashboardBars(target, counts, order.slice(0, 8), alerts.length, function (value) {
-        return value;
-    });
-}
-
-function renderDashboardBars(target, counts, order, total, labelFunction) {
-    if (!total) {
-        target.append($("<div>").addClass("overview-empty").text(i18n.t("overview.empty.no_data")));
-        return;
-    }
-
-    order.forEach(function (key) {
-        const count = counts[key] || 0;
-        if (!count) {
-            return;
-        }
-        const percent = Math.round((count / total) * 100);
-        target.append(
-            $("<div>")
-                .addClass("overview-bar-row")
-                .append(
-                    $("<div>")
-                        .addClass("overview-bar-meta")
-                        .append($("<span>").text(labelFunction(key)))
-                        .append($("<span>").text(count))
-                )
-                .append(
-                    $("<div>")
-                        .addClass("overview-bar-track")
-                        .append(
-                            $("<div>")
-                                .addClass("overview-bar-fill")
-                                .attr("style", "width: " + percent + "%;")
+                        .addClass("dashboard-oncall-status")
+                        .toggleClass("is-gap", !hasOncall)
+                        .text(
+                            hasOncall
+                                ? i18n.t("overview.oncall.now")
+                                : i18n.t("overview.oncall.gap")
                         )
                 )
         );
     });
+
+    if (items.length > 6) {
+        target.append(
+            $("<button>")
+                .attr("type", "button")
+                .addClass("overview-list-item overview-list-button dashboard-impact-more")
+                .text(i18n.t("overview.oncall.more", {count: items.length - 6}))
+                .on("click", function () {
+                    navigate("/calendar", true);
+                })
+        );
+    }
+}
+
+function dashboardDoughnutData(counts, order, labelFunction, colorFunction) {
+    const labels = [];
+    const values = [];
+    const colors = [];
+
+    order.forEach(function (key) {
+        const count = Number(counts[key] || 0);
+        if (!count) {
+            return;
+        }
+        labels.push(labelFunction(key));
+        values.push(count);
+        colors.push(colorFunction(key));
+    });
+
+    return {
+        labels: labels,
+        values: values,
+        colors: colors,
+    };
+}
+
+function dashboardSeverityColor(value) {
+    const normalized = normalizeAlertValue(value);
+    const colors = {
+        critical: dashboardThemeToken("--md-danger", "#dc2626"),
+        high: dashboardThemeToken("--md-warning", "#d97706"),
+        warning: dashboardThemeToken("--md-warning", "#d97706"),
+        medium: dashboardThemeToken("--md-info", "#0284c7"),
+        info: dashboardThemeToken("--md-info", "#0284c7"),
+        low: dashboardThemeToken("--md-primary", "#2563eb"),
+        unknown: dashboardThemeToken("--md-muted", "#64748b"),
+    };
+
+    return colors[normalized] || colors.unknown;
+}
+
+function renderDashboardSeveritySplit(alerts) {
+    const counts = dashboardGroupCount(alerts, "severity", "unknown");
+    const order = ["critical", "high", "warning", "medium", "info", "low", "unknown"];
+    const chartData = dashboardDoughnutData(
+        counts,
+        order,
+        dashboardSeverityDisplayLabel,
+        dashboardSeverityColor
+    );
+    const total = chartData.values.reduce(function (sum, value) { return sum + value; }, 0);
+
+    dashboardRenderChart(
+        "severity",
+        "#dashboard-severity-chart",
+        {
+            type: "doughnut",
+            data: {
+                labels: chartData.labels,
+                datasets: [{
+                    data: chartData.values,
+                    backgroundColor: chartData.colors,
+                    borderWidth: 0,
+                    hoverOffset: 5,
+                }],
+            },
+            options: dashboardDoughnutOptions(
+                total,
+                i18n.t("overview.charts.alerts_label")
+            ),
+            plugins: [dashboardDoughnutCenterPlugin],
+        },
+        total > 0
+    );
+}
+
+function dashboardPriorityColor(value) {
+    const colors = {
+        p1: dashboardThemeToken("--md-danger", "#dc2626"),
+        p2: dashboardThemeToken("--md-warning", "#d97706"),
+        p3: dashboardThemeToken("--md-info", "#0284c7"),
+        p4: dashboardThemeToken("--md-primary", "#2563eb"),
+        p5: dashboardThemeToken("--md-muted", "#64748b"),
+    };
+
+    return colors[normalizeAlertValue(value)] || colors.p5;
+}
+
+function renderDashboardPrioritySplit(alerts) {
+    const counts = dashboardPriorityCounts(alerts);
+    const order = ["p1", "p2", "p3", "p4", "p5"];
+    const chartData = dashboardDoughnutData(
+        counts,
+        order,
+        dashboardPriorityLabel,
+        dashboardPriorityColor
+    );
+    const total = chartData.values.reduce(function (sum, value) { return sum + value; }, 0);
+
+    dashboardRenderChart(
+        "priority",
+        "#dashboard-priority-chart",
+        {
+            type: "doughnut",
+            data: {
+                labels: chartData.labels,
+                datasets: [{
+                    data: chartData.values,
+                    backgroundColor: chartData.colors,
+                    borderWidth: 0,
+                    hoverOffset: 5,
+                }],
+            },
+            options: dashboardDoughnutOptions(
+                total,
+                i18n.t("overview.charts.alerts_label")
+            ),
+            plugins: [dashboardDoughnutCenterPlugin],
+        },
+        total > 0
+    );
+}
+
+function renderDashboardTeamSummary(alerts) {
+    const unknownTeam = i18n.t("overview.labels.unknown_team");
+    const teamCounts = {};
+
+    dashboardActiveAlerts(alerts).forEach(function (alert) {
+        const team = alert.team_slug || alert.team_name || unknownTeam;
+        if (!teamCounts[team]) {
+            teamCounts[team] = {firing: 0, acknowledged: 0, total: 0};
+        }
+
+        if (alert.status === "firing") {
+            teamCounts[team].firing += 1;
+        } else if (alert.status === "acknowledged") {
+            teamCounts[team].acknowledged += 1;
+        }
+        teamCounts[team].total += 1;
+    });
+
+    const order = Object.keys(teamCounts).sort(function (left, right) {
+        return teamCounts[right].total - teamCounts[left].total;
+    }).slice(0, 8);
+    const options = dashboardChartOptions();
+
+    options.indexAxis = "y";
+    options.scales = {
+        x: {
+            beginAtZero: true,
+            stacked: true,
+            ticks: {precision: 0},
+        },
+        y: {
+            stacked: true,
+            grid: {display: false},
+        },
+    };
+
+    dashboardRenderChart(
+        "teams",
+        "#dashboard-team-chart",
+        {
+            type: "bar",
+            data: {
+                labels: order,
+                datasets: [
+                    {
+                        label: i18n.t("alerts.status.firing"),
+                        data: order.map(function (team) { return teamCounts[team].firing; }),
+                        backgroundColor: dashboardThemeToken("--md-danger", "#dc2626"),
+                        borderRadius: 7,
+                        borderSkipped: false,
+                        barThickness: 18,
+                    },
+                    {
+                        label: i18n.t("alerts.status.acknowledged"),
+                        data: order.map(function (team) { return teamCounts[team].acknowledged; }),
+                        backgroundColor: dashboardThemeToken("--md-warning", "#d97706"),
+                        borderRadius: 7,
+                        borderSkipped: false,
+                        barThickness: 18,
+                    },
+                ],
+            },
+            options: options,
+        },
+        order.length > 0
+    );
+}
+
+function dashboardServiceHealthColor(status) {
+    const colors = {
+        operational: dashboardThemeToken("--md-operational", "#16a34a"),
+        degraded: dashboardThemeToken("--md-degraded", "#f59e0b"),
+        partial_outage: dashboardThemeToken("--md-partial-outage", "#f97316"),
+        major_outage: dashboardThemeToken("--md-major-outage", "#dc2626"),
+        maintenance: dashboardThemeToken("--md-maintenance", "#7c3aed"),
+        unknown: dashboardThemeToken("--md-muted", "#64748b"),
+    };
+
+    return colors[status] || colors.unknown;
+}
+
+function renderDashboardServiceHealth(rows) {
+    const counts = {};
+    const order = [
+        "major_outage",
+        "partial_outage",
+        "degraded",
+        "maintenance",
+        "operational",
+        "unknown",
+    ];
+
+    rows.forEach(function (row) {
+        const status = row.effective_status || "unknown";
+        if (status === "disabled") {
+            return;
+        }
+        counts[status] = (counts[status] || 0) + 1;
+    });
+
+    const chartData = dashboardDoughnutData(
+        counts,
+        order,
+        dashboardImpactStatusLabel,
+        dashboardServiceHealthColor
+    );
+    const total = chartData.values.reduce(function (sum, value) { return sum + value; }, 0);
+
+    dashboardRenderChart(
+        "serviceHealth",
+        "#dashboard-service-health-chart",
+        {
+            type: "doughnut",
+            data: {
+                labels: chartData.labels,
+                datasets: [{
+                    data: chartData.values,
+                    backgroundColor: chartData.colors,
+                    borderWidth: 0,
+                    hoverOffset: 5,
+                }],
+            },
+            options: dashboardDoughnutOptions(
+                total,
+                i18n.t("overview.charts.services_label")
+            ),
+            plugins: [dashboardDoughnutCenterPlugin],
+        },
+        total > 0
+    );
 }
 
 function renderDashboardSystemStatus(alerts, activeAlerts) {
@@ -643,8 +1261,12 @@ function loadDashboardServiceImpact() {
             return;
         }
 
+        const serviceRows = dashboardAsArray(rows);
+
         dashboardImpactHasLoaded = true;
-        renderDashboardServiceImpact(dashboardImpactRows(rows));
+        dashboardLastServiceRows = serviceRows.slice();
+        renderDashboardServiceHealth(serviceRows);
+        renderDashboardServiceImpact(dashboardImpactRows(serviceRows));
     }, function (xhr) {
         if (generation !== dashboardImpactLoadGeneration) {
             return;
@@ -894,3 +1516,16 @@ function dashboardBuildImpactIssue(row, rootCause, path, index) {
         _index: index,
     };
 }
+
+document.addEventListener("incidentrelay:theme-change", function () {
+    if (dashboardLastAlerts.length) {
+        renderDashboardActivityTrend(dashboardLastAlerts);
+        renderDashboardSeveritySplit(dashboardLastAlerts);
+        renderDashboardPrioritySplit(dashboardLastAlerts);
+        renderDashboardTeamSummary(dashboardLastAlerts);
+    }
+
+    if (dashboardLastServiceRows.length) {
+        renderDashboardServiceHealth(dashboardLastServiceRows);
+    }
+});
