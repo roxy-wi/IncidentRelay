@@ -336,5 +336,9 @@
   "alert_details.shelve.4h": "4 hours",
   "alert_details.shelve.8h": "8 hours",
   "alert_details.shelve.24h": "24 hours",
-  "alert_details.shelve.until": "Until: {time}"
+  "alert_details.shelve.until": "Until: {time}",
+  "alert_details.incident.title": "Incident",
+  "alert_details.incident.linked_help": "This AlertGroup is linked to an operational Incident.",
+  "alert_details.incident.open": "Open Incident",
+  "alert_details.incident.load_failed": "Could not load the linked Incident."
 }

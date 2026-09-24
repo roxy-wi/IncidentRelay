@@ -85,6 +85,25 @@ def serialize_incident(incident, *, current_user=None, include_details=False):
     return data
 
 
+def serialize_alert_group_incident_link(link, *, current_user=None):
+    """Serialize the operational Incident currently linked to one AlertGroup."""
+    if not link:
+        return None
+
+    incident = link.incident
+    return {
+        "id": link.id,
+        "relation_type": link.relation_type,
+        "linked_by_id": link.linked_by_id,
+        "linked_at": serialize_utc_datetime(link.linked_at),
+        "incident": serialize_incident(
+            incident,
+            current_user=current_user,
+            include_details=False,
+        ) if incident else None,
+    }
+
+
 def serialize_incident_link(link):
     group = link.alert_group
     return {

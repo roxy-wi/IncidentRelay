@@ -43,6 +43,8 @@ window.AlertIncidentManagement = (function () {
 
         const section = ensureSection(detailsModal);
 
+        renderOperationalIncidentLink(alert, detailsModal, section);
+
         section.data("incident-id", incidentId);
         section.data("on-change", options && options.onChange ? options.onChange : null);
 
@@ -65,6 +67,132 @@ window.AlertIncidentManagement = (function () {
         apiGet("/api/alert-groups/" + incidentId, function (incident) {
             callback(incident || {});
         });
+    }
+
+    function ensureOperationalIncidentSection(detailsModal, beforeSection) {
+        let section = detailsModal.find(".operational-incident-link-section");
+
+        if (section.length) {
+            return section;
+        }
+
+        section = $("<section>")
+            .addClass("details-section operational-incident-link-section is-hidden")
+            .append(
+                $("<div>")
+                    .addClass("details-section-header")
+                    .append(
+                        $("<div>")
+                            .append($("<h3>").text(i18n.t("alert_details.incident.title")))
+                            .append(
+                                $("<p>")
+                                    .addClass("details-section-subtitle")
+                                    .text(i18n.t("alert_details.incident.linked_help"))
+                            )
+                    )
+            )
+            .append($("<div>").addClass("operational-incident-link-body"));
+
+        if (beforeSection && beforeSection.length) {
+            section.insertBefore(beforeSection);
+            return section;
+        }
+
+        const commentsSection = detailsModal.find(".alert-comments-section");
+        if (commentsSection.length) {
+            section.insertBefore(commentsSection);
+        }
+
+        return section;
+    }
+
+    function renderOperationalIncidentLink(alert, detailsModal, beforeSection) {
+        const alertGroupId = parsePositiveInt(
+            alert && (alert.id || alert.group_id || alert.incident_id)
+        );
+        const section = ensureOperationalIncidentSection(detailsModal, beforeSection);
+        const body = section.find(".operational-incident-link-body");
+
+        section.data("alert-group-id", alertGroupId || null);
+        section.addClass("is-hidden");
+        body.empty();
+
+        if (!alertGroupId) {
+            return;
+        }
+
+        apiGet(
+            "/api/alert-groups/" + encodeURIComponent(alertGroupId) + "/incident",
+            function (link) {
+                if (Number(section.data("alert-group-id")) !== alertGroupId) {
+                    return;
+                }
+
+                if (!link || !link.incident) {
+                    return;
+                }
+
+                const incident = link.incident;
+                const status = String(incident.workflow_status || "-");
+                const priority = String(incident.priority || "p3").toUpperCase();
+                const relation = String(link.relation_type || "related");
+
+                detailsModal.find("#modal-alert-create-incident").hide();
+                section.removeClass("is-hidden");
+                body.empty().append(
+                    $("<button>")
+                        .attr("type", "button")
+                        .addClass("alert-operational-incident-card")
+                        .append(
+                            $("<div>")
+                                .addClass("alert-operational-incident-main")
+                                .append(
+                                    $("<div>")
+                                        .addClass("alert-operational-incident-title")
+                                        .text(
+                                            "#" + incident.id + " "
+                                            + (incident.title || i18n.t("alert_details.incident.title"))
+                                        )
+                                )
+                                .append(
+                                    $("<div>")
+                                        .addClass("alert-operational-incident-meta")
+                                        .text(
+                                            i18n.t("incidents.status." + status, {}, status)
+                                            + " · " + priority
+                                            + " · " + relation
+                                        )
+                                )
+                        )
+                        .append(
+                            $("<span>")
+                                .addClass("btn btn-small")
+                                .text(i18n.t("alert_details.incident.open"))
+                        )
+                        .on("click", function () {
+                            if (typeof closeAlertDetailsModal === "function") {
+                                closeAlertDetailsModal({updateUrl: false});
+                            }
+                            navigate("/incidents/" + encodeURIComponent(incident.id), true);
+                        })
+                );
+            },
+            function (xhr) {
+                if (Number(section.data("alert-group-id")) !== alertGroupId) {
+                    return;
+                }
+
+                section.removeClass("is-hidden");
+                body.empty().append(
+                    renderEmpty(
+                        getApiErrorMessage(
+                            xhr,
+                            i18n.t("alert_details.incident.load_failed")
+                        )
+                    )
+                );
+            }
+        );
     }
 
     function loadPriorities(callback) {

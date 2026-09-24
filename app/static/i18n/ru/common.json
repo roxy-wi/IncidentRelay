@@ -87,5 +87,8 @@
   "pages.sso.title": "SSO",
   "pages.sso.subtitle": "Провайдеры входа OIDC и SAML",
   "pages.login.title": "Вход",
-  "pages.login.subtitle": "Аутентификация JWT"
+  "pages.login.subtitle": "Аутентификация JWT",
+  "nav.incidents": "Инциденты",
+  "pages.incidents.title": "Инциденты",
+  "pages.incidents.subtitle": "Операционные инциденты и независимый процесс реагирования"
 }

@@ -1644,7 +1644,7 @@ function showAlertDetails(alertId) {
             "#alert-comments-list"
         ].join(", ")).empty();
         initialModal.find(
-            "#modal-alert-ack, #modal-alert-shelve, #modal-alert-unshelve, #modal-alert-resolve"
+            "#modal-alert-ack, #modal-alert-shelve, #modal-alert-unshelve, #modal-alert-resolve, #modal-alert-create-incident"
         ).hide();
 
         openAlertDetailsModal();
@@ -1706,6 +1706,8 @@ function showAlertDetails(alertId) {
                 onChange: loadAlerts,
             });
         }
+
+        modal.find("#modal-alert-create-incident").toggle(currentDetailsAlertCanRespond);
 
         if (!currentDetailsAlertCanRespond || normalizeAlertValue(alert.status) === "resolved") {
             modal.find("#modal-alert-ack").hide();
@@ -3135,6 +3137,35 @@ $(document).on("keydown", function (event) {
         closeAlertDetailsModal();
     }
 });
+$(document).on("click", "#modal-alert-create-incident", function () {
+    if (!currentDetailsAlertId || !currentDetailsAlertCanRespond) {
+        return;
+    }
+    const button = $(this);
+    if (window.AppLoading) {
+        AppLoading.setButtonLoading(button, true);
+    }
+    apiPost(
+        "/api/alert-groups/" + currentDetailsAlertId + "/create-incident",
+        {},
+        function (incident) {
+            if (window.AppLoading) {
+                AppLoading.setButtonLoading(button, false);
+            }
+            closeAlertDetailsModal({updateUrl: false});
+            if (incident && incident.id) {
+                navigate("/incidents/" + incident.id, true);
+            }
+        },
+        function (xhr) {
+            if (window.AppLoading) {
+                AppLoading.setButtonLoading(button, false);
+            }
+            showApiError(xhr);
+        }
+    );
+});
+
 $(document).on("click", "#modal-alert-ack", function () {
     if (!currentDetailsAlertId) {
         return;

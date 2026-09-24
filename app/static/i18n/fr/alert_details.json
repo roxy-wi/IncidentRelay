@@ -336,5 +336,9 @@
   "alert_details.shelve.4h": "4 heures",
   "alert_details.shelve.8h": "8 heures",
   "alert_details.shelve.24h": "24 heures",
-  "alert_details.shelve.until": "Jusqu’au : {time}"
+  "alert_details.shelve.until": "Jusqu’au : {time}",
+  "alert_details.incident.title": "Incident",
+  "alert_details.incident.linked_help": "Cet AlertGroup est lié à un incident opérationnel.",
+  "alert_details.incident.open": "Ouvrir l’incident",
+  "alert_details.incident.load_failed": "Impossible de charger l’incident lié."
 }

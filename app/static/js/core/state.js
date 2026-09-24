@@ -2,7 +2,8 @@ let currentUser = null;
 
 const routes = {
     "/": { page: "dashboard", title: "Overview", subtitle: "Real-time summary of active incidents and affected teams", load: function () { loadDashboard(); } },
-    "/alerts": { page: "alerts", title: "Alerts", subtitle: "Search, inspect, acknowledge and resolve routed incidents", load: function () { loadAlerts(); } },
+    "/alerts": { page: "alerts", title: "Alerts", subtitle: "Search, inspect, acknowledge and resolve routed alert groups", load: function () { loadAlerts(); } },
+    "/incidents": { page: "incidents", title: "Incidents", subtitle: "Operational incidents and independent response workflow", load: function () { loadIncidents(); } },
     "/rotations": { page: "rotations", title: "Rotations", subtitle: "Manage on-call rotations", load: function () { loadRotations(); } },
     "/calendar": { page: "calendar", title: "Calendar", subtitle: "On-call calendar by team", load: function () { loadCalendar(); } },
     "/routes": { page: "routes", title: "Routes", subtitle: "Connect alert sources, rotations and channels", load: function () { loadRoutes(); } },

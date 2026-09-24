@@ -87,5 +87,8 @@
   "pages.sso.title": "SSO",
   "pages.sso.subtitle": "Proveedores de inicio de sesión OIDC y SAML",
   "pages.login.title": "Inicio de sesión",
-  "pages.login.subtitle": "Autenticación JWT"
+  "pages.login.subtitle": "Autenticación JWT",
+  "nav.incidents": "Incidentes",
+  "pages.incidents.title": "Incidentes",
+  "pages.incidents.subtitle": "Incidentes operativos y flujo de respuesta independiente"
 }

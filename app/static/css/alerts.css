@@ -466,3 +466,46 @@ body.md-theme .alert-comment-edit-body {
 .alert-correlation-badges:empty {
     display: none;
 }
+
+body.md-theme .operational-incident-link-section.is-hidden {
+  display: none;
+}
+
+body.md-theme .alert-operational-incident-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  width: 100%;
+  padding: 12px;
+  border: 1px solid var(--md-border);
+  border-radius: var(--md-radius-md);
+  background: var(--md-surface-soft);
+  color: var(--md-text);
+  cursor: pointer;
+  font: inherit;
+  text-align: left;
+}
+
+body.md-theme .alert-operational-incident-card:hover {
+  border-color: var(--md-primary);
+  background: var(--md-surface-hover);
+}
+
+body.md-theme .alert-operational-incident-main {
+  flex: 1;
+  min-width: 0;
+}
+
+body.md-theme .alert-operational-incident-title {
+  overflow: hidden;
+  color: var(--md-text);
+  font-weight: 850;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+body.md-theme .alert-operational-incident-meta {
+  margin-top: 4px;
+  color: var(--md-muted);
+  font-size: 12px;
+}

@@ -1,0 +1,230 @@
+<div class="first-div-page-layout page-stack incidents-page">
+  <div class="summary-grid incidents-summary-grid">
+    <div class="summary-card summary-primary">
+      <div class="summary-icon">#</div>
+      <div>
+        <div class="summary-title">{{ _('incidents.summary.total') }}</div>
+        <div id="incidents-summary-total" class="summary-value">0</div>
+        <div class="summary-hint">{{ _('incidents.summary.total_hint') }}</div>
+      </div>
+    </div>
+
+    <div class="summary-card summary-warning">
+      <div class="summary-icon">!</div>
+      <div>
+        <div class="summary-title">{{ _('incidents.summary.active') }}</div>
+        <div id="incidents-summary-active" class="summary-value">0</div>
+        <div class="summary-hint">{{ _('incidents.summary.active_hint') }}</div>
+      </div>
+    </div>
+
+    <div class="summary-card summary-success">
+      <div class="summary-icon">✓</div>
+      <div>
+        <div class="summary-title">{{ _('incidents.summary.resolved') }}</div>
+        <div id="incidents-summary-resolved" class="summary-value">0</div>
+        <div class="summary-hint">{{ _('incidents.summary.resolved_hint') }}</div>
+      </div>
+    </div>
+
+    <div class="summary-card summary-muted">
+      <div class="summary-icon">×</div>
+      <div>
+        <div class="summary-title">{{ _('incidents.summary.closed') }}</div>
+        <div id="incidents-summary-closed" class="summary-value">0</div>
+        <div class="summary-hint">{{ _('incidents.summary.closed_hint') }}</div>
+      </div>
+    </div>
+  </div>
+
+  <section class="card incidents-list-card">
+    <div class="card-header">
+      <div>
+        <h2>{{ _('incidents.list.title') }}</h2>
+        <div id="incidents-list-subtitle" class="card-subtitle">{{ _('incidents.list.subtitle') }}</div>
+      </div>
+
+      <div class="card-header-actions">
+        <span id="incidents-loading-indicator"></span>
+        <button id="open-incident-create-modal" type="button" class="btn btn-primary is-hidden">
+          {{ _('incidents.actions.create') }}
+        </button>
+        <button id="reload-incidents" type="button" class="btn">
+          {{ _('incidents.actions.reload') }}
+        </button>
+      </div>
+    </div>
+
+    <div class="page-toolbar is-flush-top incidents-toolbar">
+      <div class="page-toolbar-search">
+        <span class="page-toolbar-search-icon">⌕</span>
+        <input id="incidents-search" class="input" type="search" placeholder="{{ _('incidents.filters.search') }}" autocomplete="off">
+      </div>
+
+      <select id="incidents-status-filter" class="input page-toolbar-filter">
+        <option value="">{{ _('incidents.filters.all_statuses') }}</option>
+        <option value="declared">{{ _('incidents.status.declared') }}</option>
+        <option value="investigating">{{ _('incidents.status.investigating') }}</option>
+        <option value="identified">{{ _('incidents.status.identified') }}</option>
+        <option value="monitoring">{{ _('incidents.status.monitoring') }}</option>
+        <option value="resolved">{{ _('incidents.status.resolved') }}</option>
+        <option value="closed">{{ _('incidents.status.closed') }}</option>
+        <option value="cancelled">{{ _('incidents.status.cancelled') }}</option>
+      </select>
+    </div>
+
+    <div class="table-wrapper has-table-pagination">
+      <table class="data-table incidents-table">
+        <thead>
+          <tr>
+            <th>{{ _('incidents.table.id') }}</th>
+            <th>{{ _('incidents.table.title') }}</th>
+            <th>{{ _('incidents.table.status') }}</th>
+            <th>{{ _('incidents.table.priority') }}</th>
+            <th>{{ _('incidents.table.team') }}</th>
+            <th>{{ _('incidents.table.service') }}</th>
+            <th>{{ _('incidents.table.assignee') }}</th>
+            <th>{{ _('incidents.table.updated') }}</th>
+            <th class="actions-th">{{ _('incidents.table.actions') }}</th>
+          </tr>
+        </thead>
+        <tbody id="incidents-table-body">
+          <tr><td colspan="9" class="empty-table-cell">{{ _('incidents.empty.loading') }}</td></tr>
+        </tbody>
+      </table>
+    </div>
+
+    <div class="table-pagination table-pagination-attached">
+      <div id="incidents-pagination-summary" class="table-pagination-left"></div>
+      <div id="incidents-pagination-page" class="table-pagination-center"></div>
+      <div class="table-pagination-actions">
+        <button id="incidents-prev-page" type="button" class="btn btn-small">{{ _('incidents.actions.previous') }}</button>
+        <button id="incidents-next-page" type="button" class="btn btn-small">{{ _('incidents.actions.next') }}</button>
+      </div>
+    </div>
+  </section>
+
+  <div id="incident-create-modal" class="app-modal is-hidden">
+    <div class="app-modal-dialog app-modal-dialog-wide">
+      <div class="app-modal-header">
+        <div>
+          <h2>{{ _('incidents.create.title') }}</h2>
+          <div class="card-subtitle">{{ _('incidents.create.subtitle') }}</div>
+        </div>
+        <button id="close-incident-create-modal" type="button" class="app-modal-close" aria-label="{{ _('common.close') }}">×</button>
+      </div>
+
+      <div class="app-modal-body">
+        <div id="incident-create-error" class="alert alert-danger is-hidden"></div>
+        <div class="grid-two incidents-form-grid">
+          <div class="form-body">
+            <label for="incident-create-team">{{ _('incidents.form.team') }}</label>
+            <select id="incident-create-team" class="input"></select>
+
+            <label for="incident-create-service">{{ _('incidents.form.service') }}</label>
+            <select id="incident-create-service" class="input"></select>
+
+            <label for="incident-create-priority">{{ _('incidents.form.priority') }}</label>
+            <select id="incident-create-priority" class="input"></select>
+          </div>
+
+          <div class="form-body">
+            <label for="incident-create-title">{{ _('incidents.form.title') }}</label>
+            <input id="incident-create-title" class="input" type="text" maxlength="255" autocomplete="off">
+
+            <label for="incident-create-description">{{ _('incidents.form.description') }}</label>
+            <textarea id="incident-create-description" class="input" rows="5" maxlength="10000"></textarea>
+
+            <label for="incident-create-assignee">{{ _('incidents.form.assignee') }}</label>
+            <select id="incident-create-assignee" class="input"></select>
+          </div>
+        </div>
+      </div>
+
+      <div class="app-modal-footer">
+        <button id="cancel-incident-create" type="button" class="btn">{{ _('common.cancel') }}</button>
+        <button id="save-incident-create" type="button" class="btn btn-primary">{{ _('incidents.actions.create') }}</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="incident-details-modal" class="app-modal is-hidden">
+    <div class="app-modal-dialog app-modal-dialog-wide incidents-details-dialog">
+      <div class="app-modal-header">
+        <div>
+          <h2 id="incident-details-title">{{ _('incidents.details.title') }}</h2>
+          <div id="incident-details-subtitle" class="card-subtitle"></div>
+        </div>
+        <button id="close-incident-details" type="button" class="app-modal-close" aria-label="{{ _('common.close') }}">×</button>
+      </div>
+
+      <div class="app-modal-body incidents-details-body">
+        <div id="incident-details-error" class="alert alert-danger is-hidden"></div>
+        <div id="incident-details-summary" class="details-grid"></div>
+
+        <section class="card incidents-operation-card">
+          <div class="card-header">
+            <div>
+              <h3>{{ _('incidents.details.operations') }}</h3>
+              <div class="card-subtitle">{{ _('incidents.details.operations_help') }}</div>
+            </div>
+          </div>
+          <div class="incidents-operation-grid">
+            <div>
+              <label for="incident-details-status">{{ _('incidents.form.status') }}</label>
+              <select id="incident-details-status" class="input"></select>
+              <div id="incident-status-error" class="incidents-field-error is-hidden"></div>
+            </div>
+            <div>
+              <label for="incident-details-assignee">{{ _('incidents.form.assignee') }}</label>
+              <select id="incident-details-assignee" class="input"></select>
+            </div>
+            <div class="incidents-operation-actions">
+              <button id="incident-assign-me" type="button" class="btn btn-small">{{ _('incidents.actions.assign_me') }}</button>
+              <button id="incident-unassign" type="button" class="btn btn-small">{{ _('incidents.actions.unassign') }}</button>
+            </div>
+          </div>
+        </section>
+
+        <section class="card incidents-links-card">
+          <div class="card-header">
+            <div>
+              <h3>{{ _('incidents.links.title') }}</h3>
+              <div class="card-subtitle">
+                {{ _('incidents.links.subtitle') }}
+                <span id="incident-linked-alert-groups-count" class="overview-count-badge">0</span>
+              </div>
+            </div>
+          </div>
+
+          <div id="incident-linked-alert-groups" class="incidents-linked-groups"></div>
+
+          <div id="incident-link-controls" class="incidents-link-controls">
+            <input id="incident-link-alert-group-id" class="input" type="number" min="1" placeholder="{{ _('incidents.links.alert_group_id') }}">
+            <select id="incident-link-relation" class="input">
+              <option value="related">{{ _('incidents.links.related') }}</option>
+              <option value="primary">{{ _('incidents.links.primary') }}</option>
+            </select>
+            <button id="incident-link-alert-group" type="button" class="btn btn-primary btn-small">{{ _('incidents.actions.link') }}</button>
+          </div>
+        </section>
+
+        <section class="card incidents-events-card">
+          <div class="card-header">
+            <div>
+              <h3>{{ _('incidents.activity.title') }}</h3>
+              <div class="card-subtitle">{{ _('incidents.activity.subtitle') }}</div>
+            </div>
+          </div>
+          <div id="incident-events" class="event-list"></div>
+        </section>
+      </div>
+
+      <div class="app-modal-footer">
+        <button id="incident-close-action" type="button" class="btn btn-danger btn-small">{{ _('incidents.actions.close_incident') }}</button>
+        <button id="incident-reopen-action" type="button" class="btn btn-primary btn-small">{{ _('incidents.actions.reopen') }}</button>
+        <button id="close-incident-details-footer" type="button" class="btn btn-small">{{ _('common.close') }}</button>
+      </div>
+    </div>
+  </div>
+</div>

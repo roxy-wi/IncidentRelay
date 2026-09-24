@@ -87,5 +87,8 @@
   "pages.sso.title": "SSO",
   "pages.sso.subtitle": "OIDC 和 SAML 登录提供方",
   "pages.login.title": "登录",
-  "pages.login.subtitle": "JWT 身份认证"
+  "pages.login.subtitle": "JWT 身份认证",
+  "nav.incidents": "事件",
+  "pages.incidents.title": "事件",
+  "pages.incidents.subtitle": "运营事件和独立响应流程"
 }

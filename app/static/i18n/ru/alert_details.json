@@ -336,5 +336,9 @@
   "alert_details.shelve.4h": "4 часа",
   "alert_details.shelve.8h": "8 часов",
   "alert_details.shelve.24h": "24 часа",
-  "alert_details.shelve.until": "До: {time}"
+  "alert_details.shelve.until": "До: {time}",
+  "alert_details.incident.title": "Инцидент",
+  "alert_details.incident.linked_help": "Эта группа алертов связана с операционным инцидентом.",
+  "alert_details.incident.open": "Открыть инцидент",
+  "alert_details.incident.load_failed": "Не удалось загрузить связанный инцидент."
 }

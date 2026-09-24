@@ -1,4 +1,5 @@
 {% set initial_alert_page = initial_page in ("/alerts", "/alerts/") or initial_alert_id %}
+{% set initial_incident_page = initial_page.startswith("/incidents") %}
 <!doctype html>
 <html lang="{{ current_locale }}" data-theme="{{ current_theme }}"{% if initial_alert_id %} class="modal-open"{% endif %}>
 <head>
@@ -81,6 +82,7 @@
     <link rel="stylesheet" href="/static/css/material.css">
     <link rel="stylesheet" href="/static/css/loading.css">
     <link rel="stylesheet" href="/static/css/table_pages.css">
+    <link rel="stylesheet" href="/static/css/incidents.css">
     <link rel="stylesheet" href="/static/css/orchestrations.css">
     <link rel="stylesheet" href="/static/css/audit_log.css">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/vendor/tom-select/tom-select.css') }}">
@@ -131,6 +133,11 @@
         <a href="/alerts" data-page="alerts" class="menu-link" title="{{ _('nav.alerts') }}">
             <svg class="menu-icon"><use href="#icon-alerts"></use></svg>
             <span class="menu-text">{{ _('nav.alerts') }}</span>
+        </a>
+
+        <a href="/incidents" data-page="incidents" class="menu-link" title="{{ _('nav.incidents') }}">
+            <svg class="menu-icon"><use href="#icon-incidents"></use></svg>
+            <span class="menu-text">{{ _('nav.incidents') }}</span>
         </a>
 
         <a href="/rotations" data-page="rotations" class="menu-link" title="{{ _('nav.rotations') }}">
@@ -317,6 +324,7 @@
         <section class="page">
             <div id="view-dashboard" class="view{% if initial_page == '/' %} view-visible{% endif %}">{% include "pages/dashboard.html" %}</div>
             <div id="view-alerts" class="view{% if initial_alert_page %} view-visible{% endif %}">{% include "pages/alerts.html" %}</div>
+            <div id="view-incidents" class="view{% if initial_incident_page %} view-visible{% endif %}">{% include "pages/incidents.html" %}</div>
             <div id="view-rotations" class="view">{% include "pages/rotations.html" %}</div>
             <div id="view-calendar" class="view">{% include "pages/calendar.html" %}</div>
             <div id="view-routes" class="view">{% include "pages/routes.html" %}</div>
@@ -411,6 +419,7 @@
 <script src="{{ url_for('static', filename='js/components/dependency_graph.js') }}"></script>
 <script src="{{ url_for('static', filename='js/common/slug.js') }}"></script>
 <script src="{{ url_for('static', filename='js/pages/alerts.js') }}"></script>
+<script src="{{ url_for('static', filename='js/pages/incidents.js') }}"></script>
 <script src="/static/js/pages/rotations.js"></script>
 <script src="{{ url_for('static', filename='js/pages/oncall_health.js') }}"></script>
 <script src="/static/js/pages/calendar.js"></script>

@@ -67,6 +67,34 @@ def user_short_schema():
     }
 
 
+def alert_group_incident_link_schema():
+    """Build the active AlertGroup -> Incident link response schema."""
+    return {
+        "type": "object",
+        "nullable": True,
+        "properties": {
+            "id": {"type": "integer"},
+            "relation_type": {"type": "string", "enum": ["primary", "related"]},
+            "linked_by_id": {"type": "integer", "nullable": True},
+            "linked_at": date_time_property("Time when the AlertGroup was linked to the Incident."),
+            "incident": {
+                "type": "object",
+                "properties": {
+                    "id": {"type": "integer"},
+                    "type": {"type": "string", "enum": ["incident"]},
+                    "title": {"type": "string"},
+                    "workflow_status": {"type": "string"},
+                    "priority": {"type": "string", "nullable": True},
+                    "team_id": {"type": "integer", "nullable": True},
+                    "service_id": {"type": "integer", "nullable": True},
+                    "assignee_id": {"type": "integer", "nullable": True},
+                    "row_version": {"type": "integer"},
+                },
+            },
+        },
+    }
+
+
 def alert_child_schema(include_payload=False):
     """Build a child alert response schema."""
 
@@ -1411,6 +1439,23 @@ def paths():
                 "security": bearer_security(),
                 "parameters": [path_param("alert_id", "AlertGroup id.")],
                 "responses": {"200": response("AlertGroup assigned.", alert_group_schema())},
+            }
+        },
+        "/api/alert-groups/{alert_id}/incident": {
+            "get": {
+                "tags": ["alerts"],
+                "summary": "Get the active Incident linked to an AlertGroup",
+                "description": (
+                    "Returns the currently active operational Incident link for this AlertGroup, "
+                    "or null when there is no active Incident."
+                ),
+                "security": bearer_security(),
+                "parameters": [path_param("alert_id", "AlertGroup id.")],
+                "responses": {
+                    "200": response("Active Incident link or null.", alert_group_incident_link_schema()),
+                    "403": response("Access denied."),
+                    "404": response("AlertGroup not found."),
+                },
             }
         },
         "/api/alert-groups/{alert_id}/create-incident": {

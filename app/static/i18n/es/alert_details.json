@@ -336,5 +336,9 @@
   "alert_details.shelve.8h": "8 horas",
   "alert_details.shelve.24h": "24 horas",
   "alert_details.shelve.until": "Hasta: {time}",
-  "alert_details.events.load_older": "Cargar eventos anteriores"
+  "alert_details.events.load_older": "Cargar eventos anteriores",
+  "alert_details.incident.title": "Incidente",
+  "alert_details.incident.linked_help": "Este AlertGroup está vinculado a un incidente operativo.",
+  "alert_details.incident.open": "Abrir incidente",
+  "alert_details.incident.load_failed": "No se pudo cargar el incidente vinculado."
 }

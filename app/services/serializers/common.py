@@ -53,6 +53,11 @@ def attach_team_permissions(data, team_id, current_user=None):
             or can_respond_team(current_user, team_id)
             or permissions["can_write_resources"]
         )
+        permissions["can_create_incident"] = (
+            is_admin_user(current_user)
+            or can_respond_team(current_user, team_id)
+            or permissions["can_write_resources"]
+        )
 
         data["permissions"] = permissions
 

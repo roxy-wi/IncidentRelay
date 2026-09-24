@@ -87,5 +87,8 @@
   "pages.sso.title": "SSO",
   "pages.sso.subtitle": "Fournisseurs de connexion OIDC et SAML",
   "pages.login.title": "Connexion",
-  "pages.login.subtitle": "Authentification JWT"
+  "pages.login.subtitle": "Authentification JWT",
+  "nav.incidents": "Incidents",
+  "pages.incidents.title": "Incidents",
+  "pages.incidents.subtitle": "Incidents opérationnels et processus de réponse indépendant"
 }

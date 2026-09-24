@@ -336,5 +336,9 @@
   "alert_details.shelve.8h": "8 小时",
   "alert_details.shelve.24h": "24 小时",
   "alert_details.shelve.until": "截至：{time}",
-  "alert_details.events.load_older": "加载更早的事件"
+  "alert_details.events.load_older": "加载更早的事件",
+  "alert_details.incident.title": "事件",
+  "alert_details.incident.linked_help": "此 AlertGroup 已关联到一个运营事件。",
+  "alert_details.incident.open": "打开事件",
+  "alert_details.incident.load_failed": "无法加载关联的事件。"
 }

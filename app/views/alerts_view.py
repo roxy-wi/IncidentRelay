@@ -9,7 +9,7 @@ from app.api.schemas.alerts import (
     AlertListQuerySchema,
     AlertShelveSchema,
 )
-from app.modules.db import alerts_repo, incidents_repo, notifications_repo
+from app.modules.db import alerts_repo, incident_core_repo, incidents_repo, notifications_repo
 from app.services.alerts.actions import acknowledge_alert, resolve_alert
 from app.services.alerts.assignment import set_alert_group_assignee
 from app.services.alerts.shelving import shelve_alert_group, unshelve_alert_group
@@ -31,7 +31,11 @@ from app.services.serializers.alerts import (
     serialize_incident_responder,
     serialize_alert_explain_trace,
 )
-from app.services.serializers.incidents import serialize_incident, serialize_incident_stakeholder
+from app.services.serializers.incidents import (
+    serialize_alert_group_incident_link,
+    serialize_incident,
+    serialize_incident_stakeholder,
+)
 from app.services.alerts.alert_comments import (
     create_group_comment,
     create_child_alert_comment,
@@ -426,6 +430,22 @@ def assign_alert_group_to_me(alert_id):
     except ValueError as exc:
         return safe_exception_response(exc, error="validation_error", message="Invalid AlertGroup assignee.", status_code=400)
     return jsonify(serialize_alert_group(group, current_user=_request_user()))
+
+
+@alerts_bp.route("/<int:alert_id>/incident", methods=["GET"])
+def get_alert_group_active_incident(alert_id):
+    """Return the active operational Incident linked to this AlertGroup."""
+    group, error = _require_alert_group_read(alert_id)
+    if error:
+        return error
+
+    link = incident_core_repo.active_link_for_group(group.id)
+    return jsonify(
+        serialize_alert_group_incident_link(
+            link,
+            current_user=_request_user(),
+        )
+    )
 
 
 @alerts_bp.route("/<int:alert_id>/create-incident", methods=["POST"])

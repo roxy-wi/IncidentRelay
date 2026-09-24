@@ -87,5 +87,8 @@
   "pages.sso.title": "SSO",
   "pages.sso.subtitle": "OIDC- und SAML-Anmeldeanbieter",
   "pages.login.title": "Anmeldung",
-  "pages.login.subtitle": "JWT-Authentifizierung"
+  "pages.login.subtitle": "JWT-Authentifizierung",
+  "nav.incidents": "Incidents",
+  "pages.incidents.title": "Incidents",
+  "pages.incidents.subtitle": "Operative Incidents und unabhängiger Reaktionsablauf"
 }

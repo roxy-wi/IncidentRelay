@@ -12,6 +12,9 @@ function normalizeAppRoutePath(pathname) {
     if (/^\/alerts\/\d+$/.test(normalizedPath)) {
         return "/alerts";
     }
+    if (/^\/incidents\/\d+$/.test(normalizedPath)) {
+        return "/incidents";
+    }
     return normalizedPath || "/";
 }
 
@@ -118,6 +121,12 @@ function navigate(path, pushState) {
     ) {
         syncAlertDetailsFromUrl();
     }
+    if (
+        normalizedPath.routePath === "/incidents"
+        && typeof syncIncidentDetailsFromUrl === "function"
+    ) {
+        syncIncidentDetailsFromUrl();
+    }
 
     if (window.PageUrlState && typeof window.PageUrlState.restorePath === "function") {
         window.PageUrlState.restorePath(normalizedPath.routePath);
@@ -190,6 +199,7 @@ function updateAuthUi() {
 const TEAM_SCOPED_ROUTE_PATHS = {
     "/": true,
     "/alerts": true,
+    "/incidents": true,
     "/rotations": true,
     "/calendar": true,
     "/routes": true,
