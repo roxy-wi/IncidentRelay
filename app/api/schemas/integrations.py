@@ -1,6 +1,6 @@
 from typing import Any, Dict, List
 
-from pydantic import ConfigDict, Field, model_validator
+from pydantic import ConfigDict, Field, field_validator, model_validator
 
 from app.api.schemas.base import ApiModel
 
@@ -64,6 +64,16 @@ class GrafanaAlertSchema(ApiModel):
 
     values: Dict[str, Any] = Field(default_factory=dict)
     valueString: str | None = None
+
+    @field_validator("labels", "annotations", "values", mode="before")
+    @classmethod
+    def _null_to_empty_dict(cls, value: Any) -> Any:
+        # Grafana sends `"values": null` (and can send null labels/annotations) for
+        # alerts that carry no reduced numeric values — e.g. the contact-point
+        # "Test" notification and no-data transitions. `default_factory` only
+        # applies when the key is absent, so an explicit null still fails
+        # validation with "Input should be a valid dictionary". Coerce it to {}.
+        return {} if value is None else value
 
 
 class GrafanaWebhookSchema(ApiModel):

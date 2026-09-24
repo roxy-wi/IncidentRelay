@@ -130,6 +130,20 @@ def test_grafana_fallback_dedup_key_is_stable():
     assert first["external_id"] == "disk-full-rule"
 
 
+def test_grafana_alert_accepts_null_values():
+    # Grafana sends `values: null` for alerts with no reduced numeric values —
+    # e.g. the contact-point "Test" notification and no-data transitions.
+    # `default_factory` only applies when the key is absent, so an explicit null
+    # previously failed validation with "Input should be a valid dictionary".
+    payload = grafana_payload()
+    payload["alerts"][0]["values"] = None
+
+    alert = normalize_grafana(payload)[0]
+
+    assert alert["status"] == "firing"
+    assert alert["payload"]["alerts"][0]["values"] == {}
+
+
 def test_grafana_endpoint_requires_token(client):
     response = client.post(
         "/api/integrations/grafana",
