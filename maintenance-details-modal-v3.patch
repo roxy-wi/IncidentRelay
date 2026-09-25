@@ -1,0 +1,158 @@
+diff --git a/app/templates/pages/maintenance_windows.html b/app/templates/pages/maintenance_windows.html
+--- a/app/templates/pages/maintenance_windows.html
++++ b/app/templates/pages/maintenance_windows.html
+@@ -37,7 +37,7 @@
+     </div>
+   </div>
+ 
+-  <div id="maintenance-page-layout" class="page-layout-grid">
++  <div id="maintenance-page-layout" class="page-layout-grid" style="grid-template-columns: minmax(0, 1fr);">
+     <section class="card page-layout-main">
+       <div class="card-header">
+         <div>
+@@ -106,18 +106,29 @@
+       </div>
+     </section>
+ 
+-    <aside id="maintenance-details-card" class="card page-details-card">
+-      <div class="card-header">
++  </div>
++
++  <div id="maintenance-details-modal" class="app-modal" style="display: none;">
++    <div class="app-modal-dialog app-modal-dialog-medium">
++      <div class="app-modal-header">
+         <div>
+           <h2>{{ _('maintenance.details.title') }}</h2>
+           <div id="maintenance-details-subtitle" class="card-subtitle">{{ _('maintenance.details.select') }}</div>
+         </div>
++        <button
++          id="close-maintenance-details-modal"
++          type="button"
++          class="app-modal-close"
++          aria-label="{{ _('common.close') }}"
++        >
++          ×
++        </button>
+       </div>
+ 
+-      <div id="maintenance-details-body" class="details-body">
++      <div id="maintenance-details-body" class="app-modal-body">
+         <p>{{ _('maintenance.details.help') }}</p>
+       </div>
+-    </aside>
++    </div>
+   </div>
+ </div>
+ 
+diff --git a/app/static/js/pages/maintenance_windows.js b/app/static/js/pages/maintenance_windows.js
+--- a/app/static/js/pages/maintenance_windows.js
++++ b/app/static/js/pages/maintenance_windows.js
+@@ -121,7 +121,9 @@
+         maintenanceWindowsCache = asArraySafe(items);
+         renderMaintenanceSummary();
+         renderMaintenanceWindowsTable();
+-        restoreMaintenanceDetails();
++        if ($("#maintenance-details-modal").hasClass("is-open")) {
++            restoreMaintenanceDetails();
++        }
+     });
+ }
+ 
+@@ -262,7 +264,7 @@
+                     .addClass("name-button")
+                     .text(item.name || i18n.t("maintenance.values.window_number", {id: item.id}))
+                     .on("click", function () {
+-                        renderMaintenanceDetails(item);
++                        openMaintenanceDetailsModal(item);
+                     })
+             )
+             .append(
+@@ -392,6 +394,16 @@
+         .append($("<div>").addClass("details-value").text(value || "-"));
+ }
+ 
++function closeMaintenanceDetailsModal() {
++    closeAppModal("#maintenance-details-modal");
++    selectedMaintenanceWindowId = null;
++}
++
++function openMaintenanceDetailsModal(item) {
++    renderMaintenanceDetails(item);
++    openAppModal("#maintenance-details-modal");
++}
++
+ function renderMaintenanceDetails(item) {
+     selectedMaintenanceWindowId = item.id;
+ 
+@@ -443,6 +455,7 @@
+                 .addClass("btn")
+                 .text(i18n.t("maintenance.actions.edit_window"))
+                 .on("click", function () {
++                    closeMaintenanceDetailsModal();
+                     editMaintenanceWindow(item.id);
+                 })
+         )
+@@ -452,6 +465,7 @@
+                 .addClass("btn")
+                 .text(i18n.t("maintenance.actions.cancel_window"))
+                 .on("click", function () {
++                    closeMaintenanceDetailsModal();
+                     cancelMaintenanceWindow(item);
+                 })
+         );
+@@ -474,7 +488,7 @@
+     const item = findMaintenanceWindow(selectedMaintenanceWindowId);
+ 
+     if (!item) {
+-        renderMaintenanceDetailsEmpty();
++        closeMaintenanceDetailsModal();
+         return;
+     }
+ 
+@@ -532,8 +546,7 @@
+     apiPost(
+         "/api/maintenance-windows",
+         payload,
+-        function (created) {
+-            selectedMaintenanceWindowId = created.id;
++        function () {
+             closeAppModal("#maintenance-window-modal");
+             refreshMaintenanceWindows();
+         },
+@@ -872,6 +885,26 @@
+ }
+ 
+ $(document)
++    .off("click.maintenanceDetails", "#close-maintenance-details-modal")
++    .on("click.maintenanceDetails", "#close-maintenance-details-modal", closeMaintenanceDetailsModal);
++
++$(document)
++    .off("click.maintenanceDetails", "#maintenance-details-modal")
++    .on("click.maintenanceDetails", "#maintenance-details-modal", function (event) {
++        if (event.target === this) {
++            closeMaintenanceDetailsModal();
++        }
++    });
++
++$(document)
++    .off("keydown.maintenanceDetails")
++    .on("keydown.maintenanceDetails", function (event) {
++        if (event.key === "Escape" && $("#maintenance-details-modal").hasClass("is-open")) {
++            closeMaintenanceDetailsModal();
++        }
++    });
++
++$(document)
+     .off("click.maintenance", "#open-maintenance-create-modal")
+     .on("click.maintenance", "#open-maintenance-create-modal", openMaintenanceCreateModal);
+ $(document)
+@@ -1171,8 +1204,7 @@
+     apiPost(
+         "/api/maintenance-windows",
+         payload,
+-        function (created) {
+-            selectedMaintenanceWindowId = created.id;
++        function () {
+             refreshMaintenanceWindows();
+         },
+         function (xhr) {

@@ -1863,7 +1863,7 @@ class AlertGroup(BaseModel):
     group_key_hash = CharField(index=True)
     group_key = TextField()
 
-    title = CharField()
+    title = TextField()
     message = TextField(null=True)
     severity = CharField(null=True)
 
@@ -2078,10 +2078,10 @@ class Alert(BaseModel):
     escalation_repeat_count = IntegerField(default=0)
     assignee = ForeignKeyField(User, null=True, backref="assigned_alerts", on_delete="SET NULL")
     source = CharField()
-    external_id = CharField(null=True)
+    external_id = TextField(null=True)
     dedup_key = CharField(index=True)
-    group_key = CharField(index=True)
-    title = CharField()
+    group_key = TextField()
+    title = TextField()
     message = TextField(null=True)
     severity = CharField(null=True)
     priority = ForeignKeyField(
@@ -2130,7 +2130,6 @@ class Alert(BaseModel):
         indexes = (
             (("team", "status"), False),
             (("source", "dedup_key"), False),
-            (("group_key", "status"), False),
             (("status", "resolved_at"), False),
         )
 

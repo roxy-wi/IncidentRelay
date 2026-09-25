@@ -1737,18 +1737,12 @@ function deleteRotation(id) {
         confirmClass: "btn-danger",
     }).done(function () {
         apiDelete("/api/rotations/" + id, function () {
-            refreshRotations();
             if (Number(selectedRotationDetailsId) === Number(id)) {
                 selectedRotationDetailsId = null;
-                $("#rotation-details-subtitle").text(
-                    i18n.t("rotations.details.select")
-                );
-                $("#rotation-details-body")
-                    .empty()
-                    .append(
-                        $("<p>").text(i18n.t("rotations.details.help"))
-                    );
+                closeAppModal("#rotation-details-modal");
             }
+
+            refreshRotations();
         });
     });
 }
@@ -1970,6 +1964,7 @@ function renderRotationRow(rotation) {
         .text(rotation.name || "-")
         .on("click", function () {
             renderRotationDetails(rotation);
+            openAppModal("#rotation-details-modal");
         });
 
     row.append(
@@ -2177,6 +2172,7 @@ function renderRotationDetails(rotation) {
         icon: "fas fa-edit",
         label: i18n.t("rotations.actions.edit"),
         onClick: function () {
+            closeAppModal("#rotation-details-modal");
             editRotation(rotation.id);
         }
     });
@@ -2186,6 +2182,7 @@ function renderRotationDetails(rotation) {
         icon: "fas fa-layer-group",
         label: i18n.t("rotations.layers.title"),
         onClick: function () {
+            closeAppModal("#rotation-details-modal");
             selectRotationLayers(rotation.id);
         }
     });
@@ -2195,6 +2192,7 @@ function renderRotationDetails(rotation) {
         icon: "fas fa-user-clock",
         label: i18n.t("rotations.overrides.title"),
         onClick: function () {
+            closeAppModal("#rotation-details-modal");
             selectOverrideRotation(rotation.id);
         }
     });
@@ -2204,6 +2202,7 @@ function renderRotationDetails(rotation) {
             icon: "fas fa-calendar-alt",
             label: i18n.t("rotations.details.open_calendar"),
             onClick: function () {
+                closeAppModal("#rotation-details-modal");
                 navigate("/calendar?team_id=" + encodeURIComponent(rotation.team_id), true);
             }
         })
@@ -2341,6 +2340,20 @@ $(document).on("change", '[data-layer-field="rotation_type"]', function () {
 $(document).on("keydown", function (event) {
     if (event.key === "Escape" && $("#rotation-layers-modal").hasClass("is-open")) {
         closeRotationLayersModal();
+    }
+});
+
+$(document).on("click", "#close-rotation-details-modal", function () {
+    closeAppModal("#rotation-details-modal");
+});
+$(document).on("click", "#rotation-details-modal", function (event) {
+    if (event.target === this) {
+        closeAppModal("#rotation-details-modal");
+    }
+});
+$(document).on("keydown", function (event) {
+    if (event.key === "Escape" && $("#rotation-details-modal").hasClass("is-open")) {
+        closeAppModal("#rotation-details-modal");
     }
 });
 

@@ -38,7 +38,7 @@
     </div>
   </div>
 
-  <div class="page-layout-grid">
+  <div class="page-layout-grid rotations-page-grid">
     <section class="card page-layout-main">
       <div class="card-header">
         <div>
@@ -103,23 +103,34 @@
         </table>
       </div>
     </section>
+  </div>
 
-    <aside class="card page-details-card">
-      <div class="card-header">
+  <div id="rotation-details-modal" class="app-modal" style="display: none;">
+    <div class="app-modal-dialog app-modal-dialog-medium">
+      <div class="app-modal-header">
         <div>
           <h2>{{ _('rotations.details.title') }}</h2>
           <div id="rotation-details-subtitle" class="card-subtitle">
             {{ _('rotations.details.select') }}
           </div>
         </div>
+
+        <button
+          id="close-rotation-details-modal"
+          type="button"
+          class="app-modal-close"
+          aria-label="{{ _('common.close') }}"
+        >
+          ×
+        </button>
       </div>
 
-      <div id="rotation-details-body" class="details-body">
+      <div id="rotation-details-body" class="app-modal-body">
         <div class="details-empty">
           {{ _('rotations.details.help') }}
         </div>
       </div>
-    </aside>
+    </div>
   </div>
 
   <div id="rotation-form-modal" class="app-modal" style="display: none;">

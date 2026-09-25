@@ -1,6 +1,10 @@
-from app.modules.db.models import AlertEvent
+import pytest
+
+from app.modules.db import alerts_repo
+from app.modules.db.models import Alert, AlertEvent, AlertGroup
 from app.services.alerts.actions import acknowledge_alert, resolve_alert
 from app.services.alerts.lifecycle import upsert_alert
+import app.services.alerts.lifecycle as lifecycle
 from tests.factories import create_group, create_route, create_team, create_user
 
 
@@ -203,3 +207,81 @@ def test_resolve_alert_can_skip_message_updates(monkeypatch, db):
     assert message_updates == []
     assert len(stakeholder_updates) == 1
     assert _event_count(alert_group.id, "resolved") == 1
+
+
+def test_alert_intake_accepts_long_external_text_and_group_key(db):
+    group = create_group(slug="long-alert-fields")
+    team = create_team(group, slug="long-alert-fields-team")
+    route = create_route(
+        team,
+        source="alertmanager",
+        group_by=["alertname"],
+    )
+
+    long_title = "T" * 600
+    long_external_id = "E" * 600
+    long_alertname = "A" * 700
+
+    alert_data = _normalized_alert(route)
+    alert_data.update(
+        {
+            "external_id": long_external_id,
+            "title": long_title,
+            "labels": {
+                "alertname": long_alertname,
+                "severity": "critical",
+                "instance": "host1",
+            },
+        }
+    )
+
+    result = upsert_alert(alert_data)
+
+    stored_group = AlertGroup.get_by_id(result.group.id)
+    stored_alert = Alert.get_by_id(result.alert.id)
+
+    assert stored_group.title == long_title
+    assert stored_alert.title == long_title
+    assert stored_alert.external_id == long_external_id
+    assert len(stored_alert.group_key) > 255
+    assert long_alertname in stored_alert.group_key
+
+
+def test_new_alert_persistence_rolls_back_group_when_child_insert_fails(
+    monkeypatch,
+    db,
+):
+    group = create_group(slug="alert-atomicity")
+    team = create_team(group, slug="alert-atomicity-team")
+    route = create_route(
+        team,
+        source="alertmanager",
+        group_by=["alertname"],
+    )
+
+    stakeholder_calls = []
+
+    monkeypatch.setattr(
+        lifecycle,
+        "_add_service_stakeholders_for_new_group",
+        lambda current_group: stakeholder_calls.append(current_group.id),
+    )
+
+    def fail_create_alert(**kwargs):
+        raise RuntimeError("simulated child alert insert failure")
+
+    monkeypatch.setattr(
+        alerts_repo,
+        "create_alert",
+        fail_create_alert,
+    )
+
+    with pytest.raises(
+        RuntimeError,
+        match="simulated child alert insert failure",
+    ):
+        upsert_alert(_normalized_alert(route))
+
+    assert Alert.select().count() == 0
+    assert AlertGroup.select().count() == 0
+    assert stakeholder_calls == []

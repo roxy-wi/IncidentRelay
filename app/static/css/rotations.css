@@ -1,3 +1,31 @@
+body.md-theme .rotations-page-grid {
+    grid-template-columns: minmax(0, 1fr);
+}
+
+body.md-theme #rotation-details-modal .details-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+body.md-theme #rotation-details-modal .details-item {
+    min-width: 0;
+}
+
+body.md-theme #rotation-details-modal .details-item:last-child {
+    grid-column: 1 / -1;
+}
+
+body.md-theme #rotation-details-modal .details-actions {
+    padding: 16px 0 0;
+}
+
+@media (max-width: 700px) {
+    body.md-theme #rotation-details-modal .details-list {
+        grid-template-columns: 1fr;
+    }
+}
+
 .rotations-bottom-grid {
     display: grid;
     grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
