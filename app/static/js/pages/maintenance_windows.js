@@ -121,7 +121,10 @@ function refreshMaintenanceWindows() {
         maintenanceWindowsCache = asArraySafe(items);
         renderMaintenanceSummary();
         renderMaintenanceWindowsTable();
-        restoreMaintenanceDetails();
+
+        if ($("#maintenance-details-modal").hasClass("is-open")) {
+            restoreMaintenanceDetails();
+        }
     });
 }
 
@@ -262,7 +265,7 @@ function renderMaintenanceRow(item) {
                     .addClass("name-button")
                     .text(item.name || i18n.t("maintenance.values.window_number", {id: item.id}))
                     .on("click", function () {
-                        renderMaintenanceDetails(item);
+                        openMaintenanceDetailsModal(item);
                     })
             )
             .append(
@@ -392,6 +395,39 @@ function maintenanceDetailsItem(label, value) {
         .append($("<div>").addClass("details-value").text(value || "-"));
 }
 
+function closeMaintenanceDetailsModal() {
+    closeAppModal("#maintenance-details-modal");
+    selectedMaintenanceWindowId = null;
+}
+
+function openMaintenanceDetailsModal(item) {
+    renderMaintenanceDetails(item);
+
+    const modal = $("#maintenance-details-modal");
+
+    $("#close-maintenance-details-modal")
+        .off("click.maintenanceDetails")
+        .on("click.maintenanceDetails", closeMaintenanceDetailsModal);
+
+    modal
+        .off("click.maintenanceDetails")
+        .on("click.maintenanceDetails", function (event) {
+            if (event.target === this) {
+                closeMaintenanceDetailsModal();
+            }
+        });
+
+    $(document)
+        .off("keydown.maintenanceDetails")
+        .on("keydown.maintenanceDetails", function (event) {
+            if (event.key === "Escape" && modal.hasClass("is-open")) {
+                closeMaintenanceDetailsModal();
+            }
+        });
+
+    openAppModal(modal);
+}
+
 function renderMaintenanceDetails(item) {
     selectedMaintenanceWindowId = item.id;
 
@@ -443,6 +479,7 @@ function renderMaintenanceDetails(item) {
                 .addClass("btn")
                 .text(i18n.t("maintenance.actions.edit_window"))
                 .on("click", function () {
+                    closeMaintenanceDetailsModal();
                     editMaintenanceWindow(item.id);
                 })
         )
@@ -474,7 +511,7 @@ function restoreMaintenanceDetails() {
     const item = findMaintenanceWindow(selectedMaintenanceWindowId);
 
     if (!item) {
-        renderMaintenanceDetailsEmpty();
+        closeMaintenanceDetailsModal();
         return;
     }
 

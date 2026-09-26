@@ -6,6 +6,44 @@ let notificationPolicyChannelsCache = [];
 let expandedNotificationPolicyRuleId = null;
 let unsavedNotificationPolicyRuleCounter = 0;
 let notificationPolicyMatcherPresetsCache = [];
+let notificationPolicyServicesCache = [];
+
+const NOTIFICATION_POLICY_PRIORITY_OPTIONS = [
+    ["p1", "P1"],
+    ["p2", "P2"],
+    ["p3", "P3"],
+    ["p4", "P4"],
+    ["p5", "P5"],
+];
+
+const NOTIFICATION_POLICY_SEVERITY_OPTIONS = [
+    ["critical", "Critical"],
+    ["high", "High"],
+    ["medium", "Medium"],
+    ["warning", "Warning"],
+    ["low", "Low"],
+    ["info", "Info"],
+];
+
+const NOTIFICATION_POLICY_SOURCE_OPTIONS = [
+    "alertmanager",
+    "aws_sns",
+    "azure_monitor",
+    "cloud_ru",
+    "datadog",
+    "grafana",
+    "heartbeat",
+    "librenms",
+    "nagios",
+    "new_relic",
+    "rmon",
+    "sentry",
+    "uptime_kuma",
+    "webhook",
+    "zabbix",
+].map(function (value) {
+    return [value, value];
+});
 
 function isUnsavedNotificationPolicyRule(ruleOrId) {
     const value = typeof ruleOrId === "object" ? ruleOrId.id : ruleOrId;
@@ -406,6 +444,25 @@ function loadNotificationPolicyRuleChannels(policy, callback) {
     );
 }
 
+function loadNotificationPolicyRuleServices(policy, callback) {
+    notificationPolicyServicesCache = [];
+
+    apiGet(
+        "/api/services?team_id=" + encodeURIComponent(policy.team_id),
+        function (response) {
+            const services = response && Array.isArray(response.items)
+                ? response.items
+                : response;
+
+            notificationPolicyServicesCache = asArray(services);
+
+            if (typeof callback === "function") {
+                callback();
+            }
+        }
+    );
+}
+
 function loadNotificationPolicyMatcherPresets(policy, callback) {
     notificationPolicyMatcherPresetsCache = [];
 
@@ -514,6 +571,7 @@ function openNotificationPolicyRulesModal(policyId, ruleIdToExpand) {
     notificationPolicyRulesCache = [];
     notificationPolicyChannelsCache = [];
     notificationPolicyMatcherPresetsCache = [];
+    notificationPolicyServicesCache = [];
     expandedNotificationPolicyRuleId = ruleIdToExpand || null;
     unsavedNotificationPolicyRuleCounter = 0;
 
@@ -528,8 +586,10 @@ function openNotificationPolicyRulesModal(policyId, ruleIdToExpand) {
     openAppModal("#notification-policy-rules-modal");
 
     loadNotificationPolicyRuleChannels(policy, function () {
-        loadNotificationPolicyMatcherPresets(policy, function () {
-            loadNotificationPolicyRuleCards(policy.id);
+        loadNotificationPolicyRuleServices(policy, function () {
+            loadNotificationPolicyMatcherPresets(policy, function () {
+                loadNotificationPolicyRuleCards(policy.id);
+            });
         });
     });
 }
@@ -541,6 +601,7 @@ function closeNotificationPolicyRulesModal() {
     notificationPolicyRulesCache = [];
     notificationPolicyChannelsCache = [];
     notificationPolicyMatcherPresetsCache = [];
+    notificationPolicyServicesCache = [];
     expandedNotificationPolicyRuleId = null;
     unsavedNotificationPolicyRuleCounter = 0;
 
@@ -969,6 +1030,260 @@ function notificationPolicyRuleMatcherPresetField(rule) {
         .append($("<div>").attr("id", hintId).addClass("help-text").text(notificationPolicyMatcherPresetHint(preset)));
 }
 
+function notificationPolicySimpleMatcherValues(value) {
+    if (Array.isArray(value)) {
+        if (value.some(function (item) {
+            return item !== null && typeof item === "object";
+        })) {
+            return null;
+        }
+
+        return value.slice();
+    }
+
+    if (typeof value === "string" || typeof value === "number") {
+        return [value];
+    }
+
+    return null;
+}
+
+function notificationPolicyCommonMatcherState(matchers) {
+    matchers = matchers && typeof matchers === "object" ? matchers : {};
+
+    const fields = (
+        matchers.fields
+        && typeof matchers.fields === "object"
+        && !Array.isArray(matchers.fields)
+    ) ? matchers.fields : {};
+
+    return {
+        priority: notificationPolicySimpleMatcherValues(matchers.priority) || [],
+        severity: notificationPolicySimpleMatcherValues(matchers.severity) || [],
+        source: notificationPolicySimpleMatcherValues(matchers.source) || [],
+        service: (
+            notificationPolicySimpleMatcherValues(fields["service.id"]) || []
+        ).map(String),
+        environment: (
+            notificationPolicySimpleMatcherValues(
+                fields["service.environment"]
+            ) || []
+        ).map(String),
+        criticality: (
+            notificationPolicySimpleMatcherValues(
+                fields["service.criticality"]
+            ) || []
+        ).map(String),
+        tier: (
+            notificationPolicySimpleMatcherValues(fields["service.tier"]) || []
+        ).map(String),
+    };
+}
+
+function notificationPolicyAdvancedMatchers(matchers) {
+    const result = JSON.parse(JSON.stringify(matchers || {}));
+
+    ["priority", "severity", "source"].forEach(function (key) {
+        if (notificationPolicySimpleMatcherValues(result[key]) !== null) {
+            delete result[key];
+        }
+    });
+
+    if (
+        result.fields
+        && typeof result.fields === "object"
+        && !Array.isArray(result.fields)
+    ) {
+        [
+            "service.id",
+            "service.environment",
+            "service.criticality",
+            "service.tier",
+        ].forEach(function (key) {
+            if (
+                notificationPolicySimpleMatcherValues(
+                    result.fields[key]
+                ) !== null
+            ) {
+                delete result.fields[key];
+            }
+        });
+
+        if (!Object.keys(result.fields).length) {
+            delete result.fields;
+        }
+    }
+
+    return result;
+}
+
+function notificationPolicyServiceFilterOptions(selectedValues) {
+    const optionsById = new Map();
+
+    notificationPolicyServicesCache.forEach(function (service) {
+        const id = String(service.id);
+        const name = service.name || service.slug || ("#" + id);
+        const label = service.name && service.slug
+            ? service.name + " (" + service.slug + ")"
+            : name;
+
+        optionsById.set(id, [id, label]);
+    });
+
+    asArray(selectedValues).forEach(function (serviceId) {
+        const id = String(serviceId);
+
+        if (!optionsById.has(id)) {
+            optionsById.set(id, [id, "#" + id]);
+        }
+    });
+
+    return Array.from(optionsById.values()).sort(function (left, right) {
+        return String(left[1]).localeCompare(String(right[1]));
+    });
+}
+
+function notificationPolicyServiceCatalogOptions(name, fallback) {
+    const catalog = window.ServiceCatalogOptions || {};
+    const options = asArray(catalog[name]);
+
+    return options.length ? options : fallback;
+}
+
+function notificationPolicyRuleCommonFilterField(
+    rule,
+    field,
+    label,
+    options,
+    selectedValues
+) {
+    const id = notificationPolicyRuleFieldId(rule.id, field);
+    const selected = new Set(
+        asArray(selectedValues).map(function (value) {
+            return String(value);
+        })
+    );
+    const values = new Set();
+
+    const select = $("<select>")
+        .attr("id", id)
+        .attr("multiple", "multiple")
+        .attr("size", String(Math.min(Math.max(options.length, 3), 6)))
+        .addClass("input");
+
+    options.forEach(function (option) {
+        const value = String(option[0]);
+        values.add(value);
+
+        select.append(
+            $("<option>")
+                .val(value)
+                .text(option[1])
+        );
+    });
+
+    selected.forEach(function (value) {
+        if (!values.has(value)) {
+            select.append(
+                $("<option>")
+                    .val(value)
+                    .text(value)
+            );
+        }
+    });
+
+    select.val(Array.from(selected));
+
+    return $("<div>")
+        .addClass("app-field layer-settings-col-4")
+        .append($("<label>").attr("for", id).text(label))
+        .append(select);
+}
+
+function notificationPolicyRuleCommonFilterValues(ruleId, field) {
+    return asArray(
+        $("#" + notificationPolicyRuleFieldId(ruleId, field)).val()
+    ).filter(function (value) {
+        return String(value || "").trim() !== "";
+    });
+}
+
+function mergeNotificationPolicyCommonMatchers(ruleId, advancedMatchers) {
+    const result = $.extend(true, {}, advancedMatchers || {});
+    const fields = (
+        result.fields
+        && typeof result.fields === "object"
+        && !Array.isArray(result.fields)
+    ) ? $.extend(true, {}, result.fields) : {};
+
+    const priorities = notificationPolicyRuleCommonFilterValues(
+        ruleId,
+        "common-priority"
+    );
+    const severities = notificationPolicyRuleCommonFilterValues(
+        ruleId,
+        "common-severity"
+    );
+    const sources = notificationPolicyRuleCommonFilterValues(
+        ruleId,
+        "common-source"
+    );
+    const services = notificationPolicyRuleCommonFilterValues(
+        ruleId,
+        "common-service"
+    ).map(Number).filter(function (serviceId) {
+        return serviceId > 0;
+    });
+    const environments = notificationPolicyRuleCommonFilterValues(
+        ruleId,
+        "common-environment"
+    );
+    const criticalities = notificationPolicyRuleCommonFilterValues(
+        ruleId,
+        "common-criticality"
+    );
+    const tiers = notificationPolicyRuleCommonFilterValues(
+        ruleId,
+        "common-tier"
+    );
+
+    if (priorities.length) {
+        result.priority = priorities;
+    }
+
+    if (severities.length) {
+        result.severity = severities;
+    }
+
+    if (sources.length) {
+        result.source = sources;
+    }
+
+    if (services.length) {
+        fields["service.id"] = services;
+    }
+
+    if (environments.length) {
+        fields["service.environment"] = environments;
+    }
+
+    if (criticalities.length) {
+        fields["service.criticality"] = criticalities;
+    }
+
+    if (tiers.length) {
+        fields["service.tier"] = tiers;
+    }
+
+    if (Object.keys(fields).length) {
+        result.fields = fields;
+    } else {
+        delete result.fields;
+    }
+
+    return result;
+}
+
 function renderNotificationPolicyRuleEditor(rule) {
     const editor = $("<div>").addClass("rotation-layer-editor");
     const section = $("<section>").addClass("layer-editor-section");
@@ -1016,6 +1331,126 @@ function renderNotificationPolicyRuleEditor(rule) {
 
     grid.append(notificationPolicyRuleChannelsField(rule));
     grid.append(notificationPolicyRuleMatcherPresetField(rule));
+
+    const commonMatchers = notificationPolicyCommonMatcherState(
+        rule.matchers || {}
+    );
+
+    grid.append(
+        $("<div>")
+            .addClass("app-field layer-settings-col-12")
+            .append(
+                $("<label>").text(
+                    i18n.t("notification_policies.rules.common_filters")
+                )
+            )
+            .append(
+                $("<div>")
+                    .addClass("help-text")
+                    .text(
+                        i18n.t(
+                            "notification_policies.rules.common_filters_help"
+                        )
+                    )
+            )
+    );
+
+    grid.append(
+        notificationPolicyRuleCommonFilterField(
+            rule,
+            "common-priority",
+            i18n.t("notification_policies.rules.filter_priority"),
+            NOTIFICATION_POLICY_PRIORITY_OPTIONS,
+            commonMatchers.priority
+        )
+    );
+
+    grid.append(
+        notificationPolicyRuleCommonFilterField(
+            rule,
+            "common-severity",
+            i18n.t("notification_policies.rules.filter_severity"),
+            NOTIFICATION_POLICY_SEVERITY_OPTIONS,
+            commonMatchers.severity
+        )
+    );
+
+    grid.append(
+        notificationPolicyRuleCommonFilterField(
+            rule,
+            "common-source",
+            i18n.t("notification_policies.rules.filter_source"),
+            NOTIFICATION_POLICY_SOURCE_OPTIONS,
+            commonMatchers.source
+        )
+    );
+
+    grid.append(
+        notificationPolicyRuleCommonFilterField(
+            rule,
+            "common-service",
+            i18n.t("notification_policies.rules.filter_service"),
+            notificationPolicyServiceFilterOptions(
+                commonMatchers.service
+            ),
+            commonMatchers.service
+        )
+    );
+
+    grid.append(
+        notificationPolicyRuleCommonFilterField(
+            rule,
+            "common-environment",
+            i18n.t("notification_policies.rules.filter_environment"),
+            notificationPolicyServiceCatalogOptions(
+                "environments",
+                [
+                    ["production", "Production"],
+                    ["staging", "Staging"],
+                    ["development", "Development"],
+                    ["testing", "Testing"],
+                    ["shared", "Shared"],
+                ]
+            ),
+            commonMatchers.environment
+        )
+    );
+
+    grid.append(
+        notificationPolicyRuleCommonFilterField(
+            rule,
+            "common-criticality",
+            i18n.t("notification_policies.rules.filter_criticality"),
+            notificationPolicyServiceCatalogOptions(
+                "criticalities",
+                [
+                    ["critical", "Critical"],
+                    ["high", "High"],
+                    ["medium", "Medium"],
+                    ["low", "Low"],
+                ]
+            ),
+            commonMatchers.criticality
+        )
+    );
+
+    grid.append(
+        notificationPolicyRuleCommonFilterField(
+            rule,
+            "common-tier",
+            i18n.t("notification_policies.rules.filter_tier"),
+            notificationPolicyServiceCatalogOptions(
+                "tiers",
+                [
+                    ["tier_1", "Tier 1"],
+                    ["tier_2", "Tier 2"],
+                    ["tier_3", "Tier 3"],
+                    ["tier_4", "Tier 4"],
+                ]
+            ),
+            commonMatchers.tier
+        )
+    );
 
     grid.append(
         $("<div>")
@@ -1081,9 +1516,9 @@ function renderNotificationPolicyRuleEditor(rule) {
     grid.append(
         createMatcherEditor({
             id: notificationPolicyRuleFieldId(rule.id, "matchers"),
-            value: rule.matchers || {},
-            label: i18n.t("notification_policies.rules.additional_matchers"),
-            helpText: i18n.t("notification_policies.rules.additional_matchers_help"),
+            value: notificationPolicyAdvancedMatchers(rule.matchers || {}),
+            label: i18n.t("notification_policies.rules.advanced_matchers"),
+            helpText: i18n.t("notification_policies.rules.advanced_matchers_help"),
             context: function () {
                 const policy = getNotificationPolicyById(selectedNotificationPolicyRulesId);
                 const matcherPresetId = Number($("#" + notificationPolicyRuleFieldId(rule.id, "matcher-preset")).val()) || null;
@@ -1143,12 +1578,20 @@ function collectNotificationPolicyRulePayload(ruleId) {
     $(prefix + "event-escalation").is(":checked")
         && eventTypes.push("escalation");
 
+    const advancedMatchers = getMatcherEditorValue(
+        prefix + "matchers",
+        {}
+    );
+
     return {
         name: $(prefix + "name").val(),
         description: $(prefix + "description").val(),
         position: Number($(prefix + "position").val() || 1),
         event_types: eventTypes,
-        matchers: getMatcherEditorValue(prefix + "matchers", {}),
+        matchers: mergeNotificationPolicyCommonMatchers(
+            ruleId,
+            advancedMatchers
+        ),
         matcher_preset_id: $(prefix + "matcher-preset").val() ? Number($(prefix + "matcher-preset").val()) : null,
         channel_ids: ($(prefix + "channels").val() || []).map(Number),
         continue_matching: $(prefix + "continue-matching").is(":checked"),

@@ -37,7 +37,7 @@
     </div>
   </div>
 
-  <div id="maintenance-page-layout" class="page-layout-grid">
+  <div id="maintenance-page-layout" class="page-layout-grid" style="grid-template-columns: minmax(0, 1fr);">
     <section class="card page-layout-main">
       <div class="card-header">
         <div>
@@ -106,18 +106,30 @@
       </div>
     </section>
 
-    <aside id="maintenance-details-card" class="card page-details-card">
-      <div class="card-header">
+  </div>
+
+  <div id="maintenance-details-modal" class="app-modal" style="display: none;">
+    <div class="app-modal-dialog app-modal-dialog-medium">
+      <div class="app-modal-header">
         <div>
           <h2>{{ _('maintenance.details.title') }}</h2>
           <div id="maintenance-details-subtitle" class="card-subtitle">{{ _('maintenance.details.select') }}</div>
         </div>
+
+        <button
+          id="close-maintenance-details-modal"
+          type="button"
+          class="app-modal-close"
+          aria-label="{{ _('common.close') }}"
+        >
+          ×
+        </button>
       </div>
 
-      <div id="maintenance-details-body" class="details-body">
+      <div id="maintenance-details-body" class="app-modal-body">
         <p>{{ _('maintenance.details.help') }}</p>
       </div>
-    </aside>
+    </div>
   </div>
 </div>
 

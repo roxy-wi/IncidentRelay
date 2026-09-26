@@ -167,6 +167,72 @@ def test_policy_matches_priority():
     assert resolution.matched_rule_ids == [p1_rule.id]
 
 
+def test_policy_matches_common_ui_filters():
+    group = create_group()
+    team = create_team(group)
+    service = create_service(
+        team,
+        environment="production",
+        criticality="critical",
+        tier="tier_1",
+    )
+
+    filtered_channel = create_channel(group, team)
+    default_channel = create_channel(group, team)
+
+    policy = create_notification_policy(team)
+    filtered_rule = create_notification_policy_rule(
+        policy,
+        position=1,
+        matchers={
+            "priority": ["p1", "p2"],
+            "severity": ["critical", "warning"],
+            "source": ["sentry"],
+            "fields": {
+                "service.id": [service.id],
+                "service.environment": ["production"],
+                "service.criticality": ["critical"],
+                "service.tier": ["tier_1"],
+            },
+        },
+        channels=[filtered_channel],
+    )
+    default_rule = create_notification_policy_rule(
+        policy,
+        position=2,
+        matchers={},
+        channels=[default_channel],
+    )
+
+    service.notification_policy = policy
+    service.save()
+
+    route = create_route(
+        team,
+        source="sentry",
+        service=service,
+        notification_channel_mode="service_policy",
+    )
+
+    alert_group = _create_group(team, route, service)
+    alert_group.source = "sentry"
+    alert_group.priority_slug = "p1"
+    alert_group.save()
+
+    resolution = resolve_notification_channels(alert_group)
+
+    assert _channel_ids(resolution) == [filtered_channel.id]
+    assert resolution.matched_rule_ids == [filtered_rule.id]
+
+    alert_group.source = "grafana"
+    alert_group.save()
+
+    resolution = resolve_notification_channels(alert_group)
+
+    assert _channel_ids(resolution) == [default_channel.id]
+    assert resolution.matched_rule_ids == [default_rule.id]
+
+
 def test_continue_matching_combines_policy_rules():
     group = create_group()
     team = create_team(group)

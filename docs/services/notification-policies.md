@@ -140,8 +140,23 @@ separately from shared channel policies.
 5. Save the policy.
 6. Open the policy action menu and select **Rules**.
 7. Add rules in the required evaluation order.
-8. Select event types, matchers and channels for each rule.
+8. Select event types, common filters, advanced matchers and channels for each rule.
 9. Save each rule.
+
+The rule editor exposes common filters for:
+
+- priority;
+- severity;
+- alert source;
+- service;
+- service environment;
+- service criticality;
+- service tier.
+
+These controls write to the same `matchers` object used by the existing matcher
+engine. **Advanced matchers** remains available for labels, annotations, route
+fields and custom combinations. Common filters, advanced matchers and a selected
+matcher preset all use AND semantics.
 
 An enabled rule must contain at least one notification channel. A disabled rule
 may be saved without channels.
