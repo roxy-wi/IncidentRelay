@@ -28,6 +28,7 @@ from app.modules.db.query_filters import (
     normalize_filter_values,
 )
 from app.modules.common import utc_now
+from app.services.metrics import record_alert_group_action
 
 
 MAX_ALERTS_PAGE_SIZE = 100
@@ -500,7 +501,11 @@ def create_alert_group(**kwargs):
 
     group_key = kwargs.get("group_key") or ""
     kwargs["group_key_hash"] = hash_group_key(group_key)
-    return AlertGroup.create(**kwargs)
+    group = AlertGroup.create(**kwargs)
+    # Single hook point for group creation, whatever path created the
+    # group: integration intake, manual creation, scheduler-side intakes.
+    record_alert_group_action("created")
+    return group
 
 
 def list_alerts_for_group(group_id):
@@ -654,6 +659,7 @@ def acknowledge_alert_group(group_id, user_id=None):
     group.acknowledged_by = user_id
     group.acknowledged_at = utc_now()
     group.save()
+    record_alert_group_action("acknowledged")
     return group
 
 
@@ -681,7 +687,7 @@ def resolve_alert_group(group_id, user_id=None):
     group.resolved_count = Alert.select().where(Alert.group == group.id).count()
     group.updated_at = now
     group.save()
-
+    record_alert_group_action("resolved")
     return group
 
 

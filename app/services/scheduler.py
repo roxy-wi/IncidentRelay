@@ -1,4 +1,6 @@
 import logging
+import os
+import socket
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.schedulers.base import SchedulerAlreadyRunningError, SchedulerNotRunningError
@@ -10,6 +12,8 @@ from app.services.alerts.maintenance_state import process_maintenance_lifecycle
 from app.services.alerts.shelving import process_due_shelves
 from app.services.alerts.reminders import send_unacked_reminders
 from app.services.db_lock import acquire_db_lock, release_db_lock
+from app.modules.db.locks_repo import touch_lock
+from app.services.metrics import SCHEDULER_HEARTBEAT_LOCK_NAME
 from app.services.notifications.shift_notifications import (
     send_due_oncall_shift_email_notifications,
     send_due_oncall_shift_mattermost_notifications,
@@ -475,6 +479,30 @@ def retention_cleanup_job():
             db.close()
 
 
+def scheduler_heartbeat_job():
+    """
+    Refresh the scheduler heartbeat lock.
+
+    The heartbeat is a lock row that is never released: only its
+    timestamps move. /metrics reads it to report how recently the
+    scheduler ran, so this job deliberately takes no job lock — with a
+    misconfigured second scheduler the freshest writer simply wins.
+    """
+    if db.is_closed():
+        db.connect(reuse_if_open=True)
+
+    try:
+        touch_lock(
+            SCHEDULER_HEARTBEAT_LOCK_NAME,
+            owner=f"scheduler:{os.getpid()}@{socket.gethostname()}",
+            ttl_seconds=int(getattr(Config, "SCHEDULER_LOCK_TTL_SECONDS", 120)),
+        )
+        return {"heartbeat": 1}
+    except Exception:
+        logger.exception("scheduler heartbeat job failed")
+        return {"heartbeat": 0}
+
+
 def silence_lifecycle_job():
     """Apply scheduled Silences and reactivate alerts after Silence expiry."""
     if db.is_closed():
@@ -798,6 +826,17 @@ def start_scheduler():
         coalesce=True,
         next_run_time=utc_now(),
         id="shelve_lifecycle_job",
+        replace_existing=True,
+    )
+
+    _scheduler.add_job(
+        scheduler_heartbeat_job,
+        "interval",
+        seconds=int(getattr(Config, "SCHEDULER_HEARTBEAT_INTERVAL_SECONDS", 30)),
+        max_instances=1,
+        coalesce=True,
+        next_run_time=utc_now(),
+        id="scheduler_heartbeat_job",
         replace_existing=True,
     )
 

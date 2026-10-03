@@ -18,3 +18,4 @@ cryptography>=41.0.5,<49
 pywebpush>=2.0.0
 defusedxml>=0.7.1
 slack-sdk==3.43.0
+prometheus-client==0.23.1

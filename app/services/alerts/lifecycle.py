@@ -29,6 +29,7 @@ from app.services.alerts.priority import (
 )
 from app.services.incidents.priority_policies.resolver import resolve_incident_priority
 from app.services.alerts.result import AlertProcessingResult
+from app.services.metrics import record_alert_group_action
 from app.services.orchestration.runtime import (
     attach_runtime_executions,
     run_event_orchestration,
@@ -1052,6 +1053,8 @@ def _upsert_alert(alert_data, trace, runtime=None):
                         event_type="reopened",
                         message="New alert requires reopening acknowledged incident",
                     )
+
+                    record_alert_group_action("reopened")
             else:
                 trace.group_reused(group)
 

@@ -38,15 +38,15 @@ def test_healthz_returns_200_even_when_database_is_unreachable(client):
     Liveness must NOT depend on the database. A DB outage should not cause
     Kubernetes to restart the pod, since restarting would not help.
     """
+    # /healthz never touches the database itself. Patching init_database on
+    # the shared readiness probe guarantees that if a future refactor moved
+    # a DB call into the liveness path, this test would catch it.
     with patch(
-        "app.views.health_view.init_database",
+        "app.services.readiness.init_database",
         side_effect=RuntimeError("simulated DB outage"),
     ):
         response = client.get("/healthz")
 
-    # /healthz never even calls init_database, but the patch above guarantees
-    # that if a future refactor accidentally introduced a DB call, this test
-    # would catch it.
     assert response.status_code == 200
     assert response.get_json() == {"status": "ok"}
 
@@ -115,12 +115,11 @@ def test_readyz_returns_503_when_pending_migrations_exist(client):
     # Pretend there's a new migration file on disk that hasn't been applied.
     fake_new_file = "29990101000000_simulated_pending_migration.py"
 
-    real_files = None
-    from app.views import health_view
-    real_files = health_view.get_migration_files()
+    from app.services import readiness
+    real_files = readiness.get_migration_files()
 
     with patch(
-        "app.views.health_view.get_migration_files",
+        "app.services.readiness.get_migration_files",
         return_value=list(real_files) + [fake_new_file],
     ):
         response = client.get("/readyz")
@@ -142,7 +141,7 @@ def test_readyz_returns_503_when_migration_check_raises(client):
     crashing the request handler.
     """
     with patch(
-        "app.views.health_view.get_migration_files",
+        "app.services.readiness.get_migration_files",
         side_effect=OSError("disk gone"),
     ):
         response = client.get("/readyz")
@@ -155,6 +154,56 @@ def test_readyz_returns_503_when_migration_check_raises(client):
     assert "error" in body["migrations"]
     assert body["migrations"]["error"] == "migration check failed"
     assert "disk gone" not in response.get_data(as_text=True)
+
+
+def test_probe_keeps_connection_open_between_checks():
+    """
+    Regression guard: the probe runs SELECT 1 and the migration check on
+    one open connection and closes it afterwards. Closing it in between
+    makes the migration check depend on Peewee autoconnect silently
+    reopening the connection — and fail outright when autoconnect is
+    unavailable, turning a healthy database into a 503.
+    """
+    from app.services.readiness import run_readiness_probe
+
+    class _ConnectionTrackingDatabase:
+        def __init__(self):
+            self._closed = True
+            self.close_calls = 0
+
+        def is_closed(self):
+            return self._closed
+
+        def connect(self, reuse_if_open=False):
+            self._closed = False
+
+        def execute_sql(self, query):
+            pass
+
+        def close(self):
+            self.close_calls += 1
+            self._closed = True
+
+    database = _ConnectionTrackingDatabase()
+
+    def applied_migrations():
+        assert not database.is_closed(), "migration check ran on a closed connection"
+        return []
+
+    with patch(
+        "app.services.readiness.init_database", lambda: database
+    ), patch(
+        "app.services.readiness.get_applied_migrations", applied_migrations
+    ), patch(
+        "app.services.readiness.get_migration_files", lambda: []
+    ):
+        probe = run_readiness_probe()
+
+    assert probe.database_error is None
+    assert probe.migration_error is None
+    # The probe opened the connection, so it closes it again — exactly once.
+    assert database.close_calls == 1
+    assert database.is_closed()
 
 
 # ---------------------------------------------------------------------------

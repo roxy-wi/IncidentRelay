@@ -298,9 +298,64 @@ After changing browser push settings, restart the web service. Restart the sched
 
 Read more: [Browser Push](../usage/browser-push.md).
 
+## Metrics section
+
+IncidentRelay can serve Prometheus metrics at `GET /metrics`:
+
+```ini
+[metrics]
+enabled = true
+auth_token = replace-with-a-random-value
+```
+
+| Option | Description |
+|---|---|
+| `enabled` | Serves `GET /metrics` in the Prometheus text exposition format. The default is `false` and the endpoint answers 404 |
+| `auth_token` | When set, scrapes must send `Authorization: Bearer <token>` or receive 401 |
+
+The endpoint is disabled by default. Enable it only when something actually scrapes it, and protect the port at the network layer the same way you protect `/healthz`.
+
+Generate a value for `auth_token` with `openssl rand -hex 32`. Example Prometheus scrape configuration:
+
+```yaml
+scrape_configs:
+  - job_name: web
+    scheme: https
+    metrics_path: /metrics
+    bearer_token_file: /etc/prometheus/incidentrelay.token
+    static_configs:
+      - targets:
+          - incidentrelay.example.com
+```
+
+Exported metrics:
+
+| Metric | Type | Description |
+|---|---|---|
+| `incidentrelay_http_requests` | counter | Handled HTTP requests, labels `method` and `status` |
+| `incidentrelay_http_request_duration_seconds` | histogram | Request latency, label `method` |
+| `incidentrelay_database_up` | gauge | 1 when the database answered `SELECT 1` at scrape time, otherwise 0 |
+| `incidentrelay_migrations_pending` | gauge | Number of migration files not applied yet |
+| `incidentrelay_build_info` | gauge | Running version, label `version`, value is always 1 |
+| `incidentrelay_alerts_received` | counter | Alerts received through the integration API, label `source` |
+| `incidentrelay_alert_group_actions` | counter | Alert group transitions, label `action`: `created`, `acknowledged`, `resolved`, `reopened` |
+| `incidentrelay_user_notification_deliveries` | gauge | Recorded per-user notification deliveries, labels `method` and `status` |
+| `incidentrelay_notification_targets_failing` | gauge | Notification channels whose last delivery ended in an error, label `provider` |
+| `incidentrelay_scheduler_last_run_timestamp_seconds` | gauge | Unix time of the last scheduler heartbeat, `0` when it never ran |
+
+`incidentrelay_database_up` and `incidentrelay_migrations_pending` are evaluated at scrape time and repeat the `/readyz` checks. `/metrics` keeps answering while the database is down, so both values stay visible during an outage. While the database is down, `incidentrelay_migrations_pending` is reported as `0`, which then means unknown rather than none — counting pending migrations needs a database connection. Alert on `incidentrelay_database_up = 0` instead of the pending count alone.
+
+Request counting is active only while `enabled = true`. After changing metrics settings, restart the web service. Only the web service serves `/metrics`; the scheduler and the other workers do not.
+
+The business counters count events handled by the web service itself: integration intake, manual creation, UI and chat actions. Events handled by the scheduler process (overdue heartbeats, orchestration intake, queued notification delivery) are not visible in the web `/metrics` — exposing them would require a metrics endpoint in the scheduler process too.
+
+`incidentrelay_user_notification_deliveries`, `incidentrelay_notification_targets_failing` and `incidentrelay_scheduler_last_run_timestamp_seconds` are recomputed from the database at scrape time, so they work across processes. During a database outage the first two are absent from the exposition and the heartbeat reads `0`; `incidentrelay_database_up = 0` explains why. The heartbeat gauge requires a running scheduler worker.
+
 ## Scheduler settings
 
 The scheduler process checks reminders, escalations and periodic jobs.
+
+The scheduler refreshes a heartbeat every `heartbeat_interval_seconds` (default `30`, `[scheduler]` section); `incidentrelay_scheduler_last_run_timestamp_seconds` in `/metrics` reports how recently it ran.
 
 The scheduler wake-up interval is separate from rotation reminder intervals. Rotation reminder intervals are configured per rotation:
 

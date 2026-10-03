@@ -157,6 +157,9 @@ class Config:
         "auth", "login_account_block_seconds", 300
     )
 
+    METRICS_ENABLED = settings.get_bool("metrics", "enabled", False)
+    METRICS_AUTH_TOKEN = settings.get("metrics", "auth_token", "") or ""
+
     SECRET_ENCRYPTION_KEY = settings.get("main", "secret_encryption_key", SECRET_KEY) or SECRET_KEY
     SSO_SECRET_ENCRYPTION_KEY = settings.get("sso", "secret_encryption_key", SECRET_ENCRYPTION_KEY) or SECRET_ENCRYPTION_KEY
 
@@ -172,6 +175,9 @@ class Config:
     )
 
     SCHEDULER_LOCK_TTL_SECONDS = settings.get_int("scheduler", "lock_ttl_seconds", 120)
+    SCHEDULER_HEARTBEAT_INTERVAL_SECONDS = settings.get_int(
+        "scheduler", "heartbeat_interval_seconds", 30
+    )
     ORCHESTRATION_PENDING_CHECK_INTERVAL_SECONDS = settings.get_int(
         "orchestration", "pending_check_interval_seconds", 10
     )
