@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import logging
 
-import app.views.health_view as health_view
+import app.services.readiness as readiness
 
 
 class _HealthyDatabase:
@@ -34,7 +34,7 @@ def test_healthz_is_independent_from_database(client, monkeypatch):
     def fail_if_called():
         raise AssertionError("healthz must not initialize the database")
 
-    monkeypatch.setattr(health_view, "init_database", fail_if_called)
+    monkeypatch.setattr(readiness, "init_database", fail_if_called)
 
     response = client.get("/healthz")
 
@@ -47,14 +47,14 @@ def test_readyz_returns_ready_when_database_and_migrations_are_ready(
     monkeypatch,
 ):
     database = _HealthyDatabase()
-    monkeypatch.setattr(health_view, "init_database", lambda: database)
+    monkeypatch.setattr(readiness, "init_database", lambda: database)
     monkeypatch.setattr(
-        health_view,
+        readiness,
         "get_applied_migrations",
         lambda: ["001_initial", "002_alerts"],
     )
     monkeypatch.setattr(
-        health_view,
+        readiness,
         "get_migration_files",
         lambda: ["001_initial.py", "002_alerts.py"],
     )
@@ -75,14 +75,14 @@ def test_readyz_reports_pending_migrations_without_internal_paths(
     monkeypatch,
 ):
     database = _HealthyDatabase()
-    monkeypatch.setattr(health_view, "init_database", lambda: database)
+    monkeypatch.setattr(readiness, "init_database", lambda: database)
     monkeypatch.setattr(
-        health_view,
+        readiness,
         "get_applied_migrations",
         lambda: ["001_initial"],
     )
     monkeypatch.setattr(
-        health_view,
+        readiness,
         "get_migration_files",
         lambda: ["001_initial.py", "002_alerts.py"],
     )
@@ -108,7 +108,7 @@ def test_readyz_does_not_expose_database_exception(
     caplog,
 ):
     monkeypatch.setattr(
-        health_view,
+        readiness,
         "init_database",
         lambda: _BrokenDatabase(),
     )
@@ -142,13 +142,13 @@ def test_readyz_does_not_expose_migration_exception(
     caplog,
 ):
     database = _HealthyDatabase()
-    monkeypatch.setattr(health_view, "init_database", lambda: database)
+    monkeypatch.setattr(readiness, "init_database", lambda: database)
 
     def fail_migration_lookup():
         raise RuntimeError("migration table public.schema_migrations is missing")
 
     monkeypatch.setattr(
-        health_view,
+        readiness,
         "get_applied_migrations",
         fail_migration_lookup,
     )

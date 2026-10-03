@@ -22,11 +22,7 @@ from typing import Any
 
 from flask import Blueprint, jsonify
 
-from app.db import init_database
-from app.modules.db.migrations import (
-    get_applied_migrations,
-    get_migration_files,
-)
+from app.services.readiness import run_readiness_probe
 
 
 logger = logging.getLogger("oncall.health")
@@ -56,59 +52,40 @@ def readyz():
       files on disk (no pending migrations).
 
     Otherwise returns 503 with a structured payload describing what
-    is not ready.
+    is not ready. The shared probe in app/services/readiness.py does
+    the checking and never raises; this view only maps the result to
+    the response payload.
     """
-    db = init_database()
+
     response: dict[str, Any] = {"status": "ready"}
     http_status = 200
-    db_was_closed = db.is_closed()
 
-    try:
-        # Keep the connection open for both checks. Closing it after SELECT 1
-        # and relying on an implicit reconnect in get_applied_migrations()
-        # makes readiness depend on Peewee/backend autoconnect behaviour.
-        try:
-            if db_was_closed:
-                db.connect(reuse_if_open=True)
-            db.execute_sql("SELECT 1")
-            response["database"] = "ok"
-        except Exception:
-            response["status"] = "not_ready"
-            response["database"] = "error"
-            response["database_error"] = "database check failed"
-            logger.warning("readyz database check failed", exc_info=True)
-            return jsonify(response), 503
+    probe = run_readiness_probe()
 
-        # Migration table stores names WITHOUT the .py suffix; on-disk files
-        # carry it. Normalize the disk side so set comparison works (this
-        # matches how migrations.migrate() itself compares them).
-        try:
-            applied = set(get_applied_migrations())
-            on_disk = [
-                filename.replace(".py", "")
-                for filename in get_migration_files()
-            ]
-            pending = [name for name in on_disk if name not in applied]
+    if probe.database_error is not None:
+        response["status"] = "not_ready"
+        response["database"] = "error"
+        response["database_error"] = "database check failed"
+        logger.warning("readyz database check failed", exc_info=probe.database_error)
+        return jsonify(response), 503
 
-            response["migrations"] = {
-                "applied": len(applied),
-                "total": len(on_disk),
-            }
+    response["database"] = "ok"
 
-            if pending:
-                response["status"] = "not_ready"
-                response["migrations"]["pending"] = pending
-                http_status = 503
-        except Exception:
-            response["status"] = "not_ready"
-            response["migrations"] = {"error": "migration check failed"}
-            http_status = 503
-            logger.warning("readyz migration check failed", exc_info=True)
-
+    if probe.migration_error is not None:
+        response["status"] = "not_ready"
+        response["migrations"] = {"error": "migration check failed"}
+        http_status = 503
+        logger.warning("readyz migration check failed", exc_info=probe.migration_error)
         return jsonify(response), http_status
-    finally:
-        if db_was_closed and not db.is_closed():
-            try:
-                db.close()
-            except Exception:
-                pass
+
+    response["migrations"] = {
+        "applied": probe.applied,
+        "total": probe.total,
+    }
+
+    if probe.pending:
+        response["status"] = "not_ready"
+        response["migrations"]["pending"] = probe.pending
+        http_status = 503
+
+    return jsonify(response), http_status

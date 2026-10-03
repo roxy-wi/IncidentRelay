@@ -38,6 +38,11 @@ from app.views.caldav_view import caldav_bp
 from app.views.notification_center_view import notification_center_bp
 from app.views.notification_policies_view import notification_policies_bp
 from app.views.matcher_presets_view import matcher_presets_bp
+from app.views.metrics_view import (
+    METRICS_PATH,
+    metrics_bp,
+    register_http_metrics,
+)
 from app.views.priority_policies_view import priority_policies_bp
 from app.views.matchers_view import matchers_bp
 from app.views.business_services.routes import business_services_bp
@@ -46,6 +51,11 @@ from app.views.orchestrations_view import (
     orchestrations_bp,
     orchestration_webhook_actions_bp,
 )
+
+# Paths served without the implicit per-request database connection.
+# /metrics belongs with the health probes: it must keep serving exactly
+# while the database is down, which is when metrics matter most.
+DB_BYPASS_PATHS = HEALTH_PATHS + (METRICS_PATH,)
 
 
 def create_app(log_role=None):
@@ -61,6 +71,8 @@ def create_app(log_role=None):
     flask_app.register_error_handler(IntegrityError, handle_integrity_error)
     flask_app.register_error_handler(DoesNotExist, handle_not_found_error)
 
+    register_http_metrics(flask_app)
+
     db = init_database()
 
     @flask_app.before_request
@@ -68,14 +80,15 @@ def create_app(log_role=None):
         """
         Open a database connection before each request.
 
-        Health probes (/healthz, /readyz) bypass the implicit DB
-        connect: /healthz must work even when the database is down
-        (otherwise Kubernetes would restart a healthy pod for no
-        reason), and /readyz manages its own connection explicitly so
-        it can return a clean 503 on DB errors.
+        The paths in DB_BYPASS_PATHS skip the implicit DB connect:
+        /healthz must work even when the database is down (otherwise
+        Kubernetes would restart a healthy pod for no reason), /readyz
+        manages its own connection explicitly so it can return a clean
+        503 on DB errors, and /metrics must keep serving metrics while
+        the database is down, which is exactly when they matter most.
         """
 
-        if request.path not in HEALTH_PATHS:
+        if request.path not in DB_BYPASS_PATHS:
             if db.is_closed():
                 db.connect()
 
@@ -104,6 +117,7 @@ def register_blueprints(flask_app):
     flask_app.register_blueprint(pages_bp)
     flask_app.register_blueprint(docs_bp)
     flask_app.register_blueprint(health_bp)
+    flask_app.register_blueprint(metrics_bp)
     flask_app.register_blueprint(version_bp, url_prefix="/api/version")
     flask_app.register_blueprint(auth_bp, url_prefix="/api/auth")
     flask_app.register_blueprint(sso_auth_bp, url_prefix="/api/auth/sso")

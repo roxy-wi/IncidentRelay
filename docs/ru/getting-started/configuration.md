@@ -343,9 +343,64 @@ action_token_ttl_seconds = 900
 
 Подробнее: [Браузерные push-уведомления](../usage/browser-push.md).
 
+## Секция metrics
+
+IncidentRelay может отдавать метрики Prometheus по `GET /metrics`:
+
+```ini
+[metrics]
+enabled = true
+auth_token = replace-with-a-random-value
+```
+
+| Параметр | Описание |
+|---|---|
+| `enabled` | Отдает `GET /metrics` в текстовом формате Prometheus. По умолчанию `false`, endpoint отвечает 404 |
+| `auth_token` | Если задан, запросы должны передавать `Authorization: Bearer <token>`, иначе возвращается 401 |
+
+Endpoint отключен по умолчанию. Включайте его, только когда метрики кто-то собирает, и закрывайте порт на сетевом уровне так же, как для `/healthz`.
+
+Значение для `auth_token` можно получить командой `openssl rand -hex 32`. Пример настройки сбора в Prometheus:
+
+```yaml
+scrape_configs:
+  - job_name: web
+    scheme: https
+    metrics_path: /metrics
+    bearer_token_file: /etc/prometheus/incidentrelay.token
+    static_configs:
+      - targets:
+          - incidentrelay.example.com
+```
+
+Метрики:
+
+| Метрика | Тип | Описание |
+|---|---|---|
+| `incidentrelay_http_requests` | counter | Обработанные HTTP-запросы, метки `method` и `status` |
+| `incidentrelay_http_request_duration_seconds` | histogram | Задержка обработки запросов, метка `method` |
+| `incidentrelay_database_up` | gauge | 1, если база ответила на `SELECT 1` в момент сбора, иначе 0 |
+| `incidentrelay_migrations_pending` | gauge | Число файлов миграций, которые еще не применены |
+| `incidentrelay_build_info` | gauge | Версия запущенного сервиса, метка `version`, значение всегда 1 |
+| `incidentrelay_alerts_received` | counter | Алерты, принятые через integration API, метка `source` |
+| `incidentrelay_alert_group_actions` | counter | Переходы групп алертов, метка `action`: `created`, `acknowledged`, `resolved`, `reopened` |
+| `incidentrelay_user_notification_deliveries` | gauge | Учтенные доставки пользовательских уведомлений, метки `method` и `status` |
+| `incidentrelay_notification_targets_failing` | gauge | Каналы уведомлений, последняя доставка которых завершилась ошибкой, метка `provider` |
+| `incidentrelay_scheduler_last_run_timestamp_seconds` | gauge | Unix-время последнего heartbeat планировщика, `0`, если он еще не запускался |
+
+`incidentrelay_database_up` и `incidentrelay_migrations_pending` вычисляются в момент сбора и повторяют проверки `/readyz`. `/metrics` продолжает отвечать, когда база данных недоступна, поэтому обе метрики остаются видимыми во время сбоя. Пока база недоступна, `incidentrelay_migrations_pending` равен `0` — в этот момент это означает «неизвестно», а не «нет отложенных миграций»: чтобы посчитать их, нужен доступ к базе. Заведите алерт на `incidentrelay_database_up = 0` и не полагайтесь только на число отложенных миграций.
+
+Подсчет запросов активен только при `enabled = true`. После изменения настроек metrics перезапустите веб-сервис. `/metrics` отдает только веб-сервис, планировщик и остальные воркеры его не отдают.
+
+Бизнес-счетчики учитывают события, которые обработал сам веб-сервис: прием из интеграций, ручное создание, действия из интерфейса и чатов. События планировщика (просроченные heartbeat, оркестрация, отложенная доставка уведомлений) в веб-`/metrics` не видны — для них понадобился бы отдельный endpoint в самом планировщике.
+
+`incidentrelay_user_notification_deliveries`, `incidentrelay_notification_targets_failing` и `incidentrelay_scheduler_last_run_timestamp_seconds` пересчитываются из базы в момент сбора, поэтому работают между процессами. Когда база недоступна, первые две метрики исчезают из выдачи, а heartbeat равен `0`; причину показывает `incidentrelay_database_up = 0`. Для heartbeat нужен работающий воркер планировщика.
+
 ## Настройки планировщика
 
 Процесс планировщика проверяет напоминания, эскалации и периодические задания.
+
+Планировщик обновляет heartbeat каждые `heartbeat_interval_seconds` (по умолчанию `30`, секция `[scheduler]`); метрика `incidentrelay_scheduler_last_run_timestamp_seconds` в `/metrics` показывает, как давно он запускался.
 
 Интервал пробуждения планировщика отличается от интервалов напоминаний ротаций. Интервалы напоминаний ротаций настраиваются для каждой ротации отдельно:
 

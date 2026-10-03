@@ -27,6 +27,7 @@ from app.services.alerts.actions import acknowledge_alert, resolve_alert
 from app.services.alerts.shelving import shelve_alert_group, unshelve_alert_group
 from app.services.alerts.lifecycle import upsert_alert
 from app.services.integrations.auth import require_alert_token
+from app.services.metrics import record_alert_received
 from app.services.integrations.normalizers.registry import normalize_for_source
 from app.services.integrations.normalizers.webhook import is_pagerduty_events_v2
 from app.services.validation import make_error_response, validate_body
@@ -690,6 +691,8 @@ def process_incoming_alerts(normalized_alerts):
     intake_route = getattr(request, "current_intake_route", None)
 
     for alert_data in normalized_alerts:
+        record_alert_received(alert_data.get("source"))
+
         if intake_route:
             # The route intake token is the routing boundary.
             # Alerts submitted with this token are forced to this route,
