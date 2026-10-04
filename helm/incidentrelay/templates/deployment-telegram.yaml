@@ -60,6 +60,9 @@ spec:
             - name: INCIDENTRELAY_RUN_MIGRATIONS
               value: "0"
             {{- include "incidentrelay.customCAEnv" . | nindent 12 }}
+            {{- with include "incidentrelay.configFromEnv" . }}
+            {{- . | trim | nindent 12 }}
+            {{- end }}
             - name: PYTHONUNBUFFERED
               value: "1"
             {{- with .Values.telegram.extraEnv }}

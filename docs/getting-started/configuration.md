@@ -32,6 +32,29 @@ environment:
 
 The old `ONCALL_CONFIG_FILE` name should not be used.
 
+## Environment overrides
+
+Any option from the config file can also be set with an environment variable
+named `INCIDENTRELAY__<SECTION>__<OPTION>`, with the section and option in
+upper case. It takes precedence over the file:
+
+```bash
+export INCIDENTRELAY__DATABASE__PASSWORD=replace-with-the-database-password
+export INCIDENTRELAY__LOGGING__LEVEL=DEBUG
+```
+
+To read the value from a file instead, add `__FILE` to the name and pass the
+path. Use this for Docker or Kubernetes secrets and Secrets Store CSI volumes,
+so secrets never have to be written into `incidentrelay.conf`:
+
+```bash
+export INCIDENTRELAY__DATABASE__PASSWORD__FILE=/run/secrets/db-password
+```
+
+A trailing newline in the file is ignored. Setting both a variable and its
+`__FILE` form is an error. For systemd, put the variables into an
+`EnvironmentFile=`.
+
 ## Main and authentication secrets
 
 Generate two different random values and keep them stable across restarts and

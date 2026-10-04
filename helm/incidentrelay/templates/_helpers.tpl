@@ -82,7 +82,10 @@ missing nested map.
 {{- if not .Values.existingConfigSecret -}}
 {{- $config := default (dict) .Values.config -}}
 {{- $main := default (dict) (get $config "main") -}}
-{{- $mainSecret := required "config.main.secret_key is required; set a unique random value or use existingConfigSecret" (get $main "secret_key") -}}
+{{- $mainSecret := default "" (get $main "secret_key") -}}
+{{- if and (not $mainSecret) (not (hasKey (default (dict) .Values.configFrom) "main.secret_key")) -}}
+{{- fail "config.main.secret_key is required; set a unique random value, take it from a Secret with configFrom, or use existingConfigSecret" -}}
+{{- end -}}
 {{- $knownInsecure := list "dev-secret-key" "change-me" "change-this-secret-key" "change-this-jwt-secret" "change-this-mattermost-action-secret" -}}
 {{- if has ($mainSecret | toString | trim) $knownInsecure -}}
 {{- fail "config.main.secret_key uses a known insecure default; set a unique cryptographically random value" -}}
@@ -271,6 +274,50 @@ checksum/custom-ca: {{ $bundle | sha256sum }}
 checksum/custom-ca: {{ printf "%s:%s" $existingConfigMap $key | sha256sum }}
 {{- end -}}
 {{- end -}}
+{{- end }}
+
+{{/*
+Environment variables that set config options from configFrom. The
+application reads INCIDENTRELAY__<SECTION>__<OPTION> (and the __FILE form)
+before incidentrelay.conf. When main.secret_key comes from configFrom, the
+shared security keys left empty in chart-rendered config use the same source,
+so every pod keeps using the same keys instead of generating its own.
+*/}}
+{{- define "incidentrelay.configFromEnv" -}}
+{{- $configFrom := default (dict) .Values.configFrom -}}
+{{- $sources := deepCopy $configFrom -}}
+{{- $mainSecretSource := get $configFrom "main.secret_key" -}}
+{{- if and $mainSecretSource (not .Values.existingConfigSecret) -}}
+{{- $config := default (dict) .Values.config -}}
+{{- range $key := list "main.secret_encryption_key" "auth.jwt_secret" "mattermost.action_secret" "voice.callback_secret" -}}
+{{- $parts := splitn "." 2 $key -}}
+{{- $section := default (dict) (get $config $parts._0) -}}
+{{- if and (not (hasKey $sources $key)) (not (get $section $parts._1)) -}}
+{{- $_ := set $sources $key $mainSecretSource -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- range $key, $source := $sources }}
+{{- if not (regexMatch "^[a-z0-9_]+\\.[a-z0-9_]+$" $key) -}}
+{{- fail (printf "configFrom key %q must look like <section>.<option>, e.g. database.password" $key) -}}
+{{- end -}}
+{{- $parts := splitn "." 2 $key -}}
+{{- $name := printf "INCIDENTRELAY__%s__%s" (upper $parts._0) (upper $parts._1) -}}
+{{- $source = default (dict) $source -}}
+{{- if ne (len (keys $source)) 1 -}}
+{{- fail (printf "configFrom.%s must set exactly one of secretKeyRef, configMapKeyRef or file" $key) -}}
+{{- end -}}
+{{- if hasKey $source "file" }}
+- name: {{ $name }}__FILE
+  value: {{ $source.file | quote }}
+{{- else if or (hasKey $source "secretKeyRef") (hasKey $source "configMapKeyRef") }}
+- name: {{ $name }}
+  valueFrom:
+    {{- toYaml $source | nindent 4 }}
+{{- else -}}
+{{- fail (printf "configFrom.%s must set exactly one of secretKeyRef, configMapKeyRef or file" $key) -}}
+{{- end }}
+{{- end }}
 {{- end }}
 
 {{/*

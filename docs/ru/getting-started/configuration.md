@@ -32,6 +32,29 @@ environment:
 
 Старое имя `ONCALL_CONFIG_FILE` использовать не следует.
 
+## Переопределение через переменные окружения
+
+Любой параметр из файла конфигурации можно также задать переменной окружения
+`INCIDENTRELAY__<SECTION>__<OPTION>`, где секция и параметр записываются в
+верхнем регистре. Переменная имеет приоритет над файлом:
+
+```bash
+export INCIDENTRELAY__DATABASE__PASSWORD=replace-with-the-database-password
+export INCIDENTRELAY__LOGGING__LEVEL=DEBUG
+```
+
+Чтобы прочитать значение из файла, добавьте к имени `__FILE` и укажите путь.
+Так можно использовать секреты Docker и Kubernetes или тома Secrets Store CSI,
+не записывая секреты в `incidentrelay.conf`:
+
+```bash
+export INCIDENTRELAY__DATABASE__PASSWORD__FILE=/run/secrets/db-password
+```
+
+Перевод строки в конце файла игнорируется. Задавать одновременно переменную и
+её форму `__FILE` нельзя — это ошибка. Для systemd поместите переменные в
+`EnvironmentFile=`.
+
 ## Основной секрет и секрет аутентификации
 
 Сгенерируйте два разных случайных значения и не меняйте их при перезапусках и

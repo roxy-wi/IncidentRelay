@@ -46,6 +46,11 @@ with open(lock_path, "a+", encoding="utf-8") as lock_file:
     parser.read(target if os.path.exists(target) else source)
 
     def ensure_secret(section, option):
+        # Keys passed as INCIDENTRELAY__<SECTION>__<OPTION>[__FILE] are read
+        # by the application from the environment; don't generate them.
+        env_name = f"INCIDENTRELAY__{section}__{option}".upper()
+        if env_name in os.environ or env_name + "__FILE" in os.environ:
+            return
         if not parser.has_section(section):
             parser.add_section(section)
         current = parser.get(section, option, fallback="").strip()
