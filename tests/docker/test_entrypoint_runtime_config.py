@@ -42,23 +42,34 @@ def _env(extra_env=None):
     return env
 
 
-def _render_runtime_config(tmp_path, source_body, extra_env=None):
+def _run_entrypoint(tmp_path, source_body, extra_env=None):
+    """
+    Run the runtime config script and return the runtime config and stderr.
+
+    The runtime config in tmp_path/runtime persists between calls, like the
+    copy on the data volume between container starts.
+    """
     source = tmp_path / "incidentrelay.conf"
     source.write_text(source_body, encoding="utf-8")
     target = tmp_path / "runtime" / "incidentrelay.conf"
 
-    subprocess.run(
+    result = subprocess.run(
         [sys.executable, "-", str(source), str(target)],
         input=_runtime_config_script(),
         text=True,
         env=_env(extra_env),
+        capture_output=True,
         check=True,
     )
 
     parser = configparser.ConfigParser()
     parser.optionxform = str
     parser.read(target)
-    return parser
+    return parser, result.stderr
+
+
+def _render_runtime_config(tmp_path, source_body, extra_env=None):
+    return _run_entrypoint(tmp_path, source_body, extra_env)[0]
 
 
 def _effective_keys(config_path, extra_env):
@@ -154,3 +165,70 @@ def test_secret_key_from_env_gives_every_pod_the_same_shared_keys(tmp_path):
 
     assert effective_keys[0] == effective_keys[1]
     assert set(effective_keys[0].values()) == {secret_key}
+
+
+def test_config_changes_apply_on_the_next_start(tmp_path):
+    secret = "[main]\nsecret_key = configured-secret-key-0123456789abcdef\n"
+    _render_runtime_config(tmp_path, secret + "[logging]\nlevel = INFO\n[database]\npassword = old\n")
+
+    parser = _render_runtime_config(
+        tmp_path, secret + "[logging]\nlevel = DEBUG\n[database]\npassword = new\n"
+    )
+
+    assert parser.get("logging", "level") == "DEBUG"
+    assert parser.get("database", "password") == "new"
+
+
+def test_generated_keys_are_kept_across_starts(tmp_path):
+    first = _render_runtime_config(tmp_path, "[logging]\nlevel = INFO\n")
+    second = _render_runtime_config(tmp_path, "[logging]\nlevel = DEBUG\n")
+
+    for section, option in SHARED_SECRETS:
+        assert second.get(section, option) == first.get(section, option), f"{section}.{option} changed"
+    assert second.get("logging", "level") == "DEBUG"
+
+
+def test_copy_from_the_previous_version_keeps_its_keys_but_not_its_settings(tmp_path):
+    # Earlier versions read the copy instead of the mounted config, so a copy
+    # on an existing volume can hold stale settings next to generated keys.
+    runtime = tmp_path / "runtime"
+    runtime.mkdir()
+    (runtime / "incidentrelay.conf").write_text(
+        "[main]\n"
+        "secret_key = stored-secret-key-0123456789abcdef\n"
+        "secret_encryption_key = stored-encryption-key-0123456789abcdef\n"
+        "[logging]\n"
+        "level = INFO\n",
+        encoding="utf-8",
+    )
+
+    parser = _render_runtime_config(tmp_path, "[logging]\nlevel = DEBUG\n")
+
+    assert parser.get("logging", "level") == "DEBUG"
+    assert parser.get("main", "secret_key") == "stored-secret-key-0123456789abcdef"
+    assert parser.get("main", "secret_encryption_key") == "stored-encryption-key-0123456789abcdef"
+
+
+def test_keys_stored_before_secret_key_moved_to_env_are_kept(tmp_path):
+    first = _render_runtime_config(tmp_path, "[main]\ntimezone = UTC\n")
+
+    parser = _render_runtime_config(
+        tmp_path,
+        "[main]\ntimezone = UTC\n",
+        extra_env={"INCIDENTRELAY__MAIN__SECRET_KEY": "from-env"},
+    )
+
+    for section, option in SHARED_SECRETS[1:]:
+        assert parser.get(section, option) == first.get(section, option), f"{section}.{option} changed"
+
+
+def test_changed_encryption_key_keeps_the_stored_one(tmp_path):
+    base = "[main]\nsecret_key = configured-secret-key-0123456789abcdef\n"
+    _render_runtime_config(tmp_path, base + "secret_encryption_key = old-encryption-key-0123456789abcdef\n")
+
+    parser, stderr = _run_entrypoint(
+        tmp_path, base + "secret_encryption_key = new-encryption-key-0123456789abcdef\n"
+    )
+
+    assert parser.get("main", "secret_encryption_key") == "old-encryption-key-0123456789abcdef"
+    assert "main.secret_encryption_key differs" in stderr

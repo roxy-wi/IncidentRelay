@@ -17,6 +17,8 @@ fi
 # The stock image config intentionally contains no reusable authentication
 # secrets. Create one persistent runtime config on the shared data volume so
 # web/scheduler/notifier processes all use the same random keys across restarts.
+# The runtime config is rebuilt from the mounted config on every start, so
+# config changes take effect; only the generated keys are kept from it.
 if [ "$CONFIG_FILE" = "/etc/incidentrelay/incidentrelay.conf" ]; then
   RUNTIME_CONFIG="/var/lib/incidentrelay/incidentrelay.conf"
   python - "$CONFIG_FILE" "$RUNTIME_CONFIG" <<'PY_CONFIG'
@@ -43,7 +45,11 @@ with open(lock_path, "a+", encoding="utf-8") as lock_file:
     fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
     parser = configparser.ConfigParser()
     parser.optionxform = str
-    parser.read(target if os.path.exists(target) else source)
+    parser.read(source)
+    stored = configparser.ConfigParser()
+    stored.optionxform = str
+    if os.path.exists(target):
+        stored.read(target)
 
     def from_env(section, option):
         # Keys passed as INCIDENTRELAY__<SECTION>__<OPTION>[__FILE] are read
@@ -61,7 +67,11 @@ with open(lock_path, "a+", encoding="utf-8") as lock_file:
         current = parser.get(section, option, fallback="").strip()
         if current not in known_insecure:
             return
-        if inherits_secret_key and secret_key_from_env:
+        previous = stored.get(section, option, fallback="").strip()
+        if previous not in known_insecure:
+            # Keep the key this installation has been using.
+            parser.set(section, option, previous)
+        elif inherits_secret_key and secret_key_from_env:
             # Leave it empty: the application falls back to main.secret_key,
             # so every pod uses the same key instead of generating its own.
             parser.set(section, option, "")
@@ -73,6 +83,22 @@ with open(lock_path, "a+", encoding="utf-8") as lock_file:
     ensure_secret("auth", "jwt_secret")
     ensure_secret("mattermost", "action_secret")
     ensure_secret("voice", "callback_secret")
+
+    # Stored secrets are encrypted with this key; a new one would make them
+    # unreadable, so keep the key this installation has been using.
+    stored_key = stored.get("main", "secret_encryption_key", fallback="").strip()
+    if (
+        not from_env("main", "secret_encryption_key")
+        and stored_key not in known_insecure
+        and parser.get("main", "secret_encryption_key") != stored_key
+    ):
+        print(
+            "WARNING: main.secret_encryption_key differs from the key this installation "
+            f"has been using; keeping the stored key from {target} so encrypted data "
+            "stays readable.",
+            file=sys.stderr,
+        )
+        parser.set("main", "secret_encryption_key", stored_key)
 
     fd, temp_path = tempfile.mkstemp(
         prefix="incidentrelay-conf-",
