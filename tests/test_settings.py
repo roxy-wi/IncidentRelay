@@ -167,12 +167,13 @@ def test_env_override_reports_unreadable_file(tmp_path):
         settings.get("database", "password")
 
 
-def test_get_section_merges_env_overrides(tmp_path):
+def test_get_section_overrides_options_from_the_file_and_keeps_their_spelling(tmp_path):
     config_path = write_config(
         tmp_path / "incidentrelay.conf",
         """
 [voice_provider]
 apiKey = from-config
+token = from-config
 region = eu
 """,
     )
@@ -189,16 +190,48 @@ region = eu
 
     assert settings.get_section("voice_provider") == {
         "apiKey": "from-env",
-        "region": "eu",
         "token": "from-file",
+        "region": "eu",
     }
 
 
-def test_get_section_does_not_mix_sections_with_a_common_prefix(tmp_path):
+def test_get_section_does_not_add_options_that_are_not_in_the_file(tmp_path):
+    config_path = write_config(
+        tmp_path / "incidentrelay.conf",
+        """
+[voice_provider]
+region = eu
+""",
+    )
+
     settings = Settings(
-        str(tmp_path / "missing.conf"),
+        str(config_path),
+        environ={
+            "INCIDENTRELAY__VOICE_PROVIDER__APIKEY": "from-env",
+            "INCIDENTRELAY__STUB_PROVIDER__TOKEN": "from-env",
+        },
+    )
+
+    assert settings.get_section("voice_provider") == {"region": "eu"}
+    assert settings.get_section("stub_provider", {"fallback": "yes"}) == {"fallback": "yes"}
+
+
+def test_get_section_does_not_mix_sections_with_a_common_prefix(tmp_path):
+    config_path = write_config(
+        tmp_path / "incidentrelay.conf",
+        """
+[voice]
+token = voice-from-config
+
+[voice_provider]
+token = provider-from-config
+""",
+    )
+
+    settings = Settings(
+        str(config_path),
         environ={"INCIDENTRELAY__VOICE_PROVIDER__TOKEN": "from-env"},
     )
 
-    assert settings.get_section("voice", {"fallback": "yes"}) == {"fallback": "yes"}
+    assert settings.get_section("voice") == {"token": "voice-from-config"}
     assert settings.get_section("voice_provider") == {"token": "from-env"}

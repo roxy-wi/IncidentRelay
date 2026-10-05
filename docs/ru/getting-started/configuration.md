@@ -59,10 +59,22 @@ export INCIDENTRELAY__DATABASE__PASSWORD__FILE=/run/secrets/db-password
 `main.secret_encryption_key`, `auth.jwt_secret`, `mattermost.action_secret` и
 `voice.callback_secret` берут его значение, а не генерируются Docker entrypoint.
 
-Параметр, который задан только в переменной окружения, добавляется в нижнем
-регистре. Чтобы сохранить имя в смешанном регистре, например в
-`[voice_provider]`, оставьте параметр в файле: переменная переопределит его
-значение и сохранит написание имени.
+В `[voice_provider]`, где набор параметров зависит от провайдера, переменная
+только переопределяет параметр, который есть в файле, и имя параметра
+сохраняет написание из файла. Новых параметров переменные туда не добавляют:
+
+```ini
+[voice_provider]
+apiKey =
+```
+
+```bash
+export INCIDENTRELAY__VOICE_PROVIDER__APIKEY=replace-with-the-api-key
+```
+
+Параметры провайдера также могут ссылаться на переменную напрямую, например
+`api_token = ${VOICE_API_TOKEN}`, см.
+[Настройка голосового провайдера](../voice-providers/configuration.md).
 
 ## Основной секрет и секрет аутентификации
 

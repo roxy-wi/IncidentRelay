@@ -107,39 +107,27 @@ class Settings:
 
     def get_section(self, section, default=None):
         """Return all options from a config section as a dictionary."""
-        has_section = self.parser.has_section(section)
-        values = dict(self.parser.items(section)) if has_section else {}
-        overrides = self._env_section_overrides(section, values)
-
-        if not has_section and not overrides:
+        if not self.parser.has_section(section):
             return default or {}
 
-        values.update(overrides)
+        values = dict(self.parser.items(section))
+        values.update(self._env_section_overrides(section, values))
         return values
 
     def _env_section_overrides(self, section, values):
         """
-        Return environment overrides for every option of a section.
+        Return environment overrides for the options of a section.
 
-        Options already present in the config file keep their spelling;
-        options that only come from the environment are lower-cased.
+        Like Grafana's GF_* variables, the environment only overrides options
+        that are present in the config file and never adds new ones, so every
+        option keeps the spelling it has in the file.
         """
-        prefix = env_override_name(section, "")
-        options = set()
-
-        for name in self.environ:
-            if not name.startswith(prefix):
-                continue
-            option = name[len(prefix):]
-            if option.endswith(ENV_OVERRIDE_FILE_SUFFIX):
-                option = option[: -len(ENV_OVERRIDE_FILE_SUFFIX)]
-            if option:
-                options.add(option)
-
         overrides = {}
-        for option in options:
-            key = next((existing for existing in values if existing.upper() == option), option.lower())
-            overrides[key] = self._env_override(prefix + option)
+
+        for option in values:
+            override = self._env_override(env_override_name(section, option))
+            if override is not None:
+                overrides[option] = override
 
         return overrides
 
