@@ -95,6 +95,14 @@ fi
 echo "Using config: $CONFIG_FILE"
 echo "Starting IncidentRelay service: $SERVICE"
 
+# Multiprocess Prometheus metrics. Every service container of the stack
+# mounts the same data volume, so the default below puts all counter
+# files in one shared directory and the web workers merge every process's
+# counters (web workers, scheduler, Telegram/Slack) for GET /metrics.
+# Override PROMETHEUS_MULTIPROC_DIR to point it somewhere else.
+export PROMETHEUS_MULTIPROC_DIR="${PROMETHEUS_MULTIPROC_DIR:-/var/lib/incidentrelay/metrics}"
+mkdir -p "$PROMETHEUS_MULTIPROC_DIR"
+
 if [ "${INCIDENTRELAY_RUN_MIGRATIONS:-0}" = "1" ]; then
   echo "Running database migrations..."
   python app/migrate.py migrate

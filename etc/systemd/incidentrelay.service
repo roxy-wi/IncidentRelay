@@ -11,6 +11,12 @@ Group=incidentrelay
 WorkingDirectory=/var/www/incidentrelay
 
 Environment=INCIDENTRELAY_CONFIG_FILE=/etc/incidentrelay/incidentrelay.conf
+# Shared directory for multiprocess Prometheus metrics: the web workers
+# and the scheduler/Telegram/Slack services below all write their counter
+# files here, and GET /metrics merges them into one scrape.
+Environment=PROMETHEUS_MULTIPROC_DIR=/run/incidentrelay/metrics
+RuntimeDirectory=incidentrelay
+RuntimeDirectoryMode=0755
 
 ExecStart=/usr/local/bin/gunicorn \
     --workers 4 \

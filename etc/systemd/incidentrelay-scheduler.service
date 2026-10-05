@@ -14,6 +14,11 @@ WorkingDirectory=/var/www/incidentrelay
 Environment=INCIDENTRELAY_CONFIG_FILE=/etc/incidentrelay/incidentrelay.conf
 Environment=INCIDENTRELAY_SERVICE=scheduler
 Environment=PYTHONUNBUFFERED=1
+# Shared with the web service so scheduler-side lifecycle events are
+# visible in GET /metrics (see incidentrelay.service).
+Environment=PROMETHEUS_MULTIPROC_DIR=/run/incidentrelay/metrics
+RuntimeDirectory=incidentrelay
+RuntimeDirectoryMode=0755
 
 ExecStart=/usr/bin/python3 -m app.scheduler_worker
 

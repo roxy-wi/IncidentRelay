@@ -20,12 +20,14 @@ Scraping is optionally protected by a bearer token:
   oracle and a non-ASCII header cannot crash it.
 
 The collectors live in app/services/metrics.py so services can record
-business events without importing a view module. The database,
-migration, notification and heartbeat gauges are evaluated at scrape
-time. The database checks share the readiness probe with /readyz
-(app/services/readiness.py) and never raise, so the exposition keeps
-working while the database is down, which is exactly when the gauges
-matter most.
+business events without importing a view module; render_exposition()
+there assembles the response. All database-derived gauges are evaluated
+at scrape time and never raise, so the exposition keeps working while
+the database is down, which is exactly when the gauges matter most.
+In multiprocess deployments (PROMETHEUS_MULTIPROC_DIR set) the same
+function merges the counter files of every IncidentRelay process, so
+the web workers and the scheduler/Telegram/Slack daemons are all
+covered by this one endpoint.
 """
 
 import hmac
@@ -34,17 +36,13 @@ import time
 from typing import Union
 
 from flask import Blueprint, Response, abort, g, jsonify, request
-from prometheus_client import CONTENT_TYPE_LATEST, generate_latest
+from prometheus_client import CONTENT_TYPE_LATEST
 
 from app.services.metrics import (
-    DATABASE_UP,
     HTTP_REQUESTS_TOTAL,
     HTTP_REQUEST_DURATION_SECONDS,
-    MIGRATIONS_PENDING,
-    REGISTRY,
-    refresh_notification_gauges,
+    render_exposition,
 )
-from app.services.readiness import run_readiness_probe
 from app.settings import Config
 
 
@@ -87,42 +85,6 @@ def _authorized():
     )
 
 
-def _update_database_gauges():
-    """
-    Refresh database_up and migrations_pending at scrape time.
-
-    Maps the shared readiness probe result onto the gauges. Every
-    failure path only degrades the gauges and logs a warning; the
-    exposition itself never fails.
-    """
-
-    probe = run_readiness_probe()
-
-    if probe.database_error is not None:
-        DATABASE_UP.set(0)
-        MIGRATIONS_PENDING.set(0)
-        logger.warning(
-            "metrics database check failed",
-            exc_info=probe.database_error,
-        )
-        return
-
-    DATABASE_UP.set(1)
-
-    if probe.migration_error is not None:
-        # The database answers but the migration state is unknown.
-        # Report no pending migrations: /readyz is the authoritative
-        # readiness signal.
-        MIGRATIONS_PENDING.set(0)
-        logger.warning(
-            "metrics migration check failed",
-            exc_info=probe.migration_error,
-        )
-        return
-
-    MIGRATIONS_PENDING.set(len(probe.pending))
-
-
 @metrics_bp.route(METRICS_PATH, methods=["GET"])
 def metrics() -> Union[Response, tuple]:
     """
@@ -135,11 +97,8 @@ def metrics() -> Union[Response, tuple]:
     if not _authorized():
         return jsonify({"error": "Valid bearer token is required"}), 401
 
-    _update_database_gauges()
-    refresh_notification_gauges()
-
     return Response(
-        generate_latest(REGISTRY),
+        render_exposition(),
         headers={"Content-Type": CONTENT_TYPE_LATEST},
     )
 
