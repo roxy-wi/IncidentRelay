@@ -142,7 +142,7 @@ configFrom:
     file: /mnt/secrets-store/smtp-password
 ```
 
-The chart passes them to every component as `INCIDENTRELAY__<SECTION>__<OPTION>` environment variables, which take precedence over `incidentrelay.conf` (see [Environment overrides](configuration.md#environment-overrides)). When `main.secret_key` comes from `configFrom`, it no longer has to be set in `config`, and the shared keys left empty there (`main.secret_encryption_key`, `auth.jwt_secret`, `mattermost.action_secret`, `voice.callback_secret`) use the same Secret.
+The chart passes them to every component as `INCIDENTRELAY__<SECTION>__<OPTION>` environment variables, which take precedence over `incidentrelay.conf` (see [Environment overrides](configuration.md#environment-overrides)). When `main.secret_key` comes from `configFrom`, it no longer has to be set in `config`, and the shared keys left empty (`main.secret_encryption_key`, `auth.jwt_secret`, `mattermost.action_secret`, `voice.callback_secret`) fall back to it, with `existingConfigSecret` too, so every pod uses the same keys.
 
 `file` works with any volume mounted into the pods, for example the [Secrets Store CSI Driver](https://secrets-store-csi-driver.sigs.k8s.io/) with a `SecretProviderClass` for AWS Systems Manager Parameter Store, Secrets Manager or Vault:
 

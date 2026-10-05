@@ -152,8 +152,8 @@ existingConfigSecret: ""
 # secretKeyRef, configMapKeyRef or file (a path inside the pod, e.g. on a
 # Secrets Store CSI volume added with extraVolumes/extraVolumeMounts).
 # When main.secret_key comes from here, the shared security keys left empty
-# in `config` (main.secret_encryption_key, auth.jwt_secret,
-# mattermost.action_secret, voice.callback_secret) use the same source.
+# (main.secret_encryption_key, auth.jwt_secret, mattermost.action_secret,
+# voice.callback_secret) fall back to it, also with existingConfigSecret.
 configFrom: {}
 #  main.secret_key:
 #    secretKeyRef:

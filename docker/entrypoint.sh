@@ -45,19 +45,30 @@ with open(lock_path, "a+", encoding="utf-8") as lock_file:
     parser.optionxform = str
     parser.read(target if os.path.exists(target) else source)
 
-    def ensure_secret(section, option):
+    def from_env(section, option):
         # Keys passed as INCIDENTRELAY__<SECTION>__<OPTION>[__FILE] are read
-        # by the application from the environment; don't generate them.
+        # by the application from the environment.
         env_name = f"INCIDENTRELAY__{section}__{option}".upper()
-        if env_name in os.environ or env_name + "__FILE" in os.environ:
+        return env_name in os.environ or env_name + "__FILE" in os.environ
+
+    secret_key_from_env = from_env("main", "secret_key")
+
+    def ensure_secret(section, option, inherits_secret_key=True):
+        if from_env(section, option):
             return
         if not parser.has_section(section):
             parser.add_section(section)
         current = parser.get(section, option, fallback="").strip()
-        if current in known_insecure:
+        if current not in known_insecure:
+            return
+        if inherits_secret_key and secret_key_from_env:
+            # Leave it empty: the application falls back to main.secret_key,
+            # so every pod uses the same key instead of generating its own.
+            parser.set(section, option, "")
+        else:
             parser.set(section, option, secrets.token_urlsafe(48))
 
-    ensure_secret("main", "secret_key")
+    ensure_secret("main", "secret_key", inherits_secret_key=False)
     ensure_secret("main", "secret_encryption_key")
     ensure_secret("auth", "jwt_secret")
     ensure_secret("mattermost", "action_secret")

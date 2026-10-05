@@ -96,7 +96,7 @@ def test_config_from_renders_secret_configmap_and_file_sources(tmp_path):
 
 
 @requires_helm
-def test_secret_key_from_config_from_is_shared_by_empty_security_keys(tmp_path):
+def test_secret_key_from_config_from_is_not_required_in_config(tmp_path):
     result = _helm_template(
         tmp_path,
         """\
@@ -113,20 +113,18 @@ def test_secret_key_from_config_from_is_shared_by_empty_security_keys(tmp_path):
 
     assert result.returncode == 0, result.stderr
     rendered = result.stdout
-    for name in (
-        "INCIDENTRELAY__MAIN__SECRET_KEY",
-        "INCIDENTRELAY__MAIN__SECRET_ENCRYPTION_KEY",
-        "INCIDENTRELAY__MATTERMOST__ACTION_SECRET",
-        "INCIDENTRELAY__VOICE__CALLBACK_SECRET",
-    ):
-        assert rendered.count(_secret_env(name, "incidentrelay-secrets", "secret-key")) == 4, name
-    # A key set explicitly in `config` keeps its own value.
-    assert "INCIDENTRELAY__AUTH__JWT_SECRET" not in rendered
+    assert rendered.count(
+        _secret_env("INCIDENTRELAY__MAIN__SECRET_KEY", "incidentrelay-secrets", "secret-key")
+    ) == 4
+    # Empty shared keys are left to the application's fallback to main.secret_key
+    # (see tests/docker), so the chart only passes the options from configFrom.
+    assert rendered.count("- name: INCIDENTRELAY__") == 4
+    assert "secret_encryption_key = \n" in rendered
     assert "jwt_secret = separate-jwt-secret-for-helm-rendering" in rendered
 
 
 @requires_helm
-def test_existing_config_secret_does_not_get_shared_security_keys(tmp_path):
+def test_config_from_with_existing_config_secret_renders_only_the_given_options(tmp_path):
     result = _helm_template(
         tmp_path,
         """\
@@ -141,7 +139,7 @@ def test_existing_config_secret_does_not_get_shared_security_keys(tmp_path):
 
     assert result.returncode == 0, result.stderr
     assert result.stdout.count("- name: INCIDENTRELAY__MAIN__SECRET_KEY\n") == 4
-    assert "INCIDENTRELAY__AUTH__JWT_SECRET" not in result.stdout
+    assert result.stdout.count("- name: INCIDENTRELAY__") == 4
 
 
 @requires_helm

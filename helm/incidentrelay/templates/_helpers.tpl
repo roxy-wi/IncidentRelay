@@ -279,25 +279,12 @@ checksum/custom-ca: {{ printf "%s:%s" $existingConfigMap $key | sha256sum }}
 {{/*
 Environment variables that set config options from configFrom. The
 application reads INCIDENTRELAY__<SECTION>__<OPTION> (and the __FILE form)
-before incidentrelay.conf. When main.secret_key comes from configFrom, the
-shared security keys left empty in chart-rendered config use the same source,
-so every pod keeps using the same keys instead of generating its own.
+before incidentrelay.conf. When main.secret_key comes from here, the
+entrypoint leaves empty shared security keys empty and the application falls
+back to main.secret_key, so every pod uses the same keys.
 */}}
 {{- define "incidentrelay.configFromEnv" -}}
-{{- $configFrom := default (dict) .Values.configFrom -}}
-{{- $sources := deepCopy $configFrom -}}
-{{- $mainSecretSource := get $configFrom "main.secret_key" -}}
-{{- if and $mainSecretSource (not .Values.existingConfigSecret) -}}
-{{- $config := default (dict) .Values.config -}}
-{{- range $key := list "main.secret_encryption_key" "auth.jwt_secret" "mattermost.action_secret" "voice.callback_secret" -}}
-{{- $parts := splitn "." 2 $key -}}
-{{- $section := default (dict) (get $config $parts._0) -}}
-{{- if and (not (hasKey $sources $key)) (not (get $section $parts._1)) -}}
-{{- $_ := set $sources $key $mainSecretSource -}}
-{{- end -}}
-{{- end -}}
-{{- end -}}
-{{- range $key, $source := $sources }}
+{{- range $key, $source := default (dict) .Values.configFrom }}
 {{- if not (regexMatch "^[a-z0-9_]+\\.[a-z0-9_]+$" $key) -}}
 {{- fail (printf "configFrom key %q must look like <section>.<option>, e.g. database.password" $key) -}}
 {{- end -}}

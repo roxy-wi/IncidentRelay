@@ -142,7 +142,7 @@ configFrom:
     file: /mnt/secrets-store/smtp-password
 ```
 
-Чарт передаёт их всем компонентам как переменные окружения `INCIDENTRELAY__<SECTION>__<OPTION>`, которые имеют приоритет над `incidentrelay.conf` (см. [Переопределение через переменные окружения](configuration.md#переопределение-через-переменные-окружения)). Если `main.secret_key` задан через `configFrom`, указывать его в `config` больше не нужно, а общие ключи, оставленные там пустыми (`main.secret_encryption_key`, `auth.jwt_secret`, `mattermost.action_secret`, `voice.callback_secret`), берутся из того же Secret.
+Чарт передаёт их всем компонентам как переменные окружения `INCIDENTRELAY__<SECTION>__<OPTION>`, которые имеют приоритет над `incidentrelay.conf` (см. [Переопределение через переменные окружения](configuration.md#переопределение-через-переменные-окружения)). Если `main.secret_key` задан через `configFrom`, указывать его в `config` больше не нужно, а пустые общие ключи (`main.secret_encryption_key`, `auth.jwt_secret`, `mattermost.action_secret`, `voice.callback_secret`) берут его значение — в том числе с `existingConfigSecret`, — поэтому во всех pod'ах ключи одинаковые.
 
 `file` работает с любым томом, смонтированным в pod'ы, например с [Secrets Store CSI Driver](https://secrets-store-csi-driver.sigs.k8s.io/) и `SecretProviderClass` для AWS Systems Manager Parameter Store, Secrets Manager или Vault:
 
