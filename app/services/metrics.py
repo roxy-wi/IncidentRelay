@@ -1,55 +1,3 @@
-"""
-Prometheus metric collectors for IncidentRelay.
-
-Owns the collectors the /metrics endpoint serves (app/views/metrics_view.py)
-and render_exposition(), the function that turns them into the text
-exposition. The module is a leaf on purpose: the view imports it for the
-exposition, and services (alert intake, the alert-group repo layer, the
-scheduler) import it to record business events — so nothing here may
-import views or other services.
-
-IncidentRelay runs several processes against one scrape target: the
-Gunicorn web workers (four in the shipped systemd unit) plus the
-scheduler and the Telegram/Slack workers as separate daemons. Two
-mechanisms keep the exposition correct for that model:
-
-- Counters and histograms are recorded by every process into one
-  shared directory when PROMETHEUS_MULTIPROC_DIR is set (the
-  prometheus_client multiprocess mode). render_exposition() merges all
-  process files at scrape time, so a scrape always covers every event
-  every process handled. The files are PID-keyed, so the directory is
-  only shared by processes that see the same PIDs: the systemd units
-  share the per-host /run/incidentrelay/metrics, while each container
-  (docker entrypoint) gets its own per-service directory.
-  Without the variable everything falls back to one in-process
-  registry, which is correct for single-process development runs.
-  Files of processes that exited keep contributing their last values
-  until the next IncidentRelay process starts and removes them, so
-  counters only ever reset on a restart of a contributing process —
-  which Prometheus rate() handles natively.
-
-- The database-derived gauges (database and migration state, recent
-  notification deliveries and errors, scheduler heartbeat, build info)
-  are never stored per process. DatabaseGaugeCollector computes them at
-  scrape time from the shared database, exactly once per scrape, and
-  they never appear more than once in the exposition regardless of the
-  process count. The delivery gauges count only RECENT_WINDOW (24h), so
-  a scrape never aggregates the full delivery history. Like the
-  readiness probe (app/services/readiness.py) the collector manages its
-  own connection and never raises: on a database outage the delivery
-  gauges are absent, database_up reads 0 and the heartbeat reads 0, with
-  a warning in the logs. The migrations_pending gauge is reported only
-  while the migration state can actually be read; while it is unknown
-  the sample is absent instead of reading as a healthy 0.
-
-Files of processes that died (a Gunicorn worker killed on timeout, a
-crashed daemon) would keep being merged forever, so render_exposition()
-removes files whose recorded PID is no longer alive before collecting.
-A removed file takes its process's counter share with it: Prometheus
-treats that as a counter reset, which rate() handles natively, and it
-is strictly better than counting a process that no longer exists.
-"""
-
 import fcntl
 import logging
 import os
@@ -82,12 +30,6 @@ from app.version import get_service_version
 
 logger = logging.getLogger("incidentrelay.metrics")
 
-# A dedicated registry (instead of the global prometheus_client.REGISTRY)
-# keeps the exposition limited to IncidentRelay's own metrics: the global
-# one also exposes process collectors whose metric set differs between
-# platforms and duplicates what runtime exporters already publish. The
-# registry and the collectors are module-level singletons so repeated
-# create_app() calls (tests, workers) cannot register them twice.
 REGISTRY = CollectorRegistry()
 
 HTTP_REQUESTS_TOTAL = Counter(
@@ -154,34 +96,12 @@ _MULTIPROC_DIR = multiprocess_dir()
 
 
 class DatabaseGaugeCollector(Collector):
-    """
-    Compute the database-derived gauges at scrape time.
-
-    None of these values may live in a process registry: in multiprocess
-    mode every process would report its own copy and the exposition would
-    repeat or mis-aggregate them. Computing them here, once per scrape,
-    keeps one authoritative value and keeps working while the database
-    is down — which is when the gauges matter most.
-    """
-
     def collect(self):
         yield from self._database_gauges()
         yield from self._notification_gauges()
         yield self._build_info_gauge()
 
     def _database_gauges(self):
-        """
-        Report database_up and migrations_pending from the readiness probe.
-
-        migrations_pending is only reported while its value is actually
-        known; when the database is down or the migration state is
-        unreadable the sample is absent rather than reading 0 ("none"),
-        and database_up carries the outage signal instead.
-
-        Every failure path only degrades the gauges and logs a warning;
-        the exposition itself never fails.
-        """
-
         database_up = GaugeMetricFamily(
             "incidentrelay_database_up",
             "1 when the database answered SELECT 1 at scrape time, else 0.",
@@ -217,15 +137,6 @@ class DatabaseGaugeCollector(Collector):
         yield migrations_pending
 
     def _notification_gauges(self):
-        """
-        Report recent deliveries, errored deliveries and the heartbeat.
-
-        The delivery gauges count only rows inside RECENT_WINDOW. Opens
-        its own connection and never raises: on failure the delivery
-        gauges are absent, the heartbeat reads 0 and the reason is
-        logged, so a scrape during a database outage still succeeds.
-        """
-
         deliveries = GaugeMetricFamily(
             "incidentrelay_user_notification_deliveries_recent",
             "User notification deliveries recorded in the last 24 hours, "
@@ -257,7 +168,7 @@ class DatabaseGaugeCollector(Collector):
             # delivery history of a long-lived installation.
             recent_since = utc_now() - RECENT_WINDOW
 
-            rows = (
+            delivery_rows = list(
                 UserNotificationDelivery
                 .select(
                     UserNotificationDelivery.method,
@@ -272,13 +183,7 @@ class DatabaseGaugeCollector(Collector):
                 .tuples()
             )
 
-            for method, status, total in rows:
-                deliveries.add_metric(
-                    (method, status),
-                    total,
-                )
-
-            rows = (
+            error_rows = list(
                 AlertNotification
                 .select(
                     AlertNotification.provider,
@@ -292,15 +197,11 @@ class DatabaseGaugeCollector(Collector):
                 .tuples()
             )
 
-            for provider, total in rows:
-                errors.add_metric((provider,), total)
-
-            heartbeat.add_metric(
-                [],
-                self._scheduler_heartbeat_value(),
-            )
+            heartbeat_value = self._scheduler_heartbeat_value()
         except Exception as exc:
-            heartbeat.add_metric([], 0)
+            delivery_rows = []
+            error_rows = []
+            heartbeat_value = 0
             logger.warning(
                 "metrics notification gauge refresh failed",
                 exc_info=exc,
@@ -311,6 +212,17 @@ class DatabaseGaugeCollector(Collector):
                     db.close()
                 except Exception:
                     pass
+
+        for method, status, total in delivery_rows:
+            deliveries.add_metric(
+                (method, status),
+                total,
+            )
+
+        for provider, total in error_rows:
+            errors.add_metric((provider,), total)
+
+        heartbeat.add_metric([], heartbeat_value)
 
         yield deliveries
         yield errors
@@ -347,10 +259,6 @@ class DatabaseGaugeCollector(Collector):
 
 DATABASE_GAUGES = DatabaseGaugeCollector()
 
-# Single-process mode renders straight from REGISTRY, so the database
-# gauges join the counters there. In multiprocess mode render_exposition()
-# registers the collector on a fresh per-scrape registry instead; either
-# way the gauges are computed exactly once per scrape.
 if not is_multiprocess_enabled():
     REGISTRY.register(DATABASE_GAUGES)
 
@@ -359,10 +267,6 @@ if not is_multiprocess_enabled():
 # else in the directory (lock files, foreign files) must not be touched.
 _MULTIPROC_FILE_RE = re.compile(r"^[a-z]+(?:_[a-z]+)?_(\d+)\.db$")
 
-# Serializes dead-file cleanup against the collection step across
-# processes: cleanup removes files, and MultiProcessCollector would raise
-# if a file vanished between its glob and its read. Best effort — if the
-# filesystem refuses locks, scraping still works, races are just possible.
 _COLLECT_LOCK_NAME = ".incidentrelay-metrics.lock"
 
 
@@ -375,10 +279,16 @@ def _file_lock(path, exclusive):
         return
 
     try:
-        fcntl.flock(
-            handle.fileno(),
-            fcntl.LOCK_EX if exclusive else fcntl.LOCK_SH,
-        )
+        try:
+            fcntl.flock(
+                handle.fileno(),
+                fcntl.LOCK_EX if exclusive else fcntl.LOCK_SH,
+            )
+        except OSError:
+            # Locks are best effort: work without one if the
+            # filesystem refuses them.
+            pass
+
         yield
     finally:
         try:
@@ -404,14 +314,6 @@ def _pid_alive(pid):
 
 
 def _cleanup_dead_process_files(path):
-    """Remove multiprocess files whose PID is no longer alive.
-
-    Runs at process startup (see _init_multiprocess_directory), not at
-    scrape time: until then, files of exited processes keep contributing
-    their last values, which keeps counters monotonic across worker
-    churn while bounding the directory growth across restarts.
-    """
-
     try:
         filenames = os.listdir(path)
     except OSError:
@@ -436,21 +338,7 @@ def _cleanup_dead_process_files(path):
 
 
 def _init_multiprocess_directory():
-    """
-    Create the multiprocess directory and drop files of dead processes.
-
-    Runs once at import, from every process that contributes to or
-    serves the exposition. prometheus_client opens its per-process
-    files lazily but requires the directory to exist; creating it here
-    fails the process at startup with a clear error instead of turning
-    every later scrape or recorded event into a 500 — a configured
-    directory that cannot be created is a broken deployment, and
-    silently continuing would mean serving the wrong (process-local)
-    metrics. The cleanup holds the lock exclusively so it cannot race
-    a scrape that is currently reading the files it removes.
-    """
-
-    if _MULTIPROC_DIR is None:
+    if _MULTIPROC_DIR is None or not Config.METRICS_ENABLED:
         return
 
     try:
@@ -473,17 +361,6 @@ _init_multiprocess_directory()
 
 
 def render_exposition():
-    """
-    Return the Prometheus text exposition for the current process model.
-
-    Multiprocess mode merges the files of every contributing process —
-    web workers and the scheduler/Telegram/Slack daemons alike — and
-    adds the database gauges. Single-process mode renders REGISTRY,
-    which already carries the counters and the database gauges. The
-    shared lock keeps a concurrent process startup from removing a file
-    between the collector's glob and its read.
-    """
-
     if not is_multiprocess_enabled():
         return generate_latest(REGISTRY)
 

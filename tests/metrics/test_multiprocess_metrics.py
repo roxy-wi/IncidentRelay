@@ -1,36 +1,22 @@
-"""
-Cross-process aggregation tests for the multiprocess metrics mode.
-
-prometheus_client chooses its value class from the environment at first
-import, so a pytest process that already imported the collectors cannot
-exercise the multiprocess path by flipping environment variables. These
-tests therefore drive real subprocesses: recorder children record events
-with PROMETHEUS_MULTIPROC_DIR set (they stand in for the scheduler and
-the Telegram/Slack daemons and for sibling Gunicorn workers), a renderer
-child produces the exposition through render_exposition(), and the
-pytest process parses and asserts on the output — the same split as a
-real deployment, where one web worker scrapes while every process
-records. Recorders stay alive while the scrape runs, mirroring the
-long-lived daemons of a real deployment; the exit-cleanup test covers
-the short-lived case separately.
-"""
-
 import base64
+import fcntl
 import os
 import subprocess
 import sys
 import textwrap
+import types
 from contextlib import contextmanager
 
 from prometheus_client.mmap_dict import MmapedDict
-from prometheus_client.parser import text_string_to_metric_families
+
+from tests.metrics.exposition import parse_exposition, sample_value
 
 ROOT_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 
-_ENABLE_CONFIG = """
-    from app.settings import Config
-    Config.METRICS_ENABLED = True
-"""
+# Children cannot set Config.METRICS_ENABLED in the snippet: importing
+# anything from the app package already imports the metrics module and
+# runs its init. They get a config file instead, like a real deployment.
+_TEST_CONFIG = os.path.join(ROOT_DIR, "tests", "incidentrelay.test.conf")
 
 _RECORD_ALERTS = """
     from app.services.metrics import record_alert_received
@@ -70,20 +56,34 @@ _BREAK_DATABASE = """
 """
 
 
+def _write_child_config(directory, enabled=True):
+    """Write a child config: the test config plus a [metrics] section."""
+
+    config = os.path.join(directory, "incidentrelay-child.conf")
+    content = open(_TEST_CONFIG).read()
+    content += f"\n[metrics]\nenabled = {'true' if enabled else 'false'}\n"
+    with open(config, "w") as handle:
+        handle.write(content)
+
+    return config
+
+
 def _snippet(body):
     """Wrap a snippet with the imports every child needs."""
 
     return (
         "import sys\n"
         f"sys.path.insert(0, {ROOT_DIR!r})\n"
-        f"{textwrap.dedent(_ENABLE_CONFIG).strip()}\n"
         f"{textwrap.dedent(body).strip()}\n"
     )
 
 
-def _child_environment(multiproc_dir):
+def _child_environment(multiproc_dir, config_file):
     environment = os.environ.copy()
     environment["PROMETHEUS_MULTIPROC_DIR"] = str(multiproc_dir)
+    environment["INCIDENTRELAY_CONFIG_FILE"] = str(config_file)
+    # The legacy typo name must not shadow the child config.
+    environment.pop("INCEDENTRELAY_CONFIG_FILE", None)
     environment["PYTHONPATH"] = os.pathsep.join(
         [ROOT_DIR, environment.get("PYTHONPATH", "")],
     )
@@ -91,12 +91,12 @@ def _child_environment(multiproc_dir):
     return environment
 
 
-def _run_child(code, multiproc_dir):
+def _run_child(code, multiproc_dir, config_file):
     """Run one child process with the multiprocess directory configured."""
 
     return subprocess.run(
         [sys.executable, "-c", code],
-        env=_child_environment(multiproc_dir),
+        env=_child_environment(multiproc_dir, config_file),
         check=True,
         capture_output=True,
         text=True,
@@ -105,7 +105,7 @@ def _run_child(code, multiproc_dir):
 
 
 @contextmanager
-def _live_recorder(code, multiproc_dir):
+def _live_recorder(code, multiproc_dir, config_file):
     """
     Run a recorder child that stays alive until the block ends.
 
@@ -116,7 +116,7 @@ def _live_recorder(code, multiproc_dir):
 
     process = subprocess.Popen(
         [sys.executable, "-c", code],
-        env=_child_environment(multiproc_dir),
+        env=_child_environment(multiproc_dir, config_file),
         stdin=subprocess.PIPE,
         stdout=subprocess.PIPE,
         stderr=subprocess.PIPE,
@@ -139,6 +139,7 @@ def _record_alerts(multiproc_dir, count=1, source="grafana"):
     return _live_recorder(
         _snippet(_RECORD_ALERTS.format(count=count, source=source)),
         multiproc_dir,
+        _write_child_config(multiproc_dir),
     )
 
 
@@ -146,6 +147,7 @@ def _record_action(multiproc_dir, action="resolved"):
     return _live_recorder(
         _snippet(_RECORD_ACTION.format(action=action)),
         multiproc_dir,
+        _write_child_config(multiproc_dir),
     )
 
 
@@ -155,37 +157,10 @@ def _render(multiproc_dir, setup=""):
     result = _run_child(
         _snippet(setup + _RENDER),
         multiproc_dir,
+        _write_child_config(multiproc_dir),
     )
 
     return base64.b64decode(result.stdout)
-
-
-def _parse(body):
-    """Parse an exposition into a name -> family mapping."""
-
-    families = {}
-
-    for family in text_string_to_metric_families(body.decode()):
-        families[family.name] = family
-
-    return families
-
-
-def _sample_value(families, name, labels):
-    """Latest value of one sample across all families (None when absent).
-
-    Lookup goes by sample name: the text parser names counter families
-    without the ``_total`` suffix the samples carry.
-    """
-
-    value = None
-
-    for family in families.values():
-        for sample in family.samples:
-            if sample.name == name and sample.labels == labels:
-                value = sample.value
-
-    return value
 
 
 def _assert_no_pid_labels(families):
@@ -204,10 +179,10 @@ def test_counters_from_other_processes_are_aggregated(tmp_path):
         count=2,
         source="pagertree",
     ):
-        families = _parse(_render(tmp_path))
+        families = parse_exposition(_render(tmp_path))
 
     assert (
-        _sample_value(
+        sample_value(
             families,
             "incidentrelay_alerts_received_total",
             {"source": "grafana"},
@@ -215,7 +190,7 @@ def test_counters_from_other_processes_are_aggregated(tmp_path):
         == 3.0
     )
     assert (
-        _sample_value(
+        sample_value(
             families,
             "incidentrelay_alerts_received_total",
             {"source": "pagertree"},
@@ -233,10 +208,10 @@ def test_worker_daemon_actions_are_visible_in_web_scrape(tmp_path):
     """
 
     with _record_action(tmp_path, action="resolved"):
-        families = _parse(_render(tmp_path))
+        families = parse_exposition(_render(tmp_path))
 
     assert (
-        _sample_value(
+        sample_value(
             families,
             "incidentrelay_alert_group_actions_total",
             {"action": "resolved"},
@@ -249,19 +224,19 @@ def test_scrape_reflects_events_recorded_between_scrapes(tmp_path):
     """Two scrapes must behave like Prometheus scraping twice: grow."""
 
     with _record_alerts(tmp_path, count=2) as first_recorder:
-        first = _parse(_render(tmp_path))
+        first = parse_exposition(_render(tmp_path))
 
         with _record_alerts(tmp_path, count=2):
-            second = _parse(_render(tmp_path))
+            second = parse_exposition(_render(tmp_path))
 
     del first_recorder
 
-    first_value = _sample_value(
+    first_value = sample_value(
         first,
         "incidentrelay_alerts_received_total",
         {"source": "grafana"},
     )
-    second_value = _sample_value(
+    second_value = sample_value(
         second,
         "incidentrelay_alerts_received_total",
         {"source": "grafana"},
@@ -279,12 +254,12 @@ def test_database_gauges_render_exactly_once(tmp_path):
     """
 
     with _record_alerts(tmp_path, count=1), _record_alerts(tmp_path, count=1):
-        families = _parse(_render(tmp_path))
+        families = parse_exposition(_render(tmp_path))
 
     assert len(families["incidentrelay_database_up"].samples) == 1
     assert len(families["incidentrelay_build_info"].samples) == 1
     assert len(families["incidentrelay_scheduler_last_run_timestamp_seconds"].samples) == 1
-    assert _sample_value(families, "incidentrelay_database_up", {}) == 1.0
+    assert sample_value(families, "incidentrelay_database_up", {}) == 1.0
     _assert_no_pid_labels(families)
 
 
@@ -295,11 +270,11 @@ def test_database_outage_degrades_gauges_in_multiprocess_mode(tmp_path):
     """
 
     with _record_alerts(tmp_path, count=1):
-        families = _parse(_render(tmp_path, setup=_BREAK_DATABASE))
+        families = parse_exposition(_render(tmp_path, setup=_BREAK_DATABASE))
 
-    assert _sample_value(families, "incidentrelay_database_up", {}) == 0.0
+    assert sample_value(families, "incidentrelay_database_up", {}) == 0.0
     assert (
-        _sample_value(
+        sample_value(
             families,
             "incidentrelay_scheduler_last_run_timestamp_seconds",
             {},
@@ -315,7 +290,7 @@ def test_database_outage_degrades_gauges_in_multiprocess_mode(tmp_path):
         family = families.get(absent_name)
         assert family is None or not family.samples, absent_name
     assert (
-        _sample_value(
+        sample_value(
             families,
             "incidentrelay_alerts_received_total",
             {"source": "grafana"},
@@ -337,6 +312,7 @@ def test_dead_process_files_are_removed_at_next_process_start(tmp_path):
     _run_child(
         _snippet(_RECORD_ALERTS_AND_EXIT.format(source="grafana")),
         tmp_path,
+        _write_child_config(tmp_path),
     )
 
     dead_files = [
@@ -376,9 +352,9 @@ def test_metrics_view_serves_multiprocess_exposition(client, monkeypatch, tmp_pa
     assert response.status_code == 200
     assert response.content_type == CONTENT_TYPE_LATEST
 
-    families = _parse(response.get_data())
+    families = parse_exposition(response.get_data())
 
-    assert _sample_value(families, "incidentrelay_database_up", {}) == 1.0
+    assert sample_value(families, "incidentrelay_database_up", {}) == 1.0
     _assert_no_pid_labels(families)
 
 
@@ -392,3 +368,80 @@ def test_metrics_view_stays_disabled_with_multiproc_dir(client, monkeypatch, tmp
 
     assert client.get("/metrics").status_code == 404
     assert client.post("/metrics").status_code == 404
+
+
+def _init_snippet():
+    """Child that imports the collectors and reports success."""
+
+    return (
+        "import sys\n"
+        f"sys.path.insert(0, {ROOT_DIR!r})\n"
+        "import app.services.metrics\n"
+        "print('INIT-OK', flush=True)\n"
+    )
+
+
+def test_unusable_multiproc_dir_only_fails_when_metrics_enabled(tmp_path):
+    """
+    A broken multiproc directory must not block startup while metrics
+    are disabled. With metrics enabled it is a deployment error and the
+    process refuses to start.
+    """
+
+    blocker = tmp_path / "metrics"
+    blocker.write_text("occupies the multiproc directory path")
+
+    disabled_config = _write_child_config(tmp_path, enabled=False)
+    disabled = subprocess.run(
+        [sys.executable, "-c", _init_snippet()],
+        env=_child_environment(blocker, disabled_config),
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    assert disabled.returncode == 0, disabled.stderr
+    assert "INIT-OK" in disabled.stdout
+
+    enabled_config = _write_child_config(tmp_path, enabled=True)
+    enabled = subprocess.run(
+        [sys.executable, "-c", _init_snippet()],
+        env=_child_environment(blocker, enabled_config),
+        capture_output=True,
+        text=True,
+        timeout=120,
+    )
+    assert enabled.returncode != 0
+    assert "not usable" in enabled.stderr
+
+
+def test_scrape_survives_filesystem_without_flock_support(client, monkeypatch, tmp_path):
+    """
+    The shared lock is best effort: if the filesystem refuses flock,
+    scraping must still work, not fail on every request.
+    """
+
+    import app.services.metrics as business_metrics_module
+    from app.settings import Config
+
+    monkeypatch.setenv("PROMETHEUS_MULTIPROC_DIR", str(tmp_path))
+    monkeypatch.setattr(Config, "METRICS_ENABLED", True)
+
+    lockless_fcntl = types.SimpleNamespace(
+        LOCK_EX=fcntl.LOCK_EX,
+        LOCK_SH=fcntl.LOCK_SH,
+        flock=lambda fileno, mode: (_ for _ in ()).throw(
+            OSError("filesystem refuses locks"),
+        ),
+    )
+    monkeypatch.setattr(
+        business_metrics_module,
+        "fcntl",
+        lockless_fcntl,
+    )
+
+    response = client.get("/metrics")
+
+    assert response.status_code == 200
+
+    families = parse_exposition(response.get_data())
+    assert sample_value(families, "incidentrelay_database_up", {}) == 1.0

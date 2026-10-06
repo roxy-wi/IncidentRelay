@@ -31,7 +31,6 @@ covered by this one endpoint.
 """
 
 import hmac
-import logging
 import time
 from typing import Union
 
@@ -45,8 +44,6 @@ from app.services.metrics import (
 )
 from app.settings import Config
 
-
-logger = logging.getLogger("incidentrelay.metrics")
 
 metrics_bp = Blueprint("metrics", __name__)
 
@@ -115,18 +112,25 @@ def metrics_wrong_method() -> Union[Response, tuple]:
     """
     Keep non-GET methods consistent with the disabled endpoint.
 
-    The GET rule 404s from inside the view when metrics are disabled and
-    disables Flask's automatic OPTIONS response for the path; Flask
-    answers 405 (or an automatic OPTIONS 200) during URL matching —
-    before any view code runs — which would reveal that /metrics exists.
-    This rule keeps every non-GET method answering 404 while disabled;
-    when enabled, it keeps the regular 405.
+    Flask answers 405 or automatic OPTIONS during URL matching, before
+    any view code runs, which would reveal that /metrics exists. This
+    rule keeps every non-GET method answering 404 while disabled and
+    405 when enabled. The 405 body is built here instead of raised, so
+    the app-wide JSON error handler cannot drop the Allow header.
     """
 
     if not Config.METRICS_ENABLED:
         abort(404)
 
-    abort(405)
+    return (
+        jsonify({
+            "error": "Method Not Allowed",
+            "message": "The method is not allowed for the requested URL.",
+            "status": 405,
+        }),
+        405,
+        {"Allow": "GET"},
+    )
 
 
 def register_http_metrics(flask_app) -> None:

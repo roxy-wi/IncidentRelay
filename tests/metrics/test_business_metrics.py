@@ -1,9 +1,7 @@
 from datetime import timedelta, timezone
-from unittest.mock import patch
-
-from prometheus_client.parser import text_string_to_metric_families
 
 import app.services.metrics as business_metrics
+import app.services.readiness as readiness
 from app.modules.common import utc_now
 from app.modules.db import alerts_repo
 from app.modules.db.locks_repo import touch_lock
@@ -25,24 +23,13 @@ from tests.factories import (
     create_team,
     create_user,
 )
+from tests.metrics.exposition import sample_value
 
 
 def _enable(monkeypatch, token=""):
     """Enable the metrics endpoint for one test."""
     monkeypatch.setattr(Config, "METRICS_ENABLED", True)
     monkeypatch.setattr(Config, "METRICS_AUTH_TOKEN", token)
-
-
-def _sample_value(body, name, labels):
-    """Latest value of one sample of a metric family (None when absent)."""
-    value = None
-
-    for family in text_string_to_metric_families(body):
-        for sample in family.samples:
-            if sample.name == name and sample.labels == labels:
-                value = sample.value
-
-    return value
 
 
 def _scrape(client):
@@ -330,13 +317,13 @@ def test_user_notification_deliveries_recent_gauge(client, monkeypatch):
 
     metric = "incidentrelay_user_notification_deliveries_recent"
 
-    assert _sample_value(body, metric, {"method": "email", "status": "sent"}) == 2.0
-    assert _sample_value(body, metric, {"method": "email", "status": "failed"}) == 1.0
-    assert _sample_value(
+    assert sample_value(body, metric, {"method": "email", "status": "sent"}) == 2.0
+    assert sample_value(body, metric, {"method": "email", "status": "failed"}) == 1.0
+    assert sample_value(
         body, metric, {"method": "telegram", "status": "pending"},
     ) == 1.0
     # No deliveries for other methods — no sample at all.
-    assert _sample_value(body, metric, {"method": "email", "status": "pending"}) is None
+    assert sample_value(body, metric, {"method": "email", "status": "pending"}) is None
 
 
 def test_alert_notification_errors_recent_gauge(client, monkeypatch):
@@ -370,31 +357,47 @@ def test_alert_notification_errors_recent_gauge(client, monkeypatch):
     metric = "incidentrelay_alert_notification_errors_recent"
 
     # Only in-window errored deliveries are counted.
-    assert _sample_value(body, metric, {"provider": "telegram"}) == 1.0
+    assert sample_value(body, metric, {"provider": "telegram"}) == 1.0
     # A channel without a recorded error is not counted.
-    assert _sample_value(body, metric, {"provider": "slack"}) is None
+    assert sample_value(body, metric, {"provider": "slack"}) is None
 
 
 def test_business_gauges_degrade_when_database_unreachable(client, monkeypatch):
     """
-    A broken database must not fail the scrape: the database-derived
-    gauges disappear (no samples) and the heartbeat reads 0.
+    A broken database must not fail the scrape: database_up reads 0,
+    the delivery gauges have no samples and the heartbeat reads 0.
+    Both init_database entry points are patched, the readiness probe's
+    and the notification gauges'.
     """
     _enable(monkeypatch)
 
     def broken_init():
         raise RuntimeError("connection refused")
 
-    with patch.object(business_metrics, "init_database", broken_init):
-        _, body = _scrape(client)
+    monkeypatch.setattr(business_metrics, "init_database", broken_init)
+    monkeypatch.setattr(readiness, "init_database", broken_init)
 
-    metric = "incidentrelay_user_notification_deliveries"
-    assert _sample_value(body, metric, {"method": "email", "status": "sent"}) is None
+    _, body = _scrape(client)
 
-    metric = "incidentrelay_notification_targets_failing"
-    assert _sample_value(body, metric, {"provider": "telegram"}) is None
+    assert sample_value(
+        body,
+        "incidentrelay_database_up",
+        {},
+    ) == 0.0
 
-    assert _sample_value(
+    for name, labels in (
+        (
+            "incidentrelay_user_notification_deliveries_recent",
+            {"method": "email", "status": "sent"},
+        ),
+        (
+            "incidentrelay_alert_notification_errors_recent",
+            {"provider": "telegram"},
+        ),
+    ):
+        assert sample_value(body, name, labels) is None, name
+
+    assert sample_value(
         body,
         "incidentrelay_scheduler_last_run_timestamp_seconds",
         {},
@@ -411,7 +414,7 @@ def test_scheduler_heartbeat_gauge_absent_then_present(client, monkeypatch):
     _enable(monkeypatch)
 
     _, body = _scrape(client)
-    assert _sample_value(
+    assert sample_value(
         body,
         "incidentrelay_scheduler_last_run_timestamp_seconds",
         {},
@@ -426,7 +429,7 @@ def test_scheduler_heartbeat_gauge_absent_then_present(client, monkeypatch):
     )
 
     _, body = _scrape(client)
-    value = _sample_value(
+    value = sample_value(
         body,
         "incidentrelay_scheduler_last_run_timestamp_seconds",
         {},
