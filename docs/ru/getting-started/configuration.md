@@ -377,28 +377,30 @@ scrape_configs:
 
 | Метрика | Тип | Описание |
 |---|---|---|
-| `incidentrelay_http_requests` | counter | Обработанные HTTP-запросы, метки `method` и `status` |
+| `incidentrelay_http_requests_total` | counter | Обработанные HTTP-запросы, метки `method` и `status` |
 | `incidentrelay_http_request_duration_seconds` | histogram | Задержка обработки запросов, метка `method` |
 | `incidentrelay_database_up` | gauge | 1, если база ответила на `SELECT 1` в момент сбора, иначе 0 |
-| `incidentrelay_migrations_pending` | gauge | Число файлов миграций, которые еще не применены |
+| `incidentrelay_migrations_pending` | gauge | Число файлов миграций, которые еще не применены; отсутствует, пока состояние миграций неизвестно |
 | `incidentrelay_build_info` | gauge | Версия запущенного сервиса, метка `version`, значение всегда 1 |
-| `incidentrelay_alerts_received` | counter | Алерты, принятые через integration API, метка `source` |
-| `incidentrelay_alert_group_actions` | counter | Переходы групп алертов, метка `action`: `created`, `acknowledged`, `resolved`, `reopened` |
-| `incidentrelay_user_notification_deliveries` | gauge | Учтенные доставки пользовательских уведомлений, метки `method` и `status` |
-| `incidentrelay_notification_targets_failing` | gauge | Каналы уведомлений, последняя доставка которых завершилась ошибкой, метка `provider` |
+| `incidentrelay_alerts_received_total` | counter | Алерты, принятые через integration API, метка `source` |
+| `incidentrelay_alert_group_actions_total` | counter | Переходы групп алертов, метка `action`: `created`, `acknowledged`, `resolved`, `reopened` |
+| `incidentrelay_user_notification_deliveries_recent` | gauge | Доставки пользовательских уведомлений за последние 24 часа, метки `method` и `status` |
+| `incidentrelay_alert_notification_errors_recent` | gauge | Доставки уведомлений алертов, завершившиеся ошибкой, за последние 24 часа, метка `provider` |
 | `incidentrelay_scheduler_last_run_timestamp_seconds` | gauge | Unix-время последнего heartbeat планировщика, `0`, если он еще не запускался |
 
-`incidentrelay_database_up` и `incidentrelay_migrations_pending` вычисляются в момент сбора и повторяют проверки `/readyz`. `/metrics` продолжает отвечать, когда база данных недоступна, поэтому обе метрики остаются видимыми во время сбоя. Пока база недоступна, `incidentrelay_migrations_pending` равен `0` — в этот момент это означает «неизвестно», а не «нет отложенных миграций»: чтобы посчитать их, нужен доступ к базе. Заведите алерт на `incidentrelay_database_up = 0` и не полагайтесь только на число отложенных миграций.
+`incidentrelay_database_up` и `incidentrelay_migrations_pending` вычисляются в момент сбора и повторяют проверки `/readyz`. `/metrics` продолжает отвечать, когда база данных недоступна, поэтому обе метрики остаются видимыми во время сбоя. Пока состояние миграций прочитать нельзя (база недоступна или проверка не выполнилась), сэмпл `incidentrelay_migrations_pending` отсутствует, а не равен `0` — метрика отдается только тогда, когда ее значение действительно известно. Заведите алерт на `incidentrelay_database_up = 0` и не полагайтесь только на число отложенных миграций.
 
 Подсчет запросов активен только при `enabled = true`. После изменения настроек metrics перезапустите веб-сервис, а также планировщик и воркеры — они подхватывают настройку при старте. `/metrics` отдает только веб-сервис; планировщик и остальные воркеры только записывают в него события.
 
-Обычно IncidentRelay работает несколькими процессами за одной точкой сбора: несколько Gunicorn-воркеров плюс отдельные демоны планировщика и Telegram/Slack-воркеров. Чтобы один сбор `/metrics` покрывал их все, каждый процесс IncidentRelay записывает свои счетчики в один общий каталог, заданный переменной окружения `PROMETHEUS_MULTIPROC_DIR`, а веб-воркеры при сборе объединяют файлы всех процессов. В готовых поставках это уже настроено: systemd-юниты используют общий каталог `/run/incidentrelay/metrics`, а Docker-образ — `/var/lib/incidentrelay/metrics` на общем томе данных. Поэтому в сбор попадают и прием из интеграций, и действия API, обработанные любым веб-воркером, и переходы групп алертов, выполненные планировщиком или чат-воркерами. Без переменной — одиночный процесс в development-запуске — счетчики покрывают только этот один процесс.
+Обычно IncidentRelay работает несколькими процессами за одной точкой сбора: несколько Gunicorn-воркеров плюс отдельные демоны планировщика и Telegram/Slack-воркеров. Чтобы один сбор `/metrics` покрывал их все, каждый процесс IncidentRelay записывает свои счетчики в один общий каталог, заданный переменной окружения `PROMETHEUS_MULTIPROC_DIR`, а веб-воркеры при сборе объединяют файлы всех процессов. В готовых поставках это уже настроено: systemd-юниты используют общий каталог `/run/incidentrelay/metrics`, поэтому сбор покрывает все юниты хоста — веб-воркеры, планировщик и чат-воркеры. Без переменной — одиночный процесс в development-запуске — счетчики покрывают только этот один процесс.
 
-Если указываете свой путь в `PROMETHEUS_MULTIPROC_DIR`, все процессы IncidentRelay должны видеть один и тот же каталог на одном хосте или через один смонтированный том; каталог должен существовать и быть доступен для записи до старта процессов. Файлы завершившихся процессов удаляются при сборе: счетчик при этом уменьшается на долю умершего процесса — Prometheus считает это обычным сбросом счетчика и корректно обрабатывает в `rate()`.
+Файлы счетчиков привязаны к PID процессов, поэтому каталог `PROMETHEUS_MULTIPROC_DIR` можно разделять только процессам, которые видят одни и те же PID: на одном хосте или внутри одного контейнера. Никогда не указывайте контейнерам один и тот же каталог — независимые PID-пространства могут переиспользовать одни и те же PID и портить файлы друг друга. Поэтому Docker-образ дает каждому сервисному контейнеру собственный каталог внутри `/var/lib/incidentrelay/metrics/`; сбор `/metrics` в контейнерной поставке агрегирует воркеров веб-контейнера, а переходы от планировщика и чат-воркеров попадают в их собственные каталоги и в нем не видны. Чтобы объединить их, понадобился бы механизм агрегации через границы контейнеров, которого в этой функциональности нет.
 
-Гаужи, считаемые из базы (`incidentrelay_database_up`, `incidentrelay_migrations_pending`, `incidentrelay_user_notification_deliveries`, `incidentrelay_notification_targets_failing`, `incidentrelay_scheduler_last_run_timestamp_seconds`, `incidentrelay_build_info`), вычисляются один раз за сбор, поэтому их значения не зависят от числа процессов.
+Если указываете свой путь в `PROMETHEUS_MULTIPROC_DIR`, оставьте его процессам одного хоста или одного контейнера; каталог должен существовать и быть доступен для записи до старта процессов. Файлы завершившихся процессов удаляются при запуске следующего процесса IncidentRelay: счетчик при этом уменьшается на долю умершего процесса — Prometheus считает это обычным сбросом счетчика и корректно обрабатывает в `rate()`.
 
-`incidentrelay_user_notification_deliveries`, `incidentrelay_notification_targets_failing` и `incidentrelay_scheduler_last_run_timestamp_seconds` пересчитываются из базы в момент сбора, поэтому работают между процессами. Когда база недоступна, первые две метрики исчезают из выдачи, а heartbeat равен `0`; причину показывает `incidentrelay_database_up = 0`. Для heartbeat нужен работающий воркер планировщика.
+Гаужи, считаемые из базы (`incidentrelay_database_up`, `incidentrelay_migrations_pending`, `incidentrelay_user_notification_deliveries_recent`, `incidentrelay_alert_notification_errors_recent`, `incidentrelay_scheduler_last_run_timestamp_seconds`, `incidentrelay_build_info`), вычисляются один раз за сбор, поэтому их значения не зависят от числа процессов.
+
+`incidentrelay_user_notification_deliveries_recent`, `incidentrelay_alert_notification_errors_recent` и `incidentrelay_scheduler_last_run_timestamp_seconds` пересчитываются из базы в момент сбора, поэтому работают между процессами. Обе метрики доставок учитывают только последние 24 часа, поэтому сбор никогда не сканирует всю историю доставок. Когда база недоступна, они исчезают из выдачи, а heartbeat равен `0`; причину показывает `incidentrelay_database_up = 0`. Для heartbeat нужен работающий воркер планировщика.
 
 ## Настройки планировщика
 

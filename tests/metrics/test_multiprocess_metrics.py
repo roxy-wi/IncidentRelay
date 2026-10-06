@@ -306,11 +306,11 @@ def test_database_outage_degrades_gauges_in_multiprocess_mode(tmp_path):
         )
         == 0.0
     )
-    # During the outage the delivery and failing-target gauges carry no
-    # samples at all — the same shape as the single-process outage path.
+    # During the outage the recent delivery gauges carry no samples at
+    # all — the same shape as the single-process outage path.
     for absent_name in (
-        "incidentrelay_user_notification_deliveries",
-        "incidentrelay_notification_targets_failing",
+        "incidentrelay_user_notification_deliveries_recent",
+        "incidentrelay_alert_notification_errors_recent",
     ):
         family = families.get(absent_name)
         assert family is None or not family.samples, absent_name

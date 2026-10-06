@@ -277,7 +277,7 @@ def test_reopen_counter_after_acknowledged_group_reopens(client, monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def _create_delivery(group, user, method, status):
+def _create_delivery(group, user, method, status, created_at=None):
     return UserNotificationDelivery.create(
         group=group.id,
         user=user.id,
@@ -285,6 +285,7 @@ def _create_delivery(group, user, method, status):
         status=status,
         event_type="notification",
         scheduled_at=utc_now(),
+        created_at=created_at or utc_now(),
     )
 
 
@@ -308,8 +309,8 @@ def _alert_group_for_deliveries():
     return alert_group, user
 
 
-def test_user_notification_deliveries_gauge(client, monkeypatch):
-    """Deliveries are grouped by method and outcome at scrape time."""
+def test_user_notification_deliveries_recent_gauge(client, monkeypatch):
+    """Deliveries from the last 24 hours are grouped by method and outcome."""
     _enable(monkeypatch)
     alert_group, user = _alert_group_for_deliveries()
 
@@ -317,10 +318,17 @@ def test_user_notification_deliveries_gauge(client, monkeypatch):
     _create_delivery(alert_group, user, "email", "sent")
     _create_delivery(alert_group, user, "email", "failed")
     _create_delivery(alert_group, user, "telegram", "pending")
+    _create_delivery(
+        alert_group,
+        user,
+        "email",
+        "sent",
+        created_at=utc_now() - business_metrics.RECENT_WINDOW - timedelta(hours=1),
+    )
 
     _, body = _scrape(client)
 
-    metric = "incidentrelay_user_notification_deliveries"
+    metric = "incidentrelay_user_notification_deliveries_recent"
 
     assert _sample_value(body, metric, {"method": "email", "status": "sent"}) == 2.0
     assert _sample_value(body, metric, {"method": "email", "status": "failed"}) == 1.0
@@ -331,8 +339,8 @@ def test_user_notification_deliveries_gauge(client, monkeypatch):
     assert _sample_value(body, metric, {"method": "email", "status": "pending"}) is None
 
 
-def test_notification_targets_failing_gauge(client, monkeypatch):
-    """Channels whose last delivery failed are counted per provider."""
+def test_alert_notification_errors_recent_gauge(client, monkeypatch):
+    """Errored notification deliveries are counted per provider."""
     _enable(monkeypatch)
     group = create_group(slug="platform")
     team = create_team(group, slug="sre")
@@ -350,13 +358,20 @@ def test_notification_targets_failing_gauge(client, monkeypatch):
         provider="slack",
         last_error=None,
     )
+    AlertNotification.create(
+        channel=failing,
+        provider="telegram",
+        last_error="timeout",
+        created_at=utc_now() - business_metrics.RECENT_WINDOW - timedelta(hours=1),
+    )
 
     _, body = _scrape(client)
 
-    metric = "incidentrelay_notification_targets_failing"
+    metric = "incidentrelay_alert_notification_errors_recent"
 
+    # Only in-window errored deliveries are counted.
     assert _sample_value(body, metric, {"provider": "telegram"}) == 1.0
-    # A channel without a recorded error is not "failing".
+    # A channel without a recorded error is not counted.
     assert _sample_value(body, metric, {"provider": "slack"}) is None
 
 

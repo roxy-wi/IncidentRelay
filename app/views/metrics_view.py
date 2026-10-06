@@ -85,7 +85,11 @@ def _authorized():
     )
 
 
-@metrics_bp.route(METRICS_PATH, methods=["GET"])
+@metrics_bp.route(
+    METRICS_PATH,
+    methods=["GET"],
+    provide_automatic_options=False,
+)
 def metrics() -> Union[Response, tuple]:
     """
     Serve the Prometheus exposition, or pretend the endpoint is absent.
@@ -103,16 +107,20 @@ def metrics() -> Union[Response, tuple]:
     )
 
 
-@metrics_bp.route(METRICS_PATH, methods=["POST", "PUT", "PATCH", "DELETE"])
+@metrics_bp.route(
+    METRICS_PATH,
+    methods=["POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+)
 def metrics_wrong_method() -> Union[Response, tuple]:
     """
     Keep non-GET methods consistent with the disabled endpoint.
 
-    The GET rule 404s from inside the view when metrics are disabled,
-    but Flask answers 405 for other methods during URL matching — before
-    any view code runs — which would reveal that /metrics exists. This
-    rule keeps every method answering 404 while disabled; when enabled,
-    non-GET methods keep the regular 405.
+    The GET rule 404s from inside the view when metrics are disabled and
+    disables Flask's automatic OPTIONS response for the path; Flask
+    answers 405 (or an automatic OPTIONS 200) during URL matching —
+    before any view code runs — which would reveal that /metrics exists.
+    This rule keeps every non-GET method answering 404 while disabled;
+    when enabled, it keeps the regular 405.
     """
 
     if not Config.METRICS_ENABLED:

@@ -17,9 +17,10 @@ mechanisms keep the exposition correct for that model:
   shared directory when PROMETHEUS_MULTIPROC_DIR is set (the
   prometheus_client multiprocess mode). render_exposition() merges all
   process files at scrape time, so a scrape always covers every event
-  every process handled. Deployment units set the variable to one
-  shared per-host directory (systemd: /run/incidentrelay/metrics,
-  Docker: /var/lib/incidentrelay/metrics on the shared data volume).
+  every process handled. The files are PID-keyed, so the directory is
+  only shared by processes that see the same PIDs: the systemd units
+  share the per-host /run/incidentrelay/metrics, while each container
+  (docker entrypoint) gets its own per-service directory.
   Without the variable everything falls back to one in-process
   registry, which is correct for single-process development runs.
   Files of processes that exited keep contributing their last values
@@ -27,15 +28,19 @@ mechanisms keep the exposition correct for that model:
   counters only ever reset on a restart of a contributing process —
   which Prometheus rate() handles natively.
 
-- The database-derived gauges (database and migration state, notification
-  deliveries, failing notification targets, scheduler heartbeat, build
-  info) are never stored per process. DatabaseGaugeCollector computes
-  them at scrape time from the shared database, exactly once per scrape,
-  and they never appear more than once in the exposition regardless of
-  the process count. Like the readiness probe (app/services/readiness.py)
-  it manages its own connection and never raises: on a database outage
-  the delivery gauges are absent, database_up reads 0 and the heartbeat
-  reads 0, with a warning in the logs.
+- The database-derived gauges (database and migration state, recent
+  notification deliveries and errors, scheduler heartbeat, build info)
+  are never stored per process. DatabaseGaugeCollector computes them at
+  scrape time from the shared database, exactly once per scrape, and
+  they never appear more than once in the exposition regardless of the
+  process count. The delivery gauges count only RECENT_WINDOW (24h), so
+  a scrape never aggregates the full delivery history. Like the
+  readiness probe (app/services/readiness.py) the collector manages its
+  own connection and never raises: on a database outage the delivery
+  gauges are absent, database_up reads 0 and the heartbeat reads 0, with
+  a warning in the logs. The migrations_pending gauge is reported only
+  while the migration state can actually be read; while it is unknown
+  the sample is absent instead of reading as a healthy 0.
 
 Files of processes that died (a Gunicorn worker killed on timeout, a
 crashed daemon) would keep being merged forever, so render_exposition()
@@ -50,7 +55,7 @@ import logging
 import os
 import re
 from contextlib import contextmanager
-from datetime import timezone
+from datetime import timedelta, timezone
 
 from peewee import fn
 from prometheus_client import (
@@ -64,6 +69,7 @@ from prometheus_client.multiprocess import MultiProcessCollector
 from prometheus_client.registry import Collector
 
 from app.db import init_database
+from app.modules.common import utc_now
 from app.modules.db.models import (
     AlertNotification,
     AppLock,
@@ -116,6 +122,10 @@ ALERT_GROUP_ACTIONS = Counter(
 # heartbeat; app/services/scheduler.py writes it, the gauge reads it.
 SCHEDULER_HEARTBEAT_LOCK_NAME = "scheduler_heartbeat"
 
+# Time window of the *_recent database gauges; the migration
+# 20261006070000_metrics_recent_indexes backs its created_at filters.
+RECENT_WINDOW = timedelta(hours=24)
+
 
 def multiprocess_dir():
     """Return the configured multiprocess directory, or None."""
@@ -163,6 +173,11 @@ class DatabaseGaugeCollector(Collector):
         """
         Report database_up and migrations_pending from the readiness probe.
 
+        migrations_pending is only reported while its value is actually
+        known; when the database is down or the migration state is
+        unreadable the sample is absent rather than reading 0 ("none"),
+        and database_up carries the outage signal instead.
+
         Every failure path only degrades the gauges and logs a warning;
         the exposition itself never fails.
         """
@@ -180,28 +195,21 @@ class DatabaseGaugeCollector(Collector):
 
         if probe.database_error is not None:
             database_up.add_metric([], 0)
-            migrations_pending.add_metric([], 0)
             logger.warning(
                 "metrics database check failed",
                 exc_info=probe.database_error,
             )
             yield database_up
-            yield migrations_pending
             return
 
         database_up.add_metric([], 1)
 
         if probe.migration_error is not None:
-            # The database answers but the migration state is unknown.
-            # Report no pending migrations: /readyz is the authoritative
-            # readiness signal.
-            migrations_pending.add_metric([], 0)
             logger.warning(
                 "metrics migration check failed",
                 exc_info=probe.migration_error,
             )
             yield database_up
-            yield migrations_pending
             return
 
         migrations_pending.add_metric([], len(probe.pending))
@@ -210,21 +218,24 @@ class DatabaseGaugeCollector(Collector):
 
     def _notification_gauges(self):
         """
-        Report deliveries, failing targets and the scheduler heartbeat.
+        Report recent deliveries, errored deliveries and the heartbeat.
 
-        Opens its own connection and never raises: on failure the
-        delivery gauges are absent, the heartbeat reads 0 and the reason
-        is logged, so a scrape during a database outage still succeeds.
+        The delivery gauges count only rows inside RECENT_WINDOW. Opens
+        its own connection and never raises: on failure the delivery
+        gauges are absent, the heartbeat reads 0 and the reason is
+        logged, so a scrape during a database outage still succeeds.
         """
 
         deliveries = GaugeMetricFamily(
-            "incidentrelay_user_notification_deliveries",
-            "Recorded per-user notification deliveries by method and outcome.",
+            "incidentrelay_user_notification_deliveries_recent",
+            "User notification deliveries recorded in the last 24 hours, "
+            "by method and outcome.",
             labels=("method", "status"),
         )
-        failing = GaugeMetricFamily(
-            "incidentrelay_notification_targets_failing",
-            "Notification channels whose last delivery ended in an error.",
+        errors = GaugeMetricFamily(
+            "incidentrelay_alert_notification_errors_recent",
+            "Alert notification deliveries that ended in an error, "
+            "recorded in the last 24 hours.",
             labels=("provider",),
         )
         heartbeat = GaugeMetricFamily(
@@ -242,6 +253,10 @@ class DatabaseGaugeCollector(Collector):
             if db_was_closed:
                 db.connect(reuse_if_open=True)
 
+            # Both gauges are windowed so a scrape never scans the full
+            # delivery history of a long-lived installation.
+            recent_since = utc_now() - RECENT_WINDOW
+
             rows = (
                 UserNotificationDelivery
                 .select(
@@ -249,6 +264,7 @@ class DatabaseGaugeCollector(Collector):
                     UserNotificationDelivery.status,
                     fn.COUNT(UserNotificationDelivery.id).alias("total"),
                 )
+                .where(UserNotificationDelivery.created_at >= recent_since)
                 .group_by(
                     UserNotificationDelivery.method,
                     UserNotificationDelivery.status,
@@ -268,13 +284,16 @@ class DatabaseGaugeCollector(Collector):
                     AlertNotification.provider,
                     fn.COUNT(AlertNotification.id).alias("total"),
                 )
-                .where(AlertNotification.last_error.is_null(False))
+                .where(
+                    AlertNotification.last_error.is_null(False),
+                    AlertNotification.created_at >= recent_since,
+                )
                 .group_by(AlertNotification.provider)
                 .tuples()
             )
 
             for provider, total in rows:
-                failing.add_metric((provider,), total)
+                errors.add_metric((provider,), total)
 
             heartbeat.add_metric(
                 [],
@@ -294,7 +313,7 @@ class DatabaseGaugeCollector(Collector):
                     pass
 
         yield deliveries
-        yield failing
+        yield errors
         yield heartbeat
 
     @staticmethod

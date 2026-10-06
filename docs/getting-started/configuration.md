@@ -377,28 +377,30 @@ Exported metrics:
 
 | Metric | Type | Description |
 |---|---|---|
-| `incidentrelay_http_requests` | counter | Handled HTTP requests, labels `method` and `status` |
+| `incidentrelay_http_requests_total` | counter | Handled HTTP requests, labels `method` and `status` |
 | `incidentrelay_http_request_duration_seconds` | histogram | Request latency, label `method` |
 | `incidentrelay_database_up` | gauge | 1 when the database answered `SELECT 1` at scrape time, otherwise 0 |
-| `incidentrelay_migrations_pending` | gauge | Number of migration files not applied yet |
+| `incidentrelay_migrations_pending` | gauge | Number of migration files not applied yet, absent while the migration state is unknown |
 | `incidentrelay_build_info` | gauge | Running version, label `version`, value is always 1 |
-| `incidentrelay_alerts_received` | counter | Alerts received through the integration API, label `source` |
-| `incidentrelay_alert_group_actions` | counter | Alert group transitions, label `action`: `created`, `acknowledged`, `resolved`, `reopened` |
-| `incidentrelay_user_notification_deliveries` | gauge | Recorded per-user notification deliveries, labels `method` and `status` |
-| `incidentrelay_notification_targets_failing` | gauge | Notification channels whose last delivery ended in an error, label `provider` |
+| `incidentrelay_alerts_received_total` | counter | Alerts received through the integration API, label `source` |
+| `incidentrelay_alert_group_actions_total` | counter | Alert group transitions, label `action`: `created`, `acknowledged`, `resolved`, `reopened` |
+| `incidentrelay_user_notification_deliveries_recent` | gauge | User notification deliveries recorded in the last 24 hours, labels `method` and `status` |
+| `incidentrelay_alert_notification_errors_recent` | gauge | Alert notification deliveries that ended in an error, recorded in the last 24 hours, label `provider` |
 | `incidentrelay_scheduler_last_run_timestamp_seconds` | gauge | Unix time of the last scheduler heartbeat, `0` when it never ran |
 
-`incidentrelay_database_up` and `incidentrelay_migrations_pending` are evaluated at scrape time and repeat the `/readyz` checks. `/metrics` keeps answering while the database is down, so both values stay visible during an outage. While the database is down, `incidentrelay_migrations_pending` is reported as `0`, which then means unknown rather than none — counting pending migrations needs a database connection. Alert on `incidentrelay_database_up = 0` instead of the pending count alone.
+`incidentrelay_database_up` and `incidentrelay_migrations_pending` are evaluated at scrape time and repeat the `/readyz` checks. `/metrics` keeps answering while the database is down, so both values stay visible during an outage. While the migration state cannot be read (database down or migration check failed), the `incidentrelay_migrations_pending` sample is absent rather than reading `0` — it is only reported when it is actually known. Alert on `incidentrelay_database_up = 0` instead of the pending count alone.
 
 Request counting is active only while `enabled = true`. After changing metrics settings, restart the web service and the scheduler and worker services too — they pick up the setting when they start. Only the web service serves `/metrics`; the scheduler and the other workers only record into it.
 
-IncidentRelay normally runs several processes behind one scrape target: multiple Gunicorn web workers plus the scheduler and the Telegram/Slack workers as separate daemons. So that one `/metrics` scrape covers them all, every IncidentRelay process records its counters into one shared directory configured through the `PROMETHEUS_MULTIPROC_DIR` environment variable, and the web workers merge all processes' files at scrape time. The packaged deployments set this up already: the systemd units share `/run/incidentrelay/metrics`, and the Docker image uses `/var/lib/incidentrelay/metrics` on the shared data volume. A scrape therefore includes integration intake and API actions handled by any web worker, as well as alert-group lifecycle transitions performed by the scheduler or the chat workers. Without the variable — single-process development runs — the counters cover that one process only.
+IncidentRelay normally runs several processes behind one scrape target: multiple Gunicorn web workers plus the scheduler and the Telegram/Slack workers as separate daemons. So that one `/metrics` scrape covers them all, every IncidentRelay process records its counters into one shared directory configured through the `PROMETHEUS_MULTIPROC_DIR` environment variable, and the web workers merge all processes' files at scrape time. The packaged deployments set this up already: the systemd units share `/run/incidentrelay/metrics`, so a scrape covers every unit on the host — web workers, scheduler and chat workers alike. Without the variable — single-process development runs — the counters cover that one process only.
 
-If you point `PROMETHEUS_MULTIPROC_DIR` at your own location, every IncidentRelay process must see the same directory on the same host or through the same mounted volume, and it must exist and be writable before the processes start. Files left behind by exited processes are removed at scrape time; a counter then drops by the dead process's share, which Prometheus treats as a regular counter reset and `rate()` handles natively.
+The counter files are keyed by process PID, so a `PROMETHEUS_MULTIPROC_DIR` may only be shared by processes that see the same PIDs: those on one host, or inside one container. Never point containers at the same directory — independent PID namespaces can reuse the same PIDs and corrupt each other's files. The Docker image therefore gives every service container its own directory under `/var/lib/incidentrelay/metrics/`; a containerized `/metrics` scrape aggregates the web container's workers, while scheduler and chat-worker transitions land in their own directories and are not visible to it. To merge them you would need an aggregation mechanism that crosses container boundaries, which this feature does not provide.
 
-The database-derived gauges (`incidentrelay_database_up`, `incidentrelay_migrations_pending`, `incidentrelay_user_notification_deliveries`, `incidentrelay_notification_targets_failing`, `incidentrelay_scheduler_last_run_timestamp_seconds`, `incidentrelay_build_info`) are computed once per scrape from the database, so their values never depend on how many processes are running.
+If you point `PROMETHEUS_MULTIPROC_DIR` at your own location, keep it to processes of one host or one container; it must exist and be writable before the processes start. Files left behind by exited processes are removed when the next IncidentRelay process starts; a counter then drops by the dead process's share, which Prometheus treats as a regular counter reset and `rate()` handles natively.
 
-`incidentrelay_user_notification_deliveries`, `incidentrelay_notification_targets_failing` and `incidentrelay_scheduler_last_run_timestamp_seconds` are recomputed from the database at scrape time, so they work across processes. During a database outage the first two are absent from the exposition and the heartbeat reads `0`; `incidentrelay_database_up = 0` explains why. The heartbeat gauge requires a running scheduler worker.
+The database-derived gauges (`incidentrelay_database_up`, `incidentrelay_migrations_pending`, `incidentrelay_user_notification_deliveries_recent`, `incidentrelay_alert_notification_errors_recent`, `incidentrelay_scheduler_last_run_timestamp_seconds`, `incidentrelay_build_info`) are computed once per scrape from the database, so their values never depend on how many processes are running.
+
+`incidentrelay_user_notification_deliveries_recent`, `incidentrelay_alert_notification_errors_recent` and `incidentrelay_scheduler_last_run_timestamp_seconds` are recomputed from the database at scrape time, so they work across processes. The two delivery gauges cover only the last 24 hours, so a scrape never aggregates the full delivery history. During a database outage both are absent from the exposition and the heartbeat reads `0`; `incidentrelay_database_up = 0` explains why. The heartbeat gauge requires a running scheduler worker.
 
 ## Scheduler settings
 

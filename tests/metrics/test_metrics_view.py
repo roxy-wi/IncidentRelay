@@ -80,11 +80,30 @@ def test_metrics_disabled_post_also_answers_404(client):
     assert response.status_code == 404
 
 
+def test_metrics_disabled_options_also_answers_404(client):
+    """
+    Flask answers automatic OPTIONS with 200 before any view code runs,
+    so /metrics must list OPTIONS to keep the endpoint undiscoverable.
+    """
+    response = client.options("/metrics")
+
+    assert response.status_code == 404
+
+
 def test_metrics_enabled_post_answers_405(client, monkeypatch):
     """While enabled, non-GET methods get the regular 405."""
     _enabled(monkeypatch)
 
     response = client.post("/metrics")
+
+    assert response.status_code == 405
+
+
+def test_metrics_enabled_options_answers_405(client, monkeypatch):
+    """Listing OPTIONS keeps the enabled endpoint's 405 consistent."""
+    _enabled(monkeypatch)
+
+    response = client.options("/metrics")
 
     assert response.status_code == 405
 
@@ -157,11 +176,6 @@ def test_metrics_http_counter_counts_requests(client, monkeypatch):
 
 
 def test_metrics_latency_histogram_observes_requests(client, monkeypatch):
-    """
-    The duration histogram must see every served request. A regression
-    that silently stops observing (renamed g key, broken hook) would
-    otherwise empty every latency dashboard with a green test suite.
-    """
     _enabled(monkeypatch)
 
     client.get("/metrics")
@@ -195,7 +209,7 @@ def test_metrics_endpoint_survives_database_outage(client, monkeypatch):
 
     families = _parse(response)
     assert families["incidentrelay_database_up"].samples[0].value == 0.0
-    assert families["incidentrelay_migrations_pending"].samples[0].value == 0.0
+    assert "incidentrelay_migrations_pending" not in families
 
     body = response.get_data(as_text=True)
     assert "RuntimeError" not in body
@@ -224,13 +238,6 @@ def test_metrics_endpoint_survives_database_init_failure(client, monkeypatch):
 
 
 def test_metrics_served_while_app_database_connect_fails(client, monkeypatch):
-    """
-    The implicit per-request DB connect in app/__init__.py is bypassed for
-    /metrics (DB_BYPASS_PATHS). The other outage tests stub the readiness
-    probe and never reach that hook, so break the app-level connect
-    directly: with the bypass intact the scrape still succeeds, without it
-    before_request would turn the outage into a 500.
-    """
     _enabled(monkeypatch)
 
     from app.db import database_proxy
@@ -250,10 +257,6 @@ def test_metrics_served_while_app_database_connect_fails(client, monkeypatch):
 
 
 def test_metrics_migration_check_failure_degrades_gauges(client, monkeypatch):
-    """
-    Database answers but migration state is unreadable: db_up stays 1
-    and migrations_pending degrades to 0 instead of failing the scrape.
-    """
     _enabled(monkeypatch)
 
     with patch.object(
@@ -267,7 +270,7 @@ def test_metrics_migration_check_failure_degrades_gauges(client, monkeypatch):
 
     families = _parse(response)
     assert families["incidentrelay_database_up"].samples[0].value == 1.0
-    assert families["incidentrelay_migrations_pending"].samples[0].value == 0.0
+    assert "incidentrelay_migrations_pending" not in families
 
 
 def test_metrics_token_required_when_configured(client, monkeypatch):
