@@ -5,7 +5,7 @@ type: application
 version: 2.3.1
 appVersion: "2.3.1"
 kubeVersion: ">=1.23.0-0"
-home: https://github.com/roxy-wi/IncidentRelay
+home: https://IncidentRelay.io
 sources:
   - https://github.com/roxy-wi/IncidentRelay
 keywords:
