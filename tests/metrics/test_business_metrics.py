@@ -89,11 +89,7 @@ def _grafana_payload(severity="critical"):
 
 
 def _intake_route(source="grafana", token="route-token"):
-    """Create team + route with an intake token, like the integration tests.
-
-    The route groups by incident_key so that distinct alerts sharing the
-    label land in one alert group (the supported reopen scenario).
-    """
+    """Create team + route with an intake token, like the integration tests."""
     group = create_group(slug="platform")
     team = create_team(group, slug="sre")
 
@@ -206,13 +202,7 @@ def test_alert_group_action_counters_follow_repo_transitions(client, monkeypatch
 
 
 def test_reopen_counter_after_acknowledged_group_reopens(client, monkeypatch):
-    """A deteriorating alert against an acknowledged group counts a reopen.
-
-    Two alerts share one incident_key group; the second raises severity
-    from warning to critical (critical outranks warning, see
-    incidents_repo.priority_from_severity), so the acknowledgement is
-    not preserved and the group reopens.
-    """
+    """A deteriorating alert against an acknowledged group counts a reopen."""
     _enable(monkeypatch)
     _intake_route()
 
@@ -272,8 +262,6 @@ def _create_delivery(group, user, method, status, updated_at=None):
         status=status,
         event_type="notification",
         scheduled_at=utc_now(),
-        # created_at follows updated_at so the helper cannot
-        # accidentally manufacture in-window rows for the gauges.
         created_at=updated_at or utc_now(),
         updated_at=updated_at or utc_now(),
     )
@@ -315,8 +303,7 @@ def test_user_notification_deliveries_recent_gauge(client, monkeypatch):
         "sent",
         updated_at=utc_now() - business_metrics.RECENT_WINDOW - timedelta(hours=1),
     )
-    # A row created days ago that failed just now counts: the window
-    # follows updated_at, so in-place transitions are never missed.
+    # Old row that failed just now still counts (window on updated_at).
     _create_delivery(
         alert_group,
         user,
@@ -334,7 +321,7 @@ def test_user_notification_deliveries_recent_gauge(client, monkeypatch):
     assert sample_value(
         body, metric, {"method": "telegram", "status": "pending"},
     ) == 1.0
-    # No deliveries for other methods — no sample at all.
+    # No deliveries for other methods, no sample at all.
     assert sample_value(body, metric, {"method": "email", "status": "pending"}) is None
 
 
@@ -364,8 +351,7 @@ def test_alert_notification_errors_recent_gauge(client, monkeypatch):
         created_at=utc_now() - business_metrics.RECENT_WINDOW - timedelta(hours=1),
         updated_at=utc_now() - business_metrics.RECENT_WINDOW - timedelta(hours=1),
     )
-    # Created days ago, failed just now: must count, the window follows
-    # updated_at and never misses an in-place transition.
+    # Old row that failed just now still counts (window on updated_at).
     AlertNotification.create(
         channel=failing,
         provider="telegram",
@@ -385,12 +371,7 @@ def test_alert_notification_errors_recent_gauge(client, monkeypatch):
 
 
 def test_business_gauges_degrade_when_database_unreachable(client, monkeypatch):
-    """
-    A broken database must not fail the scrape: database_up reads 0,
-    the delivery gauges have no samples and the heartbeat reads 0.
-    Both init_database entry points are patched, the readiness probe's
-    and the notification gauges'.
-    """
+    """A broken database reads database_up 0 and empty gauges, not a 500."""
     _enable(monkeypatch)
 
     def broken_init():

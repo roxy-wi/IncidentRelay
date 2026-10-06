@@ -106,13 +106,7 @@ def _run_child(code, multiproc_dir, config_file):
 
 @contextmanager
 def _live_recorder(code, multiproc_dir, config_file):
-    """
-    Run a recorder child that stays alive until the block ends.
-
-    The child records, signals READY and then blocks; closing our end of
-    its stdin stops it. If it dies before READY (import error, crash),
-    the assertion surfaces its stderr instead of a confusing KeyError.
-    """
+    """Run a recorder child that stays alive until the block ends."""
 
     process = subprocess.Popen(
         [sys.executable, "-c", code],
@@ -201,11 +195,7 @@ def test_counters_from_other_processes_are_aggregated(tmp_path):
 
 
 def test_worker_daemon_actions_are_visible_in_web_scrape(tmp_path):
-    """
-    The maintainer's blocker: lifecycle transitions performed by the
-    scheduler/Telegram/Slack daemons must show up in the web /metrics.
-    A daemon subprocess records an action; a web-like child renders it.
-    """
+    """A daemon subprocess records an action; a web-like child renders it."""
 
     with _record_action(tmp_path, action="resolved"):
         families = parse_exposition(_render(tmp_path))
@@ -247,11 +237,7 @@ def test_scrape_reflects_events_recorded_between_scrapes(tmp_path):
 
 
 def test_database_gauges_render_exactly_once(tmp_path):
-    """
-    The database gauges are computed by the scrape itself, so however
-    many processes recorded counters, each gauge must appear once —
-    never one copy per contributing process.
-    """
+    """Database gauges are computed at scrape time and appear once."""
 
     with _record_alerts(tmp_path, count=1), _record_alerts(tmp_path, count=1):
         families = parse_exposition(_render(tmp_path))
@@ -264,10 +250,7 @@ def test_database_gauges_render_exactly_once(tmp_path):
 
 
 def test_database_outage_degrades_gauges_in_multiprocess_mode(tmp_path):
-    """
-    Same outage contract as single-process mode: database_up 0, absent
-    delivery gauges, heartbeat 0, and the exposition still renders.
-    """
+    """Same outage contract as single-process mode."""
 
     with _record_alerts(tmp_path, count=1):
         families = parse_exposition(_render(tmp_path, setup=_BREAK_DATABASE))
@@ -281,8 +264,7 @@ def test_database_outage_degrades_gauges_in_multiprocess_mode(tmp_path):
         )
         == 0.0
     )
-    # During the outage the recent delivery gauges carry no samples at
-    # all — the same shape as the single-process outage path.
+    # Same shape as the single-process outage path.
     for absent_name in (
         "incidentrelay_user_notification_deliveries_recent",
         "incidentrelay_alert_notification_errors_recent",
@@ -300,12 +282,7 @@ def test_database_outage_degrades_gauges_in_multiprocess_mode(tmp_path):
 
 
 def test_dead_process_counters_survive_cleanup(tmp_path):
-    """
-    Counter files of exited processes must survive cleanup: removing one
-    would drop its share from the merged counter, and Prometheus would
-    read that drop as a counter reset. Only the dead process's live-gauge
-    files go.
-    """
+    """Dead processes keep their counter files; only their gauges go."""
 
     # Run a recorder to completion: it exits before any scrape, so its
     # counters survive as a dead process's file.
@@ -349,11 +326,7 @@ def test_dead_process_counters_survive_cleanup(tmp_path):
 
 
 def test_metrics_view_serves_multiprocess_exposition(client, monkeypatch, tmp_path):
-    """
-    The view integration: with the multiprocess directory configured the
-    endpoint still answers 200 and serves the database gauges even when
-    no process has recorded any counter yet.
-    """
+    """The view serves the merged exposition while no counters exist."""
 
     from prometheus_client import CONTENT_TYPE_LATEST
 
@@ -397,11 +370,7 @@ def _init_snippet():
 
 
 def test_unusable_multiproc_dir_only_fails_when_metrics_enabled(tmp_path):
-    """
-    A broken multiproc directory must not block startup while metrics
-    are disabled. With metrics enabled it is a deployment error and the
-    process refuses to start.
-    """
+    """A broken directory only blocks startup while metrics are enabled."""
 
     blocker = tmp_path / "metrics"
     blocker.write_text("occupies the multiproc directory path")
@@ -430,10 +399,7 @@ def test_unusable_multiproc_dir_only_fails_when_metrics_enabled(tmp_path):
 
 
 def test_scrape_survives_filesystem_without_flock_support(client, monkeypatch, tmp_path):
-    """
-    The shared lock is best effort: if the filesystem refuses flock,
-    scraping must still work, not fail on every request.
-    """
+    """Scraping must work when the filesystem refuses flock."""
 
     import app.services.metrics as business_metrics_module
     from app.settings import Config

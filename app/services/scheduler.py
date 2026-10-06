@@ -484,9 +484,8 @@ def scheduler_heartbeat_job():
     Refresh the scheduler heartbeat lock.
 
     The heartbeat is a lock row that is never released: only its
-    timestamps move. /metrics reads it to report how recently the
-    scheduler ran, so this job deliberately takes no job lock — with a
-    misconfigured second scheduler the freshest writer simply wins.
+    timestamps move, and the freshest writer wins. /metrics reads it
+    to report how recently the scheduler ran.
     """
     if db.is_closed():
         db.connect(reuse_if_open=True)
@@ -830,8 +829,7 @@ def start_scheduler():
     )
 
     if Config.METRICS_ENABLED:
-        # Only the /metrics heartbeat gauge reads this lock row; a
-        # disabled metrics feature must not pay a write every interval.
+        # Only the /metrics heartbeat gauge reads this row.
         _scheduler.add_job(
             scheduler_heartbeat_job,
             "interval",

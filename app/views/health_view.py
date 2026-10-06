@@ -1,20 +1,10 @@
 """
-Health probes for liveness and readiness checks.
+Health probes, unauthenticated and outside the /api/ namespace so
+load balancers can poll them without credentials.
 
-The probes are deliberately unauthenticated and live outside the /api/
-namespace so Kubernetes, HAProxy, nginx, AWS ELB and other load
-balancers can poll them without credentials.
-
-Conventions follow the Kubernetes naming style:
-
-- /healthz: liveness. Returns 200 as long as the process can serve a
-  request. Does NOT touch the database — a database outage must not
-  cause Kubernetes to restart the pod, since a restart would not help.
-
-- /readyz: readiness. Returns 200 only when the database is reachable
-  and all on-disk migrations have been applied. Otherwise returns 503
-  so the load balancer stops routing traffic until the process is
-  fully usable.
+/healthz is liveness and never touches the database, so an outage
+cannot cause a pointless restart. /readyz is readiness: 503 until the
+database answers and all migrations are applied.
 """
 
 import logging
@@ -35,26 +25,16 @@ HEALTH_PATHS = ("/healthz", "/readyz")
 
 @health_bp.route("/healthz", methods=["GET"])
 def healthz():
-    """
-    Liveness probe. Returns 200 as long as the process can respond.
-    Intentionally does not touch the database or any other dependency.
-    """
+    """Liveness probe: 200 as long as the process can respond."""
     return jsonify({"status": "ok"}), 200
 
 
 @health_bp.route("/readyz", methods=["GET"])
 def readyz():
     """
-    Readiness probe. Returns 200 only when:
-
-    - the database connection can be opened and answers SELECT 1;
-    - the number of applied migrations matches the number of migration
-      files on disk (no pending migrations).
-
-    Otherwise returns 503 with a structured payload describing what
-    is not ready. The shared probe in app/services/readiness.py does
-    the checking and never raises; this view only maps the result to
-    the response payload.
+    Readiness probe: 503 until the database answers SELECT 1 and no
+    migrations are pending. The shared probe in
+    app/services/readiness.py does the checking.
     """
 
     response: dict[str, Any] = {"status": "ready"}

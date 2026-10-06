@@ -16,12 +16,7 @@ def parse_exposition(body):
 
 
 def sample_value(source, name, labels):
-    """Value of one sample, None when it is absent.
-
-    source is a families mapping from parse_exposition() or a raw body.
-    Lookup is by sample name, which for counters carries a _total
-    suffix that the family name drops.
-    """
+    """Value of one sample, None when it is absent (counters add _total)."""
 
     families = source if isinstance(source, dict) else parse_exposition(source)
 

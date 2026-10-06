@@ -15,13 +15,7 @@ def _enabled(monkeypatch, token=""):
 
 
 class _BrokenDatabase:
-    """
-    Database stub whose connection handling works but queries fail.
-
-    The failure message mimics a Peewee OperationalError carrying the
-    connection string, so the test can assert that credentials from a
-    database exception never reach the exposition body.
-    """
+    """Database stub whose queries fail with a Peewee-style message."""
 
     def __init__(self):
         self._closed = True
@@ -59,11 +53,7 @@ def test_metrics_disabled_by_default_even_with_auth_header(client):
 
 
 def test_metrics_disabled_post_also_answers_404(client):
-    """
-    Flask answers 405 during URL matching before any view code runs, which
-    would reveal that /metrics exists. While disabled, every method must
-    behave as if the endpoint does not exist.
-    """
+    """Flask answers 405 before any view code runs, so check POST/DELETE."""
     response = client.post("/metrics")
     assert response.status_code == 404
 
@@ -72,10 +62,7 @@ def test_metrics_disabled_post_also_answers_404(client):
 
 
 def test_metrics_disabled_options_also_answers_404(client):
-    """
-    Flask answers automatic OPTIONS with 200 before any view code runs,
-    so /metrics must list OPTIONS to keep the endpoint undiscoverable.
-    """
+    """Automatic OPTIONS is answered before any view code runs."""
     response = client.options("/metrics")
 
     assert response.status_code == 404
@@ -212,10 +199,7 @@ def test_metrics_endpoint_survives_database_outage(client, monkeypatch):
 
 
 def test_metrics_endpoint_survives_database_init_failure(client, monkeypatch):
-    """
-    The implicit DB connect is bypassed for /metrics (app/__init__.py),
-    and the scrape-time probe itself must swallow init failures too.
-    """
+    """The scrape-time probe must swallow database init failures too."""
     _enabled(monkeypatch)
 
     def broken_init():
@@ -288,11 +272,7 @@ def test_metrics_token_wrong_value_rejected(client, monkeypatch):
 
 
 def test_metrics_non_ascii_token_rejected_not_500(client, monkeypatch):
-    """
-    hmac.compare_digest rejects non-ASCII str arguments, so the token
-    check compares bytes. A scanner sending a latin-1 header value must
-    get 401, not an unhandled TypeError (500).
-    """
+    """A non-ASCII header value must get 401, not a TypeError (500)."""
     _enabled(monkeypatch, token="correct-horse-battery-staple")
 
     response = client.get(

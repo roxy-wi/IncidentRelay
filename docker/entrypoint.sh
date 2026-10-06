@@ -95,13 +95,9 @@ fi
 echo "Using config: $CONFIG_FILE"
 echo "Starting IncidentRelay service: $SERVICE"
 
-# Multiprocess Prometheus metrics. prometheus_client keys its counter
-# files by PID, so a directory may only be shared by processes that see
-# the same PIDs — those in one container (web workers) or on one host
-# (the systemd units). Containers get one directory per service so
-# containers with overlapping PID namespaces cannot collide; GET
-# /metrics therefore aggregates the web container only. Override
-# PROMETHEUS_MULTIPROC_DIR to point it somewhere else.
+# prometheus_client keys its counter files by PID, so a directory may
+# only be shared by processes that see the same PIDs. One directory per
+# container: /metrics aggregates the web container only.
 export PROMETHEUS_MULTIPROC_DIR="${PROMETHEUS_MULTIPROC_DIR:-/var/lib/incidentrelay/metrics/$SERVICE}"
 mkdir -p "$PROMETHEUS_MULTIPROC_DIR"
 

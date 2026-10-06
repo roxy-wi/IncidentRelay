@@ -1,15 +1,8 @@
 """
-Shared database readiness probe.
+Shared database readiness probe for /readyz and /metrics.
 
-/readyz (app/views/health_view.py) and /metrics (app/views/metrics_view.py)
-run the same two checks: the database must answer SELECT 1, and the number
-of applied migrations must match the migration files on disk. This module
-owns that logic so the two endpoints cannot drift apart.
-
-The probe never raises. Failures are stored on the result and the caller
-decides how to report them: /readyz answers 503, /metrics degrades its
-gauges. Both log with their own logger and keep the original exception
-through ``exc_info``.
+The probe never raises: failures are stored on the result and the
+caller decides how to report them.
 """
 
 from dataclasses import dataclass, field
@@ -23,14 +16,7 @@ from app.modules.db.migrations import (
 
 @dataclass
 class ReadinessProbeResult:
-    """
-    Outcome of one probe pass.
-
-    ``database_error`` and ``migration_error`` carry the caught exceptions
-    for logging; both are None when the check passed. Exceptions can hold
-    connection strings with credentials, so they are for logs only and
-    must never end up in a response body (see tests/release).
-    """
+    """Outcome of one probe pass; the errors are for logs only."""
 
     database_ok: bool = False
     database_error: Exception | None = None
@@ -44,13 +30,8 @@ def run_readiness_probe() -> ReadinessProbeResult:
     """
     Run SELECT 1 and the pending migration check.
 
-    Opens a database connection when none is open, keeps it open for
-    both checks and closes it again if this call opened it. Closing it
-    in between and relying on an implicit reconnect in
-    get_applied_migrations() would make readiness depend on
-    Peewee/backend autoconnect behaviour. Migration names on disk are
-    normalized the same way migrations.migrate() compares them: files
-    carry the .py suffix, the migration table does not.
+    Opens a connection when none is open and closes it again if this
+    call opened it, so readiness never depends on autoconnect behaviour.
     """
 
     result = ReadinessProbeResult()

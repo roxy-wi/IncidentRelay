@@ -1,34 +1,9 @@
 """
-Optional Prometheus metrics endpoint.
+Optional Prometheus /metrics endpoint in the Prometheus text format.
 
-Exposes GET /metrics in the Prometheus text exposition format using the
-official prometheus_client package. The endpoint follows the health
-probe conventions (it lives outside the /api/ namespace) but is
-disabled by default:
-
-- [metrics] enabled = true   -> the endpoint serves the exposition;
-- otherwise                  -> the endpoint answers 404 and does not
-  exist for scrapers, scanners or proxies.
-
-Scraping is optionally protected by a bearer token:
-
-- [metrics] auth_token empty -> unauthenticated scraping, the same
-  trust model as /healthz (protect the port at the network layer);
-- auth_token set             -> requests must carry
-  "Authorization: Bearer <token>" or receive 401. The comparison is
-  constant-time over bytes so the endpoint does not become a timing
-  oracle and a non-ASCII header cannot crash it.
-
-The collectors live in app/services/metrics.py so services can record
-business events without importing a view module; render_exposition()
-there assembles the response. All database-derived gauges are evaluated
-at scrape time and never raise, so the exposition keeps working while
-the database is down, which is exactly when the gauges matter most.
-In multiprocess deployments (PROMETHEUS_MULTIPROC_DIR set) the same
-function merges the counter files of the IncidentRelay processes that
-share the directory, i.e. one PID namespace: on a systemd host that is
-the web workers plus the scheduler and the Telegram/Slack daemons, in
-per-container deployments each container merges its own processes only.
+Disabled by default: without [metrics] enabled the endpoint answers
+404 to every method. With auth_token set, scrapes must carry
+"Authorization: Bearer <token>".
 """
 
 import hmac
@@ -53,16 +28,10 @@ METRICS_PATH = "/metrics"
 
 def _authorized():
     """
-    Check scrape authorization against the configured token.
+    Check the scrape against the configured token, empty means open.
 
-    An empty configured token means the endpoint is intentionally open
-    (the /healthz trust model). A configured token must match the
-    Authorization header exactly. Both sides are compared as bytes:
-    hmac.compare_digest rejects non-ASCII str arguments, and headers
-    and config files can legitimately contain non-ASCII values. The
-    import is lazy because app.services.integrations.auth pulls in the
-    whole API middleware stack and metrics_view is imported from
-    create_app().
+    Compared as bytes: hmac.compare_digest rejects non-ASCII str, while
+    headers and config values can legitimately contain them.
     """
 
     expected = (Config.METRICS_AUTH_TOKEN or "").strip()
@@ -89,9 +58,7 @@ def _authorized():
     provide_automatic_options=False,
 )
 def metrics() -> Union[Response, tuple]:
-    """
-    Serve the Prometheus exposition, or pretend the endpoint is absent.
-    """
+    """Serve the Prometheus exposition, or pretend the endpoint is absent."""
 
     if not Config.METRICS_ENABLED:
         abort(404)
@@ -113,11 +80,9 @@ def metrics_wrong_method() -> Union[Response, tuple]:
     """
     Keep non-GET methods consistent with the disabled endpoint.
 
-    Flask answers 405 or automatic OPTIONS during URL matching, before
-    any view code runs, which would reveal that /metrics exists. This
-    rule keeps every non-GET method answering 404 while disabled and
-    405 when enabled. The 405 body is built here instead of raised, so
-    the app-wide JSON error handler cannot drop the Allow header.
+    Flask answers 405 or automatic OPTIONS during URL matching, which
+    would reveal that /metrics exists. The body is built here so the
+    app-wide JSON error handler cannot drop the Allow header.
     """
 
     if not Config.METRICS_ENABLED:
@@ -135,12 +100,7 @@ def metrics_wrong_method() -> Union[Response, tuple]:
 
 
 def register_http_metrics(flask_app) -> None:
-    """
-    Install the app-level request-counting hooks.
-
-    Counting only happens while METRICS_ENABLED is true, so deployments
-    that never enable the endpoint pay no per-request cost.
-    """
+    """Install the request-counting hooks, active only while enabled."""
 
     @flask_app.before_request
     def metrics_before_request():

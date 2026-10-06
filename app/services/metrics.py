@@ -63,14 +63,11 @@ ALERT_GROUP_ACTIONS = Counter(
     registry=REGISTRY,
 )
 
-# Lock name of the never-released row the scheduler refreshes as its
-# heartbeat; app/services/scheduler.py writes it, the gauge reads it.
+# Written by app/services/scheduler.py, read by the heartbeat gauge.
 SCHEDULER_HEARTBEAT_LOCK_NAME = "scheduler_heartbeat"
 
-# Time window of the *_recent database gauges; the migration
-# 20261006070000_metrics_recent_indexes backs its updated_at filters.
-# Both delivery tables are mutable: a row created days ago can fail
-# today, so the window must follow updated_at, not created_at.
+# Window of the *_recent database gauges, filtered by updated_at:
+# delivery rows transition in place, so created_at misses late failures.
 RECENT_WINDOW = timedelta(hours=24)
 
 
@@ -85,18 +82,13 @@ def multiprocess_dir():
 
 
 def is_multiprocess_enabled():
-    """True when counters are backed by the shared multiprocess directory.
-
-    prometheus_client picks its value class from the same environment
-    variables at first import, so this is a deployment-level switch, not
-    a runtime setting: it cannot be flipped for a running process.
-    """
+    """True when counters are backed by the multiprocess directory."""
 
     return multiprocess_dir() is not None
 
 
-# Frozen at import: prometheus_client has already picked its value class
-# from the same environment, so the process model cannot change later.
+# Frozen at import: prometheus_client picks its value class from the
+# same environment, so the process model cannot change at runtime.
 _MULTIPROC_DIR = multiprocess_dir()
 
 
@@ -169,11 +161,8 @@ class DatabaseGaugeCollector(Collector):
             if db_was_closed:
                 db.connect(reuse_if_open=True)
 
-            # Both gauges are windowed so a scrape never scans the full
-            # delivery history of a long-lived installation. The window
-            # follows updated_at: rows transition in place (pending ->
-            # sent/failed, new provider errors), so created_at would
-            # miss recent failures of old rows.
+            # Windowed on updated_at so a scrape never scans the full
+            # delivery history and late failures of old rows still count.
             recent_since = utc_now() - RECENT_WINDOW
 
             delivery_rows = list(
@@ -270,13 +259,10 @@ DATABASE_GAUGES = DatabaseGaugeCollector()
 if not is_multiprocess_enabled():
     REGISTRY.register(DATABASE_GAUGES)
 
-# Live-mode gauge files only: these die with their process. Counter and
-# histogram files of dead processes must stay: removing one would drop
-# its share from the merged counter, which Prometheus reads as a counter
-# reset and rate() distorts on. They keep accumulating until the shared
-# directory is cleared on a full redeploy. Every live gauge mode name
-# (liveall, livesum, livemin, livemax, livemostrecent) starts with
-# "live", the non-live modes (all, sum, max, min, mostrecent) do not.
+# Dead-process cleanup targets live-mode gauge files only (every live
+# mode name starts with "live"). Counter and histogram files of dead
+# processes must stay: removing one drops its share from the merged
+# counter, which Prometheus reads as a counter reset.
 _DEAD_PID_FILE_RE = re.compile(r"^gauge_live[a-z]*_(\d+)\.db$")
 
 _COLLECT_LOCK_NAME = ".incidentrelay-metrics.lock"
@@ -327,12 +313,9 @@ def _pid_alive(pid):
 
 def _cleanup_dead_process_files(path):
     """
-    Remove live-mode gauge files of dead processes.
-
-    This mirrors prometheus_client.multiprocess.mark_process_dead():
-    counter and histogram files of dead processes are kept, so the
-    merged counters never drop and Prometheus never sees a synthetic
-    counter reset when a worker exits.
+    Remove live-mode gauge files of dead processes, like
+    prometheus_client.multiprocess.mark_process_dead(). Counter and
+    histogram files are kept so the merged counters never drop.
     """
 
     try:

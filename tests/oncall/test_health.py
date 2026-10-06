@@ -1,11 +1,4 @@
-"""
-Tests for liveness (/healthz) and readiness (/readyz) probes.
-
-These endpoints exist outside the /api/ namespace so they are reachable
-without authentication (Kubernetes/HAProxy/ELB probes can't carry
-credentials). Behaviour is asserted directly here so regressions don't
-silently break load balancer integration.
-"""
+"""Tests for liveness (/healthz) and readiness (/readyz) probes."""
 
 from unittest.mock import patch
 
@@ -34,13 +27,7 @@ def test_healthz_does_not_require_authentication(client):
 
 
 def test_healthz_returns_200_even_when_database_is_unreachable(client):
-    """
-    Liveness must NOT depend on the database. A DB outage should not cause
-    Kubernetes to restart the pod, since restarting would not help.
-    """
-    # /healthz never touches the database itself. Patching init_database on
-    # the shared readiness probe guarantees that if a future refactor moved
-    # a DB call into the liveness path, this test would catch it.
+    """Liveness must not depend on the database."""
     with patch(
         "app.services.readiness.init_database",
         side_effect=RuntimeError("simulated DB outage"),
@@ -57,10 +44,7 @@ def test_healthz_returns_200_even_when_database_is_unreachable(client):
 
 
 def test_readyz_returns_200_when_database_and_migrations_are_ok(client):
-    """
-    Happy path: tests/conftest.py applies all migrations before the test, so
-    /readyz should report database=ok, no pending migrations and status=ready.
-    """
+    """Migrated and reachable database reports ready."""
     response = client.get("/readyz")
 
     assert response.status_code == 200
@@ -77,15 +61,12 @@ def test_readyz_does_not_require_authentication(client):
     """/readyz must be reachable without credentials too."""
     response = client.get("/readyz")
 
-    # Either 200 (ready) or 503 (not ready), but NOT 401/403 — auth is bypassed.
+    # Either 200 or 503, but never 401/403: auth is bypassed.
     assert response.status_code in (200, 503)
 
 
 def test_readyz_returns_503_when_database_select_fails(client):
-    """
-    When SELECT 1 raises, readyz reports database=error, status=not_ready
-    and HTTP 503 — so the load balancer drops this pod from the rotation.
-    """
+    """A failing SELECT 1 reports not_ready with 503."""
     def boom(*args, **kwargs):
         raise RuntimeError("connection refused")
 
@@ -103,15 +84,12 @@ def test_readyz_returns_503_when_database_select_fails(client):
     assert body["database"] == "error"
     assert body["database_error"] == "database check failed"
     assert "connection refused" not in response.get_data(as_text=True)
-    # Migration check is skipped when the DB is down — it would be pointless.
+    # Migration check is skipped when the DB is down, it would be pointless.
     assert "migrations" not in body
 
 
 def test_readyz_returns_503_when_pending_migrations_exist(client):
-    """
-    When on-disk migration files exist that are not yet applied, /readyz
-    reports them in body.migrations.pending and returns 503.
-    """
+    """Pending migrations are reported and answered with 503."""
     # Pretend there's a new migration file on disk that hasn't been applied.
     fake_new_file = "29990101000000_simulated_pending_migration.py"
 
@@ -157,13 +135,7 @@ def test_readyz_returns_503_when_migration_check_raises(client):
 
 
 def test_probe_keeps_connection_open_between_checks():
-    """
-    Regression guard: the probe runs SELECT 1 and the migration check on
-    one open connection and closes it afterwards. Closing it in between
-    makes the migration check depend on Peewee autoconnect silently
-    reopening the connection — and fail outright when autoconnect is
-    unavailable, turning a healthy database into a 503.
-    """
+    """Both checks run on one connection, closed again afterwards."""
     from app.services.readiness import run_readiness_probe
 
     class _ConnectionTrackingDatabase:
@@ -201,7 +173,7 @@ def test_probe_keeps_connection_open_between_checks():
 
     assert probe.database_error is None
     assert probe.migration_error is None
-    # The probe opened the connection, so it closes it again — exactly once.
+    # The probe opened the connection, so it closes it again, exactly once.
     assert database.close_calls == 1
     assert database.is_closed()
 

@@ -53,8 +53,6 @@ from app.views.orchestrations_view import (
 )
 
 # Paths served without the implicit per-request database connection.
-# /metrics belongs with the health probes: it must keep serving exactly
-# while the database is down, which is when metrics matter most.
 DB_BYPASS_PATHS = HEALTH_PATHS + (METRICS_PATH,)
 
 
@@ -80,12 +78,9 @@ def create_app(log_role=None):
         """
         Open a database connection before each request.
 
-        The paths in DB_BYPASS_PATHS skip the implicit DB connect:
-        /healthz must work even when the database is down (otherwise
-        Kubernetes would restart a healthy pod for no reason), /readyz
-        manages its own connection explicitly so it can return a clean
-        503 on DB errors, and /metrics must keep serving metrics while
-        the database is down, which is exactly when they matter most.
+        DB_BYPASS_PATHS skip it: /healthz must work while the database
+        is down, /readyz manages its own connection to answer a clean
+        503, /metrics degrades its gauges instead of failing.
         """
 
         if request.path not in DB_BYPASS_PATHS:
