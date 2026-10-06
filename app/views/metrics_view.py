@@ -25,9 +25,10 @@ there assembles the response. All database-derived gauges are evaluated
 at scrape time and never raise, so the exposition keeps working while
 the database is down, which is exactly when the gauges matter most.
 In multiprocess deployments (PROMETHEUS_MULTIPROC_DIR set) the same
-function merges the counter files of every IncidentRelay process, so
-the web workers and the scheduler/Telegram/Slack daemons are all
-covered by this one endpoint.
+function merges the counter files of the IncidentRelay processes that
+share the directory, i.e. one PID namespace: on a systemd host that is
+the web workers plus the scheduler and the Telegram/Slack daemons, in
+per-container deployments each container merges its own processes only.
 """
 
 import hmac

@@ -829,16 +829,19 @@ def start_scheduler():
         replace_existing=True,
     )
 
-    _scheduler.add_job(
-        scheduler_heartbeat_job,
-        "interval",
-        seconds=int(getattr(Config, "SCHEDULER_HEARTBEAT_INTERVAL_SECONDS", 30)),
-        max_instances=1,
-        coalesce=True,
-        next_run_time=utc_now(),
-        id="scheduler_heartbeat_job",
-        replace_existing=True,
-    )
+    if Config.METRICS_ENABLED:
+        # Only the /metrics heartbeat gauge reads this lock row; a
+        # disabled metrics feature must not pay a write every interval.
+        _scheduler.add_job(
+            scheduler_heartbeat_job,
+            "interval",
+            seconds=int(getattr(Config, "SCHEDULER_HEARTBEAT_INTERVAL_SECONDS", 30)),
+            max_instances=1,
+            coalesce=True,
+            next_run_time=utc_now(),
+            id="scheduler_heartbeat_job",
+            replace_existing=True,
+        )
 
     _scheduler.add_job(
         maintenance_lifecycle_job,

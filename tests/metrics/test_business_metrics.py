@@ -264,7 +264,7 @@ def test_reopen_counter_after_acknowledged_group_reopens(client, monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def _create_delivery(group, user, method, status, created_at=None):
+def _create_delivery(group, user, method, status, updated_at=None):
     return UserNotificationDelivery.create(
         group=group.id,
         user=user.id,
@@ -272,7 +272,10 @@ def _create_delivery(group, user, method, status, created_at=None):
         status=status,
         event_type="notification",
         scheduled_at=utc_now(),
-        created_at=created_at or utc_now(),
+        # created_at follows updated_at so the helper cannot
+        # accidentally manufacture in-window rows for the gauges.
+        created_at=updated_at or utc_now(),
+        updated_at=updated_at or utc_now(),
     )
 
 
@@ -310,7 +313,16 @@ def test_user_notification_deliveries_recent_gauge(client, monkeypatch):
         user,
         "email",
         "sent",
-        created_at=utc_now() - business_metrics.RECENT_WINDOW - timedelta(hours=1),
+        updated_at=utc_now() - business_metrics.RECENT_WINDOW - timedelta(hours=1),
+    )
+    # A row created days ago that failed just now counts: the window
+    # follows updated_at, so in-place transitions are never missed.
+    _create_delivery(
+        alert_group,
+        user,
+        "email",
+        "failed",
+        updated_at=utc_now(),
     )
 
     _, body = _scrape(client)
@@ -318,7 +330,7 @@ def test_user_notification_deliveries_recent_gauge(client, monkeypatch):
     metric = "incidentrelay_user_notification_deliveries_recent"
 
     assert sample_value(body, metric, {"method": "email", "status": "sent"}) == 2.0
-    assert sample_value(body, metric, {"method": "email", "status": "failed"}) == 1.0
+    assert sample_value(body, metric, {"method": "email", "status": "failed"}) == 2.0
     assert sample_value(
         body, metric, {"method": "telegram", "status": "pending"},
     ) == 1.0
@@ -350,6 +362,16 @@ def test_alert_notification_errors_recent_gauge(client, monkeypatch):
         provider="telegram",
         last_error="timeout",
         created_at=utc_now() - business_metrics.RECENT_WINDOW - timedelta(hours=1),
+        updated_at=utc_now() - business_metrics.RECENT_WINDOW - timedelta(hours=1),
+    )
+    # Created days ago, failed just now: must count, the window follows
+    # updated_at and never misses an in-place transition.
+    AlertNotification.create(
+        channel=failing,
+        provider="telegram",
+        last_error="connection refused",
+        created_at=utc_now() - business_metrics.RECENT_WINDOW - timedelta(hours=48),
+        updated_at=utc_now(),
     )
 
     _, body = _scrape(client)
@@ -357,7 +379,7 @@ def test_alert_notification_errors_recent_gauge(client, monkeypatch):
     metric = "incidentrelay_alert_notification_errors_recent"
 
     # Only in-window errored deliveries are counted.
-    assert sample_value(body, metric, {"provider": "telegram"}) == 1.0
+    assert sample_value(body, metric, {"provider": "telegram"}) == 2.0
     # A channel without a recorded error is not counted.
     assert sample_value(body, metric, {"provider": "slack"}) is None
 
@@ -451,6 +473,45 @@ def test_scheduler_heartbeat_job_records_lock(db):
 
     assert row is not None
     assert row.owner.startswith("scheduler:")
+
+
+def test_scheduler_registers_heartbeat_job_only_when_metrics_enabled(monkeypatch):
+    """The scheduler registers the heartbeat job only while metrics are on."""
+
+    from app.services import scheduler as scheduler_module
+
+    registered = []
+
+    class _FakeScheduler:
+        running = False
+
+        def add_job(self, job, *args, **kwargs):
+            registered.append(kwargs.get("id"))
+
+        def start(self):
+            self.running = True
+
+        def shutdown(self, wait=False):
+            self.running = False
+
+    monkeypatch.setattr(scheduler_module, "_scheduler", None)
+    monkeypatch.setattr(scheduler_module, "BackgroundScheduler", _FakeScheduler)
+
+    try:
+        monkeypatch.setattr(scheduler_module.Config, "METRICS_ENABLED", False)
+        scheduler_module.start_scheduler()
+
+        assert "scheduler_heartbeat_job" not in registered
+        assert "reminder_job" in registered
+
+        scheduler_module.stop_scheduler()
+
+        monkeypatch.setattr(scheduler_module.Config, "METRICS_ENABLED", True)
+        scheduler_module.start_scheduler()
+
+        assert "scheduler_heartbeat_job" in registered
+    finally:
+        scheduler_module.stop_scheduler()
 
 
 def test_touch_lock_creates_then_refreshes(db):

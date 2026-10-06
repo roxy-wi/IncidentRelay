@@ -299,12 +299,12 @@ def test_database_outage_degrades_gauges_in_multiprocess_mode(tmp_path):
     )
 
 
-def test_dead_process_files_are_removed_at_next_process_start(tmp_path):
+def test_dead_process_counters_survive_cleanup(tmp_path):
     """
-    Files of exited processes keep contributing until the next
-    IncidentRelay process starts: a renderer started afterwards removes
-    the dead process's file, while files of live processes (here: the
-    pytest process itself) survive.
+    Counter files of exited processes must survive cleanup: removing one
+    would drop its share from the merged counter, and Prometheus would
+    read that drop as a counter reset. Only the dead process's live-gauge
+    files go.
     """
 
     # Run a recorder to completion: it exits before any scrape, so its
@@ -320,17 +320,32 @@ def test_dead_process_files_are_removed_at_next_process_start(tmp_path):
         for filename in os.listdir(tmp_path)
         if filename.startswith("counter_")
     ]
+    dead_files = [
+        filename
+        for filename in os.listdir(tmp_path)
+        if filename.startswith("counter_")
+    ]
     assert len(dead_files) == 1
-    dead_file = tmp_path / dead_files[0]
+    dead_counter = tmp_path / dead_files[0]
+    dead_pid = int(dead_files[0].removeprefix("counter_").removesuffix(".db"))
 
-    live_file = tmp_path / f"counter_{os.getpid()}.db"
-    MmapedDict(str(live_file)).close()
+    # A stale live-gauge file of the same dead process must go.
+    dead_gauge = tmp_path / f"gauge_livesum_{dead_pid}.db"
+    MmapedDict(str(dead_gauge)).close()
 
     # A renderer starting now performs the startup cleanup.
-    _render(tmp_path)
+    families = parse_exposition(_render(tmp_path))
 
-    assert not dead_file.exists()
-    assert live_file.exists()
+    assert dead_counter.exists()
+    assert not dead_gauge.exists()
+    assert (
+        sample_value(
+            families,
+            "incidentrelay_alerts_received_total",
+            {"source": "grafana"},
+        )
+        == 1.0
+    )
 
 
 def test_metrics_view_serves_multiprocess_exposition(client, monkeypatch, tmp_path):

@@ -1,4 +1,4 @@
-"""Add created_at indexes used by the /metrics recent-delivery gauges."""
+"""Add updated_at indexes used by the /metrics recent-delivery gauges."""
 
 from playhouse.migrate import migrate
 
@@ -11,8 +11,8 @@ from app.modules.db.models import AlertNotification, UserNotificationDelivery
 db = init_database()
 migrator = get_migrator(db)
 INDEXES = (
-    (AlertNotification._meta.table_name, ("created_at",)),
-    (UserNotificationDelivery._meta.table_name, ("created_at",)),
+    (AlertNotification._meta.table_name, ("updated_at",)),
+    (UserNotificationDelivery._meta.table_name, ("updated_at",)),
 )
 
 

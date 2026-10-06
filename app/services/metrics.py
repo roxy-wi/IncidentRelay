@@ -13,7 +13,10 @@ from prometheus_client import (
     generate_latest,
 )
 from prometheus_client.metrics_core import GaugeMetricFamily
-from prometheus_client.multiprocess import MultiProcessCollector
+from prometheus_client.multiprocess import (
+    MultiProcessCollector,
+    mark_process_dead,
+)
 from prometheus_client.registry import Collector
 
 from app.db import init_database
@@ -65,7 +68,9 @@ ALERT_GROUP_ACTIONS = Counter(
 SCHEDULER_HEARTBEAT_LOCK_NAME = "scheduler_heartbeat"
 
 # Time window of the *_recent database gauges; the migration
-# 20261006070000_metrics_recent_indexes backs its created_at filters.
+# 20261006070000_metrics_recent_indexes backs its updated_at filters.
+# Both delivery tables are mutable: a row created days ago can fail
+# today, so the window must follow updated_at, not created_at.
 RECENT_WINDOW = timedelta(hours=24)
 
 
@@ -139,14 +144,14 @@ class DatabaseGaugeCollector(Collector):
     def _notification_gauges(self):
         deliveries = GaugeMetricFamily(
             "incidentrelay_user_notification_deliveries_recent",
-            "User notification deliveries recorded in the last 24 hours, "
+            "User notification deliveries updated in the last 24 hours, "
             "by method and outcome.",
             labels=("method", "status"),
         )
         errors = GaugeMetricFamily(
             "incidentrelay_alert_notification_errors_recent",
             "Alert notification deliveries that ended in an error, "
-            "recorded in the last 24 hours.",
+            "updated in the last 24 hours.",
             labels=("provider",),
         )
         heartbeat = GaugeMetricFamily(
@@ -165,7 +170,10 @@ class DatabaseGaugeCollector(Collector):
                 db.connect(reuse_if_open=True)
 
             # Both gauges are windowed so a scrape never scans the full
-            # delivery history of a long-lived installation.
+            # delivery history of a long-lived installation. The window
+            # follows updated_at: rows transition in place (pending ->
+            # sent/failed, new provider errors), so created_at would
+            # miss recent failures of old rows.
             recent_since = utc_now() - RECENT_WINDOW
 
             delivery_rows = list(
@@ -175,7 +183,7 @@ class DatabaseGaugeCollector(Collector):
                     UserNotificationDelivery.status,
                     fn.COUNT(UserNotificationDelivery.id).alias("total"),
                 )
-                .where(UserNotificationDelivery.created_at >= recent_since)
+                .where(UserNotificationDelivery.updated_at >= recent_since)
                 .group_by(
                     UserNotificationDelivery.method,
                     UserNotificationDelivery.status,
@@ -191,7 +199,7 @@ class DatabaseGaugeCollector(Collector):
                 )
                 .where(
                     AlertNotification.last_error.is_null(False),
-                    AlertNotification.created_at >= recent_since,
+                    AlertNotification.updated_at >= recent_since,
                 )
                 .group_by(AlertNotification.provider)
                 .tuples()
@@ -262,10 +270,14 @@ DATABASE_GAUGES = DatabaseGaugeCollector()
 if not is_multiprocess_enabled():
     REGISTRY.register(DATABASE_GAUGES)
 
-# Matches the per-process files prometheus_client writes:
-# counter_<pid>.db, histogram_<pid>.db, gauge_<mode>_<pid>.db. Anything
-# else in the directory (lock files, foreign files) must not be touched.
-_MULTIPROC_FILE_RE = re.compile(r"^[a-z]+(?:_[a-z]+)?_(\d+)\.db$")
+# Live-mode gauge files only: these die with their process. Counter and
+# histogram files of dead processes must stay: removing one would drop
+# its share from the merged counter, which Prometheus reads as a counter
+# reset and rate() distorts on. They keep accumulating until the shared
+# directory is cleared on a full redeploy. Every live gauge mode name
+# (liveall, livesum, livemin, livemax, livemostrecent) starts with
+# "live", the non-live modes (all, sum, max, min, mostrecent) do not.
+_DEAD_PID_FILE_RE = re.compile(r"^gauge_live[a-z]*_(\d+)\.db$")
 
 _COLLECT_LOCK_NAME = ".incidentrelay-metrics.lock"
 
@@ -314,13 +326,24 @@ def _pid_alive(pid):
 
 
 def _cleanup_dead_process_files(path):
+    """
+    Remove live-mode gauge files of dead processes.
+
+    This mirrors prometheus_client.multiprocess.mark_process_dead():
+    counter and histogram files of dead processes are kept, so the
+    merged counters never drop and Prometheus never sees a synthetic
+    counter reset when a worker exits.
+    """
+
     try:
         filenames = os.listdir(path)
     except OSError:
         return
 
+    dead_pids = set()
+
     for filename in filenames:
-        match = _MULTIPROC_FILE_RE.match(filename)
+        match = _DEAD_PID_FILE_RE.match(filename)
 
         if match is None:
             continue
@@ -330,11 +353,10 @@ def _cleanup_dead_process_files(path):
         if pid == os.getpid() or _pid_alive(pid):
             continue
 
-        try:
-            os.remove(os.path.join(path, filename))
-        except OSError:
-            # Another starting process removed it first.
-            pass
+        dead_pids.add(pid)
+
+    for pid in dead_pids:
+        mark_process_dead(pid, path)
 
 
 def _init_multiprocess_directory():
