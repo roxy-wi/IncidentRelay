@@ -124,6 +124,47 @@ existingConfigSecret: incidentrelay-config
 !!! note "Примечание"
     Чарт добавляет к pod'ам аннотацию `checksum/config`, чтобы при изменении конфигурации они перезапускались автоматически. При использовании `existingConfigSecret` чарт не видит его содержимое, поэтому аннотация не добавляется — после изменения Secret перезапустите pod'ы самостоятельно.
 
+### Секреты из существующих Secret и файлов
+
+Чтобы не хранить учётные данные в `values.yaml`, возьмите любой параметр из Secret, ConfigMap или файла через `configFrom`. Ключи имеют вид `<секция>.<параметр>`, а в каждой записи задаётся ровно один из `secretKeyRef`, `configMapKeyRef` или `file`:
+
+```yaml
+configFrom:
+  main.secret_key:
+    secretKeyRef:
+      name: incidentrelay-secrets
+      key: secret-key
+  database.password:
+    secretKeyRef:
+      name: incidentrelay-db
+      key: password
+  smtp.password:
+    file: /mnt/secrets-store/smtp-password
+```
+
+Чарт передаёт их всем компонентам как переменные окружения `INCIDENTRELAY__<SECTION>__<OPTION>`, которые имеют приоритет над `incidentrelay.conf` (см. [Переопределение через переменные окружения](configuration.md#переопределение-через-переменные-окружения)). Если `main.secret_key` задан через `configFrom`, указывать его в `config` больше не нужно, а пустые общие ключи (`main.secret_encryption_key`, `auth.jwt_secret`, `mattermost.action_secret`, `voice.callback_secret`) берут его значение — в том числе с `existingConfigSecret`, — поэтому во всех pod'ах ключи одинаковые.
+
+`file` работает с любым томом, смонтированным в pod'ы, например с [Secrets Store CSI Driver](https://secrets-store-csi-driver.sigs.k8s.io/) и `SecretProviderClass` для AWS Systems Manager Parameter Store, Secrets Manager или Vault:
+
+```yaml
+extraVolumes:
+  - name: secrets-store
+    csi:
+      driver: secrets-store.csi.k8s.io
+      readOnly: true
+      volumeAttributes:
+        secretProviderClass: incidentrelay
+extraVolumeMounts:
+  - name: secrets-store
+    mountPath: /mnt/secrets-store
+    readOnly: true
+```
+
+Доступ pod'ов к облачному провайдеру настраивается через `serviceAccount.annotations`, например с помощью IAM-ролей для service account в EKS.
+
+!!! note "Примечание"
+    Pod'ы не перезапускаются при изменении Secret или файла, на которые ссылается `configFrom`. После смены значения перезапустите их.
+
 ## База данных
 
 ### SQLite (по умолчанию)
@@ -166,6 +207,8 @@ config:
 persistence:
   enabled: false
 ```
+
+Чтобы не хранить пароль в `values.yaml`, задайте `database.password` через [`configFrom`](#секреты-из-существующих-secret-и-файлов).
 
 ## Миграции и масштабирование веб-компонента
 

@@ -59,6 +59,9 @@ spec:
             - name: INCIDENTRELAY_RUN_MIGRATIONS
               value: {{ .Values.web.runMigrations | ternary "1" "0" | quote }}
             {{- include "incidentrelay.customCAEnv" . | nindent 12 }}
+            {{- with include "incidentrelay.configFromEnv" . }}
+            {{- . | trim | nindent 12 }}
+            {{- end }}
             - name: INCIDENTRELAY_PORT
               value: {{ .Values.web.port | quote }}
             - name: INCIDENTRELAY_WEB_WORKERS

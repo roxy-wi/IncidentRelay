@@ -124,6 +124,47 @@ When `existingConfigSecret` is set, the `config` map is ignored and the chart re
 !!! note
     The chart adds a `checksum/config` pod annotation so config changes restart the pods automatically. With `existingConfigSecret` the chart cannot see the content, so the annotation is omitted — restart the pods yourself after changing the Secret.
 
+### Secrets from existing Secrets or files
+
+To keep credentials out of `values.yaml`, take any option from a Secret, a ConfigMap or a file with `configFrom`. Keys are `<section>.<option>`, and each entry sets exactly one of `secretKeyRef`, `configMapKeyRef` or `file`:
+
+```yaml
+configFrom:
+  main.secret_key:
+    secretKeyRef:
+      name: incidentrelay-secrets
+      key: secret-key
+  database.password:
+    secretKeyRef:
+      name: incidentrelay-db
+      key: password
+  smtp.password:
+    file: /mnt/secrets-store/smtp-password
+```
+
+The chart passes them to every component as `INCIDENTRELAY__<SECTION>__<OPTION>` environment variables, which take precedence over `incidentrelay.conf` (see [Environment overrides](configuration.md#environment-overrides)). When `main.secret_key` comes from `configFrom`, it no longer has to be set in `config`, and the shared keys left empty (`main.secret_encryption_key`, `auth.jwt_secret`, `mattermost.action_secret`, `voice.callback_secret`) fall back to it, with `existingConfigSecret` too, so every pod uses the same keys.
+
+`file` works with any volume mounted into the pods, for example the [Secrets Store CSI Driver](https://secrets-store-csi-driver.sigs.k8s.io/) with a `SecretProviderClass` for AWS Systems Manager Parameter Store, Secrets Manager or Vault:
+
+```yaml
+extraVolumes:
+  - name: secrets-store
+    csi:
+      driver: secrets-store.csi.k8s.io
+      readOnly: true
+      volumeAttributes:
+        secretProviderClass: incidentrelay
+extraVolumeMounts:
+  - name: secrets-store
+    mountPath: /mnt/secrets-store
+    readOnly: true
+```
+
+Use `serviceAccount.annotations` to give the pods access to the cloud provider, for example with IAM roles for service accounts on EKS.
+
+!!! note
+    Pods are not restarted when a referenced Secret or file changes. Restart them after rotating a value.
+
 ## Database
 
 ### SQLite (default)
@@ -166,6 +207,8 @@ config:
 persistence:
   enabled: false
 ```
+
+To keep the password out of `values.yaml`, set `database.password` with [`configFrom`](#secrets-from-existing-secrets-or-files) instead.
 
 ## Migrations and scaling the web component
 

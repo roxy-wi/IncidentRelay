@@ -32,6 +32,50 @@ environment:
 
 Старое имя `ONCALL_CONFIG_FILE` использовать не следует.
 
+## Переопределение через переменные окружения
+
+Любой параметр из файла конфигурации можно также задать переменной окружения
+`INCIDENTRELAY__<SECTION>__<OPTION>`, где секция и параметр записываются в
+верхнем регистре. Переменная имеет приоритет над файлом:
+
+```bash
+export INCIDENTRELAY__DATABASE__PASSWORD=replace-with-the-database-password
+export INCIDENTRELAY__LOGGING__LEVEL=DEBUG
+```
+
+Чтобы прочитать значение из файла, добавьте к имени `__FILE` и укажите путь.
+Так можно использовать секреты Docker и Kubernetes или тома Secrets Store CSI,
+не записывая секреты в `incidentrelay.conf`:
+
+```bash
+export INCIDENTRELAY__DATABASE__PASSWORD__FILE=/run/secrets/db-password
+```
+
+Перевод строки в конце файла игнорируется. Задавать одновременно переменную и
+её форму `__FILE` нельзя — это ошибка. Для systemd поместите переменные в
+`EnvironmentFile=`.
+
+Если `main.secret_key` задан через переменную окружения, пустые
+`main.secret_encryption_key`, `auth.jwt_secret`, `mattermost.action_secret` и
+`voice.callback_secret` берут его значение, а не генерируются Docker entrypoint.
+
+В `[voice_provider]`, где набор параметров зависит от провайдера, переменная
+только переопределяет параметр, который есть в файле, и имя параметра
+сохраняет написание из файла. Новых параметров переменные туда не добавляют:
+
+```ini
+[voice_provider]
+apiKey =
+```
+
+```bash
+export INCIDENTRELAY__VOICE_PROVIDER__APIKEY=replace-with-the-api-key
+```
+
+Параметры провайдера также могут ссылаться на переменную напрямую, например
+`api_token = ${VOICE_API_TOKEN}`, см.
+[Настройка голосового провайдера](../voice-providers/configuration.md).
+
 ## Основной секрет и секрет аутентификации
 
 Сгенерируйте два разных случайных значения и не меняйте их при перезапусках и
