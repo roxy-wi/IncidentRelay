@@ -2,6 +2,8 @@ import fcntl
 import logging
 import os
 import re
+import socket
+import time
 from contextlib import contextmanager
 from datetime import timedelta, timezone
 
@@ -21,9 +23,11 @@ from prometheus_client.registry import Collector
 
 from app.db import init_database
 from app.modules.common import utc_now
+from app.modules.db.locks_repo import touch_lock
 from app.modules.db.models import (
     AlertNotification,
     AppLock,
+    PendingOrchestratedEvent,
     UserNotificationDelivery,
 )
 from app.services.readiness import run_readiness_probe
@@ -63,8 +67,16 @@ ALERT_GROUP_ACTIONS = Counter(
     registry=REGISTRY,
 )
 
-# Written by app/services/scheduler.py, read by the heartbeat gauge.
-SCHEDULER_HEARTBEAT_LOCK_NAME = "scheduler_heartbeat"
+WORKER_HEARTBEAT_LOCK_NAMES = {
+    "scheduler": "scheduler_heartbeat",
+    "telegram": "telegram_worker_heartbeat",
+    "slack": "slack_worker_heartbeat",
+}
+
+# Keep the existing scheduler metric/lock name for backwards compatibility.
+SCHEDULER_HEARTBEAT_LOCK_NAME = WORKER_HEARTBEAT_LOCK_NAMES["scheduler"]
+WORKER_HEARTBEAT_MIN_INTERVAL_SECONDS = 15
+_WORKER_HEARTBEAT_LAST_ATTEMPT = {}
 
 # Window of the *_recent database gauges, filtered by updated_at:
 # delivery rows transition in place, so created_at misses late failures.
@@ -95,7 +107,7 @@ _MULTIPROC_DIR = multiprocess_dir()
 class DatabaseGaugeCollector(Collector):
     def collect(self):
         yield from self._database_gauges()
-        yield from self._notification_gauges()
+        yield from self._operational_gauges()
         yield self._build_info_gauge()
 
     def _database_gauges(self):
@@ -133,7 +145,7 @@ class DatabaseGaugeCollector(Collector):
         yield database_up
         yield migrations_pending
 
-    def _notification_gauges(self):
+    def _operational_gauges(self):
         deliveries = GaugeMetricFamily(
             "incidentrelay_user_notification_deliveries_recent",
             "User notification deliveries updated in the last 24 hours, "
@@ -146,13 +158,47 @@ class DatabaseGaugeCollector(Collector):
             "updated in the last 24 hours.",
             labels=("provider",),
         )
-        heartbeat = GaugeMetricFamily(
+        scheduler_heartbeat = GaugeMetricFamily(
             "incidentrelay_scheduler_last_run_timestamp_seconds",
             "Unix time of the last scheduler heartbeat, 0 when it never ran.",
+        )
+        worker_heartbeat = GaugeMetricFamily(
+            "incidentrelay_worker_last_seen_timestamp_seconds",
+            "Unix time of the last successful worker-loop heartbeat.",
+            labels=("worker",),
+        )
+        notification_queue_depth = GaugeMetricFamily(
+            "incidentrelay_user_notification_queue_depth",
+            "User notification work that is due or currently processing.",
+            labels=("state",),
+        )
+        notification_queue_oldest_age = GaugeMetricFamily(
+            "incidentrelay_user_notification_queue_oldest_age_seconds",
+            "Age in seconds of the oldest user notification work item.",
+            labels=("state",),
+        )
+        orchestration_pending = GaugeMetricFamily(
+            "incidentrelay_orchestration_pending_events",
+            "Paused orchestration events by current status.",
+            labels=("status",),
+        )
+        orchestration_oldest_due_age = GaugeMetricFamily(
+            "incidentrelay_orchestration_oldest_due_age_seconds",
+            "Age in seconds of the oldest paused orchestration event that is due.",
         )
 
         db = None
         db_was_closed = True
+        now = utc_now()
+        delivery_rows = []
+        error_rows = []
+        due_delivery_count = None
+        due_delivery_oldest = None
+        processing_delivery_count = None
+        processing_delivery_oldest = None
+        orchestration_rows = None
+        orchestration_oldest_due = None
+        heartbeat_values = {}
 
         try:
             db = init_database()
@@ -163,7 +209,7 @@ class DatabaseGaugeCollector(Collector):
 
             # Windowed on updated_at so a scrape never scans the full
             # delivery history and late failures of old rows still count.
-            recent_since = utc_now() - RECENT_WINDOW
+            recent_since = now - RECENT_WINDOW
 
             delivery_rows = list(
                 UserNotificationDelivery
@@ -194,13 +240,96 @@ class DatabaseGaugeCollector(Collector):
                 .tuples()
             )
 
-            heartbeat_value = self._scheduler_heartbeat_value()
+            due_delivery_query = UserNotificationDelivery.select().where(
+                (UserNotificationDelivery.status == "pending")
+                & (UserNotificationDelivery.scheduled_at <= now)
+            )
+            due_delivery_count = due_delivery_query.count()
+            due_delivery = (
+                due_delivery_query
+                .order_by(UserNotificationDelivery.scheduled_at.asc())
+                .first()
+            )
+            if due_delivery is not None:
+                due_delivery_oldest = due_delivery.scheduled_at
+
+            processing_delivery_query = UserNotificationDelivery.select().where(
+                UserNotificationDelivery.status == "processing"
+            )
+            processing_delivery_count = processing_delivery_query.count()
+            processing_delivery = (
+                processing_delivery_query
+                .order_by(UserNotificationDelivery.updated_at.asc())
+                .first()
+            )
+            if processing_delivery is not None:
+                processing_delivery_oldest = processing_delivery.updated_at
+
+            orchestration_rows = list(
+                PendingOrchestratedEvent
+                .select(
+                    PendingOrchestratedEvent.status,
+                    fn.COUNT(PendingOrchestratedEvent.id).alias("total"),
+                )
+                .where(
+                    PendingOrchestratedEvent.status.in_(
+                        ("pending", "activating", "failed")
+                    )
+                )
+                .group_by(PendingOrchestratedEvent.status)
+                .tuples()
+            )
+
+            due_orchestration = (
+                PendingOrchestratedEvent
+                .select()
+                .where(
+                    (PendingOrchestratedEvent.status == "pending")
+                    & (PendingOrchestratedEvent.activation_at <= now)
+                    & (
+                        PendingOrchestratedEvent.next_attempt_at.is_null(True)
+                        | (PendingOrchestratedEvent.next_attempt_at <= now)
+                    )
+                )
+                .order_by(
+                    fn.COALESCE(
+                        PendingOrchestratedEvent.next_attempt_at,
+                        PendingOrchestratedEvent.activation_at,
+                    ).asc(),
+                    PendingOrchestratedEvent.id.asc(),
+                )
+                .first()
+            )
+            if due_orchestration is not None:
+                orchestration_oldest_due = (
+                    due_orchestration.next_attempt_at
+                    or due_orchestration.activation_at
+                )
+
+            heartbeat_rows = (
+                AppLock
+                .select(AppLock.name, AppLock.updated_at)
+                .where(
+                    AppLock.name.in_(
+                        tuple(WORKER_HEARTBEAT_LOCK_NAMES.values())
+                    )
+                )
+                .tuples()
+            )
+            heartbeat_values = {
+                name: self._timestamp(updated_at)
+                for name, updated_at in heartbeat_rows
+                if updated_at is not None
+            }
         except Exception as exc:
             delivery_rows = []
             error_rows = []
-            heartbeat_value = 0
+            due_delivery_count = None
+            processing_delivery_count = None
+            orchestration_rows = None
+            heartbeat_values = {}
             logger.warning(
-                "metrics notification gauge refresh failed",
+                "metrics operational gauge refresh failed",
                 exc_info=exc,
             )
         finally:
@@ -219,25 +348,70 @@ class DatabaseGaugeCollector(Collector):
         for provider, total in error_rows:
             errors.add_metric((provider,), total)
 
-        heartbeat.add_metric([], heartbeat_value)
+        if due_delivery_count is not None:
+            notification_queue_depth.add_metric(
+                ("due",),
+                due_delivery_count,
+            )
+            notification_queue_depth.add_metric(
+                ("processing",),
+                processing_delivery_count or 0,
+            )
+            notification_queue_oldest_age.add_metric(
+                ("due",),
+                self._age_seconds(now, due_delivery_oldest),
+            )
+            notification_queue_oldest_age.add_metric(
+                ("processing",),
+                self._age_seconds(now, processing_delivery_oldest),
+            )
+
+        if orchestration_rows is not None:
+            orchestration_counts = {
+                status: int(total or 0)
+                for status, total in orchestration_rows
+            }
+            for status in ("pending", "activating", "failed"):
+                orchestration_pending.add_metric(
+                    (status,),
+                    orchestration_counts.get(status, 0),
+                )
+            orchestration_oldest_due_age.add_metric(
+                [],
+                self._age_seconds(now, orchestration_oldest_due),
+            )
+
+        for worker, lock_name in WORKER_HEARTBEAT_LOCK_NAMES.items():
+            worker_heartbeat.add_metric(
+                (worker,),
+                heartbeat_values.get(lock_name, 0),
+            )
+
+        scheduler_heartbeat.add_metric(
+            [],
+            heartbeat_values.get(SCHEDULER_HEARTBEAT_LOCK_NAME, 0),
+        )
 
         yield deliveries
         yield errors
-        yield heartbeat
+        yield notification_queue_depth
+        yield notification_queue_oldest_age
+        yield orchestration_pending
+        yield orchestration_oldest_due_age
+        yield worker_heartbeat
+        yield scheduler_heartbeat
 
     @staticmethod
-    def _scheduler_heartbeat_value():
-        """Unix time of the last scheduler heartbeat, 0 when absent."""
-
-        lock = AppLock.get_or_none(
-            AppLock.name == SCHEDULER_HEARTBEAT_LOCK_NAME,
-        )
-
-        if lock is None or lock.updated_at is None:
+    def _age_seconds(now, value):
+        if value is None:
             return 0
+        return max(0.0, (now - value).total_seconds())
 
-        # Timestamps are stored as naive UTC values (app/modules/common.py).
-        return lock.updated_at.replace(tzinfo=timezone.utc).timestamp()
+    @staticmethod
+    def _timestamp(value):
+        if value.tzinfo is None:
+            value = value.replace(tzinfo=timezone.utc)
+        return value.timestamp()
 
     def _build_info_gauge(self):
         """Report the running version once, whatever the process count."""
@@ -363,6 +537,57 @@ def _init_multiprocess_directory():
 
 
 _init_multiprocess_directory()
+
+
+def record_worker_heartbeat(
+    worker,
+    *,
+    min_interval_seconds=WORKER_HEARTBEAT_MIN_INTERVAL_SECONDS,
+):
+    """Persist one rate-limited worker heartbeat in app_lock."""
+
+    lock_name = WORKER_HEARTBEAT_LOCK_NAMES.get(worker)
+    if lock_name is None:
+        raise ValueError(f"unsupported worker heartbeat: {worker}")
+
+    monotonic_now = time.monotonic()
+    previous_attempt = _WORKER_HEARTBEAT_LAST_ATTEMPT.get(worker)
+    if (
+        previous_attempt is not None
+        and monotonic_now - previous_attempt
+        < max(float(min_interval_seconds), 0.0)
+    ):
+        return True
+
+    # Rate-limit failures too so a tight worker loop cannot hammer an
+    # already unhealthy database.
+    _WORKER_HEARTBEAT_LAST_ATTEMPT[worker] = monotonic_now
+
+    db = None
+    db_was_closed = True
+    try:
+        db = init_database()
+        db_was_closed = db.is_closed()
+        if db_was_closed:
+            db.connect(reuse_if_open=True)
+
+        touch_lock(
+            lock_name,
+            owner=f"{worker}:{os.getpid()}@{socket.gethostname()}",
+            ttl_seconds=int(
+                getattr(Config, "SCHEDULER_LOCK_TTL_SECONDS", 120)
+            ),
+        )
+        return True
+    except Exception:
+        logger.exception("%s worker heartbeat update failed", worker)
+        return False
+    finally:
+        if db is not None and db_was_closed and not db.is_closed():
+            try:
+                db.close()
+            except Exception:
+                pass
 
 
 def render_exposition():

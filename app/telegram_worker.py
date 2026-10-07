@@ -4,6 +4,8 @@ import time
 
 from app import create_app
 from app.notifiers.telegram.poller import poll_telegram_channels_once
+from app.services.metrics import record_worker_heartbeat
+from app.settings import Config
 
 
 logger = logging.getLogger("oncall.telegram")
@@ -44,6 +46,9 @@ def main():
                     "telegram poll completed",
                     extra={"extra": {"processed": processed}},
                 )
+
+                if Config.METRICS_ENABLED:
+                    record_worker_heartbeat("telegram")
             except Exception:
                 logger.exception("telegram poll failed")
                 time.sleep(5)

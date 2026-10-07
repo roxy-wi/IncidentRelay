@@ -4,6 +4,8 @@ import time
 
 from app import create_app
 from app.notifiers.slack.socket_worker import SlackSocketManager
+from app.services.metrics import record_worker_heartbeat
+from app.settings import Config
 
 
 logger = logging.getLogger("oncall.slack")
@@ -40,6 +42,9 @@ def main():
                             }
                         },
                     )
+
+                    if Config.METRICS_ENABLED:
+                        record_worker_heartbeat("slack")
                 except Exception:
                     logger.exception("Slack Socket Mode reconciliation failed")
                 for _ in range(15):

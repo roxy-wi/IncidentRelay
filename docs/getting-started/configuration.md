@@ -387,6 +387,11 @@ Exported metrics:
 | `incidentrelay_user_notification_deliveries_recent` | gauge | User notification deliveries updated in the last 24 hours, labels `method` and `status` |
 | `incidentrelay_alert_notification_errors_recent` | gauge | Alert notification deliveries that ended in an error, updated in the last 24 hours, label `provider` |
 | `incidentrelay_scheduler_last_run_timestamp_seconds` | gauge | Unix time of the last scheduler heartbeat, `0` when it never ran |
+| `incidentrelay_worker_last_seen_timestamp_seconds` | gauge | Last successful worker-loop heartbeat, label `worker`: `scheduler`, `telegram`, `slack` |
+| `incidentrelay_user_notification_queue_depth` | gauge | Due or processing user-notification work, label `state`: `due`, `processing` |
+| `incidentrelay_user_notification_queue_oldest_age_seconds` | gauge | Age of the oldest user-notification work item, label `state`: `due`, `processing` |
+| `incidentrelay_orchestration_pending_events` | gauge | Paused orchestration events, label `status`: `pending`, `activating`, `failed` |
+| `incidentrelay_orchestration_oldest_due_age_seconds` | gauge | Age of the oldest paused orchestration event already due for activation/retry |
 
 `incidentrelay_database_up` and `incidentrelay_migrations_pending` are evaluated at scrape time and repeat the `/readyz` checks. `/metrics` keeps answering while the database is down, so both values stay visible during an outage. While the migration state cannot be read (database down or migration check failed), the `incidentrelay_migrations_pending` sample is absent rather than reading `0` — it is only reported when it is actually known. Alert on `incidentrelay_database_up = 0` instead of the pending count alone.
 
@@ -401,6 +406,12 @@ If you point `PROMETHEUS_MULTIPROC_DIR` at your own location, keep it to process
 The database-derived gauges (`incidentrelay_database_up`, `incidentrelay_migrations_pending`, `incidentrelay_user_notification_deliveries_recent`, `incidentrelay_alert_notification_errors_recent`, `incidentrelay_scheduler_last_run_timestamp_seconds`, `incidentrelay_build_info`) are computed once per scrape from the database, so their values never depend on how many processes are running.
 
 `incidentrelay_user_notification_deliveries_recent`, `incidentrelay_alert_notification_errors_recent` and `incidentrelay_scheduler_last_run_timestamp_seconds` are recomputed from the database at scrape time, so they work across processes. The two delivery gauges cover rows updated in the last 24 hours: delivery rows transition in place (pending to sent or failed, new provider errors), so the window follows `updated_at`, not `created_at`, and a scrape never aggregates the full delivery history. During a database outage both are absent from the exposition and the heartbeat reads `0`; `incidentrelay_database_up = 0` explains why. The heartbeat gauge requires a running scheduler worker; the heartbeat job itself only runs while `[metrics]` is enabled.
+
+`incidentrelay_worker_last_seen_timestamp_seconds` is persisted in the database, so it works across systemd units and separate Docker/Kubernetes containers. The scheduler is also exposed under `incidentrelay_scheduler_last_run_timestamp_seconds` for compatibility. Telegram and Slack update their timestamp after a successful worker loop; alert only on workers that your deployment actually runs.
+
+The user-notification queue gauges describe current backlog, not history. `state="due"` counts only `pending` deliveries whose `scheduled_at` has arrived, so intentionally delayed notifications do not look stuck. `state="processing"` counts claimed deliveries and measures age from their last state update.
+
+`incidentrelay_orchestration_pending_events` exposes the current paused-event inventory. `failed` means activation exhausted its automatic retries and needs attention. `incidentrelay_orchestration_oldest_due_age_seconds` includes only `pending` rows whose activation/retry time has arrived, so future pauses do not inflate the age.
 
 ## Scheduler settings
 

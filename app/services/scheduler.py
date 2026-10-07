@@ -1,6 +1,4 @@
 import logging
-import os
-import socket
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.schedulers.base import SchedulerAlreadyRunningError, SchedulerNotRunningError
@@ -12,8 +10,7 @@ from app.services.alerts.maintenance_state import process_maintenance_lifecycle
 from app.services.alerts.shelving import process_due_shelves
 from app.services.alerts.reminders import send_unacked_reminders
 from app.services.db_lock import acquire_db_lock, release_db_lock
-from app.modules.db.locks_repo import touch_lock
-from app.services.metrics import SCHEDULER_HEARTBEAT_LOCK_NAME
+from app.services.metrics import record_worker_heartbeat
 from app.services.notifications.shift_notifications import (
     send_due_oncall_shift_email_notifications,
     send_due_oncall_shift_mattermost_notifications,
@@ -480,26 +477,12 @@ def retention_cleanup_job():
 
 
 def scheduler_heartbeat_job():
-    """
-    Refresh the scheduler heartbeat lock.
-
-    The heartbeat is a lock row that is never released: only its
-    timestamps move, and the freshest writer wins. /metrics reads it
-    to report how recently the scheduler ran.
-    """
-    if db.is_closed():
-        db.connect(reuse_if_open=True)
-
-    try:
-        touch_lock(
-            SCHEDULER_HEARTBEAT_LOCK_NAME,
-            owner=f"scheduler:{os.getpid()}@{socket.gethostname()}",
-            ttl_seconds=int(getattr(Config, "SCHEDULER_LOCK_TTL_SECONDS", 120)),
-        )
-        return {"heartbeat": 1}
-    except Exception:
-        logger.exception("scheduler heartbeat job failed")
-        return {"heartbeat": 0}
+    """Refresh the scheduler heartbeat used by /metrics."""
+    return {
+        "heartbeat": 1
+        if record_worker_heartbeat("scheduler", min_interval_seconds=0)
+        else 0,
+    }
 
 
 def silence_lifecycle_job():

@@ -6,10 +6,12 @@ from app.modules.common import utc_now
 from app.modules.db import alerts_repo
 from app.modules.db.locks_repo import touch_lock
 from app.modules.db.models import (
-    Alert,
     AlertGroup,
     AlertNotification,
     AppLock,
+    EventOrchestration,
+    EventOrchestrationVersion,
+    PendingOrchestratedEvent,
     UserNotificationDelivery,
 )
 from app.services.alerts.actions import acknowledge_alert
@@ -220,9 +222,8 @@ def test_reopen_counter_after_acknowledged_group_reopens(client, monkeypatch):
     assert response.status_code == 200
 
     group = AlertGroup.get(AlertGroup.source == "grafana")
-    alert = Alert.get(Alert.group == group.id)
 
-    acknowledge_alert(alert.id)
+    acknowledge_alert(group.id)
     assert AlertGroup.get_by_id(group.id).status == "acknowledged"
 
     reopened_before = (
@@ -254,16 +255,26 @@ def test_reopen_counter_after_acknowledged_group_reopens(client, monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def _create_delivery(group, user, method, status, updated_at=None):
+def _create_delivery(
+    group,
+    user,
+    method,
+    status,
+    *,
+    scheduled_at=None,
+    created_at=None,
+    updated_at=None,
+):
+    now = utc_now()
     return UserNotificationDelivery.create(
         group=group.id,
         user=user.id,
         method=method,
         status=status,
         event_type="notification",
-        scheduled_at=utc_now(),
-        created_at=updated_at or utc_now(),
-        updated_at=updated_at or utc_now(),
+        scheduled_at=scheduled_at or now,
+        created_at=created_at or updated_at or now,
+        updated_at=updated_at or now,
     )
 
 
@@ -309,6 +320,9 @@ def test_user_notification_deliveries_recent_gauge(client, monkeypatch):
         user,
         "email",
         "failed",
+        created_at=(
+            utc_now() - business_metrics.RECENT_WINDOW - timedelta(hours=48)
+        ),
         updated_at=utc_now(),
     )
 
@@ -368,6 +382,118 @@ def test_alert_notification_errors_recent_gauge(client, monkeypatch):
     assert sample_value(body, metric, {"provider": "telegram"}) == 2.0
     # A channel without a recorded error is not counted.
     assert sample_value(body, metric, {"provider": "slack"}) is None
+
+
+def test_user_notification_queue_backlog_gauges(client, monkeypatch):
+    """Only due pending work and in-flight processing contribute to backlog."""
+    _enable(monkeypatch)
+    alert_group, user = _alert_group_for_deliveries()
+    now = utc_now()
+
+    _create_delivery(
+        alert_group,
+        user,
+        "email",
+        "pending",
+        scheduled_at=now - timedelta(seconds=120),
+        updated_at=now - timedelta(seconds=120),
+    )
+    _create_delivery(
+        alert_group,
+        user,
+        "email",
+        "pending",
+        scheduled_at=now + timedelta(minutes=10),
+    )
+    _create_delivery(
+        alert_group,
+        user,
+        "voice_call",
+        "processing",
+        scheduled_at=now - timedelta(seconds=60),
+        updated_at=now - timedelta(seconds=45),
+    )
+
+    _, body = _scrape(client)
+
+    assert sample_value(
+        body,
+        "incidentrelay_user_notification_queue_depth",
+        {"state": "due"},
+    ) == 1.0
+    assert sample_value(
+        body,
+        "incidentrelay_user_notification_queue_depth",
+        {"state": "processing"},
+    ) == 1.0
+
+    due_age = sample_value(
+        body,
+        "incidentrelay_user_notification_queue_oldest_age_seconds",
+        {"state": "due"},
+    )
+    processing_age = sample_value(
+        body,
+        "incidentrelay_user_notification_queue_oldest_age_seconds",
+        {"state": "processing"},
+    )
+
+    assert 100 <= due_age <= 180
+    assert 30 <= processing_age <= 90
+
+
+def test_orchestration_backlog_gauges(client, monkeypatch):
+    """Future paused events count in inventory but not in due age."""
+    _enable(monkeypatch)
+    group = create_group(slug="metrics-orchestration")
+    orchestration = EventOrchestration.create(
+        group=group.id,
+        name="Metrics backlog",
+    )
+    version = EventOrchestrationVersion.create(
+        orchestration=orchestration.id,
+        version_number=1,
+    )
+    now = utc_now()
+
+    def create_pending(dedup_key, status, activation_at, next_attempt_at=None):
+        return PendingOrchestratedEvent.create(
+            group=group.id,
+            orchestration=orchestration.id,
+            version=version.id,
+            source="alertmanager",
+            dedup_key=dedup_key,
+            normalized_event_json={},
+            context_json={},
+            activation_at=activation_at,
+            next_attempt_at=next_attempt_at,
+            status=status,
+        )
+
+    create_pending("due", "pending", now - timedelta(seconds=120))
+    create_pending("future", "pending", now + timedelta(minutes=10))
+    create_pending("activating", "activating", now - timedelta(seconds=20))
+    create_pending("failed", "failed", now - timedelta(minutes=5))
+
+    _, body = _scrape(client)
+
+    for status, expected in (
+        ("pending", 2.0),
+        ("activating", 1.0),
+        ("failed", 1.0),
+    ):
+        assert sample_value(
+            body,
+            "incidentrelay_orchestration_pending_events",
+            {"status": status},
+        ) == expected
+
+    oldest_due_age = sample_value(
+        body,
+        "incidentrelay_orchestration_oldest_due_age_seconds",
+        {},
+    )
+    assert 100 <= oldest_due_age <= 180
 
 
 def test_business_gauges_degrade_when_database_unreachable(client, monkeypatch):
@@ -440,6 +566,72 @@ def test_scheduler_heartbeat_gauge_absent_then_present(client, monkeypatch):
 
     expected = updated_at.replace(tzinfo=timezone.utc).timestamp()
     assert abs(value - expected) < 2.0
+
+
+def test_worker_heartbeat_gauge_reports_worker_roles(client, monkeypatch):
+    _enable(monkeypatch)
+    now = utc_now()
+
+    AppLock.create(
+        name=business_metrics.WORKER_HEARTBEAT_LOCK_NAMES["scheduler"],
+        owner="scheduler:test",
+        expires_at=now + timedelta(seconds=120),
+        updated_at=now - timedelta(seconds=10),
+    )
+    AppLock.create(
+        name=business_metrics.WORKER_HEARTBEAT_LOCK_NAMES["telegram"],
+        owner="telegram:test",
+        expires_at=now + timedelta(seconds=120),
+        updated_at=now - timedelta(seconds=20),
+    )
+
+    _, body = _scrape(client)
+
+    scheduler_value = sample_value(
+        body,
+        "incidentrelay_worker_last_seen_timestamp_seconds",
+        {"worker": "scheduler"},
+    )
+    telegram_value = sample_value(
+        body,
+        "incidentrelay_worker_last_seen_timestamp_seconds",
+        {"worker": "telegram"},
+    )
+    slack_value = sample_value(
+        body,
+        "incidentrelay_worker_last_seen_timestamp_seconds",
+        {"worker": "slack"},
+    )
+    legacy_scheduler_value = sample_value(
+        body,
+        "incidentrelay_scheduler_last_run_timestamp_seconds",
+        {},
+    )
+
+    assert abs(scheduler_value - legacy_scheduler_value) < 0.001
+    assert scheduler_value > 0
+    assert telegram_value > 0
+    assert slack_value == 0
+
+
+def test_record_worker_heartbeat_persists_worker_lock(db, monkeypatch):
+    monkeypatch.setattr(
+        business_metrics,
+        "_WORKER_HEARTBEAT_LAST_ATTEMPT",
+        {},
+    )
+
+    assert business_metrics.record_worker_heartbeat(
+        "slack",
+        min_interval_seconds=0,
+    ) is True
+
+    row = AppLock.get(
+        AppLock.name
+        == business_metrics.WORKER_HEARTBEAT_LOCK_NAMES["slack"]
+    )
+    assert row.owner.startswith("slack:")
+    assert row.updated_at is not None
 
 
 def test_scheduler_heartbeat_job_records_lock(db):

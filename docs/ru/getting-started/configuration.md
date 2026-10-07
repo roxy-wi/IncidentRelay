@@ -387,6 +387,11 @@ scrape_configs:
 | `incidentrelay_user_notification_deliveries_recent` | gauge | Доставки пользовательских уведомлений, обновленные за последние 24 часа, метки `method` и `status` |
 | `incidentrelay_alert_notification_errors_recent` | gauge | Доставки уведомлений алертов, завершившиеся ошибкой, обновленные за последние 24 часа, метка `provider` |
 | `incidentrelay_scheduler_last_run_timestamp_seconds` | gauge | Unix-время последнего heartbeat планировщика, `0`, если он еще не запускался |
+| `incidentrelay_worker_last_seen_timestamp_seconds` | gauge | Последний успешный heartbeat цикла worker; метка `worker`: `scheduler`, `telegram`, `slack` |
+| `incidentrelay_user_notification_queue_depth` | gauge | Пользовательские уведомления, уже ожидающие обработки или находящиеся в обработке; метка `state`: `due`, `processing` |
+| `incidentrelay_user_notification_queue_oldest_age_seconds` | gauge | Возраст самого старого элемента очереди пользовательских уведомлений; метка `state`: `due`, `processing` |
+| `incidentrelay_orchestration_pending_events` | gauge | Отложенные события оркестрации; метка `status`: `pending`, `activating`, `failed` |
+| `incidentrelay_orchestration_oldest_due_age_seconds` | gauge | Возраст самого старого отложенного события, для которого уже наступило время активации/retry |
 
 `incidentrelay_database_up` и `incidentrelay_migrations_pending` вычисляются в момент сбора и повторяют проверки `/readyz`. `/metrics` продолжает отвечать, когда база данных недоступна, поэтому обе метрики остаются видимыми во время сбоя. Пока состояние миграций прочитать нельзя (база недоступна или проверка не выполнилась), сэмпл `incidentrelay_migrations_pending` отсутствует, а не равен `0` — метрика отдается только тогда, когда ее значение действительно известно. Заведите алерт на `incidentrelay_database_up = 0` и не полагайтесь только на число отложенных миграций.
 
@@ -401,6 +406,12 @@ scrape_configs:
 Гаужи, считаемые из базы (`incidentrelay_database_up`, `incidentrelay_migrations_pending`, `incidentrelay_user_notification_deliveries_recent`, `incidentrelay_alert_notification_errors_recent`, `incidentrelay_scheduler_last_run_timestamp_seconds`, `incidentrelay_build_info`), вычисляются один раз за сбор, поэтому их значения не зависят от числа процессов.
 
 `incidentrelay_user_notification_deliveries_recent`, `incidentrelay_alert_notification_errors_recent` и `incidentrelay_scheduler_last_run_timestamp_seconds` пересчитываются из базы в момент сбора, поэтому работают между процессами. Обе метрики доставок учитывают строки, обновленные за последние 24 часа: строки доставок меняются на месте (pending переходит в sent или failed, приходят новые ошибки провайдеров), поэтому окно идет по `updated_at`, а не по `created_at`, и сбор никогда не сканирует всю историю доставок. Когда база недоступна, они исчезают из выдачи, а heartbeat равен `0`; причину показывает `incidentrelay_database_up = 0`. Для heartbeat нужен работающий воркер планировщика; сама heartbeat-job запускается только при включенном `[metrics]`.
+
+`incidentrelay_worker_last_seen_timestamp_seconds` хранится в БД, поэтому работает между systemd-сервисами и отдельными Docker/Kubernetes-контейнерами. Scheduler также остается доступен под совместимым именем `incidentrelay_scheduler_last_run_timestamp_seconds`. Telegram и Slack обновляют timestamp после успешной итерации worker; alert следует настраивать только для тех worker, которые действительно запущены в deployment.
+
+Гейджи очереди пользовательских уведомлений показывают текущий backlog, а не историю. `state="due"` считает только `pending`-доставки, у которых уже наступил `scheduled_at`, поэтому намеренно отложенные уведомления не выглядят зависшими. `state="processing"` считает захваченные доставки, а возраст измеряется от последнего обновления состояния.
+
+`incidentrelay_orchestration_pending_events` показывает текущее состояние отложенных событий. `failed` означает, что автоматические попытки активации исчерпаны и событие требует внимания. `incidentrelay_orchestration_oldest_due_age_seconds` учитывает только `pending`-события, у которых уже наступило время активации/retry; будущие pause-события возраст не увеличивают.
 
 ## Настройки планировщика
 
