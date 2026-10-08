@@ -42,9 +42,9 @@ def _env(extra_env=None):
     return env
 
 
-def _run_entrypoint(tmp_path, source_body, extra_env=None):
+def _start(tmp_path, source_body, extra_env=None):
     """
-    Run the runtime config script and return the runtime config and stderr.
+    Run the runtime config script like a container start and return the result.
 
     The runtime config in tmp_path/runtime persists between calls, like the
     copy on the data volume between container starts.
@@ -53,23 +53,26 @@ def _run_entrypoint(tmp_path, source_body, extra_env=None):
     source.write_text(source_body, encoding="utf-8")
     target = tmp_path / "runtime" / "incidentrelay.conf"
 
-    result = subprocess.run(
+    return subprocess.run(
         [sys.executable, "-", str(source), str(target)],
         input=_runtime_config_script(),
         text=True,
         env=_env(extra_env),
         capture_output=True,
-        check=True,
     )
 
+
+def _runtime_config(tmp_path):
     parser = configparser.ConfigParser()
     parser.optionxform = str
-    parser.read(target)
-    return parser, result.stderr
+    parser.read(tmp_path / "runtime" / "incidentrelay.conf")
+    return parser
 
 
 def _render_runtime_config(tmp_path, source_body, extra_env=None):
-    return _run_entrypoint(tmp_path, source_body, extra_env)[0]
+    result = _start(tmp_path, source_body, extra_env)
+    assert result.returncode == 0, result.stderr
+    return _runtime_config(tmp_path)
 
 
 def _effective_keys(config_path, extra_env):
@@ -222,13 +225,75 @@ def test_keys_stored_before_secret_key_moved_to_env_are_kept(tmp_path):
         assert parser.get(section, option) == first.get(section, option), f"{section}.{option} changed"
 
 
-def test_changed_encryption_key_keeps_the_stored_one(tmp_path):
+def test_changed_encryption_key_refuses_to_start(tmp_path):
     base = "[main]\nsecret_key = configured-secret-key-0123456789abcdef\n"
     _render_runtime_config(tmp_path, base + "secret_encryption_key = old-encryption-key-0123456789abcdef\n")
 
-    parser, stderr = _run_entrypoint(
-        tmp_path, base + "secret_encryption_key = new-encryption-key-0123456789abcdef\n"
+    result = _start(tmp_path, base + "secret_encryption_key = new-encryption-key-0123456789abcdef\n")
+
+    assert result.returncode != 0
+    assert "main.secret_encryption_key differs" in result.stderr
+    # The runtime config is left as it was, so restoring the old key works.
+    parser = _runtime_config(tmp_path)
+    assert parser.get("main", "secret_encryption_key") == "old-encryption-key-0123456789abcdef"
+
+
+@pytest.mark.parametrize("from_file", [False, True], ids=["variable", "file"])
+def test_changed_encryption_key_from_the_environment_refuses_to_start(tmp_path, from_file):
+    base = "[main]\nsecret_key = configured-secret-key-0123456789abcdef\n"
+
+    def key_env(key):
+        name = "INCIDENTRELAY__MAIN__SECRET_ENCRYPTION_KEY"
+        if not from_file:
+            return {name: key}
+        key_file = tmp_path / "encryption-key"
+        key_file.write_text(key + "\n", encoding="utf-8")
+        return {name + "__FILE": str(key_file)}
+
+    _render_runtime_config(tmp_path, base, key_env("old-encryption-key-0123456789abcdef"))
+    assert _start(tmp_path, base, key_env("old-encryption-key-0123456789abcdef")).returncode == 0
+
+    result = _start(tmp_path, base, key_env("new-encryption-key-0123456789abcdef"))
+
+    assert result.returncode != 0
+    assert "main.secret_encryption_key differs" in result.stderr
+
+
+def test_encryption_key_from_the_environment_is_not_written(tmp_path):
+    _render_runtime_config(
+        tmp_path,
+        "[main]\nsecret_key = configured-secret-key-0123456789abcdef\n",
+        {"INCIDENTRELAY__MAIN__SECRET_ENCRYPTION_KEY": "env-encryption-key-0123456789abcdef"},
     )
 
-    assert parser.get("main", "secret_encryption_key") == "old-encryption-key-0123456789abcdef"
-    assert "main.secret_encryption_key differs" in stderr
+    runtime_config = (tmp_path / "runtime" / "incidentrelay.conf").read_text(encoding="utf-8")
+    assert "env-encryption-key-0123456789abcdef" not in runtime_config
+
+
+def test_encryption_key_moved_to_the_environment_keeps_starting(tmp_path):
+    base = "[main]\nsecret_key = configured-secret-key-0123456789abcdef\n"
+    _render_runtime_config(tmp_path, base + "secret_encryption_key = encryption-key-0123456789abcdef0123\n")
+
+    result = _start(
+        tmp_path,
+        base,
+        {"INCIDENTRELAY__MAIN__SECRET_ENCRYPTION_KEY": "encryption-key-0123456789abcdef0123"},
+    )
+
+    assert result.returncode == 0, result.stderr
+
+
+def test_changed_encryption_key_refuses_to_start_after_upgrading(tmp_path):
+    # Copies written by earlier versions hold the key itself, but no key check.
+    base = "[main]\nsecret_key = configured-secret-key-0123456789abcdef\n"
+    runtime = tmp_path / "runtime"
+    runtime.mkdir()
+    (runtime / "incidentrelay.conf").write_text(
+        base + "secret_encryption_key = old-encryption-key-0123456789abcdef\n",
+        encoding="utf-8",
+    )
+
+    result = _start(tmp_path, base + "secret_encryption_key = new-encryption-key-0123456789abcdef\n")
+
+    assert result.returncode != 0
+    assert "main.secret_encryption_key differs" in result.stderr

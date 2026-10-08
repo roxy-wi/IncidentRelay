@@ -18,18 +18,22 @@ fi
 # secrets. Create one persistent runtime config on the shared data volume so
 # web/scheduler/notifier processes all use the same random keys across restarts.
 # The runtime config is rebuilt from the mounted config on every start, so
-# config changes take effect; only the generated keys are kept from it.
+# config changes take effect; shared keys the mounted config leaves empty are
+# carried over from the previous copy.
 if [ "$CONFIG_FILE" = "/etc/incidentrelay/incidentrelay.conf" ]; then
   RUNTIME_CONFIG="/var/lib/incidentrelay/incidentrelay.conf"
   python - "$CONFIG_FILE" "$RUNTIME_CONFIG" <<'PY_CONFIG'
 import configparser
 import fcntl
+import hashlib
+import hmac
 import os
 import secrets
 import sys
 import tempfile
 
 source, target = sys.argv[1], sys.argv[2]
+KEY_CHECK_ITERATIONS = 200_000
 os.makedirs(os.path.dirname(target), exist_ok=True)
 lock_path = target + ".lock"
 known_insecure = {
@@ -84,21 +88,58 @@ with open(lock_path, "a+", encoding="utf-8") as lock_file:
     ensure_secret("mattermost", "action_secret")
     ensure_secret("voice", "callback_secret")
 
-    # Stored secrets are encrypted with this key; a new one would make them
-    # unreadable, so keep the key this installation has been using.
-    stored_key = stored.get("main", "secret_encryption_key", fallback="").strip()
-    if (
-        not from_env("main", "secret_encryption_key")
-        and stored_key not in known_insecure
-        and parser.get("main", "secret_encryption_key") != stored_key
-    ):
-        print(
-            "WARNING: main.secret_encryption_key differs from the key this installation "
-            f"has been using; keeping the stored key from {target} so encrypted data "
-            "stays readable.",
-            file=sys.stderr,
+    def env_value(section, option):
+        # The value the application reads from the environment, or None.
+        env_name = f"INCIDENTRELAY__{section}__{option}".upper()
+        if env_name + "__FILE" in os.environ:
+            try:
+                with open(os.environ[env_name + "__FILE"], encoding="utf-8") as handle:
+                    return handle.read().rstrip("\r\n")
+            except OSError:
+                # The application reports the unreadable file itself.
+                return None
+        return os.environ.get(env_name)
+
+    def key_check(key):
+        # A salted hash, so a key from the environment is never written here.
+        salt = secrets.token_bytes(16)
+        digest = hashlib.pbkdf2_hmac("sha256", key.encode("utf-8"), salt, KEY_CHECK_ITERATIONS)
+        return f"pbkdf2_sha256:{KEY_CHECK_ITERATIONS}:{salt.hex()}:{digest.hex()}"
+
+    def key_matches(key, check):
+        _, iterations, salt, digest = check.split(":")
+        expected = hashlib.pbkdf2_hmac(
+            "sha256", key.encode("utf-8"), bytes.fromhex(salt), int(iterations)
         )
-        parser.set("main", "secret_encryption_key", stored_key)
+        return hmac.compare_digest(expected.hex(), digest)
+
+    def is_key_check(check):
+        parts = check.split(":")
+        return len(parts) == 4 and parts[0] == "pbkdf2_sha256"
+
+    # Secrets in the database are encrypted with main.secret_encryption_key,
+    # so it must stay the same across restarts wherever it comes from.
+    configured_key = env_value("main", "secret_encryption_key")
+    if configured_key is None:
+        configured_key = parser.get("main", "secret_encryption_key", fallback="").strip()
+    stored_check = stored.get("entrypoint", "secret_encryption_key_check", fallback="")
+    if not is_key_check(stored_check):
+        # Copies written by earlier versions hold only the key itself.
+        stored_key = stored.get("main", "secret_encryption_key", fallback="").strip()
+        stored_check = key_check(stored_key) if stored_key not in known_insecure else ""
+    if configured_key:
+        if stored_check and not key_matches(configured_key, stored_check):
+            sys.exit(
+                "ERROR: main.secret_encryption_key differs from the key this installation "
+                "has been using. Secrets stored in the database are encrypted with it and "
+                "would become unreadable, and changing the key directly is not supported. "
+                "Restore the previous key."
+            )
+        stored_check = stored_check or key_check(configured_key)
+    if stored_check:
+        if not parser.has_section("entrypoint"):
+            parser.add_section("entrypoint")
+        parser.set("entrypoint", "secret_encryption_key_check", stored_check)
 
     fd, temp_path = tempfile.mkstemp(
         prefix="incidentrelay-conf-",
