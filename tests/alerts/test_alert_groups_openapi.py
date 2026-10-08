@@ -126,3 +126,33 @@ def test_openapi_documents_recent_alert_group_activity():
     item = schema["properties"]["items"]["items"]
     assert "alert_group" in item["properties"]
     assert "event_type" in item["properties"]
+
+
+def test_openapi_documents_alert_analytics():
+    spec = build_openapi_spec()
+    operation = spec["paths"]["/api/alert-groups/analytics"]["get"]
+
+    assert operation["operationId"] == "getAlertAnalytics"
+    assert operation["security"] == [{"bearerAuth": []}]
+
+    parameters = {item["name"]: item for item in operation["parameters"]}
+    assert parameters["team_id"]["schema"]["minimum"] == 1
+    assert parameters["days"]["schema"]["maximum"] == 365
+    assert parameters["limit"]["schema"]["maximum"] == 50
+
+    schema = _json_schema(operation)
+    assert schema["properties"]["version"]["enum"] == [1]
+    assert "top_noisy" in schema["properties"]
+    assert "oldest_unresolved" in schema["properties"]
+    assert "attention" in schema["properties"]
+    assert "lifecycle_by_day" in schema["properties"]["series"]["properties"]
+
+    attention = schema["properties"]["attention"]["properties"]
+    resolved_health = attention["resolved_without_ack_by_alert"]["items"]
+    resolved_health_properties = resolved_health["properties"]
+
+    assert "alertname" in resolved_health_properties
+    assert "resolved_groups" in resolved_health_properties
+    assert "resolved_without_ack" in resolved_health_properties
+    assert "rate" in resolved_health_properties
+    assert "median_lifetime_seconds" in resolved_health_properties

@@ -12,6 +12,14 @@ class AlertActivityQuerySchema(ApiModel):
     limit: int = Field(default=6, ge=1, le=25)
 
 
+class AlertAnalyticsQuerySchema(ApiModel):
+    """Validate Alert Analytics v1 query parameters."""
+
+    team_id: int | None = Field(default=None, ge=1)
+    days: int = Field(default=30, ge=1, le=365)
+    limit: int = Field(default=10, ge=1, le=50)
+
+
 class AlertEventListQuerySchema(ApiModel):
     """Pagination for alert event history."""
 

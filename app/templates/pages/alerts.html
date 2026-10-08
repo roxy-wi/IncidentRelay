@@ -1,6 +1,33 @@
 <link rel="stylesheet" href="{{ url_for('static', filename='css/alerts.css') }}">
+<link rel="stylesheet" href="{{ url_for('static', filename='css/alert_analytics.css') }}">
 
 <div class="first-div-page-layout page-stack">
+    <div class="alerts-page-tabs" role="tablist" aria-label="{{ _('pages.alerts.title') }}">
+        <button
+          id="alerts-tab-inbox"
+          type="button"
+          class="alerts-page-tab is-active"
+          data-alerts-page-tab="inbox"
+          role="tab"
+          aria-selected="true"
+          aria-controls="alerts-inbox-panel"
+        >
+          {{ _('alerts.inbox.title') }}
+        </button>
+        <button
+          id="alerts-tab-analytics"
+          type="button"
+          class="alerts-page-tab"
+          data-alerts-page-tab="analytics"
+          role="tab"
+          aria-selected="false"
+          aria-controls="alert-analytics-panel"
+        >
+          {{ _('alerts.analytics.title') }}
+        </button>
+    </div>
+
+    <div id="alerts-inbox-panel" class="alerts-inbox-panel" role="tabpanel" aria-labelledby="alerts-tab-inbox">
     {% set summary_id = "alerts-alerts-summary" %}
     {% include 'pages/include/alerts_summary_grid.html' %}
     <section class="card alerts-table-card">
@@ -139,4 +166,7 @@
     </div>
 
   </section>
+    </div>
+
+    {% include 'pages/include/alert_analytics_panel.html' %}
 </div>

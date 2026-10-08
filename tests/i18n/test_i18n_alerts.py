@@ -30,6 +30,7 @@ def test_alert_templates_reference_existing_keys():
     paths = [
         ROOT / "app" / "templates" / "pages" / "alerts.html",
         ROOT / "app" / "templates" / "pages" / "include" / "alerts_summary_grid.html",
+        ROOT / "app" / "templates" / "pages" / "include" / "alert_analytics_panel.html",
     ]
 
     keys = set()
@@ -43,9 +44,14 @@ def test_alert_templates_reference_existing_keys():
 
 def test_alert_javascript_references_existing_keys():
     messages = load_catalog("en")
-    content = (
-        ROOT / "app" / "static" / "js" / "pages" / "alerts.js"
-    ).read_text(encoding="utf-8")
+    paths = [
+        ROOT / "app" / "static" / "js" / "pages" / "alerts.js",
+        ROOT / "app" / "static" / "js" / "pages" / "alert_analytics.js",
+    ]
+    content = "\n".join(
+        path.read_text(encoding="utf-8")
+        for path in paths
+    )
 
     keys = set(re.findall(r'i18n\.t\([""]([^""]+)[""]', content))
     missing = sorted(

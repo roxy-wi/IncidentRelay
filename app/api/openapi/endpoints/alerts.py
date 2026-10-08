@@ -671,6 +671,175 @@ def alert_list_schema():
     }
 
 
+def alert_analytics_group_row_schema():
+    """Build a compact AlertGroup row used by Alert Analytics v1."""
+
+    return {
+        "type": "object",
+        "properties": {
+            "id": {"type": "integer"},
+            "title": {"type": "string"},
+            "status": {"type": "string"},
+            "severity": {"type": "string", "nullable": True},
+            "priority": {"type": "string", "nullable": True},
+            "team_id": {"type": "integer", "nullable": True},
+            "team_slug": {"type": "string", "nullable": True},
+            "team_name": {"type": "string", "nullable": True},
+            "service_id": {"type": "integer", "nullable": True},
+            "service_slug": {"type": "string", "nullable": True},
+            "service_name": {"type": "string", "nullable": True},
+            "first_seen_at": date_time_property(
+                "First AlertGroup occurrence timestamp in UTC.",
+                nullable=True,
+            ),
+            "last_seen_at": date_time_property(
+                "Most recent AlertGroup activity timestamp in UTC.",
+                nullable=True,
+            ),
+            "acknowledged_at": date_time_property(
+                "AlertGroup acknowledgement timestamp in UTC.",
+                nullable=True,
+            ),
+            "resolved_at": date_time_property(
+                "AlertGroup resolution timestamp in UTC.",
+                nullable=True,
+            ),
+            "age_seconds": {
+                "type": "integer",
+                "minimum": 0,
+                "nullable": True,
+            },
+            "problem": {"type": "string", "nullable": True},
+        },
+    }
+
+
+def alert_analytics_schema():
+    """Build Alert Analytics v1 response schema."""
+
+    nullable_duration = {
+        "type": "integer",
+        "minimum": 0,
+        "nullable": True,
+    }
+    nullable_ratio = {
+        "type": "number",
+        "minimum": 0,
+        "maximum": 1,
+        "nullable": True,
+    }
+    group_row = alert_analytics_group_row_schema()
+
+    return {
+        "type": "object",
+        "properties": {
+            "version": {"type": "integer", "enum": [1]},
+            "window": {
+                "type": "object",
+                "properties": {
+                    "days": {"type": "integer", "minimum": 1, "maximum": 365},
+                    "since": date_time_property("Analytics window start in UTC."),
+                    "until": date_time_property("Analytics window end in UTC."),
+                },
+            },
+            "summary": {
+                "type": "object",
+                "properties": {
+                    "alert_groups": {"type": "integer", "minimum": 0},
+                    "occurrences": {"type": "integer", "minimum": 0},
+                    "open_now": {"type": "integer", "minimum": 0},
+                    "unacknowledged": {"type": "integer", "minimum": 0},
+                    "ack_rate": nullable_ratio,
+                    "resolved_without_ack": {"type": "integer", "minimum": 0},
+                    "mtta_seconds_p50": nullable_duration,
+                    "mtta_seconds_p95": nullable_duration,
+                    "mttr_seconds_p50": nullable_duration,
+                    "mttr_seconds_p95": nullable_duration,
+                },
+            },
+            "top_noisy": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "alertname": {"type": "string"},
+                        "occurrences": {"type": "integer", "minimum": 0},
+                        "groups": {"type": "integer", "minimum": 0},
+                        "dedup_ratio": {
+                            "type": "number",
+                            "minimum": 0,
+                            "nullable": True,
+                        },
+                        "open": {"type": "integer", "minimum": 0},
+                        "ack_rate": nullable_ratio,
+                    },
+                },
+            },
+            "oldest_unresolved": {
+                "type": "array",
+                "items": group_row,
+            },
+            "attention": {
+                "type": "object",
+                "properties": {
+                    "unacknowledged": {
+                        "type": "array",
+                        "items": group_row,
+                    },
+                    "resolved_without_ack": {
+                        "type": "array",
+                        "items": group_row,
+                    },
+                    "resolved_without_ack_by_alert": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "alertname": {"type": "string"},
+                                "resolved_groups": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                },
+                                "resolved_without_ack": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                },
+                                "rate": nullable_ratio,
+                                "median_lifetime_seconds": nullable_duration,
+                            },
+                        },
+                    },
+                },
+            },
+            "series": {
+                "type": "object",
+                "properties": {
+                    "lifecycle_by_day": {
+                        "type": "array",
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "bucket": {"type": "string", "format": "date"},
+                                "created": {"type": "integer", "minimum": 0},
+                                "acknowledged": {"type": "integer", "minimum": 0},
+                                "resolved": {"type": "integer", "minimum": 0},
+                            },
+                        },
+                    },
+                },
+            },
+            "filters": {
+                "type": "object",
+                "properties": {
+                    "team_id": {"type": "integer", "nullable": True},
+                    "days": {"type": "integer", "minimum": 1, "maximum": 365},
+                    "limit": {"type": "integer", "minimum": 1, "maximum": 50},
+                },
+            },
+        },
+    }
+
+
 def alert_group_merge_request_schema():
     """Build alert group merge request schema."""
 
@@ -1023,6 +1192,57 @@ def paths():
                             },
                         },
                     ),
+                    "401": response("Authentication required."),
+                    "403": response("Access denied."),
+                },
+            }
+        },
+        "/api/alert-groups/analytics": {
+            "get": {
+                "tags": ["alerts"],
+                "summary": "Get alert analytics",
+                "description": (
+                    "Returns Alert Analytics v1 for a rolling time window. "
+                    "Occurrences are persisted child Alert lifecycle rows; repeated updates "
+                    "to the same still-open child alert are not counted as separate occurrences. "
+                    "Response-quality metrics exclude currently maintenance- or orchestration-suppressed "
+                    "groups. Oldest unresolved rows are current-state and may predate the selected window."
+                ),
+                "operationId": "getAlertAnalytics",
+                "security": bearer_security(),
+                "parameters": [
+                    query_param(
+                        "team_id",
+                        "Restrict analytics to one readable team.",
+                        {"type": "integer", "minimum": 1},
+                    ),
+                    query_param(
+                        "days",
+                        "Rolling analytics window in days.",
+                        {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 365,
+                            "default": 30,
+                        },
+                    ),
+                    query_param(
+                        "limit",
+                        "Maximum rows in each ranked or attention list.",
+                        {
+                            "type": "integer",
+                            "minimum": 1,
+                            "maximum": 50,
+                            "default": 10,
+                        },
+                    ),
+                ],
+                "responses": {
+                    "200": response(
+                        "Alert analytics.",
+                        alert_analytics_schema(),
+                    ),
+                    "400": response("Validation error."),
                     "401": response("Authentication required."),
                     "403": response("Access denied."),
                 },

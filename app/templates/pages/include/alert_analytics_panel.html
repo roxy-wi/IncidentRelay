@@ -1,0 +1,163 @@
+<section id="alert-analytics-panel" class="alerts-analytics-panel is-hidden" role="tabpanel" aria-labelledby="alerts-tab-analytics" aria-hidden="true" aria-live="polite">
+    <div class="alerts-analytics-header">
+        <div>
+            <h3>{{ _('alerts.analytics.title') }}</h3>
+            <div class="card-subtitle">{{ _('alerts.analytics.subtitle') }}</div>
+        </div>
+        <div class="alerts-analytics-header-actions">
+            <span id="alert-analytics-loading" class="alerts-analytics-loading is-hidden">
+                {{ _('alerts.analytics.loading') }}
+            </span>
+            <select id="alert-analytics-days" class="input alerts-analytics-days" aria-label="{{ _('alerts.analytics.title') }}">
+                <option value="7">7d</option>
+                <option value="30" selected>30d</option>
+                <option value="90">90d</option>
+            </select>
+            <button id="refresh-alert-analytics" type="button" class="btn btn-secondary btn-small">
+                {{ _('alerts.analytics.refresh') }}
+            </button>
+        </div>
+    </div>
+
+    <div class="alerts-analytics-summary">
+        <div class="alerts-analytics-metric">
+            <div class="alerts-analytics-metric-label">{{ _('alerts.analytics.summary.alert_groups') }}</div>
+            <div class="alerts-analytics-metric-value" data-alert-analytics-metric="groups">0</div>
+        </div>
+        <div class="alerts-analytics-metric">
+            <div class="alerts-analytics-metric-label">{{ _('alerts.analytics.summary.occurrences') }}</div>
+            <div class="alerts-analytics-metric-value" data-alert-analytics-metric="occurrences">0</div>
+        </div>
+        <div class="alerts-analytics-metric">
+            <div class="alerts-analytics-metric-label">{{ _('alerts.analytics.summary.open_now') }}</div>
+            <div class="alerts-analytics-metric-value" data-alert-analytics-metric="open">0</div>
+        </div>
+        <div class="alerts-analytics-metric">
+            <div class="alerts-analytics-metric-label">{{ _('alerts.analytics.summary.unacknowledged') }}</div>
+            <div class="alerts-analytics-metric-value" data-alert-analytics-metric="unacknowledged">0</div>
+        </div>
+        <div class="alerts-analytics-metric">
+            <div class="alerts-analytics-metric-label">{{ _('alerts.analytics.summary.ack_rate') }}</div>
+            <div class="alerts-analytics-metric-value" data-alert-analytics-metric="ack-rate">-</div>
+        </div>
+        <div class="alerts-analytics-metric">
+            <div class="alerts-analytics-metric-label">{{ _('alerts.analytics.summary.resolved_without_ack') }}</div>
+            <div class="alerts-analytics-metric-value" data-alert-analytics-metric="resolved-without-ack">0</div>
+        </div>
+        <div class="alerts-analytics-metric">
+            <div class="alerts-analytics-metric-label">{{ _('alerts.analytics.summary.mtta') }}</div>
+            <div class="alerts-analytics-metric-value" data-alert-analytics-metric="mtta">-</div>
+        </div>
+        <div class="alerts-analytics-metric">
+            <div class="alerts-analytics-metric-label">{{ _('alerts.analytics.summary.mttr') }}</div>
+            <div class="alerts-analytics-metric-value" data-alert-analytics-metric="mttr">-</div>
+        </div>
+    </div>
+
+    <section class="alerts-analytics-chart-card">
+        <div class="alerts-analytics-section-header">
+            <h4>{{ _('alerts.analytics.lifecycle.title') }}</h4>
+            <p>{{ _('alerts.analytics.lifecycle.subtitle') }}</p>
+        </div>
+        <div class="alerts-analytics-chart-wrap">
+            <canvas id="alert-analytics-lifecycle-chart"></canvas>
+        </div>
+    </section>
+
+    <div class="alerts-analytics-grid">
+        <section class="alerts-analytics-table-card alerts-analytics-table-card-wide">
+            <div class="alerts-analytics-section-header">
+                <h4>{{ _('alerts.analytics.noisy.title') }}</h4>
+                <p>{{ _('alerts.analytics.noisy.subtitle') }}</p>
+            </div>
+            <div class="table-wrapper">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>{{ _('alerts.analytics.noisy.alert') }}</th>
+                            <th>{{ _('alerts.analytics.noisy.occurrences') }}</th>
+                            <th>{{ _('alerts.analytics.noisy.groups') }}</th>
+                            <th>{{ _('alerts.analytics.noisy.dedup') }}</th>
+                            <th>{{ _('alerts.analytics.noisy.open') }}</th>
+                            <th>{{ _('alerts.analytics.noisy.ack_rate') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody id="alert-analytics-noisy-table"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="alerts-analytics-table-card alerts-analytics-table-card-wide">
+            <div class="alerts-analytics-section-header">
+                <h4>{{ _('alerts.analytics.oldest.title') }}</h4>
+                <p>{{ _('alerts.analytics.oldest.subtitle') }}</p>
+            </div>
+            <div class="table-wrapper">
+                <table class="data-table">
+                    <thead>
+                        <tr>
+                            <th>{{ _('alerts.analytics.table.alert') }}</th>
+                            <th>{{ _('alerts.analytics.table.service') }}</th>
+                            <th>{{ _('alerts.analytics.table.priority') }}</th>
+                            <th>{{ _('alerts.analytics.table.status') }}</th>
+                            <th>{{ _('alerts.analytics.table.age') }}</th>
+                            <th>{{ _('alerts.analytics.table.last_seen') }}</th>
+                        </tr>
+                    </thead>
+                    <tbody id="alert-analytics-oldest-table"></tbody>
+                </table>
+            </div>
+        </section>
+
+        <section class="alerts-analytics-table-card alerts-analytics-table-card-wide">
+            <div class="alerts-analytics-section-header">
+                <h4>{{ _('alerts.analytics.attention.title') }}</h4>
+                <p>{{ _('alerts.analytics.attention.subtitle') }}</p>
+            </div>
+
+            <div class="alerts-analytics-health-grid">
+                <section class="alerts-analytics-health-block">
+                    <div class="alerts-analytics-section-header">
+                        <h5>{{ _('alerts.analytics.attention.needs_ack.title') }}</h5>
+                        <p>{{ _('alerts.analytics.attention.needs_ack.subtitle') }}</p>
+                    </div>
+                    <div class="table-wrapper">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>{{ _('alerts.analytics.table.alert') }}</th>
+                                    <th>{{ _('alerts.analytics.table.service') }}</th>
+                                    <th>{{ _('alerts.analytics.table.priority') }}</th>
+                                    <th>{{ _('alerts.analytics.table.age') }}</th>
+                                    <th>{{ _('alerts.analytics.table.last_seen') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody id="alert-analytics-needs-ack-table"></tbody>
+                        </table>
+                    </div>
+                </section>
+
+                <section class="alerts-analytics-health-block">
+                    <div class="alerts-analytics-section-header">
+                        <h5>{{ _('alerts.analytics.attention.resolved_without_ack.title') }}</h5>
+                        <p>{{ _('alerts.analytics.attention.resolved_without_ack.subtitle') }}</p>
+                    </div>
+                    <div class="table-wrapper">
+                        <table class="data-table">
+                            <thead>
+                                <tr>
+                                    <th>{{ _('alerts.analytics.table.alert') }}</th>
+                                    <th>{{ _('alerts.analytics.attention.resolved_groups') }}</th>
+                                    <th>{{ _('alerts.analytics.attention.without_ack') }}</th>
+                                    <th>{{ _('alerts.analytics.attention.rate') }}</th>
+                                    <th>{{ _('alerts.analytics.attention.median_lifetime') }}</th>
+                                </tr>
+                            </thead>
+                            <tbody id="alert-analytics-resolved-without-ack-table"></tbody>
+                        </table>
+                    </div>
+                </section>
+            </div>
+        </section>
+    </div>
+</section>
