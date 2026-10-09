@@ -238,25 +238,64 @@ def test_changed_encryption_key_refuses_to_start(tmp_path):
     assert parser.get("main", "secret_encryption_key") == "old-encryption-key-0123456789abcdef"
 
 
+def _key_env(tmp_path, name, key, from_file):
+    """Pass a key in an environment variable or through its __FILE form."""
+    if not from_file:
+        return {name: key}
+    key_file = tmp_path / f"{name.lower()}.txt"
+    key_file.write_text(key + "\n", encoding="utf-8")
+    return {name + "__FILE": str(key_file)}
+
+
 @pytest.mark.parametrize("from_file", [False, True], ids=["variable", "file"])
 def test_changed_encryption_key_from_the_environment_refuses_to_start(tmp_path, from_file):
     base = "[main]\nsecret_key = configured-secret-key-0123456789abcdef\n"
+    name = "INCIDENTRELAY__MAIN__SECRET_ENCRYPTION_KEY"
 
-    def key_env(key):
-        name = "INCIDENTRELAY__MAIN__SECRET_ENCRYPTION_KEY"
-        if not from_file:
-            return {name: key}
-        key_file = tmp_path / "encryption-key"
-        key_file.write_text(key + "\n", encoding="utf-8")
-        return {name + "__FILE": str(key_file)}
+    _render_runtime_config(tmp_path, base, _key_env(tmp_path, name, "old-encryption-key-0123456789abcdef", from_file))
+    assert _start(tmp_path, base, _key_env(tmp_path, name, "old-encryption-key-0123456789abcdef", from_file)).returncode == 0
 
-    _render_runtime_config(tmp_path, base, key_env("old-encryption-key-0123456789abcdef"))
-    assert _start(tmp_path, base, key_env("old-encryption-key-0123456789abcdef")).returncode == 0
-
-    result = _start(tmp_path, base, key_env("new-encryption-key-0123456789abcdef"))
+    result = _start(tmp_path, base, _key_env(tmp_path, name, "new-encryption-key-0123456789abcdef", from_file))
 
     assert result.returncode != 0
     assert "main.secret_encryption_key differs" in result.stderr
+
+
+@pytest.mark.parametrize("from_file", [False, True], ids=["variable", "file"])
+def test_changed_secret_key_refuses_to_start_while_it_is_the_encryption_key(tmp_path, from_file):
+    # With main.secret_key from the environment, an empty
+    # main.secret_encryption_key falls back to it.
+    base = "[main]\ntimezone = UTC\n"
+    name = "INCIDENTRELAY__MAIN__SECRET_KEY"
+
+    _render_runtime_config(tmp_path, base, _key_env(tmp_path, name, "old-secret-key-0123456789abcdef", from_file))
+    assert _start(tmp_path, base, _key_env(tmp_path, name, "old-secret-key-0123456789abcdef", from_file)).returncode == 0
+
+    result = _start(tmp_path, base, _key_env(tmp_path, name, "new-secret-key-0123456789abcdef", from_file))
+
+    assert result.returncode != 0
+    assert "main.secret_key, which is the encryption key" in result.stderr
+
+
+def test_changed_secret_key_keeps_starting_with_a_separate_encryption_key(tmp_path):
+    # Without main.secret_key in the environment, the entrypoint generates a
+    # separate encryption key, so main.secret_key itself can change.
+    _render_runtime_config(tmp_path, "[main]\nsecret_key = old-secret-key-0123456789abcdef\n")
+
+    result = _start(tmp_path, "[main]\nsecret_key = new-secret-key-0123456789abcdef\n")
+
+    assert result.returncode == 0, result.stderr
+
+
+def test_unreadable_key_file_refuses_to_start(tmp_path):
+    result = _start(
+        tmp_path,
+        "[main]\ntimezone = UTC\n",
+        {"INCIDENTRELAY__MAIN__SECRET_KEY__FILE": str(tmp_path / "missing")},
+    )
+
+    assert result.returncode != 0
+    assert "cannot read INCIDENTRELAY__MAIN__SECRET_KEY__FILE" in result.stderr
 
 
 def test_encryption_key_from_the_environment_is_not_written(tmp_path):

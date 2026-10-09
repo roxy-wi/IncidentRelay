@@ -62,11 +62,12 @@ Docker entrypoint.
 
 `main.secret_encryption_key` encrypts the secrets stored in the database, so it
 must not change once IncidentRelay has used it, whether it comes from the config
-file, an environment variable or a `__FILE`. If it changes, the Docker
-entrypoint refuses to start: restore the previous key. Changing the key directly
-is not supported. The entrypoint compares the key with a salted hash it keeps in
-`/var/lib/incidentrelay`, so the check only works when that directory persists
-between restarts.
+file, an environment variable or a `__FILE`. When it is empty, IncidentRelay
+encrypts with `main.secret_key` instead, and the same applies to that key. If
+the encryption key changes, the Docker entrypoint refuses to start: restore the
+previous key. Changing the key directly is not supported. The entrypoint
+compares the key with a salted hash it keeps in `/var/lib/incidentrelay`, so the
+check only works when that directory persists between restarts.
 
 In `[voice_provider]`, whose options depend on the provider, a variable only
 overrides an option that is present in the file, and the option keeps its

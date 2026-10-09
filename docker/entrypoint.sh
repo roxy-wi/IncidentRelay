@@ -89,16 +89,27 @@ with open(lock_path, "a+", encoding="utf-8") as lock_file:
     ensure_secret("voice", "callback_secret")
 
     def env_value(section, option):
-        # The value the application reads from the environment, or None.
+        # The value the application reads from the environment, or None. It
+        # fails the same way the application does.
         env_name = f"INCIDENTRELAY__{section}__{option}".upper()
-        if env_name + "__FILE" in os.environ:
+        file_name = env_name + "__FILE"
+        if env_name in os.environ and file_name in os.environ:
+            sys.exit(f"ERROR: both {env_name} and {file_name} are set; use only one of them")
+        if file_name in os.environ:
+            path = os.environ[file_name]
             try:
-                with open(os.environ[env_name + "__FILE"], encoding="utf-8") as handle:
+                with open(path, encoding="utf-8") as handle:
                     return handle.read().rstrip("\r\n")
-            except OSError:
-                # The application reports the unreadable file itself.
-                return None
+            except OSError as exc:
+                sys.exit(f"ERROR: cannot read {file_name}={path}: {exc}")
         return os.environ.get(env_name)
+
+    def setting(section, option):
+        # Like the application, an environment override wins over the config.
+        value = env_value(section, option)
+        if value is None:
+            value = parser.get(section, option, fallback="").strip()
+        return value
 
     def key_check(key):
         # A salted hash, so a key from the environment is never written here.
@@ -117,25 +128,35 @@ with open(lock_path, "a+", encoding="utf-8") as lock_file:
         parts = check.split(":")
         return len(parts) == 4 and parts[0] == "pbkdf2_sha256"
 
-    # Secrets in the database are encrypted with main.secret_encryption_key,
-    # so it must stay the same across restarts wherever it comes from.
-    configured_key = env_value("main", "secret_encryption_key")
-    if configured_key is None:
-        configured_key = parser.get("main", "secret_encryption_key", fallback="").strip()
+    # Secrets in the database are encrypted with the effective key: as in the
+    # application, an empty main.secret_encryption_key falls back to
+    # main.secret_key. It must stay the same across restarts wherever it
+    # comes from.
+    explicit_key = setting("main", "secret_encryption_key")
+    effective_key = explicit_key or setting("main", "secret_key")
     stored_check = stored.get("entrypoint", "secret_encryption_key_check", fallback="")
     if not is_key_check(stored_check):
-        # Copies written by earlier versions hold only the key itself.
-        stored_key = stored.get("main", "secret_encryption_key", fallback="").strip()
+        # Copies written by earlier versions hold only the keys themselves.
+        stored_key = (
+            stored.get("main", "secret_encryption_key", fallback="").strip()
+            or stored.get("main", "secret_key", fallback="").strip()
+        )
         stored_check = key_check(stored_key) if stored_key not in known_insecure else ""
-    if configured_key:
-        if stored_check and not key_matches(configured_key, stored_check):
+    if effective_key:
+        if stored_check and not key_matches(effective_key, stored_check):
+            changed = (
+                "main.secret_encryption_key"
+                if explicit_key
+                else "main.secret_key, which is the encryption key while "
+                "main.secret_encryption_key is empty,"
+            )
             sys.exit(
-                "ERROR: main.secret_encryption_key differs from the key this installation "
-                "has been using. Secrets stored in the database are encrypted with it and "
-                "would become unreadable, and changing the key directly is not supported. "
+                f"ERROR: {changed} differs from the key this installation has been using. "
+                "Secrets stored in the database are encrypted with it and would become "
+                "unreadable, and changing the key directly is not supported. "
                 "Restore the previous key."
             )
-        stored_check = stored_check or key_check(configured_key)
+        stored_check = stored_check or key_check(effective_key)
     if stored_check:
         if not parser.has_section("entrypoint"):
             parser.add_section("entrypoint")
