@@ -121,6 +121,30 @@ missing nested map.
 {{- end }}
 
 {{/*
+Fail early when the ServiceMonitor can't scrape /metrics. With
+existingConfigSecret the config isn't visible here, so only configFrom is
+checked.
+*/}}
+{{- define "incidentrelay.validateServiceMonitor" -}}
+{{- $configFrom := default (dict) .Values.configFrom -}}
+{{- $token := default (dict) .Values.serviceMonitor.bearerTokenSecret -}}
+{{- if and $token (not (and $token.name $token.key)) -}}
+{{- fail "serviceMonitor.bearerTokenSecret needs both name and key" -}}
+{{- end -}}
+{{- $metrics := dict -}}
+{{- if not .Values.existingConfigSecret -}}
+{{- $metrics = default (dict) (get (default (dict) .Values.config) "metrics") -}}
+{{- $enabled := has (default "" (get $metrics "enabled") | toString | lower) (list "1" "true" "yes" "y" "on") -}}
+{{- if and (not $enabled) (not (hasKey $configFrom "metrics.enabled")) -}}
+{{- fail "serviceMonitor.enabled needs the /metrics endpoint; set config.metrics.enabled to true" -}}
+{{- end -}}
+{{- end -}}
+{{- if and (or (get $metrics "auth_token") (hasKey $configFrom "metrics.auth_token")) (not $token) -}}
+{{- fail "/metrics requires metrics.auth_token; set serviceMonitor.bearerTokenSecret to the Secret key that holds it" -}}
+{{- end -}}
+{{- end }}
+
+{{/*
 Render Helm config values without scientific notation for whole-number floats.
 Helm can deserialize large YAML numbers as float64, and Go's default formatting
 may render values such as 1048576 as 1.048576e+06. The application intentionally
