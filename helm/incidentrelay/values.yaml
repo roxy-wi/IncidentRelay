@@ -139,6 +139,10 @@ config:
     providers_dir: /usr/local/lib/incidentrelay/voice_providers
     # Empty inherits main.secret_key in the rendered Helm config.
     callback_secret: ""
+  # Prometheus metrics at GET /metrics on the web Service, off by default.
+  # Take auth_token from a Secret with configFrom, see serviceMonitor below.
+  #   metrics:
+  #     enabled: true
 
 # Name of an existing Secret holding the full config under the key
 # `incidentrelay.conf`. When set, the `config` map above is ignored and
@@ -266,6 +270,32 @@ ingress:
         - path: /
           pathType: Prefix
   tls: []
+
+# Prometheus Operator ServiceMonitor for GET /metrics on the web Service.
+# The endpoint itself is turned on with config.metrics.enabled. When it
+# requires a token, take metrics.auth_token from a Secret with configFrom and
+# point bearerTokenSecret at the same Secret key:
+#   configFrom:
+#     metrics.auth_token:
+#       secretKeyRef:
+#         name: incidentrelay-metrics
+#         key: token
+#   serviceMonitor:
+#     enabled: true
+#     bearerTokenSecret:
+#       name: incidentrelay-metrics
+#       key: token
+# Only the web pod serves /metrics, so counters recorded by the scheduler and
+# chat workers aren't included; database-derived gauges are.
+serviceMonitor:
+  enabled: false
+  # Extra labels, e.g. the ones your Prometheus selects ServiceMonitors by.
+  labels: {}
+  # Empty uses the Prometheus defaults.
+  interval: ""
+  scrapeTimeout: ""
+  # Secret key holding metrics.auth_token: {name: ..., key: ...}.
+  bearerTokenSecret: {}
 
 podSecurityContext: {}
 securityContext: {}

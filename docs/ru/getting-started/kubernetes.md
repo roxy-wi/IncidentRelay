@@ -247,6 +247,44 @@ web:
 
 Startup-проба даёт первому запуску до пяти минут — этого достаточно для выполнения миграций на новой базе данных.
 
+## Метрики
+
+Веб-компонент умеет отдавать метрики Prometheus по адресу `/metrics` (см. [Секция metrics](configuration.md#секция-metrics)). Включите эндпоинт в конфигурации и закройте его токеном из Secret:
+
+```bash
+kubectl create secret generic incidentrelay-metrics \
+  --namespace incidentrelay \
+  --from-literal=token="$(openssl rand -hex 32)"
+```
+
+```yaml
+config:
+  metrics:
+    enabled: true
+configFrom:
+  metrics.auth_token:
+    secretKeyRef:
+      name: incidentrelay-metrics
+      key: token
+```
+
+Если используется Prometheus Operator, чарт может создать ServiceMonitor, который собирает метрики с веб-Service с тем же токеном:
+
+```yaml
+serviceMonitor:
+  enabled: true
+  interval: 30s
+  labels:
+    release: kube-prometheus-stack  # лейблы, по которым ваш Prometheus выбирает ServiceMonitor
+  bearerTokenSecret:
+    name: incidentrelay-metrics
+    key: token
+```
+
+Чарт не создаст ServiceMonitor, который не сможет собирать метрики: если `config.metrics.enabled` выключен или если задан `metrics.auth_token`, а `bearerTokenSecret` — нет. С `existingConfigSecret` чарт не видит конфигурацию, поэтому убедитесь, что секция `[metrics]` в ней включена.
+
+`/metrics` отдаёт только веб-pod, поэтому счётчики, которые пишут планировщик и воркеры чатов, не собираются; метрики, которые вычисляются из базы данных, собираются.
+
 ## Доступ
 
 По умолчанию Service имеет тип `ClusterIP`. Для быстрой проверки:

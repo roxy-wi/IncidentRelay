@@ -247,6 +247,44 @@ The web deployment is wired to the unauthenticated probe endpoints:
 
 A startup probe allows up to five minutes for the first boot, which covers migrations on a fresh database.
 
+## Metrics
+
+The web component can serve Prometheus metrics at `/metrics` (see the [Metrics section](configuration.md#metrics-section)). Turn the endpoint on in the config and protect it with a token from a Secret:
+
+```bash
+kubectl create secret generic incidentrelay-metrics \
+  --namespace incidentrelay \
+  --from-literal=token="$(openssl rand -hex 32)"
+```
+
+```yaml
+config:
+  metrics:
+    enabled: true
+configFrom:
+  metrics.auth_token:
+    secretKeyRef:
+      name: incidentrelay-metrics
+      key: token
+```
+
+With the Prometheus Operator, the chart can also render a ServiceMonitor that scrapes the web Service with the same token:
+
+```yaml
+serviceMonitor:
+  enabled: true
+  interval: 30s
+  labels:
+    release: kube-prometheus-stack  # the labels your Prometheus selects ServiceMonitors by
+  bearerTokenSecret:
+    name: incidentrelay-metrics
+    key: token
+```
+
+The chart refuses to render a ServiceMonitor that can't scrape: when `config.metrics.enabled` is off, or when `metrics.auth_token` is set but `bearerTokenSecret` isn't. With `existingConfigSecret` the chart can't see the config, so make sure its `[metrics]` section is enabled.
+
+Only the web pod serves `/metrics`, so counters recorded by the scheduler and the chat workers aren't scraped; the gauges computed from the database are.
+
 ## Access
 
 By default the Service is `ClusterIP`. For a quick look:

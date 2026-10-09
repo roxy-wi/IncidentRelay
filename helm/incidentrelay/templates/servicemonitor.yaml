@@ -1,0 +1,32 @@
+{{- if .Values.serviceMonitor.enabled }}
+{{- include "incidentrelay.validateServiceMonitor" . }}
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: {{ include "incidentrelay.fullname" . }}
+  labels:
+    {{- include "incidentrelay.labels" . | nindent 4 }}
+    {{- with .Values.serviceMonitor.labels }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  selector:
+    matchLabels:
+      {{- include "incidentrelay.selectorLabels" . | nindent 6 }}
+  endpoints:
+    - port: http
+      path: /metrics
+      {{- with .Values.serviceMonitor.interval }}
+      interval: {{ . | quote }}
+      {{- end }}
+      {{- with .Values.serviceMonitor.scrapeTimeout }}
+      scrapeTimeout: {{ . | quote }}
+      {{- end }}
+      {{- with .Values.serviceMonitor.bearerTokenSecret }}
+      authorization:
+        type: Bearer
+        credentials:
+          name: {{ .name | quote }}
+          key: {{ .key | quote }}
+      {{- end }}
+{{- end }}
