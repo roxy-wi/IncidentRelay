@@ -294,6 +294,7 @@ The chart refuses to render a ServiceMonitor it knows can't scrape: when metrics
 
 Only the web pod serves `/metrics`, so counters recorded by the scheduler and the chat workers aren't scraped; the gauges computed from the database are. Every pod keeps its counter files in its own `emptyDir` at `/var/lib/incidentrelay/metrics`, so several web replicas don't share them.
 
+
 ## Access
 
 By default the Service is `ClusterIP`. For a quick look:
