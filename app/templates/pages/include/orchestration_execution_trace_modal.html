@@ -1,0 +1,52 @@
+<div
+  id="orchestration-execution-modal"
+  class="app-modal is-hidden"
+  style="display: none;"
+  role="dialog"
+  aria-modal="true"
+  aria-hidden="true"
+  aria-labelledby="orchestration-execution-modal-title"
+>
+  <div class="app-modal-dialog app-modal-dialog-wide orchestration-execution-dialog">
+    <div class="app-modal-header">
+      <div>
+        <h2 id="orchestration-execution-modal-title">{{ _('orchestrations.actions.trace') }}</h2>
+        <div id="orchestration-execution-modal-subtitle" class="card-subtitle"></div>
+      </div>
+      <button
+        id="orchestration-execution-modal-close"
+        class="app-modal-close"
+        type="button"
+        data-modal-close="#orchestration-execution-modal"
+        aria-label="{{ _('common.close') }}"
+      >×</button>
+    </div>
+    <div class="app-modal-body orchestration-execution-modal-body">
+      <section
+        id="orchestration-execution-notes"
+        class="orchestration-execution-notes is-hidden"
+        aria-labelledby="orchestration-execution-notes-title"
+      >
+        <h3 id="orchestration-execution-notes-title">{{ _('orchestrations.executions.notes') }}</h3>
+        <ul id="orchestration-execution-notes-list"></ul>
+      </section>
+
+      <div id="orchestration-execution-overview" class="orchestration-simulation-overview"></div>
+      <div id="orchestration-execution-metadata" class="orchestration-execution-metadata"></div>
+
+      <div class="page-tabs orchestration-simulation-result-tabs" role="tablist" aria-label="{{ _('orchestrations.executions.trace_views') }}">
+        <button type="button" class="page-tab is-active" role="tab" aria-selected="true" aria-controls="orchestration-execution-summary" data-execution-trace-tab="summary">{{ _('orchestrations.simulator.summary') }}</button>
+        <button type="button" class="page-tab" role="tab" aria-selected="false" aria-controls="orchestration-execution-rules" data-execution-trace-tab="rules">{{ _('orchestrations.simulator.rules') }}</button>
+        <button type="button" class="page-tab" role="tab" aria-selected="false" aria-controls="orchestration-execution-changes" data-execution-trace-tab="changes">{{ _('orchestrations.simulator.changes') }}</button>
+        <button type="button" class="page-tab" role="tab" aria-selected="false" aria-controls="orchestration-execution-raw" data-execution-trace-tab="raw">{{ _('orchestrations.simulator.raw_json') }}</button>
+      </div>
+
+      <section id="orchestration-execution-summary" class="orchestration-simulation-result-panel" role="tabpanel" data-execution-trace-panel="summary"></section>
+      <section id="orchestration-execution-rules" class="orchestration-simulation-result-panel is-hidden" role="tabpanel" data-execution-trace-panel="rules"></section>
+      <section id="orchestration-execution-changes" class="orchestration-simulation-result-panel is-hidden" role="tabpanel" data-execution-trace-panel="changes"></section>
+      <section id="orchestration-execution-raw" class="orchestration-simulation-result-panel is-hidden" role="tabpanel" data-execution-trace-panel="raw">
+        <pre id="orchestration-execution-trace" class="orchestration-output orchestration-execution-trace" tabindex="0"></pre>
+      </section>
+    </div>
+  </div>
+</div>

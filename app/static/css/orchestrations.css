@@ -94,6 +94,14 @@ body.md-theme #orchestration-webhook-modal .app-modal-dialog-wide,
 .orchestration-simulation-diff-table th:first-child,
 .orchestration-simulation-diff-table td:first-child { width: 30%; }
 .orchestration-simulation-diff-table code { white-space: pre-wrap; overflow-wrap: anywhere; }
+body.md-theme .orchestration-simulation-diff-table code {
+    background: transparent;
+    color: var(--md-text);
+    border: 0;
+    border-radius: 0;
+    padding: 0;
+    box-shadow: none;
+}
 .orchestration-simulation-no-changes { padding: 18px; border: 1px dashed var(--border-color); border-radius: 9px; color: var(--muted); text-align: center; }
 .orchestration-simulation-truncated { padding: 8px 2px 0; }
 .status-badge.status-danger { background: var(--md-danger-soft); color: var(--md-danger); }
@@ -108,4 +116,60 @@ body.md-theme #orchestration-webhook-modal .app-modal-dialog-wide,
   .orchestration-simulation-kv-grid { grid-template-columns: 1fr; }
   .orchestration-simulation-rule { margin-left: 0; }
   .orchestration-simulation-rule-header { align-items: stretch; flex-direction: column; }
+}
+
+/* Execution trace is shown in a dedicated scrollable modal. */
+body.md-theme #orchestration-execution-modal .orchestration-execution-dialog,
+#orchestration-execution-modal .orchestration-execution-dialog {
+  width: min(1060px, calc(100vw - 32px));
+  max-height: min(88vh, 920px);
+}
+
+#orchestration-execution-modal .orchestration-execution-modal-body {
+  min-height: 0;
+  overflow-y: auto;
+}
+
+#orchestration-execution-modal .orchestration-execution-trace {
+  margin: 0;
+  min-height: 180px;
+  max-height: none;
+  overflow: auto;
+  white-space: pre;
+  word-break: normal;
+  tab-size: 2;
+}
+
+.orchestration-execution-notes {
+  margin-bottom: 16px;
+  padding: 12px 16px;
+  border: 1px solid var(--md-border);
+  border-radius: 10px;
+  background: var(--md-surface-soft);
+}
+
+.orchestration-execution-notes h3 { margin: 0 0 8px; font-size: 14px; }
+.orchestration-execution-notes ul { margin: 0; padding-left: 20px; }
+.orchestration-execution-notes li { white-space: pre-wrap; overflow-wrap: anywhere; }
+
+#orchestration-execution-modal .orchestration-simulation-overview {
+  padding: 0 0 12px;
+}
+#orchestration-execution-modal .orchestration-simulation-result-tabs {
+  margin: 0 0 14px;
+}
+#orchestration-execution-modal .orchestration-simulation-result-panel {
+  padding: 0;
+}
+#orchestration-execution-modal .orchestration-simulation-result-panel.is-hidden {
+  display: none;
+}
+#orchestration-execution-modal .orchestration-execution-metadata {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+#orchestration-execution-modal .orchestration-execution-metadata .orchestration-simulation-metric {
+  flex: 1 1 180px;
 }

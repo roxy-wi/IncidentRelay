@@ -1297,8 +1297,8 @@ function resetOrchestrationSimulationResult() {
     switchOrchestrationSimulationResultTab("summary");
 }
 
-function renderOrchestrationSimulationOverview(result) {
-    const target = $("#orchestration-simulation-overview").empty();
+function renderOrchestrationSimulationOverview(result, targetSelector) {
+    const target = $(targetSelector || "#orchestration-simulation-overview").empty();
     const execution = result.execution || {};
     const flattened = orchestrationSimulationFlattenRules(execution.rules || [], 0, []);
     const disposition = (result.disposition || {}).type || "process";
@@ -1332,8 +1332,9 @@ function orchestrationSimulationKeyValue(label, value, options) {
     return item;
 }
 
-function renderOrchestrationSimulationSummary(result) {
-    const target = $("#orchestration-simulation-summary").empty();
+function renderOrchestrationSimulationSummary(result, targetSelector, options) {
+    const target = $(targetSelector || "#orchestration-simulation-summary").empty();
+    const settings = options || {};
     if (!result.executed) {
         const errors = asArray(result.errors);
         target.append(
@@ -1351,7 +1352,7 @@ function renderOrchestrationSimulationSummary(result) {
     const disposition = result.disposition || {};
 
     const eventSection = $("<section>").addClass("orchestration-simulation-section").append(
-        $("<h3>").text(i18n.t("orchestrations.simulator.effective_event")),
+        $("<h3>").text(i18n.t(settings.recorded ? "orchestrations.executions.candidate_event" : "orchestrations.simulator.effective_event")),
         $("<div>").addClass("orchestration-simulation-kv-grid").append(
             orchestrationSimulationKeyValue(i18n.t("orchestrations.simulator.title"), event.title),
             orchestrationSimulationKeyValue(i18n.t("orchestrations.simulator.severity"), event.severity),
@@ -1364,7 +1365,7 @@ function renderOrchestrationSimulationSummary(result) {
     );
 
     const selectionSection = $("<section>").addClass("orchestration-simulation-section").append(
-        $("<h3>").text(i18n.t("orchestrations.simulator.selected_targets")),
+        $("<h3>").text(i18n.t(settings.recorded ? "orchestrations.executions.candidate_targets" : "orchestrations.simulator.selected_targets")),
         $("<div>").addClass("orchestration-simulation-kv-grid").append(
             orchestrationSimulationKeyValue(i18n.t("orchestrations.simulator.route"), orchestrationSimulationEntity(selected.route)),
             orchestrationSimulationKeyValue(i18n.t("orchestrations.simulator.team"), orchestrationSimulationEntity(selected.team)),
@@ -1375,16 +1376,27 @@ function renderOrchestrationSimulationSummary(result) {
         )
     );
 
+    const versionLabel = settings.recorded
+        ? "#" + (result.version_id || "—")
+        : "v" + (result.version_number || result.version_id || "—");
+    const executionInfo = [
+        orchestrationSimulationKeyValue(i18n.t("orchestrations.simulator.version"), versionLabel),
+        orchestrationSimulationKeyValue(
+            i18n.t(settings.recorded ? "orchestrations.executions.source" : "orchestrations.simulator.normalizer"),
+            result.selected_normalizer
+        ),
+    ];
+    if (!settings.recorded) {
+        executionInfo.push(orchestrationSimulationKeyValue(i18n.t("orchestrations.simulator.normalized_events"), result.normalized_event_count));
+    }
+    executionInfo.push(
+        orchestrationSimulationKeyValue(i18n.t("orchestrations.simulator.reason"), disposition.reason),
+        orchestrationSimulationKeyValue(i18n.t("orchestrations.simulator.pause_seconds"), disposition.pause_seconds),
+        orchestrationSimulationKeyValue(i18n.t("orchestrations.simulator.grouping"), selected.grouping, {code: true})
+    );
     const executionSection = $("<section>").addClass("orchestration-simulation-section").append(
         $("<h3>").text(i18n.t("orchestrations.simulator.execution_details")),
-        $("<div>").addClass("orchestration-simulation-kv-grid").append(
-            orchestrationSimulationKeyValue(i18n.t("orchestrations.simulator.version"), "v" + (result.version_number || result.version_id || "—")),
-            orchestrationSimulationKeyValue(i18n.t("orchestrations.simulator.normalizer"), result.selected_normalizer),
-            orchestrationSimulationKeyValue(i18n.t("orchestrations.simulator.normalized_events"), result.normalized_event_count),
-            orchestrationSimulationKeyValue(i18n.t("orchestrations.simulator.reason"), disposition.reason),
-            orchestrationSimulationKeyValue(i18n.t("orchestrations.simulator.pause_seconds"), disposition.pause_seconds),
-            orchestrationSimulationKeyValue(i18n.t("orchestrations.simulator.grouping"), selected.grouping, {code: true})
-        )
+        $("<div>").addClass("orchestration-simulation-kv-grid").append(...executionInfo)
     );
 
     target.append(eventSection, selectionSection, executionSection);
@@ -1400,8 +1412,8 @@ function renderOrchestrationSimulationSummary(result) {
     }
 }
 
-function renderOrchestrationSimulationRules(result) {
-    const target = $("#orchestration-simulation-rules").empty();
+function renderOrchestrationSimulationRules(result, targetSelector) {
+    const target = $(targetSelector || "#orchestration-simulation-rules").empty();
     const execution = result.execution || {};
     const flattened = orchestrationSimulationFlattenRules(execution.rules || [], 0, []);
     if (!flattened.length) {
@@ -1513,8 +1525,9 @@ function orchestrationSimulationDiffTable(diff) {
     return wrapper;
 }
 
-function renderOrchestrationSimulationChanges(result) {
-    const target = $("#orchestration-simulation-changes").empty();
+function renderOrchestrationSimulationChanges(result, targetSelector, options) {
+    const target = $(targetSelector || "#orchestration-simulation-changes").empty();
+    const settings = options || {};
     target.append(
         $("<section>").addClass("orchestration-simulation-section").append(
             $("<h3>").text(i18n.t("orchestrations.simulator.input_output_changes")),
@@ -1525,7 +1538,7 @@ function renderOrchestrationSimulationChanges(result) {
     if (result.active_draft_diff) {
         target.append(
             $("<section>").addClass("orchestration-simulation-section").append(
-                $("<h3>").text(i18n.t("orchestrations.simulator.active_draft_changes")),
+                $("<h3>").text(i18n.t(settings.secondaryTitleKey || "orchestrations.simulator.active_draft_changes")),
                 orchestrationSimulationDiffTable(result.active_draft_diff)
             )
         );
@@ -1574,9 +1587,31 @@ function loadOrchestrationExecutions() {
     });
 }
 
+function orchestrationExecutionTraceNotes(trace) {
+    const result = trace && trace.result && trace.result.context && trace.result.context.result;
+    return Array.isArray(result && result.notes) ? result.notes : [];
+}
+
 function viewOrchestrationExecution(id) {
     const row = orchestrationExecutions.find(function (item) { return Number(item.id) === Number(id); });
-    $("#orchestration-execution-trace").text(orchestrationJson(row && (row.trace || row.trace_json || row)));
+    if (!row) {
+        return;
+    }
+
+    const trace = row.trace || row.trace_json || row;
+    const notes = orchestrationExecutionTraceNotes(trace);
+    const notesList = $("#orchestration-execution-notes-list").empty();
+
+    notes.forEach(function (note) {
+        notesList.append($("<li>").text(String(note)));
+    });
+    $("#orchestration-execution-notes").toggleClass("is-hidden", notes.length === 0);
+
+    $("#orchestration-execution-modal-subtitle").text("#" + row.id);
+    $("#orchestration-execution-trace").text(orchestrationJson(trace));
+    renderOrchestrationExecutionTraceDetails(row, trace);
+    openAppModal("#orchestration-execution-modal");
+    $("#orchestration-execution-modal-close").trigger("focus");
 }
 
 function loadOrchestrationWebhooks() {
