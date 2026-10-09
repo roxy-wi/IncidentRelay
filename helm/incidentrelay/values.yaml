@@ -273,8 +273,8 @@ ingress:
 
 # Prometheus Operator ServiceMonitor for GET /metrics on the web Service.
 # The endpoint itself is turned on with config.metrics.enabled. When it
-# requires a token, take metrics.auth_token from a Secret with configFrom and
-# point bearerTokenSecret at the same Secret key:
+# requires a token, take metrics.auth_token from a Secret with configFrom;
+# the ServiceMonitor sends the same Secret key as its bearer token:
 #   configFrom:
 #     metrics.auth_token:
 #       secretKeyRef:
@@ -282,9 +282,10 @@ ingress:
 #         key: token
 #   serviceMonitor:
 #     enabled: true
-#     bearerTokenSecret:
-#       name: incidentrelay-metrics
-#       key: token
+# Prometheus must discover ServiceMonitors in this release's namespace: check
+# its serviceMonitorNamespaceSelector as well as the labels below. The chart
+# rejects settings it knows can't be scraped, but it can't see values from
+# Secrets, ConfigMaps, files or existingConfigSecret.
 # Only the web pod serves /metrics, so counters recorded by the scheduler and
 # chat workers aren't included; database-derived gauges are.
 serviceMonitor:
@@ -294,7 +295,9 @@ serviceMonitor:
   # Empty uses the Prometheus defaults.
   interval: ""
   scrapeTimeout: ""
-  # Secret key holding metrics.auth_token: {name: ..., key: ...}.
+  # Secret key holding metrics.auth_token: {name: ..., key: ...}. Only needed
+  # when the token doesn't come from configFrom secretKeyRef, e.g. with
+  # existingConfigSecret.
   bearerTokenSecret: {}
 
 podSecurityContext: {}

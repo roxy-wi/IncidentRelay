@@ -121,26 +121,76 @@ missing nested map.
 {{- end }}
 
 {{/*
-Fail early when the ServiceMonitor can't scrape /metrics. With
-existingConfigSecret the config isn't visible here, so only configFrom is
-checked.
+Whether /metrics is enabled, as far as the chart can tell: "true", "false",
+or "unknown" when the value comes from outside the chart (a Secret, a
+ConfigMap, a file or existingConfigSecret). As in the application, an
+environment variable wins over the config; web.extraEnv is rendered after
+configFrom, so it wins over configFrom.
+*/}}
+{{- define "incidentrelay.metricsEnabled" -}}
+{{- $truthy := list "1" "true" "yes" "y" "on" -}}
+{{- $result := "" -}}
+{{- range (default (list) .Values.web.extraEnv) -}}
+{{- if eq (toString .name) "INCIDENTRELAY__METRICS__ENABLED" -}}
+{{- if hasKey . "value" -}}
+{{- $result = ternary "true" "false" (has (toString .value | trim | lower) $truthy) -}}
+{{- else -}}
+{{- $result = "unknown" -}}
+{{- end -}}
+{{- else if eq (toString .name) "INCIDENTRELAY__METRICS__ENABLED__FILE" -}}
+{{- $result = "unknown" -}}
+{{- end -}}
+{{- end -}}
+{{- if not $result -}}
+{{- if or (hasKey (default (dict) .Values.configFrom) "metrics.enabled") .Values.existingConfigSecret -}}
+{{- $result = "unknown" -}}
+{{- else -}}
+{{- $metrics := default (dict) (get (default (dict) .Values.config) "metrics") -}}
+{{- $result = ternary "true" "false" (has (default "" (get $metrics "enabled") | toString | trim | lower) $truthy) -}}
+{{- end -}}
+{{- end -}}
+{{- $result -}}
+{{- end }}
+
+{{/*
+The Secret key the ServiceMonitor sends as the bearer token, as YAML:
+serviceMonitor.bearerTokenSecret, or else the Secret configFrom takes
+metrics.auth_token from.
+*/}}
+{{- define "incidentrelay.serviceMonitorTokenSecret" -}}
+{{- $token := default (dict) .Values.serviceMonitor.bearerTokenSecret -}}
+{{- if not $token -}}
+{{- $source := default (dict) (get (default (dict) .Values.configFrom) "metrics.auth_token") -}}
+{{- $token = default (dict) (get $source "secretKeyRef") -}}
+{{- end -}}
+{{- with $token -}}
+{{- toYaml (dict "name" .name "key" .key) -}}
+{{- end -}}
+{{- end }}
+
+{{/*
+Fail early when the ServiceMonitor can't scrape /metrics. This is
+best-effort: values from outside the chart can't be checked.
 */}}
 {{- define "incidentrelay.validateServiceMonitor" -}}
 {{- $configFrom := default (dict) .Values.configFrom -}}
-{{- $token := default (dict) .Values.serviceMonitor.bearerTokenSecret -}}
-{{- if and $token (not (and $token.name $token.key)) -}}
+{{- $explicit := default (dict) .Values.serviceMonitor.bearerTokenSecret -}}
+{{- if and $explicit (not (and $explicit.name $explicit.key)) -}}
 {{- fail "serviceMonitor.bearerTokenSecret needs both name and key" -}}
+{{- end -}}
+{{- $fromConfigFrom := default (dict) (get (default (dict) (get $configFrom "metrics.auth_token")) "secretKeyRef") -}}
+{{- if and $explicit $fromConfigFrom (or (ne (toString $explicit.name) (toString $fromConfigFrom.name)) (ne (toString $explicit.key) (toString $fromConfigFrom.key))) -}}
+{{- fail "serviceMonitor.bearerTokenSecret differs from configFrom.metrics.auth_token.secretKeyRef, so Prometheus would get 401; remove serviceMonitor.bearerTokenSecret, the ServiceMonitor reuses the configFrom Secret" -}}
+{{- end -}}
+{{- if eq (include "incidentrelay.metricsEnabled" .) "false" -}}
+{{- fail "serviceMonitor.enabled needs the /metrics endpoint, but metrics are disabled; set config.metrics.enabled to true (an INCIDENTRELAY__METRICS__ENABLED variable in web.extraEnv takes precedence over it)" -}}
 {{- end -}}
 {{- $metrics := dict -}}
 {{- if not .Values.existingConfigSecret -}}
 {{- $metrics = default (dict) (get (default (dict) .Values.config) "metrics") -}}
-{{- $enabled := has (default "" (get $metrics "enabled") | toString | lower) (list "1" "true" "yes" "y" "on") -}}
-{{- if and (not $enabled) (not (hasKey $configFrom "metrics.enabled")) -}}
-{{- fail "serviceMonitor.enabled needs the /metrics endpoint; set config.metrics.enabled to true" -}}
 {{- end -}}
-{{- end -}}
-{{- if and (or (get $metrics "auth_token") (hasKey $configFrom "metrics.auth_token")) (not $token) -}}
-{{- fail "/metrics requires metrics.auth_token; set serviceMonitor.bearerTokenSecret to the Secret key that holds it" -}}
+{{- if and (or (get $metrics "auth_token") (hasKey $configFrom "metrics.auth_token")) (not (include "incidentrelay.serviceMonitorTokenSecret" .)) -}}
+{{- fail "/metrics requires metrics.auth_token, but the ServiceMonitor has no Secret to send it from; take the token from a Secret with configFrom secretKeyRef or set serviceMonitor.bearerTokenSecret" -}}
 {{- end -}}
 {{- end }}
 
@@ -398,6 +448,8 @@ Volumes shared by every component.
   {{- end }}
 - name: logs
   emptyDir: {}
+- name: metrics
+  emptyDir: {}
 {{- if include "incidentrelay.customCAEnabled" . }}
 - name: custom-ca-source
   configMap:
@@ -424,6 +476,12 @@ Volume mounts shared by every component.
   mountPath: /var/lib/incidentrelay
 - name: logs
   mountPath: /var/log/incidentrelay
+{{- /*
+prometheus_client keys its counter files by PID, so every pod gets its own
+directory instead of sharing the data volume with other pods.
+*/}}
+- name: metrics
+  mountPath: /var/lib/incidentrelay/metrics
 {{- if include "incidentrelay.customCAEnabled" . }}
 - name: custom-ca-bundle
   mountPath: /etc/incidentrelay/ca
