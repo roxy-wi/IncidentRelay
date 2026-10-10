@@ -158,6 +158,8 @@ existingConfigSecret: ""
 # When main.secret_key comes from here, the shared security keys left empty
 # (main.secret_encryption_key, auth.jwt_secret, mattermost.action_secret,
 # voice.callback_secret) fall back to it, also with existingConfigSecret.
+# Don't set the same option in a component's extraEnv as well: a Deployment
+# can't hold the same variable twice, so the chart refuses to render it.
 configFrom: {}
 #  main.secret_key:
 #    secretKeyRef:
@@ -272,9 +274,11 @@ ingress:
   tls: []
 
 # Prometheus Operator ServiceMonitor for GET /metrics on the web Service.
-# The endpoint itself is turned on with config.metrics.enabled. When it
-# requires a token, take metrics.auth_token from a Secret with configFrom and
-# point bearerTokenSecret at the same Secret key:
+# The endpoint itself is turned on with config.metrics.enabled; prefer it (or
+# configFrom) over web.extraEnv, since the scheduler and chat workers read the
+# setting too. When it requires a token, take metrics.auth_token from a Secret
+# with configFrom (or a secretKeyRef in web.extraEnv); the
+# ServiceMonitor sends the same Secret key as its bearer token:
 #   configFrom:
 #     metrics.auth_token:
 #       secretKeyRef:
@@ -282,9 +286,10 @@ ingress:
 #         key: token
 #   serviceMonitor:
 #     enabled: true
-#     bearerTokenSecret:
-#       name: incidentrelay-metrics
-#       key: token
+# Prometheus must discover ServiceMonitors in this release's namespace: check
+# its serviceMonitorNamespaceSelector as well as the labels below. The chart
+# rejects settings it knows can't be scraped, but it can't see values from
+# Secrets, ConfigMaps, files or existingConfigSecret.
 # Only the web pod serves /metrics, so counters recorded by the scheduler and
 # chat workers aren't included; database-derived gauges are.
 serviceMonitor:
@@ -294,7 +299,9 @@ serviceMonitor:
   # Empty uses the Prometheus defaults.
   interval: ""
   scrapeTimeout: ""
-  # Secret key holding metrics.auth_token: {name: ..., key: ...}.
+  # Secret key holding metrics.auth_token: {name: ..., key: ...}. Only needed
+  # when the chart can't tell which Secret holds the token, e.g. with
+  # existingConfigSecret, a token from a file or a plain value.
   bearerTokenSecret: {}
 
 podSecurityContext: {}
