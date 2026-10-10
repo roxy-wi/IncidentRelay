@@ -145,22 +145,41 @@ AUTHORIZATION = """\
 """
 
 
+CONFIG_FROM_TOKEN = "configFrom:\n  metrics.auth_token:\n    secretKeyRef: {name: incidentrelay-metrics, key: token}\n"
+
+
+def _web_extra_env_token(entry):
+    return f"web:\n  extraEnv:\n    - name: INCIDENTRELAY__METRICS__AUTH_TOKEN{entry}\n"
+
+
+EXTRA_ENV_TOKEN_SECRET = _web_extra_env_token(
+    "\n      valueFrom:\n        secretKeyRef: {name: monitoring-secret, key: token}"
+)
+
+
 @requires_helm
 @pytest.mark.parametrize(
     ("values_yaml", "name", "key"),
     [
         (
-            METRICS_ENABLED
-            + "configFrom:\n  metrics.auth_token:\n    secretKeyRef: {name: incidentrelay-metrics, key: token}\n"
-            + "serviceMonitor:\n  enabled: true\n",
+            METRICS_ENABLED + CONFIG_FROM_TOKEN + "serviceMonitor:\n  enabled: true\n",
             "incidentrelay-metrics",
             "token",
         ),
         (
-            "existingConfigSecret: incidentrelay-config\n"
-            + "configFrom:\n  metrics.auth_token:\n    secretKeyRef: {name: incidentrelay-metrics, key: token}\n"
-            + "serviceMonitor:\n  enabled: true\n",
+            "existingConfigSecret: incidentrelay-config\n" + CONFIG_FROM_TOKEN + "serviceMonitor:\n  enabled: true\n",
             "incidentrelay-metrics",
+            "token",
+        ),
+        (
+            METRICS_ENABLED + EXTRA_ENV_TOKEN_SECRET + "serviceMonitor:\n  enabled: true\n",
+            "monitoring-secret",
+            "token",
+        ),
+        (
+            # web.extraEnv is rendered after configFrom, so the web pod uses it.
+            METRICS_ENABLED + CONFIG_FROM_TOKEN + EXTRA_ENV_TOKEN_SECRET + "serviceMonitor:\n  enabled: true\n",
+            "monitoring-secret",
             "token",
         ),
         (
@@ -169,14 +188,41 @@ AUTHORIZATION = """\
             "metrics-token",
             "value",
         ),
+        (
+            METRICS_ENABLED
+            + _web_extra_env_token("\n      value: plain-token")
+            + "serviceMonitor:\n  enabled: true\n  bearerTokenSecret: {name: metrics-token, key: value}\n",
+            "metrics-token",
+            "value",
+        ),
     ],
-    ids=["from-config-from", "from-config-from-with-existing-config-secret", "explicit"],
+    ids=[
+        "from-config-from",
+        "from-config-from-with-existing-config-secret",
+        "from-web-extra-env",
+        "web-extra-env-over-config-from",
+        "explicit",
+        "explicit-for-a-plain-value-in-web-extra-env",
+    ],
 )
 def test_service_monitor_sends_the_token_secret(tmp_path, values_yaml, name, key):
     result = _helm_template(tmp_path, values_yaml, "--show-only", "templates/servicemonitor.yaml")
 
     assert result.returncode == 0, result.stderr
     assert AUTHORIZATION.format(name=name, key=key) in result.stdout
+
+
+@requires_helm
+def test_an_empty_token_in_web_extra_env_turns_token_authentication_off(tmp_path):
+    result = _helm_template(
+        tmp_path,
+        METRICS_ENABLED + CONFIG_FROM_TOKEN + _web_extra_env_token("\n      value: ''") + "serviceMonitor:\n  enabled: true\n",
+        "--show-only",
+        "templates/servicemonitor.yaml",
+    )
+
+    assert result.returncode == 0, result.stderr
+    assert "authorization:" not in result.stdout
 
 
 @requires_helm
@@ -227,9 +273,31 @@ def test_service_monitor_accepts_metrics_enabled_outside_the_config(tmp_path, va
         ),
         (
             METRICS_ENABLED
-            + "configFrom:\n  metrics.auth_token:\n    secretKeyRef: {name: incidentrelay-metrics, key: token}\n"
+            + CONFIG_FROM_TOKEN
             + "serviceMonitor:\n  enabled: true\n  bearerTokenSecret: {name: other-secret, key: token}\n",
-            "serviceMonitor.bearerTokenSecret differs from configFrom.metrics.auth_token.secretKeyRef",
+            "serviceMonitor.bearerTokenSecret differs from the Secret the web pod takes metrics.auth_token from "
+            "(configFrom.metrics.auth_token)",
+        ),
+        (
+            METRICS_ENABLED
+            + EXTRA_ENV_TOKEN_SECRET
+            + "serviceMonitor:\n  enabled: true\n  bearerTokenSecret: {name: other-secret, key: token}\n",
+            "serviceMonitor.bearerTokenSecret differs from the Secret the web pod takes metrics.auth_token from "
+            "(web.extraEnv)",
+        ),
+        (
+            METRICS_ENABLED + _web_extra_env_token("\n      value: plain-token") + "serviceMonitor:\n  enabled: true\n",
+            "the ServiceMonitor can't tell which Secret holds it (it comes from web.extraEnv)",
+        ),
+        (
+            METRICS_ENABLED
+            + _web_extra_env_token("\n      valueFrom:\n        configMapKeyRef: {name: c, key: token}")
+            + "serviceMonitor:\n  enabled: true\n",
+            "the ServiceMonitor can't tell which Secret holds it (it comes from web.extraEnv)",
+        ),
+        (
+            METRICS_ENABLED + _web_extra_env_token("__FILE\n      value: /mnt/token") + "serviceMonitor:\n  enabled: true\n",
+            "the ServiceMonitor can't tell which Secret holds it (it comes from web.extraEnv)",
         ),
         (
             METRICS_ENABLED + "serviceMonitor:\n  enabled: true\n  bearerTokenSecret:\n    name: s\n",
@@ -242,6 +310,10 @@ def test_service_monitor_accepts_metrics_enabled_outside_the_config(tmp_path, va
         "plain-token",
         "token-from-a-file",
         "different-token-secrets",
+        "conflicts-with-web-extra-env",
+        "plain-value-in-web-extra-env",
+        "config-map-in-web-extra-env",
+        "token-file-in-web-extra-env",
         "token-without-key",
     ],
 )

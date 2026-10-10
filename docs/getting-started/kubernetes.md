@@ -268,7 +268,9 @@ configFrom:
       key: token
 ```
 
-With the Prometheus Operator, the chart can also render a ServiceMonitor that scrapes the web Service. It sends the token from the same Secret that `configFrom` takes `metrics.auth_token` from:
+Turn metrics on in `config` or `configFrom` rather than only through `web.extraEnv`: the scheduler and the chat workers read the setting too, and the scheduler records its heartbeat only while metrics are enabled.
+
+With the Prometheus Operator, the chart can also render a ServiceMonitor that scrapes the web Service. It sends the token from the Secret the web pod takes `metrics.auth_token` from, through a `secretKeyRef` in `configFrom` or in `web.extraEnv`, which takes precedence:
 
 ```yaml
 serviceMonitor:
@@ -278,7 +280,7 @@ serviceMonitor:
     release: kube-prometheus-stack  # the labels your Prometheus selects ServiceMonitors by
 ```
 
-When the token comes from elsewhere, for example with `existingConfigSecret`, point the ServiceMonitor at the Secret key that holds it:
+When the chart can't tell which Secret holds the token, for example with `existingConfigSecret`, a token from a file or a plain value, point the ServiceMonitor at the Secret key that holds it:
 
 ```yaml
 serviceMonitor:
@@ -290,10 +292,9 @@ serviceMonitor:
 
 Prometheus must also be allowed to discover ServiceMonitors in the namespace where IncidentRelay is installed: the labels above only match its `serviceMonitorSelector`, while its `serviceMonitorNamespaceSelector` decides which namespaces it looks in.
 
-The chart refuses to render a ServiceMonitor it knows can't scrape: when metrics are disabled in `config.metrics.enabled` or in an `INCIDENTRELAY__METRICS__ENABLED` variable in `web.extraEnv`, when `metrics.auth_token` is set but there is no Secret to send it from, or when `bearerTokenSecret` and `configFrom` point at different Secrets. The check is best-effort: values from Secrets, ConfigMaps, files or `existingConfigSecret` aren't visible to the chart, so it can't guarantee a successful scrape.
+The chart refuses to render a ServiceMonitor it knows can't scrape: when metrics are disabled in `config.metrics.enabled` or in an `INCIDENTRELAY__METRICS__ENABLED` variable in `web.extraEnv`, when `metrics.auth_token` is set but the chart can't tell which Secret holds it, or when `bearerTokenSecret` points at a different Secret than the web pod uses. The check is best-effort: values from Secrets, ConfigMaps, files or `existingConfigSecret` aren't visible to the chart, so it can't guarantee a successful scrape.
 
 Only the web pod serves `/metrics`, so counters recorded by the scheduler and the chat workers aren't scraped; the gauges computed from the database are. Every pod keeps its counter files in its own `emptyDir` at `/var/lib/incidentrelay/metrics`, so several web replicas don't share them.
-
 
 ## Access
 

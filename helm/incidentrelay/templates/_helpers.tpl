@@ -153,15 +153,59 @@ configFrom, so it wins over configFrom.
 {{- end }}
 
 {{/*
+Where the web pod takes metrics.auth_token from, as YAML, with the same
+precedence as its environment: web.extraEnv is rendered after configFrom,
+and both override the config. A "secret" source carries the Secret key; for
+an "unknown" one the chart can't tell which Secret holds the token. Empty
+when no token is configured, as far as the chart can see.
+*/}}
+{{- define "incidentrelay.metricsTokenSource" -}}
+{{- $source := dict -}}
+{{- if not .Values.existingConfigSecret -}}
+{{- $metrics := default (dict) (get (default (dict) .Values.config) "metrics") -}}
+{{- if get $metrics "auth_token" -}}
+{{- $source = dict "kind" "unknown" "from" "config.metrics.auth_token" -}}
+{{- end -}}
+{{- end -}}
+{{- with get (default (dict) .Values.configFrom) "metrics.auth_token" -}}
+{{- if hasKey . "secretKeyRef" -}}
+{{- $source = dict "kind" "secret" "from" "configFrom.metrics.auth_token" "name" .secretKeyRef.name "key" .secretKeyRef.key -}}
+{{- else -}}
+{{- $source = dict "kind" "unknown" "from" "configFrom.metrics.auth_token" -}}
+{{- end -}}
+{{- end -}}
+{{- range (default (list) .Values.web.extraEnv) -}}
+{{- if eq (toString .name) "INCIDENTRELAY__METRICS__AUTH_TOKEN" -}}
+{{- $secretKeyRef := dig "valueFrom" "secretKeyRef" (dict) . -}}
+{{- if $secretKeyRef -}}
+{{- $source = dict "kind" "secret" "from" "web.extraEnv" "name" $secretKeyRef.name "key" $secretKeyRef.key -}}
+{{- else if and (hasKey . "value") (not .value) -}}
+{{- /* An empty value turns token authentication off. */ -}}
+{{- $source = dict -}}
+{{- else -}}
+{{- $source = dict "kind" "unknown" "from" "web.extraEnv" -}}
+{{- end -}}
+{{- else if eq (toString .name) "INCIDENTRELAY__METRICS__AUTH_TOKEN__FILE" -}}
+{{- $source = dict "kind" "unknown" "from" "web.extraEnv" -}}
+{{- end -}}
+{{- end -}}
+{{- with $source -}}
+{{- toYaml . -}}
+{{- end -}}
+{{- end }}
+
+{{/*
 The Secret key the ServiceMonitor sends as the bearer token, as YAML:
-serviceMonitor.bearerTokenSecret, or else the Secret configFrom takes
+serviceMonitor.bearerTokenSecret, or else the Secret the web pod takes
 metrics.auth_token from.
 */}}
 {{- define "incidentrelay.serviceMonitorTokenSecret" -}}
 {{- $token := default (dict) .Values.serviceMonitor.bearerTokenSecret -}}
 {{- if not $token -}}
-{{- $source := default (dict) (get (default (dict) .Values.configFrom) "metrics.auth_token") -}}
-{{- $token = default (dict) (get $source "secretKeyRef") -}}
+{{- $source := include "incidentrelay.metricsTokenSource" . | fromYaml -}}
+{{- if eq (toString (get $source "kind")) "secret" -}}
+{{- $token = $source -}}
+{{- end -}}
 {{- end -}}
 {{- with $token -}}
 {{- toYaml (dict "name" .name "key" .key) -}}
@@ -173,24 +217,20 @@ Fail early when the ServiceMonitor can't scrape /metrics. This is
 best-effort: values from outside the chart can't be checked.
 */}}
 {{- define "incidentrelay.validateServiceMonitor" -}}
-{{- $configFrom := default (dict) .Values.configFrom -}}
 {{- $explicit := default (dict) .Values.serviceMonitor.bearerTokenSecret -}}
 {{- if and $explicit (not (and $explicit.name $explicit.key)) -}}
 {{- fail "serviceMonitor.bearerTokenSecret needs both name and key" -}}
 {{- end -}}
-{{- $fromConfigFrom := default (dict) (get (default (dict) (get $configFrom "metrics.auth_token")) "secretKeyRef") -}}
-{{- if and $explicit $fromConfigFrom (or (ne (toString $explicit.name) (toString $fromConfigFrom.name)) (ne (toString $explicit.key) (toString $fromConfigFrom.key))) -}}
-{{- fail "serviceMonitor.bearerTokenSecret differs from configFrom.metrics.auth_token.secretKeyRef, so Prometheus would get 401; remove serviceMonitor.bearerTokenSecret, the ServiceMonitor reuses the configFrom Secret" -}}
+{{- $source := include "incidentrelay.metricsTokenSource" . | fromYaml -}}
+{{- $kind := toString (get $source "kind") -}}
+{{- if and $explicit (eq $kind "secret") (or (ne (toString $explicit.name) (toString $source.name)) (ne (toString $explicit.key) (toString $source.key))) -}}
+{{- fail (printf "serviceMonitor.bearerTokenSecret differs from the Secret the web pod takes metrics.auth_token from (%s), so Prometheus would get 401; remove serviceMonitor.bearerTokenSecret, the ServiceMonitor reuses that Secret" $source.from) -}}
 {{- end -}}
 {{- if eq (include "incidentrelay.metricsEnabled" .) "false" -}}
 {{- fail "serviceMonitor.enabled needs the /metrics endpoint, but metrics are disabled; set config.metrics.enabled to true (an INCIDENTRELAY__METRICS__ENABLED variable in web.extraEnv takes precedence over it)" -}}
 {{- end -}}
-{{- $metrics := dict -}}
-{{- if not .Values.existingConfigSecret -}}
-{{- $metrics = default (dict) (get (default (dict) .Values.config) "metrics") -}}
-{{- end -}}
-{{- if and (or (get $metrics "auth_token") (hasKey $configFrom "metrics.auth_token")) (not (include "incidentrelay.serviceMonitorTokenSecret" .)) -}}
-{{- fail "/metrics requires metrics.auth_token, but the ServiceMonitor has no Secret to send it from; take the token from a Secret with configFrom secretKeyRef or set serviceMonitor.bearerTokenSecret" -}}
+{{- if and (eq $kind "unknown") (not $explicit) -}}
+{{- fail (printf "/metrics requires metrics.auth_token, but the ServiceMonitor can't tell which Secret holds it (it comes from %s); take it from a Secret with secretKeyRef or set serviceMonitor.bearerTokenSecret" $source.from) -}}
 {{- end -}}
 {{- end }}
 

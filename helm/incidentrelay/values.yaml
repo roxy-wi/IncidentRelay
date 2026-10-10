@@ -272,9 +272,11 @@ ingress:
   tls: []
 
 # Prometheus Operator ServiceMonitor for GET /metrics on the web Service.
-# The endpoint itself is turned on with config.metrics.enabled. When it
-# requires a token, take metrics.auth_token from a Secret with configFrom;
-# the ServiceMonitor sends the same Secret key as its bearer token:
+# The endpoint itself is turned on with config.metrics.enabled; prefer it (or
+# configFrom) over web.extraEnv, since the scheduler and chat workers read the
+# setting too. When it requires a token, take metrics.auth_token from a Secret
+# with configFrom (or a secretKeyRef in web.extraEnv, which wins); the
+# ServiceMonitor sends the same Secret key as its bearer token:
 #   configFrom:
 #     metrics.auth_token:
 #       secretKeyRef:
@@ -296,8 +298,8 @@ serviceMonitor:
   interval: ""
   scrapeTimeout: ""
   # Secret key holding metrics.auth_token: {name: ..., key: ...}. Only needed
-  # when the token doesn't come from configFrom secretKeyRef, e.g. with
-  # existingConfigSecret.
+  # when the chart can't tell which Secret holds the token, e.g. with
+  # existingConfigSecret, a token from a file or a plain value.
   bearerTokenSecret: {}
 
 podSecurityContext: {}

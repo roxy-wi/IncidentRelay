@@ -268,7 +268,9 @@ configFrom:
       key: token
 ```
 
-Если используется Prometheus Operator, чарт может создать ServiceMonitor, который собирает метрики с веб-Service. Токен он берёт из того же Secret, из которого `configFrom` берёт `metrics.auth_token`:
+Включайте метрики через `config` или `configFrom`, а не только через `web.extraEnv`: эту настройку читают и планировщик, и воркеры чатов, а планировщик записывает heartbeat, только пока метрики включены.
+
+Если используется Prometheus Operator, чарт может создать ServiceMonitor, который собирает метрики с веб-Service. Токен он берёт из того же Secret, из которого его берёт веб-pod: через `secretKeyRef` в `configFrom` или в `web.extraEnv`, причём `web.extraEnv` важнее:
 
 ```yaml
 serviceMonitor:
@@ -278,7 +280,7 @@ serviceMonitor:
     release: kube-prometheus-stack  # лейблы, по которым ваш Prometheus выбирает ServiceMonitor
 ```
 
-Если токен задан иначе, например через `existingConfigSecret`, укажите ServiceMonitor ключ Secret, в котором он хранится:
+Если чарт не может определить, в каком Secret хранится токен, например с `existingConfigSecret`, токеном из файла или заданным открытым текстом, укажите ServiceMonitor ключ Secret, в котором он хранится:
 
 ```yaml
 serviceMonitor:
@@ -290,7 +292,7 @@ serviceMonitor:
 
 Кроме того, Prometheus должен искать ServiceMonitor в namespace, куда установлен IncidentRelay: лейблы выше проверяются только его `serviceMonitorSelector`, а в каких namespace искать, решает `serviceMonitorNamespaceSelector`.
 
-Чарт не создаст ServiceMonitor, который точно не сможет собирать метрики: если метрики выключены в `config.metrics.enabled` или переменной `INCIDENTRELAY__METRICS__ENABLED` в `web.extraEnv`, если задан `metrics.auth_token`, но токен неоткуда взять, или если `bearerTokenSecret` и `configFrom` указывают на разные Secret. Проверка не всеобъемлющая: значения из Secret, ConfigMap, файлов и `existingConfigSecret` чарту не видны, поэтому успешный сбор метрик она не гарантирует.
+Чарт не создаст ServiceMonitor, который точно не сможет собирать метрики: если метрики выключены в `config.metrics.enabled` или переменной `INCIDENTRELAY__METRICS__ENABLED` в `web.extraEnv`, если задан `metrics.auth_token`, но чарт не может определить, в каком Secret он хранится, или если `bearerTokenSecret` указывает не на тот Secret, который использует веб-pod. Проверка не всеобъемлющая: значения из Secret, ConfigMap, файлов и `existingConfigSecret` чарту не видны, поэтому успешный сбор метрик она не гарантирует.
 
 `/metrics` отдаёт только веб-pod, поэтому счётчики, которые пишут планировщик и воркеры чатов, не собираются; метрики, которые вычисляются из базы данных, собираются. Каждый pod хранит файлы счётчиков в собственном `emptyDir` в `/var/lib/incidentrelay/metrics`, поэтому несколько веб-реплик не делят их между собой.
 
