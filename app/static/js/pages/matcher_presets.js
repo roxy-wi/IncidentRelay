@@ -1,5 +1,6 @@
 let matcherPresetsCache = [];
 let selectedMatcherPresetDetailsId = null;
+let matcherPresetDetailsLoadGeneration = 0;
 
 function initializeMatcherPresetEditor() {
     enhanceMatcherEditor("#matcher-preset-matchers", {
@@ -35,7 +36,7 @@ function refreshMatcherPresets() {
         matcherPresetsCache = asArray(presets);
         renderMatcherPresetsSummary();
         renderMatcherPresetsTable();
-        restoreMatcherPresetDetails();
+        refreshVisibleMatcherPresetDetails();
         updateMatcherPresetCreateButtonState();
     });
 }
@@ -121,7 +122,7 @@ function renderMatcherPresetRow(preset) {
                     .attr("type", "button")
                     .addClass("name-button")
                     .text(preset.name || "-")
-                    .on("click", function () { loadMatcherPresetDetails(preset.id, {scroll: true}); })
+                    .on("click", function () { loadMatcherPresetDetails(preset.id); })
             )
             .append(
                 $("<div>").addClass("row-subtitle").text(preset.description || i18n.t("matcher_presets.row.fallback", {id: preset.id}))
@@ -202,7 +203,7 @@ function matcherPresetUsageContext(usage) {
 
 
 function matcherPresetUsageList(title, usages) {
-    const section = $("<div>").addClass("details-section");
+    const section = $("<div>").addClass("details-section details-card matcher-preset-usage-section");
 
     section.append($("<h3>").text(title));
 
@@ -226,44 +227,89 @@ function matcherPresetUsageList(title, usages) {
     return section;
 }
 
+function closeMatcherPresetDetailsModal() {
+    matcherPresetDetailsLoadGeneration += 1;
+    selectedMatcherPresetDetailsId = null;
+    closeAppModal("#matcher-preset-details-modal");
+}
+
 function loadMatcherPresetDetails(presetId, options) {
-    apiGet("/api/matcher-presets/" + presetId, function (preset) {
+    const id = Number(presetId);
+    if (!Number.isInteger(id) || id <= 0) {
+        return;
+    }
+
+    const generation = ++matcherPresetDetailsLoadGeneration;
+    const modal = $("#matcher-preset-details-modal");
+    selectedMatcherPresetDetailsId = id;
+
+    if (!(options && options.refresh)) {
+        $("#matcher-preset-details-title").text(i18n.t("matcher_presets.details.title"));
+        $("#matcher-preset-details-subtitle").text("");
+        $("#matcher-preset-details-actions").empty();
+        $("#matcher-preset-details-body")
+            .empty()
+            .append($("<div>").addClass("details-empty").text(i18n.t("matcher_presets.empty.loaded")));
+    }
+
+    if (!modal.hasClass("is-open")) {
+        openAppModal(modal);
+    }
+
+    apiGet("/api/matcher-presets/" + id, function (preset) {
+        if (generation !== matcherPresetDetailsLoadGeneration ||
+                selectedMatcherPresetDetailsId !== id || !modal.hasClass("is-open")) {
+            return;
+        }
         rememberMatcherPresetInCache(preset);
-        renderMatcherPresetDetails(preset, options);
+        renderMatcherPresetDetails(preset);
+    }, function (xhr) {
+        if (generation !== matcherPresetDetailsLoadGeneration || !modal.hasClass("is-open")) {
+            return;
+        }
+        closeMatcherPresetDetailsModal();
+        showApiError(xhr);
     });
 }
 
-function renderMatcherPresetDetails(preset, options) {
-    selectedMatcherPresetDetailsId = preset.id;
-
+function renderMatcherPresetDetails(preset) {
+    $("#matcher-preset-details-title").text(preset.name || i18n.t("matcher_presets.details.title"));
     $("#matcher-preset-details-subtitle").text(
         (preset.team_slug || preset.team_name || "-") + " / v" + Number(preset.version || 1)
     );
 
-    const body = $("#matcher-preset-details-body");
-    body.empty();
+    const metadata = $("<section>").addClass("details-card matcher-preset-details-section");
+    const fields = $("<div>").addClass("matcher-preset-details-fields").append(
+        matcherPresetDetailsItem(i18n.t("matcher_presets.details.name"), preset.name),
+        matcherPresetDetailsItem(i18n.t("matcher_presets.details.team"), preset.team_slug || preset.team_name),
+        matcherPresetDetailsItem(i18n.t("matcher_presets.details.version"), "v" + Number(preset.version || 1)),
+        matcherPresetDetailsItem(i18n.t("matcher_presets.details.status"), preset.enabled ? i18n.t("matcher_presets.status.enabled") : i18n.t("matcher_presets.status.disabled")),
+        matcherPresetDetailsItem(i18n.t("matcher_presets.details.total_usages"), String(preset.usage_count || 0)),
+        matcherPresetDetailsItem(i18n.t("matcher_presets.details.description"), preset.description)
+            .addClass("matcher-preset-details-field-wide")
+    );
+    metadata.append($("<h3>").text(i18n.t("matcher_presets.form.preset")), fields);
 
-    body.append(
-        $("<div>")
-            .addClass("details-list")
-            .append(matcherPresetDetailsItem(i18n.t("matcher_presets.details.name"), preset.name))
-            .append(matcherPresetDetailsItem(i18n.t("matcher_presets.details.team"), preset.team_slug || preset.team_name))
-            .append(matcherPresetDetailsItem(i18n.t("matcher_presets.details.description"), preset.description))
-            .append(matcherPresetDetailsItem(i18n.t("matcher_presets.details.version"), "v" + Number(preset.version || 1)))
-            .append(matcherPresetDetailsItem(i18n.t("matcher_presets.details.status"), preset.enabled ? i18n.t("matcher_presets.status.enabled") : i18n.t("matcher_presets.status.disabled")))
-            .append(matcherPresetDetailsItem(i18n.t("matcher_presets.details.total_usages"), String(preset.usage_count || 0)))
-            .append(matcherPresetDetailsItem(i18n.t("matcher_presets.details.matchers"), JSON.stringify(preset.matchers || {}, null, 2)))
+    const matcherBlock = $("<section>").addClass("details-card matcher-preset-details-section").append(
+        $("<h3>").text(i18n.t("matcher_presets.details.matchers")),
+        $("<pre>").addClass("details-code matcher-preset-details-json").text(JSON.stringify(preset.matchers || {}, null, 2))
     );
 
     const usages = preset.usages || {};
-    body.append(matcherPresetUsageList(i18n.t("matcher_presets.usages.notification"), asArray(usages.notification_policy_rules)));
-    body.append(matcherPresetUsageList(i18n.t("matcher_presets.usages.priority"), asArray(usages.priority_policy_rules)));
-    body.append(matcherPresetUsageList(i18n.t("matcher_presets.usages.routes"), asArray(usages.routes)));
-    body.append(matcherPresetUsageList(i18n.t("matcher_presets.usages.service_match"), asArray(usages.service_match_rules)));
-    body.append(matcherPresetUsageList(i18n.t("matcher_presets.usages.runbooks"), asArray(usages.service_runbooks)));
-    body.append(matcherPresetUsageList(i18n.t("matcher_presets.usages.silences"), asArray(usages.silences)));
+    const usageGrid = $("<div>").addClass("matcher-preset-details-usage-grid").append(
+        matcherPresetUsageList(i18n.t("matcher_presets.usages.notification"), asArray(usages.notification_policy_rules)),
+        matcherPresetUsageList(i18n.t("matcher_presets.usages.priority"), asArray(usages.priority_policy_rules)),
+        matcherPresetUsageList(i18n.t("matcher_presets.usages.routes"), asArray(usages.routes)),
+        matcherPresetUsageList(i18n.t("matcher_presets.usages.service_match"), asArray(usages.service_match_rules)),
+        matcherPresetUsageList(i18n.t("matcher_presets.usages.runbooks"), asArray(usages.service_runbooks)),
+        matcherPresetUsageList(i18n.t("matcher_presets.usages.silences"), asArray(usages.silences))
+    );
 
-    const actions = $("<div>").addClass("details-actions");
+    $("#matcher-preset-details-body")
+        .empty()
+        .append($("<div>").addClass("matcher-preset-details-overview").append(metadata, matcherBlock), usageGrid);
+
+    const actions = $("#matcher-preset-details-actions").empty();
 
     appendIconActionIfAllowed(actions, preset, {
         required: "write",
@@ -287,49 +333,23 @@ function renderMatcherPresetDetails(preset, options) {
         className: "btn-danger",
         onClick: function () { removeMatcherPreset(preset); },
     });
-
-    if (actions.children().length) {
-        body.append(actions);
-    }
-
-    if (options && options.scroll) {
-        scrollToAndHighlight("#matcher-preset-details-body", {
-            highlight: "#matcher-preset-details-body",
-            block: "nearest",
-        });
-    }
 }
 
-function renderMatcherPresetDetailsEmpty() {
-    selectedMatcherPresetDetailsId = null;
-    $("#matcher-preset-details-subtitle").text(i18n.t("matcher_presets.details.select"));
-    $("#matcher-preset-details-body")
-        .empty()
-        .append(
-            $("<div>")
-                .addClass("details-empty")
-                .text(i18n.t("matcher_presets.details.select_help"))
-        );
-}
-
-function restoreMatcherPresetDetails() {
-    const presets = getFilteredMatcherPresets();
-
-    if (!presets.length) {
-        renderMatcherPresetDetailsEmpty();
+function refreshVisibleMatcherPresetDetails() {
+    const modal = $("#matcher-preset-details-modal");
+    if (!modal.hasClass("is-open") || !selectedMatcherPresetDetailsId) {
         return;
     }
 
-    if (selectedMatcherPresetDetailsId) {
-        const selected = presets.find(function (preset) { return Number(preset.id) === Number(selectedMatcherPresetDetailsId); });
-
-        if (selected) {
-            loadMatcherPresetDetails(selected.id);
-            return;
-        }
+    const exists = matcherPresetsCache.some(function (preset) {
+        return Number(preset.id) === selectedMatcherPresetDetailsId;
+    });
+    if (!exists) {
+        closeMatcherPresetDetailsModal();
+        return;
     }
 
-    loadMatcherPresetDetails(presets[0].id);
+    loadMatcherPresetDetails(selectedMatcherPresetDetailsId, {refresh: true});
 }
 
 function rememberMatcherPresetInCache(preset) {
@@ -422,6 +442,10 @@ function editMatcherPreset(presetId) {
         return;
     }
 
+    if ($("#matcher-preset-details-modal").hasClass("is-open")) {
+        closeMatcherPresetDetailsModal();
+    }
+
     $("#matcher-preset-form-title").text(i18n.t("matcher_presets.form.edit", {id: preset.id}));
     $("#matcher-preset-id").val(preset.id);
     $("#matcher-preset-team").val(preset.team_id).prop("disabled", true);
@@ -464,12 +488,5 @@ $(document).on("click", "#reset-matcher-preset-form", resetMatcherPresetForm);
 $(document).on("click", "#save-matcher-preset", saveMatcherPreset);
 $(document).on("click", "#reload-matcher-presets", refreshMatcherPresets);
 
-$(document).on("input", "#matcher-presets-search", function () {
-    renderMatcherPresetsTable();
-    restoreMatcherPresetDetails();
-});
-
-$(document).on("change", "#matcher-presets-status-filter", function () {
-    renderMatcherPresetsTable();
-    restoreMatcherPresetDetails();
-});
+$(document).on("input", "#matcher-presets-search", renderMatcherPresetsTable);
+$(document).on("change", "#matcher-presets-status-filter", renderMatcherPresetsTable);

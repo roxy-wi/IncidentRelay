@@ -124,9 +124,18 @@
             link.title = translated;
         });
 
-        setText("#services-menu-toggle .menu-text", "nav.services");
-        setAttribute("#services-menu-toggle", "title", "nav.services");
-        setText(".menu-section-title", "nav.administration");
+        // Never assign nav.administration to every section heading.
+        // Each collapsible group has its own translation key.
+        document.querySelectorAll("#app-sidebar .menu-group-toggle[data-nav-key]")
+            .forEach(function (button) {
+                const key = button.dataset.navKey;
+                const label = button.querySelector(".menu-text");
+                const fallback = label ? label.textContent.trim() : button.title;
+                const translated = t(key, {}, fallback);
+                if (label) { label.textContent = translated; }
+                button.title = translated;
+                button.setAttribute("aria-label", translated);
+            });
         setText('a.menu-link[href="/docs"] .menu-text', "nav.swagger");
         setAttribute('a.menu-link[href="/docs"]', "title", "nav.swagger");
     }

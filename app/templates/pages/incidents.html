@@ -210,7 +210,7 @@
           <div id="incident-linked-alert-groups" class="incidents-linked-groups"></div>
 
           <div id="incident-link-controls" class="incidents-link-controls">
-            <input id="incident-link-alert-group-id" class="input" type="number" min="1" placeholder="{{ _('incidents.links.alert_group_id') }}">
+            <select id="incident-link-alert-group-id" aria-label="{{ _('incidents.links.search_alert_group') }}"><option value=""></option></select>
             <select id="incident-link-relation" class="input">
               <option value="related">{{ _('incidents.links.related') }}</option>
               <option value="primary">{{ _('incidents.links.primary') }}</option>

@@ -570,6 +570,14 @@ function renderIncidentDetails(incident) {
     renderIncidentAssignmentControl(incident, canRespond);
 
     $("#incident-link-controls").toggleClass("is-hidden", !canRespond);
+    if (canRespond) {
+        const picker = initIncidentAlertGroupLinkPicker();
+        if (picker) {
+            picker.clear(true);
+            picker.clearOptions();
+            picker.loadedSearches = {};
+        }
+    }
     $("#incident-close-action").toggle(canRespond && incident.workflow_status !== "closed" && incident.workflow_status !== "cancelled");
     $("#incident-reopen-action").toggle(canRespond && (incident.workflow_status === "closed" || incident.workflow_status === "resolved"));
 }
@@ -743,6 +751,112 @@ function unlinkIncidentAlertGroup(groupId) {
     );
 }
 
+function initIncidentAlertGroupLinkPicker() {
+    const element = document.getElementById("incident-link-alert-group-id");
+    if (!element || typeof window.TomSelect === "undefined") {
+        return null;
+    }
+    if (element.tomselect) {
+        return element.tomselect;
+    }
+
+    return new TomSelect(element, {
+        create: false,
+        allowEmptyOption: false,
+        valueField: "id",
+        labelField: "label",
+        searchField: ["label"], // Never show unrelated cached results.
+        maxItems: 1,
+        maxOptions: 40,
+        loadThrottle: 250,
+        placeholder: i18n.t("incidents.links.search_alert_group"),
+        shouldLoad: function (query) {
+            const text = String(query || "").trim();
+            return text.length >= 2 || /^#?\d+$/.test(text);
+        },
+        onType: function () {
+            // Tom Select caches remote results, which otherwise stay in the
+            // dropdown after a different search query is entered.
+            this.clearOptions();
+            this.loadedSearches = {};
+        },
+        render: {
+            no_results: function () {
+                return '<div class="no-results">'
+                    + escapeIncidentAlertGroupPickerText(i18n.t("incidents.links.no_matches"))
+                    + '</div>';
+            },
+            not_loading: function () {
+                return '<div class="no-results">'
+                    + escapeIncidentAlertGroupPickerText(i18n.t("incidents.links.type_to_search"))
+                    + '</div>';
+            },
+        },
+        load: function (query, callback) {
+            const incident = currentIncident;
+            if (!incident || !incident.team_id) {
+                callback([]);
+                return;
+            }
+            const incidentId = Number(incident.id);
+            const search = String(query || "").trim();
+            const exactIdSearch = /^#?\d+$/.test(search);
+            const params = new URLSearchParams({
+                team_id: String(incident.team_id),
+                page: "1",
+                page_size: "40",
+                search: search.replace(/^#(?=\d+$)/, ""),
+            });
+            const picker = this;
+            // A numeric ID is an exact lookup. List search can match many
+            // unrelated payload fields before reaching a particular ID.
+            const url = exactIdSearch
+                ? "/api/alert-groups/" + encodeURIComponent(search.replace(/^#/, ""))
+                    + "?events_page=1&events_page_size=1"
+                : "/api/alert-groups?" + params.toString();
+            $.getJSON(url)
+                .done(function (response) {
+                    if (!currentIncident || Number(currentIncident.id) !== incidentId
+                        || String(picker.control_input.value || "").trim() !== search) {
+                        callback([]);
+                        return;
+                    }
+                    const linked = new Set(currentIncidentLinks.map(function (item) {
+                        return Number(item.alert_group_id);
+                    }));
+                    const queryText = search.replace(/^#/, "").toLocaleLowerCase();
+                    const candidates = exactIdSearch ? [response] : incidentAsArray(response);
+                    const options = candidates.filter(function (group) {
+                        return Number(group.team_id) === Number(incident.team_id)
+                            && !linked.has(Number(group.id))
+                            && !group.merged_into_id;
+                    }).map(function (group) {
+                        const label = "#" + group.id + " · " + (group.title || "-")
+                            + " · " + (group.status || "-")
+                            + " · " + (group.service_name || group.service_slug || "-");
+                        return {id: String(group.id), label: label};
+                    }).filter(function (option) {
+                        // Backend search also matches payload/labels which are
+                        // not shown here; visible matches are less confusing.
+                        return exactIdSearch
+                            ? option.id === queryText
+                            : option.label.toLocaleLowerCase().includes(queryText);
+                    });
+                    callback(options);
+                })
+                .fail(function () { callback([]); });
+        },
+    });
+}
+
+function escapeIncidentAlertGroupPickerText(value) {
+    return String(value || "")
+        .replace(/&/g, "&amp;")
+        .replace(/</g, "&lt;")
+        .replace(/>/g, "&gt;")
+        .replace(/"/g, "&quot;");
+}
+
 function linkIncidentAlertGroup(groupId, relationType) {
     if (!currentIncident) { return; }
 
@@ -771,7 +885,14 @@ function linkIncidentAlertGroup(groupId, relationType) {
             });
             currentIncidentLinks.push(link);
             renderIncidentLinks(currentIncidentLinks, incidentCanRespond(currentIncident));
-            $("#incident-link-alert-group-id").val("");
+            const picker = document.getElementById("incident-link-alert-group-id");
+            if (picker && picker.tomselect) {
+                picker.tomselect.clear(true);
+                picker.tomselect.clearOptions();
+                picker.tomselect.loadedSearches = {};
+            } else {
+                $("#incident-link-alert-group-id").val("");
+            }
             $("#incident-details-error").addClass("is-hidden").text("");
             loadIncidentEvents(currentIncident, false);
         },

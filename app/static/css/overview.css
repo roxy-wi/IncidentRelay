@@ -168,32 +168,8 @@ body.md-theme .dashboard-alerts-table .overview-alert-title-cell {
 }
 
 body.md-theme .overview-id-link {
-  border: 0;
-  background: transparent;
-  color: var(--md-primary);
-  cursor: pointer;
+  /* Dashboard IDs are slightly lighter than generic alert IDs. */
   font-weight: 850;
-  padding: 0;
-}
-
-body.md-theme .overview-id-link:hover {
-  text-decoration: underline;
-}
-
-body.md-theme .overview-alert-title {
-  color: var(--md-text);
-  font-weight: 850;
-}
-
-body.md-theme .overview-alert-meta {
-  margin-top: 4px;
-  color: var(--md-muted);
-  font-size: 12px;
-}
-
-body.md-theme .overview-duration-cell {
-  color: var(--md-text-soft);
-  font-weight: 750;
 }
 
 body.md-theme .actions-cell {
@@ -201,10 +177,7 @@ body.md-theme .actions-cell {
 }
 
 body.md-theme .table-actions {
-  display: inline-flex;
-  align-items: center;
   justify-content: flex-end;
-  gap: 6px;
   width: 100%;
 }
 
@@ -234,11 +207,7 @@ body.md-theme .dashboard-status-text {
 }
 
 body.md-theme .dashboard-list {
-  display: flex;
   flex: 1 1 auto;
-  flex-direction: column;
-  gap: 10px;
-  padding: 16px 18px 18px;
 }
 
 body.md-theme .dashboard-oncall-status {
@@ -269,10 +238,6 @@ body.md-theme .dashboard-oncall-item .list-subtitle {
   line-height: 1.35;
 }
 
-body.md-theme .overview-dot-firing { background: var(--md-danger); }
-body.md-theme .overview-dot-acknowledged { background: var(--md-warning); }
-body.md-theme .overview-dot-resolved { background: var(--md-success); }
-body.md-theme .overview-dot-silenced { background: var(--md-muted); }
 body.md-theme .overview-dot-activity { background: var(--md-primary); }
 
 body.md-theme .dashboard-activity-item {
@@ -314,26 +279,6 @@ body.md-theme .dashboard-activity-time {
   padding-top: 2px;
   line-height: 1.45;
   white-space: nowrap;
-}
-
-body.md-theme .overview-team-count {
-  min-width: 30px;
-  height: 30px;
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 999px;
-  background: var(--md-surface-soft);
-  color: var(--md-text);
-  font-size: 13px;
-  font-weight: 900;
-}
-
-body.md-theme .overview-empty,
-body.md-theme .empty-table-cell {
-  padding: 18px;
-  color: var(--md-muted);
-  text-align: center;
 }
 
 @media (max-width: 1280px) {

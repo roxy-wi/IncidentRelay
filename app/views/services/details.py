@@ -11,6 +11,7 @@ from app.services.serializers.services import serialize_utc_datetime, serialize_
     serialize_service_readiness_state, serialize_service_link, serialize_service_runbook, serialize_service_dependency, \
     serialize_service_readiness, serialize_service_sli, serialize_service_slo
 from app.services.service_catalog import readiness as service_readiness
+from app.services.incidents.priority_policies.service import get_effective_policy
 from app.services.service_catalog.impact import build_single_service_impact_v2
 from app.services.service_catalog.sli_slo import evaluate_service_slos
 from app.services.service_catalog.timeline import list_service_events, serialize_service_event, build_next_cursor
@@ -222,6 +223,19 @@ def _service_orchestration_summaries(service):
     ]
 
 
+def _service_priority_policy_resolution(service):
+    """Current effective priority-policy configuration, not historical decisions."""
+    policy = get_effective_policy(team_id=service.team_id, service=service)
+    if policy is None:
+        return {"id": None, "name": None, "source": "severity_fallback"}
+    source = (
+        "service_override"
+        if getattr(service, "priority_policy_id", None) == policy.id
+        else "team_default"
+    )
+    return {"id": policy.id, "name": policy.name, "source": source}
+
+
 def _service_details_payload(service, *, days):
     alert_summary = _service_alert_summary(service.id, days=days)
     timeline = list_service_events(service.id, limit=50)
@@ -263,6 +277,7 @@ def _service_details_payload(service, *, days):
             readiness_state=readiness_state,
         ),
         "event_orchestrations": _service_orchestration_summaries(service),
+        "priority_policy_resolution": _service_priority_policy_resolution(service),
         "summary": {
             "alerts": alert_summary,
             "maintenance_windows": len(_service_maintenance_windows(service)),

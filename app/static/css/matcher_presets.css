@@ -1,0 +1,109 @@
+/* Matcher Presets: modal-specific layout; shared controls come from material.css. */
+#matcher-preset-details-modal .matcher-preset-details-dialog {
+    width: min(1200px, calc(100vw - 40px));
+    max-height: calc(100dvh - 40px);
+    min-height: 0;
+}
+
+.matcher-preset-details-body {
+    display: grid;
+    gap: 16px;
+    min-height: 0;
+}
+
+.matcher-preset-details-overview,
+.matcher-preset-details-usage-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 16px;
+    align-items: start;
+}
+
+/* Shared details-card supplies the border, surface and base spacing. */
+#matcher-preset-details-modal .matcher-preset-details-section,
+#matcher-preset-details-modal .matcher-preset-usage-section {
+    min-width: 0;
+    margin: 0;
+    padding: 16px;
+    border-radius: var(--md-radius-md);
+    box-shadow: none;
+}
+
+.matcher-preset-details-section > h3,
+.matcher-preset-usage-section > h3 {
+    margin: 0 0 12px;
+    font-size: 15px;
+}
+
+.matcher-preset-details-fields {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+}
+
+.matcher-preset-details-fields .details-item {
+    min-width: 0;
+}
+
+.matcher-preset-details-fields .details-value,
+.matcher-preset-usage-section .details-value {
+    overflow-wrap: anywhere;
+}
+
+.matcher-preset-details-field-wide {
+    grid-column: 1 / -1;
+}
+
+/* Shared details-code owns the monospace typography and code surface. */
+#matcher-preset-details-modal .matcher-preset-details-json {
+    max-height: 320px;
+    margin: 0;
+    padding: 12px;
+    font-size: 13px;
+    overflow-wrap: anywhere;
+}
+
+.matcher-preset-usage-section .details-list {
+    max-height: 260px;
+    overflow-y: auto;
+}
+
+/* The shared mobile footer stacks buttons; keep preset actions and Close level. */
+#matcher-preset-details-modal .matcher-preset-details-footer {
+    flex-direction: row;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: nowrap;
+    gap: 12px;
+}
+
+#matcher-preset-details-modal .matcher-preset-details-footer .details-actions {
+    align-items: center;
+    flex-wrap: nowrap;
+    margin: 0;
+    padding: 0;
+}
+
+#matcher-preset-details-modal .matcher-preset-details-footer .btn {
+    flex: 0 0 auto;
+    min-height: 36px;
+    height: 36px;
+    width: auto;
+}
+
+#matcher-preset-details-modal .matcher-preset-details-footer .btn-icon {
+    width: 36px;
+    padding: 0;
+}
+
+@media (max-width: 760px) {
+    #matcher-preset-details-modal .matcher-preset-details-dialog {
+        width: calc(100vw - 24px);
+        max-height: calc(100dvh - 24px);
+    }
+
+    .matcher-preset-details-overview,
+    .matcher-preset-details-usage-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}

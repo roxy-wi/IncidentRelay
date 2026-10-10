@@ -1,3 +1,5 @@
+<link rel="stylesheet" href="{{ url_for('static', filename='css/matcher_presets.css') }}">
+
 <div class="first-div-page-layout page-stack">
   <div class="summary-grid">
     <div class="summary-card summary-primary">
@@ -37,7 +39,7 @@
     </div>
   </div>
 
-  <div class="page-layout-grid">
+  <div class="page-layout-grid is-full-width">
     <section class="card page-layout-main">
       <div class="card-header">
         <div>
@@ -104,23 +106,28 @@
         </table>
       </div>
     </section>
+  </div>
 
-    <aside class="card page-details-card">
-      <div class="card-header">
+  <div id="matcher-preset-details-modal" class="app-modal is-hidden" style="display: none;" aria-hidden="true">
+    <div class="app-modal-dialog app-modal-dialog-wide matcher-preset-details-dialog"
+         role="dialog" aria-modal="true" aria-labelledby="matcher-preset-details-title">
+      <div class="app-modal-header">
         <div>
-          <h2>{{ _('matcher_presets.details.title') }}</h2>
-          <div id="matcher-preset-details-subtitle" class="card-subtitle">
-            {{ _('matcher_presets.details.select') }}
-          </div>
+          <h2 id="matcher-preset-details-title">{{ _('matcher_presets.details.title') }}</h2>
+          <div id="matcher-preset-details-subtitle" class="card-subtitle"></div>
         </div>
+        <button type="button" class="app-modal-close"
+                data-modal-close="#matcher-preset-details-modal"
+                aria-label="{{ _('common.close') }}">×</button>
       </div>
-
-      <div id="matcher-preset-details-body" class="details-body">
-        <div class="details-empty">
-          {{ _('matcher_presets.details.select_help') }}
-        </div>
+      <div id="matcher-preset-details-body" class="app-modal-body matcher-preset-details-body"></div>
+      <div class="app-modal-footer matcher-preset-details-footer">
+        <div id="matcher-preset-details-actions" class="details-actions"></div>
+        <button type="button" class="btn" data-modal-close="#matcher-preset-details-modal">
+          {{ _('common.close') }}
+        </button>
       </div>
-    </aside>
+    </div>
   </div>
 
   <div id="matcher-preset-form-modal" class="app-modal" style="display: none;">

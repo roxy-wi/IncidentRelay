@@ -125,144 +125,163 @@
         </div>
 
     <nav class="menu">
-        <a href="/" data-page="dashboard" class="menu-link" title="{{ _('nav.overview') }}">
+        <div class="menu-group menu-section" data-menu-group="operations" data-menu-default-expanded="true">
+          <button id="operations-menu-toggle" type="button" class="menu-group-toggle" data-nav-key="nav.operations" aria-expanded="false" aria-controls="operations-menu-items" title="{{ _('nav.operations') }}">
             <svg class="menu-icon"><use href="#icon-overview"></use></svg>
-            <span class="menu-text">{{ _('nav.overview') }}</span>
-        </a>
-
-        <a href="/alerts" data-page="alerts" class="menu-link" title="{{ _('nav.alerts') }}">
-            <svg class="menu-icon"><use href="#icon-alerts"></use></svg>
-            <span class="menu-text">{{ _('nav.alerts') }}</span>
-        </a>
-
-        <a href="/incidents" data-page="incidents" class="menu-link" title="{{ _('nav.incidents') }}">
-            <svg class="menu-icon"><use href="#icon-incidents"></use></svg>
-            <span class="menu-text">{{ _('nav.incidents') }}</span>
-        </a>
-
-        <a href="/rotations" data-page="rotations" class="menu-link" title="{{ _('nav.rotations') }}">
-            <svg class="menu-icon"><use href="#icon-rotations"></use></svg>
-            <span class="menu-text">{{ _('nav.rotations') }}</span>
-        </a>
-
-        <a href="/calendar" data-page="calendar" class="menu-link" title="{{ _('nav.calendar') }}">
-            <svg class="menu-icon"><use href="#icon-calendar"></use></svg>
-            <span class="menu-text">{{ _('nav.calendar') }}</span>
-        </a>
-
-        <a href="/routes" data-page="routes" class="menu-link" title="{{ _('nav.routes') }}">
-            <svg class="menu-icon"><use href="#icon-routes"></use></svg>
-            <span class="menu-text">{{ _('nav.routes') }}</span>
-        </a>
-
-        <a href="/heartbeats" data-page="heartbeats" class="menu-link" title="{{ _('nav.heartbeats') }}">
-            <span class="menu-icon">♥</span>
-            <span class="menu-text">{{ _('nav.heartbeats') }}</span>
-        </a>
-
-        <div class="menu-group" data-menu-group="services">
-          <button id="services-menu-toggle" type="button" class="menu-group-toggle" title="{{ _('nav.services') }}" aria-expanded="false" aria-controls="services-menu-items">
-            <svg class="menu-icon">
-              <use href="#icon-services"></use>
-            </svg>
-
-            <span class="menu-text">{{ _('nav.services') }}</span>
+            <span class="menu-text">{{ _('nav.operations') }}</span>
             <i class="fa-solid fa-chevron-down menu-group-chevron" aria-hidden="true"></i>
           </button>
+          <div id="operations-menu-items" class="menu-group-items">
+            <a href="/" data-page="dashboard" class="menu-link" title="{{ _('nav.overview') }}">
+                        <svg class="menu-icon"><use href="#icon-overview"></use></svg>
+                        <span class="menu-text">{{ _('nav.overview') }}</span>
+                    </a>
+            <a href="/alerts" data-page="alerts" class="menu-link" title="{{ _('nav.alerts') }}">
+                        <svg class="menu-icon"><use href="#icon-alerts"></use></svg>
+                        <span class="menu-text">{{ _('nav.alerts') }}</span>
+                    </a>
+            <a href="/incidents" data-page="incidents" class="menu-link" title="{{ _('nav.incidents') }}">
+                        <svg class="menu-icon"><use href="#icon-incidents"></use></svg>
+                        <span class="menu-text">{{ _('nav.incidents') }}</span>
+                    </a>
+            <a href="/silences" data-page="silences" class="menu-link" title="{{ _('nav.silences') }}">
+                        <svg class="menu-icon"><use href="#icon-silences"></use></svg>
+                        <span class="menu-text">{{ _('nav.silences') }}</span>
+                    </a>
+            <a href="/maintenance-windows" data-page="maintenance-windows" class="menu-link" title="{{ _('nav.maintenance') }}">
+                          <svg class="menu-icon">
+                            <use href="#icon-calendar"></use>
+                          </svg>
 
-          <div id="services-menu-items" class="menu-group-items">
-            <a href="/services" data-page="services" class="menu-link menu-sub-link" title="{{ _('nav.service_catalog') }}">
-              <svg class="menu-icon">
-                <use href="#icon-services"></use>
-              </svg>
-
-              <span class="menu-text">{{ _('nav.service_catalog') }}</span>
-            </a>
-              <a class="menu-link menu-sub-link" href="/business-services" data-page="business-services" title="{{ _('nav.business_services') }}">
-                <span class="menu-icon">◆</span>
-                <span class="menu-text">{{ _('nav.business_services') }}</span>
-            </a>
-
-            <a href="/maintenance-windows" data-page="maintenance-windows" class="menu-link menu-sub-link" title="{{ _('nav.maintenance') }}">
-              <svg class="menu-icon">
-                <use href="#icon-calendar"></use>
-              </svg>
-
-              <span class="menu-text">{{ _('nav.maintenance') }}</span>
-            </a>
-
-            <a href="/notification-policies" data-page="notification-policies" class="menu-link menu-sub-link" title="{{ _('nav.notification_policies') }}">
-              <svg class="menu-icon">
-                <use href="#icon-notification-policies"></use>
-              </svg>
-
-              <span class="menu-text">{{ _('nav.notification_policies') }}</span>
-            </a>
-
-              <a href="/matcher-presets" data-page="matcher-presets" class="menu-link menu-sub-link" title="{{ _('nav.matcher_presets') }}">
-                  <svg class="menu-icon">
-                    <use href="#icon-matcher-presets"></use>
-                  </svg>
-                  <span class="menu-text">{{ _('nav.matcher_presets') }}</span>
-              </a>
-               <a href="/priority-policies" data-page="priority-policies" class="menu-link menu-sub-link" title="{{ _('nav.priority_policies') }}">
-                 <svg class="menu-icon"><use href="#icon-priority-policies"></use></svg>
-                 <span class="menu-text">{{ _('nav.priority_policies') }}</span>
-               </a>
+                          <span class="menu-text">{{ _('nav.maintenance') }}</span>
+                        </a>
           </div>
         </div>
+        <div class="menu-group menu-section" data-menu-group="on-call">
+          <button id="on-call-menu-toggle" type="button" class="menu-group-toggle" data-nav-key="nav.on_call" aria-expanded="false" aria-controls="on-call-menu-items" title="{{ _('nav.on_call') }}">
+            <svg class="menu-icon"><use href="#icon-rotations"></use></svg>
+            <span class="menu-text">{{ _('nav.on_call') }}</span>
+            <i class="fa-solid fa-chevron-down menu-group-chevron" aria-hidden="true"></i>
+          </button>
+          <div id="on-call-menu-items" class="menu-group-items">
+            <a href="/rotations" data-page="rotations" class="menu-link" title="{{ _('nav.rotations') }}">
+                        <svg class="menu-icon"><use href="#icon-rotations"></use></svg>
+                        <span class="menu-text">{{ _('nav.rotations') }}</span>
+                    </a>
+            <a href="/calendar" data-page="calendar" class="menu-link" title="{{ _('nav.calendar') }}">
+                        <svg class="menu-icon"><use href="#icon-calendar"></use></svg>
+                        <span class="menu-text">{{ _('nav.calendar') }}</span>
+                    </a>
+            <a href="/teams" data-page="teams" class="menu-link" title="{{ _('nav.teams') }}">
+                        <svg class="menu-icon"><use href="#icon-teams"></use></svg>
+                        <span class="menu-text">{{ _('nav.teams') }}</span>
+                    </a>
+            <div class="menu-group" data-menu-group="services">
+              <button id="services-menu-toggle" type="button" class="menu-group-toggle" data-nav-key="nav.services" aria-expanded="false" aria-controls="services-menu-items" title="{{ _('nav.services') }}">
+                <svg class="menu-icon"><use href="#icon-services"></use></svg>
+                <span class="menu-text">{{ _('nav.services') }}</span>
+                <i class="fa-solid fa-chevron-down menu-group-chevron" aria-hidden="true"></i>
+              </button>
+              <div id="services-menu-items" class="menu-group-items">
+                <a href="/services" data-page="services" class="menu-link menu-sub-link" title="{{ _('nav.service_catalog') }}">
+                              <svg class="menu-icon">
+                                <use href="#icon-services"></use>
+                              </svg>
 
-        <a href="/event-orchestration" data-page="orchestrations" class="menu-link" title="{{ _('nav.event_orchestration') }}">
-            <span class="menu-icon">⇄</span>
-            <span class="menu-text">{{ _('nav.event_orchestration') }}</span>
-        </a>
-
-        <a href="/escalation-policies" data-page="escalation-policies" class="menu-link" title="{{ _('nav.escalation_policies') }}">
-          <svg class="menu-icon"><use href="#icon-escalation-policies"></use></svg>
-          <span class="menu-text">{{ _('nav.escalation_policies') }}</span>
-        </a>
-
-        <a href="/channels" data-page="channels" class="menu-link" title="{{ _('nav.channels') }}">
-            <svg class="menu-icon"><use href="#icon-channels"></use></svg>
-            <span class="menu-text">{{ _('nav.channels') }}</span>
-        </a>
-
-        <a href="/silences" data-page="silences" class="menu-link" title="{{ _('nav.silences') }}">
-            <svg class="menu-icon"><use href="#icon-silences"></use></svg>
-            <span class="menu-text">{{ _('nav.silences') }}</span>
-        </a>
-
-        <a href="/teams" data-page="teams" class="menu-link" title="{{ _('nav.teams') }}">
-            <svg class="menu-icon"><use href="#icon-teams"></use></svg>
-            <span class="menu-text">{{ _('nav.teams') }}</span>
-        </a>
-
-        <div class="menu-section menu-link-admin is-hidden">
-            <div class="menu-section-title">{{ _('nav.administration') }}</div>
-
-            <a href="/groups" data-page="groups" class="menu-link menu-sub-link menu-link-groups is-hidden" title="{{ _('nav.groups') }}">
-                <svg class="menu-icon"><use href="#icon-groups"></use></svg>
-                <span class="menu-text">{{ _('nav.groups') }}</span>
-            </a>
-
-            <a href="/admin/users" data-page="admin-users" class="menu-link menu-sub-link menu-link-users is-hidden" title="{{ _('nav.users') }}">
-                <svg class="menu-icon"><use href="#icon-users"></use></svg>
-                <span class="menu-text">{{ _('nav.users') }}</span>
-            </a>
-            <a href="/admin/audit-log" data-page="audit-log" class="menu-link menu-sub-link menu-link-audit is-hidden" title="{{ _('nav.audit_log') }}">
-                <svg class="menu-icon"><use href="#icon-audit-log"></use></svg>
-                <span class="menu-text">{{ _('nav.audit_log') }}</span>
-            </a>
-            <a href="/admin/sso" data-page="sso" class="menu-link menu-sub-link menu-link-global-admin is-hidden" title="{{ _('nav.sso') }}">
-                <svg class="menu-icon"><use href="#icon-sso"></use></svg>
-                <span class="menu-text">{{ _('nav.sso') }}</span>
-            </a>
+                              <span class="menu-text">{{ _('nav.service_catalog') }}</span>
+                            </a>
+                <a class="menu-link menu-sub-link" href="/business-services" data-page="business-services" title="{{ _('nav.business_services') }}">
+                                <span class="menu-icon">◆</span>
+                                <span class="menu-text">{{ _('nav.business_services') }}</span>
+                            </a>
+              </div>
+            </div>
+            <a href="/escalation-policies" data-page="escalation-policies" class="menu-link" title="{{ _('nav.escalation_policies') }}">
+                      <svg class="menu-icon"><use href="#icon-escalation-policies"></use></svg>
+                      <span class="menu-text">{{ _('nav.escalation_policies') }}</span>
+                    </a>
+            <a href="/channels" data-page="channels" class="menu-link" title="{{ _('nav.channels') }}">
+                        <svg class="menu-icon"><use href="#icon-channels"></use></svg>
+                        <span class="menu-text">{{ _('nav.channels') }}</span>
+                    </a>
+          </div>
         </div>
+        <div class="menu-group menu-section" data-menu-group="configuration">
+          <button id="configuration-menu-toggle" type="button" class="menu-group-toggle" data-nav-key="nav.configuration" aria-expanded="false" aria-controls="configuration-menu-items" title="{{ _('nav.configuration') }}">
+            <svg class="menu-icon"><use href="#icon-routes"></use></svg>
+            <span class="menu-text">{{ _('nav.configuration') }}</span>
+            <i class="fa-solid fa-chevron-down menu-group-chevron" aria-hidden="true"></i>
+          </button>
+          <div id="configuration-menu-items" class="menu-group-items">
+            <a href="/routes" data-page="routes" class="menu-link" title="{{ _('nav.routes') }}">
+                        <svg class="menu-icon"><use href="#icon-routes"></use></svg>
+                        <span class="menu-text">{{ _('nav.routes') }}</span>
+                    </a>
+            <a href="/heartbeats" data-page="heartbeats" class="menu-link" title="{{ _('nav.heartbeats') }}">
+                        <span class="menu-icon">♥</span>
+                        <span class="menu-text">{{ _('nav.heartbeats') }}</span>
+                    </a>
+            <a href="/event-orchestration" data-page="orchestrations" class="menu-link" title="{{ _('nav.event_orchestration') }}">
+                        <span class="menu-icon">⇄</span>
+                        <span class="menu-text">{{ _('nav.event_orchestration') }}</span>
+                    </a>
+            <div class="menu-group" data-menu-group="policies">
+              <button id="policies-menu-toggle" type="button" class="menu-group-toggle" data-nav-key="nav.policies" aria-expanded="false" aria-controls="policies-menu-items" title="{{ _('nav.policies') }}">
+                <svg class="menu-icon"><use href="#icon-priority-policies"></use></svg>
+                <span class="menu-text">{{ _('nav.policies') }}</span>
+                <i class="fa-solid fa-chevron-down menu-group-chevron" aria-hidden="true"></i>
+              </button>
+              <div id="policies-menu-items" class="menu-group-items">
+                <a href="/priority-policies" data-page="priority-policies" class="menu-link menu-sub-link" title="{{ _('nav.priority_policies') }}">
+                                 <svg class="menu-icon"><use href="#icon-priority-policies"></use></svg>
+                                 <span class="menu-text">{{ _('nav.priority_policies') }}</span>
+                               </a>
+                <a href="/notification-policies" data-page="notification-policies" class="menu-link menu-sub-link" title="{{ _('nav.notification_policies') }}">
+                              <svg class="menu-icon">
+                                <use href="#icon-notification-policies"></use>
+                              </svg>
 
-        <a href="/docs" class="menu-link" title="{{ _('nav.swagger') }}">
-            <svg class="menu-icon"><use href="#icon-swagger"></use></svg>
-            <span class="menu-text">{{ _('nav.swagger') }}</span>
-        </a>
+                              <span class="menu-text">{{ _('nav.notification_policies') }}</span>
+                            </a>
+                <a href="/matcher-presets" data-page="matcher-presets" class="menu-link menu-sub-link" title="{{ _('nav.matcher_presets') }}">
+                                  <svg class="menu-icon">
+                                    <use href="#icon-matcher-presets"></use>
+                                  </svg>
+                                  <span class="menu-text">{{ _('nav.matcher_presets') }}</span>
+                              </a>
+              </div>
+            </div>
+            <a href="/docs" class="menu-link" title="{{ _('nav.swagger') }}">
+                        <svg class="menu-icon"><use href="#icon-swagger"></use></svg>
+                        <span class="menu-text">{{ _('nav.swagger') }}</span>
+                    </a>
+          </div>
+        </div>
+        <div class="menu-group menu-section menu-link-admin is-hidden" data-menu-group="administration">
+          <button id="administration-menu-toggle" type="button" class="menu-group-toggle" data-nav-key="nav.administration" aria-expanded="false" aria-controls="administration-menu-items" title="{{ _('nav.administration') }}">
+            <svg class="menu-icon"><use href="#icon-teams"></use></svg>
+            <span class="menu-text">{{ _('nav.administration') }}</span>
+            <i class="fa-solid fa-chevron-down menu-group-chevron" aria-hidden="true"></i>
+          </button>
+          <div id="administration-menu-items" class="menu-group-items">
+            <a href="/groups" data-page="groups" class="menu-link menu-link-groups is-hidden" title="{{ _('nav.groups') }}">
+                            <svg class="menu-icon"><use href="#icon-groups"></use></svg>
+                            <span class="menu-text">{{ _('nav.groups') }}</span>
+                        </a>
+            <a href="/admin/users" data-page="admin-users" class="menu-link menu-link-users is-hidden" title="{{ _('nav.users') }}">
+                            <svg class="menu-icon"><use href="#icon-users"></use></svg>
+                            <span class="menu-text">{{ _('nav.users') }}</span>
+                        </a>
+            <a href="/admin/audit-log" data-page="audit-log" class="menu-link menu-link-audit is-hidden" title="{{ _('nav.audit_log') }}">
+                            <svg class="menu-icon"><use href="#icon-audit-log"></use></svg>
+                            <span class="menu-text">{{ _('nav.audit_log') }}</span>
+                        </a>
+            <a href="/admin/sso" data-page="sso" class="menu-link menu-link-global-admin is-hidden" title="{{ _('nav.sso') }}">
+                            <svg class="menu-icon"><use href="#icon-sso"></use></svg>
+                            <span class="menu-text">{{ _('nav.sso') }}</span>
+                        </a>
+          </div>
+        </div>
     </nav>
     </aside>
 
@@ -408,6 +427,7 @@
 <script src="/static/js/core/forms.js"></script>
 <script src="{{ url_for('static', filename='js/core/timezones.js') }}"></script>
 <script src="/static/js/sidebar.js"></script>
+<script src="/static/js/sidebar_section_restore.js"></script>
 <script src="{{ url_for('static', filename='js/components/alerts/alerts_summary_grid.js') }}"></script>
 <script src="/static/js/components/buttons.js"></script>
 <script src="/static/js/components/oncall_status_panel.js"></script>

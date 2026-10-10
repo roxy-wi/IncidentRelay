@@ -387,11 +387,11 @@ body.md-theme .menu-group-items {
   gap: 4px;
 }
 
-body.md-theme .menu-group.is-expanded .menu-group-items {
+body.md-theme .menu-group.is-expanded > .menu-group-items {
   display: flex;
 }
 
-body.md-theme .menu-group.is-expanded .menu-group-chevron {
+body.md-theme .menu-group.is-expanded > .menu-group-toggle .menu-group-chevron {
   transform: rotate(180deg);
 }
 
@@ -807,14 +807,7 @@ body.md-theme input[type="checkbox"] {
   accent-color: var(--md-primary);
 }
 
-/* Generic checkbox layout */
-
-body.md-theme .checkbox-grid {
-  display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
-  gap: 10px 14px;
-  margin-top: 8px;
-}
+/* Generic checkbox layout is defined with the other form layouts below. */
 
 body.md-theme .md-checkbox,
 body.md-theme .md-switch,
@@ -2261,15 +2254,6 @@ body.md-theme .checkbox-grid {
 }
 
 body.md-theme .code-textarea {
-  font-family:
-    ui-monospace,
-    SFMono-Regular,
-    Menlo,
-    Monaco,
-    Consolas,
-    "Liberation Mono",
-    monospace;
-  font-size: 12px;
   line-height: 1.45;
 }
 /* Generic person block */
@@ -2730,7 +2714,7 @@ body.md-theme .details-name {
 body.md-theme .details-grid {
   display: grid;
   grid-template-columns: repeat(3, minmax(0, 1fr));
-  gap: 10px;
+  gap: 0.75rem;
   margin-bottom: 16px;
 }
 
@@ -2800,11 +2784,6 @@ body.md-theme .event-item-meta {
   font-size: 12px;
 }
 
-@media (max-width: 980px) {
-  body.md-theme .details-grid {
-    grid-template-columns: 1fr;
-  }
-}
 body.md-theme .login-sso-section,
 .login-sso-section {
   margin-top: 20px;
@@ -3037,12 +3016,6 @@ body.md-theme .details-muted {
     color: var(--md-muted);
 }
 
-body.md-theme .details-grid {
-    display: grid;
-    grid-template-columns: repeat(3, minmax(0, 1fr));
-    gap: 0.75rem;
-}
-
 body.md-theme .details-card {
     border: 1px solid var(--md-border);
     border-radius: 16px;
@@ -3069,8 +3042,6 @@ body.md-theme .details-card-header h4 {
 body.md-theme .details-empty {
     padding: 0.75rem;
     border-radius: 12px;
-    background: var(--md-surface-soft);
-    color: var(--md-muted);
     font-size: 0.875rem;
 }
 
@@ -3338,4 +3309,37 @@ body.md-theme .profile-interface-fields .field-hint {
   body.md-theme .profile-settings-grid {
     grid-template-columns: 1fr;
   }
+}
+
+/* UX P1: consistent item indentation and independently collapsible sidebar groups. */
+body.md-theme .menu > .menu-group.menu-section:first-child {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: 0;
+}
+
+body.md-theme .menu-group-items > .menu-link {
+    min-height: 42px;
+    margin: 0 0 0 18px;
+    padding: 0 12px;
+}
+
+body.md-theme .menu-group-items > .menu-group > .menu-group-toggle {
+    width: calc(100% - 18px);
+    margin-left: 18px;
+}
+
+body.md-theme .menu-group-items > .menu-group > .menu-group-items > .menu-link {
+    margin-left: 32px;
+}
+
+/* A collapsed sidebar shows section icons, not floating nested item icons. */
+body.md-theme .sidebar.is-collapsed .menu > .menu-group > .menu-group-items {
+    display: none;
+}
+
+body.md-theme .menu > .menu-group.menu-link-admin {
+    border-left: 0;
+    border-right: 0;
+    border-bottom: 0;
 }

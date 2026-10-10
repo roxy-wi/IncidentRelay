@@ -22,6 +22,31 @@
     </div>
 
     <div class="app-modal-body">
+      <div id="alert-details-action-bar" class="alert-details-action-bar is-hidden">
+        <div class="alert-details-action-context">
+          <span><small>{{ _('alerts.table.status') }}</small><strong id="alert-details-context-status">-</strong></span>
+          <span><small>{{ _('alert_details.detail.assignee') }}</small><strong id="alert-details-context-assignee">-</strong></span>
+          <span><small>{{ _('alert_details.detail.acknowledged_by') }}</small><strong id="alert-details-context-acknowledged">-</strong></span>
+          <span><small>{{ _('alert_details.detail.next_escalation') }}</small><strong id="alert-details-context-escalation">-</strong></span>
+        </div>
+        <div class="alert-details-action-buttons">
+          <button id="modal-alert-ack" type="button" class="btn btn-warning btn-small"{% if initial_alert_id %} style="display: none;"{% endif %}>
+        {{ _('alert_details.actions.acknowledge') }}
+      </button>
+          <button id="modal-alert-shelve" type="button" class="btn btn-secondary btn-small"{% if initial_alert_id %} style="display: none;"{% endif %}>
+        {{ _('alert_details.actions.shelve') }}
+      </button>
+          <button id="modal-alert-unshelve" type="button" class="btn btn-secondary btn-small" style="display: none;">
+        {{ _('alert_details.actions.unshelve') }}
+      </button>
+          <button id="modal-alert-resolve" type="button" class="btn btn-resolve btn-small"{% if initial_alert_id %} style="display: none;"{% endif %}>
+        {{ _('alert_details.actions.resolve') }}
+      </button>
+          <button id="modal-alert-create-incident" type="button" class="btn btn-primary btn-small" style="display: none;">
+        {{ _('alerts.actions.create_incident') }}
+      </button>
+        </div>
+      </div>
       <div
         id="alert-details-tabs"
         class="page-tabs alert-details-tabs"
@@ -218,25 +243,6 @@
     </div>
 
     <div class="app-modal-footer">
-      <button id="modal-alert-ack" type="button" class="btn btn-warning btn-small"{% if initial_alert_id %} style="display: none;"{% endif %}>
-        {{ _('alert_details.actions.acknowledge') }}
-      </button>
-
-      <button id="modal-alert-shelve" type="button" class="btn btn-secondary btn-small"{% if initial_alert_id %} style="display: none;"{% endif %}>
-        {{ _('alert_details.actions.shelve') }}
-      </button>
-
-      <button id="modal-alert-unshelve" type="button" class="btn btn-secondary btn-small" style="display: none;">
-        {{ _('alert_details.actions.unshelve') }}
-      </button>
-
-      <button id="modal-alert-resolve" type="button" class="btn btn-resolve btn-small"{% if initial_alert_id %} style="display: none;"{% endif %}>
-        {{ _('alert_details.actions.resolve') }}
-      </button>
-
-      <button id="modal-alert-create-incident" type="button" class="btn btn-primary btn-small" style="display: none;">
-        {{ _('alerts.actions.create_incident') }}
-      </button>
 
       <button id="close-alert-details-footer" type="button" class="btn btn-small">
         {{ _('alert_details.close') }}

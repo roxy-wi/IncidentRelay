@@ -600,7 +600,6 @@ summary {
 .details-actions {
     display: flex;
     flex-wrap: wrap;
-    gap: 8px;
     margin-top: 14px;
 }
 .details-header {
@@ -1148,24 +1147,6 @@ body.has-app-sticky-x-scroll {
     display: flex;
     flex-direction: column;
     gap: 9px;
-}
-
-.table-cell-truncate,
-.table-cell-truncate-wide {
-    max-width: 240px;
-    overflow: hidden;
-    text-overflow: ellipsis;
-}
-
-.table-cell-truncate-wide {
-    max-width: 360px;
-}
-
-.table-cell-truncate > *,
-.table-cell-truncate-wide > * {
-    max-width: 100%;
-    overflow: hidden;
-    text-overflow: ellipsis;
 }
 
 .name-button {

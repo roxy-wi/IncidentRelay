@@ -164,3 +164,23 @@ body.md-theme .incidents-events-card .event-list {
     grid-template-columns: 1fr;
   }
 }
+
+/* Searchable Incident -> AlertGroup picker. */
+body.md-theme .incidents-link-controls .ts-wrapper {
+    min-width: 0;
+}
+
+body.md-theme .incidents-link-controls .ts-control {
+    min-height: 38px;
+    background: var(--md-surface);
+    color: var(--md-text);
+}
+
+/* Tom Select replaces the native select: it must not inherit .input styles. */
+body.md-theme .incidents-link-controls .ts-wrapper {
+    width: 100%;
+}
+
+body.md-theme .incidents-link-controls .ts-dropdown {
+    z-index: 12;
+}

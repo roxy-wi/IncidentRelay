@@ -61,14 +61,28 @@ function renderAppRoute(routePath) {
 
     activeMenuLink.addClass("active");
 
-    const activeMenuGroup = activeMenuLink.closest(".menu-group");
+    // Mark every ancestor group (including nested Services/Policies).
+    // Do not undo an explicit user collapse on SPA navigation.
+    activeMenuLink.parents(".menu-group").each(function () {
+        const group = $(this);
+        group.addClass("is-active");
 
-    if (activeMenuGroup.length) {
-        activeMenuGroup.addClass("is-active is-expanded");
-        activeMenuGroup
-            .children(".menu-group-toggle")
-            .attr("aria-expanded", "true");
-    }
+        let remembered = null;
+        const groupName = this.dataset.menuGroup;
+        if (groupName) {
+            try {
+                remembered = localStorage.getItem(
+                    "incidentrelay_menu_group_" + groupName + "_expanded"
+                );
+            } catch (error) {
+                // No persisted preference.
+            }
+        }
+        if (remembered === null) {
+            group.addClass("is-expanded");
+            group.children(".menu-group-toggle").attr("aria-expanded", "true");
+        }
+    });
 
     return selectedRoute;
 }

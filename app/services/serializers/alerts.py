@@ -1,4 +1,4 @@
-from app.modules.db import incidents_repo, maintenance_repo, business_services_repo
+from app.modules.db import incidents_repo, maintenance_repo, business_services_repo, notification_policies_repo
 from app.services.incidents.responder_display import responder_target_label
 from app.services.serializers.business_services import serialize_business_service_incident_impact, \
     serialize_alert_group_business_impact_summary
@@ -524,6 +524,59 @@ def serialize_priority_ref(obj):
     }
 
 
+def _current_alert_group_policy_context(group, route, service):
+    """Display selected escalation and today's configuration without replaying the event.
+
+    A historical priority-policy source isn't persisted on AlertGroup, and
+    notification channels depend on event type. Never describe these as an
+    authoritative record of how a past event was handled; Explain Trace owns
+    the historical decision.
+    """
+    from app.services.incidents.priority_policies.service import get_effective_policy
+    from app.services.notifications.policies.resolver import resolve_notification_channels
+
+    priority_policy = get_effective_policy(team_id=group.team_id, service=service) if group.team_id else None
+    priority_source = (
+        "service_override"
+        if priority_policy and service and service.priority_policy_id == priority_policy.id
+        else "team_default" if priority_policy else "severity_fallback"
+    )
+    channels = resolve_notification_channels(group, event_type="notification")
+    notification_policy = (
+        notification_policies_repo.get_notification_policy_or_none(channels.policy_id)
+        if channels.policy_id else None
+    )
+    if notification_policy and notification_policy.team_id != group.team_id:
+        notification_policy = None
+    if group.notification_policy_id:
+        notification_source = "orchestration_override"
+    elif channels.policy_id:
+        notification_source = "service_policy"
+    else:
+        notification_source = "route_channels"
+
+    return {
+        "escalation": {
+            "id": group.escalation_policy_id,
+            "name": group.escalation_policy.name if group.escalation_policy_id else None,
+            "source": "selected_on_alert_group",
+        },
+        "priority": {
+            "id": priority_policy.id if priority_policy else None,
+            "name": priority_policy.name if priority_policy else None,
+            "source": priority_source,
+            "scope": "current_configuration",
+        },
+        "notification": {
+            "id": channels.policy_id,
+            "name": notification_policy.name if notification_policy else None,
+            "source": notification_source,
+            "mode": channels.mode,
+            "scope": "current_notification_event",
+        },
+    }
+
+
 def serialize_alert_group(
     group,
     include_payload=False,
@@ -638,6 +691,7 @@ def serialize_alert_group(
         data["payload_summary"] = group.payload_summary
 
     if include_details:
+        data["policy_context"] = _current_alert_group_policy_context(group, route, service)
         data["alerts"] = [
             serialize_alert(alert, current_user=current_user)
             for alert in alerts or []

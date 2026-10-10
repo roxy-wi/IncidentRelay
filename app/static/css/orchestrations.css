@@ -5,7 +5,7 @@
 .orchestration-tab-panel { padding: 20px; }
 .orchestration-rule-list { display: grid; gap: 12px; }
 .orchestration-rule-card { border: 1px solid var(--border-color); border-radius: 12px; padding: 14px; background: var(--card-background); }
-.orchestration-rule-card-header, .orchestration-rule-controls, .orchestration-condition-group-header, .orchestration-action-row { display: flex; gap: 8px; align-items: center; }
+.orchestration-rule-card-header, .orchestration-rule-controls, .orchestration-condition-group-header { display: flex; gap: 8px; align-items: center; }
 .orchestration-rule-card-header { justify-content: space-between; }
 .orchestration-rule-card-body { display: grid; gap: 8px; margin: 12px 0; }
 .orchestration-rule-card-body > div { display: grid; grid-template-columns: 72px 1fr; gap: 8px; }

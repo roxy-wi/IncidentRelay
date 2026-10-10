@@ -330,11 +330,6 @@
     flex: 0 0 auto;
 }
 
-.alerts-group-select {
-    width: 16px;
-    height: 16px;
-}
-
 .alert-child-item {
     border: 1px solid var(--border-color);
     border-radius: 12px;
@@ -509,4 +504,63 @@ body.md-theme .alert-operational-incident-meta {
   margin-top: 4px;
   color: var(--md-muted);
   font-size: 12px;
+}
+
+/* Alert lifecycle actions stay near the title instead of at the end of details. */
+body.md-theme #alert-details-modal .alert-details-action-bar {
+    position: sticky;
+    top: -22px;
+    z-index: 4;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 12px;
+    margin: -22px -24px 18px;
+    padding: 12px 24px;
+    border-bottom: 1px solid var(--md-border);
+    background: var(--md-surface);
+}
+
+body.md-theme #alert-details-modal .alert-details-action-bar.is-hidden {
+    display: none;
+}
+
+body.md-theme #alert-details-modal .alert-details-action-context {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 12px 20px;
+    min-width: 0;
+}
+
+body.md-theme #alert-details-modal .alert-details-action-context > span {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+}
+
+body.md-theme #alert-details-modal .alert-details-action-context small {
+    color: var(--md-muted);
+    font-size: 11px;
+}
+
+body.md-theme #alert-details-modal .alert-details-action-context strong {
+    color: var(--md-text);
+    font-size: 13px;
+    overflow-wrap: anywhere;
+}
+
+body.md-theme #alert-details-modal .alert-details-action-buttons {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px;
+}
+
+@media (max-width: 768px) {
+    body.md-theme #alert-details-modal .alert-details-action-bar {
+        position: relative;
+        top: 0;
+    }
 }

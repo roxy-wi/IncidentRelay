@@ -1710,6 +1710,7 @@ function showAlertDetails(alertId) {
         initialModal.find(
             "#modal-alert-ack, #modal-alert-shelve, #modal-alert-unshelve, #modal-alert-resolve, #modal-alert-create-incident"
         ).hide();
+        initialModal.find("#alert-details-action-bar").addClass("is-hidden");
 
         openAlertDetailsModal();
     }
@@ -1735,6 +1736,7 @@ function showAlertDetails(alertId) {
 
         currentDetailsAlertId = alert.id;
         currentDetailsAlertCanRespond = canRespondObject(alert);
+        renderAlertDetailsActionBar(alert, modal);
         currentDetailsAlertShelved = Boolean(alert.shelved || (alert.shelve && alert.shelve.active));
         resetAlertDetailsTabs(alert.id);
 
@@ -2650,6 +2652,15 @@ function renderAlertCorrelation(alert, modal) {
     target.append(body);
 }
 
+function renderAlertDetailsActionBar(alert, modal) {
+    modal.find("#alert-details-context-status").text(statusLabel(alert.status) || "-");
+    modal.find("#alert-details-context-assignee").text(alert.assignee || "-");
+    modal.find("#alert-details-context-acknowledged").text(alert.acknowledged_by || "-");
+    modal.find("#alert-details-context-escalation")
+        .text(alert.next_escalation_at ? formatDateTimeMinutes(alert.next_escalation_at) : "-");
+    modal.find("#alert-details-action-bar").removeClass("is-hidden");
+}
+
 function renderAlertDetailsSummary(alert, modal) {
     const summary = modal.find("#alert-details-summary");
 
@@ -2668,7 +2679,34 @@ function renderAlertDetailsSummary(alert, modal) {
     summary.append(detailItem(i18n.t("alert_details.detail.service_criticality"), alert.service_criticality));
 
     summary.append(detailItem(i18n.t("alert_details.detail.escalation_mode"), alertEscalationModeLabel(alert)));
-    summary.append(detailItem(i18n.t("alert_details.target.escalation_policy"), alert.escalation_policy_name));
+    const policies = alert.policy_context || {};
+    const escalation = policies.escalation || {};
+    const priority = policies.priority || {};
+    const notification = policies.notification || {};
+    summary.append(detailItem(
+        i18n.t("alert_details.target.escalation_policy"),
+        (escalation.name || alert.escalation_policy_name)
+            ? (escalation.name || alert.escalation_policy_name) + " (" + i18n.t("alert_details.policy.selected_on_group") + ")"
+            : "-"
+    ));
+    summary.append(detailItem(
+        i18n.t("alert_details.policy.current_priority"),
+        (priority.name || i18n.t("alert_details.policy.severity_fallback"))
+            + " (" + (priority.source === "service_override"
+                ? i18n.t("alert_details.policy.service_override")
+                : priority.source === "team_default"
+                    ? i18n.t("alert_details.policy.team_default")
+                    : i18n.t("alert_details.policy.severity_fallback")) + ")"
+    ));
+    summary.append(detailItem(
+        i18n.t("alert_details.policy.current_notification"),
+        (notification.name || notification.mode || "-")
+            + " (" + (notification.source === "orchestration_override"
+                ? i18n.t("alert_details.policy.orchestration_override")
+                : notification.source === "service_policy"
+                    ? i18n.t("alert_details.policy.service_override")
+                    : i18n.t("alert_details.policy.route_channels")) + ")"
+    ));
     summary.append(detailItem(i18n.t("alert_details.detail.policy_rule"), alertPolicyRuleLabel(alert)));
     summary.append(detailItem(i18n.t("alert_details.target.rotation"), alert.rotation_name));
     summary.append(detailItem(i18n.t("alert_details.detail.assignee"), alert.assignee));
