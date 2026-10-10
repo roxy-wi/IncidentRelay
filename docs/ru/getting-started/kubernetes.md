@@ -142,7 +142,7 @@ configFrom:
     file: /mnt/secrets-store/smtp-password
 ```
 
-Чарт передаёт их всем компонентам как переменные окружения `INCIDENTRELAY__<SECTION>__<OPTION>`, которые имеют приоритет над `incidentrelay.conf` (см. [Переопределение через переменные окружения](configuration.md#переопределение-через-переменные-окружения)). Если `main.secret_key` задан через `configFrom`, указывать его в `config` больше не нужно, а пустые общие ключи (`main.secret_encryption_key`, `auth.jwt_secret`, `mattermost.action_secret`, `voice.callback_secret`) берут его значение — в том числе с `existingConfigSecret`, — поэтому во всех pod'ах ключи одинаковые.
+Чарт передаёт их всем компонентам как переменные окружения `INCIDENTRELAY__<SECTION>__<OPTION>`, которые имеют приоритет над `incidentrelay.conf` (см. [Переопределение через переменные окружения](configuration.md#переопределение-через-переменные-окружения)). Если `main.secret_key` задан через `configFrom`, указывать его в `config` больше не нужно, а пустые общие ключи (`main.secret_encryption_key`, `auth.jwt_secret`, `mattermost.action_secret`, `voice.callback_secret`) берут его значение — в том числе с `existingConfigSecret`, — поэтому во всех pod'ах ключи одинаковые. Не задавайте один и тот же параметр одновременно в `configFrom` и в `extraEnv` компонента: в Deployment не может быть одной и той же переменной дважды, поэтому чарт откажется его рендерить.
 
 `file` работает с любым томом, смонтированным в pod'ы, например с [Secrets Store CSI Driver](https://secrets-store-csi-driver.sigs.k8s.io/) и `SecretProviderClass` для AWS Systems Manager Parameter Store, Secrets Manager или Vault:
 
@@ -270,7 +270,7 @@ configFrom:
 
 Включайте метрики через `config` или `configFrom`, а не только через `web.extraEnv`: эту настройку читают и планировщик, и воркеры чатов, а планировщик записывает heartbeat, только пока метрики включены.
 
-Если используется Prometheus Operator, чарт может создать ServiceMonitor, который собирает метрики с веб-Service. Токен он берёт из того же Secret, из которого его берёт веб-pod: через `secretKeyRef` в `configFrom` или в `web.extraEnv`, причём `web.extraEnv` важнее:
+Если используется Prometheus Operator, чарт может создать ServiceMonitor, который собирает метрики с веб-Service. Токен он берёт из того же Secret, из которого его берёт веб-pod: через `secretKeyRef` в `configFrom` или в `web.extraEnv`:
 
 ```yaml
 serviceMonitor:

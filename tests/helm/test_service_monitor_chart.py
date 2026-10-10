@@ -177,12 +177,6 @@ EXTRA_ENV_TOKEN_SECRET = _web_extra_env_token(
             "token",
         ),
         (
-            # web.extraEnv is rendered after configFrom, so the web pod uses it.
-            METRICS_ENABLED + CONFIG_FROM_TOKEN + EXTRA_ENV_TOKEN_SECRET + "serviceMonitor:\n  enabled: true\n",
-            "monitoring-secret",
-            "token",
-        ),
-        (
             "existingConfigSecret: incidentrelay-config\n"
             + "serviceMonitor:\n  enabled: true\n  bearerTokenSecret: {name: metrics-token, key: value}\n",
             "metrics-token",
@@ -200,7 +194,6 @@ EXTRA_ENV_TOKEN_SECRET = _web_extra_env_token(
         "from-config-from",
         "from-config-from-with-existing-config-secret",
         "from-web-extra-env",
-        "web-extra-env-over-config-from",
         "explicit",
         "explicit-for-a-plain-value-in-web-extra-env",
     ],
@@ -214,9 +207,13 @@ def test_service_monitor_sends_the_token_secret(tmp_path, values_yaml, name, key
 
 @requires_helm
 def test_an_empty_token_in_web_extra_env_turns_token_authentication_off(tmp_path):
+    # The variable wins over config.metrics.auth_token.
     result = _helm_template(
         tmp_path,
-        METRICS_ENABLED + CONFIG_FROM_TOKEN + _web_extra_env_token("\n      value: ''") + "serviceMonitor:\n  enabled: true\n",
+        METRICS_ENABLED
+        + "    auth_token: plain-token\n"
+        + _web_extra_env_token("\n      value: ''")
+        + "serviceMonitor:\n  enabled: true\n",
         "--show-only",
         "templates/servicemonitor.yaml",
     )
@@ -300,6 +297,10 @@ def test_service_monitor_accepts_metrics_enabled_outside_the_config(tmp_path, va
             "the ServiceMonitor can't tell which Secret holds it (it comes from web.extraEnv)",
         ),
         (
+            METRICS_ENABLED + CONFIG_FROM_TOKEN + EXTRA_ENV_TOKEN_SECRET + "serviceMonitor:\n  enabled: true\n",
+            "configFrom.metrics.auth_token and web.extraEnv (INCIDENTRELAY__METRICS__AUTH_TOKEN) set the same option",
+        ),
+        (
             METRICS_ENABLED + "serviceMonitor:\n  enabled: true\n  bearerTokenSecret:\n    name: s\n",
             "serviceMonitor.bearerTokenSecret needs both name and key",
         ),
@@ -314,6 +315,7 @@ def test_service_monitor_accepts_metrics_enabled_outside_the_config(tmp_path, va
         "plain-value-in-web-extra-env",
         "config-map-in-web-extra-env",
         "token-file-in-web-extra-env",
+        "token-in-config-from-and-web-extra-env",
         "token-without-key",
     ],
 )

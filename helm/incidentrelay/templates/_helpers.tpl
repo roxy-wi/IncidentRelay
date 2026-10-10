@@ -124,8 +124,8 @@ missing nested map.
 Whether /metrics is enabled, as far as the chart can tell: "true", "false",
 or "unknown" when the value comes from outside the chart (a Secret, a
 ConfigMap, a file or existingConfigSecret). As in the application, an
-environment variable wins over the config; web.extraEnv is rendered after
-configFrom, so it wins over configFrom.
+environment variable from web.extraEnv or configFrom wins over the config;
+configFromEnv rejects setting it in both.
 */}}
 {{- define "incidentrelay.metricsEnabled" -}}
 {{- $truthy := list "1" "true" "yes" "y" "on" -}}
@@ -153,9 +153,9 @@ configFrom, so it wins over configFrom.
 {{- end }}
 
 {{/*
-Where the web pod takes metrics.auth_token from, as YAML, with the same
-precedence as its environment: web.extraEnv is rendered after configFrom,
-and both override the config. A "secret" source carries the Secret key; for
+Where the web pod takes metrics.auth_token from, as YAML: an environment
+variable from web.extraEnv or configFrom wins over the config, and
+configFromEnv rejects setting it in both. A "secret" source carries the Secret key; for
 an "unknown" one the chart can't tell which Secret holds the token. Empty
 when no token is configured, as far as the chart can see.
 */}}
@@ -404,6 +404,21 @@ back to main.secret_key, so every pod uses the same keys.
 {{- end -}}
 {{- $parts := splitn "." 2 $key -}}
 {{- $name := printf "INCIDENTRELAY__%s__%s" (upper $parts._0) (upper $parts._1) -}}
+{{- /*
+A Deployment can't hold the same variable twice (server-side apply rejects
+it, and a plain create keeps only one of them), and the application refuses
+a variable together with its __FILE form.
+*/ -}}
+{{- range $component := list "web" "scheduler" "telegram" "slack" -}}
+{{- $values := default (dict) (get $.Values $component) -}}
+{{- if or (eq $component "web") $values.enabled -}}
+{{- range (default (list) $values.extraEnv) -}}
+{{- if has (toString .name) (list $name (printf "%s__FILE" $name)) -}}
+{{- fail (printf "configFrom.%s and %s.extraEnv (%s) set the same option; set it in only one of them" $key $component .name) -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
+{{- end -}}
 {{- $source = default (dict) $source -}}
 {{- if ne (len (keys $source)) 1 -}}
 {{- fail (printf "configFrom.%s must set exactly one of secretKeyRef, configMapKeyRef or file" $key) -}}

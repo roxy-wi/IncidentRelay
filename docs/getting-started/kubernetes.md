@@ -142,7 +142,7 @@ configFrom:
     file: /mnt/secrets-store/smtp-password
 ```
 
-The chart passes them to every component as `INCIDENTRELAY__<SECTION>__<OPTION>` environment variables, which take precedence over `incidentrelay.conf` (see [Environment overrides](configuration.md#environment-overrides)). When `main.secret_key` comes from `configFrom`, it no longer has to be set in `config`, and the shared keys left empty (`main.secret_encryption_key`, `auth.jwt_secret`, `mattermost.action_secret`, `voice.callback_secret`) fall back to it, with `existingConfigSecret` too, so every pod uses the same keys.
+The chart passes them to every component as `INCIDENTRELAY__<SECTION>__<OPTION>` environment variables, which take precedence over `incidentrelay.conf` (see [Environment overrides](configuration.md#environment-overrides)). When `main.secret_key` comes from `configFrom`, it no longer has to be set in `config`, and the shared keys left empty (`main.secret_encryption_key`, `auth.jwt_secret`, `mattermost.action_secret`, `voice.callback_secret`) fall back to it, with `existingConfigSecret` too, so every pod uses the same keys. Don't set the same option in `configFrom` and in a component's `extraEnv` as well: a Deployment can't hold the same variable twice, so the chart refuses to render it.
 
 `file` works with any volume mounted into the pods, for example the [Secrets Store CSI Driver](https://secrets-store-csi-driver.sigs.k8s.io/) with a `SecretProviderClass` for AWS Systems Manager Parameter Store, Secrets Manager or Vault:
 
@@ -270,7 +270,7 @@ configFrom:
 
 Turn metrics on in `config` or `configFrom` rather than only through `web.extraEnv`: the scheduler and the chat workers read the setting too, and the scheduler records its heartbeat only while metrics are enabled.
 
-With the Prometheus Operator, the chart can also render a ServiceMonitor that scrapes the web Service. It sends the token from the Secret the web pod takes `metrics.auth_token` from, through a `secretKeyRef` in `configFrom` or in `web.extraEnv`, which takes precedence:
+With the Prometheus Operator, the chart can also render a ServiceMonitor that scrapes the web Service. It sends the token from the Secret the web pod takes `metrics.auth_token` from, through a `secretKeyRef` in `configFrom` or in `web.extraEnv`:
 
 ```yaml
 serviceMonitor:
