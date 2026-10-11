@@ -22,7 +22,7 @@ spec:
       {{- with .Values.serviceMonitor.scrapeTimeout }}
       scrapeTimeout: {{ . | quote }}
       {{- end }}
-      {{- with .Values.serviceMonitor.bearerTokenSecret }}
+      {{- with include "incidentrelay.serviceMonitorTokenSecret" . | fromYaml }}
       authorization:
         type: Bearer
         credentials:

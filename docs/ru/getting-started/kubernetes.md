@@ -142,7 +142,7 @@ configFrom:
     file: /mnt/secrets-store/smtp-password
 ```
 
-Чарт передаёт их всем компонентам как переменные окружения `INCIDENTRELAY__<SECTION>__<OPTION>`, которые имеют приоритет над `incidentrelay.conf` (см. [Переопределение через переменные окружения](configuration.md#переопределение-через-переменные-окружения)). Если `main.secret_key` задан через `configFrom`, указывать его в `config` больше не нужно, а пустые общие ключи (`main.secret_encryption_key`, `auth.jwt_secret`, `mattermost.action_secret`, `voice.callback_secret`) берут его значение — в том числе с `existingConfigSecret`, — поэтому во всех pod'ах ключи одинаковые.
+Чарт передаёт их всем компонентам как переменные окружения `INCIDENTRELAY__<SECTION>__<OPTION>`, которые имеют приоритет над `incidentrelay.conf` (см. [Переопределение через переменные окружения](configuration.md#переопределение-через-переменные-окружения)). Если `main.secret_key` задан через `configFrom`, указывать его в `config` больше не нужно, а пустые общие ключи (`main.secret_encryption_key`, `auth.jwt_secret`, `mattermost.action_secret`, `voice.callback_secret`) берут его значение — в том числе с `existingConfigSecret`, — поэтому во всех pod'ах ключи одинаковые. Не задавайте один и тот же параметр одновременно в `configFrom` и в `extraEnv` компонента: в Deployment не может быть одной и той же переменной дважды, поэтому чарт откажется его рендерить.
 
 `file` работает с любым томом, смонтированным в pod'ы, например с [Secrets Store CSI Driver](https://secrets-store-csi-driver.sigs.k8s.io/) и `SecretProviderClass` для AWS Systems Manager Parameter Store, Secrets Manager или Vault:
 
@@ -268,7 +268,9 @@ configFrom:
       key: token
 ```
 
-Если используется Prometheus Operator, чарт может создать ServiceMonitor, который собирает метрики с веб-Service с тем же токеном:
+Включайте метрики через `config` или `configFrom`, а не только через `web.extraEnv`: эту настройку читают и планировщик, и воркеры чатов, а планировщик записывает heartbeat, только пока метрики включены.
+
+Если используется Prometheus Operator, чарт может создать ServiceMonitor, который собирает метрики с веб-Service. Токен он берёт из того же Secret, из которого его берёт веб-pod: через `secretKeyRef` в `configFrom` или в `web.extraEnv`:
 
 ```yaml
 serviceMonitor:
@@ -276,14 +278,23 @@ serviceMonitor:
   interval: 30s
   labels:
     release: kube-prometheus-stack  # лейблы, по которым ваш Prometheus выбирает ServiceMonitor
+```
+
+Если чарт не может определить, в каком Secret хранится токен, например с `existingConfigSecret`, токеном из файла или заданным открытым текстом, укажите ServiceMonitor ключ Secret, в котором он хранится:
+
+```yaml
+serviceMonitor:
+  enabled: true
   bearerTokenSecret:
     name: incidentrelay-metrics
     key: token
 ```
 
-Чарт не создаст ServiceMonitor, который не сможет собирать метрики: если `config.metrics.enabled` выключен или если задан `metrics.auth_token`, а `bearerTokenSecret` — нет. С `existingConfigSecret` чарт не видит конфигурацию, поэтому убедитесь, что секция `[metrics]` в ней включена.
+Кроме того, Prometheus должен искать ServiceMonitor в namespace, куда установлен IncidentRelay: лейблы выше проверяются только его `serviceMonitorSelector`, а в каких namespace искать, решает `serviceMonitorNamespaceSelector`.
 
-`/metrics` отдаёт только веб-pod, поэтому счётчики, которые пишут планировщик и воркеры чатов, не собираются; метрики, которые вычисляются из базы данных, собираются.
+Чарт не создаст ServiceMonitor, который точно не сможет собирать метрики: если метрики выключены в `config.metrics.enabled` или переменной `INCIDENTRELAY__METRICS__ENABLED` в `web.extraEnv`, если задан `metrics.auth_token`, но чарт не может определить, в каком Secret он хранится, или если `bearerTokenSecret` указывает не на тот Secret, который использует веб-pod. Проверка не всеобъемлющая: значения из Secret, ConfigMap, файлов и `existingConfigSecret` чарту не видны, поэтому успешный сбор метрик она не гарантирует.
+
+`/metrics` отдаёт только веб-pod, поэтому счётчики, которые пишут планировщик и воркеры чатов, не собираются; метрики, которые вычисляются из базы данных, собираются. Каждый pod хранит файлы счётчиков в собственном `emptyDir` в `/var/lib/incidentrelay/metrics`, поэтому несколько веб-реплик не делят их между собой.
 
 ## Доступ
 

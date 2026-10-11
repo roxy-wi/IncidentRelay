@@ -173,3 +173,53 @@ def test_config_from_rejects_invalid_entries(tmp_path, config_from, message):
 
     assert result.returncode != 0
     assert message in result.stderr
+
+
+@requires_helm
+@pytest.mark.parametrize(
+    ("config_from", "component", "variable"),
+    [
+        ("secretKeyRef: {name: db, key: password}", "web", "INCIDENTRELAY__DATABASE__PASSWORD"),
+        # A variable and its __FILE form can't be combined either.
+        ("file: /mnt/secrets-store/db-password", "scheduler", "INCIDENTRELAY__DATABASE__PASSWORD"),
+        ("secretKeyRef: {name: db, key: password}", "slack", "INCIDENTRELAY__DATABASE__PASSWORD__FILE"),
+    ],
+    ids=["same-variable", "variable-and-file", "file-and-variable"],
+)
+def test_config_from_rejects_options_also_set_in_extra_env(tmp_path, config_from, component, variable):
+    # A Deployment can't hold the same variable twice: server-side apply
+    # (Helm 4) rejects it, and a plain create keeps only one of them.
+    result = _helm_template(
+        tmp_path,
+        "config:\n  main:\n    secret_key: test-secret-key-for-helm-rendering\n"
+        f"configFrom:\n  database.password:\n    {config_from}\n"
+        f"{component}:\n  extraEnv:\n    - name: {variable}\n      value: other\n",
+    )
+
+    assert result.returncode != 0
+    assert (
+        f"configFrom.database.password and {component}.extraEnv ({variable}) set the same option"
+        in result.stderr
+    )
+
+
+@requires_helm
+def test_config_from_ignores_extra_env_of_disabled_components(tmp_path):
+    result = _helm_template(
+        tmp_path,
+        """\
+        config:
+          main:
+            secret_key: test-secret-key-for-helm-rendering
+        configFrom:
+          database.password:
+            secretKeyRef: {name: db, key: password}
+        telegram:
+          enabled: false
+          extraEnv:
+            - name: INCIDENTRELAY__DATABASE__PASSWORD
+              value: other
+        """,
+    )
+
+    assert result.returncode == 0, result.stderr
