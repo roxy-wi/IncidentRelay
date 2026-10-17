@@ -183,6 +183,9 @@ function dashboardEscalationText(alert) {
     }
     return i18n.t("overview.escalation.rotation", {name: alert.rotation_name || "-"});
 }
+
+// --- Chart helpers (from main) ---
+
 function dashboardThemeToken(name, fallback) {
     const value = window.getComputedStyle(document.documentElement)
         .getPropertyValue(name)
@@ -389,14 +392,338 @@ function renderDashboardActivityTrend(alerts) {
     );
 }
 
+// --- Dashboard filters (from feat/dashboard-alert-filters) ---
+
+const DASHBOARD_FILTER_STORAGE_KEY = "incidentrelay.dashboard.filters.v1";
+const DASHBOARD_INVOLVEMENTS = ["assigned", "responder", "stakeholder", "any"];
+const DASHBOARD_FILTER_URL_PARAMS = ["involvement", "team_id", "service_id"];
+
+let dashboardFilters = dashboardDefaultFilters();
+let dashboardFiltersInitialized = false;
+let dashboardFilterOptions = {key: null, teams: [], services: []};
+let dashboardLoadSequence = 0;
+
+function dashboardDefaultFilters() {
+    return {involvement: "", teamIds: [], serviceIds: []};
+}
+
+function dashboardNormalizeFilters(raw) {
+    raw = raw || {};
+
+    return {
+        involvement: DASHBOARD_INVOLVEMENTS.indexOf(raw.involvement) !== -1 ? raw.involvement : "",
+        teamIds: normalizeTableFilterValues(raw.teamIds),
+        serviceIds: normalizeTableFilterValues(raw.serviceIds),
+    };
+}
+
+function dashboardFiltersFromUrl() {
+    const params = new URLSearchParams(window.location.search || "");
+    const hasFilterParams = DASHBOARD_FILTER_URL_PARAMS.some(function (name) {
+        return params.has(name);
+    });
+
+    if (!hasFilterParams) {
+        return null;
+    }
+
+    return dashboardNormalizeFilters({
+        involvement: params.get("involvement") || "",
+        teamIds: params.getAll("team_id"),
+        serviceIds: params.getAll("service_id"),
+    });
+}
+
+function readStoredDashboardFilters() {
+    try {
+        const raw = localStorage.getItem(DASHBOARD_FILTER_STORAGE_KEY);
+        return raw ? dashboardNormalizeFilters(JSON.parse(raw)) : null;
+    } catch (error) {
+        return null;
+    }
+}
+
+function writeStoredDashboardFilters(filters) {
+    try {
+        localStorage.setItem(DASHBOARD_FILTER_STORAGE_KEY, JSON.stringify(filters));
+    } catch (error) {
+        // Ignore storage errors, the filters still work for the current page.
+    }
+}
+
+function writeDashboardFiltersToUrl(filters) {
+    if (!window.history || !window.history.replaceState) {
+        return;
+    }
+
+    if (normalizeAppRoutePath(window.location.pathname || "/") !== "/") {
+        return;
+    }
+
+    const url = new URL(window.location.href);
+
+    DASHBOARD_FILTER_URL_PARAMS.forEach(function (name) {
+        url.searchParams.delete(name);
+    });
+
+    if (filters.involvement) {
+        url.searchParams.set("involvement", filters.involvement);
+    }
+
+    appendTableFilterParams(url.searchParams, "team_id", filters.teamIds);
+    appendTableFilterParams(url.searchParams, "service_id", filters.serviceIds);
+
+    const nextUrl = url.pathname + url.search + url.hash;
+
+    if (nextUrl !== currentAppUrl()) {
+        const state = Object.assign({}, window.history.state || {}, {path: nextUrl});
+        window.history.replaceState(state, "", nextUrl);
+    }
+}
+
+function dashboardGlobalTeamId() {
+    return typeof selectedTeamId === "function" && selectedTeamId()
+        ? String(selectedTeamId())
+        : "";
+}
+
+function dashboardEffectiveTeamIds() {
+    const globalTeamId = dashboardGlobalTeamId();
+    return globalTeamId ? [globalTeamId] : dashboardFilters.teamIds;
+}
+
+function dashboardMemberTeamIds() {
+    return dashboardFilterOptions.teams
+        .filter(function (team) {
+            return team.is_member === true;
+        })
+        .map(function (team) {
+            return String(team.id);
+        });
+}
+
+function dashboardFilterOptionsKey() {
+    return String((currentUser && currentUser.active_group_id) || "");
+}
+
+function loadDashboardFilterOptions(callback) {
+    const key = dashboardFilterOptionsKey();
+
+    if (dashboardFilterOptions.key === key) {
+        callback(true);
+        return;
+    }
+
+    let pending = 2;
+    let failed = false;
+    const result = {teams: [], services: []};
+
+    function done() {
+        pending -= 1;
+
+        if (pending > 0) {
+            return;
+        }
+
+        if (!failed) {
+            dashboardFilterOptions = {key: key, teams: result.teams, services: result.services};
+        }
+
+        renderDashboardFilterOptions();
+        callback(!failed);
+    }
+
+    function fail() {
+        failed = true;
+        done();
+    }
+
+    apiGet("/api/teams", function (teams) {
+        result.teams = dashboardAsArray(teams);
+        done();
+    }, fail);
+
+    apiGet("/api/services", function (services) {
+        result.services = dashboardAsArray(services).filter(function (service) {
+            return service.enabled !== false;
+        });
+        done();
+    }, fail);
+}
+
+function renderDashboardFilterOptions() {
+    replaceTableSelectOptions(
+        "#dashboard-team-filter",
+        dashboardFilterOptions.teams.map(function (team) {
+            return {value: String(team.id), text: team.name || team.slug || String(team.id)};
+        }),
+        dashboardFilters.teamIds
+    );
+
+    replaceTableSelectOptions(
+        "#dashboard-service-filter",
+        dashboardFilterOptions.services.map(function (service) {
+            return {
+                value: String(service.id),
+                text: [
+                    service.team_name || service.team_slug || null,
+                    service.name || service.slug || service.id
+                ].filter(Boolean).join(" / ")
+            };
+        }),
+        dashboardFilters.serviceIds
+    );
+}
+
+function dashboardDropUnknownFilterIds(filters) {
+    /*
+     * Drop saved or shared ids that the user can no longer see, so the
+     * alerts API is never asked for an unreadable team.
+     */
+    const teamIds = dashboardFilterOptions.teams.map(function (team) {
+        return String(team.id);
+    });
+    const serviceIds = dashboardFilterOptions.services.map(function (service) {
+        return String(service.id);
+    });
+
+    return {
+        involvement: filters.involvement,
+        teamIds: filters.teamIds.filter(function (id) {
+            return teamIds.indexOf(String(id)) !== -1;
+        }),
+        serviceIds: filters.serviceIds.filter(function (id) {
+            return serviceIds.indexOf(String(id)) !== -1;
+        }),
+    };
+}
+
+function syncDashboardFilterControls() {
+    const globalTeamId = dashboardGlobalTeamId();
+    const teamSelect = $("#dashboard-team-filter");
+    const teamSelectControl = teamSelect.length ? teamSelect[0].tomselect : null;
+
+    $("#dashboard-involvement-filter").val(dashboardFilters.involvement);
+
+    setTableFilterValues(teamSelect, dashboardEffectiveTeamIds());
+
+    if (teamSelectControl) {
+        if (globalTeamId) {
+            teamSelectControl.disable();
+        } else {
+            teamSelectControl.enable();
+        }
+    }
+    teamSelect.prop("disabled", !!globalTeamId);
+
+    $("#dashboard-team-filter-hint").toggleClass("is-hidden", !globalTeamId);
+    $("#dashboard-my-teams").prop(
+        "disabled",
+        !!globalTeamId || !dashboardMemberTeamIds().length
+    );
+
+    setTableFilterValues("#dashboard-service-filter", dashboardFilters.serviceIds);
+}
+
+function updateDashboardViewAllLinks() {
+    /*
+     * /alerts understands service_id and assigned_to_me. Team scope reaches it
+     * through the global team selector, so a dashboard-only team selection is
+     * not carried over.
+     */
+    const params = new URLSearchParams();
+
+    appendTableFilterParams(params, "service_id", dashboardFilters.serviceIds);
+
+    if (dashboardFilters.involvement === "assigned") {
+        params.set("assigned_to_me", "true");
+    }
+
+    const query = params.toString();
+    $("[data-dashboard-view-all]").attr("href", "/alerts" + (query ? "?" + query : ""));
+}
+
+function applyDashboardFilters() {
+    writeStoredDashboardFilters(dashboardFilters);
+    writeDashboardFiltersToUrl(dashboardFilters);
+    updateDashboardViewAllLinks();
+    fetchDashboardData();
+}
+
+function bindDashboardFilterEvents() {
+    $(document)
+        .off(".dashboardFilters")
+        .on("change.dashboardFilters", "#dashboard-involvement-filter", function () {
+            dashboardFilters.involvement = dashboardNormalizeFilters({
+                involvement: $(this).val(),
+            }).involvement;
+            applyDashboardFilters();
+        })
+        .on("change.dashboardFilters", "#dashboard-team-filter", function () {
+            if (isTableFilterSilent(this) || dashboardGlobalTeamId()) {
+                return;
+            }
+            dashboardFilters.teamIds = getTableFilterValues(this);
+            applyDashboardFilters();
+        })
+        .on("change.dashboardFilters", "#dashboard-service-filter", function () {
+            if (isTableFilterSilent(this)) {
+                return;
+            }
+            dashboardFilters.serviceIds = getTableFilterValues(this);
+            applyDashboardFilters();
+        })
+        .on("click.dashboardFilters", "#dashboard-my-teams", function () {
+            dashboardFilters.teamIds = dashboardMemberTeamIds();
+            syncDashboardFilterControls();
+            applyDashboardFilters();
+        })
+        .on("click.dashboardFilters", "#dashboard-filters-reset", function () {
+            dashboardFilters = dashboardDefaultFilters();
+            syncDashboardFilterControls();
+            applyDashboardFilters();
+        });
+}
+
 function loadDashboard() {
-    const params = [];
+    initTableMultiSelects("#view-dashboard");
+    bindDashboardFilterEvents();
+
+    loadDashboardFilterOptions(function (optionsLoaded) {
+        const urlFilters = dashboardFiltersFromUrl();
+
+        if (urlFilters) {
+            dashboardFilters = urlFilters;
+        } else if (!dashboardFiltersInitialized) {
+            dashboardFilters = readStoredDashboardFilters() || dashboardDefaultFilters();
+        }
+
+        dashboardFiltersInitialized = true;
+
+        if (optionsLoaded) {
+            dashboardFilters = dashboardDropUnknownFilterIds(dashboardFilters);
+        }
+
+        syncDashboardFilterControls();
+        applyDashboardFilters();
+    });
+}
+
+function fetchDashboardData() {
+    const sequence = ++dashboardLoadSequence;
     const generation = ++dashboardLoadGeneration;
     let delayedIndicator = null;
+    const params = [];
 
-    if (typeof selectedTeamId === "function" && selectedTeamId()) {
-        params.push("team_id=" + encodeURIComponent(selectedTeamId()));
+    // Team scope is carried by dashboardEffectiveTeamIds() (which folds in the
+    // global team selector), so no separate selectedTeamId param is needed.
+    appendTableFilterParams(params, "team_id", dashboardEffectiveTeamIds());
+    appendTableFilterParams(params, "service_id", dashboardFilters.serviceIds);
+
+    if (dashboardFilters.involvement) {
+        params.push("involvement=" + encodeURIComponent(dashboardFilters.involvement));
     }
+
     params.push("page=1");
     params.push("page_size=100");
     params.push("sort=activity");
@@ -433,7 +760,9 @@ function loadDashboard() {
         }
     }
 
-    apiGet("/api/alert-groups?" + params.join("&"), function (response) {
+    // /api/alerts (not /api/alert-groups) is the endpoint that understands the
+    // involvement / team_id / service_id filters added by this feature.
+    apiGet("/api/alerts?" + params.join("&"), function (response) {
         if (generation !== dashboardLoadGeneration) {
             return;
         }
@@ -463,7 +792,7 @@ function loadDashboard() {
         }
         showApiError(xhr);
     });
-    loadDashboardServiceImpact();
+    loadDashboardServiceImpact(sequence);
     loadDashboardOncall();
     loadDashboardActivity(generation);
 }
@@ -1131,7 +1460,9 @@ function renderDashboardSystemStatus(alerts, activeAlerts) {
     target.text(i18n.t("overview.system.resolved"));
 }
 
-$(document).on("click", "#reload-dashboard", loadDashboard);
+$(document).on("click", "#reload-dashboard", function () {
+    fetchDashboardData();
+});
 function dashboardSelectedTeamQuery() {
     if (typeof selectedTeamId === "function" && selectedTeamId()) {
         return "?team_id=" + encodeURIComponent(selectedTeamId());
@@ -1245,7 +1576,24 @@ function dashboardImpactRows(rows) {
         });
 }
 
-function loadDashboardServiceImpact() {
+function dashboardFilterImpactRows(rows) {
+    /*
+     * Service impact follows the team and service filters only; involvement
+     * describes personal work, not service health.
+     */
+    const teamIds = dashboardEffectiveTeamIds().map(String);
+    const serviceIds = dashboardFilters.serviceIds.map(String);
+
+    return dashboardAsArray(rows).filter(function (row) {
+        if (teamIds.length && teamIds.indexOf(String(row.team_id)) === -1) {
+            return false;
+        }
+
+        return !serviceIds.length || serviceIds.indexOf(String(row.service_id)) !== -1;
+    });
+}
+
+function loadDashboardServiceImpact(sequence) {
     const generation = ++dashboardImpactLoadGeneration;
 
     if (window.AppLoading && !dashboardImpactHasLoaded) {
@@ -1260,13 +1608,18 @@ function loadDashboardServiceImpact() {
         if (generation !== dashboardImpactLoadGeneration) {
             return;
         }
+        if (sequence !== undefined && sequence !== dashboardLoadSequence) {
+            return;
+        }
 
         const serviceRows = dashboardAsArray(rows);
 
         dashboardImpactHasLoaded = true;
         dashboardLastServiceRows = serviceRows.slice();
+        // Health doughnut shows the overall fleet; the impact list respects
+        // the dashboard's team/service filters.
         renderDashboardServiceHealth(serviceRows);
-        renderDashboardServiceImpact(dashboardImpactRows(serviceRows));
+        renderDashboardServiceImpact(dashboardImpactRows(dashboardFilterImpactRows(serviceRows)));
     }, function (xhr) {
         if (generation !== dashboardImpactLoadGeneration) {
             return;

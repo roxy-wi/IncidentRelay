@@ -390,3 +390,72 @@ body.md-theme .dashboard-activity-time {
 .overview-dot-unknown {
   background: var(--md-muted) !important;
 }
+
+/* Dashboard filters */
+
+body.md-theme .dashboard-filters-card {
+  padding: 12px 16px;
+}
+
+body.md-theme .dashboard-filters {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-start;
+  gap: 12px 16px;
+}
+
+body.md-theme .dashboard-filter-field {
+  display: flex;
+  flex: 0 1 auto;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+}
+
+body.md-theme .dashboard-filter-field-wide {
+  flex: 1 1 240px;
+}
+
+body.md-theme .dashboard-filter-label {
+  color: var(--text-secondary);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1rem;
+}
+
+body.md-theme .dashboard-filter-inline {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+body.md-theme .dashboard-filter-inline .ts-wrapper {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+body.md-theme #dashboard-my-teams {
+  white-space: nowrap;
+}
+
+body.md-theme .dashboard-filter-hint {
+  color: var(--text-muted);
+  font-size: 0.75rem;
+}
+
+body.md-theme .dashboard-filters-reset {
+  margin-top: 20px;
+  margin-left: auto;
+}
+
+@media (max-width: 720px) {
+  body.md-theme .dashboard-filter-field,
+  body.md-theme .dashboard-filter-field-wide {
+    flex: 1 1 100%;
+  }
+
+  body.md-theme .dashboard-filters-reset {
+    margin-top: 0;
+  }
+}

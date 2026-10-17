@@ -176,22 +176,19 @@ def list_alerts():
         return error
 
     if payload.team_id:
-        error = require_team_read(payload.team_id)
-        if error:
-            return error
-        team_ids = None
+        for team_id in payload.team_id:
+            error = require_team_read(team_id)
+            if error:
+                return error
+        team_ids = payload.team_id
     else:
         team_ids = get_allowed_team_ids()
 
     current_user = _request_user()
-    assigned_to_user_id = (
-        getattr(current_user, "id", None)
-        if payload.assigned_to_me
-        else None
-    )
+    current_user_id = getattr(current_user, "id", None)
+    assigned_to_user_id = current_user_id if payload.assigned_to_me else None
 
     page = alerts_repo.paginate_alert_groups(
-        team_id=payload.team_id,
         team_ids=team_ids,
         status=payload.status,
         source=payload.source,
@@ -203,6 +200,8 @@ def list_alerts():
         service_criticality=payload.service_criticality,
         search=payload.search,
         assigned_to_user_id=assigned_to_user_id,
+        involvement=payload.involvement,
+        involvement_user_id=current_user_id,
         shelved=payload.shelved,
         page=payload.page,
         page_size=payload.page_size,

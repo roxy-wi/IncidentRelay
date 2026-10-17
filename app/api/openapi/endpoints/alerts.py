@@ -1016,10 +1016,27 @@ def paths():
                 "operationId": "listAlertGroups",
                 "security": bearer_security(),
                 "parameters": [
-                    query_param(
+                    query_array_param(
                         "team_id",
-                        "Filter alert groups by team id.",
+                        "Filter alert groups by one or more team ids. "
+                        "Every listed team must be readable by the caller.",
                         {"type": "integer", "minimum": 1},
+                    ),
+                    query_param(
+                        "involvement",
+                        "Return only alert groups where the current user is the assignee "
+                        "(assigned), a direct or accepting responder (responder), an active "
+                        "stakeholder (stakeholder), or any of these (any).",
+                        {
+                            "type": "string",
+                            "enum": ["assigned", "responder", "stakeholder", "any"],
+                        },
+                    ),
+                    query_param(
+                        "assigned_to_me",
+                        "Legacy alias: set to true to return only alert groups assigned "
+                        "to the current user. Combined with involvement using AND.",
+                        {"type": "boolean", "default": False},
                     ),
                     query_array_param(
                         "status",

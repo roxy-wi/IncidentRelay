@@ -26,6 +26,7 @@ TEAM_SCHEMA = {
         "group_id": {"type": "integer", "minimum": 1, "description": "Owner group id.", "example": 1},
         "group_slug": {"type": "string", "readOnly": True, "example": "production"},
         "group_name": {"type": "string", "readOnly": True, "example": "Production"},
+        "is_member": {"type": "boolean", "readOnly": True, "description": "Whether the current user has an active membership in this team."},
         "slug": {
             "type": "string",
             "minLength": SLUG_MIN_LENGTH,
