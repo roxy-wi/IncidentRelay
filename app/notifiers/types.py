@@ -31,3 +31,13 @@ CHANNEL_TYPE_PATTERN = (
 WEBHOOK_STYLE_CHANNELS = frozenset(
     (WEBHOOK_CHANNEL, DISCORD_CHANNEL, TEAMS_CHANNEL)
 )
+
+# Optional Slack channel config flags controlling user mentions. Both default
+# to off so an existing Slack channel keeps rendering plain display names.
+SLACK_MENTION_ASSIGNEE_KEY = "mention_assignee"
+SLACK_MENTION_ONCALL_KEY = "mention_oncall"
+
+SLACK_MENTION_CONFIG_KEYS = (
+    SLACK_MENTION_ASSIGNEE_KEY,
+    SLACK_MENTION_ONCALL_KEY,
+)

@@ -124,10 +124,30 @@ function showChannelFields() {
     }
 }
 
+function applySlackMentionConfig(config) {
+    // Only persist mention flags when enabled, so an untouched Slack channel
+    // keeps a config identical to one created before mentions existed.
+    if ($("#cfg-slack-mention-assignee").is(":checked")) {
+        config.mention_assignee = true;
+    } else {
+        delete config.mention_assignee;
+    }
+
+    if ($("#cfg-slack-mention-oncall").is(":checked")) {
+        config.mention_oncall = true;
+    } else {
+        delete config.mention_oncall;
+    }
+
+    return config;
+}
+
 function buildSlackConfig(config) {
     const mode = $("#cfg-slack-mode").val() || "bot_api";
 
     config.mode = mode;
+
+    applySlackMentionConfig(config);
 
     if (mode === "bot_api") {
         const connectionMode = (
@@ -616,6 +636,15 @@ function fillChannelFields(type, config) {
             config.webhook_url || ""
         );
 
+        $("#cfg-slack-mention-assignee").prop(
+            "checked",
+            config.mention_assignee === true
+        );
+        $("#cfg-slack-mention-oncall").prop(
+            "checked",
+            config.mention_oncall === true
+        );
+
         showSlackModeFields();
     }
     if (type === "lark") {
@@ -653,6 +682,8 @@ function clearChannelFields() {
     $("#cfg-slack-webhook-url").val("");
     $("#cfg-lark-webhook-url").val("");
     $("#cfg-lark-signing-secret").val("");
+    $("#cfg-slack-mention-assignee").prop("checked", false);
+    $("#cfg-slack-mention-oncall").prop("checked", false);
 
     showSlackModeFields();
     resetEmailHtmlTemplate();

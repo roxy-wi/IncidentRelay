@@ -37,7 +37,7 @@ For each channel IncidentRelay checks:
 | `mattermost` | Webhook URL or Bot API settings | Optional Mattermost user ID for user attribution | `public_base_url` for buttons |
 | `telegram` | `bot_token`, `chat_id` | Telegram user ID for actions | Optional Telegram proxy |
 | `email` | Optional `html_template` | Assigned user must have `email` | SMTP settings |
-| `slack` | Webhook mode: `webhook_url`; Bot API: `bot_token`, `channel_id`, and either `signing_secret` or `app_token` | Optional Slack user ID for action attribution | Public HTTPS endpoint for HTTP actions, or Slack worker for Socket Mode |
+| `slack` | Webhook mode: `webhook_url`; Bot API: `bot_token`, `channel_id`, and either `signing_secret` or `app_token`; optional `mention_assignee` / `mention_oncall` | Optional Slack user ID for action attribution and mentions | Public HTTPS endpoint for HTTP actions, or Slack worker for Socket Mode |
 | `lark` | `webhook_url`, optional `signing_secret` | None | None |
 | `discord` | `webhook_url` | None | None |
 | `teams` | `webhook_url` | None | None |
@@ -98,6 +98,7 @@ Some channels can update an existing notification after ACK, Resolve, Shelve or 
 - [Mattermost](mattermost.md)
 - [Slack](slack.md)
 - [Feishu / Lark](lark.md)
+- [Slack mentions and participant notifications](slack-mentions.md)
 - [Telegram](telegram.md)
 - [Email](email.md)
 - [Email templates](email-channel-templates.md)

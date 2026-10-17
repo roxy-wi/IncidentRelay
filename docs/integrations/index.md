@@ -49,6 +49,7 @@ Notification channels deliver alerts after a route has matched an incoming alert
 | Email           | Sends email to the assigned user's profile email                               | [Email channel](email.md)                     |
 | Slack           | Incoming webhook or Bot API notifications with ACK/Resolve/Shelve actions and updates   | [Slack channel](slack.md)                      |
 | Feishu / Lark   | Custom bot webhook notifications with optional signature verification                   | [Feishu / Lark channel](lark.md)               |
+| Slack mentions  | Pings the on-call responder in Slack and notifies incident participants        | [Slack mentions](slack-mentions.md)           |
 | Discord         | Sends notifications to a Discord webhook                                       | [Webhook-based channels](webhook-channels.md) |
 | Microsoft Teams | Sends notifications to a Teams webhook                                         | [Webhook-based channels](webhook-channels.md) |
 | Webhook         | Sends notification payloads to a custom HTTP endpoint                          | [Webhook-based channels](webhook-channels.md) |

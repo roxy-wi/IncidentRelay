@@ -219,11 +219,17 @@ Responder actions are written to the incident timeline.
 | `responder_declined` | `Alice Smith declined responder request. Busy now` |
 | `responder_expired` | `Responder request expired for Alice Smith` |
 
-## Browser push notification
+## Responder notifications
 
-When browser push is configured for the target responder, IncidentRelay sends a push notification for the responder request.
+When a responder request is created, IncidentRelay notifies every resolved active responder over email, Slack and browser push.
 
-The notification should include enough context to act without opening the incident first:
+| Channel | Requirement |
+|---|---|
+| Email | The target user has an email address in their profile |
+| Slack | The target user has a Slack user ID and the incident has a Slack channel |
+| Browser push | The target user has an active browser push subscription |
+
+The notification includes enough context to act without opening the incident first:
 
 - incident title;
 - priority;
@@ -233,4 +239,25 @@ The notification should include enough context to act without opening the incide
 - request message;
 - link to the incident.
 
-Push delivery failure does not prevent the responder request from being created. In that case `notification_status` and `notification_error` describe the delivery result.
+Delivery is best-effort per channel:
+
+- the request is recorded as notified when at least one channel succeeds;
+- a channel that fails is recorded as a partial failure but does not fail the request;
+- a missing browser push subscription alone no longer marks the notification as failed;
+- `notification_status` and `notification_error` describe the combined delivery result.
+
+If a resolved user has no email, no Slack user ID and no push subscription, the notification is recorded as failed with an error naming the missing contact data.
+
+Inactive and soft-deleted users are skipped and are not counted as delivery failures.
+
+Delivery failure never prevents the responder request from being created.
+
+For team, rotation and escalation-policy targets, each resolved user is notified independently, so one failing recipient does not block the others.
+
+In Slack Bot API mode the notification is sent as a direct message, which needs the `im:write` scope. With an incoming-webhook Slack channel a direct message is not possible, so the message is posted to the channel with the user mentioned. See [Slack](../integrations/slack.md).
+
+## Browser push notification
+
+When browser push is configured for the target responder, IncidentRelay sends a push notification for the responder request as one of the channels described above.
+
+Stakeholder and responder push notifications do not include ACK, Resolve, Shelve or Unshelve action buttons.

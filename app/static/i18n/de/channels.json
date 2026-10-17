@@ -156,6 +156,12 @@
   "channels.slack.signing_secret_help": "Erforderlich für signierte Anfragen an /api/integrations/slack/actions. Gespeicherte Werte werden beim Bearbeiten maskiert.",
   "channels.slack.app_token": "App-Level-Token",
   "channels.slack.app_token_help": "Slack App-Level-Token mit Präfix xapp- und Scope connections:write. Der Slack-Worker muss laufen.",
+  "channels.slack.mentions": "Erwähnungen",
+  "channels.slack.mentions_help": "Die verantwortliche Person in Slack anpingen, statt ihren Namen als reinen Text anzuzeigen. Erfordert eine Slack-Benutzer-ID im Benutzerprofil.",
+  "channels.slack.mention_assignee": "Zugewiesene Person des Alerts erwähnen",
+  "channels.slack.mention_assignee_help": "Stellt die zugewiesene Person als Slack-Erwähnung dar. Fällt auf den Anzeigenamen zurück, wenn keine Slack-Benutzer-ID vorhanden ist.",
+  "channels.slack.mention_oncall": "Aktuelle Bereitschaft erwähnen",
+  "channels.slack.mention_oncall_help": "Ermittelt die Bereitschaft beim Senden der Nachricht, damit Erinnerungen und Eskalationen die zu diesem Zeitpunkt zuständige Person anpingen.",
   "channels.config.bot_http_ready": "Bot API mit HTTP-Aktionen konfiguriert",
   "channels.config.bot_socket_ready": "Bot API mit Socket Mode konfiguriert"
 }

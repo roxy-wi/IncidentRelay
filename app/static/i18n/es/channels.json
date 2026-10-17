@@ -156,6 +156,12 @@
   "channels.slack.signing_secret_help": "Obligatorio para solicitudes firmadas a /api/integrations/slack/actions. Los valores almacenados se ocultan al editar.",
   "channels.slack.app_token": "Token de nivel de aplicación",
   "channels.slack.app_token_help": "Token de nivel de aplicación de Slack que comienza por xapp- y con el scope connections:write. El worker de Slack debe estar ejecutándose.",
+  "channels.slack.mentions": "Menciones",
+  "channels.slack.mentions_help": "Notifica directamente a la persona responsable en Slack en lugar de mostrar su nombre como texto simple. Requiere un ID de usuario de Slack en el perfil.",
+  "channels.slack.mention_assignee": "Mencionar al asignado de la alerta",
+  "channels.slack.mention_assignee_help": "Muestra al asignado como una mención de Slack. Usa el nombre visible si el usuario no tiene ID de usuario de Slack.",
+  "channels.slack.mention_oncall": "Mencionar al usuario de guardia actual",
+  "channels.slack.mention_oncall_help": "Resuelve el usuario de guardia al enviar el mensaje, de modo que los recordatorios y escalaciones notifiquen a quien esté de guardia en ese momento.",
   "channels.config.bot_http_ready": "Bot API configurada con acciones HTTP",
   "channels.config.bot_socket_ready": "Bot API configurada con Socket Mode"
 }

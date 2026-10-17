@@ -2,8 +2,19 @@ import logging
 
 from app.modules.db import alerts_repo, incidents_repo
 from app.modules.db.models import TeamUser, User
-from app.notifiers.browser_push import service as browser_push
 from app.services import escalation_policies as escalation_policy_service
+from app.services.alerts.priority import (
+    alert_priority_label,
+    format_alert_title_with_priority,
+)
+from app.services.incidents.participant_notifications import (
+    ParticipantRecipient,
+    is_notifiable_user,
+    notify_participants,
+    record_participant_notification_events,
+    user_contact_email,
+)
+from app.services.links import build_alert_web_url
 from app.services.oncall import get_current_oncall_user
 from app.services.incidents.responder_display import user_display_name
 
@@ -147,9 +158,91 @@ def _mark_notification_failed(responder, error):
     }
 
 
+def build_responder_notification_email(responder):
+    """Build subject and body telling a user they were added as a responder."""
+    group = responder.group
+    context = _responder_notification_context(responder)
+    alert_url = build_alert_web_url(group) or "-"
+    team = group.team.slug if group.team else "-"
+    service = getattr(group.service, "name", None) if group.service else None
+
+    subject = (
+        "[IncidentRelay] You were added as a responder: "
+        f"{format_alert_title_with_priority(group)}"
+    )
+
+    lines = [
+        (
+            f"{context['requested_by_name']} added you as a responder "
+            "to this incident."
+        ),
+        "",
+        f"Incident: {format_alert_title_with_priority(group)}",
+        f"Status: {group.status or '-'}",
+        f"Severity: {group.severity or '-'}",
+        f"Priority: {alert_priority_label(group)}",
+        f"Team: {team}",
+        f"Service: {service or '-'}",
+    ]
+
+    if context["message"]:
+        lines.extend(["", "Message:", context["message"]])
+
+    lines.extend([
+        "",
+        f"URL: {alert_url}",
+        "",
+        (
+            "You are receiving this email because you were requested as an "
+            "incident responder."
+        ),
+    ])
+
+    return subject, "\n".join(lines)
+
+
+def build_responder_notification_slack_text(responder):
+    """Build the Slack message text for a responder request."""
+    group = responder.group
+    context = _responder_notification_context(responder)
+    alert_url = build_alert_web_url(group)
+
+    text = (
+        f"You were added as a responder to *{format_alert_title_with_priority(group)}* "
+        f"by {context['requested_by_name']}."
+    )
+
+    if context["message"]:
+        text = f"{text}\nMessage: {context['message']}"
+
+    if alert_url:
+        text = f"{text}\n{alert_url}"
+
+    return text
+
+
+def _responder_recipients(responder):
+    """Resolve responder targets to notifiable participant recipients."""
+    recipients = []
+
+    for user in resolve_responder_recipients(responder):
+        if not is_notifiable_user(user):
+            continue
+
+        recipients.append(
+            ParticipantRecipient(
+                display_name=user_display_name(user),
+                user=user,
+                email=user_contact_email(user),
+            )
+        )
+
+    return recipients
+
+
 def notify_incident_responder_requested(responder):
-    """Send browser push notification for a responder request."""
-    recipients = resolve_responder_recipients(responder)
+    """Notify a responder request over email, Slack and browser push."""
+    recipients = _responder_recipients(responder)
 
     if not recipients:
         return _mark_notification_failed(
@@ -157,62 +250,35 @@ def notify_incident_responder_requested(responder):
             "no active responder recipients",
         )
 
-    sent_devices = 0
-    errors = []
-    context = _responder_notification_context(responder)
+    subject, body = build_responder_notification_email(responder)
 
-    for user in recipients:
-        try:
-            sent = browser_push.send_stakeholder_push_to_user(
-                user,
-                responder.group,
-                event_type=RESPONDER_NOTIFICATION_EVENT,
-                context=context,
-            )
-        except Exception as exc:
-            logger.exception(
-                "responder browser push failed",
-                extra={
-                    "extra": {
-                        "event_type": "responder_notification_failed",
-                        "responder_id": responder.id,
-                        "user_id": user.id,
-                        "error": str(exc),
-                    }
-                },
-            )
-            errors.append(f"{user_display_name(user)}: {exc}")
-            continue
+    result = notify_participants(
+        responder.group,
+        recipients,
+        subject=subject,
+        body=body,
+        slack_text=build_responder_notification_slack_text(responder),
+        push_event_type=RESPONDER_NOTIFICATION_EVENT,
+        push_context=_responder_notification_context(responder),
+    )
 
-        if sent:
-            sent_devices += sent
-        else:
-            errors.append(
-                f"{user_display_name(user)}: no active push subscriptions"
-            )
-
-    if sent_devices > 0:
-        error = "; ".join(errors) if errors else None
-
+    if result.status == "sent":
         incidents_repo.update_incident_responder_notification(
             responder.id,
             status="sent",
-            error=error,
+            error=result.error_text,
         )
-        alerts_repo.create_alert_event(
-            group_id=responder.group_id,
-            event_type="responder_notification_sent",
-            message=(
-                "Responder notification sent to "
-                f"{sent_devices} browser push device(s)"
-            ),
-            user_id=None,
+        record_participant_notification_events(
+            responder.group_id,
+            result,
+            sent_event_type="responder_notification_sent",
+            failed_event_type="responder_notification_failed",
+            label="Responder",
         )
-        return {
-            "status": "sent",
-            "sent": sent_devices,
-            "error": error,
-        }
 
-    error = "; ".join(errors) or "no browser push notifications were sent"
-    return _mark_notification_failed(responder, error)
+        return result.as_dict()
+
+    return _mark_notification_failed(
+        responder,
+        result.error_text or "no notifications were sent",
+    )

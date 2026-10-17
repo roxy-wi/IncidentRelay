@@ -156,6 +156,12 @@
   "channels.slack.signing_secret_help": "Нужен для подписанных запросов на /api/integrations/slack/actions. При редактировании сохранённое значение маскируется.",
   "channels.slack.app_token": "App-level token",
   "channels.slack.app_token_help": "App-level token Slack, начинающийся с xapp-, со scope connections:write. Slack worker должен быть запущен.",
+  "channels.slack.mentions": "Упоминания",
+  "channels.slack.mentions_help": "Пинговать ответственного в Slack вместо отображения его имени обычным текстом. Требуется Slack user ID в профиле пользователя.",
+  "channels.slack.mention_assignee": "Упоминать назначенного по алерту",
+  "channels.slack.mention_assignee_help": "Отображает назначенного как упоминание Slack. Если у пользователя нет Slack user ID, используется отображаемое имя.",
+  "channels.slack.mention_oncall": "Упоминать текущего дежурного",
+  "channels.slack.mention_oncall_help": "Определяет дежурного в момент отправки сообщения, поэтому напоминания и эскалации пингуют того, кто дежурит именно тогда.",
   "channels.config.bot_http_ready": "Bot API настроен с HTTP-действиями",
   "channels.config.bot_socket_ready": "Bot API настроен с Socket Mode"
 }

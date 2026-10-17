@@ -1,13 +1,19 @@
 import json
+import re
 
 import requests
 
 from app.notifiers.plugins import IncomingWebhookNotifier, alert_service_label
+from app.notifiers.types import (
+    SLACK_MENTION_ASSIGNEE_KEY,
+    SLACK_MENTION_ONCALL_KEY,
+)
 from app.services.alerts.priority import (
     alert_priority_label,
     format_alert_title_with_priority,
 )
 from app.services.links import build_alert_web_url, build_source_event_url
+from app.services.oncall import get_current_oncall_user
 from app.services.outbound_http import safe_request
 from app.services.routing.service_context import (
     get_alert_service_links,
@@ -17,6 +23,12 @@ from app.services.routing.service_context import (
 )
 from app.services.alerts.correlation import format_correlation_markdown
 from app.services.alerts.shelving import get_active_shelve, is_alert_group_shelved
+
+# Slack user IDs start with U (regular user) or W (Enterprise Grid user)
+# followed by uppercase alphanumerics. slack_user_id is free text supplied
+# through a profile form, the API or an SSO claim, so it must be validated
+# before it is embedded in Slack mention markup.
+SLACK_USER_ID_PATTERN = re.compile(r"^[UW][A-Z0-9]{1,32}$")
 
 
 class SlackNotifier(IncomingWebhookNotifier):
@@ -206,6 +218,104 @@ class SlackNotifier(IncomingWebhookNotifier):
             ),
         }
 
+    def send_direct_message(self, channel, user, text, *, blocks=None):
+        """Send a Slack message to one user.
+
+        Prefers a direct message via ``conversations.open`` + ``chat.postMessage``,
+        which needs Bot API mode and the ``im:write`` scope. When only an
+        incoming webhook is configured a DM is impossible, so the message is
+        posted to the configured channel with the user mentioned instead.
+        """
+        config = channel.config or {}
+        slack_user_id = self._slack_user_id(user)
+
+        if not slack_user_id:
+            raise RuntimeError(
+                "Slack user id is missing or invalid in user profile"
+            )
+
+        if not self._bot_api_ready(config):
+            return self._send_channel_fallback_message(
+                channel,
+                slack_user_id,
+                text,
+                blocks=blocks,
+            )
+
+        conversation = self._request(
+            config,
+            "conversations.open",
+            {"users": slack_user_id},
+        )
+
+        dm_channel_id = str(
+            (conversation.get("channel") or {}).get("id") or ""
+        ).strip()
+
+        if not dm_channel_id:
+            raise RuntimeError(
+                "Slack direct channel id was not returned"
+            )
+
+        payload = {
+            "channel": dm_channel_id,
+            "text": self._truncate(text, 4000),
+        }
+
+        if blocks:
+            payload["blocks"] = blocks
+
+        result = self._request(config, "chat.postMessage", payload)
+
+        return {
+            "provider": self.name,
+            "provider_status": "sent",
+            "delivery_mode": "direct_message",
+            "external_message_id": result.get("ts"),
+            "external_channel_id": (
+                result.get("channel") or dm_channel_id
+            ),
+        }
+
+    def _send_channel_fallback_message(
+        self,
+        channel,
+        slack_user_id,
+        text,
+        *,
+        blocks=None,
+    ):
+        """Post to the configured webhook channel, mentioning the user."""
+        config = channel.config or {}
+        webhook_url = config.get("webhook_url")
+
+        if not webhook_url:
+            raise RuntimeError(
+                "Slack direct messages require Bot API mode "
+                "(bot_token and channel_id), or a webhook_url fallback"
+            )
+
+        mention_text = f"<@{slack_user_id}> {text}"
+
+        payload = {"text": self._truncate(mention_text, 4000)}
+
+        if blocks:
+            payload["blocks"] = blocks
+
+        response = safe_request(
+            "POST",
+            webhook_url,
+            json=payload,
+            timeout=10,
+        )
+        response.raise_for_status()
+
+        return {
+            "provider": self.name,
+            "provider_status": "sent",
+            "delivery_mode": "channel_mention",
+        }
+
     def _request(self, config, method, payload):
         """Call a Slack Web API method."""
         try:
@@ -277,6 +387,89 @@ class SlackNotifier(IncomingWebhookNotifier):
 
         return bool(config.get("signing_secret"))
 
+    @staticmethod
+    def _mentions_enabled(config, key):
+        """Return whether a mention flag is explicitly enabled.
+
+        Only a real boolean True enables mentions, so a channel with no
+        mention config renders exactly as it did before mentions existed.
+        """
+        return (config or {}).get(key) is True
+
+    @staticmethod
+    def _slack_user_id(user):
+        """Return a validated Slack user ID for a user, or None."""
+        if not user:
+            return None
+
+        slack_user_id = str(
+            getattr(user, "slack_user_id", "") or ""
+        ).strip()
+
+        if not slack_user_id:
+            return None
+
+        if not SLACK_USER_ID_PATTERN.match(slack_user_id):
+            return None
+
+        return slack_user_id
+
+    @staticmethod
+    def _user_display_name(user):
+        """Return a plain display name for a user."""
+        if not user:
+            return "-"
+
+        return (
+            getattr(user, "display_name", None)
+            or getattr(user, "username", None)
+            or "-"
+        )
+
+    def _user_reference(self, user, *, mention, mentioned_user_ids):
+        """Render a user as a Slack mention or as escaped plain text.
+
+        A user is mentioned at most once per message: the first field that
+        emits a real mention claims it, and later fields fall back to the
+        display name so nobody is pinged twice for the same alert.
+        """
+        display_name = self._escape_text(self._user_display_name(user))
+
+        if not mention:
+            return display_name
+
+        slack_user_id = self._slack_user_id(user)
+
+        if not slack_user_id:
+            return display_name
+
+        user_id = getattr(user, "id", None)
+
+        if user_id is not None and user_id in mentioned_user_ids:
+            return display_name
+
+        if user_id is not None:
+            mentioned_user_ids.add(user_id)
+
+        return f"<@{slack_user_id}>"
+
+    @staticmethod
+    def _current_oncall_user(alert):
+        """Resolve the effective on-call user for an alert at send time.
+
+        Uses the rotation stored on the alert group, so rotation overrides
+        and layer restrictions are honoured by the on-call service.
+        """
+        rotation = getattr(alert, "rotation", None)
+
+        if not rotation:
+            return None
+
+        try:
+            return get_current_oncall_user(rotation)
+        except Exception:
+            return None
+
     def _build_message_payload(
             self,
             channel,
@@ -315,7 +508,7 @@ class SlackNotifier(IncomingWebhookNotifier):
             },
             {
                 "type": "section",
-                "fields": self._field_blocks(alert),
+                "fields": self._field_blocks(alert, channel=channel),
             },
         ]
 
@@ -399,8 +592,9 @@ class SlackNotifier(IncomingWebhookNotifier):
             "blocks": blocks,
         }
 
-    def _field_blocks(self, alert):
+    def _field_blocks(self, alert, channel=None):
         """Build the common Slack message fields."""
+        config = getattr(channel, "config", None) or {}
         team = getattr(alert, "team", None)
         assignee = getattr(alert, "assignee", None)
 
@@ -410,28 +604,60 @@ class SlackNotifier(IncomingWebhookNotifier):
             or "-"
         )
 
-        assignee_name = (
-            getattr(assignee, "display_name", None)
-            or getattr(assignee, "username", None)
-            or "-"
+        mention_assignee = self._mentions_enabled(
+            config,
+            SLACK_MENTION_ASSIGNEE_KEY,
         )
+        mention_oncall = self._mentions_enabled(
+            config,
+            SLACK_MENTION_ONCALL_KEY,
+        )
+        mentioned_user_ids = set()
 
+        if assignee:
+            assignee_name = self._user_reference(
+                assignee,
+                mention=mention_assignee,
+                mentioned_user_ids=mentioned_user_ids,
+            )
+        else:
+            assignee_name = "-"
+
+        # User references are already escaped or are deliberate Slack mention
+        # markup, so they are inserted verbatim. Every other value is raw and
+        # must be escaped here.
         values = [
-            ("Team", team_name),
-            ("Service", alert_service_label(alert)),
-            ("Status", getattr(alert, "status", None) or "-"),
-            ("Severity", getattr(alert, "severity", None) or "-"),
-            ("Priority", alert_priority_label(alert)),
+            ("Team", self._escape_text(team_name)),
+            ("Service", self._escape_text(alert_service_label(alert))),
+            ("Status", self._escape_text(getattr(alert, "status", None) or "-")),
+            ("Severity", self._escape_text(getattr(alert, "severity", None) or "-")),
+            ("Priority", self._escape_text(alert_priority_label(alert))),
             ("Assignee", assignee_name),
-            ("Source", getattr(alert, "source", None) or "-"),
-            ("Alert ID", getattr(alert, "id", None) or "-"),
         ]
+
+        if mention_oncall:
+            oncall_user = self._current_oncall_user(alert)
+
+            if oncall_user:
+                values.append((
+                    "On-call",
+                    self._user_reference(
+                        oncall_user,
+                        mention=True,
+                        mentioned_user_ids=mentioned_user_ids,
+                    ),
+                ))
+
+        values.extend([
+            ("Source", self._escape_text(getattr(alert, "source", None) or "-")),
+            ("Alert ID", self._escape_text(getattr(alert, "id", None) or "-")),
+        ])
 
         return [
             {
                 "type": "mrkdwn",
                 "text": self._truncate(
-                    f"*{title}*\n{self._escape_text(value)}",
+                    f"*{title}*\n{value}",
                     2000,
                 ),
             }

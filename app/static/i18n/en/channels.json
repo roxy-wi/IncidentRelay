@@ -156,6 +156,12 @@
   "channels.slack.signing_secret_help": "Required for signed requests to /api/integrations/slack/actions. Stored values are masked when editing.",
   "channels.slack.app_token": "App-level token",
   "channels.slack.app_token_help": "Slack app-level token starting with xapp- and the connections:write scope. The Slack worker must be running.",
+  "channels.slack.mentions": "Mentions",
+  "channels.slack.mentions_help": "Ping the responsible person in Slack instead of showing their name as plain text. Requires a Slack user ID on the user profile.",
+  "channels.slack.mention_assignee": "Mention the alert assignee",
+  "channels.slack.mention_assignee_help": "Renders the assignee as a Slack mention. Falls back to the display name when the user has no Slack user ID.",
+  "channels.slack.mention_oncall": "Mention the current on-call user",
+  "channels.slack.mention_oncall_help": "Resolves the on-call user when the message is sent, so reminders and escalations ping whoever is on call at that moment.",
   "channels.config.bot_http_ready": "Bot API configured with HTTP actions",
   "channels.config.bot_socket_ready": "Bot API configured with Socket Mode"
 }
