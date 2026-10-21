@@ -183,6 +183,9 @@ function dashboardEscalationText(alert) {
     }
     return i18n.t("overview.escalation.rotation", {name: alert.rotation_name || "-"});
 }
+
+// --- Chart helpers (from main) ---
+
 function dashboardThemeToken(name, fallback) {
     const value = window.getComputedStyle(document.documentElement)
         .getPropertyValue(name)
@@ -389,18 +392,316 @@ function renderDashboardActivityTrend(alerts) {
     );
 }
 
+// --- Dashboard filters (from feat/dashboard-alert-filters) ---
+
+const DASHBOARD_FILTER_STORAGE_KEY = "incidentrelay.dashboard.filters.v1";
+const DASHBOARD_INVOLVEMENTS = ["assigned", "responder", "stakeholder", "any"];
+// Team scope is owned by the global top-bar selector, so it is not a dashboard
+// filter param; only the Active Alerts section filters live here.
+const DASHBOARD_FILTER_URL_PARAMS = ["involvement", "service_id"];
+
+let dashboardFilters = dashboardDefaultFilters();
+let dashboardFiltersInitialized = false;
+let dashboardFilterOptions = {key: null, services: []};
+let dashboardLoadSequence = 0;
+
+function dashboardDefaultFilters() {
+    return {involvement: "", serviceIds: []};
+}
+
+function dashboardNormalizeFilters(raw) {
+    raw = raw || {};
+
+    return {
+        involvement: DASHBOARD_INVOLVEMENTS.indexOf(raw.involvement) !== -1 ? raw.involvement : "",
+        serviceIds: normalizeTableFilterValues(raw.serviceIds),
+    };
+}
+
+function dashboardHasPersonalFilters() {
+    // The Active Alerts list narrows on these; global widgets never do.
+    return !!dashboardFilters.involvement || dashboardFilters.serviceIds.length > 0;
+}
+
+function dashboardFiltersFromUrl() {
+    const params = new URLSearchParams(window.location.search || "");
+    const hasFilterParams = DASHBOARD_FILTER_URL_PARAMS.some(function (name) {
+        return params.has(name);
+    });
+
+    if (!hasFilterParams) {
+        return null;
+    }
+
+    return dashboardNormalizeFilters({
+        involvement: params.get("involvement") || "",
+        serviceIds: params.getAll("service_id"),
+    });
+}
+
+function readStoredDashboardFilters() {
+    try {
+        const raw = localStorage.getItem(DASHBOARD_FILTER_STORAGE_KEY);
+        return raw ? dashboardNormalizeFilters(JSON.parse(raw)) : null;
+    } catch (error) {
+        return null;
+    }
+}
+
+function writeStoredDashboardFilters(filters) {
+    try {
+        localStorage.setItem(DASHBOARD_FILTER_STORAGE_KEY, JSON.stringify(filters));
+    } catch (error) {
+        // Ignore storage errors, the filters still work for the current page.
+    }
+}
+
+function writeDashboardFiltersToUrl(filters) {
+    if (!window.history || !window.history.replaceState) {
+        return;
+    }
+
+    if (normalizeAppRoutePath(window.location.pathname || "/") !== "/") {
+        return;
+    }
+
+    const url = new URL(window.location.href);
+
+    DASHBOARD_FILTER_URL_PARAMS.forEach(function (name) {
+        url.searchParams.delete(name);
+    });
+
+    if (filters.involvement) {
+        url.searchParams.set("involvement", filters.involvement);
+    }
+
+    appendTableFilterParams(url.searchParams, "service_id", filters.serviceIds);
+
+    const nextUrl = url.pathname + url.search + url.hash;
+
+    if (nextUrl !== currentAppUrl()) {
+        const state = Object.assign({}, window.history.state || {}, {path: nextUrl});
+        window.history.replaceState(state, "", nextUrl);
+    }
+}
+
+function dashboardGlobalTeamId() {
+    return typeof selectedTeamId === "function" && selectedTeamId()
+        ? String(selectedTeamId())
+        : "";
+}
+
+function dashboardEffectiveTeamIds() {
+    // Team scope is driven solely by the global top-bar selector now; the
+    // dashboard no longer carries its own team filter.
+    const globalTeamId = dashboardGlobalTeamId();
+    return globalTeamId ? [globalTeamId] : [];
+}
+
+function dashboardFilterOptionsKey() {
+    return String((currentUser && currentUser.active_group_id) || "");
+}
+
+function loadDashboardFilterOptions(callback) {
+    const key = dashboardFilterOptionsKey();
+
+    if (dashboardFilterOptions.key === key) {
+        callback(true);
+        return;
+    }
+
+    apiGet("/api/services", function (services) {
+        dashboardFilterOptions = {
+            key: key,
+            services: dashboardAsArray(services).filter(function (service) {
+                return service.enabled !== false;
+            }),
+        };
+        renderDashboardFilterOptions();
+        callback(true);
+    }, function () {
+        renderDashboardFilterOptions();
+        callback(false);
+    });
+}
+
+function renderDashboardFilterOptions() {
+    replaceTableSelectOptions(
+        "#dashboard-service-filter",
+        dashboardFilterOptions.services.map(function (service) {
+            return {
+                value: String(service.id),
+                text: [
+                    service.team_name || service.team_slug || null,
+                    service.name || service.slug || service.id
+                ].filter(Boolean).join(" / ")
+            };
+        }),
+        dashboardFilters.serviceIds
+    );
+}
+
+function dashboardDropUnknownFilterIds(filters) {
+    /*
+     * Drop saved or shared ids that the user can no longer see, so the
+     * alert-groups API is never asked for an unreadable service.
+     */
+    const serviceIds = dashboardFilterOptions.services.map(function (service) {
+        return String(service.id);
+    });
+
+    return {
+        involvement: filters.involvement,
+        serviceIds: filters.serviceIds.filter(function (id) {
+            return serviceIds.indexOf(String(id)) !== -1;
+        }),
+    };
+}
+
+function dashboardActiveFilterCount() {
+    // Count the advanced refinements hidden inside the Filters disclosure that
+    // the My/All toggle does not already make obvious.
+    let count = dashboardFilters.serviceIds.length;
+    if (dashboardFilters.involvement && dashboardFilters.involvement !== "any") {
+        count += 1;
+    }
+    return count;
+}
+
+function dashboardSetFiltersPanel(open) {
+    $("#dashboard-filters-panel").toggleClass("is-hidden", !open);
+    $("#dashboard-filters-toggle").attr("aria-expanded", open ? "true" : "false");
+}
+
+function syncDashboardFilterControls() {
+    const mine = !!dashboardFilters.involvement;
+
+    $("#dashboard-scope-mine")
+        .attr("aria-pressed", mine ? "true" : "false")
+        .toggleClass("is-active", mine);
+    $("#dashboard-scope-all")
+        .attr("aria-pressed", mine ? "false" : "true")
+        .toggleClass("is-active", !mine);
+
+    $("#dashboard-involvement-filter").val(dashboardFilters.involvement);
+    setTableFilterValues("#dashboard-service-filter", dashboardFilters.serviceIds);
+
+    const count = dashboardActiveFilterCount();
+    $("#dashboard-filters-count")
+        .text(count ? String(count) : "")
+        .toggleClass("is-hidden", count === 0);
+    $("#dashboard-filters-toggle").toggleClass("has-active", count > 0);
+}
+
+function updateDashboardViewAllLinks() {
+    /*
+     * /alerts understands service_id and assigned_to_me. Team scope reaches it
+     * through the global team selector, so a dashboard-only team selection is
+     * not carried over.
+     */
+    const params = new URLSearchParams();
+
+    appendTableFilterParams(params, "service_id", dashboardFilters.serviceIds);
+
+    // /alerts exposes only assigned_to_me, not the finer responder/stakeholder
+    // involvement, so any "My Alerts" selection carries over as its closest
+    // equivalent.
+    if (dashboardFilters.involvement) {
+        params.set("assigned_to_me", "true");
+    }
+
+    const query = params.toString();
+    $("[data-dashboard-view-all]").attr("href", "/alerts" + (query ? "?" + query : ""));
+}
+
+function applyDashboardFilters() {
+    writeStoredDashboardFilters(dashboardFilters);
+    writeDashboardFiltersToUrl(dashboardFilters);
+    updateDashboardViewAllLinks();
+    fetchDashboardData();
+}
+
+function bindDashboardFilterEvents() {
+    $(document)
+        .off(".dashboardFilters")
+        .on("click.dashboardFilters", "#dashboard-scope-mine", function () {
+            if (!dashboardFilters.involvement) {
+                dashboardFilters.involvement = "any";
+            }
+            syncDashboardFilterControls();
+            applyDashboardFilters();
+        })
+        .on("click.dashboardFilters", "#dashboard-scope-all", function () {
+            dashboardFilters.involvement = "";
+            syncDashboardFilterControls();
+            applyDashboardFilters();
+        })
+        .on("click.dashboardFilters", "#dashboard-filters-toggle", function () {
+            dashboardSetFiltersPanel($(this).attr("aria-expanded") !== "true");
+        })
+        .on("change.dashboardFilters", "#dashboard-involvement-filter", function () {
+            dashboardFilters.involvement = dashboardNormalizeFilters({
+                involvement: $(this).val(),
+            }).involvement;
+            syncDashboardFilterControls();
+            applyDashboardFilters();
+        })
+        .on("change.dashboardFilters", "#dashboard-service-filter", function () {
+            if (isTableFilterSilent(this)) {
+                return;
+            }
+            dashboardFilters.serviceIds = getTableFilterValues(this);
+            syncDashboardFilterControls();
+            applyDashboardFilters();
+        })
+        .on("click.dashboardFilters", "#dashboard-filters-reset", function () {
+            dashboardFilters = dashboardDefaultFilters();
+            syncDashboardFilterControls();
+            applyDashboardFilters();
+        });
+}
+
 function loadDashboard() {
-    const params = [];
+    initTableMultiSelects("#view-dashboard");
+    bindDashboardFilterEvents();
+
+    loadDashboardFilterOptions(function (optionsLoaded) {
+        const urlFilters = dashboardFiltersFromUrl();
+
+        if (urlFilters) {
+            dashboardFilters = urlFilters;
+        } else if (!dashboardFiltersInitialized) {
+            dashboardFilters = readStoredDashboardFilters() || dashboardDefaultFilters();
+        }
+
+        dashboardFiltersInitialized = true;
+
+        if (optionsLoaded) {
+            dashboardFilters = dashboardDropUnknownFilterIds(dashboardFilters);
+        }
+
+        syncDashboardFilterControls();
+        dashboardSetFiltersPanel(dashboardActiveFilterCount() > 0);
+        applyDashboardFilters();
+    });
+}
+
+function fetchDashboardData() {
+    const sequence = ++dashboardLoadSequence;
     const generation = ++dashboardLoadGeneration;
     let delayedIndicator = null;
 
-    if (typeof selectedTeamId === "function" && selectedTeamId()) {
-        params.push("team_id=" + encodeURIComponent(selectedTeamId()));
-    }
-    params.push("page=1");
-    params.push("page_size=100");
-    params.push("sort=activity");
-    params.push("order=desc");
+    // Baseline scope: the global top-bar team selector only. Every global widget
+    // (KPIs, charts, System Status, team summary) reads this set, so the personal
+    // Active Alerts filters never change the overall operational picture.
+    const baseParams = [];
+    appendTableFilterParams(baseParams, "team_id", dashboardEffectiveTeamIds());
+    baseParams.push("page=1");
+    baseParams.push("page_size=100");
+    baseParams.push("sort=activity");
+    baseParams.push("order=desc");
+
+    const personalFilters = dashboardHasPersonalFilters();
 
     if (window.AppLoading) {
         if (!dashboardHasLoaded) {
@@ -433,26 +734,12 @@ function loadDashboard() {
         }
     }
 
-    apiGet("/api/alert-groups?" + params.join("&"), function (response) {
-        if (generation !== dashboardLoadGeneration) {
-            return;
-        }
+    function renderActiveAlerts(alerts) {
+        const sorted = dashboardSortByActivity(dashboardActiveAlerts(alerts));
+        renderDashboardAlertsTable(sorted.slice(0, 8));
+    }
 
-        const alerts = dashboardAsArray(response);
-        const activeAlerts = dashboardActiveAlerts(alerts);
-        const sortedActiveAlerts = dashboardSortByActivity(activeAlerts);
-
-        dashboardHasLoaded = true;
-        dashboardLastAlerts = alerts.slice();
-        finishDashboardLoading();
-        renderAlertsSummaryGrid("#overview-alerts-summary", alerts);
-        renderDashboardActivityTrend(alerts);
-        renderDashboardAlertsTable(sortedActiveAlerts.slice(0, 8));
-        renderDashboardSeveritySplit(alerts);
-        renderDashboardPrioritySplit(alerts);
-        renderDashboardTeamSummary(alerts);
-        renderDashboardSystemStatus(alerts, activeAlerts);
-    }, function (xhr) {
+    function handleError(xhr) {
         if (generation !== dashboardLoadGeneration) {
             return;
         }
@@ -462,8 +749,55 @@ function loadDashboard() {
             $("#dashboard-alerts").empty();
         }
         showApiError(xhr);
-    });
-    loadDashboardServiceImpact();
+    }
+
+    // /api/alert-groups is the alert-group list endpoint; it understands the
+    // involvement / team_id / service_id filters added by this feature.
+    apiGet("/api/alert-groups?" + baseParams.join("&"), function (response) {
+        if (generation !== dashboardLoadGeneration) {
+            return;
+        }
+
+        const alerts = dashboardAsArray(response);
+        const activeAlerts = dashboardActiveAlerts(alerts);
+
+        dashboardHasLoaded = true;
+        dashboardLastAlerts = alerts.slice();
+        renderAlertsSummaryGrid("#overview-alerts-summary", alerts);
+        renderDashboardActivityTrend(alerts);
+        renderDashboardSeveritySplit(alerts);
+        renderDashboardPrioritySplit(alerts);
+        renderDashboardTeamSummary(alerts);
+        renderDashboardSystemStatus(alerts, activeAlerts);
+
+        // Without a personal filter the Active Alerts table shows the same set,
+        // so reuse this response instead of issuing an identical request.
+        if (!personalFilters) {
+            finishDashboardLoading();
+            renderActiveAlerts(alerts);
+        }
+    }, handleError);
+
+    // Filtered scope: team + personal filters. Feeds the Active Alerts table
+    // only, leaving every global widget above untouched.
+    if (personalFilters) {
+        const activeParams = baseParams.slice();
+        if (dashboardFilters.involvement) {
+            activeParams.push("involvement=" + encodeURIComponent(dashboardFilters.involvement));
+        }
+        appendTableFilterParams(activeParams, "service_id", dashboardFilters.serviceIds);
+
+        apiGet("/api/alert-groups?" + activeParams.join("&"), function (response) {
+            if (generation !== dashboardLoadGeneration) {
+                return;
+            }
+
+            finishDashboardLoading();
+            renderActiveAlerts(dashboardAsArray(response));
+        }, handleError);
+    }
+
+    loadDashboardServiceImpact(sequence);
     loadDashboardOncall();
     loadDashboardActivity(generation);
 }
@@ -1131,7 +1465,9 @@ function renderDashboardSystemStatus(alerts, activeAlerts) {
     target.text(i18n.t("overview.system.resolved"));
 }
 
-$(document).on("click", "#reload-dashboard", loadDashboard);
+$(document).on("click", "#reload-dashboard", function () {
+    fetchDashboardData();
+});
 function dashboardSelectedTeamQuery() {
     if (typeof selectedTeamId === "function" && selectedTeamId()) {
         return "?team_id=" + encodeURIComponent(selectedTeamId());
@@ -1245,7 +1581,19 @@ function dashboardImpactRows(rows) {
         });
 }
 
-function loadDashboardServiceImpact() {
+function dashboardFilterImpactRows(rows) {
+    /*
+     * Service health reflects the whole fleet within the global team scope; the
+     * personal Active Alerts filters (involvement / service) never narrow it.
+     */
+    const teamIds = dashboardEffectiveTeamIds().map(String);
+
+    return dashboardAsArray(rows).filter(function (row) {
+        return !teamIds.length || teamIds.indexOf(String(row.team_id)) !== -1;
+    });
+}
+
+function loadDashboardServiceImpact(sequence) {
     const generation = ++dashboardImpactLoadGeneration;
 
     if (window.AppLoading && !dashboardImpactHasLoaded) {
@@ -1260,13 +1608,18 @@ function loadDashboardServiceImpact() {
         if (generation !== dashboardImpactLoadGeneration) {
             return;
         }
+        if (sequence !== undefined && sequence !== dashboardLoadSequence) {
+            return;
+        }
 
         const serviceRows = dashboardAsArray(rows);
 
         dashboardImpactHasLoaded = true;
         dashboardLastServiceRows = serviceRows.slice();
+        // Health doughnut shows the overall fleet; the impact list respects
+        // the dashboard's team/service filters.
         renderDashboardServiceHealth(serviceRows);
-        renderDashboardServiceImpact(dashboardImpactRows(serviceRows));
+        renderDashboardServiceImpact(dashboardImpactRows(dashboardFilterImpactRows(serviceRows)));
     }, function (xhr) {
         if (generation !== dashboardImpactLoadGeneration) {
             return;

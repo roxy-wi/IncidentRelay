@@ -112,6 +112,48 @@ def apply_alert_group_priority_filter(query, values):
     return query.where(reduce(or_, conditions))
 
 
+# Responder request statuses that mean the user is (or was) actively involved.
+RESPONDER_INVOLVED_STATUSES = ("requested", "accepted", "resolved")
+
+ALERT_GROUP_INVOLVEMENTS = ("assigned", "responder", "stakeholder", "any")
+
+
+def alert_group_involvement_condition(involvement, user_id):
+    """Return a predicate matching groups where the user has the involvement."""
+
+    assigned = AlertGroup.assignee == user_id
+    responder = AlertGroup.id.in_(
+        IncidentResponder
+        .select(IncidentResponder.group)
+        .where(
+            (
+                (IncidentResponder.target_user == user_id)
+                | (IncidentResponder.accepted_by == user_id)
+            )
+            & IncidentResponder.status.in_(RESPONDER_INVOLVED_STATUSES)
+        )
+    )
+    stakeholder = AlertGroup.id.in_(
+        IncidentStakeholder
+        .select(IncidentStakeholder.group)
+        .where(
+            (IncidentStakeholder.user == user_id)
+            & (IncidentStakeholder.active == True)  # noqa: E712
+        )
+    )
+
+    if involvement == "assigned":
+        return assigned
+    if involvement == "responder":
+        return responder
+    if involvement == "stakeholder":
+        return stakeholder
+    if involvement == "any":
+        return assigned | responder | stakeholder
+
+    raise ValueError(f"Unsupported involvement: {involvement}")
+
+
 def build_alert_groups_query(
     team_id=None,
     team_ids=None,
@@ -125,6 +167,8 @@ def build_alert_groups_query(
     service_criticality=None,
     search=None,
     assigned_to_user_id=None,
+    involvement=None,
+    involvement_user_id=None,
     shelved=False,
     include_merged=False,
 ):
@@ -156,6 +200,14 @@ def build_alert_groups_query(
 
     if assigned_to_user_id:
         query = query.where(AlertGroup.assignee == assigned_to_user_id)
+
+    if involvement:
+        if not involvement_user_id:
+            return None
+
+        query = query.where(
+            alert_group_involvement_condition(involvement, involvement_user_id)
+        )
 
     if shelved:
         now = utc_now()
@@ -384,6 +436,8 @@ def paginate_alert_groups(
     service_criticality=None,
     search=None,
     assigned_to_user_id=None,
+    involvement=None,
+    involvement_user_id=None,
     shelved=False,
     page=1,
     page_size=25,
@@ -411,6 +465,8 @@ def paginate_alert_groups(
         service_criticality=service_criticality,
         search=search,
         assigned_to_user_id=assigned_to_user_id,
+        involvement=involvement,
+        involvement_user_id=involvement_user_id,
         shelved=shelved,
         include_merged=include_merged,
     )

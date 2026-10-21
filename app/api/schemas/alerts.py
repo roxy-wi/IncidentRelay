@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Literal
 
 from pydantic import Field, field_validator
 
@@ -37,7 +37,7 @@ class AlertDetailQuerySchema(ApiModel):
 class AlertListQuerySchema(ApiModel):
     """Validate alert group list query parameters."""
 
-    team_id: int | None = Field(default=None, ge=1)
+    team_id: list[int] = Field(default_factory=list)
     status: list[str] = Field(default_factory=list)
     source: list[str] = Field(default_factory=list)
     severity: list[str] = Field(default_factory=list)
@@ -48,6 +48,7 @@ class AlertListQuerySchema(ApiModel):
     service_criticality: str | None = Field(default=None, min_length=1, max_length=120)
     search: str | None = Field(default=None, max_length=300)
     assigned_to_me: bool = False
+    involvement: Literal["assigned", "responder", "stakeholder", "any"] | None = None
     shelved: bool = False
     page: int = Field(default=1, ge=1)
     page_size: int = Field(default=25, ge=1, le=100)
@@ -89,6 +90,18 @@ class AlertListQuerySchema(ApiModel):
             result.append(int(item))
 
         return result
+
+    @field_validator("team_id", mode="before")
+    @classmethod
+    def normalize_team_id_list(cls, value: Any) -> list[int]:
+        result = cls.normalize_int_list(value)
+
+        for item in result:
+            if item < 1:
+                raise ValueError("team_id must be greater than or equal to 1")
+
+        # Preserve order while dropping duplicate team ids.
+        return list(dict.fromkeys(result))
 
 
 class AlertGroupCreateSchema(ApiModel):

@@ -1,3 +1,4 @@
+from app.modules.db import teams_repo
 from app.services.serializers.common import attach_group_permissions, attach_team_permissions
 
 
@@ -34,6 +35,9 @@ def serialize_team(team, current_user=None):
         "escalation_after_reminders": team.escalation_after_reminders,
         "active": team.active,
     }
+
+    if current_user:
+        data["is_member"] = teams_repo.get_user_team_role(current_user.id, team.id) is not None
 
     return attach_team_permissions(data, team.id, current_user)
 
