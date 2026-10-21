@@ -3008,6 +3008,79 @@ class UserNotificationDelivery(BaseModel):
         )
 
 
+class ParticipantNotificationDelivery(BaseModel):
+    """One persisted incident-participant notification delivery.
+
+    Responder and stakeholder-added notifications are enqueued here during the
+    request that creates the participant and delivered asynchronously by the
+    scheduler, one row per recipient per channel. This keeps participant
+    creation fast and makes delivery retryable and idempotent:
+
+    * ``idempotency_key`` is unique, so a retried request (or a retried HTTP
+      call) cannot enqueue the same recipient/channel message twice.
+    * the ``pending`` -> ``processing`` claim stops the same row being sent
+      twice, and ``attempts``/``max_attempts`` bound retries of transient
+      failures.
+
+    ``recipient_user`` is null for stakeholders added by email address only;
+    such rows are email-only. These records are AlertGroup-scoped incident
+    collaboration notifications, distinct from the user-level
+    ``UserNotificationDelivery`` deliveries for alert assignees.
+    """
+
+    id = AutoField()
+
+    group = ForeignKeyField(
+        AlertGroup,
+        backref="participant_notification_deliveries",
+        on_delete="CASCADE",
+    )
+
+    # "responder" or "stakeholder_added", with the responder/stakeholder row id.
+    kind = CharField(index=True)
+    source_id = IntegerField(null=True)
+
+    recipient_display = CharField()
+    recipient_user = ForeignKeyField(
+        User,
+        null=True,
+        backref="participant_notification_deliveries",
+        on_delete="SET NULL",
+    )
+    recipient_email = CharField(null=True)
+
+    # "email", "slack" or "browser_push".
+    channel = CharField(index=True)
+    event_type = CharField()
+
+    # Rendered message captured at enqueue time (subject/body/slack_text/push).
+    payload = JSONTextField(null=True)
+
+    status = CharField(default="pending", index=True)
+    scheduled_at = DateTimeField(index=True)
+    sent_at = DateTimeField(null=True)
+    attempts = IntegerField(default=0)
+    max_attempts = IntegerField(default=5)
+
+    idempotency_key = CharField(unique=True)
+
+    provider = CharField(null=True)
+    provider_status = CharField(null=True)
+    provider_payload = JSONTextField(null=True)
+    external_message_id = CharField(null=True)
+    last_error = TextField(null=True)
+
+    created_at = DateTimeField(default=utc_now)
+    updated_at = DateTimeField(default=utc_now)
+
+    class Meta:
+        table_name = "participant_notification_delivery"
+        indexes = (
+            (("status", "scheduled_at"), False),
+            (("kind", "source_id"), False),
+        )
+
+
 class CalendarFeed(SoftDeleteModel):
     """Tokenized public ICS subscription feed for a team calendar."""
 

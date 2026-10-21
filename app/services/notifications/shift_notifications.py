@@ -1,8 +1,6 @@
 import logging
-import smtplib
 
 from datetime import timedelta
-from email.message import EmailMessage
 
 from app import Config
 from app.modules.db import rotations_repo
@@ -12,6 +10,7 @@ from app.modules.db.models import (
     Rotation,
     User,
 )
+from app.modules.smtp import send_plain_email
 from app.notifiers.registry import get_notifier
 from app.notifiers.types import MATTERMOST_CHANNEL
 from app.services.calendar_service import build_rotation_calendar
@@ -68,30 +67,11 @@ def _mattermost_notification_fingerprint(event, event_type, mattermost_user_id):
 
 
 def _send_plain_email(to_email, subject, body):
-    smtp_host = Config.SMTP_HOST
-    smtp_port = int(Config.SMTP_PORT)
-
-    if not smtp_host:
-        raise RuntimeError("smtp host is missing: set [smtp] host in config")
-
-    message = EmailMessage()
-    message["Subject"] = subject
-    message["From"] = Config.SMTP_FROM
-    message["To"] = to_email
-    message.set_content(body)
-
-    if getattr(Config, "SMTP_USE_TLS", False):
-        with smtplib.SMTP(smtp_host, smtp_port) as smtp:
-            smtp.starttls()
-            if Config.SMTP_USER:
-                smtp.login(Config.SMTP_USER, Config.SMTP_PASSWORD)
-            smtp.send_message(message)
-        return
-
-    with smtplib.SMTP(smtp_host, smtp_port) as smtp:
-        if Config.SMTP_USER:
-            smtp.login(Config.SMTP_USER, Config.SMTP_PASSWORD)
-        smtp.send_message(message)
+    # Reuse the shared SMTP transport (app.modules.smtp) so on-call shift emails
+    # validate configuration and handle STARTTLS/AUTH/timeouts exactly like the
+    # alert email channel and the incident participant notifications, instead of
+    # maintaining a second, slightly divergent smtplib sequence here.
+    send_plain_email(to_email, subject, body)
 
 
 def _build_shift_email(user, event, event_type):

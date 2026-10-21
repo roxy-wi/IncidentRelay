@@ -1,12 +1,21 @@
-import smtplib
-from email.message import EmailMessage
+import logging
 
-from app import Config
 from app.modules.common import truncate_text
 from app.modules.db import incidents_repo, alerts_repo
+from app.modules.db.models import User
+from app.modules.smtp import send_plain_email
 from app.notifiers.browser_push import service as browser_push
+from app.notifiers.slack.mrkdwn import escape_mrkdwn
 from app.services.alerts.priority import PRIORITY_DISPLAY_LABELS, format_alert_title_with_priority, alert_priority_label
+from app.services.incidents.participant_notifications import (
+    KIND_STAKEHOLDER_ADDED,
+    ParticipantRecipient,
+    enqueue_participant_notifications,
+    is_notifiable_user,
+)
 from app.services.links import build_alert_web_url
+
+logger = logging.getLogger("oncall.incidents.stakeholders")
 
 VALID_STAKEHOLDER_ROLES = {
     "stakeholder",
@@ -242,6 +251,133 @@ def notify_stakeholders(group, event_type, old_value=None, skip_user_id=None):
     }
 
 
+STAKEHOLDER_ADDED_NOTIFICATION_EVENT = "stakeholder_added"
+STAKEHOLDER_ADDED_PUSH_EVENT = "stakeholder_added"
+
+
+def build_stakeholder_added_email(group, added_by_name=None):
+    """Build subject and body telling a stakeholder they were added."""
+    alert_url = build_alert_web_url(group) or "-"
+    team = group.team.slug if group.team else "-"
+    service = getattr(group.service, "name", None) if group.service else None
+
+    subject = (
+        "[IncidentRelay] You were added as a stakeholder: "
+        f"{format_alert_title_with_priority(group)}"
+    )
+
+    headline = (
+        f"{added_by_name} added you as a stakeholder to this incident."
+        if added_by_name
+        else "You were added as a stakeholder to this incident."
+    )
+
+    body = "\n".join([
+        headline,
+        "",
+        f"Incident: {format_alert_title_with_priority(group)}",
+        f"Status: {group.status or '-'}",
+        f"Severity: {group.severity or '-'}",
+        f"Priority: {alert_priority_label(group)}",
+        f"Team: {team}",
+        f"Service: {service or '-'}",
+        f"URL: {alert_url}",
+        "",
+        (
+            "You are receiving this email because you were added as an "
+            "incident stakeholder."
+        ),
+    ])
+
+    return subject, body
+
+
+def build_stakeholder_added_slack_text(group, added_by_name=None):
+    """Build the Slack message text for a stakeholder addition.
+
+    The incident title and the adder's name are escaped for Slack mrkdwn so an
+    injected ``<!channel>``/``<!here>``/``<@U...>`` renders as literal text
+    instead of a real broadcast or mention.
+    """
+    alert_url = build_alert_web_url(group)
+
+    title = escape_mrkdwn(format_alert_title_with_priority(group))
+    who = f" by {escape_mrkdwn(added_by_name)}" if added_by_name else ""
+    text = (
+        "You were added as a stakeholder to "
+        f"*{title}*{who}."
+    )
+
+    if alert_url:
+        text = f"{text}\n{alert_url}"
+
+    return text
+
+
+def notify_stakeholder_added(stakeholder, group, added_by=None):
+    """Notify one stakeholder that they were added to an incident.
+
+    This is a distinct event from the incident lifecycle stakeholder
+    notifications and is dispatched when the stakeholder is created.
+    Stakeholders added by email address only are email-only, because there is
+    no IncidentRelay profile to reach on Slack or browser push.
+    """
+    user = stakeholder_user(stakeholder)
+    email = stakeholder_email(stakeholder)
+
+    if user and not is_notifiable_user(user):
+        return None
+
+    if added_by is not None and user is not None:
+        if getattr(added_by, "id", None) == getattr(user, "id", None):
+            return None
+
+    if not user and not email:
+        return None
+
+    added_by_name = None
+    if added_by is not None:
+        added_by_name = (
+            getattr(added_by, "display_name", None)
+            or getattr(added_by, "username", None)
+        )
+
+    recipient = ParticipantRecipient(
+        display_name=stakeholder_display_name(stakeholder),
+        user=user,
+        email=email,
+    )
+
+    subject, body = build_stakeholder_added_email(
+        group,
+        added_by_name=added_by_name,
+    )
+
+    enqueued = enqueue_participant_notifications(
+        group,
+        [recipient],
+        kind=KIND_STAKEHOLDER_ADDED,
+        source_id=stakeholder.id,
+        subject=subject,
+        body=body,
+        slack_text=build_stakeholder_added_slack_text(
+            group,
+            added_by_name=added_by_name,
+        ),
+        push_event_type=STAKEHOLDER_ADDED_PUSH_EVENT,
+        push_context={"added_by_name": added_by_name},
+    )
+
+    alerts_repo.create_alert_event(
+        group_id=group.id,
+        event_type="stakeholder_added_notification_queued",
+        message=f"Stakeholder added notification queued for delivery ({enqueued} deliveries)",
+        user_id=None,
+    )
+
+    return {"status": "queued", "enqueued": enqueued}
+
+
 def stakeholder_user(stakeholder):
     """Return active stakeholder user for profile-level notifications."""
     user = getattr(stakeholder, "user", None)
@@ -322,44 +458,7 @@ def stakeholder_display_name(stakeholder):
 
 def send_stakeholder_email(recipient, subject, body):
     """Send a plain stakeholder notification email."""
-    smtp_host = Config.SMTP_HOST
-    smtp_port = int(Config.SMTP_PORT)
-
-    if not smtp_host:
-        raise RuntimeError("smtp host is missing: set [smtp] host in config")
-
-    message = EmailMessage()
-    message["Subject"] = subject
-    message["From"] = Config.SMTP_FROM
-    message["To"] = recipient
-    message.set_content(body)
-
-    username = (Config.SMTP_USER or "").strip()
-    password = Config.SMTP_PASSWORD or ""
-
-    with smtplib.SMTP(smtp_host, smtp_port, timeout=10) as smtp:
-        smtp.ehlo()
-
-        if Config.SMTP_USE_TLS:
-            smtp.starttls()
-            smtp.ehlo()
-
-        if username or password:
-            if not username or not password:
-                raise RuntimeError(
-                    "SMTP auth is partially configured: both [smtp] user "
-                    "and password must be set, or both must be empty"
-                )
-
-            if not smtp.has_extn("auth"):
-                raise RuntimeError(
-                    "SMTP auth is configured, but the SMTP server does not "
-                    "support AUTH"
-                )
-
-            smtp.login(username, password)
-
-        smtp.send_message(message)
+    send_plain_email(recipient, subject, body)
 
 
 def create_incident_stakeholder(*, group_id, payload, user_id=None):
@@ -400,6 +499,28 @@ def create_incident_stakeholder(*, group_id, payload, user_id=None):
         message="Stakeholder added",
         user_id=user_id,
     )
+
+    # Only manually added stakeholders are notified on add. Stakeholders
+    # created automatically from service defaults are intentionally excluded so
+    # incident creation does not fan out a burst of notifications.
+    added_by = None
+    if user_id:
+        added_by = User.get_or_none(User.id == user_id)
+
+    try:
+        notify_stakeholder_added(stakeholder, group, added_by=added_by)
+    except Exception as exc:
+        logger.exception(
+            "stakeholder added notification failed",
+            extra={
+                "extra": {
+                    "event_type": "stakeholder_added_notification_failed",
+                    "group_id": group.id,
+                    "stakeholder_id": stakeholder.id,
+                    "error": str(exc),
+                }
+            },
+        )
 
     return stakeholder
 

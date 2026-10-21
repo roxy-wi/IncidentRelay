@@ -43,3 +43,11 @@ docker-compose*.yml
 .env
 .env.*
 !.env.example
+
+# Local operator/developer configs. These contain real secret_key, jwt_secret
+# and SSO encryption keys, and must never be baked into an image.
+incidentrelay.conf
+*.local.conf
+openspec/
+.kiro/
+.claude/

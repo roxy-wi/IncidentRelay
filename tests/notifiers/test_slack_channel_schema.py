@@ -165,3 +165,26 @@ def test_slack_create_rejects_masked_socket_secrets():
                 "channel_id": "C0123456789",
             }
         )
+
+
+def test_slack_allow_dm_channel_fallback_flag_is_preserved():
+    schema = make_slack_schema(
+        {
+            "mode": "webhook",
+            "webhook_url": "https://hooks.slack.com/services/T/B/x",
+            "allow_dm_channel_fallback": True,
+        }
+    )
+
+    assert schema.config["allow_dm_channel_fallback"] is True
+
+
+def test_slack_rejects_non_boolean_allow_dm_channel_fallback():
+    with pytest.raises(ValidationError):
+        make_slack_schema(
+            {
+                "mode": "webhook",
+                "webhook_url": "https://hooks.slack.com/services/T/B/x",
+                "allow_dm_channel_fallback": "yes",
+            }
+        )

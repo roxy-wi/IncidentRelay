@@ -322,6 +322,18 @@ def build_stakeholder_alert_push_payload(
             group.message
             or f"Priority: {alert_priority_label(group)}"
         )
+    elif normalized_event_type == "stakeholder_added":
+        context = context or {}
+        added_by = context.get("added_by_name")
+
+        title = (
+            "ADDED AS STAKEHOLDER: "
+            f"{format_alert_title_with_priority(group)}"
+        )
+        if added_by:
+            body = f"{added_by} added you as a stakeholder to this incident."
+        else:
+            body = "You were added as a stakeholder to this incident."
     elif normalized_event_type in {
             "responder_requested",
             "incident_responder_requested",
