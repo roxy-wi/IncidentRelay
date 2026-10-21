@@ -1,5 +1,9 @@
 import json
+import shutil
+import subprocess
 from pathlib import Path
+
+import pytest
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -193,3 +197,17 @@ def test_orchestration_builder_supports_alert_event_history_action():
     assert 'i18n.t("orchestrations.simulator.alert_event_history")' in javascript
     for level in ("full", "initial", "disabled"):
         assert f'.val("{level}")' in javascript
+
+
+def test_orchestration_group_selection_uses_real_group_ids():
+    """Validate JS fallbacks with independent membership and group identities."""
+    if not shutil.which("node"):
+        pytest.skip("Node.js is required for orchestration UI regression contracts")
+
+    subprocess.run(
+        ["node", str(ROOT / "tests/ux/orchestration_group_identity.test.js")],
+        cwd=ROOT,
+        check=True,
+        capture_output=True,
+        text=True,
+    )

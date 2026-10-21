@@ -38,7 +38,7 @@ function orchestrationGroupId() {
         return Number(currentUser.active_group_id);
     }
     const groups = asArray(currentUser && currentUser.groups);
-    return groups.length ? Number(groups[0].id) : null;
+    return groups.length ? Number(groups[0].group_id) : null;
 }
 
 function orchestrationClone(value) {
