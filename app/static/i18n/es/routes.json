@@ -224,5 +224,13 @@
   "routes.form.cloud_ru_webhook_help": "Add this HTTPS URL as the SMN HTTP/HTTPS subscription endpoint. IncidentRelay validates SMN signatures and confirms the subscription automatically.",
   "routes.intake.cloud_ru_example_comment": "Cloud.ru SMN / Cloud Eye endpoint (requests must carry a valid SMN signature)",
   "routes.intake.cloud_ru_subtitle": "Use this route-scoped HTTPS URL as a Cloud.ru Advanced SMN HTTP/HTTPS subscription endpoint.",
-  "routes.intake.cloud_ru_help": "No IncidentRelay token is sent by SMN. IncidentRelay verifies the SMN V1 signature, Cloud.ru signing certificate and exact Topic URN before accepting Cloud Eye alarms."
+  "routes.intake.cloud_ru_help": "No IncidentRelay token is sent by SMN. IncidentRelay verifies the SMN V1 signature, Cloud.ru signing certificate and exact Topic URN before accepting Cloud Eye alarms.",
+  "routes.form.opensearch_help": "Configure un webhook personalizado de OpenSearch Alerting con monitor_id y trigger_id estables; añada bucket_key si procede.",
+  "routes.form.kibana_help": "Configure el conector Webhook de Kibana con rule_id y alert_id por alerta y una acción de recuperación separada.",
+  "routes.intake.opensearch_subtitle": "Use este endpoint en OpenSearch Custom Webhook con el token de ruta en Authorization: Bearer.",
+  "routes.intake.opensearch_help": "monitor_id + trigger_id (+ bucket_key) identifican el aviso. status define activo o recuperado.",
+  "routes.intake.opensearch_example_comment": "Ejemplo JSON de OpenSearch Alerting Custom Webhook",
+  "routes.intake.kibana_subtitle": "Use este endpoint en Kibana Webhook con el token de ruta en Authorization: Bearer.",
+  "routes.intake.kibana_help": "Use rule_id, alert_id y space_id para identificar la alerta; configure una acción de recuperación.",
+  "routes.intake.kibana_example_comment": "Ejemplo JSON de Kibana Alerting por alerta"
 }

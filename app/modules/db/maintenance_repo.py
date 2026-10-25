@@ -2,6 +2,8 @@ from datetime import datetime, timezone as dt_timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from peewee import JOIN
+
+from app.db import database_proxy as db
 from dateutil.rrule import rrulestr
 
 from app.modules.db.models import (
@@ -368,6 +370,7 @@ def soft_delete_maintenance_window(window):
     window.deleted = True
     window.deleted_at = now
     window.enabled = False
+    window.reconciled_at = None
     window.updated_at = now
     window.save()
 
@@ -376,6 +379,7 @@ def soft_delete_maintenance_window(window):
 
 def cancel_maintenance_window(window, *, cancelled_by=None, reason=None):
     window.status = "cancelled"
+    window.reconciled_at = None
     window.enabled = False
     window.cancelled_by = cancelled_by
     window.cancelled_at = utc_now()
@@ -386,29 +390,30 @@ def cancel_maintenance_window(window, *, cancelled_by=None, reason=None):
 
 
 def replace_maintenance_window_scopes(window_id, scopes):
-    (
-        MaintenanceWindowScope
-        .delete()
-        .where(MaintenanceWindowScope.maintenance_window == window_id)
-        .execute()
-    )
-
-    rows = []
-
-    for scope in scopes:
-        rows.append(
-            MaintenanceWindowScope.create(
-                maintenance_window=window_id,
-                scope_type=scope["scope_type"],
-                group=scope.get("group_id"),
-                team=scope.get("team_id"),
-                service=scope.get("service_id"),
-                route=scope.get("route_id"),
-                created_at=utc_now(),
-            )
+    with db.atomic():
+        (
+            MaintenanceWindowScope
+            .delete()
+            .where(MaintenanceWindowScope.maintenance_window == window_id)
+            .execute()
         )
 
-    return rows
+        rows = []
+
+        for scope in scopes:
+            rows.append(
+                MaintenanceWindowScope.create(
+                    maintenance_window=window_id,
+                    scope_type=scope["scope_type"],
+                    group=scope.get("group_id"),
+                    team=scope.get("team_id"),
+                    service=scope.get("service_id"),
+                    route=scope.get("route_id"),
+                    created_at=utc_now(),
+                )
+            )
+
+        return rows
 
 
 def list_maintenance_window_scopes(window_id):

@@ -107,7 +107,7 @@
   "channels.webhook.slack": "Slack webhook URL",
   "channels.webhook.discord": "Discord Webhook URL",
   "channels.webhook.teams": "Microsoft Teams Webhook URL",
-  "channels.email.help": "E-Mail-Benachrichtigungen werden an die zugewiesene Benutzerprofil-E-Mail gesendet.",
+  "channels.email.help": "Wählen Sie den Empfänger für E-Mail-Benachrichtigungen. SMTP wird global konfiguriert.",
   "channels.email.template": "HTML-Vorlage",
   "channels.email.reset": "Standardrücksetzung",
   "channels.email.placeholders": "Unterstützte Platzhalter: {alert_id}, {event_type}, {title}, {message}, {severity}, {status}, {team}, {assignee}, {source}, {alert_url}. Lassen Sie die Standardvorlage unverändert, um die integrierte Vorlage zu verwenden.",
@@ -157,5 +157,16 @@
   "channels.slack.app_token": "App-Level-Token",
   "channels.slack.app_token_help": "Slack App-Level-Token mit Präfix xapp- und Scope connections:write. Der Slack-Worker muss laufen.",
   "channels.config.bot_http_ready": "Bot API mit HTTP-Aktionen konfiguriert",
-  "channels.config.bot_socket_ready": "Bot API mit Socket Mode konfiguriert"
+  "channels.config.bot_socket_ready": "Bot API mit Socket Mode konfiguriert",
+  "channels.email.recipient_mode": "Empfängermodus",
+  "channels.email.mode_assignee": "E-Mail der zugewiesenen Person",
+  "channels.email.mode_fallback": "E-Mail der zugewiesenen Person mit Ersatzadresse",
+  "channels.email.mode_fixed": "Fester Empfänger",
+  "channels.email.recipient_mode_help": "Die Ersatzadresse wird nur ohne E-Mail der zugewiesenen Person verwendet. Der feste Empfänger wird immer verwendet.",
+  "channels.email.recipient_email": "E-Mail-Adresse des Empfängers",
+  "channels.email.recipient_email_help": "Eine einzelne Adresse für Ersatz- oder festen Empfang; keine Adressliste.",
+  "channels.email.test_help": "Der Test wird immer an die E-Mail Ihres Profils gesendet, nicht an die Ersatz- oder feste Adresse.",
+  "channels.email.template_custom": "Benutzerdefinierte HTML-Vorlage",
+  "channels.email.template_default": "Standard-HTML-Vorlage",
+  "channels.validation.recipient_email_required": "Geben Sie eine E-Mail-Adresse für den Ersatz- oder festen Empfänger an."
 }

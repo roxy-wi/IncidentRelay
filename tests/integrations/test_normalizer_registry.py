@@ -18,6 +18,8 @@ def test_registry_contains_all_supported_integration_normalizers():
         "cloud_ru",
         "datadog",
         "grafana",
+        "kibana",
+        "opensearch",
         "librenms",
         "new_relic",
         "nagios",

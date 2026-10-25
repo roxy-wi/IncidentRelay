@@ -1,6 +1,5 @@
 import json
 
-from app.services.serializers.alerts import serialize_alert_group, serialize_attached_maintenance_ref
 from app.services.serializers.common import serialize_utc_datetime
 
 

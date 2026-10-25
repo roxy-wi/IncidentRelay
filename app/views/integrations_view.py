@@ -14,6 +14,8 @@ from app.api.schemas.integrations import (
     NagiosWebhookSchema,
     GenericWebhookSchema,
     GrafanaWebhookSchema,
+    OpenSearchWebhookSchema,
+    KibanaWebhookSchema,
     LibreNMSWebhookSchema,
     RmonWebhookSchema,
     SentryWebhookSchema,
@@ -81,6 +83,43 @@ def grafana_webhook():
     return process_incoming_alerts(
         normalize_for_source("grafana", payload.model_dump())
     )
+
+
+def _search_alerting_webhook(source, schema):
+    """Shared route-token and JSON intake for search-engine alerting sources."""
+    intake_route = getattr(request, "current_intake_route", None)
+    if intake_route and intake_route.source != source:
+        return make_error_response(
+            error="route_source_mismatch",
+            message=f"Route source must be {source}.",
+            status_code=400,
+        )
+
+    payload, error = validate_body(schema)
+    if error:
+        return error
+
+    return process_incoming_alerts(
+        normalize_for_source(
+            source,
+            payload.model_dump(exclude_none=True),
+            route_config={"route_id": intake_route.id if intake_route else None},
+        )
+    )
+
+
+@integrations_bp.route("/opensearch", methods=["POST"])
+@require_alert_token()
+def opensearch_webhook():
+    """Receive per-trigger OpenSearch Alerting custom webhook notifications."""
+    return _search_alerting_webhook("opensearch", OpenSearchWebhookSchema)
+
+
+@integrations_bp.route("/kibana", methods=["POST"])
+@require_alert_token()
+def kibana_webhook():
+    """Receive per-alert Kibana Alerting Webhook connector notifications."""
+    return _search_alerting_webhook("kibana", KibanaWebhookSchema)
 
 
 @integrations_bp.route("/datadog", methods=["POST"])
@@ -192,7 +231,7 @@ def _process_nagios_lifecycle(alert_data):
             "dedup_key": dedup_key,
         }), 200
 
-    group = acknowledge_alert(existing_alert.group.id)
+    group = acknowledge_alert(existing_alert.group.id, source="integration")
     return jsonify({
         "status": "acknowledged",
         "dedup_key": dedup_key,
@@ -529,9 +568,9 @@ def _process_pagerduty_events_v2(alert_data):
         group_id = existing_alert.group.id
 
         if action == "acknowledge":
-            acknowledge_alert(group_id)
+            acknowledge_alert(group_id, source="integration")
         elif action == "resolve":
-            resolve_alert(group_id)
+            resolve_alert(group_id, source="integration")
 
     logging.getLogger("oncall.alerts").info(
         "PagerDuty Events API v2 lifecycle event processed",
@@ -803,10 +842,10 @@ def mattermost_action():
         return jsonify({"ephemeral_text": "Action rejected"}), 403
 
     if action == "acknowledge":
-        alert = acknowledge_alert(int(alert_id), user_id=user.id)
+        alert = acknowledge_alert(int(alert_id), user_id=user.id, source="mattermost")
         text = f"Alert #{alert.id} acknowledged"
     elif action == "resolve":
-        alert = resolve_alert(int(alert_id), user_id=user.id)
+        alert = resolve_alert(int(alert_id), user_id=user.id, source="mattermost")
         text = f"Alert #{alert.id} resolved"
     elif action == "shelve":
         alert, _ = shelve_alert_group(
@@ -881,6 +920,10 @@ def voice_rule_callback(delivery_id):
     if not delivery:
         return jsonify({"error": "notification delivery was not found"}), 404
 
+    # A voice callback must never act on a delivery created for email/push.
+    if delivery.method != "voice_call":
+        return jsonify({"error": "delivery is not a voice call"}), 403
+
     payload = request.get_json(silent=True)
 
     if payload is None:
@@ -917,13 +960,15 @@ def voice_rule_callback(delivery_id):
 
 
 def _process_voice_rule_callback_event(delivery, event):
+    """Record a voice callback and execute only authorized group actions."""
     delivery.provider_status = event.status
     delivery.provider_payload = event.raw
     delivery.updated_at = utc_now()
     delivery.save()
 
-    alert = delivery.alert
-
+    # UserNotificationDelivery owns an AlertGroup, not a child Alert.
+    group = delivery.group
+    user = delivery.user
     action = None
 
     if event.action in {"acknowledge", "resolve"}:
@@ -934,26 +979,47 @@ def _process_voice_rule_callback_event(delivery, event):
             "2": "resolve",
         }.get(str(event.digit))
 
+    authorized = bool(
+        user
+        and user.active
+        and not user.deleted
+        and group
+        and group.team_id
+        and can_respond_team(user, group.team_id)
+    )
+    action_rejected = bool(action and not authorized)
+
     alerts_repo.create_alert_event(
-        alert.id,
-        f"voice_{event.event_type}",
-        _voice_rule_event_message(delivery, event, action),
+        group_id=group.id,
+        event_type=f"voice_{event.event_type}",
+        message=_voice_rule_event_message(delivery, event, action),
+        user_id=user.id if user else None,
     )
 
-    if action == "acknowledge":
-        user_id = alert.assignee.id if alert.assignee else None
-        acknowledge_alert(alert.id, user_id=user_id)
+    if action_rejected:
+        logging.getLogger("oncall.alerts").warning(
+            "unauthorized voice callback action skipped",
+            extra={"extra": {
+                "event_type": "voice_action_rejected",
+                "delivery_id": delivery.id,
+                "alert_group_id": group.id,
+                "user_id": getattr(user, "id", None),
+                "action": action,
+            }},
+        )
+    elif action == "acknowledge":
+        acknowledge_alert(group.id, user_id=user.id, source="voice")
     elif action == "resolve":
-        user_id = alert.assignee.id if alert.assignee else None
-        resolve_alert(alert.id, user_id=user_id)
+        resolve_alert(group.id, user_id=user.id, source="voice")
 
     return {
         "call_id": event.call_id,
         "event_type": event.event_type,
         "status": event.status,
         "digit": event.digit,
-        "action": action,
-        "alert_id": alert.id,
+        "action": None if action_rejected else action,
+        "action_rejected": action_rejected,
+        "alert_group_id": group.id,
         "delivery_id": delivery.id,
     }
 

@@ -2,6 +2,7 @@ import logging
 from datetime import timedelta
 from types import SimpleNamespace
 
+from app.db import database_proxy as db
 from app.modules.db.models import (
     AlertGroup,
     User,
@@ -13,7 +14,7 @@ from app.notifiers.email.notifier import EmailNotifier
 from app.notifiers.voice.notifier import VoiceCallNotifier
 from app.services.severity import normalize_severity, normalize_severity_list
 from app.modules.db import alerts_repo
-from app.modules.common import utc_now
+from app.modules.common import as_utc_naive, utc_now
 from app.services.alerts.maintenance_state import is_notification_lifecycle_suppressed
 from app.services.alerts.shelving import is_alert_group_shelved
 
@@ -48,6 +49,13 @@ SKIP_IF_NOT_FIRING_EVENT_TYPES = {
 }
 
 
+# A crashed worker can strand a claimed recovery rule indefinitely. The lease
+# is deliberately longer than normal notifier HTTP timeouts. Claim recovery
+# must acquire the same group fence as a live resolved send before resetting
+# the status, so a slow in-flight request cannot be sent concurrently twice.
+RESOLVED_PROCESSING_LEASE_SECONDS = 300
+
+
 def _active_notification_user(user_id):
     if not user_id:
         return None
@@ -68,13 +76,29 @@ def _ensure_alert_group(group):
     return group
 
 
+def _stale_resolved_delivery(delivery, group):
+    """Guard against an old resolved notification after reopen + re-resolve.
+
+    A group's status alone is not enough: a different resolved occurrence can
+    reuse the same AlertGroup ID. The delivery creation time identifies which
+    resolved occurrence it belongs to without changing the existing schema.
+    """
+    if group.status != "resolved" or group.merged_into_id:
+        return True
+    if group.resolved_at and delivery.created_at:
+        return as_utc_naive(delivery.created_at) < as_utc_naive(group.resolved_at)
+    return False
+
+
 def should_skip_delivery_for_group_status(delivery):
     """Return True when delayed delivery is no longer relevant."""
 
-    if delivery.event_type not in SKIP_IF_NOT_FIRING_EVENT_TYPES:
+    if delivery.event_type not in SKIP_IF_NOT_FIRING_EVENT_TYPES | {"resolved"}:
         return False
 
     group = AlertGroup.get_by_id(delivery.group_id)
+    if delivery.event_type == "resolved":
+        return _stale_resolved_delivery(delivery, group)
 
     if is_notification_lifecycle_suppressed(group) or is_alert_group_shelved(group):
         return True
@@ -413,9 +437,96 @@ def create_delivery(group, user, rule, method, event_type, scheduled_at):
     )
 
 
+def reclaim_abandoned_resolved_deliveries(*, now=None, limit=100):
+    """Make orphaned recovery claims eligible for another scheduled attempt.
+
+    Only resolved deliveries are reclaimed here. Other events still use their
+    existing delivery contract; reopening a group must never page a stale
+    recipient from an old recovery cycle.
+    """
+    from app.services.alerts.reopen import lock_grouping_identity
+
+    now = now or utc_now()
+    cutoff = now - timedelta(seconds=RESOLVED_PROCESSING_LEASE_SECONDS)
+    stale_ids = [
+        row.id
+        for row in (
+            UserNotificationDelivery
+            .select(UserNotificationDelivery.id)
+            .where(
+                (UserNotificationDelivery.status == "processing")
+                & (UserNotificationDelivery.event_type == "resolved")
+                & (UserNotificationDelivery.updated_at <= cutoff)
+            )
+            .order_by(UserNotificationDelivery.updated_at.asc(),
+                      UserNotificationDelivery.id.asc())
+            .limit(limit)
+        )
+    ]
+
+    reclaimed = 0
+    database = db.obj
+    backend = database.__class__.__name__.lower()
+    for delivery_id in stale_ids:
+        transaction = (
+            db.atomic(lock_type="IMMEDIATE")
+            if "sqlite" in backend else db.atomic()
+        )
+        with transaction:
+            # The grouping lock must be taken *before* the row lock, matching
+            # send_delivery() and the reopen path on both SQLite/PostgreSQL.
+            delivery = UserNotificationDelivery.get_or_none(
+                UserNotificationDelivery.id == delivery_id
+            )
+            if delivery is None:
+                continue
+            group = AlertGroup.get_or_none(AlertGroup.id == delivery.group_id)
+            if group is None:
+                continue
+            if group.route_id is not None or "mysql" not in backend:
+                lock_grouping_identity(
+                    source=group.source,
+                    group_key=group.group_key,
+                    team_id=group.team_id,
+                    route_id=group.route_id,
+                    service_id=group.service_id,
+                )
+            if "sqlite" not in backend:
+                group = (AlertGroup.select()
+                         .where(AlertGroup.id == group.id)
+                         .for_update().first())
+                if group is None:
+                    continue
+
+            claimed = (
+                UserNotificationDelivery
+                .update(
+                    status="pending",
+                    scheduled_at=now,
+                    updated_at=now,
+                )
+                .where(
+                    (UserNotificationDelivery.id == delivery_id)
+                    & (UserNotificationDelivery.status == "processing")
+                    & (UserNotificationDelivery.event_type == "resolved")
+                    & (UserNotificationDelivery.updated_at <= cutoff)
+                )
+                .execute()
+            )
+            reclaimed += claimed
+
+    return reclaimed
+
+
 def process_due_user_notifications(limit=100):
     """Process due user notification deliveries and return sent count."""
     now = utc_now()
+    reclaimed = reclaim_abandoned_resolved_deliveries(now=now, limit=limit)
+    if reclaimed:
+        logger.warning(
+            "abandoned resolved user deliveries reclaimed",
+            extra={"extra": {"reclaimed": reclaimed}},
+        )
     processed = 0
 
     due_deliveries = (
@@ -467,11 +578,12 @@ def process_due_user_notifications(limit=100):
         if should_skip_delivery_for_group_status(delivery):
             mark_delivery_skipped(
                 delivery,
-                "alert_not_firing",
+                "alert_group_reopened" if delivery.event_type == "resolved"
+                else "alert_not_firing",
             )
             continue
 
-        processed += send_delivery(delivery)
+        processed += send_delivery(delivery, already_claimed=True)
 
     return processed
 
@@ -531,8 +643,90 @@ def send_browser_push_delivery(delivery):
     return 1
 
 
-def send_delivery(delivery):
-    """Send pending user notification delivery."""
+def send_delivery(delivery, *, already_claimed=False):
+    """Send user delivery, serializing resolved events with AlertGroup reopen.
+
+    Normal firing/reminder jobs keep their established behavior. For resolved
+    events the grouping advisory lock and AlertGroup row lock fence the actual
+    network call against concurrent reopen in another worker/process.
+    """
+    if delivery.event_type != "resolved":
+        return _send_delivery_unlocked(delivery)
+
+    # Imported lazily: reopen.py imports cancel_pending_group_deliveries from
+    # this module, and a module-level import would create a cycle.
+    from app.services.alerts.reopen import lock_grouping_identity
+
+    database = db.obj
+    transaction = (
+        db.atomic(lock_type="IMMEDIATE")
+        if database.__class__.__name__ == "SqliteDatabase"
+        else db.atomic()
+    )
+    with transaction:
+        group = AlertGroup.get_or_none(AlertGroup.id == delivery.group_id)
+        if group is None:
+            mark_delivery_skipped(delivery, "alert_group_not_found")
+            return 0
+
+        # MySQL uses a route lock for grouping. Manual groups can lack a route;
+        # their AlertGroup row lock is sufficient for this delivery fence.
+        backend = database.__class__.__name__.lower()
+        if group.route_id is not None or "mysql" not in backend:
+            lock_grouping_identity(
+                source=group.source,
+                group_key=group.group_key,
+                team_id=group.team_id,
+                route_id=group.route_id,
+                service_id=group.service_id,
+            )
+        query = AlertGroup.select().where(AlertGroup.id == group.id)
+        if "sqlite" not in backend:
+            query = query.for_update()
+        group = query.first()
+
+        # Inspect the persisted delivery before doing any status mutation. In
+        # particular, do not turn an already sent notification into "skipped"
+        # when the same row is submitted again after another resolution.
+        delivery = UserNotificationDelivery.get_or_none(
+            UserNotificationDelivery.id == delivery.id
+        )
+        expected_status = "processing" if already_claimed else "pending"
+        if delivery is None or delivery.status != expected_status:
+            return 0
+
+        if group is None or _stale_resolved_delivery(delivery, group):
+            mark_delivery_skipped(delivery, "alert_group_reopened")
+            return 0
+
+        # Reassign/unassign must not page the old recipient for a resolved
+        # group, regardless of when the delayed rule becomes due.
+        if group.assignee_id != delivery.user_id:
+            mark_delivery_skipped(delivery, "assignee_changed")
+            return 0
+
+        # The scheduled worker has already performed a pending->processing CAS.
+        # Synchronous fanout must claim the row itself, preventing a concurrent
+        # scheduler from sending the same freshly enqueued notification.
+        if not already_claimed:
+            claimed = (
+                UserNotificationDelivery
+                .update(status="processing", updated_at=utc_now())
+                .where(
+                    (UserNotificationDelivery.id == delivery.id)
+                    & (UserNotificationDelivery.status == "pending")
+                )
+                .execute()
+            )
+            if not claimed:
+                return 0
+            delivery.status = "processing"
+
+        return _send_delivery_unlocked(delivery)
+
+
+def _send_delivery_unlocked(delivery):
+    """Perform a delivery after the relevant lifecycle checks/locks."""
 
     if _active_notification_user(delivery.user_id) is None:
         mark_delivery_skipped(delivery, "user_inactive")
@@ -542,6 +736,10 @@ def send_delivery(delivery):
 
     if not group:
         mark_delivery_skipped(delivery, "alert_group_not_found")
+        return 0
+
+    if delivery.event_type == "resolved" and _stale_resolved_delivery(delivery, group):
+        mark_delivery_skipped(delivery, "alert_group_reopened")
         return 0
 
     if delivery.event_type in SKIP_IF_NOT_FIRING_EVENT_TYPES:

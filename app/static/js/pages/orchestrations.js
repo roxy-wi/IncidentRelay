@@ -38,7 +38,7 @@ function orchestrationGroupId() {
         return Number(currentUser.active_group_id);
     }
     const groups = asArray(currentUser && currentUser.groups);
-    return groups.length ? Number(groups[0].id) : null;
+    return groups.length ? Number(groups[0].group_id) : null;
 }
 
 function orchestrationClone(value) {
@@ -970,7 +970,13 @@ function orchestrationActionParamEditor(action, index) {
         container.append(
             $("<input>").addClass("input orchestration-action-group-key").attr("placeholder", "group_key").val(action.group_key || ""),
             $("<input>").addClass("input orchestration-action-dedup-key").attr("placeholder", "dedup_key").val(action.dedup_key || ""),
-            $("<input>").addClass("input orchestration-action-window").attr({type: "number", min: 0, max: 86400, placeholder: "window seconds"}).val(action.window_seconds === undefined ? "" : action.window_seconds)
+            $("<input>").addClass("input orchestration-action-window").attr({type: "number", min: 0, max: 86400, placeholder: "window seconds"}).val(action.window_seconds === undefined ? "" : action.window_seconds),
+            $("<input>").addClass("input orchestration-action-reopen-window")
+                .attr({type: "number", min: 0, max: 86400, step: 1,
+                    placeholder: i18n.t("orchestrations.rule_editor.reopen_window_placeholder")})
+                .attr("aria-label", i18n.t("orchestrations.rule_editor.reopen_window_label"))
+                .attr("title", i18n.t("orchestrations.rule_editor.reopen_window_help"))
+                .val(action.reopen_window_seconds === undefined ? "" : action.reopen_window_seconds)
         );
     } else if (["suppress", "drop"].includes(type)) {
         container.append($("<input>").addClass("input orchestration-action-reason").attr("placeholder", "reason").val(action.reason || ""));
@@ -1076,9 +1082,11 @@ function syncOrchestrationActionEditor() {
             const groupKey = row.find(".orchestration-action-group-key").val();
             const dedupKey = row.find(".orchestration-action-dedup-key").val();
             const windowValue = row.find(".orchestration-action-window").val();
+            const reopenValue = row.find(".orchestration-action-reopen-window").val();
             if (groupKey) { action.group_key = groupKey; }
             if (dedupKey) { action.dedup_key = dedupKey; }
             if (windowValue !== "") { action.window_seconds = Number(windowValue); }
+            if (reopenValue !== "") { action.reopen_window_seconds = Number(reopenValue); }
         }
         const traceLevel = row.find(".orchestration-action-trace-level").val();
         if (type === "set_trace_level" && traceLevel) { action.level = traceLevel; }

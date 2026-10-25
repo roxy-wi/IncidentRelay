@@ -4,6 +4,7 @@ from email.message import EmailMessage
 from app import Config
 from app.notifiers.base import BaseNotifier
 from app.notifiers.email.email_templates import render_email_html
+from app.notifiers.email.recipients import resolve_email_channel_recipient
 from app.services.alerts.priority import format_alert_title_with_priority
 
 
@@ -13,9 +14,14 @@ class EmailNotifier(BaseNotifier):
     name = "email"
 
     def send(self, channel, alert, text, event_type="notification"):
-        """Send an email notification to the assigned user's profile email."""
+        """Send an email to the recipient selected by this channel's mode."""
         config = channel.config or {}
-        recipient = self._recipient_email(alert)
+        assignee = getattr(alert, "assignee", None)
+        recipient, recipient_source = resolve_email_channel_recipient(
+            config,
+            getattr(assignee, "email", None) if assignee else None,
+            is_test=event_type == "test",
+        )
 
         smtp_host = Config.SMTP_HOST
         smtp_port = int(Config.SMTP_PORT)
@@ -67,13 +73,5 @@ class EmailNotifier(BaseNotifier):
 
         return {
             "provider": self.name,
-            "provider_payload": {"recipient_source": "assignee.email"},
+            "provider_payload": {"recipient_source": recipient_source},
         }
-
-    def _recipient_email(self, alert):
-        assignee = getattr(alert, "assignee", None)
-        email = getattr(assignee, "email", None) if assignee else None
-        email = str(email or "").strip()
-        if not email:
-            raise RuntimeError("email test recipient is missing: set email in your profile")
-        return email

@@ -779,7 +779,7 @@ class AlertExplainTrace:
             "group",
             "group_reopened",
             "success",
-            "Existing acknowledged incident reopened",
+            "Resolved AlertGroup reopened by a new firing occurrence",
             group_id=_obj_id(group),
             group_key=getattr(group, "group_key", None),
             status=getattr(group, "status", None),

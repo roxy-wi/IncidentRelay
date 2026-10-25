@@ -5,6 +5,8 @@ import hashlib
 
 from peewee import Case, JOIN, fn
 
+from app.db import database_proxy as db
+
 from app.modules.db.models import (
     Alert,
     AlertEvent,
@@ -875,70 +877,71 @@ def paginate_group_events(group_id, page=1, page_size=50):
 def merge_alert_groups(target_group_id, source_group_ids, user_id=None, reason=None):
     """Merge source groups into target group."""
 
-    target = AlertGroup.get_by_id(target_group_id)
-    now = utc_now()
+    with db.atomic():
+        target = AlertGroup.get_by_id(target_group_id)
+        now = utc_now()
 
-    for source_id in source_group_ids:
-        if int(source_id) == int(target_group_id):
-            continue
+        for source_id in source_group_ids:
+            if int(source_id) == int(target_group_id):
+                continue
 
-        source = AlertGroup.get_by_id(source_id)
+            source = AlertGroup.get_by_id(source_id)
 
-        (
-            Alert.update(group=target.id, group_key=target.group_key)
-            .where(Alert.group == source.id)
-            .execute()
-        )
-
-        source.previous_status = source.status
-        source.status = "merged"
-        source.merged_into = target.id
-        source.merged_by = user_id
-        source.merged_at = now
-        source.merge_reason = reason
-        source.updated_at = now
-        source.save()
-
-        (
-            AlertGroupShelve
-            .update(
-                active=False,
-                unshelved_at=now,
-                unshelved_by=user_id,
-                unshelve_reason="alert_group_merged",
-                updated_at=now,
+            (
+                Alert.update(group=target.id, group_key=target.group_key)
+                .where(Alert.group == source.id)
+                .execute()
             )
-            .where(
-                (AlertGroupShelve.alert_group == source.id)
-                & (AlertGroupShelve.active == True)  # noqa: E712
-            )
-            .execute()
-        )
 
-        AlertGroupMerge.create(
-            source_group=source.id,
-            target_group=target.id,
-            merged_by=user_id,
-            reason=reason,
-        )
+            source.previous_status = source.status
+            source.status = "merged"
+            source.merged_into = target.id
+            source.merged_by = user_id
+            source.merged_at = now
+            source.merge_reason = reason
+            source.updated_at = now
+            source.save()
+
+            (
+                AlertGroupShelve
+                .update(
+                    active=False,
+                    unshelved_at=now,
+                    unshelved_by=user_id,
+                    unshelve_reason="alert_group_merged",
+                    updated_at=now,
+                )
+                .where(
+                    (AlertGroupShelve.alert_group == source.id)
+                    & (AlertGroupShelve.active == True)  # noqa: E712
+                )
+                .execute()
+            )
+
+            AlertGroupMerge.create(
+                source_group=source.id,
+                target_group=target.id,
+                merged_by=user_id,
+                reason=reason,
+            )
+
+            create_alert_event(
+                group_id=source.id,
+                event_type="merged",
+                message=f"Merged into group #{target.id}",
+                user_id=user_id,
+            )
+
+        recalculate_alert_group(target)
 
         create_alert_event(
-            group_id=source.id,
-            event_type="merged",
-            message=f"Merged into group #{target.id}",
+            group_id=target.id,
+            event_type="merge_target_updated",
+            message="Alert groups merged into this group",
             user_id=user_id,
         )
 
-    recalculate_alert_group(target)
-
-    create_alert_event(
-        group_id=target.id,
-        event_type="merge_target_updated",
-        message="Alert groups merged into this group",
-        user_id=user_id,
-    )
-
-    return target
+        return target
 
 
 def normalize_alert_page(page):

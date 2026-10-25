@@ -28,8 +28,8 @@ Query parameters such as `start` and `end` should be validated before date parsi
 
 Check:
 
-1. Real alert has an assignee.
-2. Assigned user has email in profile.
+1. Email channel uses the intended `recipient_mode` (`assignee`, `fallback` or `fixed`).
+2. `assignee` mode has an assigned user with a profile email; `fallback`/`fixed` modes have a valid `recipient_email`.
 3. Channel is attached to the matched route.
 4. Severity filter allows the alert severity.
 5. SMTP relay accepted and delivered the message.

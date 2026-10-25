@@ -3,6 +3,7 @@ from datetime import timedelta
 from app.modules.db.models import AlertEvent, AlertGroup
 from app.services.alerts.escalation import maybe_escalate_alert
 from app.services.alerts.lifecycle import upsert_alert
+from app.services.incidents.manual import create_manual_alert_group
 from app.services.alerts.reminders import send_unacked_reminders
 import app.services.alerts.escalation as alert_escalation
 import app.services.alerts.notification_queue as notification_queue
@@ -14,6 +15,7 @@ from tests.factories import (
     create_group,
     create_route,
     create_rotation,
+    create_service,
     create_team,
     create_user,
     unique,
@@ -188,6 +190,170 @@ def test_upsert_alert_with_policy_uses_first_rule_target(monkeypatch, db):
 
     assert result["sent"] == 1
     assert calls == [(alert_group.id, "notification")]
+
+
+def test_initial_policy_assignment_schedules_zero_and_positive_delays(db):
+    group = create_group(slug=unique("zero-delay-group"))
+    team = create_team(group, slug=unique("zero-delay-team"))
+    user = create_user(group=group)
+    add_user_to_team(team, user)
+    now = utc_now().replace(microsecond=0)
+
+    for delay_seconds in (0, 120):
+        policy = create_escalation_policy(team)
+        rule = create_escalation_policy_rule(
+            policy,
+            position=1,
+            delay_seconds=delay_seconds,
+            target_type="user",
+            user=user,
+        )
+
+        selected, rotation, assignee, next_at = (
+            alert_escalation.apply_initial_escalation_policy_assignment(
+                policy, None, now=now,
+            )
+        )
+
+        assert selected.id == rule.id
+        assert rotation is None
+        assert assignee.id == user.id
+        assert next_at == now + timedelta(seconds=delay_seconds)
+
+
+def test_zero_delay_first_rule_escalates_on_scheduler_tick(monkeypatch, db):
+    group = create_group(slug=unique("zero-delay-group"))
+    team = create_team(group, slug=unique("zero-delay-team"))
+    first_user = create_user(group=group)
+    second_user = create_user(group=group)
+    add_user_to_team(team, first_user)
+    add_user_to_team(team, second_user)
+    first_rotation = create_rotation(team, users=[first_user])
+    second_rotation = create_rotation(team, users=[second_user])
+    policy = create_escalation_policy(team)
+    first_rule = create_escalation_policy_rule(
+        policy,
+        position=1,
+        delay_seconds=0,
+        target_type="rotation",
+        rotation=first_rotation,
+    )
+    second_rule = create_escalation_policy_rule(
+        policy,
+        position=2,
+        delay_seconds=120,
+        target_type="rotation",
+        rotation=second_rotation,
+    )
+    create_route(team, escalation_policy=policy)
+
+    # Process the initial notification, then run the normal reminder scheduler.
+    monkeypatch.setattr(Config, "ALERT_GROUP_WAIT_SECONDS", 0, raising=False)
+    monkeypatch.setattr(notification_queue, "notify_alert", lambda *args, **kwargs: 1)
+    escalation_deliveries = []
+    monkeypatch.setattr(
+        alert_escalation,
+        "notify_alert",
+        lambda group, event_type="escalation": (
+            escalation_deliveries.append(event_type) or 1
+        ),
+    )
+
+    result = upsert_alert(normalized_alert(team_slug=team.slug))
+    assert result.created_group is True
+    alert_group = result.group
+    assert alert_group.escalation_rule_id == first_rule.id
+    assert alert_group.assignee_id == first_user.id
+    assert alert_group.next_escalation_at is not None
+    assert alert_group.next_escalation_at <= utc_now()
+    assert notification_queue.process_due_alert_group_notifications()["sent"] == 1
+
+    assert send_unacked_reminders() == 1
+    stored = AlertGroup.get_by_id(alert_group.id)
+    assert stored.escalation_rule_id == second_rule.id
+    assert stored.assignee_id == second_user.id
+    assert stored.rotation_id == second_rotation.id
+    assert stored.escalation_level == 1
+    assert stored.next_escalation_at is not None
+    assert stored.next_escalation_at > utc_now()
+    assert escalation_deliveries == ["escalation"]
+    assert AlertEvent.select().where(
+        (AlertEvent.group == stored.id)
+        & (AlertEvent.event_type == "escalated")
+    ).count() == 1
+    assert send_unacked_reminders() == 0
+    assert escalation_deliveries == ["escalation"]
+
+
+def test_zero_delay_single_rule_marks_policy_exhausted_once(db):
+    group = create_group(slug=unique("single-rule-group"))
+    team = create_team(group, slug=unique("single-rule-team"))
+    user = create_user(group=group)
+    add_user_to_team(team, user)
+    policy = create_escalation_policy(team, repeat_count=0)
+    rule = create_escalation_policy_rule(
+        policy,
+        position=1,
+        delay_seconds=0,
+        target_type="user",
+        user=user,
+    )
+    create_route(team, escalation_policy=policy)
+
+    result = upsert_alert(normalized_alert(team_slug=team.slug))
+    assert result.created_group is True
+    assert result.group.escalation_rule_id == rule.id
+    assert result.group.next_escalation_at is not None
+
+    assert send_unacked_reminders() == 0
+    stored = AlertGroup.get_by_id(result.group.id)
+    assert stored.next_escalation_at is None
+    assert AlertEvent.select().where(
+        (AlertEvent.group == stored.id)
+        & (AlertEvent.event_type == "escalation_stopped")
+    ).count() == 1
+
+    assert send_unacked_reminders() == 0
+    assert AlertEvent.select().where(
+        (AlertEvent.group == stored.id)
+        & (AlertEvent.event_type == "escalation_stopped")
+    ).count() == 1
+
+
+def test_manual_alert_group_schedules_zero_delay_service_policy(monkeypatch, db):
+    group = create_group(slug=unique("manual-zero-delay-group"))
+    team = create_team(group, slug=unique("manual-zero-delay-team"))
+    service = create_service(team)
+    first_user = create_user(group=group)
+    second_user = create_user(group=group)
+    add_user_to_team(team, first_user)
+    add_user_to_team(team, second_user)
+    policy = create_escalation_policy(team)
+    first_rule = create_escalation_policy_rule(
+        policy, position=1, delay_seconds=0, target_type="user", user=first_user,
+    )
+    second_rule = create_escalation_policy_rule(
+        policy, position=2, delay_seconds=120, target_type="user", user=second_user,
+    )
+    service.default_escalation_policy = policy
+    service.save()
+    monkeypatch.setattr(alert_escalation, "notify_alert", lambda *args, **kwargs: 1)
+
+    alert_group = create_manual_alert_group({
+        "team_id": team.id,
+        "service_id": service.id,
+        "title": "Manually declared alert group",
+        "notify": False,
+    })
+    assert alert_group.escalation_rule_id == first_rule.id
+    assert alert_group.assignee_id == first_user.id
+    assert alert_group.next_escalation_at is not None
+    assert alert_group.next_escalation_at <= utc_now()
+
+    assert send_unacked_reminders() == 1
+    stored = AlertGroup.get_by_id(alert_group.id)
+    assert stored.escalation_rule_id == second_rule.id
+    assert stored.assignee_id == second_user.id
 
 
 def test_policy_escalation_moves_alert_to_next_rule(monkeypatch, db):

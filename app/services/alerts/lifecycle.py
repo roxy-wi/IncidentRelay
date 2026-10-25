@@ -4,6 +4,14 @@ from app import Config
 from app.db import database_proxy as db
 from app.modules.common import utc_now
 from app.modules.db import alerts_repo, incidents_repo
+from app.services.alerts.reopen import (
+    lock_grouping_identity,
+    find_exact_open_group,
+    find_resolved_reopen_candidate,
+    group_matches_identity,
+    restart_resolved_group,
+    record_reopened_occurrence,
+)
 from app.services.alerts.escalation import apply_initial_escalation_policy_assignment
 from app.services.alerts.event_history import should_record_incoming_alert_event
 from app.services.alerts.explain import (
@@ -18,7 +26,11 @@ from app.services.alerts.maintenance_state import (
     record_maintenance_match,
     should_apply_window_to_group,
 )
-from app.services.alerts.notification_queue import schedule_group_notification
+from app.services.alerts.notification_queue import (
+    schedule_group_notification,
+    schedule_recovery_notification,
+    recovery_notification_delay_seconds,
+)
 from app.services.alerts.shelving import clear_shelve_on_resolve
 from app.services.alerts.priority import (
     apply_priority_resolution_to_group,
@@ -578,23 +590,36 @@ def _handle_existing_alert(
         )
     elif status == "resolved":
         if group.status == "resolved":
-            alerts_repo.clear_alert_group_notification(group)
-
-            if old_group_status != "resolved":
-                notify_stakeholders(
-                    group,
-                    "resolved",
-                    old_value=old_group_status,
-                )
-
-            if group.last_notification_at:
-                sent_count = notify_alert(
-                    group,
-                    event_type="resolved",
-                )
-                trace.resolved_notification_sent(sent_count=sent_count)
-            else:
+            recovery_delay = recovery_notification_delay_seconds()
+            if recovery_delay and old_group_status == "resolved":
+                # Duplicate upstream resolved payload: leave an already queued
+                # recovery notification untouched, never push its due time out.
                 trace.notification_not_needed(group)
+            elif recovery_delay and old_group_status != "resolved":
+                # Atomically replace firing work with pending recovery. Never
+                # clear a recovery already queued by a concurrent resolved.
+                if schedule_recovery_notification(group, now=now):
+                    trace.step(
+                        "notification", "recovery_notification_scheduled", "success",
+                        "Recovery notification deferred",
+                        "Technical recovery is immediate; outbound resolution waits for the configured grace period.",
+                        delay_seconds=recovery_delay,
+                    )
+                else:
+                    trace.notification_not_needed(group)
+            else:
+                alerts_repo.clear_alert_group_notification(group)
+                if old_group_status != "resolved":
+                    notify_stakeholders(
+                        group,
+                        "resolved",
+                        old_value=old_group_status,
+                    )
+                if group.last_notification_at:
+                    sent_count = notify_alert(group, event_type="resolved")
+                    trace.resolved_notification_sent(sent_count=sent_count)
+                else:
+                    trace.notification_not_needed(group)
         elif group.status == "firing":
             schedule_group_notification(
                 group,
@@ -824,6 +849,9 @@ def _upsert_alert(alert_data, trace, runtime=None):
         alert_data["dedup_key"],
         grouping_window_seconds,
     )
+    reopen_window_seconds = (
+        runtime.grouping_reopen_window_seconds if runtime is not None else 0
+    )
 
     existing_group = alerts_repo.find_open_alert_group(
         source=alert_data["source"],
@@ -832,6 +860,17 @@ def _upsert_alert(alert_data, trace, runtime=None):
         route_id=route.id if route else None,
         service_id=service.id if service else None,
     )
+
+    # An open child from another route/service/group must not bypass the
+    # strict identity rules when the 2.4 reopen policy is active.
+    if reopen_window_seconds and existing_alert is not None and not group_matches_identity(
+        existing_alert.group,
+        source=alert_data["source"], group_key=group_key,
+        team_id=team.id if team else None,
+        route_id=route.id if route else None,
+        service_id=service.id if service else None,
+    ):
+        existing_alert = None
 
     trace.dedup_completed(
         existing_alert=existing_alert,
@@ -851,6 +890,26 @@ def _upsert_alert(alert_data, trace, runtime=None):
 
     if maintenance_incident_status:
         status = maintenance_incident_status
+
+    reopen_enabled = bool(
+        reopen_window_seconds
+        and (alert_data.get("status") or "firing") == "firing"
+        and status in {"firing", "silenced"}
+    )
+    # Record the effective policy for both enabled and disabled rules. It is
+    # independent of the deduplication window and does not change lifecycle.
+    trace.step(
+        "grouping", "reopen_policy", "success",
+        "Resolved-group reuse policy",
+        (
+            "Reopen is disabled for this event."
+            if not reopen_window_seconds
+            else "Only eligible firing occurrences may reuse matching resolved groups."
+        ),
+        reopen_window_seconds=reopen_window_seconds,
+        enabled=bool(reopen_window_seconds),
+        eligible=reopen_enabled,
+    )
 
     if maintenance_decision.suppress_incident and not existing_alert and not existing_group:
         trace.incident_suppressed(maintenance_decision)
@@ -949,13 +1008,85 @@ def _upsert_alert(alert_data, trace, runtime=None):
 
     group = existing_group
     created_group = False
+    reopened_group = False
     should_add_service_stakeholders = False
 
     # The group mutation and child Alert insert are one persistence unit. In
     # particular, do not leave an empty AlertGroup behind if PostgreSQL rejects
     # one of the externally controlled Alert fields.
     try:
-        with db.atomic():
+        # SQLite needs a writer reservation before SELECTs in the reopen path.
+        # PostgreSQL uses a transaction-scoped advisory lock by grouping identity.
+        transaction = (
+            db.atomic(lock_type="IMMEDIATE")
+            if reopen_enabled and db.obj.__class__.__name__ == "SqliteDatabase"
+            else db.atomic()
+        )
+        with transaction:
+            if reopen_enabled:
+                lock_grouping_identity(
+                    source=alert_data["source"], group_key=group_key,
+                    team_id=team.id if team else None,
+                    route_id=route.id if route else None,
+                    service_id=service.id if service else None,
+                )
+                # Re-read under the identity lock, not from the earlier snapshot.
+                # This is necessary for concurrent firing deliveries.
+                raced = alerts_repo.find_existing_alert(
+                    alert_data["source"], alert_data["dedup_key"],
+                    grouping_window_seconds, route_id=route.id,
+                )
+                if raced and raced.group_id and group_matches_identity(
+                    raced.group,
+                    source=alert_data["source"], group_key=group_key,
+                    team_id=team.id if team else None,
+                    route_id=route.id if route else None,
+                    service_id=service.id if service else None,
+                ):
+                    trace.step(
+                        "deduplication", "concurrent_occurrence_reused", "success",
+                        "Concurrent alert occurrence reused",
+                        "Another intake created this child Alert while this request waited for the grouping lock.",
+                        alert_id=raced.id, group_id=raced.group_id,
+                    )
+                    trace.processed(
+                        group=raced.group, alert=raced, created_group=False,
+                        outcome="updated",
+                    )
+                    return _completed_result(
+                        trace=trace, group=raced.group, alert=raced,
+                        created_group=False, outcome="updated",
+                    )
+                group = find_exact_open_group(
+                    source=alert_data["source"], group_key=group_key,
+                    team_id=team.id if team else None,
+                    route_id=route.id if route else None,
+                    service_id=service.id if service else None,
+                )
+                if group is None:
+                    candidate = find_resolved_reopen_candidate(
+                        source=alert_data["source"], group_key=group_key,
+                        team_id=team.id if team else None,
+                        route_id=route.id if route else None,
+                        service_id=service.id if service else None,
+                        now=now, reopen_window_seconds=reopen_window_seconds,
+                    )
+                    if candidate is None:
+                        trace.step(
+                            "grouping", "reopen_candidate_not_found", "success",
+                            "No eligible resolved AlertGroup",
+                            "No matching resolved AlertGroup was found inside the effective reopen window.",
+                            reopen_window_seconds=reopen_window_seconds,
+                        )
+                    else:
+                        group = restart_resolved_group(
+                            candidate, now=now, policy=policy,
+                            policy_rule=policy_rule, rotation=rotation,
+                            assignee=assignee,
+                            next_escalation_at=next_escalation_at,
+                        )
+                        reopened_group = True
+                        trace.group_reopened(group)
             if not group:
                 group = _create_group(
                     alert_data=alert_data,
@@ -1177,6 +1308,11 @@ def _upsert_alert(alert_data, trace, runtime=None):
                     priority_resolution,
                 )
 
+            if reopened_group:
+                # The new child is visible to recalculate and the audit record
+                # reflects the final technical status, including maintenance.
+                record_reopened_occurrence(group, alert)
+
             trace.priority_applied(
                 group,
                 priority_resolution,
@@ -1210,6 +1346,10 @@ def _upsert_alert(alert_data, trace, runtime=None):
             },
         )
         raise
+
+    if reopened_group:
+        # Metrics must only record a successful persistence transaction.
+        record_alert_group_action("reopened")
 
     # Stakeholder copy/notification may have external side effects. Run it
     # only after the AlertGroup + child Alert transaction has committed.
@@ -1321,7 +1461,7 @@ def _upsert_alert(alert_data, trace, runtime=None):
     else:
         trace.notification_not_needed(group)
 
-    outcome = "created" if created_group else "added"
+    outcome = "created" if created_group else ("reopened" if reopened_group else "added")
 
     trace.processed(
         group=group,

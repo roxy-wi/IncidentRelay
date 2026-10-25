@@ -24,13 +24,29 @@ SEVERITY_FILTER_SCHEMA = {
 EMAIL_CONFIG_SCHEMA = {
     "type": "object",
     "description": (
-        "Email channel config. The recipient is not stored in the channel: "
-        "real alerts are sent to the assigned user's profile email, and test "
-        "emails are sent to the current user's profile email. SMTP transport "
-        "is configured globally."
+        "Email recipient_mode: assignee (default/legacy), fallback (assignee "
+        "email or configured recipient_email), or fixed (always configured "
+        "recipient_email). Test emails always target the current user's profile "
+        "email, independent of the recipient mode. SMTP transport is global."
     ),
     "properties": {
         "notify_on_severities": SEVERITY_FILTER_SCHEMA,
+        "recipient_mode": {
+            "type": "string",
+            "enum": ["assignee", "fallback", "fixed"],
+            "default": "assignee",
+            "description": (
+                "Assignee profile email (default), fallback when missing, or "
+                "fixed recipient regardless of assignee."
+            ),
+        },
+        "recipient_email": {
+            "type": "string", "format": "email", "maxLength": 254,
+            "description": (
+                "Exactly one mailbox; required for recipient_mode=fallback or fixed. "
+                "Unused with assignee mode."
+            ),
+        },
         "html_template": {
             "type": "string",
             "maxLength": EMAIL_HTML_TEMPLATE_MAX_LENGTH,
@@ -82,12 +98,22 @@ CHANNEL_SCHEMA = {
                 "webhook_url and optionally accepts signing_secret. Mattermost can use "
                 "webhook_url, or mode=bot_api with api_url, "
                 "bot_token and channel_id for buttons and post updates. Email sends "
-                "to the assigned user's profile email and supports html_template. "
+                "to the assignee, a configured fallback, or a fixed recipient using "
+                "recipient_mode and recipient_email, and supports html_template. "
                 "Voice calls and browser push are configured through profile "
                 "notification rules, not channels."
             ),
             "properties": {
                 "notify_on_severities": SEVERITY_FILTER_SCHEMA,
+                "recipient_mode": {
+                    "type": "string", "enum": ["assignee", "fallback", "fixed"],
+                    "default": "assignee",
+                    "description": "Email channels only; absent means assignee email.",
+                },
+                "recipient_email": {
+                    "type": "string", "format": "email", "maxLength": 254,
+                    "description": "Email channels only; required in fallback/fixed modes.",
+                },
             },
             "additionalProperties": True,
             "example": {

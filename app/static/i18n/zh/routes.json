@@ -224,5 +224,13 @@
   "routes.form.cloud_ru_webhook_help": "Add this HTTPS URL as the SMN HTTP/HTTPS subscription endpoint. IncidentRelay validates SMN signatures and confirms the subscription automatically.",
   "routes.intake.cloud_ru_example_comment": "Cloud.ru SMN / Cloud Eye endpoint (requests must carry a valid SMN signature)",
   "routes.intake.cloud_ru_subtitle": "Use this route-scoped HTTPS URL as a Cloud.ru Advanced SMN HTTP/HTTPS subscription endpoint.",
-  "routes.intake.cloud_ru_help": "No IncidentRelay token is sent by SMN. IncidentRelay verifies the SMN V1 signature, Cloud.ru signing certificate and exact Topic URN before accepting Cloud Eye alarms."
+  "routes.intake.cloud_ru_help": "No IncidentRelay token is sent by SMN. IncidentRelay verifies the SMN V1 signature, Cloud.ru signing certificate and exact Topic URN before accepting Cloud Eye alarms.",
+  "routes.form.opensearch_help": "使用 OpenSearch Alerting 自定义 Webhook，传入稳定的 monitor_id、trigger_id，分桶告警还需要 bucket_key。",
+  "routes.form.kibana_help": "使用 Kibana Webhook 连接器，为每条告警提供 rule_id 和 alert_id，并单独配置恢复动作。",
+  "routes.intake.opensearch_subtitle": "在 OpenSearch 自定义 Webhook 中使用此端点，并通过 Authorization: Bearer 发送路由令牌。",
+  "routes.intake.opensearch_help": "monitor_id、trigger_id（可加 bucket_key）确定告警身份，status 表示触发或恢复。",
+  "routes.intake.opensearch_example_comment": "OpenSearch Alerting 自定义 Webhook JSON 示例",
+  "routes.intake.kibana_subtitle": "在 Kibana Webhook 连接器中使用此端点，通过 Authorization: Bearer 发送路由令牌。",
+  "routes.intake.kibana_help": "rule_id、alert_id 和 space_id 用于识别告警；恢复需单独配置动作。",
+  "routes.intake.kibana_example_comment": "Kibana Alerting 单条告警 JSON 示例"
 }

@@ -52,6 +52,45 @@ The config file is selected by:
 INCIDENTRELAY_CONFIG_FILE
 ```
 
+## Non-root services (2.3.1 and later)
+
+The Docker image retains **root only for entrypoint initialization**. After
+rebuilding the runtime config and reconciling permissions, the entrypoint uses
+`setpriv` to start **web, scheduler, Telegram, Slack, migrations and shell**
+as the `incidentrelay` user (UID/GID `10001`). Gunicorn uses the writable home
+`/home/incidentrelay`. Verify the running main process after startup:
+
+```bash
+docker compose exec incidentrelay grep ^Uid: /proc/1/status
+```
+
+**Important:** the image still starts with root as its Docker image default,
+so a plain `docker compose exec` can launch **new commands as root** even
+though PID 1 is unprivileged. Always pass `--user 10001:10001` for admin
+commands (migrations, user creation, etc.) to avoid creating new root-owned
+SQLite or log files.
+
+On the first startup after upgrading a **Docker Compose named-volume** deployment,
+the entrypoint repairs ownership of `/var/lib/incidentrelay` (including SQLite,
+its journal/WAL and the `0600` generated config) and `/var/log/incidentrelay`.
+It skips already-correct files and never follows symlinks outside these
+volumes. Existing secrets are retained by the normal runtime-config logic.
+The entrypoint must start as root for this one-time repair; do not set
+`user: "10001:10001"` on the Compose services unless the volumes have already
+been made writable for that UID.
+
+When using `docker run --user 12345` or OpenShift-style arbitrary UIDs, the
+entrypoint **does not change ownership or attempt privilege escalation**.
+Mounts, config and log directories must already be accessible to that UID.
+If the image home is not writable, `HOME` falls back to `/tmp` to avoid
+Gunicorn trying to write under `/`. Read-only external config files must be
+readable by the runtime user.
+
+If an external bind mount, NFS share or unusual filesystem blocks the
+ownership repair, prepare its permissions using the volume owner's trusted
+administrative procedure before starting the upgraded container. Make a backup
+of the SQLite database before changing volume permissions.
+
 ## Quick start with SQLite
 
 ```bash
@@ -76,13 +115,13 @@ docker compose logs -f incidentrelay-scheduler
 If migrations are not run automatically by your container entrypoint, run:
 
 ```bash
-docker compose exec incidentrelay python manage.py migrate
+docker compose exec --user 10001:10001 incidentrelay python manage.py migrate
 ```
 
 ## Create the first admin user
 
 ```bash
-docker compose exec incidentrelay \
+docker compose exec --user 10001:10001 incidentrelay \
   python manage.py create-admin \
     --username admin \
     --password 'change-me-123' \

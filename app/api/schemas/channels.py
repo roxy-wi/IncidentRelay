@@ -10,6 +10,7 @@ from app.notifiers.types import (
     WEBHOOK_STYLE_CHANNELS,
 )
 from app.notifiers.email.email_templates import normalize_email_html_template
+from app.notifiers.email.recipients import normalize_email_recipient_config
 from app.services.channel_config import (
     CHANNEL_SECRET_PLACEHOLDER,
     contains_channel_secret_placeholder,
@@ -195,6 +196,7 @@ class ChannelBaseSchema(ApiModel):
                 raise ValueError("mattermost webhook mode requires webhook_url")
 
         if self.channel_type == "email":
+            normalize_email_recipient_config(config)
             html_template = normalize_email_html_template(config.get("html_template"))
             if html_template:
                 config["html_template"] = html_template

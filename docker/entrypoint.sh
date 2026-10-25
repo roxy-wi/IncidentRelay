@@ -9,6 +9,15 @@ fi
 CONFIG_FILE="${INCIDENTRELAY_CONFIG_FILE:-${INCEDENTRELAY_CONFIG_FILE:-/etc/incidentrelay/incidentrelay.conf}}"
 SERVICE="${INCIDENTRELAY_SERVICE:-web}"
 
+# The image has a real home directory for UID 10001. Arbitrary non-root UIDs
+# (e.g. OpenShift or docker run --user) may not be able to write there; avoid
+# gunicorn attempting to create /.gunicorn or writing to an inaccessible HOME.
+if [ "$(id -u)" -ne 0 ]; then
+  if [ -z "${HOME:-}" ] || [ ! -d "$HOME" ] || [ ! -w "$HOME" ]; then
+    export HOME=/tmp
+  fi
+fi
+
 if [ ! -f "$CONFIG_FILE" ]; then
   echo "Config file not found: $CONFIG_FILE"
   exit 1
@@ -34,7 +43,12 @@ import tempfile
 
 source, target = sys.argv[1], sys.argv[2]
 KEY_CHECK_ITERATIONS = 200_000
-os.makedirs(os.path.dirname(target), exist_ok=True)
+target_dir = os.path.dirname(target)
+os.makedirs(target_dir, exist_ok=True)
+# Do not let a writable volume redirect privileged initialization through
+# symlinks to files outside the runtime directory.
+dir_fd = os.open(target_dir, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+os.close(dir_fd)
 lock_path = target + ".lock"
 known_insecure = {
     "",
@@ -45,15 +59,21 @@ known_insecure = {
     "change-this-mattermost-action-secret",
 }
 
-with open(lock_path, "a+", encoding="utf-8") as lock_file:
+lock_fd = os.open(lock_path, os.O_RDWR | os.O_CREAT | os.O_NOFOLLOW, 0o600)
+with os.fdopen(lock_fd, "r+", encoding="utf-8") as lock_file:
     fcntl.flock(lock_file.fileno(), fcntl.LOCK_EX)
     parser = configparser.ConfigParser()
     parser.optionxform = str
     parser.read(source)
     stored = configparser.ConfigParser()
     stored.optionxform = str
-    if os.path.exists(target):
-        stored.read(target)
+    try:
+        stored_fd = os.open(target, os.O_RDONLY | os.O_NOFOLLOW)
+    except FileNotFoundError:
+        pass
+    else:
+        with os.fdopen(stored_fd, "r", encoding="utf-8") as previous_config:
+            stored.read_file(previous_config)
 
     def from_env(section, option):
         # Keys passed as INCIDENTRELAY__<SECTION>__<OPTION>[__FILE] are read
@@ -187,6 +207,20 @@ echo "Starting IncidentRelay service: $SERVICE"
 # only be shared by processes that see the same PIDs. One directory per
 # container: /metrics aggregates the web container only.
 export PROMETHEUS_MULTIPROC_DIR="${PROMETHEUS_MULTIPROC_DIR:-/var/lib/incidentrelay/metrics/$SERVICE}"
+
+# Docker/Compose starts the entrypoint as root to reconcile existing root-owned
+# volumes. The runtime config is created above with mode 0600; repair ownership
+# only AFTER config generation, and run all migrations and services as UID 10001.
+# Under Kubernetes runAsUser (or docker --user), skip ownership changes.
+if [ "$(id -u)" -eq 0 ]; then
+  python /opt/incidentrelay/docker/fix_volume_permissions.py
+  export HOME=/home/incidentrelay
+  exec setpriv --reuid=10001 --regid=10001 --clear-groups -- /entrypoint.sh
+fi
+
+# Create the metrics directory only after the process is unprivileged. This
+# also prevents a symlink in an existing writable volume from redirecting a
+# root mkdir outside the two trusted runtime paths.
 mkdir -p "$PROMETHEUS_MULTIPROC_DIR"
 
 if [ "${INCIDENTRELAY_RUN_MIGRATIONS:-0}" = "1" ]; then

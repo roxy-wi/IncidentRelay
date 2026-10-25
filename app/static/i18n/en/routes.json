@@ -224,5 +224,13 @@
   "routes.form.cloud_ru_webhook_help": "Add this HTTPS URL as the SMN HTTP/HTTPS subscription endpoint. IncidentRelay validates SMN signatures and confirms the subscription automatically.",
   "routes.intake.cloud_ru_example_comment": "Cloud.ru SMN / Cloud Eye endpoint (requests must carry a valid SMN signature)",
   "routes.intake.cloud_ru_subtitle": "Use this route-scoped HTTPS URL as a Cloud.ru Advanced SMN HTTP/HTTPS subscription endpoint.",
-  "routes.intake.cloud_ru_help": "No IncidentRelay token is sent by SMN. IncidentRelay verifies the SMN V1 signature, Cloud.ru signing certificate and exact Topic URN before accepting Cloud Eye alarms."
+  "routes.intake.cloud_ru_help": "No IncidentRelay token is sent by SMN. IncidentRelay verifies the SMN V1 signature, Cloud.ru signing certificate and exact Topic URN before accepting Cloud Eye alarms.",
+  "routes.form.opensearch_help": "Use an OpenSearch Alerting custom webhook notification channel. Send a JSON action template with stable monitor_id and trigger_id, with an optional bucket_key for per-bucket alerts.",
+  "routes.form.kibana_help": "Use a Kibana Webhook connector with a per-alert action JSON body. Supply stable rule_id and alert_id; configure a separate recovered action.",
+  "routes.intake.opensearch_subtitle": "Configure this endpoint in an OpenSearch custom webhook notification channel with the route token in an Authorization: Bearer header.",
+  "routes.intake.opensearch_help": "Use monitor_id + trigger_id (+ bucket_key for bucket monitors) for stable grouping. The status field controls firing versus resolved.",
+  "routes.intake.opensearch_example_comment": "OpenSearch Alerting custom webhook JSON example",
+  "routes.intake.kibana_subtitle": "Configure this endpoint in a Kibana Webhook connector and use the route token in a custom Authorization: Bearer header.",
+  "routes.intake.kibana_help": "Use rule_id + alert_id + space_id to identify an alert. Set status to recovered in a separate Kibana recovery action.",
+  "routes.intake.kibana_example_comment": "Kibana Alerting per-alert webhook JSON example"
 }

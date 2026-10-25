@@ -84,7 +84,7 @@ def test_manual_assignment_changes_only_technical_assignee(db):
         .order_by(AuditLog.id.desc())
         .get()
     )
-    assert audit.action == "alert_group_assignee_changed"
+    assert audit.action == "alert_group.assignee_change"
     assert audit.team_id == team.id
 
 

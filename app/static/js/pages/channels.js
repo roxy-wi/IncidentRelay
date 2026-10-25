@@ -120,6 +120,7 @@ function showChannelFields() {
     }
     if (type === "email") {
         $('[data-channel-config="email"]').show();
+        showEmailRecipientFields();
         return;
     }
 }
@@ -233,6 +234,13 @@ function resetEmailHtmlTemplate() {
     });
 }
 
+function showEmailRecipientFields() {
+    const mode = $("#cfg-email-recipient-mode").val() || "assignee";
+    const showRecipient = mode === "fallback" || mode === "fixed";
+    $("#cfg-email-recipient-fields").toggle(showRecipient);
+    $("#cfg-email-recipient-email").prop("required", showRecipient);
+}
+
 function getEmailHtmlTemplateConfigValue() {
     const value = String($("#cfg-email-html-template").val() || "").trim();
     const defaultValue = String(getDefaultEmailHtmlTemplate() || "").trim();
@@ -289,6 +297,14 @@ function buildChannelConfig() {
         return config;
     }
     if (type === "email") {
+        const mode = $("#cfg-email-recipient-mode").val() || "assignee";
+        if (mode === "assignee") {
+            delete config.recipient_mode;
+            delete config.recipient_email;
+        } else {
+            config.recipient_mode = mode;
+            config.recipient_email = String($("#cfg-email-recipient-email").val() || "").trim();
+        }
         const htmlTemplate = getEmailHtmlTemplateConfigValue();
         if (htmlTemplate) {
             config.html_template = htmlTemplate;
@@ -481,6 +497,12 @@ function saveChannel() {
     }
 
     const payload = collectChannelPayload();
+    if (payload.channel_type === "email" &&
+        payload.config.recipient_mode && !payload.config.recipient_email) {
+        showAppError(i18n.t("channels.validation.recipient_email_required"));
+        $("#cfg-email-recipient-email").trigger("focus");
+        return;
+    }
     if (id) {
         apiPut("/api/channels/" + id, payload, function () {
             closeAppModal("#channel-form-modal");
@@ -563,6 +585,11 @@ function stripVisibleChannelConfig(type, config) {
     if (["webhook", "discord", "teams"].includes(type)) {
         delete config.webhook_url;
     }
+    if (type === "email") {
+        delete config.recipient_mode;
+        delete config.recipient_email;
+        delete config.html_template;
+    }
     return config;
 }
 
@@ -629,6 +656,9 @@ function fillChannelFields(type, config) {
         updateWebhookLabel(type);
     }
     if (type === "email") {
+        $("#cfg-email-recipient-mode").val(config.recipient_mode || "assignee");
+        $("#cfg-email-recipient-email").val(config.recipient_email || "");
+        showEmailRecipientFields();
         $("#cfg-email-html-template").val(config.html_template || getDefaultEmailHtmlTemplate());
     }
 }
@@ -653,8 +683,11 @@ function clearChannelFields() {
     $("#cfg-slack-webhook-url").val("");
     $("#cfg-lark-webhook-url").val("");
     $("#cfg-lark-signing-secret").val("");
+    $("#cfg-email-recipient-mode").val("assignee");
+    $("#cfg-email-recipient-email").val("");
 
     showSlackModeFields();
+    showEmailRecipientFields();
     resetEmailHtmlTemplate();
 }
 
@@ -792,7 +825,13 @@ function getChannelModeLabel(channel) {
         return getChannelModeTranslation("webhook");
     }
     if (channel.channel_type === "email") {
-        return getChannelModeTranslation("email");
+        const mode = config.recipient_mode || "assignee";
+        const key = {
+            assignee: "channels.email.mode_assignee",
+            fallback: "channels.email.mode_fallback",
+            fixed: "channels.email.mode_fixed"
+        }[mode];
+        return key ? i18n.t(key) : getChannelModeTranslation("email");
     }
     return "-";
 }
@@ -888,7 +927,9 @@ function getSafeChannelConfigSummary(channel) {
         return getChannelModeLabel(channel);
     }
     if (channel.channel_type === "email") {
-        return config.html_template ? i18n.t("channels.config.email_custom") : i18n.t("channels.config.email_default");
+        return getChannelModeLabel(channel) + " · " + i18n.t(
+            config.html_template ? "channels.email.template_custom" : "channels.email.template_default"
+        );
     }
     if (channel.channel_type === "slack") {
         const mode = getChannelModeLabel(channel);
@@ -1045,6 +1086,7 @@ $(document).on("change", "#channel-type", showChannelFields);
 $(document).on("change", "#cfg-mm-mode", showMattermostModeFields);
 $(document).on("change", "#cfg-slack-mode", showSlackModeFields);
 $(document).on("change", "#cfg-slack-connection-mode", showSlackActionConnectionFields);
+$(document).on("change", "#cfg-email-recipient-mode", showEmailRecipientFields);
 $(document).on("click", "#save-channel", saveChannel);
 $(document).on("click", "#reset-channel-form", resetChannelForm);
 $(document).on("click", "#reload-channels", function () {

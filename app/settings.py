@@ -439,6 +439,11 @@ class Config:
         100,
     )
 
+    # Separate from Event Orchestration reopen_window_seconds. Off by default.
+    RECOVERY_NOTIFICATION_DELAY_SECONDS = settings.get_int(
+        "alerts", "recovery_notification_delay_seconds", 0,
+    )
+
     SHELVE_LIFECYCLE_CHECK_INTERVAL_SECONDS = settings.get_int(
         "alerts",
         "shelve_lifecycle_check_interval_seconds",

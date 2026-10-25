@@ -2,20 +2,11 @@ from datetime import timedelta
 
 import pytest
 
-from app.modules.db.models import AlertGroup, BrowserPushActionToken, TeamUser
+from app.modules.db.models import AlertGroup, AuditLog, BrowserPushActionToken, TeamUser
 from app.notifiers.browser_push import service as browser_push
 from app.services.alerts.lifecycle import upsert_alert
 from tests.factories import add_user_to_team, create_group, create_route, create_team, create_user
 from app.modules.common import utc_now
-
-
-@pytest.fixture(autouse=True)
-def disable_browser_push_audit(monkeypatch):
-    monkeypatch.setattr(
-        browser_push,
-        "write_audit",
-        lambda *args, **kwargs: None,
-    )
 
 
 def _group_with_user(status="firing"):
@@ -125,6 +116,14 @@ def test_execute_push_action_acknowledges_group(db):
     assert result["status"] == "acknowledged"
     assert stored.status == "acknowledged"
     assert stored.acknowledged_by_id == user.id
+    entries = list(AuditLog.select().where(
+        (AuditLog.object_type == "alert_group")
+        & (AuditLog.object_id == alert_group.id)
+        & (AuditLog.action == "alert_group.ack")
+    ))
+    assert len(entries) == 1
+    assert entries[0].user_id == user.id
+    assert entries[0].data["source"] == "browser_push"
 
 
 def test_execute_push_action_resolves_group(db):
@@ -149,6 +148,14 @@ def test_execute_push_action_resolves_group(db):
     assert result["status"] == "resolved"
     assert stored.status == "resolved"
     assert stored.resolved_by_id == user.id
+    entries = list(AuditLog.select().where(
+        (AuditLog.object_type == "alert_group")
+        & (AuditLog.object_id == alert_group.id)
+        & (AuditLog.action == "alert_group.resolve")
+    ))
+    assert len(entries) == 1
+    assert entries[0].user_id == user.id
+    assert entries[0].data["source"] == "browser_push"
 
 
 

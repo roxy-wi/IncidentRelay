@@ -1,6 +1,8 @@
 
 from peewee import fn
 
+from app.db import database_proxy as db
+
 from app.modules.db.models import (
     BusinessService,
     BusinessServiceComponent,
@@ -131,22 +133,23 @@ def update_business_service(business_service_id, data):
 
 
 def soft_delete_business_service(business_service_id):
-    business_service = get_business_service(business_service_id)
-    now = utc_now()
-    business_service.deleted = True
-    business_service.deleted_at = now
-    business_service.enabled = False
-    business_service.updated_at = now
-    business_service.save()
+    with db.atomic():
+        business_service = get_business_service(business_service_id)
+        now = utc_now()
+        business_service.deleted = True
+        business_service.deleted_at = now
+        business_service.enabled = False
+        business_service.updated_at = now
+        business_service.save()
 
-    BusinessServiceComponent.update(
-        deleted=True,
-        deleted_at=now,
-        enabled=False,
-        updated_at=now,
-    ).where(BusinessServiceComponent.business_service == business_service.id).execute()
+        BusinessServiceComponent.update(
+            deleted=True,
+            deleted_at=now,
+            enabled=False,
+            updated_at=now,
+        ).where(BusinessServiceComponent.business_service == business_service.id).execute()
 
-    return business_service
+        return business_service
 
 
 def list_business_service_components(business_service_id, active_only=True):

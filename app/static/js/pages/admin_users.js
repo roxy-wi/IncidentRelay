@@ -840,7 +840,7 @@ function canManageGroupId(groupId) {
 
     return asArray(currentUser && currentUser.groups).some(function (group) {
         return (
-            Number(group.group_id || group.id) === Number(groupId)
+            Number(group.group_id) === Number(groupId)
             && group.role === GROUP_USER_ADMIN_ROLE
         );
     });

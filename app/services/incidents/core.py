@@ -72,8 +72,12 @@ def _require_user_in_team_group(user_id, team: Team) -> User | None:
     return user
 
 
-def _audit(action, incident: Incident, *, user_id=None, data=None):
+def _audit(
+    action, incident: Incident, *, user_id=None, api_token_id=None,
+    source="system", data=None,
+):
     group_id = incident.team.group_id if incident.team_id and incident.team else None
+    safe_data = {**(data or {}), "source": source}
     return audit_repo.create_audit_log(
         action=action,
         object_type="incident",
@@ -81,11 +85,15 @@ def _audit(action, incident: Incident, *, user_id=None, data=None):
         group_id=group_id,
         team_id=incident.team_id,
         user_id=user_id,
-        data=redact_secrets(data or {}),
+        api_token_id=api_token_id,
+        data=redact_secrets(safe_data),
     )
 
 
-def create_incident(*, team_id, title, user_id=None, service_id=None, priority_slug=None, assignee_id=None, description=None):
+def create_incident(
+    *, team_id, title, user_id=None, service_id=None, priority_slug=None,
+    assignee_id=None, description=None, api_token_id=None, source="system",
+):
     team = _require_team(team_id)
     service = _require_service(service_id, team)
     assignee = _require_user_in_team_group(assignee_id, team)
@@ -113,11 +121,18 @@ def create_incident(*, team_id, title, user_id=None, service_id=None, priority_s
             updated_at=now,
         )
         incident_core_repo.create_event(incident.id, "incident_declared", user_id=user_id, data={"status": "declared"})
-        _audit("incident_declared", incident, user_id=user_id, data={"status": "declared"})
+        _audit(
+            "incident.declare", incident, user_id=user_id,
+            api_token_id=api_token_id, source=source, data={"status": "declared"},
+        )
     return incident
 
 
-def update_incident(incident_id, *, expected_version, user_id=None, title=None, description=None, service_id=None, priority_slug=None):
+def update_incident(
+    incident_id, *, expected_version, user_id=None, title=None,
+    description=None, service_id=None, priority_slug=None, api_token_id=None,
+    source="system",
+):
     incident = incident_core_repo.get_incident(incident_id)
     if not incident:
         raise IncidentValidationError("incident not found")
@@ -143,13 +158,19 @@ def update_incident(incident_id, *, expected_version, user_id=None, title=None, 
         with db.atomic():
             updated = incident_core_repo.compare_and_swap(incident.id, expected_version, **changes)
             incident_core_repo.create_event(updated.id, "incident_updated", user_id=user_id, data={"fields": sorted(changes)})
-            _audit("incident_updated", updated, user_id=user_id, data={"fields": sorted(changes)})
+            _audit(
+                "incident.update", updated, user_id=user_id,
+                api_token_id=api_token_id, source=source, data={"fields": sorted(changes)},
+            )
         return updated
     except incident_core_repo.IncidentConflictError as exc:
         raise IncidentConflictError(str(exc)) from exc
 
 
-def assign_incident(incident_id, *, assignee_id, expected_version, user_id=None):
+def assign_incident(
+    incident_id, *, assignee_id, expected_version, user_id=None,
+    api_token_id=None, source="system",
+):
     incident = incident_core_repo.get_incident(incident_id)
     if not incident:
         raise IncidentValidationError("incident not found")
@@ -161,13 +182,19 @@ def assign_incident(incident_id, *, assignee_id, expected_version, user_id=None)
             updated = incident_core_repo.compare_and_swap(incident.id, expected_version, assignee=assignee)
             data = {"from_user_id": old_assignee_id, "to_user_id": getattr(assignee, "id", None)}
             incident_core_repo.create_event(updated.id, "incident_assignee_changed", user_id=user_id, data=data)
-            _audit("incident_assignee_changed", updated, user_id=user_id, data=data)
+            _audit(
+                "incident.assignee_change", updated, user_id=user_id,
+                api_token_id=api_token_id, source=source, data=data,
+            )
         return updated
     except incident_core_repo.IncidentConflictError as exc:
         raise IncidentConflictError(str(exc)) from exc
 
 
-def transition_incident(incident_id, new_status, *, expected_version, user_id=None):
+def transition_incident(
+    incident_id, new_status, *, expected_version, user_id=None,
+    api_token_id=None, source="system",
+):
     incident = incident_core_repo.get_incident(incident_id)
     if not incident:
         raise IncidentValidationError("incident not found")
@@ -199,13 +226,19 @@ def transition_incident(incident_id, new_status, *, expected_version, user_id=No
             updated = incident_core_repo.compare_and_swap(incident.id, expected_version, **changes)
             data = {"from": incident.workflow_status, "to": new_status}
             incident_core_repo.create_event(updated.id, "incident_status_changed", user_id=user_id, data=data)
-            _audit("incident_status_changed", updated, user_id=user_id, data=data)
+            _audit(
+                "incident.status_change", updated, user_id=user_id,
+                api_token_id=api_token_id, source=source, data=data,
+            )
         return updated
     except incident_core_repo.IncidentConflictError as exc:
         raise IncidentConflictError(str(exc)) from exc
 
 
-def link_alert_group(incident_id, alert_group_id, *, relation_type="related", user_id=None):
+def link_alert_group(
+    incident_id, alert_group_id, *, relation_type="related", user_id=None,
+    api_token_id=None, source="system",
+):
     incident = incident_core_repo.get_incident(incident_id)
     if not incident:
         raise IncidentValidationError("incident not found")
@@ -242,11 +275,17 @@ def link_alert_group(incident_id, alert_group_id, *, relation_type="related", us
         )
         data = {"alert_group_id": alert_group.id, "relation_type": relation_type}
         incident_core_repo.create_event(incident.id, "incident_group_linked", user_id=user_id, data=data)
-        _audit("incident_group_linked", incident, user_id=user_id, data=data)
+        _audit(
+            "incident.group_link", incident, user_id=user_id,
+            api_token_id=api_token_id, source=source, data=data,
+        )
     return link
 
 
-def unlink_alert_group(incident_id, alert_group_id, *, user_id=None):
+def unlink_alert_group(
+    incident_id, alert_group_id, *, user_id=None, api_token_id=None,
+    source="system",
+):
     incident = incident_core_repo.get_incident(incident_id)
     if not incident:
         raise IncidentValidationError("incident not found")
@@ -257,7 +296,10 @@ def unlink_alert_group(incident_id, alert_group_id, *, user_id=None):
         removed = incident_core_repo.remove_link(link.id, user_id=user_id)
         data = {"alert_group_id": int(alert_group_id), "relation_type": link.relation_type}
         incident_core_repo.create_event(incident.id, "incident_group_unlinked", user_id=user_id, data=data)
-        _audit("incident_group_unlinked", incident, user_id=user_id, data=data)
+        _audit(
+            "incident.group_unlink", incident, user_id=user_id,
+            api_token_id=api_token_id, source=source, data=data,
+        )
     return removed
 
 
@@ -265,6 +307,8 @@ def create_incident_from_alert_group(
     alert_group_id,
     *,
     user_id=None,
+    api_token_id=None,
+    source="system",
     title=None,
     description=None,
     priority_slug=None,
@@ -286,11 +330,15 @@ def create_incident_from_alert_group(
             priority_slug=effective_priority,
             assignee_id=assignee_id,
             user_id=user_id,
+            api_token_id=api_token_id,
+            source=source,
         )
         link_alert_group(
             incident.id,
             group.id,
             relation_type="primary",
             user_id=user_id,
+            api_token_id=api_token_id,
+            source=source,
         )
     return incident

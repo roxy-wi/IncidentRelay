@@ -2401,6 +2401,36 @@ class AlertGroupMerge(BaseModel):
         )
 
 
+class RecoveryNotificationDelivery(BaseModel):
+    """One recipient/transport for one resolved AlertGroup occurrence.
+
+    Delivery is at-least-once: remote providers cannot make a network send and
+    our DB commit atomic. A committed successful target is never retried.
+    """
+
+    id = AutoField()
+    group = ForeignKeyField(AlertGroup, backref="recovery_deliveries", on_delete="CASCADE")
+    resolved_at = DateTimeField(index=True)
+    target_kind = CharField(max_length=32)  # channel, stakeholder_email, stakeholder_push, user_rules
+    target_id = IntegerField(default=0)
+    status = CharField(max_length=16, default="pending", index=True)
+    attempts = IntegerField(default=0)
+    next_attempt_at = DateTimeField(index=True)
+    delivered_count = IntegerField(default=0)
+    delivered_at = DateTimeField(null=True)
+    last_error = TextField(null=True)
+    created_at = DateTimeField(default=utc_now)
+    updated_at = DateTimeField(default=utc_now)
+
+    class Meta:
+        table_name = "recovery_notification_delivery"
+        indexes = (
+            (("group", "resolved_at", "target_kind", "target_id"), True),
+            (("group", "resolved_at", "status"), False),
+            (("status", "next_attempt_at"), False),
+        )
+
+
 class AlertNotification(BaseModel):
     """Delivery record for a notification sent to an external channel."""
 

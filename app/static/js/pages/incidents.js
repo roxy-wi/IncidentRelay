@@ -2,6 +2,7 @@ let incidentsCurrentPage = 1;
 let incidentsPageSize = 25;
 let incidentsPagination = {page: 1, pages: 0, total: 0};
 let incidentsLoadGeneration = 0;
+let incidentsSearchTimer = null;
 let incidentsTeams = [];
 let incidentsPriorities = [];
 let currentIncident = null;
@@ -115,39 +116,51 @@ function loadIncidents() {
                     .text(i18n.t("incidents.empty.failed"))
             )
         );
+        ["total", "active", "resolved", "closed"].forEach(function (name) {
+            $("#incidents-summary-" + name).text("—");
+        });
         showApiError(xhr);
     });
 }
 
 function loadIncidentsSummary(generation) {
-    const teamId = incidentSelectedTeamId();
+    // Every summary counter uses the same team scope, independently of list
+    // search/status filters and pagination. Never subtract unfiltered counts
+    // from a filtered list total.
     const base = new URLSearchParams({page: "1", page_size: "1"});
-    if (teamId) {
-        base.set("team_id", teamId);
+    const teamId = incidentSelectedTeamId();
+    if (teamId) { base.set("team_id", teamId); }
+
+    const statuses = ["total", "resolved", "closed", "cancelled"];
+    const counts = {};
+    let pending = statuses.length;
+    let failed = false;
+    ["total", "active", "resolved", "closed"].forEach(function (name) {
+        $("#incidents-summary-" + name).text("—");
+    });
+
+    function finish() {
+        if (generation !== incidentsLoadGeneration) { return; }
+        pending -= 1;
+        if (pending !== 0 || failed) { return; }
+        $("#incidents-summary-total").text(counts.total);
+        $("#incidents-summary-active").text(Math.max(
+            counts.total - counts.resolved - counts.closed - counts.cancelled, 0
+        ));
+        $("#incidents-summary-resolved").text(counts.resolved);
+        $("#incidents-summary-closed").text(counts.closed);
     }
-
-    const counts = {resolved: 0, closed: 0, cancelled: 0};
-    const statuses = Object.keys(counts);
-    let remaining = statuses.length;
-
-    $("#incidents-summary-total").text(incidentsPagination.total || 0);
 
     statuses.forEach(function (status) {
         const params = new URLSearchParams(base.toString());
-        params.set("status", status);
+        if (status !== "total") { params.set("status", status); }
         apiGet("/api/incidents?" + params.toString(), function (response) {
-            if (generation !== incidentsLoadGeneration) {
-                return;
-            }
+            if (generation !== incidentsLoadGeneration) { return; }
             counts[status] = Number((response.pagination || {}).total || 0);
-            remaining -= 1;
-            if (!remaining) {
-                const total = Number(incidentsPagination.total || 0);
-                const active = Math.max(total - counts.resolved - counts.closed - counts.cancelled, 0);
-                $("#incidents-summary-active").text(active);
-                $("#incidents-summary-resolved").text(counts.resolved);
-                $("#incidents-summary-closed").text(counts.closed);
-            }
+            finish();
+        }, function () {
+            failed = true;
+            finish();
         });
     });
 }
@@ -452,6 +465,10 @@ function closeIncidentDetails(options) {
 }
 
 function loadIncidentDetails(incidentId) {
+    if (!currentIncident || Number(currentIncident.id) !== Number(incidentId)) {
+        currentIncidentLinks = [];
+        currentIncidentEvents = [];
+    }
     clearIncidentDetailsErrors();
     if (window.AppLoading) {
         AppLoading.showInline("#incidents-loading-indicator", i18n.t("common.loading"));
@@ -493,6 +510,9 @@ function loadIncidentDetailCollections(incident) {
             }
             currentIncidentLinks = Array.isArray(links) ? links : [];
             renderIncidentLinks(currentIncidentLinks, canRespond);
+            // Link metadata may arrive after events. Re-render so the source
+            // navigation is only shown for a currently visible linked group.
+            if (currentIncidentEvents.length) { renderIncidentEvents(currentIncidentEvents); }
         },
         function (xhr) {
             if (!currentIncident || Number(currentIncident.id) !== incidentId) {
@@ -644,16 +664,44 @@ function renderIncidentEvents(events) {
         return;
     }
     events.slice().reverse().forEach(function (event) {
-        target.append(
-            $("<div>")
-                .addClass("event-item")
-                .append($("<div>").addClass("event-dot"))
-                .append(
+        const reopened = event.event_type === "incident_reopened_by_alert_group";
+        const data = event.data || {};
+        const detail = $("<div>")
+            .addClass("event-content")
+            .append($("<div>")
+                .addClass("event-title")
+                .text(reopened
+                    ? i18n.t("incidents.activity.reopened_by_alert")
+                    : (event.message || event.event_type || "-")))
+            .append($("<div>").addClass("event-time").text(formatDateTimeMinutes(event.created_at)));
+
+        if (reopened) {
+            if (data.from && data.to) {
+                detail.append(
                     $("<div>")
-                        .addClass("event-content")
-                        .append($("<div>").addClass("event-title").text(event.message || event.event_type || "-"))
-                        .append($("<div>").addClass("event-time").text(formatDateTimeMinutes(event.created_at)))
-                )
+                        .addClass("table-subtitle")
+                        .text(incidentStatusLabel(data.from) + " → " + incidentStatusLabel(data.to))
+                );
+            }
+            const linkedGroup = currentIncidentLinks.find(function (link) {
+                return Number(link.alert_group_id) === Number(data.alert_group_id);
+            });
+            if (linkedGroup && linkedGroup.alert_group) {
+                detail.append(
+                    $("<button>")
+                        .attr("type", "button")
+                        .addClass("btn btn-secondary btn-small")
+                        .text(i18n.t("incidents.activity.open_reopened_alert", {id: data.alert_group_id}))
+                        .on("click", function () {
+                            navigate("/alerts/" + encodeURIComponent(data.alert_group_id), true);
+                        })
+                );
+            }
+        }
+        target.append(
+            $("<div>").addClass("event-item")
+                .append($("<div>").addClass("event-dot"))
+                .append(detail)
         );
     });
 }
@@ -906,7 +954,13 @@ function linkIncidentAlertGroup(groupId, relationType) {
 }
 
 $(document).on("click", "#reload-incidents", function () { loadIncidents(); });
-$(document).on("input", "#incidents-search", function () { incidentsCurrentPage = 1; loadIncidents(); });
+$(document).on("input", "#incidents-search", function () {
+    clearTimeout(incidentsSearchTimer);
+    incidentsSearchTimer = setTimeout(function () {
+        incidentsCurrentPage = 1;
+        loadIncidents();
+    }, 250);
+});
 $(document).on("change", "#incidents-status-filter", function () { incidentsCurrentPage = 1; loadIncidents(); });
 $(document).on("change", "#incidents-page-size", function () {
     incidentsPageSize = parseInt($(this).val(), 10) || 25;

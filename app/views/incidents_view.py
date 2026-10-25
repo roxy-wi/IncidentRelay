@@ -8,6 +8,7 @@ from app.api.schemas.incidents import (
     IncidentUpdateSchema,
 )
 from app.modules.db import incident_core_repo, incidents_repo
+from app.services.audit import current_api_token_id
 from app.modules.db.models import AlertGroup
 from app.services.incidents.core import (
     IncidentConflictError,
@@ -131,6 +132,8 @@ def create_incident_view():
             priority_slug=payload.priority,
             assignee_id=payload.assignee_id,
             user_id=_request_user_id(),
+            api_token_id=current_api_token_id(),
+            source="api",
         )
     except (IncidentValidationError, IncidentConflictError) as exc:
         return _service_error(exc)
@@ -170,6 +173,8 @@ def update_incident_view(incident_id):
             incident.id,
             expected_version=payload.row_version,
             user_id=_request_user_id(),
+            api_token_id=current_api_token_id(),
+            source="api",
             title=payload.title,
             description=payload.description,
             service_id=payload.service_id,
@@ -194,6 +199,8 @@ def transition_incident_view(incident_id):
             payload.status,
             expected_version=payload.row_version,
             user_id=_request_user_id(),
+            api_token_id=current_api_token_id(),
+            source="api",
         )
     except (IncidentValidationError, IncidentConflictError) as exc:
         return _service_error(exc)
@@ -210,7 +217,11 @@ def close_incident_view(incident_id):
     if not isinstance(row_version, int) or row_version < 1:
         return make_error_response("validation_error", "row_version is required", 400)
     try:
-        incident = transition_incident(incident.id, "closed", expected_version=row_version, user_id=_request_user_id())
+        incident = transition_incident(
+            incident.id, "closed", expected_version=row_version,
+            user_id=_request_user_id(), api_token_id=current_api_token_id(),
+            source="api",
+        )
     except (IncidentValidationError, IncidentConflictError) as exc:
         return _service_error(exc)
     return jsonify(serialize_incident(incident, current_user=_request_user(), include_details=True))
@@ -226,7 +237,11 @@ def reopen_incident_view(incident_id):
     if not isinstance(row_version, int) or row_version < 1:
         return make_error_response("validation_error", "row_version is required", 400)
     try:
-        incident = transition_incident(incident.id, "investigating", expected_version=row_version, user_id=_request_user_id())
+        incident = transition_incident(
+            incident.id, "investigating", expected_version=row_version,
+            user_id=_request_user_id(), api_token_id=current_api_token_id(),
+            source="api",
+        )
     except (IncidentValidationError, IncidentConflictError) as exc:
         return _service_error(exc)
     return jsonify(serialize_incident(incident, current_user=_request_user(), include_details=True))
@@ -246,6 +261,8 @@ def assign_incident_view(incident_id):
             assignee_id=payload.assignee_id,
             expected_version=payload.row_version,
             user_id=_request_user_id(),
+            api_token_id=current_api_token_id(),
+            source="api",
         )
     except (IncidentValidationError, IncidentConflictError) as exc:
         return _service_error(exc)
@@ -269,6 +286,8 @@ def assign_incident_to_me_view(incident_id):
             assignee_id=_request_user_id(),
             expected_version=row_version,
             user_id=_request_user_id(),
+            api_token_id=current_api_token_id(),
+            source="api",
         )
     except (IncidentValidationError, IncidentConflictError) as exc:
         return _service_error(exc)
@@ -306,6 +325,8 @@ def link_incident_alert_group(incident_id):
             payload.alert_group_id,
             relation_type=payload.relation_type,
             user_id=_request_user_id(),
+            api_token_id=current_api_token_id(),
+            source="api",
         )
     except (IncidentValidationError, IncidentConflictError) as exc:
         return _service_error(exc)
@@ -318,7 +339,10 @@ def unlink_incident_alert_group(incident_id, group_id):
     if error:
         return error
     try:
-        link = unlink_alert_group(incident.id, group_id, user_id=_request_user_id())
+        link = unlink_alert_group(
+            incident.id, group_id, user_id=_request_user_id(),
+            api_token_id=current_api_token_id(), source="api",
+        )
     except (IncidentValidationError, IncidentConflictError) as exc:
         return _service_error(exc)
     if not link:

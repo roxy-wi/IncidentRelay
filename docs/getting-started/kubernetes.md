@@ -65,6 +65,56 @@ Watch the rollout:
 kubectl get pods -l app.kubernetes.io/instance=incidentrelay -w
 ```
 
+## Non-root pod security (2.3.1 and later)
+
+The chart runs all four workloads **and the optional custom-CA init container**
+with secure defaults: `runAsNonRoot: true`, UID/GID `10001`, `fsGroup: 10001`
+with `fsGroupChangePolicy: OnRootMismatch`, no privilege escalation or Linux
+capabilities, and `RuntimeDefault` seccomp. These are set in
+`podSecurityContext` and `securityContext` in `values.yaml` and can be
+customized for your storage and security policies.
+
+```yaml
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001
+  fsGroupChangePolicy: OnRootMismatch
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: [ALL]
+  seccompProfile:
+    type: RuntimeDefault
+```
+
+**Upgrade preflight:** take a backup of the SQLite PVC, then check that the
+existing `/var/lib/incidentrelay` PVC (including SQLite, runtime config and
+lock files) is writable by UID/GID `10001`. The chart does **not** run a root
+permission-repair init container. Kubernetes `fsGroup` adjusts permissions for
+many supported volumes; NFS with `root_squash`, some CSI drivers and existing
+PVCs for which `OnRootMismatch` skips recursion may need a one-time
+storage-side permission repair. If a PV cannot provide appropriate access,
+fix it before upgrading, or choose a compatible non-root `runAsUser` /
+`runAsGroup` / `fsGroup` in your Helm values. Do not use a root workload as a
+permanent workaround.
+
+`customCA` uses an `emptyDir` for the combined bundle, written by the same
+non-root UID as the main container. External Secret/ConfigMap mounts and
+`configFrom` files must remain readable by the configured UID. If an OpenShift
+policy forces an arbitrary UID, provide writable volumes and a compatible
+`fsGroup`; the entrypoint falls back to `HOME=/tmp` if the image home cannot be
+written.
+
+Verify after rollout:
+
+```bash
+kubectl exec deploy/incidentrelay-web -- id
+kubectl exec deploy/incidentrelay-web -- test -w /var/lib/incidentrelay
+kubectl get pods -l app.kubernetes.io/instance=incidentrelay
+```
+
 ## Configuration
 
 IncidentRelay reads every setting from a single INI file mounted at `/etc/incidentrelay/incidentrelay.conf`. The chart renders that file from the `config` map in `values.yaml`: top-level keys become INI sections, nested keys become options.

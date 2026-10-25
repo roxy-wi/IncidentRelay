@@ -336,3 +336,42 @@ def test_changed_encryption_key_refuses_to_start_after_upgrading(tmp_path):
 
     assert result.returncode != 0
     assert "main.secret_encryption_key differs" in result.stderr
+
+
+def test_runtime_config_refuses_symlinked_lock_file(tmp_path):
+    runtime = tmp_path / "runtime"
+    runtime.mkdir()
+    outside = tmp_path / "outside"
+    outside.write_text("never modify outside the volume", encoding="utf-8")
+    (runtime / "incidentrelay.conf.lock").symlink_to(outside)
+
+    result = _start(tmp_path, "[main]\ntimezone = UTC\n")
+
+    assert result.returncode != 0
+    assert outside.read_text(encoding="utf-8") == "never modify outside the volume"
+    assert not (runtime / "incidentrelay.conf").exists()
+
+
+def test_runtime_config_refuses_symlinked_persisted_config(tmp_path):
+    runtime = tmp_path / "runtime"
+    runtime.mkdir()
+    outside = tmp_path / "outside"
+    outside.write_text("[main]\nsecret_key = no-read-outside\n", encoding="utf-8")
+    (runtime / "incidentrelay.conf").symlink_to(outside)
+
+    result = _start(tmp_path, "[main]\ntimezone = UTC\n")
+
+    assert result.returncode != 0
+    assert (runtime / "incidentrelay.conf").is_symlink()
+    assert "no-read-outside" in outside.read_text(encoding="utf-8")
+
+
+def test_runtime_config_refuses_symlink_as_the_data_directory(tmp_path):
+    outside = tmp_path / "outside"
+    outside.mkdir()
+    (tmp_path / "runtime").symlink_to(outside, target_is_directory=True)
+
+    result = _start(tmp_path, "[main]\ntimezone = UTC\n")
+
+    assert result.returncode != 0
+    assert list(outside.iterdir()) == []

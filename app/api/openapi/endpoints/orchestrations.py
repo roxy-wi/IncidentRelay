@@ -153,6 +153,15 @@ ACTION_SCHEMA = {
         "group_key": {"type": "string"},
         "dedup_key": {"type": "string"},
         "window_seconds": {"type": "integer", "minimum": 0, "maximum": 86400},
+        "reopen_window_seconds": {
+            "type": "integer", "minimum": 0, "maximum": 86400, "default": 0,
+            "description": (
+                "Opt-in grace period for reusing a resolved AlertGroup when a NEW firing "
+                "occurrence arrives with the same source, group key, team, route and service. "
+                "0 (default) disables reopen. Independent of window_seconds. "
+                "A reopened group gets a new child Alert; resolved children remain terminal."
+            ),
+        },
         "seconds": {"type": "integer", "minimum": 1, "maximum": 604800},
         "reason": {"type": "string", "maxLength": 8192},
         "retrigger": {"type": "string"},

@@ -5,6 +5,7 @@ from datetime import timedelta
 from email.message import EmailMessage
 
 from app import Config
+from app.modules.db import rotations_repo
 from app.modules.db.models import (
     OnCallShiftEmailNotification,
     OnCallShiftMattermostNotification,
@@ -14,6 +15,7 @@ from app.modules.db.models import (
 from app.notifiers.registry import get_notifier
 from app.notifiers.types import MATTERMOST_CHANNEL
 from app.services.calendar_service import build_rotation_calendar
+from app.services.rotation_schedule import layer_duration_seconds
 from app.modules.common import as_utc_naive, utc_now
 
 logger = logging.getLogger("oncall.shift_notifications")
@@ -323,6 +325,43 @@ def _event_due(event, event_type, window_start, now):
     return False
 
 
+def _shift_calendar_context(rotation, transition_start, transition_end):
+    """Build an unclipped context around due shift transitions.
+
+    Calendar events are clipped to their query boundaries. Querying only the
+    scheduler lookback corrupts the *opposite* end of a shift (including
+    persisted notification log fields). Extend by at least a whole slot on
+    either side. Keep the narrow transition window for deciding what is due.
+
+    Long overrides may be wider than the rotation's normal slot, so their
+    actual endpoints must also fit in the context.
+    """
+    layers = rotations_repo.list_rotation_layers(rotation.id, enabled_only=True)
+    slot_seconds = max(
+        [86400, int(rotation.duration_seconds or 86400)]
+        + [layer_duration_seconds(layer) for layer in layers]
+    )
+    margin = timedelta(seconds=slot_seconds * 2 + 86400)
+    start_at = transition_start - margin
+    end_at = transition_end + margin
+
+    # An override may span multiple regular shifts. Include its true edges
+    # rather than reporting the artificial context boundary as its end.
+    for override in rotations_repo.list_rotation_overrides(
+        rotation.id, transition_start, transition_end
+    ):
+        start_at = min(start_at, as_utc_naive(override.starts_at) - timedelta(seconds=1))
+        end_at = max(end_at, as_utc_naive(override.ends_at) + timedelta(seconds=1))
+
+    return start_at, end_at
+
+
+def _shift_transition_events(rotation, window_start, window_end):
+    """Return calendar slices with genuine boundaries around the due window."""
+    start_at, end_at = _shift_calendar_context(rotation, window_start, window_end)
+    return build_rotation_calendar(rotation, start_at, end_at)
+
+
 def send_due_oncall_shift_email_notifications(now=None, lookback_seconds=None):
     """
     Send email notifications for shifts that started or ended recently.
@@ -356,7 +395,7 @@ def send_due_oncall_shift_email_notifications(now=None, lookback_seconds=None):
     )
 
     for rotation in rotations:
-        events = build_rotation_calendar(rotation, window_start, window_end)
+        events = _shift_transition_events(rotation, window_start, window_end)
 
         for event in events:
             if _event_due(event, SHIFT_START, window_start, now):
@@ -404,7 +443,7 @@ def send_due_oncall_shift_mattermost_notifications(now=None, lookback_seconds=No
     )
 
     for rotation in rotations:
-        events = build_rotation_calendar(rotation, window_start, window_end)
+        events = _shift_transition_events(rotation, window_start, window_end)
 
         for event in events:
             if _event_due(event, SHIFT_START, window_start, now):

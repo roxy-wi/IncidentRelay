@@ -107,7 +107,7 @@
   "channels.webhook.slack": "Slack Webhook 地址",
   "channels.webhook.discord": "Discord Webhook 地址",
   "channels.webhook.teams": "Microsoft Teams Webhook 地址",
-  "channels.email.help": "邮件通知会发送到已分配用户的个人资料邮箱。",
+  "channels.email.help": "选择真实告警邮件的收件人。SMTP 在全局配置。",
   "channels.email.template": "HTML 模板",
   "channels.email.reset": "恢复默认模板",
   "channels.email.placeholders": "支持的占位符：{alert_id}、{event_type}、{title}、{message}、{severity}、{status}、{team}、{assignee}、{source}、{alert_url}。保持默认模板不变即可使用内置模板。",
@@ -157,5 +157,16 @@
   "channels.slack.app_token": "应用级 Token",
   "channels.slack.app_token_help": "以 xapp- 开头且具有 connections:write 权限的 Slack 应用级 Token。Slack Worker 必须保持运行。",
   "channels.config.bot_http_ready": "Bot API 已配置 HTTP 交互操作",
-  "channels.config.bot_socket_ready": "Bot API 已配置 Socket Mode"
+  "channels.config.bot_socket_ready": "Bot API 已配置 Socket Mode",
+  "channels.email.recipient_mode": "收件人模式",
+  "channels.email.mode_assignee": "负责人邮箱",
+  "channels.email.mode_fallback": "负责人邮箱（带备用地址）",
+  "channels.email.mode_fixed": "固定收件人",
+  "channels.email.recipient_mode_help": "仅当负责人未设置邮箱时使用备用地址；固定收件人始终使用指定地址。",
+  "channels.email.recipient_email": "收件人邮箱地址",
+  "channels.email.recipient_email_help": "仅允许一个备用或固定邮箱地址，不支持地址列表。",
+  "channels.email.test_help": "测试邮件始终发送到您个人资料中的邮箱，而非备用或固定地址。",
+  "channels.email.template_custom": "自定义 HTML 模板",
+  "channels.email.template_default": "默认 HTML 模板",
+  "channels.validation.recipient_email_required": "请为备用或固定收件人输入邮箱地址。"
 }

@@ -892,6 +892,89 @@ def tags():
     ]
 
 
+OPENSEARCH_WEBHOOK_BODY_SCHEMA = {
+    "type": "object",
+    "additionalProperties": True,
+    "description": (
+        "OpenSearch Alerting custom webhook action JSON. "
+        "For bucket monitors include a stable bucket_key, and send one payload "
+        "per bucket. monitor_id and trigger_id are required logically, "
+        "but may come from nested monitor.id/trigger.id or ctx; title, "
+        "severity, alert ID and status do not affect dedup."
+    ),
+    "properties": {
+        "monitor_id": {"type": "string", "description": "Stable monitor id."},
+        "trigger_id": {"type": "string", "description": "Stable trigger id."},
+        "bucket_key": {"type": "string", "description": "Stable bucket key for bucket-level monitors."},
+        "bucket_keys": {"type": "array", "items": {"type": "string"}},
+        "alert_id": {"type": "string", "description": "OpenSearch alert record id for tracing only."},
+        "monitor_name": {"type": "string"},
+        "trigger_name": {"type": "string"},
+        "title": {"type": "string"},
+        "message": {"type": "string"},
+        "severity": {"type": "string", "description": "OpenSearch trigger severity 1-5 or a severity name."},
+        "status": {
+            "type": "string",
+            "description": (
+                "ACTIVE (firing) or COMPLETED/recovered/resolved (resolved). "
+                "Recovery is processed only when the sender explicitly posts a recovery payload."
+            ),
+        },
+        "labels": {"type": "object", "additionalProperties": True},
+        "monitor_url": {"type": "string", "format": "uri"},
+        "team": {"type": "string"},
+    },
+    "example": {
+        "monitor_id": "monitor-123",
+        "trigger_id": "trigger-456",
+        "monitor_name": "Production error rate",
+        "trigger_name": "Errors exceed threshold",
+        "status": "ACTIVE",
+        "severity": "2",
+        "message": "Error rate exceeded 5%",
+        "labels": {"service": "api", "environment": "prod"},
+    },
+}
+
+KIBANA_WEBHOOK_BODY_SCHEMA = {
+    "type": "object",
+    "additionalProperties": True,
+    "description": (
+        "Kibana Alerting per-alert Webhook connector body. Use a separate "
+        "recovery action with the same rule_id, alert_id and space_id. "
+        "rule_id/alert_id (or nested rule.id/alert.id) are required logically; "
+        "alert summaries without individual IDs are not accepted."
+    ),
+    "properties": {
+        "rule_id": {"type": "string", "description": "Stable Kibana rule ID."},
+        "alert_id": {"type": "string", "description": "Stable alert instance ID (alert.id)."},
+        "space_id": {"type": "string", "description": "Kibana space; defaults to default."},
+        "rule_name": {"type": "string"},
+        "title": {"type": "string"},
+        "message": {"type": "string"},
+        "status": {
+            "type": "string",
+            "description": "active/firing or recovered/resolved; can be an alert action group.",
+        },
+        "action_group": {"type": "string"},
+        "flapping": {"oneOf": [{"type": "boolean"}, {"type": "string"}]},
+        "severity": {"type": "string"},
+        "labels": {"type": "object", "additionalProperties": True},
+        "rule_url": {"type": "string", "format": "uri"},
+        "team": {"type": "string"},
+    },
+    "example": {
+        "rule_id": "rule-123",
+        "alert_id": "instance-api-1",
+        "space_id": "default",
+        "rule_name": "API error rate",
+        "message": "Error rate exceeded 5%",
+        "status": "active",
+        "rule_url": "https://kibana.example.com/app/management/insightsAndAlerting/triggersActions/rule/rule-123",
+    },
+}
+
+
 def paths():
     """
     Return OpenAPI paths for integration endpoints.
@@ -2574,6 +2657,42 @@ def paths():
                 "responses": incoming_alert_responses(
                     "Grafana alerts accepted."
                 ),
+            },
+        },
+        "/api/integrations/opensearch": {
+            "post": {
+                "tags": ["integrations"],
+                "summary": "Receive OpenSearch Alerting webhook notifications",
+                "description": (
+                    "Accepts custom per-trigger OpenSearch Alerting JSON via "
+                    "an Authorization Bearer route token whose source is opensearch. "
+                    "Stable identity is monitor_id + trigger_id + optional bucket_key "
+                    "within the route. Does not infer recovery from absent events."
+                ),
+                "operationId": "receiveOpenSearchAlerts",
+                "security": [{"bearerAuth": []}],
+                "requestBody": json_body(
+                    "OpenSearch Alerting custom action body.", OPENSEARCH_WEBHOOK_BODY_SCHEMA,
+                ),
+                "responses": incoming_alert_responses("OpenSearch alert accepted."),
+            },
+        },
+        "/api/integrations/kibana": {
+            "post": {
+                "tags": ["integrations"],
+                "summary": "Receive Kibana Alerting per-alert webhook notifications",
+                "description": (
+                    "Accepts Kibana Webhook connector JSON through an Authorization "
+                    "Bearer route token with source=kibana. Rule ID, alert ID and "
+                    "space ID form one dedup identity. Configure separate active and "
+                    "recovery actions; aggregated summaries are not supported."
+                ),
+                "operationId": "receiveKibanaAlerts",
+                "security": [{"bearerAuth": []}],
+                "requestBody": json_body(
+                    "Kibana per-alert connector body.", KIBANA_WEBHOOK_BODY_SCHEMA,
+                ),
+                "responses": incoming_alert_responses("Kibana alert accepted."),
             },
         },
         "/api/integrations/datadog": {

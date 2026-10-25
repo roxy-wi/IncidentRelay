@@ -6,6 +6,7 @@ from app.modules.db import rotations_repo
 from app.modules.db.models import (
     Alert,
     AlertGroup,
+    IncidentStakeholder,
     AlertRoute,
     AlertRouteChannel,
     Group,
@@ -82,6 +83,25 @@ def create_user(
         )
 
     return user
+
+
+def create_incident_stakeholder(
+    alert_group: AlertGroup,
+    user: User,
+    *,
+    notify_on_resolved: bool = True,
+) -> IncidentStakeholder:
+    """Create a stakeholder subscription for notification regression tests."""
+    return IncidentStakeholder.create(
+        group=alert_group,
+        user=user,
+        email=user.email,
+        display_name=user.display_name or user.username,
+        role="stakeholder",
+        source="manual",
+        notify_on_resolved=notify_on_resolved,
+        active=True,
+    )
 
 
 def create_team(group: Group, name: str | None = None, slug: str | None = None) -> Team:

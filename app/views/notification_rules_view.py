@@ -5,12 +5,24 @@ from app.api.schemas.notification_rules import (
     NotificationRuleUpdateSchema,
 )
 from app.services.notifications import rules
+from app.services.audit import write_audit
 from app.services.validation import (
     safe_exception_response,
     validate_body,
 )
 
 notification_rules_bp = Blueprint("notification_rules_api", __name__)
+
+
+def _audit_rule(action, rule, *, changed_fields=None):
+    """Audit a personal notification-rule mutation without message contents."""
+    details = {"source": "api"}
+    if changed_fields is not None:
+        details["changed_fields"] = sorted(changed_fields)
+    write_audit(
+        action, object_type="user_notification_rule",
+        object_id=rule.id, user_id=request.current_user.id, data=details,
+    )
 
 
 @notification_rules_bp.route("/profile/notification-rules", methods=["GET"])
@@ -44,6 +56,7 @@ def create_profile_notification_rule():
             status_code=400,
         )
 
+    _audit_rule("profile.notification_rule.create", rule)
     return jsonify(rules.serialize_rule(rule)), 201
 
 
@@ -68,6 +81,7 @@ def update_profile_notification_rule(rule_id):
             status_code=400,
         )
 
+    _audit_rule("profile.notification_rule.update", rule, changed_fields=data.model_fields_set)
     return jsonify(rules.serialize_rule(rule))
 
 
@@ -86,6 +100,7 @@ def delete_profile_notification_rule(rule_id):
             status_code=404,
         )
 
+    _audit_rule("profile.notification_rule.delete", rule)
     return jsonify(
         {
             "deleted": True,

@@ -1,5 +1,8 @@
 from flask import Blueprint, jsonify, request
 
+from app.db import database_proxy as db
+from app.modules.db.models import BusinessService
+
 from app.api.schemas.business_services import (
     BusinessServiceComponentCreateSchema,
     BusinessServiceComponentUpdateSchema,
@@ -8,6 +11,7 @@ from app.api.schemas.business_services import (
     BusinessServiceManualStatusSchema,
 )
 from app.modules.db import business_services_repo, services_repo, teams_repo
+from app.services.audit import write_audit
 from app.services.business_services.status import apply_business_service_status
 from app.services.service_catalog.impact import build_service_effective_impact_map
 from app.services.rbac import (
@@ -26,6 +30,33 @@ from app.modules.common import as_utc_naive, utc_now
 
 
 business_services_bp = Blueprint("business_services", __name__, url_prefix="/api/business-services")
+
+
+def _lock_business_service(business_service_id):
+    """Serialize service/component writes on the owning BusinessService row.
+
+    PostgreSQL obtains a row lock, while SQLite uses its transaction-level
+    writer serialization. The caller must already be inside ``db.atomic()``.
+    """
+    query = BusinessService.select().where(
+        (BusinessService.id == business_service_id)
+        & (BusinessService.deleted == False)  # noqa: E712
+    )
+    database = getattr(db, "obj", None)
+    if database is not None and database.__class__.__name__ != "SqliteDatabase":
+        query = query.for_update()
+    return query.get()
+
+
+def _audit_business_service(action, item, *, object_type="business_service", object_id=None, data=None):
+    """Record a business-service change with its owning group and API actor."""
+    write_audit(
+        action, object_type=object_type,
+        object_id=item.id if object_id is None else object_id,
+        group_id=item.group_id,
+        team_id=item.owner_team_id,
+        data=data or {},
+    )
 
 
 def require_business_group_read(group_id):
@@ -202,22 +233,25 @@ def create_business_service():
         if error:
             return error
 
-    item = business_services_repo.create_business_service({
-        "group": payload.group_id,
-        "owner_team": payload.owner_team_id,
-        "slug": payload.slug,
-        "name": payload.name,
-        "description": payload.description,
-        "criticality": payload.criticality,
-        "tier": payload.tier,
-        "public": payload.public,
-        "public_name": payload.public_name,
-        "public_description": payload.public_description,
-        "public_order": payload.public_order,
-        "labels": payload.labels,
-        "metadata": payload.metadata,
-        "enabled": payload.enabled,
-    })
+    with db.atomic():
+        item = business_services_repo.create_business_service({
+            "group": payload.group_id,
+            "owner_team": payload.owner_team_id,
+            "slug": payload.slug,
+            "name": payload.name,
+            "description": payload.description,
+            "criticality": payload.criticality,
+            "tier": payload.tier,
+            "public": payload.public,
+            "public_name": payload.public_name,
+            "public_description": payload.public_description,
+            "public_order": payload.public_order,
+            "labels": payload.labels,
+            "metadata": payload.metadata,
+            "enabled": payload.enabled,
+        })
+
+        _audit_business_service("business_service.create", item)
 
     return jsonify(serialize_business_service(item, current_user=current_user)), 201
 
@@ -258,21 +292,25 @@ def update_business_service(business_service_id):
         if error:
             return error
 
-    item = business_services_repo.update_business_service(item.id, {
-        "owner_team": payload.owner_team_id,
-        "slug": payload.slug,
-        "name": payload.name,
-        "description": payload.description,
-        "criticality": payload.criticality,
-        "tier": payload.tier,
-        "public": payload.public,
-        "public_name": payload.public_name,
-        "public_description": payload.public_description,
-        "public_order": payload.public_order,
-        "labels": payload.labels,
-        "metadata": payload.metadata,
-        "enabled": payload.enabled,
-    })
+    with db.atomic():
+        _lock_business_service(item.id)
+        item = business_services_repo.update_business_service(item.id, {
+            "owner_team": payload.owner_team_id,
+            "slug": payload.slug,
+            "name": payload.name,
+            "description": payload.description,
+            "criticality": payload.criticality,
+            "tier": payload.tier,
+            "public": payload.public,
+            "public_name": payload.public_name,
+            "public_description": payload.public_description,
+            "public_order": payload.public_order,
+            "labels": payload.labels,
+            "metadata": payload.metadata,
+            "enabled": payload.enabled,
+        })
+
+        _audit_business_service("business_service.update", item)
 
     return jsonify(serialize_business_service(item, current_user=current_user))
 
@@ -284,7 +322,11 @@ def delete_business_service(business_service_id):
     if error:
         return error
 
-    business_services_repo.soft_delete_business_service(item.id)
+    with db.atomic():
+        _lock_business_service(item.id)
+        business_services_repo.soft_delete_business_service(item.id)
+        _audit_business_service("business_service.delete", item)
+
     return "", 204
 
 
@@ -317,18 +359,25 @@ def create_business_service_component(business_service_id):
     if service.group_id != item.group_id:
         return jsonify({"error": "service_group_mismatch"}), 400
 
-    component = business_services_repo.create_business_service_component(item.id, {
-        "service": payload.service_id,
-        "component_type": payload.component_type,
-        "criticality": payload.criticality,
-        "impact_weight": payload.impact_weight,
-        "position": payload.position,
-        "status_rule": payload.status_rule,
-        "description": payload.description,
-        "enabled": payload.enabled,
-    })
+    with db.atomic():
+        _lock_business_service(item.id)
+        component = business_services_repo.create_business_service_component(item.id, {
+            "service": payload.service_id,
+            "component_type": payload.component_type,
+            "criticality": payload.criticality,
+            "impact_weight": payload.impact_weight,
+            "position": payload.position,
+            "status_rule": payload.status_rule,
+            "description": payload.description,
+            "enabled": payload.enabled,
+        })
 
-    apply_business_service_status(item)
+        apply_business_service_status(item)
+        _audit_business_service(
+            "business_service.component.create", item,
+            object_type="business_service_component", object_id=component.id,
+            data={"service_id": component.service_id},
+        )
 
     return jsonify(_serialize_components([component], current_user=current_user)[0]), 201
 
@@ -352,18 +401,25 @@ def update_business_service_component(component_id):
     if service.group_id != item.group_id:
         return jsonify({"error": "service_group_mismatch"}), 400
 
-    component = business_services_repo.update_business_service_component(existing.id, {
-        "service": payload.service_id,
-        "component_type": payload.component_type,
-        "criticality": payload.criticality,
-        "impact_weight": payload.impact_weight,
-        "position": payload.position,
-        "status_rule": payload.status_rule,
-        "description": payload.description,
-        "enabled": payload.enabled,
-    })
+    with db.atomic():
+        _lock_business_service(item.id)
+        component = business_services_repo.update_business_service_component(existing.id, {
+            "service": payload.service_id,
+            "component_type": payload.component_type,
+            "criticality": payload.criticality,
+            "impact_weight": payload.impact_weight,
+            "position": payload.position,
+            "status_rule": payload.status_rule,
+            "description": payload.description,
+            "enabled": payload.enabled,
+        })
 
-    apply_business_service_status(item)
+        apply_business_service_status(item)
+        _audit_business_service(
+            "business_service.component.update", item,
+            object_type="business_service_component", object_id=component.id,
+            data={"service_id": component.service_id},
+        )
 
     return jsonify(_serialize_components([component], current_user=current_user)[0])
 
@@ -376,8 +432,15 @@ def delete_business_service_component(component_id):
     if error:
         return error
 
-    business_services_repo.soft_delete_business_service_component(component.id)
-    apply_business_service_status(item)
+    with db.atomic():
+        _lock_business_service(item.id)
+        business_services_repo.soft_delete_business_service_component(component.id)
+        apply_business_service_status(item)
+        _audit_business_service(
+            "business_service.component.delete", item,
+            object_type="business_service_component", object_id=component.id,
+        )
+
     return "", 204
 
 
@@ -393,7 +456,12 @@ def recalculate_business_service(business_service_id):
     if error:
         return error
 
-    return jsonify(_business_service_details_payload(item, current_user=request.current_user))
+    with db.atomic():
+        _lock_business_service(item.id)
+        result = _business_service_details_payload(item, current_user=request.current_user)
+        _audit_business_service("business_service.recalculate", item)
+
+    return jsonify(result)
 
 
 @business_services_bp.route("/<int:business_service_id>/manual-status", methods=["POST"])
@@ -418,15 +486,22 @@ def set_business_service_manual_status(business_service_id):
     if until is not None and until <= utc_now():
         return jsonify({"error": "Manual status expiration must be in the future"}), 400
 
-    item = business_services_repo.set_business_service_manual_status(
-        item.id,
-        manual_status=payload.status,
-        message=payload.message,
-        until=until,
-        user_id=request.current_user.id if request.current_user else None,
-    )
+    with db.atomic():
+        _lock_business_service(item.id)
+        item = business_services_repo.set_business_service_manual_status(
+            item.id,
+            manual_status=payload.status,
+            message=payload.message,
+            until=until,
+            user_id=request.current_user.id if request.current_user else None,
+        )
+        _audit_business_service(
+            "business_service.manual_status.set", item,
+            data={"status": payload.status, "until": until.isoformat() if until else None},
+        )
+        details = _business_service_details_payload(item, current_user=request.current_user)
 
-    return jsonify(_business_service_details_payload(item, current_user=request.current_user))
+    return jsonify(details)
 
 
 @business_services_bp.route("/<int:business_service_id>/manual-status", methods=["DELETE"])
@@ -441,6 +516,10 @@ def clear_business_service_manual_status(business_service_id):
     if error:
         return error
 
-    item = business_services_repo.clear_business_service_manual_status(item.id)
+    with db.atomic():
+        _lock_business_service(item.id)
+        item = business_services_repo.clear_business_service_manual_status(item.id)
+        _audit_business_service("business_service.manual_status.clear", item)
+        details = _business_service_details_payload(item, current_user=request.current_user)
 
-    return jsonify(_business_service_details_payload(item, current_user=request.current_user))
+    return jsonify(details)

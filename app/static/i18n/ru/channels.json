@@ -107,7 +107,7 @@
   "channels.webhook.slack": "URL webhook Slack",
   "channels.webhook.discord": "URL webhook Discord",
   "channels.webhook.teams": "URL webhook Microsoft Teams",
-  "channels.email.help": "Email-уведомления отправляются на адрес из профиля назначенного пользователя.",
+  "channels.email.help": "Выберите получателя обычных email-уведомлений. SMTP настраивается глобально.",
   "channels.email.template": "HTML-шаблон",
   "channels.email.reset": "Восстановить стандартный",
   "channels.email.placeholders": "Поддерживаемые переменные: {alert_id}, {event_type}, {title}, {message}, {severity}, {status}, {team}, {assignee}, {source}, {alert_url}. Не изменяйте стандартный шаблон, чтобы использовать встроенный вариант.",
@@ -157,5 +157,16 @@
   "channels.slack.app_token": "App-level token",
   "channels.slack.app_token_help": "App-level token Slack, начинающийся с xapp-, со scope connections:write. Slack worker должен быть запущен.",
   "channels.config.bot_http_ready": "Bot API настроен с HTTP-действиями",
-  "channels.config.bot_socket_ready": "Bot API настроен с Socket Mode"
+  "channels.config.bot_socket_ready": "Bot API настроен с Socket Mode",
+  "channels.email.recipient_mode": "Режим получателя",
+  "channels.email.mode_assignee": "Email назначенного пользователя",
+  "channels.email.mode_fallback": "Email назначенного пользователя с резервным адресом",
+  "channels.email.mode_fixed": "Фиксированный получатель",
+  "channels.email.recipient_mode_help": "Резервный адрес используется только при отсутствии email у назначенного пользователя. Фиксированный получатель используется всегда.",
+  "channels.email.recipient_email": "Email-адрес получателя",
+  "channels.email.recipient_email_help": "Один адрес для резервного или фиксированного получателя; список адресов не поддерживается.",
+  "channels.email.test_help": "Кнопка Test отправляет письмо на email вашего профиля, а не на резервный или фиксированный адрес.",
+  "channels.email.template_custom": "Свой HTML-шаблон",
+  "channels.email.template_default": "Стандартный HTML-шаблон",
+  "channels.validation.recipient_email_required": "Укажите email-адрес для резервного или фиксированного получателя."
 }

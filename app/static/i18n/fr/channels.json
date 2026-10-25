@@ -107,7 +107,7 @@
   "channels.webhook.slack": "URL du webhook Slack",
   "channels.webhook.discord": "URL du webhook Discord",
   "channels.webhook.teams": "URL du webhook Microsoft Teams",
-  "channels.email.help": "Les notifications par e-mail sont envoyées à l’adresse du profil de l’utilisateur affecté.",
+  "channels.email.help": "Choisissez le destinataire des alertes par e-mail. SMTP est configuré globalement.",
   "channels.email.template": "Modèle HTML",
   "channels.email.reset": "Rétablir le modèle par défaut",
   "channels.email.placeholders": "Espaces réservés pris en charge : {alert_id}, {event_type}, {title}, {message}, {severity}, {status}, {team}, {assignee}, {source}, {alert_url}. Laissez le modèle par défaut inchangé pour utiliser le modèle intégré.",
@@ -157,5 +157,16 @@
   "channels.slack.app_token": "Jeton de niveau application",
   "channels.slack.app_token_help": "Jeton Slack de niveau application commençant par xapp- et disposant de la portée connections:write. Le worker Slack doit être en cours d’exécution.",
   "channels.config.bot_http_ready": "API du bot configurée avec des actions HTTP",
-  "channels.config.bot_socket_ready": "API du bot configurée avec le mode Socket"
+  "channels.config.bot_socket_ready": "API du bot configurée avec le mode Socket",
+  "channels.email.recipient_mode": "Mode de destinataire",
+  "channels.email.mode_assignee": "E-mail du responsable",
+  "channels.email.mode_fallback": "E-mail du responsable avec adresse de secours",
+  "channels.email.mode_fixed": "Destinataire fixe",
+  "channels.email.recipient_mode_help": "L’adresse de secours sert uniquement si le responsable n’a pas d’e-mail. Le destinataire fixe est toujours utilisé.",
+  "channels.email.recipient_email": "Adresse e-mail du destinataire",
+  "channels.email.recipient_email_help": "Une seule adresse pour le secours ou le destinataire fixe, pas de liste.",
+  "channels.email.test_help": "Le test est toujours envoyé à l’e-mail de votre profil, pas à l’adresse de secours ou fixe.",
+  "channels.email.template_custom": "Modèle HTML personnalisé",
+  "channels.email.template_default": "Modèle HTML par défaut",
+  "channels.validation.recipient_email_required": "Saisissez une adresse e-mail pour le secours ou le destinataire fixe."
 }

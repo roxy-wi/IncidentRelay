@@ -3,7 +3,9 @@ from datetime import timedelta
 import pytest
 
 from app.modules.common import utc_now
-from app.modules.db.models import Alert, AlertComment, AlertEvent, AlertGroup
+from app.modules.db.models import (
+    Alert, AlertComment, AlertEvent, AlertGroup, RecoveryNotificationDelivery,
+)
 from app.services.alerts.retention import cleanup_alert_history
 
 
@@ -75,6 +77,40 @@ def test_cleanup_deletes_old_resolved_group_and_dependent_history(db):
     assert Alert.get_or_none(Alert.id == alert.id) is None
     assert AlertEvent.get_or_none(AlertEvent.id == event.id) is None
     assert AlertComment.get_or_none(AlertComment.id == comment.id) is None
+
+
+
+def test_recovery_deliveries_follow_alert_group_retention(db):
+    """No separate retention job: child delivery rows cascade with their group."""
+    now = utc_now()
+    resolved_at = now - timedelta(days=31)
+    old = _group(resolved_at=resolved_at, suffix="recovery-old")
+    _alert(group=old, resolved_at=resolved_at, suffix="recovery-old")
+    recent_at = now - timedelta(days=3)
+    recent = _group(resolved_at=recent_at, suffix="recovery-recent")
+    _alert(group=recent, resolved_at=recent_at, suffix="recovery-recent")
+
+    targets = []
+    for group in (old, recent):
+        targets.append(RecoveryNotificationDelivery.create(
+            group=group,
+            resolved_at=group.resolved_at,
+            target_kind="channel",
+            target_id=group.id,
+            status="sent",
+            next_attempt_at=group.resolved_at,
+            delivered_at=group.resolved_at,
+        ))
+
+    cleaned = cleanup_alert_history(retention_days=30, now=now)
+    assert cleaned["groups_deleted"] == 1
+    assert RecoveryNotificationDelivery.get_or_none(
+        RecoveryNotificationDelivery.id == targets[0].id
+    ) is None
+    assert RecoveryNotificationDelivery.get_or_none(
+        RecoveryNotificationDelivery.id == targets[1].id
+    ) is not None
+    assert AlertGroup.get_by_id(recent.id).status == "resolved"
 
 
 def test_cleanup_keeps_recent_resolved_and_active_groups(db):

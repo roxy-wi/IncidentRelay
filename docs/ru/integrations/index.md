@@ -22,6 +22,8 @@ Monitoring system -> Incoming integration -> Route -> Notification channels -> U
 | Alertmanager        | `POST /api/integrations/alertmanager`      | [Alertmanager](alertmanager.md)                           |
 | AWS SNS/Cloud watch | `POST /api/integrations/aws-sns`           | [AWS SNS/Cloud watch](aws-sns-cloudwatch.md)              |
 | Grafana             | `POST /api/integrations/grafana`           | [Grafana](grafana.md)                                     |
+| OpenSearch Alerting | `POST /api/integrations/opensearch` | [OpenSearch](opensearch.md) |
+| Kibana Alerting | `POST /api/integrations/kibana` | [Kibana](kibana.md) |
 | Datadog             | `POST /api/integrations/datadog`           | [Datadog](datadog.md)                                     |
 | New Relic           | `POST /api/integrations/new-relic`         | [New Relic](new-relic.md)                                 |
 | Azure Monitor       | `POST /api/integrations/azure-monitor`      | [Azure Monitor](azure-monitor.md)                         |
@@ -44,7 +46,7 @@ Monitoring system -> Incoming integration -> Route -> Notification channels -> U
 |-----------------|--------------------------------------------------------------------------------|-----------------------------------------------|
 | Mattermost      | Уведомления в чате, опциональные кнопки ACK/Resolve/Shelve, обновления сообщений       | [Канал Mattermost](mattermost.md)             |
 | Telegram        | Уведомления через Telegram Bot API, опциональные inline-действия                | [Канал Telegram](telegram.md)                 |
-| Email           | Отправляет письмо на email из профиля назначенного пользователя                 | [Канал Email](email.md)                       |
+| Email           | Отправляет на email пользователя, резервный или фиксированный адрес                 | [Канал Email](email.md)                       |
 | Slack           | Уведомления через входящий webhook или Bot API с действиями ACK/Resolve/Shelve и обновлениями | [Канал Slack](slack.md)                      |
 | Discord         | Отправляет уведомления в вебхук Discord                                         | [Каналы на основе вебхуков](webhook-channels.md) |
 | Microsoft Teams | Отправляет уведомления в вебхук Teams                                           | [Каналы на основе вебхуков](webhook-channels.md) |

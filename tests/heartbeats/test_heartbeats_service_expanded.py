@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from app.modules.db.models import AlertGroup, HeartbeatPing
 from app.services.heartbeats.service import process_overdue_heartbeats, receive_heartbeat_ping
 from app.services.integrations.auth import hash_token
-from tests.factories import create_group, create_heartbeat, create_route, create_service, create_team, create_user, add_user_to_team
+from tests.factories import create_channel, create_group, create_heartbeat, create_route, create_service, create_team, create_user, add_user_to_team
 from app.modules.common import utc_now
 
 
@@ -991,3 +991,77 @@ def test_instance_ping_recovery_sends_resolved_notification(
     assert error is None
     assert recovered.status == "ok"
     assert deliveries == [(group.id, "resolved")]
+
+
+def test_heartbeat_auto_recovery_can_defer_outbound_notifications(monkeypatch, db):
+    """Heartbeat recovery must not skip the opt-in recovery hysteresis."""
+    from app.settings import Config
+    from app.services.alerts import notification_queue
+    from app.modules.db import notifications_repo
+
+    monkeypatch.setattr(Config, "RECOVERY_NOTIFICATION_DELAY_SECONDS", 120)
+    _, team, service, route = _fixture()
+    now = utc_now()
+    hb = create_heartbeat(
+        team,
+        route,
+        service=service,
+        token_hash=hash_token("hysteresis-hb-token"),
+        last_seen_at=now - timedelta(minutes=10),
+        next_expected_at=now - timedelta(minutes=5),
+        expected_interval_seconds=60,
+        grace_period_seconds=60,
+    )
+    process_overdue_heartbeats(now=now)
+    hb = hb.__class__.get_by_id(hb.id)
+    group = AlertGroup.get_by_id(hb.current_alert_group_id)
+    group.last_notification_at = now - timedelta(minutes=1)
+    group.save(only=[AlertGroup.last_notification_at])
+    # Recovery fanout in 2.4 uses persisted recipients from earlier
+    # successful firing notifications, not a global notify_stakeholders call.
+    channel = create_channel(team.group, team)
+    notifications_repo.save_notification(
+        group_id=group.id,
+        channel_id=channel.id,
+        provider="webhook",
+        event_type="notification",
+        provider_status="sent",
+    )
+
+    premature = []
+    monkeypatch.setattr(
+        "app.services.heartbeats.service.notify_alert",
+        lambda *a, **kwargs: premature.append("resolved"),
+    )
+    monkeypatch.setattr(
+        "app.services.alerts.actions.notify_stakeholders",
+        lambda *a, **kwargs: premature.append("stakeholders"),
+    )
+    recovered, error = receive_heartbeat_ping(
+        "hysteresis-hb-token", payload={"status": "completed"}, now=now,
+    )
+    assert error is None
+    assert recovered.status == "ok"
+    assert premature == []
+    saved = AlertGroup.get_by_id(group.id)
+    assert saved.status == "resolved"
+    assert saved.notification_pending
+    assert saved.notification_reason == "recovery"
+
+    delayed = []
+
+    def deliver_recovery(g, *, event_type, channel_ids, **kwargs):
+        assert g.id == group.id
+        assert event_type == "resolved"
+        assert channel_ids == {channel.id}
+        assert kwargs.get("report_channels") is True
+        assert kwargs.get("enqueue_rules") is False
+        delayed.append(event_type)
+        return {"sent": 1, "channels": {channel.id: {"status": "sent"}}}
+
+    monkeypatch.setattr(notification_queue, "notify_alert", deliver_recovery)
+    AlertGroup.update(notification_due_at=utc_now() - timedelta(seconds=1)).where(
+        AlertGroup.id == group.id,
+    ).execute()
+    assert notification_queue.process_due_alert_group_notifications()["sent"] == 1
+    assert delayed == ["resolved"]

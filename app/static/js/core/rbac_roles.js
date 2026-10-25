@@ -133,8 +133,9 @@ function getCurrentUserGroupRole(groupId) {
     }
 
     const group = asArray(currentUser.groups).find(function (item) {
-        return Number(item.id) === Number(groupId)
-            || Number(item.group_id) === Number(groupId);
+        // Profile groups contain a membership id and a distinct group_id.
+        // Matching membership ids can select roles from an unrelated group.
+        return Number(item.group_id) === Number(groupId);
     });
 
     return group ? group.role : null;
@@ -321,7 +322,7 @@ function getCurrentUserActiveGroupRole() {
     }
 
     const group = groups.find(function (item) {
-        return Number(item.group_id || item.id) === Number(activeGroupId);
+        return Number(item.group_id) === Number(activeGroupId);
     });
 
     return group ? group.role : null;

@@ -11,7 +11,13 @@ RUN apt-get update \
         ca-certificates \
         build-essential \
         libpq-dev \
+        passwd \
+        util-linux \
     && rm -rf /var/lib/apt/lists/*
+
+RUN groupadd --gid 10001 incidentrelay \
+    && useradd --uid 10001 --gid 10001 --create-home \
+         --home-dir /home/incidentrelay --shell /bin/bash incidentrelay
 
 COPY requirements.txt /opt/incidentrelay/requirements.txt
 
@@ -24,13 +30,16 @@ RUN mkdir -p \
       /etc/incidentrelay \
       /var/lib/incidentrelay \
       /var/log/incidentrelay \
-      /usr/local/lib/incidentrelay/voice_providers
+      /usr/local/lib/incidentrelay/voice_providers \
+    && chown incidentrelay:incidentrelay \
+       /var/lib/incidentrelay /var/log/incidentrelay
 
 COPY docker/incidentrelay.docker.conf /etc/incidentrelay/incidentrelay.conf
 COPY docker/entrypoint.sh /entrypoint.sh
 
 RUN chmod +x /entrypoint.sh
 
+ENV HOME=/home/incidentrelay
 ENV INCIDENTRELAY_CONFIG_FILE=/etc/incidentrelay/incidentrelay.conf
 ENV INCIDENTRELAY_SERVICE=web
 

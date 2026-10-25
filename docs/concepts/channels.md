@@ -59,7 +59,7 @@ Some channels send notifications directly to the assigned user.
 
 | Channel | Required user profile field |
 |---|---|
-| `email` | `email` |
+| `email` | `email` in assignee-only mode; optional with channel fallback/fixed recipient |
 | `voice_call` | `phone` |
 
 For channel tests, IncidentRelay should use the current user's matching profile field.

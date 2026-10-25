@@ -459,6 +459,10 @@ identical to the application container.
 - name: build-ca-bundle
   image: {{ include "incidentrelay.image" . }}
   imagePullPolicy: {{ .Values.image.pullPolicy }}
+  {{- with .Values.securityContext }}
+  securityContext:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
   command:
     - /bin/sh
     - -ec

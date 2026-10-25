@@ -233,5 +233,8 @@
   "orchestrations.simulator.active_draft_changes": "Active → brouillon",
   "orchestrations.edit.title": "Modifier l’orchestration d’événements",
   "orchestrations.edit.help": "Mettez à jour les métadonnées, la portée et les paramètres d’exécution.",
-  "orchestrations.simulator.alert_event_history": "Historique des événements d’alerte"
+  "orchestrations.simulator.alert_event_history": "Historique des événements d’alerte",
+  "orchestrations.rule_editor.reopen_window_placeholder": "Délai de réouverture (s ; 0 = désactivé)",
+  "orchestrations.rule_editor.reopen_window_label": "Délai de réouverture (secondes)",
+  "orchestrations.rule_editor.reopen_window_help": "Réutiliser un groupe résolu récemment pour une nouvelle alerte active correspondante. Indépendant du regroupement ; désactivé par défaut."
 }

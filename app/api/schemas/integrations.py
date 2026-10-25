@@ -106,6 +106,51 @@ class GrafanaWebhookSchema(ApiModel):
     message: str | None = None
 
 
+class OpenSearchWebhookSchema(ApiModel):
+    """Custom OpenSearch Alerting action JSON (not a raw search response)."""
+
+    model_config = ConfigDict(extra="allow")
+
+    monitor_id: str | int | None = None
+    trigger_id: str | int | None = None
+    monitor: PayloadMap = Field(default_factory=dict)
+    trigger: PayloadMap = Field(default_factory=dict)
+    ctx: PayloadMap = Field(default_factory=dict)
+    labels: PayloadMap = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def validate_identity(self):
+        data = self.model_dump(exclude_none=True)
+        from app.services.integrations.normalizers.search_alerting_common import provider_value
+        if not provider_value(data, "monitor_id", ("monitor", "id"), ("ctx", "monitor", "id")):
+            raise ValueError("OpenSearch payload requires monitor_id")
+        if not provider_value(data, "trigger_id", ("trigger", "id"), ("ctx", "trigger", "id")):
+            raise ValueError("OpenSearch payload requires trigger_id")
+        return self
+
+
+class KibanaWebhookSchema(ApiModel):
+    """One Kibana per-alert webhook, not an aggregate alert summary."""
+
+    model_config = ConfigDict(extra="allow")
+
+    rule_id: str | int | None = None
+    alert_id: str | int | None = None
+    rule: PayloadMap = Field(default_factory=dict)
+    alert: PayloadMap = Field(default_factory=dict)
+    labels: PayloadMap = Field(default_factory=dict)
+
+    @model_validator(mode="after")
+    def validate_identity(self):
+        data = self.model_dump(exclude_none=True)
+        from app.services.integrations.normalizers.search_alerting_common import provider_value
+        if not provider_value(data, "rule_id", ("rule", "id")):
+            raise ValueError("Kibana payload requires rule_id")
+        if not provider_value(data, "alert_id", ("alert", "id")):
+            raise ValueError("Kibana payload requires alert_id")
+        return self
+
+
 class ZabbixWebhookSchema(ApiModel):
     """Validate Zabbix webhook payload at envelope level."""
 

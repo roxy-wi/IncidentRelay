@@ -100,6 +100,8 @@ config:
     alert_group_interval_seconds: 300
     alert_group_notification_check_interval_seconds: 10
     alert_group_notification_batch_size: 100
+    # Opt-in delayed recovery notifications; independent of reopen_window_seconds.
+    recovery_notification_delay_seconds: 0
     silence_lifecycle_check_interval_seconds: 30
     shelve_lifecycle_check_interval_seconds: 30
     shelve_lifecycle_batch_size: 100
@@ -304,8 +306,22 @@ serviceMonitor:
   # existingConfigSecret, a token from a file or a plain value.
   bearerTokenSecret: {}
 
-podSecurityContext: {}
-securityContext: {}
+# IncidentRelay pods and the custom-CA init container run without root.
+# Existing PVCs must permit UID/GID 10001 to read and write; fsGroup supports
+# most volume drivers but may not work with NFS/root_squash or some CSI drivers.
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001
+  fsGroupChangePolicy: OnRootMismatch
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  seccompProfile:
+    type: RuntimeDefault
 
 # Extra volumes / mounts added to every component, e.g. custom voice
 # provider plugins for /usr/local/lib/incidentrelay/voice_providers.

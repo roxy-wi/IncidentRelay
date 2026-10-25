@@ -12,6 +12,7 @@ from app.modules.db import (
 )
 from app.services.integrations.auth import create_raw_token, hash_token
 from app.services.audit import write_audit
+from app.db import database_proxy as db
 from app.services.rbac import (
     current_user,
     get_allowed_team_ids,
@@ -799,5 +800,12 @@ def delete_route_channel(route_id, channel_id):
     if error:
         return error
 
-    routes_repo.unlink_route_channel(route_id, channel_id)
+    with db.atomic():
+        removed = routes_repo.unlink_route_channel(route_id, channel_id)
+        if removed:
+            write_audit(
+                "route.channel.remove", object_type="route", object_id=route_id,
+                team_id=route_before.team_id,
+                data={"source": "api", "channel_id": channel_id},
+            )
     return jsonify({"status": "deleted"})

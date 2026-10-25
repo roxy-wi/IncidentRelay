@@ -73,5 +73,7 @@
   "incidents.links.none": "No AlertGroups are linked.",
   "incidents.activity.title": "Incident activity",
   "incidents.activity.subtitle": "Operational Incident timeline",
-  "incidents.activity.none": "No Incident activity yet."
+  "incidents.activity.none": "No Incident activity yet.",
+  "incidents.activity.reopened_by_alert": "告警组重新打开后，事件调查已恢复",
+  "incidents.activity.open_reopened_alert": "打开告警组 #{id}"
 }

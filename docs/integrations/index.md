@@ -21,7 +21,9 @@ Incoming integrations create or update alerts in IncidentRelay. They are selecte
 |---------------------|--------------------------------------------|-----------------------------------------------------------|
 | Alertmanager        | `POST /api/integrations/alertmanager`      | [Alertmanager](alertmanager.md)                           |
 | AWS SNS/Cloud watch | `POST /api/integrations/aws-sns`           | [AWS SNS/Cloud watch](integrations/aws-sns-cloudwatch.md) |
-| Grafana             | `POST /api/integrations/grafana`           | [Grafana](grafana.md)                                     |
+| Grafana             | `POST /api/integrations/grafana`           | [Grafana](grafana.md)
+| OpenSearch Alerting | `POST /api/integrations/opensearch`        | [OpenSearch](opensearch.md) |
+| Kibana Alerting     | `POST /api/integrations/kibana`            | [Kibana](kibana.md) |                                     |
 | Datadog             | `POST /api/integrations/datadog`           | [Datadog](datadog.md)                                     |
 | New Relic           | `POST /api/integrations/new-relic`         | [New Relic](new-relic.md)                                 |
 | Azure Monitor       | `POST /api/integrations/azure-monitor`      | [Azure Monitor](azure-monitor.md)                         |
@@ -44,7 +46,7 @@ Notification channels deliver alerts after a route has matched an incoming alert
 |-----------------|--------------------------------------------------------------------------------|-----------------------------------------------|
 | Mattermost      | Chat notifications, optional ACK/Resolve/Shelve buttons, message updates              | [Mattermost channel](mattermost.md)           |
 | Telegram        | Telegram Bot API notifications, optional inline actions                        | [Telegram channel](telegram.md)               |
-| Email           | Sends email to the assigned user's profile email                               | [Email channel](email.md)                     |
+| Email           | Sends email to assignee, fallback or fixed recipient                               | [Email channel](email.md)                     |
 | Slack           | Incoming webhook or Bot API notifications with ACK/Resolve/Shelve actions and updates   | [Slack channel](slack.md)                      |
 | Feishu / Lark   | Custom bot webhook notifications with optional signature verification                   | [Feishu / Lark channel](lark.md)               |
 | Discord         | Sends notifications to a Discord webhook                                       | [Webhook-based channels](webhook-channels.md) |

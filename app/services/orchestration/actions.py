@@ -34,6 +34,8 @@ MAX_CUSTOM_FIELD_NAME_LENGTH = 128
 MAX_NOTE_LENGTH = 8_192
 MAX_PAUSE_SECONDS = 604_800
 MAX_GROUP_WINDOW_SECONDS = 86_400
+# Reopen is a different policy from the legacy grouping/dedup window.
+MAX_REOPEN_WINDOW_SECONDS = 86_400
 
 FAILURE_MODES = frozenset({"continue", "stop_rule", "stop_orchestration"})
 PROCESS_DISPOSITIONS = frozenset({"process", "suppress", "pause", "drop"})
@@ -477,13 +479,20 @@ def validate_action(action: Any, *, path: str = "action") -> List[ValidationIssu
         except ActionValidationError as exc:
             issues.append(ValidationIssue(exc.path or path, exc.code, str(exc)))
     elif action_type == "set_grouping":
-        keys = {"dedup_key", "group_key", "window_seconds", "strategy"}
+        keys = {"dedup_key", "group_key", "window_seconds", "reopen_window_seconds", "strategy"}
         if not any(key in action for key in keys):
             issues.append(ValidationIssue(path, "empty_grouping_action", "set_grouping requires at least one grouping field"))
         if "window_seconds" in action:
             value = action["window_seconds"]
             if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= MAX_GROUP_WINDOW_SECONDS:
                 issues.append(ValidationIssue(f"{path}.window_seconds", "invalid_group_window", "grouping window must be between 0 and 86400 seconds"))
+        if "reopen_window_seconds" in action:
+            value = action["reopen_window_seconds"]
+            if isinstance(value, bool) or not isinstance(value, int) or not 0 <= value <= MAX_REOPEN_WINDOW_SECONDS:
+                issues.append(ValidationIssue(
+                    f"{path}.reopen_window_seconds", "invalid_reopen_window",
+                    "reopen window must be between 0 and 86400 seconds",
+                ))
         for key in ("dedup_key", "group_key", "strategy"):
             value = action.get(key)
             if isinstance(value, str) and ("{{" in value or "}}" in value):
@@ -549,6 +558,15 @@ def _execute_grouping(action: Mapping[str, Any], state: EventActionState, *, pat
         if isinstance(seconds, bool) or not isinstance(seconds, int) or not 0 <= seconds <= MAX_GROUP_WINDOW_SECONDS:
             raise ActionValidationError("grouping window must be between 0 and 86400 seconds", path=f"{path}.window_seconds")
         grouping["window_seconds"] = seconds
+
+    if "reopen_window_seconds" in action:
+        seconds = action["reopen_window_seconds"]
+        if isinstance(seconds, bool) or not isinstance(seconds, int) or not 0 <= seconds <= MAX_REOPEN_WINDOW_SECONDS:
+            raise ActionValidationError(
+                "reopen window must be between 0 and 86400 seconds",
+                path=f"{path}.reopen_window_seconds",
+            )
+        grouping["reopen_window_seconds"] = seconds
 
     return before, copy.deepcopy(grouping), tuple(references)
 

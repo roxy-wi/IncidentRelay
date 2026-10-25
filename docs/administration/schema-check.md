@@ -13,7 +13,7 @@ Common checks:
 - if a schema rejects a field because `extra="forbid"`, Swagger should not advertise that field;
 - enum values should use the same constants as backend validation;
 - old role values such as `read_only` and `rw` should not appear in request schemas after migration;
-- email channels should not document channel-level recipients or SMTP transport fields.
+- email channel recipient_mode and recipient_email must match schema validation; SMTP transport fields remain global (never per channel).
 
 Recommended local checks:
 

@@ -6,6 +6,8 @@ from app.modules.db import alerts_repo, incidents_repo
 from app.modules.db.models import (
     EventOrchestration,
     AlertEvent,
+    Alert,
+    AlertGroup,
     EventOrchestrationRule,
     EventOrchestrationVersion,
     AlertExplainStep,
@@ -25,6 +27,7 @@ from app.modules.db.orchestrations_repo import (
     set_runtime_state,
 )
 from app.services.orchestration.cache import PublishedDefinitionCache
+from app.services.orchestration.simulator import simulate_event
 from app.services.orchestration.runtime import (
     attach_runtime_executions,
     run_event_orchestration,
@@ -131,12 +134,46 @@ def test_hybrid_runtime_applies_event_routing_service_and_grouping(db):
     assert result.service.id == service.id
     assert result.group_key == "database-prod"
     assert result.grouping_window_seconds == 120
+    assert result.grouping_reopen_window_seconds == 0
     assert alert_data["title"] == "Orchestrated title"
     assert alert_data["service_id"] == service.id
     assert alert_data["orchestration_group_key"] == "database-prod"
     execution = OrchestrationExecution.get_by_id(result.execution_ids[0])
     assert execution.matched_rule_count == 1
     assert execution.trace_json["applied"] is True
+
+
+def test_active_runtime_propagates_reopen_window_without_changing_group_window(db):
+    group = create_group()
+    team = create_team(group)
+    route = create_route(team, source="alertmanager")
+    _publish(group, _always([
+        {"type": "set_grouping", "reopen_window_seconds": 300, "window_seconds": 17},
+    ]))
+    event = {
+        "source": "alertmanager", "forced_route_id": route.id,
+        "dedup_key": "runtime-reopen-window-1", "title": "Reopen test",
+        "labels": {"alertname": "DiskFull"}, "payload": {},
+    }
+    result = run_event_orchestration(event)
+    assert result.grouping_reopen_window_seconds == 300
+    assert result.grouping_window_seconds == 17
+    assert result.to_dict()["grouping_reopen_window_seconds"] == 300
+
+
+def test_shadow_reopen_window_does_not_activate(db):
+    group = create_group()
+    team = create_team(group)
+    route = create_route(team, source="alertmanager")
+    _publish(group, _always([
+        {"type": "set_grouping", "reopen_window_seconds": 300},
+    ]), mode="shadow")
+    result = run_event_orchestration({
+        "source": "alertmanager", "forced_route_id": route.id,
+        "dedup_key": "shadow-reopen-window-1", "title": "Shadow test",
+        "labels": {"alertname": "DiskFull"}, "payload": {},
+    })
+    assert result.grouping_reopen_window_seconds == 0
 
 
 def test_shadow_runtime_records_candidate_without_mutating_event(db):
@@ -856,3 +893,41 @@ def test_last_matching_alert_event_history_action_wins(db):
     })
 
     assert runtime.alert_event_history == "disabled"
+
+
+def test_simulator_matches_published_runtime_reopen_policy_without_mutation(db):
+    """Simulation uses the published rule but never creates or reopens an AlertGroup."""
+    scope = create_group()
+    team = create_team(scope)
+    route = create_route(team, source="alertmanager", group_by=["alertname"])
+    orchestration = _publish(scope, _always([
+        {"type": "set_grouping", "reopen_window_seconds": 300, "window_seconds": 17},
+    ]), mode="active", compatibility="hybrid")
+    event = {
+        "source": "alertmanager", "forced_route_id": route.id,
+        "dedup_key": "reopen-simulator-parity", "external_id": "reopen-simulator-parity",
+        "title": "DiskFull", "status": "firing",
+        "labels": {"alertname": "DiskFull"}, "payload": {},
+    }
+    before = (
+        Alert.select().count(),
+        AlertGroup.select().count(),
+        OrchestrationExecution.select().count(),
+    )
+
+    simulation = simulate_event(orchestration.id, copy.deepcopy(event))
+
+    assert simulation["executed"] is True
+    assert simulation["final_context"]["result"]["grouping"]["reopen_window_seconds"] == 300
+    assert simulation["final_context"]["result"]["grouping"]["window_seconds"] == 17
+    assert (
+        Alert.select().count(),
+        AlertGroup.select().count(),
+        OrchestrationExecution.select().count(),
+    ) == before
+
+    runtime = run_event_orchestration(copy.deepcopy(event))
+    assert runtime.grouping_reopen_window_seconds == 300
+    assert runtime.grouping_window_seconds == 17
+    assert Alert.select().count() == before[0]
+    assert AlertGroup.select().count() == before[1]

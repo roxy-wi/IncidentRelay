@@ -659,10 +659,17 @@ def _resolve_heartbeat_alert(
     """Resolve a heartbeat alert and complete the resolved delivery flow."""
     had_notification = bool(group.last_notification_at)
 
+    from app.services.alerts.notification_queue import (
+        recovery_notification_delay_seconds,
+        schedule_recovery_notification,
+    )
+
+    recovery_delay = recovery_notification_delay_seconds()
     resolved = resolve_alert(
         group.id,
         user_id=None,
         update_messages=False,
+        defer_stakeholder_notification=bool(recovery_delay),
     )
 
     alerts_repo.clear_alert_group_notification(resolved)
@@ -673,11 +680,10 @@ def _resolve_heartbeat_alert(
         message=recovery_message,
     )
 
-    if had_notification:
-        notify_alert(
-            resolved,
-            event_type="resolved",
-        )
+    if recovery_delay:
+        schedule_recovery_notification(resolved)
+    elif had_notification:
+        notify_alert(resolved, event_type="resolved")
 
     return resolved
 
@@ -1035,6 +1041,9 @@ def expire_auto_discovered_instances(now=None, team_ids=None):
     return expired
 
 def pause_heartbeat(heartbeat, now=None):
+    if heartbeat.status == "paused":
+        return heartbeat
+
     now = as_utc_naive_seconds(now or utc_now_seconds())
     before = heartbeat.status
     heartbeat.status = "paused"
@@ -1059,6 +1068,9 @@ def pause_heartbeat(heartbeat, now=None):
 
 
 def resume_heartbeat(heartbeat, now=None):
+    if heartbeat.status != "paused":
+        return heartbeat
+
     now = as_utc_naive_seconds(now or utc_now_seconds())
     before = heartbeat.status
 

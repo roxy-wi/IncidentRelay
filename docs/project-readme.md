@@ -134,11 +134,12 @@ matchers set   -> runbook only for matching alerts
 
 ## Email notifications
 
-Email channel does not store recipients or SMTP transport settings.
+Email channels support assignee email, a fallback recipient or a fixed recipient; SMTP transport remains global.
 
 - SMTP is configured globally in the config file.
-- Emails are sent to the assigned user's profile email address.
-- Email channel can optionally override the HTML template.
+- Existing channels default to the assigned user's profile email.
+- `recipient_mode` and `recipient_email` support backup/shared addresses.
+- Email channels can optionally override the HTML template.
 
 ## Reminder intervals
 

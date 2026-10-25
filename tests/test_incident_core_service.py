@@ -2,7 +2,7 @@ import pytest
 
 from app.modules.db.models import AlertGroup, AuditLog, Incident, IncidentAlertGroupLink, IncidentEvent
 from app.services.incidents import core
-from tests.factories import add_user_to_team, create_group, create_service, create_team, create_user, unique
+from tests.factories import add_user_to_team, create_group, create_team, create_user, unique
 
 
 @pytest.fixture(autouse=True)
@@ -30,7 +30,7 @@ def test_create_incident_is_operational_only(db):
     assert incident.workflow_status == "declared"
     assert AlertGroup.select().count() == 0
     assert IncidentEvent.get(IncidentEvent.incident == incident.id).event_type == "incident_declared"
-    assert AuditLog.get(AuditLog.object_type == "incident", AuditLog.object_id == incident.id).action == "incident_declared"
+    assert AuditLog.get(AuditLog.object_type == "incident", AuditLog.object_id == incident.id).action == "incident.declare"
 
 
 def test_transition_uses_optimistic_concurrency(db):

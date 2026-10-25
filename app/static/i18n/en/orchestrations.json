@@ -233,5 +233,8 @@
   "orchestrations.simulator.active_draft_changes": "Active → draft",
   "orchestrations.edit.title": "Edit event orchestration",
   "orchestrations.edit.help": "Update metadata, scope and runtime settings.",
-  "orchestrations.simulator.alert_event_history": "Alert event history"
+  "orchestrations.simulator.alert_event_history": "Alert event history",
+  "orchestrations.rule_editor.reopen_window_placeholder": "Reopen grace (seconds; 0 disables)",
+  "orchestrations.rule_editor.reopen_window_label": "Reopen grace (seconds)",
+  "orchestrations.rule_editor.reopen_window_help": "Reuse a recently resolved AlertGroup for a new matching firing event. Independent of grouping window; default disabled."
 }

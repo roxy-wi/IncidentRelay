@@ -1,4 +1,5 @@
-from app.modules.db import alerts_repo, incidents_repo
+from app.db import database_proxy as db
+from app.modules.db import alerts_repo, audit_repo, incidents_repo
 from app.services.incidents.stakeholders import notify_stakeholders
 from app.services.notifications.delivery import update_alert_messages
 from app.services.incidents.priority_policies import service as policy_service
@@ -10,7 +11,26 @@ from app.services.incidents.priority_policies.constants import (
 )
 
 
-def set_incident_priority(*, group_id, priority, user_id=None):
+def _record_priority_audit(group, action, *, user_id, source, old_priority, api_token_id=None):
+    """Record a manual priority transition in the same DB transaction."""
+    audit_repo.create_audit_log(
+        action=action,
+        object_type="alert_group",
+        object_id=group.id,
+        group_id=group.team.group_id if group.team_id and group.team else None,
+        team_id=group.team_id,
+        user_id=user_id,
+        api_token_id=api_token_id,
+        data={
+            "source": source,
+            "from": old_priority,
+            "to": group.priority_slug,
+            "manual": bool(group.priority_set_manually),
+        },
+    )
+
+
+def set_incident_priority(*, group_id, priority, user_id=None, source="system", api_token_id=None):
     if not priority:
         raise ValueError("priority is required")
 
@@ -19,14 +39,27 @@ def set_incident_priority(*, group_id, priority, user_id=None):
     if not group:
         raise LookupError("incident not found")
 
-    old_priority = group.priority_slug
+    # Validate before the no-op fast path: disabled/deleted priority slugs
+    # must not become accepted just because the current row still holds them.
+    if not incidents_repo.get_priority_by_slug(priority):
+        raise ValueError("priority must be one of enabled incident priorities")
 
-    group = incidents_repo.set_incident_priority(
-        group.id,
-        priority,
-        user_id=user_id,
-        manual=True,
-    )
+    old_priority = group.priority_slug
+    if old_priority == priority and group.priority_set_manually:
+        return group
+
+    with db.atomic():
+        group = incidents_repo.set_incident_priority(
+            group.id,
+            priority,
+            user_id=user_id,
+            manual=True,
+        )
+        _record_priority_audit(
+            group, "alert_group.priority.set", user_id=user_id,
+            source=source, old_priority=old_priority,
+            api_token_id=api_token_id,
+        )
 
     if old_priority != group.priority_slug:
         update_alert_messages(group, event_type="priority_changed")
@@ -84,7 +117,7 @@ def resolve_automatic_incident_priority(group):
     return _policy_fallback_priority(group, policy), update_mode
 
 
-def reset_incident_priority(*, group_id):
+def reset_incident_priority(*, group_id, user_id=None, source="system", api_token_id=None):
     group = alerts_repo.get_alert_group(group_id)
 
     if not group:
@@ -99,7 +132,15 @@ def reset_incident_priority(*, group_id):
     if not priority:
         raise ValueError("automatic priority could not be resolved")
 
-    group = incidents_repo.reset_incident_priority(group.id, priority, update_mode=update_mode)
+    with db.atomic():
+        group = incidents_repo.reset_incident_priority(
+            group.id, priority, update_mode=update_mode,
+        )
+        _record_priority_audit(
+            group, "alert_group.priority.reset", user_id=user_id,
+            source=source, old_priority=old_priority,
+            api_token_id=api_token_id,
+        )
 
     if old_priority != group.priority_slug:
         update_alert_messages(group, event_type="priority_changed")

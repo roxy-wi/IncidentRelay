@@ -564,3 +564,27 @@ body.md-theme #alert-details-modal .alert-details-action-buttons {
         top: 0;
     }
 }
+
+/* 2.4: keep technical child occurrences and their event links discoverable. */
+.alert-child-item.is-highlighted {
+    outline: 2px solid var(--md-primary, currentColor);
+    outline-offset: 2px;
+}
+
+.alert-child-identification {
+    display: flex;
+    flex-direction: column;
+    gap: 0.25rem;
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.alert-child-occurrence-note,
+.alert-reopen-policy {
+    color: var(--md-text-soft);
+    font-size: 0.85rem;
+}
+
+.alert-event-child-link {
+    margin-top: 0.5rem;
+}

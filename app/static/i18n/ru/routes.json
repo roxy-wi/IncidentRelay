@@ -224,5 +224,13 @@
   "routes.form.cloud_ru_webhook_help": "Добавьте этот HTTPS URL как endpoint HTTP/HTTPS-подписки SMN. IncidentRelay проверяет подпись SMN и автоматически подтверждает подписку.",
   "routes.intake.cloud_ru_example_comment": "Endpoint Cloud.ru SMN / Cloud Eye (запрос должен содержать корректную подпись SMN)",
   "routes.intake.cloud_ru_subtitle": "Используйте этот route-scoped HTTPS URL как endpoint HTTP/HTTPS-подписки Cloud.ru Advanced SMN.",
-  "routes.intake.cloud_ru_help": "SMN не отправляет токен IncidentRelay. Перед приемом Cloud Eye alarm IncidentRelay проверяет SMN V1 signature, сертификат Cloud.ru и точное совпадение Topic URN."
+  "routes.intake.cloud_ru_help": "SMN не отправляет токен IncidentRelay. Перед приемом Cloud Eye alarm IncidentRelay проверяет SMN V1 signature, сертификат Cloud.ru и точное совпадение Topic URN.",
+  "routes.form.opensearch_help": "Создайте канал уведомлений Custom Webhook в OpenSearch Alerting. Передавайте JSON-шаблон со стабильными monitor_id, trigger_id и необязательным bucket_key.",
+  "routes.form.kibana_help": "Создайте Webhook connector в Kibana с JSON для каждого алерта. Передавайте rule_id и alert_id, отдельно настройте recovery action.",
+  "routes.intake.opensearch_subtitle": "Используйте этот endpoint в Custom Webhook OpenSearch с токеном маршрута в заголовке Authorization: Bearer.",
+  "routes.intake.opensearch_help": "Для дедупликации используйте monitor_id + trigger_id (и bucket_key для bucket-мониторов). Поле status задаёт firing или resolved.",
+  "routes.intake.opensearch_example_comment": "Пример JSON для Custom Webhook OpenSearch Alerting",
+  "routes.intake.kibana_subtitle": "Настройте этот endpoint в Webhook connector Kibana и передайте токен маршрута в заголовке Authorization: Bearer.",
+  "routes.intake.kibana_help": "Идентификаторы rule_id + alert_id + space_id должны быть стабильны. Для восстановления используйте отдельный recovery action.",
+  "routes.intake.kibana_example_comment": "Пример JSON для Kibana Alerting (по одному алерту)"
 }

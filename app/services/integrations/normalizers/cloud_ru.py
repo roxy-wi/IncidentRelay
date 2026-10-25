@@ -104,7 +104,6 @@ def normalize_cloud_ru(payload):
     alarm_id = clean_string(message.get("alarm_id"))
     alarm_name = clean_string(message.get("alarm_name"))
     alarm_status = clean_string(message.get("alarm_status") or message.get("alarm_state"))
-    namespace = clean_string(message.get("namespace"))
     metric_name = clean_string(message.get("metric_name"))
 
     status = "resolved" if (alarm_status or "").lower() in RESOLVED_STATUSES else "firing"

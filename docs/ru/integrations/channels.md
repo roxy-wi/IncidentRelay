@@ -36,7 +36,7 @@ Incoming alert -> Route -> Notification channels
 |---|---|---|---|
 | `mattermost` | Webhook URL или настройки Bot API | Опциональный Mattermost user ID для атрибуции пользователя | `public_base_url` для кнопок |
 | `telegram` | `bot_token`, `chat_id` | Telegram user ID для действий | Опциональный прокси Telegram |
-| `email` | Опциональный `html_template` | У назначенного пользователя должен быть `email` | Настройки SMTP |
+| `email` | Опциональный `html_template`; `recipient_mode` и `recipient_email` для fallback/fixed | Email профиля обязателен только в режиме assignee | Настройки SMTP |
 | `slack` | Режим webhook: `webhook_url`; Bot API: `bot_token`, `channel_id` и либо `signing_secret`, либо `app_token` | Необязательный Slack user ID для атрибуции действий | Публичный HTTPS-эндпоинт для HTTP-действий или воркер Slack для Socket Mode |
 | `discord` | `webhook_url` | Нет | Нет |
 | `teams` | `webhook_url` | Нет | Нет |

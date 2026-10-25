@@ -191,8 +191,15 @@ def _notification_targets(group, event_type):
     ]
 
 
-def notify_alert(group, event_type="notification"):
-    """Send or update alert group notifications for route channels and user rules."""
+def notify_alert(
+    group, event_type="notification", *,
+    channel_ids=None, enqueue_rules=True, report_channels=False,
+):
+    """Send alert notifications; optionally target specific channels.
+
+    The opt-in channel outcome report is used by the persistent recovery retry
+    ledger. Existing callers retain the integer return value and semantics.
+    """
 
     group = _ensure_alert_group(group)
 
@@ -236,9 +243,14 @@ def notify_alert(group, event_type="notification"):
 
     text = format_alert_message(group, event_type)
     sent_count = 0
+    channel_outcomes = {}
+    selected_channel_ids = None if channel_ids is None else set(channel_ids)
 
     for channel, delivery in _notification_targets(group, event_type):
-        if not channel.enabled:
+        if selected_channel_ids is not None and channel.id not in selected_channel_ids:
+            continue
+        if not channel.enabled or getattr(channel, "deleted", False):
+            channel_outcomes[channel.id] = {"status": "skipped", "reason": "disabled"}
             continue
 
         try:
@@ -248,6 +260,7 @@ def notify_alert(group, event_type="notification"):
                 "unsupported notification channel type",
                 extra=notification_log_extra(channel, group, event_type, error=exc),
             )
+            channel_outcomes[channel.id] = {"status": "failed", "error": str(exc)}
             continue
 
         if not channel_matches_alert_severity(channel, group):
@@ -270,6 +283,7 @@ def notify_alert(group, event_type="notification"):
                         ),
                     ),
                 )
+                channel_outcomes[channel.id] = {"status": "skipped", "reason": "severity_filter"}
                 continue
 
         try:
@@ -281,6 +295,12 @@ def notify_alert(group, event_type="notification"):
                     delivery,
                     event_type=event_type,
                 ) or {}
+
+                if result.get("skipped"):
+                    channel_outcomes[channel.id] = {
+                        "status": "skipped", "reason": result.get("skip_reason"),
+                    }
+                    continue
 
                 notifications_repo.save_notification(
                     group_id=group.id,
@@ -310,6 +330,7 @@ def notify_alert(group, event_type="notification"):
                 )
 
                 sent_count += 1
+                channel_outcomes[channel.id] = {"status": "sent"}
                 continue
 
             result = notifier.send(
@@ -330,6 +351,9 @@ def notify_alert(group, event_type="notification"):
                         reason=result.get("skip_reason"),
                     ),
                 )
+                channel_outcomes[channel.id] = {
+                    "status": "skipped", "reason": result.get("skip_reason"),
+                }
                 continue
 
             notifications_repo.save_notification(
@@ -360,6 +384,7 @@ def notify_alert(group, event_type="notification"):
             )
 
             sent_count += 1
+            channel_outcomes[channel.id] = {"status": "sent"}
 
         except Exception as exc:
             notifications_repo.mark_notification_error(
@@ -385,42 +410,46 @@ def notify_alert(group, event_type="notification"):
                     error=exc,
                 ),
             )
+            channel_outcomes[channel.id] = {"status": "failed", "error": str(exc)}
 
-    try:
-        user_sent_count = rules.enqueue_user_notifications(
-            group,
-            event_type=event_type,
-        )
+    if enqueue_rules:
+        try:
+            user_sent_count = rules.enqueue_user_notifications(
+                group,
+                event_type=event_type,
+            )
 
-        sent_count += user_sent_count
+            sent_count += user_sent_count
 
-        alerts_repo.create_alert_event(
-            group_id=group.id,
-            event_type=f"{event_type}_user_notifications_processed",
-            message=f"User-level notifications processed: {user_sent_count}",
-        )
+            alerts_repo.create_alert_event(
+                group_id=group.id,
+                event_type=f"{event_type}_user_notifications_processed",
+                message=f"User-level notifications processed: {user_sent_count}",
+            )
 
-    except Exception as exc:
-        alerts_repo.create_alert_event(
-            group_id=group.id,
-            event_type=f"{event_type}_user_notifications_failed",
-            message=f"User-level notification failed: {exc}",
-        )
+        except Exception as exc:
+            alerts_repo.create_alert_event(
+                group_id=group.id,
+                event_type=f"{event_type}_user_notifications_failed",
+                message=f"User-level notification failed: {exc}",
+            )
 
-        logger.exception(
-            "user-level notification failed",
-            extra={
-                "extra": {
-                    "alert_group_id": group.id,
-                    "event_type": event_type,
-                    "error": str(exc),
-                }
-            },
-        )
+            logger.exception(
+                "user-level notification failed",
+                extra={
+                    "extra": {
+                        "alert_group_id": group.id,
+                        "event_type": event_type,
+                        "error": str(exc),
+                    }
+                },
+            )
 
     if sent_count:
         alerts_repo.record_group_notification_time(group, utc_now())
 
+    if report_channels:
+        return {"sent": sent_count, "channels": channel_outcomes}
     return sent_count
 
 

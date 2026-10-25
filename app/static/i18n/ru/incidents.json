@@ -73,5 +73,7 @@
   "incidents.links.none": "Нет связанных AlertGroup.",
   "incidents.activity.title": "Активность инцидента",
   "incidents.activity.subtitle": "Операционная timeline инцидента",
-  "incidents.activity.none": "Активности пока нет."
+  "incidents.activity.none": "Активности пока нет.",
+  "incidents.activity.reopened_by_alert": "Расследование возобновлено после повторного открытия AlertGroup",
+  "incidents.activity.open_reopened_alert": "Открыть AlertGroup №{id}"
 }

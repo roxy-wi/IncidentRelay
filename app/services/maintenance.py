@@ -1,13 +1,84 @@
+import logging
 from dataclasses import dataclass
 from datetime import datetime
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from dateutil.rrule import rrulestr
 
+from app.db import database_proxy as db
+
 from app.modules.db import maintenance_repo
-from app.modules.db.models import AlertRoute, Group, Service, Team, User
+from app.modules.db.models import AlertRoute, Group, MaintenanceWindow, Service, Team, User
 from app.services import rbac
+from app.services.audit import record_audit
+from app.services.serializers.common import serialize_utc_datetime
 from app.modules.common import as_naive_datetime
+
+logger = logging.getLogger("oncall.maintenance")
+
+
+def _maintenance_audit_payload(payload):
+    data = dict(payload or {})
+    for key in ("starts_at", "ends_at"):
+        value = data.get(key)
+        if value is not None and hasattr(value, "isoformat"):
+            data[key] = value.isoformat()
+    return data
+
+
+def _record_maintenance_command(action, window, *, user_id, api_token_id, payload=None):
+    """Persist the command audit in the same transaction as window/scopes."""
+    data = {
+        "name": window.name,
+        "status": window.status,
+        "behavior": window.behavior,
+        "timezone": window.timezone,
+        "starts_at": serialize_utc_datetime(window.starts_at),
+        "ends_at": serialize_utc_datetime(window.ends_at),
+        "enabled": window.enabled,
+        "apply_to_existing": bool(window.apply_to_existing),
+        "reactivate_on_end": bool(window.reactivate_on_end),
+        "deleted": window.deleted,
+    }
+    if getattr(window, "rrule", None):
+        data["rrule"] = window.rrule
+    if payload:
+        data["payload"] = _maintenance_audit_payload(payload)
+    return record_audit(
+        action=action,
+        object_type="maintenance_window",
+        object_id=window.id,
+        group_id=window.group_id,
+        team_id=window.team_id,
+        user_id=user_id,
+        api_token_id=api_token_id,
+        data=data,
+    )
+
+
+def _reconcile_after_command(window, *, user_id, api_token_id, force_release=False):
+    """Reconcile after the short configuration/audit transaction commits.
+
+    The periodic scheduler rechecks every window and can repair a transient
+    reconciliation failure. Holding a DB transaction across all matching
+    AlertGroups would otherwise create unbounded locks and timeout risks.
+    """
+    from app.services.alerts.maintenance_state import reconcile_maintenance_window
+
+    try:
+        reconcile_maintenance_window(
+            window,
+            trigger_source="api",
+            actor_user_id=user_id,
+            api_token_id=api_token_id,
+            force_release=force_release,
+        )
+    except Exception:
+        logger.exception(
+            "maintenance window reconciliation deferred to scheduler",
+            extra={"extra": {"window_id": window.id, "user_id": user_id}},
+        )
+
 
 VALID_BEHAVIORS = {
     "suppress_notifications",
@@ -29,6 +100,22 @@ VALID_STATUSES = {
     "finished",
     "cancelled",
 }
+
+
+def _lock_maintenance_window(window_id):
+    """Lock an existing window before replacing scopes or changing lifecycle.
+
+    Only PostgreSQL uses ``SELECT FOR UPDATE``; SQLite serializes writes through
+    its transaction. Never lock before entering a database transaction.
+    """
+    query = MaintenanceWindow.select().where(
+        (MaintenanceWindow.id == window_id)
+        & (MaintenanceWindow.deleted == False)  # noqa: E712
+    )
+    database = getattr(db, "obj", None)
+    if database is not None and database.__class__.__name__ != "SqliteDatabase":
+        query = query.for_update()
+    return query.first()
 
 
 @dataclass
@@ -387,118 +474,95 @@ def normalize_window_payload(payload, *, existing_window=None, partial=False):
     }
 
 
-def create_maintenance_window(payload, *, user_id):
+def create_maintenance_window(payload, *, user_id, api_token_id=None):
     user = _get_user_or_raise(user_id)
-
     data = normalize_window_payload(payload)
     scopes = data.pop("scopes")
-
     _ensure_can_manage_scopes(user, scopes)
-
     data.update(_window_owner_from_scopes(scopes))
 
-    window = maintenance_repo.create_maintenance_window(**data)
+    with db.atomic():
+        window = maintenance_repo.create_maintenance_window(**data)
+        maintenance_repo.replace_maintenance_window_scopes(window, scopes)
+        _record_maintenance_command(
+            "maintenance_window.create", window,
+            user_id=user.id, api_token_id=api_token_id, payload=payload,
+        )
 
-    maintenance_repo.replace_maintenance_window_scopes(window, scopes)
-
-    from app.services.alerts.maintenance_state import reconcile_maintenance_window
-    reconcile_maintenance_window(
-        window,
-        trigger_source="api",
-        actor_user_id=user.id,
-    )
-
+    _reconcile_after_command(window, user_id=user.id, api_token_id=api_token_id)
     return window
 
 
-def update_maintenance_window(window_id, payload, *, user_id):
+def update_maintenance_window(window_id, payload, *, user_id, api_token_id=None):
     user = _get_user_or_raise(user_id)
 
-    window = maintenance_repo.get_maintenance_window(window_id)
+    with db.atomic():
+        window = _lock_maintenance_window(window_id)
+        if not window:
+            raise LookupError("maintenance window was not found")
 
-    if not window:
-        raise LookupError("maintenance window was not found")
+        data = normalize_window_payload(payload, existing_window=window, partial=True)
+        scopes = data.pop("scopes", None)
+        if scopes is not None:
+            _ensure_can_manage_scopes(user, scopes)
+            data.update(_window_owner_from_scopes(scopes))
+        else:
+            _ensure_can_manage_existing_window(user, window)
 
-    data = normalize_window_payload(
-        payload,
-        existing_window=window,
-        partial=True,
-    )
+        # Invalidate the previous reconciliation marker before the config commit.
+        data["reconciled_at"] = None
+        window = maintenance_repo.update_maintenance_window(window, **data)
+        if scopes is not None:
+            maintenance_repo.replace_maintenance_window_scopes(window, scopes)
+        _record_maintenance_command(
+            "maintenance_window.update", window,
+            user_id=user.id, api_token_id=api_token_id, payload=payload,
+        )
 
-    scopes = data.pop("scopes", None)
+    _reconcile_after_command(window, user_id=user.id, api_token_id=api_token_id)
+    return window
 
-    if scopes is not None:
-        _ensure_can_manage_scopes(user, scopes)
-        data.update(_window_owner_from_scopes(scopes))
-    else:
+
+def cancel_maintenance_window(window_id, payload=None, *, user_id, api_token_id=None):
+    user = _get_user_or_raise(user_id)
+
+    with db.atomic():
+        window = _lock_maintenance_window(window_id)
+        if not window:
+            raise LookupError("maintenance window was not found")
         _ensure_can_manage_existing_window(user, window)
 
-    window = maintenance_repo.update_maintenance_window(
-        window,
-        **data,
-    )
+        reason = payload.get("reason") if isinstance(payload, dict) else None
+        window = maintenance_repo.cancel_maintenance_window(
+            window, cancelled_by=user, reason=reason,
+        )
+        _record_maintenance_command(
+            "maintenance_window.cancel", window,
+            user_id=user.id, api_token_id=api_token_id, payload=payload,
+        )
 
-    if scopes is not None:
-        maintenance_repo.replace_maintenance_window_scopes(window, scopes)
-
-    from app.services.alerts.maintenance_state import reconcile_maintenance_window
-    reconcile_maintenance_window(
-        window,
-        trigger_source="api",
-        actor_user_id=user.id,
-    )
-
+    _reconcile_after_command(window, user_id=user.id, api_token_id=api_token_id)
     return window
 
 
-def cancel_maintenance_window(window_id, payload=None, *, user_id):
+def delete_maintenance_window(window_id, *, user_id, api_token_id=None):
     user = _get_user_or_raise(user_id)
 
-    window = maintenance_repo.get_maintenance_window(window_id)
+    with db.atomic():
+        window = _lock_maintenance_window(window_id)
+        if not window:
+            raise LookupError("maintenance window was not found")
+        _ensure_can_manage_existing_window(user, window)
 
-    if not window:
-        raise LookupError("maintenance window was not found")
+        window = maintenance_repo.soft_delete_maintenance_window(window)
+        _record_maintenance_command(
+            "maintenance_window.delete", window,
+            user_id=user.id, api_token_id=api_token_id,
+            payload={"deleted": True},
+        )
 
-    _ensure_can_manage_existing_window(user, window)
-
-    reason = None
-
-    if isinstance(payload, dict):
-        reason = payload.get("reason")
-
-    window = maintenance_repo.cancel_maintenance_window(
-        window,
-        cancelled_by=user,
-        reason=reason,
-    )
-
-    from app.services.alerts.maintenance_state import reconcile_maintenance_window
-    reconcile_maintenance_window(
-        window,
-        trigger_source="api",
-        actor_user_id=user.id,
-    )
-    return window
-
-
-def delete_maintenance_window(window_id, *, user_id):
-    user = _get_user_or_raise(user_id)
-
-    window = maintenance_repo.get_maintenance_window(window_id)
-
-    if not window:
-        raise LookupError("maintenance window was not found")
-
-    _ensure_can_manage_existing_window(user, window)
-
-    maintenance_repo.soft_delete_maintenance_window(window)
-
-    from app.services.alerts.maintenance_state import reconcile_maintenance_window
-    reconcile_maintenance_window(
-        window,
-        trigger_source="api",
-        actor_user_id=user.id,
-        force_release=True,
+    _reconcile_after_command(
+        window, user_id=user.id, api_token_id=api_token_id, force_release=True,
     )
     return window
 

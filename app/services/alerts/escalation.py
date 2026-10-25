@@ -1,5 +1,5 @@
 import logging
-from datetime import datetime, timedelta
+from datetime import datetime
 
 from app.modules.db import alerts_repo
 from app.services import escalation_policies as escalation_policy_service
@@ -103,10 +103,10 @@ def apply_initial_escalation_policy_assignment(
 
     assignee = policy_target_user
 
-    delay_seconds = escalation_policy_service.get_rule_delay_seconds(policy_rule)
-
-    if delay_seconds:
-        next_escalation_at = (now or utc_now()) + timedelta(seconds=delay_seconds)
+    # A zero-second first rule is immediately due, not an exhausted policy.
+    next_escalation_at = escalation_policy_service.get_next_escalation_at(
+        policy_rule, now or utc_now(),
+    )
 
     return policy_rule, rotation, assignee, next_escalation_at
 

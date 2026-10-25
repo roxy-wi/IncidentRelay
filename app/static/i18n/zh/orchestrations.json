@@ -233,5 +233,8 @@
   "orchestrations.simulator.active_draft_changes": "生效版本 → 草稿",
   "orchestrations.edit.title": "编辑事件编排",
   "orchestrations.edit.help": "更新元数据、作用域和运行配置。",
-  "orchestrations.simulator.alert_event_history": "告警事件历史"
+  "orchestrations.simulator.alert_event_history": "告警事件历史",
+  "orchestrations.rule_editor.reopen_window_placeholder": "重新打开宽限期（秒；0 表示禁用）",
+  "orchestrations.rule_editor.reopen_window_label": "重新打开宽限期（秒）",
+  "orchestrations.rule_editor.reopen_window_help": "收到匹配的新触发事件时重用近期已解决的告警组。与分组窗口无关；默认禁用。"
 }

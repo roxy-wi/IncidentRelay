@@ -233,5 +233,8 @@
   "orchestrations.simulator.active_draft_changes": "Activa → borrador",
   "orchestrations.edit.title": "Editar orquestación de eventos",
   "orchestrations.edit.help": "Actualiza metadatos, ámbito y configuración de runtime.",
-  "orchestrations.simulator.alert_event_history": "Historial de eventos de alerta"
+  "orchestrations.simulator.alert_event_history": "Historial de eventos de alerta",
+  "orchestrations.rule_editor.reopen_window_placeholder": "Ventana de reapertura (s; 0 desactiva)",
+  "orchestrations.rule_editor.reopen_window_label": "Ventana de reapertura (segundos)",
+  "orchestrations.rule_editor.reopen_window_help": "Reutiliza un grupo resuelto recientemente para una nueva alerta activa. Independiente de la ventana de agrupación; desactivado por defecto."
 }

@@ -247,6 +247,32 @@ Supported values are `full`, `initial` and `disabled`. `full` stores incoming ch
 Global and service Event Orchestration can override the configured default for matching events with `set_alert_event_history`. If several matching actions set a level, the last applied action wins.
 
 
+## Recovery notification hysteresis
+
+Incoming webhook and heartbeat recoveries can delay **external** resolved
+notifications while technical AlertGroup resolution remains immediate:
+
+```ini
+[alerts]
+recovery_notification_delay_seconds = 300
+```
+
+The default `0` retains existing immediate recovery delivery. Values are
+clamped to 0–86400 seconds. This option is **independent** of Event
+Orchestration `set_grouping.reopen_window_seconds`: setting one does not
+enable the other. Delayed recovery is persisted through the normal AlertGroup
+notification queue, uses the scheduler, and is cancelled on a matching
+AlertGroup reopen. Duplicate source `resolved` events do not reschedule it.
+Manual Resolve remains immediate.
+
+A worker that starts sending exactly as a reopen occurs is serialized with
+reopen on supported database backends; a message already delivered before
+reopen cannot be recalled. Delivery uses the existing notifier semantics;
+providers without an idempotency API can duplicate a message after a crash
+between sending and committing the queue update. To serialize with reopen, the
+worker holds a database transaction while delivering recovery; for high-volume
+installations or slow outbound channels, use PostgreSQL rather than SQLite.
+
 ## Alert shelving scheduler
 
 Timed AlertGroup shelves are expired by the scheduler:
@@ -302,7 +328,7 @@ user = incidentrelay@example.com
 password = change-me
 ```
 
-Email notifications are sent to the assigned user's profile email address.
+Email channels default to the assigned user's profile email; optional fallback/fixed recipients can be configured per channel using `recipient_mode` and `recipient_email`. SMTP transport remains global.
 
 ## Telegram proxy
 

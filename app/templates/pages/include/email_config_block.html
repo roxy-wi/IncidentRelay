@@ -3,6 +3,24 @@
             {{ _('channels.email.help') }}
           </div>
           <div class="app-field app-form-wide">
+            <label for="cfg-email-recipient-mode">{{ _('channels.email.recipient_mode') }}</label>
+            <select id="cfg-email-recipient-mode" class="input">
+              <option value="assignee">{{ _('channels.email.mode_assignee') }}</option>
+              <option value="fallback">{{ _('channels.email.mode_fallback') }}</option>
+              <option value="fixed">{{ _('channels.email.mode_fixed') }}</option>
+            </select>
+            <div class="app-help" id="cfg-email-mode-help">{{ _('channels.email.recipient_mode_help') }}</div>
+          </div>
+          <div class="app-field app-form-wide" id="cfg-email-recipient-fields" style="display: none;">
+            <label for="cfg-email-recipient-email">{{ _('channels.email.recipient_email') }}</label>
+            <input id="cfg-email-recipient-email" type="email" class="input"
+                   inputmode="email" autocomplete="off" maxlength="254"
+                   placeholder="oncall-backup@example.com"
+                   aria-describedby="cfg-email-recipient-help">
+            <div class="app-help" id="cfg-email-recipient-help">{{ _('channels.email.recipient_email_help') }}</div>
+          </div>
+          <div class="app-help">{{ _('channels.email.test_help') }}</div>
+          <div class="app-field app-form-wide">
             <div class="app-json-header">
               <label for="cfg-email-html-template">{{ _('channels.email.template') }}</label>
               <button id="reset-email-template" type="button" class="btn btn-small"><i class="fas fa-undo"></i> {{ _('channels.email.reset') }}</button>

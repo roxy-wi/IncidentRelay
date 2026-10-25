@@ -83,6 +83,8 @@ def _record_transition_audit(
     previous_status: str,
     new_status: str,
     trigger_source: str,
+    actor_user_id: int | None = None,
+    api_token_id: int | None = None,
 ) -> None:
     audit_repo.create_audit_log(
         action=action,
@@ -90,6 +92,8 @@ def _record_transition_audit(
         object_id=group.id,
         group_id=group.team.group_id if group.team else None,
         team_id=group.team_id,
+        user_id=actor_user_id,
+        api_token_id=api_token_id,
         message=(
             f"Silence {silence.name} changed alert group "
             f"from {previous_status} to {new_status}"
@@ -105,6 +109,7 @@ def _record_transition_audit(
             "previous_status": previous_status,
             "new_status": new_status,
             "trigger_source": trigger_source,
+            "transport": "api" if trigger_source == "api" else "system",
         },
     )
 
@@ -117,6 +122,8 @@ def _record_alert_application_audit(
     previous_status: str,
     new_status: str,
     trigger_source: str,
+    actor_user_id: int | None = None,
+    api_token_id: int | None = None,
 ) -> None:
     audit_repo.create_audit_log(
         action=action,
@@ -124,6 +131,8 @@ def _record_alert_application_audit(
         object_id=alert.id,
         group_id=alert.team.group_id if alert.team else None,
         team_id=alert.team_id,
+        user_id=actor_user_id,
+        api_token_id=api_token_id,
         message=(
             f"Silence {silence.name} changed alert "
             f"from {previous_status} to {new_status}"
@@ -140,6 +149,7 @@ def _record_alert_application_audit(
             "previous_status": previous_status,
             "new_status": new_status,
             "trigger_source": trigger_source,
+            "transport": "api" if trigger_source == "api" else "system",
         },
     )
 
@@ -150,6 +160,8 @@ def _pause_group_after_silencing(
     silence: Silence,
     previous_status: str,
     trigger_source: str,
+    actor_user_id: int | None = None,
+    api_token_id: int | None = None,
 ) -> AlertGroup:
     alerts_repo.clear_alert_group_notification(group)
     group.next_escalation_at = None
@@ -160,6 +172,7 @@ def _pause_group_after_silencing(
         group_id=group.id,
         event_type="silenced",
         message=f"Alert silenced by active Silence: {silence.name}",
+        user_id=actor_user_id,
     )
     _record_transition_audit(
         action="silence.alert_applied",
@@ -168,6 +181,8 @@ def _pause_group_after_silencing(
         previous_status=previous_status,
         new_status=group.status,
         trigger_source=trigger_source,
+        actor_user_id=actor_user_id,
+        api_token_id=api_token_id,
     )
     return group
 
@@ -179,6 +194,8 @@ def _restart_group_after_unsilencing(
     previous_status: str,
     trigger_source: str,
     now: datetime,
+    actor_user_id: int | None = None,
+    api_token_id: int | None = None,
 ) -> AlertGroup:
     fallback_rotation = group.route.rotation if group.route else group.rotation
     policy_rule, rotation, assignee, next_escalation_at = (
@@ -221,6 +238,7 @@ def _restart_group_after_unsilencing(
             if silence
             else "Alert active again: no active Silence matches"
         ),
+        user_id=actor_user_id,
     )
     _record_transition_audit(
         action="silence.alert_reactivated",
@@ -229,6 +247,8 @@ def _restart_group_after_unsilencing(
         previous_status=previous_status,
         new_status=group.status,
         trigger_source=trigger_source,
+        actor_user_id=actor_user_id,
+        api_token_id=api_token_id,
     )
     return group
 
@@ -261,6 +281,8 @@ def apply_silence_to_existing_alerts(
     *,
     now: datetime | None = None,
     trigger_source: str = "api",
+    actor_user_id: int | None = None,
+    api_token_id: int | None = None,
 ) -> dict[str, int]:
     """Apply an opted-in active Silence to existing firing alerts."""
     now = now or utc_now()
@@ -317,6 +339,7 @@ def apply_silence_to_existing_alerts(
                 group_id=alert.group_id,
                 event_type="silenced",
                 message=f"Retroactively matched silence: {silence.name}",
+                user_id=actor_user_id,
             )
             _record_alert_application_audit(
                 action="silence.alert_applied",
@@ -325,6 +348,8 @@ def apply_silence_to_existing_alerts(
                 previous_status=previous_status,
                 new_status=alert.status,
                 trigger_source=trigger_source,
+                actor_user_id=actor_user_id,
+                api_token_id=api_token_id,
             )
             changed_group_ids.add(alert.group_id)
             result["silenced"] += 1
@@ -339,6 +364,8 @@ def apply_silence_to_existing_alerts(
                     silence=silence,
                     previous_status=previous_status,
                     trigger_source=trigger_source,
+                    actor_user_id=actor_user_id,
+                    api_token_id=api_token_id,
                 )
                 result["groups_changed"] += 1
 
@@ -356,6 +383,8 @@ def _release_application_alert(
     reason: str,
     now: datetime,
     trigger_source: str,
+    actor_user_id: int | None = None,
+    api_token_id: int | None = None,
 ) -> int | None:
     alert = application.alert
     silences_repo.release_application(application, reason=reason, now=now)
@@ -384,6 +413,7 @@ def _release_application_alert(
         group_id=alert.group_id,
         event_type="unsilenced",
         message=f"Silence no longer applies: {silence.name}",
+        user_id=actor_user_id,
     )
     _record_alert_application_audit(
         action="silence.alert_reactivated",
@@ -392,6 +422,8 @@ def _release_application_alert(
         previous_status=previous_status,
         new_status=alert.status,
         trigger_source=trigger_source,
+        actor_user_id=actor_user_id,
+        api_token_id=api_token_id,
     )
     return alert.group_id
 
@@ -402,6 +434,8 @@ def release_silence_applications(
     reason: str,
     now: datetime | None = None,
     trigger_source: str = "scheduler",
+    actor_user_id: int | None = None,
+    api_token_id: int | None = None,
     applications: list[SilenceAlertApplication] | None = None,
     respect_reactivate_on_end: bool = True,
 ) -> dict[str, int]:
@@ -419,29 +453,37 @@ def release_silence_applications(
     }
 
     if respect_reactivate_on_end and not silence.reactivate_on_end:
-        result["retained"] = len(applications)
-        silence.reconciled_at = now
-        silence.updated_at = now
-        silence.save()
-        if applications:
-            audit_repo.create_audit_log(
-                action="silence.alerts_retained",
-                object_type="silence",
-                object_id=silence.id,
-                group_id=silence.team.group_id if silence.team else None,
-                team_id=silence.team_id,
-                message=(
-                    f"Silence {silence.name} ended with automatic "
-                    "reactivation disabled"
-                ),
-                data={
-                    "silence_id": silence.id,
-                    "silence_name": silence.name,
-                    "retained_alerts": len(applications),
-                    "reason": reason,
-                    "trigger_source": trigger_source,
-                },
-            )
+        with database_proxy.atomic():
+            # A previously reconciled, still-retained Silence is not a new
+            # transition. Repeated scheduler/API evaluations must not duplicate
+            # the same retention audit.
+            first_retention = silence.reconciled_at is None
+            result["retained"] = len(applications)
+            silence.reconciled_at = now
+            silence.updated_at = now
+            silence.save()
+            if applications and first_retention:
+                audit_repo.create_audit_log(
+                    action="silence.alerts_retained",
+                    object_type="silence",
+                    object_id=silence.id,
+                    group_id=silence.team.group_id if silence.team else None,
+                    team_id=silence.team_id,
+                    user_id=actor_user_id,
+                    api_token_id=api_token_id,
+                    message=(
+                        f"Silence {silence.name} ended with automatic "
+                        "reactivation disabled"
+                    ),
+                    data={
+                        "silence_id": silence.id,
+                        "silence_name": silence.name,
+                        "retained_alerts": len(applications),
+                        "reason": reason,
+                        "trigger_source": trigger_source,
+            "transport": "api" if trigger_source == "api" else "system",
+                    },
+                )
         return result
 
     changed_group_ids: set[int] = set()
@@ -454,6 +496,8 @@ def release_silence_applications(
                 reason=reason,
                 now=now,
                 trigger_source=trigger_source,
+                actor_user_id=actor_user_id,
+                api_token_id=api_token_id,
             )
             result["released"] += 1
             if group_id is not None:
@@ -470,6 +514,8 @@ def release_silence_applications(
                     silence=silence,
                     previous_status=previous_status,
                     trigger_source=trigger_source,
+                    actor_user_id=actor_user_id,
+                    api_token_id=api_token_id,
                     now=now,
                 )
                 result["groups_changed"] += 1
@@ -486,6 +532,8 @@ def reconcile_silence(
     *,
     now: datetime | None = None,
     trigger_source: str = "api",
+    actor_user_id: int | None = None,
+    api_token_id: int | None = None,
 ) -> dict[str, int]:
     """Reconcile one Silence after create, update, disable, start or expiry."""
     now = now or utc_now()
@@ -497,6 +545,8 @@ def reconcile_silence(
                 reason=RELEASE_REASON_UPDATED,
                 now=now,
                 trigger_source=trigger_source,
+                actor_user_id=actor_user_id,
+                api_token_id=api_token_id,
                 respect_reactivate_on_end=False,
             )
             silence.reconciled_at = None
@@ -514,6 +564,8 @@ def reconcile_silence(
             reason=reason,
             now=now,
             trigger_source=trigger_source,
+            actor_user_id=actor_user_id,
+            api_token_id=api_token_id,
         )
 
     # Release applications invalidated by matcher/team changes. New-alert
@@ -539,6 +591,8 @@ def reconcile_silence(
             reason=RELEASE_REASON_UPDATED,
             now=now,
             trigger_source=trigger_source,
+            actor_user_id=actor_user_id,
+            api_token_id=api_token_id,
             applications=invalid_applications,
             respect_reactivate_on_end=False,
         )
@@ -547,6 +601,8 @@ def reconcile_silence(
         silence,
         now=now,
         trigger_source=trigger_source,
+        actor_user_id=actor_user_id,
+        api_token_id=api_token_id,
     )
 
 

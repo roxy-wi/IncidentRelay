@@ -528,6 +528,24 @@ def get_or_create_draft(
         return draft
 
 
+def ensure_draft_with_creation_status(
+    orchestration_id: int,
+    *,
+    actor_id: Optional[int] = None,
+) -> tuple[EventOrchestrationVersion, bool]:
+    """Ensure a draft under the parent lock; return (draft, newly_created).
+
+    Using the same lock for the existence check and creation prevents two
+    concurrent POST /draft requests from both claiming they created a draft.
+    """
+    with database_proxy.atomic():
+        _locked_orchestration(orchestration_id)
+        existing = get_draft(orchestration_id)
+        if existing is not None:
+            return existing, False
+        return get_or_create_draft(orchestration_id, actor_id=actor_id), True
+
+
 def _walk_json(value: Any):
     yield value
     if isinstance(value, dict):

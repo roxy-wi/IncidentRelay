@@ -13,7 +13,6 @@ from app.modules.db.models import (
     User,
 )
 from app.db import database_proxy as db
-from app.services.audit import write_audit
 from app.modules.common import truncate_text
 from app.services.links import build_alert_web_url, build_source_event_url
 from app.settings import Config
@@ -582,24 +581,6 @@ def execute_push_action(token, action):
             action=action,
         )
 
-    if action in {"ack", "resolve"}:
-        audit_event = (
-            "alert_group.ack.browser_push"
-            if action == "ack"
-            else "alert_group.resolve.browser_push"
-        )
-        write_audit(
-            audit_event,
-            object_type="alert_group",
-            object_id=result_group.id,
-            team_id=result_group.team_id,
-            user_id=record.user_id,
-            data={
-                "source": "browser_push",
-                "action": action,
-            },
-        )
-
     follow_up_action_tokens = {}
     if action == "shelve":
         # Keep the confirmation notification actionable for the whole 1-hour
@@ -631,10 +612,10 @@ def _run_alert_push_action(group_id, user_id, action):
     from app.services.alerts.shelving import shelve_alert_group, unshelve_alert_group
 
     if action == "ack":
-        return acknowledge_alert(group_id, user_id=user_id)
+        return acknowledge_alert(group_id, user_id=user_id, source="browser_push")
 
     if action == "resolve":
-        return resolve_alert(group_id, user_id=user_id)
+        return resolve_alert(group_id, user_id=user_id, source="browser_push")
 
     if action == "shelve":
         group, _ = shelve_alert_group(

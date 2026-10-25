@@ -233,5 +233,8 @@
   "orchestrations.simulator.active_draft_changes": "Aktiv → Entwurf",
   "orchestrations.edit.title": "Ereignis-Orchestrierung bearbeiten",
   "orchestrations.edit.help": "Metadaten, Geltungsbereich und Laufzeiteinstellungen ändern.",
-  "orchestrations.simulator.alert_event_history": "Alarmereignisverlauf"
+  "orchestrations.simulator.alert_event_history": "Alarmereignisverlauf",
+  "orchestrations.rule_editor.reopen_window_placeholder": "Wiederöffnungsfrist (Sek.; 0 = aus)",
+  "orchestrations.rule_editor.reopen_window_label": "Wiederöffnungsfrist (Sekunden)",
+  "orchestrations.rule_editor.reopen_window_help": "Kürzlich aufgelöste AlertGroup für ein neues passendes Firing-Ereignis wiederverwenden. Unabhängig vom Gruppierungsfenster; standardmäßig aus."
 }

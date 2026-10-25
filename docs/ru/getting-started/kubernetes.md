@@ -65,6 +65,54 @@ helm upgrade --install incidentrelay ./helm/incidentrelay \
 kubectl get pods -l app.kubernetes.io/instance=incidentrelay -w
 ```
 
+## Безопасный запуск pod без root (с версии 2.3.1)
+
+По умолчанию чарт запускает все четыре компонента **и init container для
+пользовательских CA** без root: `runAsNonRoot: true`, UID/GID `10001`,
+`fsGroup: 10001` и `fsGroupChangePolicy: OnRootMismatch`. Повышение
+привилегий запрещено, Linux capabilities удалены, seccomp — `RuntimeDefault`.
+Параметры можно переопределить через `podSecurityContext` и `securityContext`
+в `values.yaml`.
+
+```yaml
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 10001
+  runAsGroup: 10001
+  fsGroup: 10001
+  fsGroupChangePolicy: OnRootMismatch
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: [ALL]
+  seccompProfile:
+    type: RuntimeDefault
+```
+
+**Перед обновлением** сделайте резервную копию SQLite PVC и убедитесь, что UID/GID
+`10001` может читать и записывать данные в `/var/lib/incidentrelay`, включая
+SQLite, runtime-конфиг и lock-файлы. Чарт **не запускает root init container**
+для изменения владельцев. Kubernetes `fsGroup` исправляет права для многих
+хранилищ, но NFS с `root_squash`, некоторые CSI-драйверы и PVC, на которых
+`OnRootMismatch` пропускает рекурсивную обработку, требуют подготовки прав на
+стороне хранилища. При несовместимости скорректируйте права до обновления либо
+выберите подходящие непривилегированные `runAsUser`, `runAsGroup` и `fsGroup`.
+Не используйте root-процессы как постоянное решение.
+
+При `customCA` общий CA bundle создаётся непривилегированным init container на
+`emptyDir`. Файлы внешних Secret/ConfigMap и `configFrom` должны быть доступны
+для чтения выбранному UID. Для произвольного UID в OpenShift подготовьте
+записываемые тома и подходящий `fsGroup`: если домашний каталог образа
+недоступен, entrypoint переключит `HOME` на `/tmp`.
+
+Проверка после развёртывания:
+
+```bash
+kubectl exec deploy/incidentrelay-web -- id
+kubectl exec deploy/incidentrelay-web -- test -w /var/lib/incidentrelay
+kubectl get pods -l app.kubernetes.io/instance=incidentrelay
+```
+
 ## Конфигурация
 
 IncidentRelay читает все настройки из одного INI-файла, смонтированного по пути `/etc/incidentrelay/incidentrelay.conf`. Чарт формирует этот файл из объекта `config` в `values.yaml`: ключи верхнего уровня становятся разделами INI, а вложенные ключи — параметрами.

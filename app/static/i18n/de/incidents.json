@@ -73,5 +73,7 @@
   "incidents.links.none": "No AlertGroups are linked.",
   "incidents.activity.title": "Incident activity",
   "incidents.activity.subtitle": "Operational Incident timeline",
-  "incidents.activity.none": "No Incident activity yet."
+  "incidents.activity.none": "No Incident activity yet.",
+  "incidents.activity.reopened_by_alert": "Untersuchung nach Wiedereröffnung der AlertGroup fortgesetzt",
+  "incidents.activity.open_reopened_alert": "AlertGroup #{id} öffnen"
 }

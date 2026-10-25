@@ -40,8 +40,11 @@ def serialize_alert_event(event):
 
     return {
         "id": event.id,
+        "alert_id": event.alert_id,
+        "group_id": event.group_id,
         "event_type": event.event_type,
         "message": event.message,
+        "user_id": event.user_id,
         "user": serialize_user_short(event.user),
         "created_at": serialize_utc_datetime(event.created_at),
     }
@@ -655,6 +658,13 @@ def serialize_alert_group(
         "first_seen_at": serialize_utc_datetime(group.first_seen_at),
         "last_seen_at": serialize_utc_datetime(group.last_seen_at),
         "last_notification_at": serialize_utc_datetime(group.last_notification_at),
+        "recovery_notification_due_at": (
+            serialize_utc_datetime(group.notification_due_at)
+            if group.status == "resolved"
+            and group.notification_pending
+            and group.notification_reason == "recovery"
+            else None
+        ),
 
         "reminder_count": group.reminder_count,
 

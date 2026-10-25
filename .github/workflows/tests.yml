@@ -72,6 +72,9 @@ jobs:
         run: |
           python -m app.check_templates
 
+      - name: Detect exact duplicate tests
+        run: python tools/check_duplicate_tests.py
+
       - name: Run pytest with coverage
         run: |
           pytest \
@@ -79,8 +82,20 @@ jobs:
             --cov-branch \
             --cov-report=term-missing \
             --cov-report=xml \
+            --junitxml=pytest-results.xml \
             --cov-fail-under=50
 
+
+      - name: Upload test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports-python-${{ matrix.python-version }}
+          path: |
+            pytest-results.xml
+            coverage.xml
+          if-no-files-found: warn
+          retention-days: 1
 
   postgres-tests:
     name: PostgreSQL tests
@@ -200,4 +215,16 @@ jobs:
             --cov=app \
             --cov-branch \
             --cov-report=term-missing \
-            --cov-report=xml:coverage-postgresql.xml
+            --cov-report=xml:coverage-postgresql.xml \
+            --junitxml=pytest-results-postgresql.xml
+
+      - name: Upload PostgreSQL test reports
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: test-reports-postgresql
+          path: |
+            pytest-results-postgresql.xml
+            coverage-postgresql.xml
+          if-no-files-found: warn
+          retention-days: 1

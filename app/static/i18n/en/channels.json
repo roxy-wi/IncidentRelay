@@ -107,7 +107,7 @@
   "channels.webhook.slack": "Slack webhook URL",
   "channels.webhook.discord": "Discord webhook URL",
   "channels.webhook.teams": "Microsoft Teams webhook URL",
-  "channels.email.help": "Email notifications are sent to the assigned user profile email.",
+  "channels.email.help": "Choose who receives real alert emails. SMTP is configured globally.",
   "channels.email.template": "HTML template",
   "channels.email.reset": "Reset default",
   "channels.email.placeholders": "Supported placeholders: {alert_id}, {event_type}, {title}, {message}, {severity}, {status}, {team}, {assignee}, {source}, {alert_url}. Leave the default template unchanged to use the built-in template.",
@@ -157,5 +157,16 @@
   "channels.slack.app_token": "App-level token",
   "channels.slack.app_token_help": "Slack app-level token starting with xapp- and the connections:write scope. The Slack worker must be running.",
   "channels.config.bot_http_ready": "Bot API configured with HTTP actions",
-  "channels.config.bot_socket_ready": "Bot API configured with Socket Mode"
+  "channels.config.bot_socket_ready": "Bot API configured with Socket Mode",
+  "channels.email.recipient_mode": "Recipient mode",
+  "channels.email.mode_assignee": "Assignee email",
+  "channels.email.mode_fallback": "Assignee email with fallback",
+  "channels.email.mode_fixed": "Fixed recipient",
+  "channels.email.recipient_mode_help": "Fallback is used only when the assignee has no email. Fixed always sends to the configured address.",
+  "channels.email.recipient_email": "Recipient email address",
+  "channels.email.recipient_email_help": "Single mailbox used for fallback or fixed delivery; do not enter a list of addresses.",
+  "channels.email.test_help": "Test always sends to your profile email, not to the configured fallback or fixed address.",
+  "channels.email.template_custom": "Custom HTML template",
+  "channels.email.template_default": "Default HTML template",
+  "channels.validation.recipient_email_required": "Enter a recipient email address for fallback or fixed mode."
 }

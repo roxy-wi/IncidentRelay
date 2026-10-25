@@ -65,13 +65,24 @@ def create_group():
     if error:
         return error
 
+    from app.services.service_catalog.presets import ensure_basic_operational_standard
+
     try:
-        group = groups_repo.create_group(
-            payload.slug,
-            payload.name,
-            payload.description,
-            active=payload.active,
-        )
+        with db.atomic():
+            group = groups_repo.create_group(
+                payload.slug,
+                payload.name,
+                payload.description,
+                active=payload.active,
+            )
+            ensure_basic_operational_standard(group, actor_user=request.current_user)
+            write_audit(
+                "group.create",
+                object_type="group",
+                object_id=group.id,
+                group_id=group.id,
+                data=payload.model_dump()
+            )
     except IntegrityError as exc:
         error_text = str(exc).lower()
 
@@ -83,17 +94,6 @@ def create_group():
             )
 
         return integrity_conflict("Group could not be saved because it conflicts with existing data")
-
-    from app.services.service_catalog.presets import ensure_basic_operational_standard
-
-    ensure_basic_operational_standard(group, actor_user=request.current_user)
-    write_audit(
-        "group.create",
-        object_type="group",
-        object_id=group.id,
-        group_id=group.id,
-        data=payload.model_dump()
-    )
 
     return jsonify(serialize_group(group, request.current_user)), 201
 
@@ -109,8 +109,9 @@ def update_group(group_id):
     if error:
         return error
 
-    group = groups_repo.update_group(group_id, payload.model_dump())
-    write_audit("group.update", object_type="group", object_id=group.id, group_id=group.id, data=payload.model_dump())
+    with db.atomic():
+        group = groups_repo.update_group(group_id, payload.model_dump())
+        write_audit("group.update", object_type="group", object_id=group.id, group_id=group.id, data=payload.model_dump())
     return jsonify(serialize_group(group, request.current_user))
 
 
@@ -165,19 +166,19 @@ def create_group_user(group_id):
             groups_repo.add_user_to_group(user_id=user.id, group_id=group_id, role=group_role)
             users_repo.set_active_group(user.id, group_id)
             user = users_repo.get_user(user.id)
+            write_audit(
+                "group.user.create",
+                object_type="user",
+                object_id=user.id,
+                group_id=group_id,
+                data={**data, "password_hash": "***", "group_role": group_role},
+            )
     except IntegrityError:
         return jsonify({
             "error": "user_conflict",
             "message": "User with this username or unique field already exists",
         }), 409
 
-    write_audit(
-        "group.user.create",
-        object_type="user",
-        object_id=user.id,
-        group_id=group_id,
-        data={**data, "password_hash": "***", "group_role": group_role},
-    )
     return jsonify(serialize_user(user)), 201
 
 
@@ -213,20 +214,21 @@ def add_group_user(group_id):
     if role_error:
         return role_error
 
-    membership = groups_repo.add_user_to_group(
-        payload.user_id,
-        group_id,
-        payload.role,
-        active=payload.active,
-    )
+    with db.atomic():
+        membership = groups_repo.add_user_to_group(
+            payload.user_id,
+            group_id,
+            payload.role,
+            active=payload.active,
+        )
 
-    write_audit(
-        "group.user.add",
-        object_type="group",
-        object_id=group_id,
-        group_id=group_id,
-        data=payload.model_dump(),
-    )
+        write_audit(
+            "group.user.add",
+            object_type="group",
+            object_id=group_id,
+            group_id=group_id,
+            data=payload.model_dump(),
+        )
 
     return jsonify(serialize_user_group(membership)), 201
 
@@ -250,18 +252,19 @@ def update_group_user(membership_id):
     if role_error:
         return role_error
 
-    membership = groups_repo.update_group_membership(
-        membership_id=membership_id,
-        role=payload.role,
-        active=payload.active,
-    )
-    write_audit(
-        "group.user.update",
-        object_type="group",
-        object_id=membership.group.id,
-        group_id=membership.group.id,
-        data={"membership_id": membership.id, **payload.model_dump()},
-    )
+    with db.atomic():
+        membership = groups_repo.update_group_membership(
+            membership_id=membership_id,
+            role=payload.role,
+            active=payload.active,
+        )
+        write_audit(
+            "group.user.update",
+            object_type="group",
+            object_id=membership.group.id,
+            group_id=membership.group.id,
+            data={"membership_id": membership.id, **payload.model_dump()},
+        )
     return jsonify({
         "id": membership.id,
         "user_id": membership.user.id,
@@ -285,21 +288,22 @@ def delete_group_user(membership_id):
         return error
 
     group_id = membership.group.id
-    data = groups_repo.delete_group_membership(membership_id)
-    write_audit(
-        "group.user.remove",
-        object_type="group",
-        object_id=data["group_id"],
-        group_id=data["group_id"],
-        data={
-            "membership_id": data["id"],
-            "user_id": data["user_id"],
-            "removed_team_memberships": data.get("removed_team_memberships", 0),
-            "removed_rotation_members": data.get("removed_rotation_members", 0),
-            "removed_rotation_layer_members": data.get("removed_rotation_layer_members", 0),
-            "removed_rotation_overrides": data.get("removed_rotation_overrides", 0),
-        },
-    )
+    with db.atomic():
+        data = groups_repo.delete_group_membership(membership_id)
+        write_audit(
+            "group.user.remove",
+            object_type="group",
+            object_id=data["group_id"],
+            group_id=data["group_id"],
+            data={
+                "membership_id": data["id"],
+                "user_id": data["user_id"],
+                "removed_team_memberships": data.get("removed_team_memberships", 0),
+                "removed_rotation_members": data.get("removed_rotation_members", 0),
+                "removed_rotation_layer_members": data.get("removed_rotation_layer_members", 0),
+                "removed_rotation_overrides": data.get("removed_rotation_overrides", 0),
+            },
+        )
     return jsonify({"deleted": True, "id": membership_id, "group_id": group_id})
 
 
@@ -310,18 +314,19 @@ def delete_group(group_id):
     if error:
         return error
 
-    group = groups_repo.soft_delete_group(group_id)
-    write_audit(
-        "group.delete",
-        object_type="group",
-        object_id=group.id,
-        group_id=group.id,
-        data={
-            "slug": group.slug,
-            "name": group.name,
-            "deleted": True,
-        },
-    )
+    with db.atomic():
+        group = groups_repo.soft_delete_group(group_id)
+        write_audit(
+            "group.delete",
+            object_type="group",
+            object_id=group.id,
+            group_id=group.id,
+            data={
+                "slug": group.slug,
+                "name": group.name,
+                "deleted": True,
+            },
+        )
     return jsonify({
         "deleted": True,
         "id": group.id,

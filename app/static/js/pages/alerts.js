@@ -1591,7 +1591,32 @@ function renderAlertExplainSteps(steps) {
                 ].filter(Boolean).join(" / ") || "-")
         );
 
-        if (step.message) {
+        // Never infer a policy from a missing/compact trace. Display the
+        // recorded effective policy only when the backend supplied it.
+        if (step.code === "reopen_policy" && step.data
+            && Number.isInteger(step.data.reopen_window_seconds)) {
+            const seconds = step.data.reopen_window_seconds;
+            const policy = seconds > 0
+                ? i18n.t("alert_details.explain.reopen_enabled", {seconds: seconds})
+                : i18n.t("alert_details.explain.reopen_disabled");
+            const eligibility = seconds > 0 && step.data.eligible === false
+                ? " · " + i18n.t("alert_details.explain.reopen_not_eligible")
+                : "";
+            item.append(
+                $("<div>")
+                    .addClass("alert-reopen-policy")
+                    .text(i18n.t("alert_details.explain.reopen_policy") + ": " + policy + eligibility)
+            );
+        } else if (step.code === "reopen_candidate_not_found") {
+            item.append(
+                $("<div>")
+                    .addClass("alert-reopen-policy")
+                    .text(i18n.t("alert_details.explain.reopen_not_found"))
+            );
+        }
+
+        if (step.message && step.code !== "reopen_policy"
+            && step.code !== "reopen_candidate_not_found") {
             item.append($("<div>").text(step.message));
         }
 
@@ -1757,7 +1782,7 @@ function showAlertDetails(alertId) {
             JSON.stringify(alert.payload_summary || alert.payload || {}, null, 2)
         );
 
-        renderAlertGroupChildren(alert.alerts || [], modal);
+        renderAlertGroupChildren(alert.alerts || [], modal, alert.events || []);
         renderEvents(
             alert.events || [],
             modal,
@@ -2067,6 +2092,17 @@ function renderAlertPrimaryDetails(alert, modal) {
             .addClass("alert-primary-title")
             .text(alert.title || i18n.t("alert_details.entity.alert_number", {id: alert.id}))
     );
+
+    if (alert.recovery_notification_due_at && alert.status === "resolved") {
+        target.append(
+            $("<div>")
+                .addClass("help-text alert-recovery-notification-pending")
+                .attr("role", "status")
+                .text(i18n.t("alert_details.recovery.technical_resolved_pending", {
+                    time: formatDateTimeMinutes(alert.recovery_notification_due_at)
+                }))
+        );
+    }
 
     if (alert.shelved && alert.shelve) {
         const shelfSummary = $("<div>").addClass("help-text alert-shelve-summary");
@@ -2733,11 +2769,16 @@ function ensureAlertGroupChildrenSection(modal) {
 }
 
 
-function renderAlertGroupChildren(alerts, modal) {
+function renderAlertGroupChildren(alerts, modal, events) {
     const section = ensureAlertGroupChildrenSection(modal);
     const target = modal.find("#alert-group-children");
 
     alerts = asArray(alerts);
+    // A reopened occurrence is identified by a persisted event, not guessed
+    // from the current child status or the AlertGroup's previous_status.
+    const reopenedChildIds = new Set(asArray(events).filter(function (event) {
+        return event.event_type === "reopened" && event.alert_id;
+    }).map(function (event) { return Number(event.alert_id); }));
 
     target.empty();
     section.prop("hidden", false);
@@ -2766,11 +2807,22 @@ function renderAlertGroupChildren(alerts, modal) {
         target.append(
             $("<div>")
                 .addClass("alert-child-item")
+                .attr("data-child-alert-id", alert.id)
+                .attr("tabindex", "-1")
                 .append(
                     $("<div>")
                         .addClass("alert-child-header")
                         .append(
-                            $("<span>").text("#" + alert.id + " " + (alert.title || i18n.t("alert_details.entity.alert")))
+                            $("<div>")
+                                .addClass("alert-child-identification")
+                                .append(
+                                    $("<strong>").text("#" + alert.id + " " + (alert.title || i18n.t("alert_details.entity.alert")))
+                                )
+                                .append(reopenedChildIds.has(Number(alert.id))
+                                    ? $("<span>")
+                                        .addClass("alert-child-occurrence-note")
+                                        .text(i18n.t("alert_details.children.reopened_occurrence"))
+                                    : $())
                         )
                         .append(
                             $("<span>")
@@ -2806,6 +2858,24 @@ function renderAlertGroupChildren(alerts, modal) {
     });
 }
 
+function focusAlertChildOccurrence(childAlertId) {
+    const id = Number(childAlertId);
+    if (!Number.isSafeInteger(id) || id <= 0) { return; }
+
+    const card = alertDetailsModal().find("#alert-group-children .alert-child-item")
+        .filter(function () {
+            return Number($(this).attr("data-child-alert-id")) === id;
+        }).first();
+    if (!card.length) { return; }
+
+    setAlertDetailsTab("alerts");
+    alertDetailsModal().find(".alert-child-item").removeClass("is-highlighted");
+    card.addClass("is-highlighted").trigger("focus");
+    if (card[0] && typeof card[0].scrollIntoView === "function") {
+        card[0].scrollIntoView({block: "nearest"});
+    }
+}
+
 function alertEventTypeLabel(eventType) {
     const labels = {
         correlation_detected: i18n.t("alert_details.events.correlation_detected"),
@@ -2816,6 +2886,15 @@ function alertEventTypeLabel(eventType) {
         merged: i18n.t("alert_details.events.merged"),
         merge_target_updated: i18n.t("alert_details.events.merge_target_updated"),
         acknowledged: i18n.t("alert_details.events.acknowledged"),
+        reopened: i18n.t("alert_details.events.reopened"),
+        recovery_notification_scheduled: i18n.t("alert_details.recovery.scheduled"),
+        recovery_notification_cancelled: i18n.t("alert_details.recovery.cancelled"),
+        recovery_notification_sent: i18n.t("alert_details.recovery.sent"),
+        recovery_notification_skipped: i18n.t("alert_details.recovery.skipped"),
+        recovery_notification_retry_scheduled: i18n.t("alert_details.recovery.retry_scheduled"),
+        recovery_notification_partial: i18n.t("alert_details.recovery.partial"),
+        recovery_notification_failed: i18n.t("alert_details.recovery.failed"),
+        recovery_delivery_exhausted: i18n.t("alert_details.recovery.exhausted"),
         resolved: i18n.t("alert_details.responder.resolved"),
         notification: i18n.t("alert_details.events.notification"),
         reminder: i18n.t("alert_details.events.reminder"),
@@ -2872,27 +2951,29 @@ function renderEvents(events, modal, pagination, append) {
     }
 
     events.forEach(function (event) {
-        target.append(
-            $("<div>")
-                .addClass("event-item")
-                .append(
-                    $("<div>")
-                        .addClass("event-title")
-                        .text(
-                            "#" + event.id + " "
-                            + alertEventTypeLabel(event.event_type)
-                        )
-                )
-                .append(
-                    $("<div>")
-                        .addClass("table-subtitle")
-                        .text(
-                            formatDateTimeMinutes(event.created_at)
-                            + " "
-                            + (event.message || "")
-                        )
-                )
-        );
+        const row = $("<div>")
+            .addClass("event-item")
+            .append(
+                $("<div>")
+                    .addClass("event-title")
+                    .text("#" + event.id + " " + alertEventTypeLabel(event.event_type))
+            )
+            .append(
+                $("<div>")
+                    .addClass("table-subtitle")
+                    .text(formatDateTimeMinutes(event.created_at) + " " + (event.message || ""))
+            );
+
+        if (event.event_type === "reopened" && event.alert_id) {
+            row.append(
+                $("<button>")
+                    .attr("type", "button")
+                    .addClass("btn btn-secondary btn-small alert-event-child-link")
+                    .text(i18n.t("alert_details.events.view_child", {id: event.alert_id}))
+                    .on("click", function () { focusAlertChildOccurrence(event.alert_id); })
+            );
+        }
+        target.append(row);
     });
 
     if (pagination && pagination.has_next) {

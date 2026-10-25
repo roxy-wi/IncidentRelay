@@ -107,7 +107,7 @@
   "channels.webhook.slack": "URL del webhook de Slack",
   "channels.webhook.discord": "URL del webhook de Discord",
   "channels.webhook.teams": "URL del webhook de Microsoft Teams",
-  "channels.email.help": "Las notificaciones por email se envían al correo del perfil del usuario asignado.",
+  "channels.email.help": "Elige quién recibe los correos de alerta. SMTP se configura de forma global.",
   "channels.email.template": "Plantilla HTML",
   "channels.email.reset": "Restablecer predeterminada",
   "channels.email.placeholders": "Placeholders compatibles: {alert_id}, {event_type}, {title}, {message}, {severity}, {status}, {team}, {assignee}, {source}, {alert_url}. Deja la plantilla predeterminada sin cambios para usar la plantilla integrada.",
@@ -157,5 +157,16 @@
   "channels.slack.app_token": "Token de nivel de aplicación",
   "channels.slack.app_token_help": "Token de nivel de aplicación de Slack que comienza por xapp- y con el scope connections:write. El worker de Slack debe estar ejecutándose.",
   "channels.config.bot_http_ready": "Bot API configurada con acciones HTTP",
-  "channels.config.bot_socket_ready": "Bot API configurada con Socket Mode"
+  "channels.config.bot_socket_ready": "Bot API configurada con Socket Mode",
+  "channels.email.recipient_mode": "Modo de destinatario",
+  "channels.email.mode_assignee": "Correo del responsable asignado",
+  "channels.email.mode_fallback": "Correo del responsable con dirección alternativa",
+  "channels.email.mode_fixed": "Destinatario fijo",
+  "channels.email.recipient_mode_help": "La dirección alternativa solo se usa si el responsable no tiene correo. El destinatario fijo siempre se usa.",
+  "channels.email.recipient_email": "Correo del destinatario",
+  "channels.email.recipient_email_help": "Una única dirección para el modo alternativo o fijo; no se aceptan listas.",
+  "channels.email.test_help": "La prueba siempre se envía al correo de tu perfil, no a la dirección alternativa o fija.",
+  "channels.email.template_custom": "Plantilla HTML personalizada",
+  "channels.email.template_default": "Plantilla HTML predeterminada",
+  "channels.validation.recipient_email_required": "Introduce un correo para el destinatario alternativo o fijo."
 }

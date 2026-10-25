@@ -79,6 +79,7 @@ class RuntimeResult:
     notification_policy: Any = None
     group_key: Optional[str] = None
     grouping_window_seconds: Optional[int] = None
+    grouping_reopen_window_seconds: int = 0
     trace_level: Optional[str] = None
     alert_event_history: Optional[str] = None
     route_selected_by_orchestration: bool = False
@@ -110,6 +111,7 @@ class RuntimeResult:
             "notification_policy_id": getattr(self.notification_policy, "id", None),
             "group_key": self.group_key,
             "grouping_window_seconds": self.grouping_window_seconds,
+            "grouping_reopen_window_seconds": self.grouping_reopen_window_seconds,
             "trace_level": self.trace_level,
             "alert_event_history": self.alert_event_history,
             "blocked": self.blocked,
@@ -607,6 +609,8 @@ def _evaluate_orchestrations(
             runtime.group_key = event_group_key
         if "window_seconds" in grouping:
             runtime.grouping_window_seconds = grouping.get("window_seconds")
+        if "reopen_window_seconds" in grouping:
+            runtime.grouping_reopen_window_seconds = grouping["reopen_window_seconds"]
 
         result_state = context.get("result") or {}
         trace_level = result_state.get("trace_level")
@@ -1018,6 +1022,7 @@ def restore_runtime_result(data: Mapping[str, Any]) -> RuntimeResult:
         ) if payload.get("notification_policy_id") else None,
         group_key=payload.get("group_key"),
         grouping_window_seconds=payload.get("grouping_window_seconds"),
+        grouping_reopen_window_seconds=payload.get("grouping_reopen_window_seconds") or 0,
         trace_level=payload.get("trace_level"),
         alert_event_history=payload.get("alert_event_history"),
         route_selected_by_orchestration=bool(

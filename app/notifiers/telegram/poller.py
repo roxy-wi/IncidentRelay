@@ -301,11 +301,11 @@ def handle_telegram_callback(channel, callback):
             return
 
         if action == "acknowledge":
-            alert = acknowledge_alert(alert_id, user_id=user.id)
+            alert = acknowledge_alert(alert_id, user_id=user.id, source="telegram")
             event_type = "acknowledged"
             answer_text = f"Alert #{alert.id} acknowledged"
         elif action == "resolve":
-            alert = resolve_alert(alert_id, user_id=user.id)
+            alert = resolve_alert(alert_id, user_id=user.id, source="telegram")
             event_type = "resolved"
             answer_text = f"Alert #{alert.id} resolved"
         elif action == "shelve":
@@ -333,12 +333,6 @@ def handle_telegram_callback(channel, callback):
                 show_alert=True,
             )
             return
-
-        alerts_repo.create_alert_event(
-            alert.id,
-            f"telegram_{event_type}",
-            f"Telegram action by {user.username}",
-        )
 
         # Shelve/Unshelve already update every stored provider message from
         # the shared shelving service. Avoid issuing a second Telegram edit

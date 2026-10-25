@@ -602,6 +602,10 @@ def alert_group_schema(include_details=False):
         ),
         "notification_pending": {"type": "boolean"},
         "notification_reason": {"type": "string", "nullable": True},
+        "recovery_notification_due_at": date_time_property(
+            "Deferred external recovery notification due timestamp (null when not pending).",
+            nullable=True,
+        ),
         "reminder_count": {"type": "integer"},
         "escalation_level": {"type": "integer"},
         "correlation_summary": alert_correlation_summary_schema(),

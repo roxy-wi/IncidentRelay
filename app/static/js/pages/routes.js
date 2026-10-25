@@ -326,6 +326,8 @@ function fillRouteSourceFilter(routes) {
         new_relic: true,
         nagios: true,
         grafana: true,
+        opensearch: true,
+        kibana: true,
         rmon: true,
         heartbeat: true,
         zabbix: true,
@@ -1127,6 +1129,8 @@ function updateRouteSourceUi() {
     const isAwsSns = source === "aws_sns";
     const isDatadog = source === "datadog";
     const isNewRelic = source === "new_relic";
+    const isOpenSearch = source === "opensearch";
+    const isKibana = source === "kibana";
     const isAzureMonitor = source === "azure_monitor";
     const isCloudRu = source === "cloud_ru";
     const isNagios = source === "nagios";
@@ -1146,6 +1150,8 @@ function updateRouteSourceUi() {
         "is-hidden",
         !isNewRelic
     );
+    $("#route-opensearch-help").toggleClass("is-hidden", !isOpenSearch);
+    $("#route-kibana-help").toggleClass("is-hidden", !isKibana);
     $("#route-azure-monitor-help").toggleClass(
         "is-hidden",
         !isAzureMonitor
@@ -1197,6 +1203,14 @@ function updateRouteSourceUi() {
         } else if (source === "grafana") {
             $("#route-group-by").val(
                 '["alertname","grafana_folder","instance"]'
+            );
+        } else if (source === "opensearch") {
+            $("#route-group-by").val(
+                '["opensearch_monitor_id","opensearch_trigger_id","opensearch_bucket_key"]'
+            );
+        } else if (source === "kibana") {
+            $("#route-group-by").val(
+                '["kibana_rule_id","kibana_alert_id"]'
             );
         } else if (source === "datadog") {
             $("#route-group-by").val(
@@ -1694,6 +1708,26 @@ function buildRouteIntakeCurl(route, token) {
         ].join("\n");
     }
 
+    if (source === "opensearch") {
+        return [
+            "# " + i18n.t("routes.intake.opensearch_example_comment"),
+            `curl -X POST '${url}' \\`,
+            "  -H 'Content-Type: application/json' \\",
+            `  -H 'Authorization: Bearer ${token || "<route-token>"}' \\`,
+            "  -d '{\"monitor_id\":\"monitor-123\",\"trigger_id\":\"trigger-1\",\"monitor_name\":\"Error rate\",\"trigger_name\":\"Error rate exceeded\",\"status\":\"ACTIVE\",\"severity\":\"2\",\"message\":\"Error rate exceeded 5%\"}'"
+        ].join("\n");
+    }
+
+    if (source === "kibana") {
+        return [
+            "# " + i18n.t("routes.intake.kibana_example_comment"),
+            `curl -X POST '${url}' \\`,
+            "  -H 'Content-Type: application/json' \\",
+            `  -H 'Authorization: Bearer ${token || "<route-token>"}' \\`,
+            "  -d '{\"rule_id\":\"rule-123\",\"alert_id\":\"instance-api-1\",\"rule_name\":\"API errors\",\"status\":\"active\",\"severity\":\"critical\",\"message\":\"Error rate exceeded 5%\"}'"
+        ].join("\n");
+    }
+
     if (source === "new_relic") {
         return [
             "# " + i18n.t("routes.intake.new_relic_example_comment"),
@@ -1764,6 +1798,8 @@ function showRouteIntakeDetails(route) {
     const isHeartbeat = source === "heartbeat";
     const isDatadog = source === "datadog";
     const isNewRelic = source === "new_relic";
+    const isOpenSearch = source === "opensearch";
+    const isKibana = source === "kibana";
     const isAzureMonitor = source === "azure_monitor";
     const isCloudRu = source === "cloud_ru";
     const isNagios = source === "nagios";
@@ -1789,6 +1825,12 @@ function showRouteIntakeDetails(route) {
     } else if (isNewRelic) {
         subtitleKey = "routes.intake.new_relic_subtitle";
         helpKey = "routes.intake.new_relic_help";
+    } else if (source === "opensearch") {
+        subtitleKey = "routes.intake.opensearch_subtitle";
+        helpKey = "routes.intake.opensearch_help";
+    } else if (source === "kibana") {
+        subtitleKey = "routes.intake.kibana_subtitle";
+        helpKey = "routes.intake.kibana_help";
     } else if (isAzureMonitor) {
         subtitleKey = "routes.intake.azure_monitor_subtitle";
         helpKey = "routes.intake.azure_monitor_help";
