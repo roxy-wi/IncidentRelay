@@ -9,6 +9,7 @@ from app.api.schemas.services import (
     ServiceImpactSnapshotQuerySchema,
 )
 from app.modules.db import services_repo
+from app.services.audit import write_audit
 from app.services.rbac import require_team_read, get_allowed_team_ids
 from app.services.service_catalog.impact import build_service_impact_v2, build_single_service_impact_v2
 from app.services.service_catalog.impact_snapshots import (
@@ -104,6 +105,12 @@ def create_service_impact_snapshot():
         payload,
         team_ids=team_ids,
         source="manual",
+    )
+    scoped_team_id = snapshot.get("team_id") or (team_ids[0] if len(team_ids or []) == 1 else None)
+    write_audit(
+        "service_impact.snapshot.create", object_type="service_impact_snapshot",
+        object_id=snapshot["id"], group_id=snapshot.get("group_id"),
+        team_id=scoped_team_id, data={"team_ids": list(team_ids or [])},
     )
 
     return jsonify(snapshot), 201

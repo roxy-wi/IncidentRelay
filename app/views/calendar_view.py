@@ -5,6 +5,8 @@ from peewee import DoesNotExist
 
 from app.services.calendar_service import build_team_calendar
 from app.services.rbac import parse_date_or_datetime, require_team_oncall_read, require_team_write
+from app.services.audit import write_audit
+from app.db import database_proxy as db
 from app.modules.db import calendar_feeds_repo
 from app.services.calendar_feeds import (
     build_ics_for_calendar_feed,
@@ -165,6 +167,11 @@ def create_calendar_feed():
         future_days=int(payload.get("future_days") or 90),
     )
 
+    write_audit(
+        "calendar_feed.create", object_type="calendar_feed",
+        object_id=feed.id, group_id=feed.team.group_id, team_id=feed.team_id,
+        data={"source": "api"},
+    )
     return jsonify(
         serialize_calendar_feed(
             feed,
@@ -187,12 +194,18 @@ def regenerate_calendar_feed_token(feed_id):
 
     token, prefix, token_hash = generate_calendar_feed_token()
 
-    feed = calendar_feeds_repo.update_calendar_feed(
-        feed,
-        token_prefix=prefix,
-        token_hash=token_hash,
-        enabled=True,
-    )
+    with db.atomic():
+        feed = calendar_feeds_repo.update_calendar_feed(
+            feed,
+            token_prefix=prefix,
+            token_hash=token_hash,
+            enabled=True,
+        )
+        write_audit(
+            "calendar_feed.token.rotate", object_type="calendar_feed",
+            object_id=feed.id, group_id=feed.team.group_id, team_id=feed.team_id,
+            data={"source": "api"},
+        )
 
     return jsonify(
         serialize_calendar_feed(
@@ -215,6 +228,11 @@ def delete_calendar_feed(feed_id):
         return error
 
     calendar_feeds_repo.soft_delete_calendar_feed(feed)
+    write_audit(
+        "calendar_feed.delete", object_type="calendar_feed",
+        object_id=feed.id, group_id=feed.team.group_id, team_id=feed.team_id,
+        data={"source": "api"},
+    )
 
     return jsonify({"deleted": True, "id": feed_id})
 

@@ -184,7 +184,7 @@ def test_reopen_resumes_linked_resolved_incident_not_closed(db, monkeypatch, sta
     audit = list(AuditLog.select().where(
         (AuditLog.object_type == "incident")
         & (AuditLog.object_id == incident.id)
-        & (AuditLog.action == "incident_reopened_by_alert_group")
+        & (AuditLog.action == "incident.reopen_by_alert_group")
     ))
     assert len(audit) == 1
     assert audit[0].data["alert_group_id"] == first.group.id

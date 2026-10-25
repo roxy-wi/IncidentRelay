@@ -3,9 +3,10 @@ from typing import Any
 from flask import Blueprint, jsonify, request
 
 from app.api.schemas.silences import SilenceCreateSchema, SilenceUpdateSchema
+from app.db import database_proxy as db
 from app.modules.db import silences_repo
 from app.modules.db.models import Silence, User
-from app.services.audit import write_audit
+from app.services.audit import current_api_token_id, write_audit
 from app.services.rbac import (
     current_user,
     get_allowed_team_or_group_resource_ids,
@@ -18,6 +19,28 @@ from app.services.validation import make_error_response, validate_body
 
 
 silences_bp = Blueprint("silences_api", __name__)
+
+
+def _lock_silence_for_command(silence_id):
+    """Lock the record before checking whether enable/disable changes it."""
+    query = Silence.select().where(
+        (Silence.id == silence_id) & (Silence.deleted == False)  # noqa: E712
+    )
+    db_impl = getattr(db, "obj", None)
+    if db_impl is not None and db_impl.__class__.__name__ != "SqliteDatabase":
+        query = query.for_update()
+    return query.get()
+
+
+def _reconcile_api_silence(silence):
+    """Propagate the authenticated operator to retroactive lifecycle audits."""
+    actor = current_user()
+    return reconcile_silence(
+        silence,
+        trigger_source="api",
+        actor_user_id=getattr(actor, "id", None),
+        api_token_id=current_api_token_id(),
+    )
 
 
 def _validate_silence_matcher_preset(team_id, preset_id):
@@ -112,26 +135,28 @@ def create_silence():
         return preset_error
 
     actor = current_user()
-    silence = silences_repo.create_silence(
-        team_id=payload.team_id,
-        name=payload.name,
-        reason=payload.reason,
-        matcher_preset_id=preset.id if preset else None,
-        matchers=payload.matchers,
-        starts_at=payload.starts_at,
-        ends_at=payload.ends_at,
-        created_by=getattr(actor, "id", None),
-        apply_to_existing=payload.apply_to_existing,
-        reactivate_on_end=payload.reactivate_on_end,
-    )
-    write_audit(
-        "silence.create",
-        object_type="silence",
-        object_id=silence.id,
-        team_id=silence.team.id,
-        data=payload.model_dump(mode="json"),
-    )
-    reconcile_silence(silence, trigger_source="api")
+    with db.atomic():
+        silence = silences_repo.create_silence(
+            team_id=payload.team_id,
+            name=payload.name,
+            reason=payload.reason,
+            matcher_preset_id=preset.id if preset else None,
+            matchers=payload.matchers,
+            starts_at=payload.starts_at,
+            ends_at=payload.ends_at,
+            created_by=getattr(actor, "id", None),
+            apply_to_existing=payload.apply_to_existing,
+            reactivate_on_end=payload.reactivate_on_end,
+        )
+        write_audit(
+            "silence.create",
+            object_type="silence",
+            object_id=silence.id,
+            group_id=silence.team.group_id,
+            team_id=silence.team.id,
+            data=payload.model_dump(mode="json"),
+        )
+    _reconcile_api_silence(silence)
     return jsonify(serialize_silence(silence, current_user=current_user())), 201
 
 
@@ -167,28 +192,30 @@ def update_silence(silence_id):
     if preset_error:
         return preset_error
 
-    silence = silences_repo.update_silence(
-        silence_id,
-        {
-            "team": payload.team_id,
-            "name": payload.name,
-            "reason": payload.reason,
-            "matcher_preset": preset.id if preset else None,
-            "matchers": payload.matchers,
-            "starts_at": payload.starts_at,
-            "ends_at": payload.ends_at,
-            "apply_to_existing": payload.apply_to_existing,
-            "reactivate_on_end": payload.reactivate_on_end,
-        },
-    )
-    write_audit(
-        "silence.update",
-        object_type="silence",
-        object_id=silence.id,
-        team_id=silence.team.id,
-        data=payload.model_dump(mode="json"),
-    )
-    reconcile_silence(silence, trigger_source="api")
+    with db.atomic():
+        silence = silences_repo.update_silence(
+            silence_id,
+            {
+                "team": payload.team_id,
+                "name": payload.name,
+                "reason": payload.reason,
+                "matcher_preset": preset.id if preset else None,
+                "matchers": payload.matchers,
+                "starts_at": payload.starts_at,
+                "ends_at": payload.ends_at,
+                "apply_to_existing": payload.apply_to_existing,
+                "reactivate_on_end": payload.reactivate_on_end,
+            },
+        )
+        write_audit(
+            "silence.update",
+            object_type="silence",
+            object_id=silence.id,
+            group_id=silence.team.group_id,
+            team_id=silence.team.id,
+            data=payload.model_dump(mode="json"),
+        )
+    _reconcile_api_silence(silence)
     return jsonify(serialize_silence(silence, current_user=current_user()))
 
 
@@ -203,14 +230,19 @@ def enable_silence(silence_id: int):
     if error:
         return error
 
-    silence = silences_repo.enable_silence(silence_id)
-    write_audit(
-        "silence.enable",
-        object_type="silence",
-        object_id=silence.id,
-        team_id=silence.team.id,
-    )
-    reconcile_silence(silence, trigger_source="api")
+    with db.atomic():
+        current_silence = _lock_silence_for_command(silence_id)
+        changed = not current_silence.enabled
+        silence = silences_repo.enable_silence(silence_id) if changed else current_silence
+        if changed:
+            write_audit(
+                "silence.enable",
+                object_type="silence",
+                object_id=silence.id,
+                group_id=silence.team.group_id,
+                team_id=silence.team.id,
+            )
+    _reconcile_api_silence(silence)
     return jsonify(serialize_silence(silence, current_user=current_user()))
 
 
@@ -227,14 +259,19 @@ def delete_silence(silence_id):
     )
     if error:
         return error
-    silence = silences_repo.disable_silence(silence_id)
-    write_audit(
-        "silence.disable",
-        object_type="silence",
-        object_id=silence.id,
-        team_id=silence.team.id,
-    )
-    reconcile_silence(silence, trigger_source="api")
+    with db.atomic():
+        current_silence = _lock_silence_for_command(silence_id)
+        changed = bool(current_silence.enabled)
+        silence = silences_repo.disable_silence(silence_id) if changed else current_silence
+        if changed:
+            write_audit(
+                "silence.disable",
+                object_type="silence",
+                object_id=silence.id,
+                group_id=silence.team.group_id,
+                team_id=silence.team.id,
+            )
+    _reconcile_api_silence(silence)
     return jsonify(serialize_silence(silence, current_user=current_user()))
 
 

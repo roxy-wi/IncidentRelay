@@ -514,7 +514,6 @@ def test_execute_push_action_ack_uses_token_once(db, monkeypatch):
         return updated_group
 
     monkeypatch.setattr(browser_push, "_run_alert_push_action", fake_run_alert_push_action)
-    monkeypatch.setattr(browser_push, "write_audit", lambda *args, **kwargs: None)
 
     result = browser_push.execute_push_action(token, "ack")
 
@@ -556,7 +555,6 @@ def test_execute_push_action_resolve(db, monkeypatch):
         return updated_group
 
     monkeypatch.setattr(browser_push, "_run_alert_push_action", fake_run_alert_push_action)
-    monkeypatch.setattr(browser_push, "write_audit", lambda *args, **kwargs: None)
 
     result = browser_push.execute_push_action(token, "resolve")
 

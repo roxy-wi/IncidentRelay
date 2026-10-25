@@ -1041,6 +1041,9 @@ def expire_auto_discovered_instances(now=None, team_ids=None):
     return expired
 
 def pause_heartbeat(heartbeat, now=None):
+    if heartbeat.status == "paused":
+        return heartbeat
+
     now = as_utc_naive_seconds(now or utc_now_seconds())
     before = heartbeat.status
     heartbeat.status = "paused"
@@ -1065,6 +1068,9 @@ def pause_heartbeat(heartbeat, now=None):
 
 
 def resume_heartbeat(heartbeat, now=None):
+    if heartbeat.status != "paused":
+        return heartbeat
+
     now = as_utc_naive_seconds(now or utc_now_seconds())
     before = heartbeat.status
 

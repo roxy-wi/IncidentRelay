@@ -399,6 +399,7 @@ def _oidc_callback(provider):
             "provider_slug": provider.slug,
             "protocol": provider.protocol,
         },
+        transport="sso",
     )
 
     return build_sso_login_response(user, redirect_to=redirect_to)
@@ -572,6 +573,7 @@ def _saml_callback(provider):
             "provider_slug": provider.slug,
             "protocol": provider.protocol,
         },
+        transport="sso",
     )
 
     return build_sso_login_response(user, redirect_to=redirect_to)

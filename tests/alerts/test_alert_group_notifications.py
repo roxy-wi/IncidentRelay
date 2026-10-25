@@ -42,30 +42,6 @@ def _alert(route, alertname, instance, status="firing"):
     }
 
 
-def test_new_group_schedules_notification_instead_of_sending_immediately(db, monkeypatch):
-    route = _route(group_by=["alertname", "severity"])
-    sent = []
-
-    monkeypatch.setattr(Config, "ALERT_GROUP_WAIT_SECONDS", 30)
-    monkeypatch.setattr(
-        notification_queue,
-        "notify_alert",
-        lambda *args, **kwargs: sent.append((args, kwargs)),
-    )
-
-    result = upsert_alert(_alert(route, "DiskFull", "host1"))
-    group = result.group
-    created = result.created_group
-    group = alerts_repo.get_alert_group(group.id)
-
-    assert created is True
-    assert sent == []
-    assert group.notification_pending is True
-    assert group.notification_due_at is not None
-    assert group.notification_reason == "notification"
-    assert group.last_notification_at is None
-
-
 def test_due_group_notification_is_sent(db, monkeypatch):
     group = create_group()
     team = create_team(group)

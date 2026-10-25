@@ -322,7 +322,7 @@ function getCurrentUserActiveGroupRole() {
     }
 
     const group = groups.find(function (item) {
-        return Number(item.group_id || item.id) === Number(activeGroupId);
+        return Number(item.group_id) === Number(activeGroupId);
     });
 
     return group ? group.role : null;

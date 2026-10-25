@@ -196,7 +196,7 @@ def _resume_linked_incident(group, alert, *, now):
     )
     group_id = updated.team.group_id if updated.team_id and updated.team else None
     audit_repo.create_audit_log(
-        action="incident_reopened_by_alert_group",
+        action="incident.reopen_by_alert_group",
         object_type="incident", object_id=updated.id,
         group_id=group_id, team_id=updated.team_id, data=data,
     )
@@ -211,10 +211,10 @@ def record_reopened_occurrence(group, alert):
         message=f"Resolved AlertGroup reopened by new Alert #{alert.id}",
     )
     audit_repo.create_audit_log(
-        action="alert_group_reopened", object_type="alert_group",
+        action="alert_group.reopen", object_type="alert_group",
         object_id=group.id,
         group_id=group.team.group_id if group.team_id and group.team else None,
         team_id=group.team_id,
-        data={"alert_id": alert.id, "previous_status": "resolved", "status": group.status},
+        data={"alert_id": alert.id, "source": "integration", "previous_status": "resolved", "status": group.status},
     )
     _resume_linked_incident(group, alert, now=now)

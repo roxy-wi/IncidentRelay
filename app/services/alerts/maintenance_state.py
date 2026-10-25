@@ -291,6 +291,7 @@ def _write_application_audit(
     *,
     trigger_source: str,
     actor_user_id: int | None,
+    api_token_id: int | None,
     previous_state: str | None,
     new_state: str | None,
 ) -> None:
@@ -303,6 +304,7 @@ def _write_application_audit(
         group_id=group.team.group_id if group.team_id and group.team else None,
         team_id=group.team_id,
         user_id=actor_user_id,
+        api_token_id=api_token_id,
         message=None,
         data={
             "maintenance_window_id": window.id,
@@ -311,6 +313,7 @@ def _write_application_audit(
             "previous_state": previous_state,
             "new_state": new_state,
             "trigger_source": trigger_source,
+            "transport": "api" if trigger_source == "api" else "system",
         },
     )
 
@@ -442,6 +445,7 @@ def _apply_window_to_group(
     occurrence_start: datetime | None,
     trigger_source: str,
     actor_user_id: int | None,
+    api_token_id: int | None,
 ) -> bool:
     application = maintenance_repo.get_window_group_application(window, group)
     source = "existing"
@@ -502,12 +506,14 @@ def _apply_window_to_group(
             group_id=group.id,
             event_type="maintenance_applied",
             message=f"Maintenance applied: {window.name} ({window.behavior})",
+            user_id=actor_user_id,
         )
         _write_application_audit(
             "maintenance_window.alert_group_applied",
             application,
             trigger_source=trigger_source,
             actor_user_id=actor_user_id,
+            api_token_id=api_token_id,
             previous_state=previous_state,
             new_state=AlertGroup.get_by_id(group.id).status,
         )
@@ -522,6 +528,7 @@ def _release_application(
     reason: str,
     trigger_source: str,
     actor_user_id: int | None,
+    api_token_id: int | None,
 ) -> bool:
     if not application.active:
         return False
@@ -549,12 +556,14 @@ def _release_application(
         group_id=group.id,
         event_type="maintenance_released",
         message=f"Maintenance effect released: {application.maintenance_window.name}",
+        user_id=actor_user_id,
     )
     _write_application_audit(
         "maintenance_window.alert_group_released",
         application,
         trigger_source=trigger_source,
         actor_user_id=actor_user_id,
+        api_token_id=api_token_id,
         previous_state=previous_state,
         new_state=AlertGroup.get_by_id(group.id).status,
     )
@@ -567,6 +576,7 @@ def _retain_application(
     now: datetime,
     trigger_source: str,
     actor_user_id: int | None,
+    api_token_id: int | None,
 ) -> bool:
     if application.retained_at is not None:
         return False
@@ -579,12 +589,14 @@ def _retain_application(
             "Maintenance ended, but its effect remains active because automatic "
             f"reactivation is disabled: {application.maintenance_window.name}"
         ),
+        user_id=actor_user_id,
     )
     _write_application_audit(
         "maintenance_window.alert_group_retained",
         application,
         trigger_source=trigger_source,
         actor_user_id=actor_user_id,
+        api_token_id=api_token_id,
         previous_state=application.alert_group.status,
         new_state=application.alert_group.status,
     )
@@ -597,6 +609,7 @@ def reconcile_maintenance_window(
     now: datetime | None = None,
     trigger_source: str = "scheduler",
     actor_user_id: int | None = None,
+    api_token_id: int | None = None,
     limit: int | None = None,
     force_release: bool = False,
 ) -> dict[str, int]:
@@ -619,6 +632,7 @@ def reconcile_maintenance_window(
                     occurrence_start=occurrence_start,
                     trigger_source=trigger_source,
                     actor_user_id=actor_user_id,
+                    api_token_id=api_token_id,
                 ):
                     applied += 1
 
@@ -666,6 +680,7 @@ def reconcile_maintenance_window(
                     ),
                     trigger_source=trigger_source,
                     actor_user_id=actor_user_id,
+                    api_token_id=api_token_id,
                 ):
                     released += 1
             elif _retain_application(
@@ -673,6 +688,7 @@ def reconcile_maintenance_window(
                 now=now,
                 trigger_source=trigger_source,
                 actor_user_id=actor_user_id,
+                api_token_id=api_token_id,
             ):
                 retained += 1
 
@@ -709,6 +725,7 @@ def reconcile_alert_group_maintenance(
             occurrence_start=_occurrence_start_utc(window, now=now),
             trigger_source=trigger_source,
             actor_user_id=None,
+            api_token_id=None,
         ):
             applied += 1
     return {"applied": applied, "matched": len(matched_ids)}

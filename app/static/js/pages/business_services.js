@@ -54,7 +54,7 @@ function refreshBusinessServiceGroupsCache() {
     const groups = [];
 
     asArray(currentUser ? currentUser.groups : []).forEach(function (group) {
-        const groupId = normalizeBusinessServiceId(group.group_id || group.id);
+        const groupId = normalizeBusinessServiceId(group.group_id);
 
         if (!groupId) {
             return;
@@ -106,7 +106,7 @@ function selectedBusinessServiceListGroupId() {
 
     const groups = asArray(currentUser ? currentUser.groups : []);
 
-    return groups.length ? normalizeBusinessServiceId(groups[0].group_id || groups[0].id) : null;
+    return groups.length ? normalizeBusinessServiceId(groups[0].group_id) : null;
 }
 
 

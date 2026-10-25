@@ -1,9 +1,19 @@
 from flask import Blueprint, jsonify, request
 
 from app.notifiers.browser_push import service as browser_push
+from app.services.audit import write_audit
 from app.services.validation import make_error_response, safe_exception_response
 
 push_bp = Blueprint("push_api", __name__)
+
+
+def _audit_push_subscription(action, subscription_id):
+    """Store device state changes, never browser endpoint or auth keys."""
+    write_audit(
+        action, object_type="browser_push_subscription",
+        object_id=subscription_id, user_id=request.current_user.id,
+        data={"source": "api"},
+    )
 
 
 @push_bp.route("/profile/push/vapid-public-key", methods=["GET"])
@@ -41,6 +51,7 @@ def save_subscription():
             status_code=400,
         )
 
+    _audit_push_subscription("profile.push_subscription.upsert", subscription.id)
     return jsonify(browser_push.serialize_subscription(subscription)), 201
 
 
@@ -59,6 +70,7 @@ def disable_subscription(subscription_id):
             status_code=404,
         )
 
+    _audit_push_subscription("profile.push_subscription.disable", subscription_id)
     return jsonify({"disabled": True, "id": subscription_id})
 
 

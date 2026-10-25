@@ -18,6 +18,7 @@ from app.api.schemas.orchestrations import (
     OrchestrationWebhookActionCreateSchema,
     OrchestrationWebhookActionUpdateSchema,
 )
+from app.db import database_proxy as db
 from app.modules.db import orchestrations_repo
 from app.modules.db.models import (
     AlertRoute,
@@ -337,10 +338,21 @@ def create_orchestration_draft(orchestration_id):
         return error
     user = current_user()
     try:
-        draft = orchestrations_repo.get_or_create_draft(
-            orchestration.id,
-            actor_id=user.id,
-        )
+        # Lock the parent orchestration before checking for an existing draft.
+        # The repository uses the same lock to serialize draft allocation.
+        with db.atomic():
+            draft, created = orchestrations_repo.ensure_draft_with_creation_status(
+                orchestration.id,
+                actor_id=user.id,
+            )
+            if created:
+                write_audit(
+                    "event_orchestration.draft.create",
+                    object_type="event_orchestration_version",
+                    object_id=draft.id,
+                    group_id=orchestration.group_id,
+                    data={"orchestration_id": orchestration.id},
+                )
     except orchestrations_repo.OrchestrationError as exc:
         return _repo_error_response(exc)
     return jsonify(_serialize_version(draft, include_definition=True))
@@ -387,6 +399,20 @@ def validate_orchestration(orchestration_id):
             409,
         )
     result = orchestrations_repo.validate_version(draft.id)
+    # Validation is read-only but an explicit operator action worth auditing;
+    # never persist the supplied rules or validation error details in AuditLog.
+    write_audit(
+        "event_orchestration.draft.validate",
+        object_type="event_orchestration_version",
+        object_id=draft.id,
+        group_id=orchestration.group_id,
+        data={
+            "orchestration_id": orchestration.id,
+            "valid": bool(result["valid"]),
+            "errors_count": len(result["errors"]),
+            "warnings_count": len(result["warnings"]),
+        },
+    )
     return jsonify(result)
 
 

@@ -6,7 +6,7 @@ from app.api.schemas.maintenance_windows import (
     MaintenanceWindowUpdateSchema,
 )
 from app.modules.db import maintenance_repo
-from app.services.audit import write_audit
+from app.services.audit import current_api_token_id
 from app.services.maintenance import (
     cancel_maintenance_window,
     create_maintenance_window,
@@ -19,7 +19,6 @@ from app.services.rbac import (
 )
 from app.services.serializers.services import (
     serialize_maintenance_window,
-    serialize_utc_datetime,
 )
 from app.services.validation import (
     make_error_response,
@@ -44,43 +43,6 @@ def _current_user_id():
     return user.id
 
 
-def _maintenance_audit_data(window, payload=None):
-    data = {
-        "name": window.name,
-        "status": window.status,
-        "behavior": window.behavior,
-        "timezone": window.timezone,
-        "starts_at": serialize_utc_datetime(window.starts_at),
-        "ends_at": serialize_utc_datetime(window.ends_at),
-        "enabled": window.enabled,
-        "apply_to_existing": bool(window.apply_to_existing),
-        "reactivate_on_end": bool(window.reactivate_on_end),
-        "deleted": window.deleted,
-    }
-
-    if getattr(window, "rrule", None):
-        data["rrule"] = window.rrule
-
-    if payload:
-        data["payload"] = payload
-
-    return data
-
-
-def _write_maintenance_audit(action, window, payload=None):
-    user = _request_user()
-
-    write_audit(
-        action,
-        object_type="maintenance_window",
-        object_id=window.id,
-        group_id=window.group_id,
-        team_id=window.team_id,
-        user_id=user.id if user else None,
-        data=_maintenance_audit_data(window, payload),
-    )
-
-
 def _check_window_read(window):
     for scope in window.scopes:
         if scope.team_id:
@@ -99,21 +61,6 @@ def _check_window_read(window):
                 return error
 
     return None
-
-
-def _format_payload_for_audit(payload):
-    if not payload:
-        return {}
-
-    result = dict(payload)
-
-    for field_name in ("starts_at", "ends_at"):
-        value = result.get(field_name)
-
-        if value and hasattr(value, "isoformat"):
-            result[field_name] = value.isoformat()
-
-    return result
 
 
 @maintenance_bp.route("", methods=["GET"])
@@ -162,6 +109,7 @@ def create_window():
         window = create_maintenance_window(
             payload,
             user_id=_current_user_id(),
+            api_token_id=current_api_token_id(),
         )
     except ValueError as exc:
         return safe_exception_response(
@@ -177,12 +125,6 @@ def create_window():
             message="Access denied.",
             status_code=403,
         )
-
-    _write_maintenance_audit(
-        "maintenance_window.create",
-        window,
-        _format_payload_for_audit(payload),
-    )
 
     return jsonify(serialize_maintenance_window(window)), 201
 
@@ -218,6 +160,7 @@ def update_window(window_id):
             window_id,
             payload,
             user_id=_current_user_id(),
+            api_token_id=current_api_token_id(),
         )
     except ValueError as exc:
         return safe_exception_response(
@@ -241,12 +184,6 @@ def update_window(window_id):
             status_code=404,
         )
 
-    _write_maintenance_audit(
-        "maintenance_window.update",
-        window,
-        _format_payload_for_audit(payload),
-    )
-
     return jsonify(serialize_maintenance_window(window))
 
 
@@ -266,6 +203,7 @@ def cancel_window(window_id):
             window_id,
             payload,
             user_id=_current_user_id(),
+            api_token_id=current_api_token_id(),
         )
     except ValueError as exc:
         return safe_exception_response(
@@ -289,12 +227,6 @@ def cancel_window(window_id):
             status_code=404,
         )
 
-    _write_maintenance_audit(
-        "maintenance_window.cancel",
-        window,
-        payload,
-    )
-
     return jsonify(serialize_maintenance_window(window))
 
 
@@ -304,6 +236,7 @@ def delete_window(window_id):
         window = delete_maintenance_window(
             window_id,
             user_id=_current_user_id(),
+            api_token_id=current_api_token_id(),
         )
     except PermissionError as exc:
         return safe_exception_response(
@@ -319,13 +252,5 @@ def delete_window(window_id):
             message="Maintenance window not found.",
             status_code=404,
         )
-
-    _write_maintenance_audit(
-        "maintenance_window.delete",
-        window,
-        {
-            "deleted": True,
-        },
-    )
 
     return jsonify({"deleted": True, "id": window.id})

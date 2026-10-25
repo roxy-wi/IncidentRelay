@@ -1,4 +1,5 @@
 from peewee import DoesNotExist
+from app.db import database_proxy as db
 from flask import Blueprint, jsonify, request
 
 from app.api.schemas.alerts import (
@@ -15,7 +16,7 @@ from app.services.alerts.actions import acknowledge_alert, resolve_alert
 from app.services.alerts.analytics import build_alert_analytics_v1
 from app.services.alerts.assignment import set_alert_group_assignee
 from app.services.alerts.shelving import shelve_alert_group, unshelve_alert_group
-from app.services.audit import write_audit
+from app.services.audit import current_api_token_id, write_audit
 from app.services.rbac import (
     can_access_team_or_group_resource,
     can_respond_team,
@@ -366,18 +367,10 @@ def ack_alert(alert_id):
     if error:
         return error
 
-    data = request.get_json(silent=True) or {}
     user_id = getattr(_request_user(), "id", None)
-    audit_data = {key: value for key, value in data.items() if key != "user_id"}
-
-    group = acknowledge_alert(alert_id, user_id=user_id)
-    write_audit(
-        "alert_group.ack",
-        object_type="alert_group",
-        object_id=group.id,
-        team_id=group_before.team.id if group_before.team else None,
-        user_id=user_id,
-        data=audit_data,
+    group = acknowledge_alert(
+        alert_id, user_id=user_id, source="api",
+        api_token_id=current_api_token_id(),
     )
 
     return jsonify(
@@ -395,18 +388,10 @@ def resolve_alert_view(alert_id):
     if error:
         return error
 
-    data = request.get_json(silent=True) or {}
     user_id = getattr(_request_user(), "id", None)
-    audit_data = {key: value for key, value in data.items() if key != "user_id"}
-
-    group = resolve_alert(alert_id, user_id=user_id)
-    write_audit(
-        "alert_group.resolve",
-        object_type="alert_group",
-        object_id=group.id,
-        team_id=group_before.team.id if group_before.team else None,
-        user_id=user_id,
-        data=audit_data,
+    group = resolve_alert(
+        alert_id, user_id=user_id, source="api",
+        api_token_id=current_api_token_id(),
     )
 
     return jsonify(
@@ -428,6 +413,8 @@ def update_alert_group_assignee(alert_id):
             group,
             data.get("assignee_id"),
             actor_user_id=_request_user_id(),
+            source="api",
+            api_token_id=current_api_token_id(),
         )
     except ValueError as exc:
         return safe_exception_response(exc, error="validation_error", message="Invalid AlertGroup assignee.", status_code=400)
@@ -446,6 +433,8 @@ def assign_alert_group_to_me(alert_id):
             group,
             _request_user_id(),
             actor_user_id=_request_user_id(),
+            source="api",
+            api_token_id=current_api_token_id(),
         )
     except ValueError as exc:
         return safe_exception_response(exc, error="validation_error", message="Invalid AlertGroup assignee.", status_code=400)
@@ -480,6 +469,8 @@ def create_incident_from_alert_group_view(alert_id):
         incident = create_incident_from_alert_group(
             group.id,
             user_id=_request_user_id(),
+            api_token_id=current_api_token_id(),
+            source="api",
             title=payload.title,
             description=payload.description,
             priority_slug=payload.priority,
@@ -510,7 +501,8 @@ def shelve_alert_view(alert_id):
             user_id=user_id,
             duration_seconds=payload.duration_seconds,
             reason=payload.reason,
-            source="ui",
+            source="api",
+            api_token_id=current_api_token_id(),
         )
     except ValueError as exc:
         return safe_exception_response(
@@ -534,7 +526,8 @@ def unshelve_alert_view(alert_id):
     group, _shelf = unshelve_alert_group(
         alert_id,
         user_id=user_id,
-        source="ui",
+        source="api",
+        api_token_id=current_api_token_id(),
     )
     return jsonify(serialize_alert_group(group, current_user=_request_user()))
 
@@ -602,25 +595,27 @@ def merge_alert_groups_view(target_group_id):
     user = _request_user()
     user_id = getattr(user, "id", None)
 
-    group = alerts_repo.merge_alert_groups(
-        target_group_id=target_group_id,
-        source_group_ids=source_group_ids,
-        user_id=user_id,
-        reason=reason,
-    )
+    # Merge mutation, timeline and audit must commit or roll back together.
+    with db.atomic():
+        group = alerts_repo.merge_alert_groups(
+            target_group_id=target_group_id,
+            source_group_ids=source_group_ids,
+            user_id=user_id,
+            reason=reason,
+        )
 
-    write_audit(
-        "alert_group.merge",
-        object_type="alert_group",
-        object_id=group.id,
-        team_id=group.team.id if group.team else None,
-        user_id=user_id,
-        data={
-            "target_group_id": target_group_id,
-            "source_group_ids": source_group_ids,
-            "reason": reason,
-        },
-    )
+        write_audit(
+            "alert_group.merge",
+            object_type="alert_group",
+            object_id=group.id,
+            team_id=group.team.id if group.team else None,
+            user_id=user_id,
+            data={
+                "target_group_id": target_group_id,
+                "source_group_ids": source_group_ids,
+                "reason": reason,
+            },
+        )
 
     return jsonify(
         serialize_alert_group(
@@ -842,6 +837,8 @@ def update_incident_priority(alert_id):
             group_id=group.id,
             priority=payload.get("priority"),
             user_id=getattr(user, "id", None),
+            source="api",
+            api_token_id=current_api_token_id(),
         )
     except ValueError as exc:
         return safe_exception_response(
@@ -860,7 +857,10 @@ def reset_alert_group_priority(alert_id):
     if error:
         return error
     try:
-        group = reset_incident_priority(group_id=group.id)
+        group = reset_incident_priority(
+            group_id=group.id, user_id=_request_user_id(), source="api",
+            api_token_id=current_api_token_id(),
+        )
     except (ValueError, LookupError) as exc:
         return safe_exception_response(
             exc,

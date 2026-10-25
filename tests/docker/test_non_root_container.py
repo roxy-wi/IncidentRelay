@@ -133,7 +133,11 @@ def test_dockerfile_explicitly_installs_privilege_drop_and_creates_home():
 
 
 def test_entrypoint_drops_privileges_before_migrations_and_all_services():
-    entrypoint = (ROOT / "docker" / "entrypoint.sh").read_text(encoding="utf-8")
+    entrypoint_path = ROOT / "docker" / "entrypoint.sh"
+    assert b"\r\n" not in entrypoint_path.read_bytes(), (
+        "docker/entrypoint.sh has CRLF line endings; Bash scripts must use LF"
+    )
+    entrypoint = entrypoint_path.read_text(encoding="utf-8")
     assert entrypoint.index("PY_CONFIG\n") < entrypoint.index(
         "python /opt/incidentrelay/docker/fix_volume_permissions.py"
     )

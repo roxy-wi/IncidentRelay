@@ -78,6 +78,8 @@ def set_alert_group_assignee(
     assignee_id,
     *,
     actor_user_id=None,
+    source="system",
+    api_token_id=None,
 ) -> AlertGroup:
     """Change only the technical assignee of one AlertGroup.
 
@@ -120,13 +122,15 @@ def set_alert_group_assignee(
         )
 
         audit_repo.create_audit_log(
-            action="alert_group_assignee_changed",
+            action="alert_group.assignee_change",
             object_type="alert_group",
             object_id=group.id,
             group_id=getattr(team, "group_id", None),
             team_id=group.team_id,
             user_id=actor_user_id,
+            api_token_id=api_token_id,
             data={
+                "source": source,
                 "from_user_id": old_assignee_id,
                 "to_user_id": new_assignee_id,
             },

@@ -2,7 +2,7 @@ import logging
 
 from app.db import database_proxy
 from app.modules.db import business_services_repo
-from app.modules.db.models import ServiceDependency
+from app.modules.db.models import BusinessService, ServiceDependency
 from app.services.service_catalog.impact import build_service_effective_impact_map
 from app.services.service_catalog.impact_scoring import (
     COMPONENT_CRITICALITY_MULTIPLIER,
@@ -307,59 +307,65 @@ def calculated_business_service_status_message(result):
 
 def apply_business_service_status(business_service):
     """Calculate and persist current business service status."""
-    # Reload because callers may pass a stale model instance after repo.update().
-    business_service = type(business_service).get_by_id(business_service.id)
+    with database_proxy.atomic():
+        # Reload because callers may pass a stale model instance after repo.update().
+        query = BusinessService.select().where(BusinessService.id == business_service.id)
+        database = getattr(database_proxy, "obj", None)
+        if database is not None and database.__class__.__name__ != "SqliteDatabase":
+            query = query.for_update()
+        business_service = query.get()
 
-    calculated_result = calculate_business_service_status(business_service)
-    result = apply_business_service_manual_override(business_service, calculated_result)
+        calculated_result = calculate_business_service_status(business_service)
+        result = apply_business_service_manual_override(business_service, calculated_result)
 
-    old_status = business_service.status
-    old_source = business_service.status_source
-    old_message = business_service.status_message
+        old_status = business_service.status
+        old_source = business_service.status_source
+        old_message = business_service.status_message
 
-    new_status = result["status"]
-    new_source = result.get("status_source", "calculated")
+        new_status = result["status"]
+        new_source = result.get("status_source", "calculated")
 
-    if new_source == "manual":
-        new_message = result.get("status_message")
-    else:
-        new_message = calculated_business_service_status_message(result)
+        if new_source == "manual":
+            new_message = result.get("status_message")
+        else:
+            new_message = calculated_business_service_status_message(result)
 
-    changed = (
-        old_status != new_status
-        or old_source != new_source
-        or old_message != new_message
-    )
-
-    now = utc_now()
-
-    business_service.status = new_status
-    business_service.status_source = new_source
-    business_service.status_message = new_message
-    business_service.status_updated_at = now
-    business_service.updated_at = now
-    business_service.save()
-
-    if changed:
-        business_services_repo.create_business_service_status_history(
-            business_service=business_service,
-            old_status=old_status,
-            new_status=new_status,
-            status_source=new_source,
-            message=new_message,
-            impact_score=result.get("impact_score", 0),
-            component_snapshot=result.get("component_snapshot", []),
+        changed = (
+            old_status != new_status
+            or old_source != new_source
+            or old_message != new_message
         )
 
-    result["status"] = new_status
-    result["status_source"] = new_source
-    result["status_message"] = new_message
-    result["changed"] = changed
-    result["old_status"] = old_status
-    result["old_status_source"] = old_source
-    result["old_status_message"] = old_message
+        now = utc_now()
 
-    return result
+        business_service.status = new_status
+        business_service.status_source = new_source
+        business_service.status_message = new_message
+        business_service.status_updated_at = now
+        business_service.updated_at = now
+        business_service.save()
+
+        if changed:
+            business_services_repo.create_business_service_status_history(
+                business_service=business_service,
+                old_status=old_status,
+                new_status=new_status,
+                status_source=new_source,
+                message=new_message,
+                impact_score=result.get("impact_score", 0),
+                component_snapshot=result.get("component_snapshot", []),
+            )
+
+        result["status"] = new_status
+        result["status_source"] = new_source
+        result["status_message"] = new_message
+        result["changed"] = changed
+        result["old_status"] = old_status
+        result["old_status_source"] = old_source
+        result["old_status_message"] = old_message
+
+        return result
+
 
 def impacted_service_ids_for_technical_service(service_id, max_depth=5):
     """Return the alert service and downstream services affected through dependencies."""

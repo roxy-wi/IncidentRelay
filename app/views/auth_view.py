@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify, make_response, request
 
 from app.api.schemas.auth import ChangePasswordSchema, LoginSchema
+from app.db import database_proxy as db
 from app.login import create_access_token, hash_password, verify_password
 from app.middleware import jwt_required
 from app.modules.db import users_repo, groups_repo
@@ -11,6 +12,7 @@ from app.services.auth_throttle import (
     record_login_failure,
 )
 from app.services.validation import validate_body
+from app.services.audit import write_audit
 from app.settings import Config
 
 
@@ -109,6 +111,12 @@ def change_password():
     if not verify_password(payload.old_password, user.password_hash):
         return jsonify({"error": "Old password is invalid"}), 400
 
-    users_repo.set_user_password(user.id, hash_password(payload.new_password))
+    with db.atomic():
+        users_repo.set_user_password(user.id, hash_password(payload.new_password))
+        write_audit(
+            "profile.password.change",
+            object_type="user", object_id=user.id, user_id=user.id,
+            data={"source": "api"},
+        )
 
     return jsonify({"status": "password_changed"})

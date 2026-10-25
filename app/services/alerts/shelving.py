@@ -109,6 +109,7 @@ def _write_shelve_audit(
     *,
     user_id: int | None,
     data: dict,
+    api_token_id: int | None = None,
 ):
     group_id = None
     if group.team_id and group.team:
@@ -120,6 +121,7 @@ def _write_shelve_audit(
         group_id=group_id,
         team_id=group.team_id,
         user_id=user_id,
+        api_token_id=api_token_id,
         data=redact_secrets(data),
     )
 
@@ -188,6 +190,7 @@ def shelve_alert_group(
     duration_seconds: int | None = None,
     reason: str | None = None,
     source: str = "ui",
+    api_token_id: int | None = None,
 ):
     """Shelve one open AlertGroup and pause active delivery/escalation work."""
     duration = _normalize_duration(duration_seconds)
@@ -244,6 +247,7 @@ def shelve_alert_group(
             "alert_group.shelve",
             group,
             user_id=user_id,
+            api_token_id=api_token_id,
             data={
                 "source": source,
                 "duration_seconds": duration,
@@ -264,6 +268,7 @@ def unshelve_alert_group(
     user_id: int | None = None,
     source: str = "ui",
     reason: str | None = None,
+    api_token_id: int | None = None,
     expired: bool = False,
     resume: bool = True,
     update_messages: bool = True,
@@ -316,6 +321,7 @@ def unshelve_alert_group(
             "alert_group.shelve_expired" if expired else "alert_group.unshelve",
             group,
             user_id=user_id,
+            api_token_id=api_token_id,
             data={"source": source, "reason": reason},
         )
 
@@ -332,12 +338,16 @@ def unshelve_alert_group(
     return group, shelf
 
 
-def clear_shelve_on_resolve(group_id: int, *, user_id: int | None = None):
+def clear_shelve_on_resolve(
+    group_id: int, *, user_id: int | None = None,
+    api_token_id: int | None = None,
+):
     """Close an active shelf when its AlertGroup resolves, without resuming."""
     return unshelve_alert_group(
         group_id,
         user_id=user_id,
         source="resolve",
+        api_token_id=api_token_id,
         reason="alert_resolved",
         resume=False,
         update_messages=False,

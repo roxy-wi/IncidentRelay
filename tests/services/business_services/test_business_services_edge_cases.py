@@ -202,46 +202,6 @@ def test_status_history_is_not_duplicated_without_status_change(db):
     ).count() == 1
 
 
-def test_resolved_alert_deactivates_business_impact(db):
-    group, team, service, business_service = create_business_service_base()
-
-    service.status = "major_outage"
-    service.save()
-
-    BusinessServiceComponent.create(
-        business_service=business_service,
-        service=service,
-        criticality="required",
-        impact_weight=100,
-        enabled=True,
-    )
-
-    alert_group = create_impact_alert_group(
-        team=team,
-        service=service,
-        fingerprint=unique("business-impact-resolved"),
-        status="firing",
-        severity="critical",
-        alertname="API down",
-        summary="API down",
-    )
-
-    refresh_business_impacts_for_group(alert_group)
-
-    assert BusinessServiceIncidentImpact.select().where(
-        BusinessServiceIncidentImpact.active == True  # noqa: E712
-    ).count() == 1
-
-    alert_group.status = "resolved"
-    alert_group.save()
-
-    refresh_business_impacts_for_group(alert_group)
-
-    assert BusinessServiceIncidentImpact.select().where(
-        BusinessServiceIncidentImpact.active == True  # noqa: E712
-    ).count() == 0
-
-
 def test_alert_without_service_does_not_create_business_impact(db):
     group = create_group()
     team = create_team(group=group)

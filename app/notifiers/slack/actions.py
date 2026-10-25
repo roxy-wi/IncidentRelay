@@ -109,9 +109,9 @@ def _process_slack_action(
     user_id = user.id
 
     if action == "acknowledge":
-        alert = acknowledge_alert(alert.id, user_id=user_id)
+        alert = acknowledge_alert(alert.id, user_id=user_id, source="slack")
     elif action == "resolve":
-        alert = resolve_alert(alert.id, user_id=user_id)
+        alert = resolve_alert(alert.id, user_id=user_id, source="slack")
     elif action == "shelve":
         alert, _ = shelve_alert_group(
             alert.id, user_id=user_id, duration_seconds=3600, source="slack"

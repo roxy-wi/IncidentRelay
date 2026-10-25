@@ -30,7 +30,7 @@ def test_create_incident_is_operational_only(db):
     assert incident.workflow_status == "declared"
     assert AlertGroup.select().count() == 0
     assert IncidentEvent.get(IncidentEvent.incident == incident.id).event_type == "incident_declared"
-    assert AuditLog.get(AuditLog.object_type == "incident", AuditLog.object_id == incident.id).action == "incident_declared"
+    assert AuditLog.get(AuditLog.object_type == "incident", AuditLog.object_id == incident.id).action == "incident.declare"
 
 
 def test_transition_uses_optimistic_concurrency(db):

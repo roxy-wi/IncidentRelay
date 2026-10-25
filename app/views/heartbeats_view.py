@@ -1,8 +1,11 @@
 from flask import Blueprint, jsonify, request
 from peewee import DoesNotExist, IntegrityError
+from app.modules.db.models import Heartbeat
 
 from app.api.schemas.heartbeats import HeartbeatCreateSchema, HeartbeatPingSchema, HeartbeatUpdateSchema
 from app.modules.db import heartbeats_repo, routes_repo, services_repo, teams_repo
+from app.services.audit import write_audit
+from app.db import database_proxy as db
 from app.services.heartbeats.service import (
     generate_heartbeat_token,
     initialize_heartbeat_schedule,
@@ -18,6 +21,25 @@ from app.services.validation import make_error_response, validate_body
 
 
 heartbeats_bp = Blueprint("heartbeats_api", __name__)
+
+
+def _lock_heartbeat_for_command(heartbeat_id):
+    """Serialize manual heartbeat transitions across scheduler/web workers."""
+    query = Heartbeat.select().where(Heartbeat.id == heartbeat_id)
+    db_impl = getattr(db, "obj", None)
+    if db_impl is not None and db_impl.__class__.__name__ != "SqliteDatabase":
+        query = query.for_update()
+    return query.get()
+
+
+def _audit_heartbeat(action, item, *, object_type="heartbeat", object_id=None, data=None):
+    """Audit operator heartbeat changes without exposing the intake token."""
+    write_audit(
+        action, object_type=object_type,
+        object_id=item.id if object_id is None else object_id,
+        group_id=item.group_id, team_id=item.team_id,
+        data={"source": "api", **(data or {})},
+    )
 
 
 def _base_url():
@@ -194,6 +216,7 @@ def create_heartbeat():
     else:
         initialize_heartbeat_schedule(item)
     item = heartbeats_repo.get_heartbeat(item.id)
+    _audit_heartbeat("heartbeat.create", item)
 
     return jsonify(
         serialize_heartbeat(
@@ -250,6 +273,7 @@ def update_heartbeat(heartbeat_id):
     else:
         initialize_heartbeat_schedule(item)
     item = heartbeats_repo.get_heartbeat(item.id)
+    _audit_heartbeat("heartbeat.update", item)
     return jsonify(serialize_heartbeat(item))
 
 
@@ -261,6 +285,7 @@ def delete_heartbeat(heartbeat_id):
         return error
 
     heartbeats_repo.soft_delete_heartbeat(item)
+    _audit_heartbeat("heartbeat.delete", item)
     return jsonify({"deleted": True})
 
 
@@ -309,6 +334,11 @@ def disable_heartbeat_instance_endpoint(heartbeat_id, instance_id):
     from app.services.heartbeats.service import refresh_heartbeat_instance_rollup
     from app.services.serializers.heartbeats import serialize_heartbeat_instance
     refresh_heartbeat_instance_rollup(item)
+    _audit_heartbeat(
+        "heartbeat.instance.disable", item,
+        object_type="heartbeat_instance", object_id=instance.id,
+        data={"heartbeat_id": item.id},
+    )
     return jsonify(serialize_heartbeat_instance(instance))
 
 
@@ -320,10 +350,12 @@ def regenerate_heartbeat_token(heartbeat_id):
         return error
 
     raw_token, token_prefix, token_hash = generate_heartbeat_token()
-    item = heartbeats_repo.update_heartbeat(item, {
-        "token_prefix": token_prefix,
-        "token_hash": token_hash,
-    })
+    with db.atomic():
+        item = heartbeats_repo.update_heartbeat(item, {
+            "token_prefix": token_prefix,
+            "token_hash": token_hash,
+        })
+        _audit_heartbeat("heartbeat.token.rotate", item)
     return jsonify(
         serialize_heartbeat(
             item,
@@ -341,7 +373,13 @@ def pause_heartbeat_endpoint(heartbeat_id):
     if error:
         return error
 
-    return jsonify(serialize_heartbeat(pause_heartbeat(item)))
+    with db.atomic():
+        item = _lock_heartbeat_for_command(heartbeat_id)
+        changed = item.status != "paused"
+        paused = pause_heartbeat(item) if changed else item
+        if changed:
+            _audit_heartbeat("heartbeat.pause", paused)
+    return jsonify(serialize_heartbeat(paused))
 
 
 @heartbeats_bp.route("/<int:heartbeat_id>/resume", methods=["POST"])
@@ -351,7 +389,13 @@ def resume_heartbeat_endpoint(heartbeat_id):
     if error:
         return error
 
-    return jsonify(serialize_heartbeat(resume_heartbeat(item)))
+    with db.atomic():
+        item = _lock_heartbeat_for_command(heartbeat_id)
+        changed = item.status == "paused"
+        resumed = resume_heartbeat(item) if changed else item
+        if changed:
+            _audit_heartbeat("heartbeat.resume", resumed)
+    return jsonify(serialize_heartbeat(resumed))
 
 
 @heartbeats_bp.route("/check-overdue", methods=["POST"])
