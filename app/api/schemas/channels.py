@@ -6,6 +6,7 @@ from app.api.schemas.base import ApiModel
 from app.notifiers.types import (
     CHANNEL_TYPE_PATTERN,
     LARK_CHANNEL,
+    SLACK_BOOLEAN_CONFIG_KEYS,
     SLACK_CHANNEL,
     WEBHOOK_STYLE_CHANNELS,
 )
@@ -63,6 +64,18 @@ class ChannelBaseSchema(ApiModel):
             config["chat_id"] = chat_id
 
         if self.channel_type == SLACK_CHANNEL:
+            # Mention flags and the DM channel-fallback opt-in apply to both
+            # webhook and Bot API mode, so they are validated before the
+            # mode-specific branches and are never stripped by them.
+            for boolean_key in SLACK_BOOLEAN_CONFIG_KEYS:
+                if boolean_key not in config:
+                    continue
+
+                if not isinstance(config[boolean_key], bool):
+                    raise ValueError(
+                        f"slack {boolean_key} must be a boolean"
+                    )
+
             configured_mode = str(config.get("mode") or "").strip()
 
             if configured_mode:

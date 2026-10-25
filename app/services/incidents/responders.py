@@ -373,7 +373,21 @@ def create_incident_responder(*, group_id, payload, user_id=None):
         user_id=user_id,
     )
 
-    notify_incident_responder_requested(responder)
+    # Enqueuing notifications must never roll back responder creation; the
+    # responder already exists and delivery happens asynchronously.
+    try:
+        notify_incident_responder_requested(responder)
+    except Exception:
+        logger.exception(
+            "responder notification enqueue failed",
+            extra={
+                "extra": {
+                    "event_type": "responder_notification_failed",
+                    "group_id": group.id,
+                    "responder_id": responder.id,
+                }
+            },
+        )
 
     responder = incidents_repo.get_incident_responder(responder.id)
 

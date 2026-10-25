@@ -188,6 +188,53 @@ When a responder clicks `Acknowledge`, `Resolve`, `Shelve 1h` or `Unshelve`, Inc
 
 Interactive actions require a Slack user ID mapped to an active IncidentRelay user with responder access to the alert team. Unmapped or unauthorized users are rejected.
 
+## Mentions
+
+By default a Slack message shows the assignee name as plain text, so nobody is pinged. Two optional channel config flags turn names into real Slack mentions:
+
+| Key | Type | Default | Effect |
+|---|---|---|---|
+| `mention_assignee` | boolean | `false` | Renders the alert assignee as `<@SLACK_USER_ID>` |
+| `mention_oncall` | boolean | `false` | Adds an `On-call` field mentioning the user who is on call when the message is sent |
+
+Example:
+
+```json
+{
+  "mode": "bot_api",
+  "bot_token": "xoxb-...",
+  "channel_id": "C0123456789",
+  "signing_secret": "...",
+  "mention_assignee": true,
+  "mention_oncall": true
+}
+```
+
+Both flags can also be set from the **Mentions** section of the Slack channel form.
+
+Behavior notes:
+
+- mentions require a Slack user ID in the user profile. A user without one renders as their display name, exactly as before;
+- an invalid Slack user ID is never rendered as a mention. The display name is used instead, so a malformed profile value cannot produce broken markup;
+- only a real boolean `true` enables a flag. A string such as `"true"` is rejected by the API;
+- `mention_oncall` resolves the on-call user through the rotation stored on the alert at send time, so reminders and escalations ping whoever is on call at that moment, including an active rotation override;
+- if the on-call user is also the assignee, that user is mentioned once, not twice;
+- when no rotation is attached, or nobody is currently on call, the `On-call` field is omitted;
+- mentions work in both incoming-webhook mode and Bot API mode.
+
+A channel with no mention keys renders exactly as it did before mentions existed.
+
+For a step-by-step setup guide, including how to find Slack user IDs and how participant notifications behave, see [Slack mentions and participant notifications](slack-mentions.md).
+
+## Direct messages for incident participants
+
+When a user is added to an incident as a responder or stakeholder, IncidentRelay can notify them through Slack.
+
+- In **Bot API mode**, the notification is sent as a private direct message. This calls `conversations.open` followed by `chat.postMessage` and requires the `im:write` scope in addition to `chat:write`.
+- In **incoming-webhook mode**, direct messages are not possible. By default the note is **not** posted to the shared channel, so a message meant for one recipient stays private and Slack delivery for that recipient simply fails. Enable `allow_dm_channel_fallback` on the channel to post it in the channel with the user mentioned instead, which makes it visible to the whole channel.
+
+Use Bot API mode if participant notifications must stay private.
+
 ## Message behavior
 
 For a firing alert, the Slack message contains:
@@ -195,6 +242,7 @@ For a firing alert, the Slack message contains:
 - alert title and description;
 - status, severity and priority;
 - team, service and assignee;
+- the current on-call user when `mention_oncall` is enabled;
 - service links and runbooks when configured;
 - a link to the alert in IncidentRelay;
 - `Acknowledge`, `Resolve` and `Shelve 1h` buttons.

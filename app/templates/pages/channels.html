@@ -451,6 +451,44 @@
                                 </div>
                             </div>
                         </div>
+
+                    <div class="form-section">
+                        <div class="form-section-header">
+                            <div>
+                                <div class="form-section-title">{{ _('channels.slack.mentions') }}</div>
+                                <div class="form-section-description">
+                                    {{ _('channels.slack.mentions_help') }}
+                                </div>
+                            </div>
+                        </div>
+
+                        <label class="md-checkbox">
+                            <input id="cfg-slack-mention-assignee" type="checkbox">
+                            <span>{{ _('channels.slack.mention_assignee') }}</span>
+                        </label>
+
+                        <div class="field-help">
+                            {{ _('channels.slack.mention_assignee_help') }}
+                        </div>
+
+                        <label class="md-checkbox">
+                            <input id="cfg-slack-mention-oncall" type="checkbox">
+                            <span>{{ _('channels.slack.mention_oncall') }}</span>
+                        </label>
+
+                        <div class="field-help">
+                            {{ _('channels.slack.mention_oncall_help') }}
+                        </div>
+
+                        <label class="md-checkbox">
+                            <input id="cfg-slack-allow-dm-channel-fallback" type="checkbox">
+                            <span>{{ _('channels.slack.allow_dm_channel_fallback') }}</span>
+                        </label>
+
+                        <div class="field-help">
+                            {{ _('channels.slack.allow_dm_channel_fallback_help') }}
+                        </div>
+                    </div>
                     </div>
                 </div>
 

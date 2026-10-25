@@ -16,6 +16,9 @@ from app.services.notifications.shift_notifications import (
     send_due_oncall_shift_mattermost_notifications,
 )
 from app.services.notifications.rules import process_due_user_notifications
+from app.services.incidents.participant_notifications import (
+    process_due_participant_notifications,
+)
 from app.services.incidents.responders import expire_due_incident_responders
 from app.services.alerts.explain_cleanup import cleanup_alert_explain_traces
 from app.services.alerts.retention import cleanup_alert_history
@@ -256,6 +259,58 @@ def alert_group_notification_job():
         if not db.is_closed():
             db.close()
 
+
+def participant_notification_job():
+    """Deliver due incident participant notifications under a database lock."""
+
+    if db.is_closed():
+        db.connect(reuse_if_open=True)
+
+    owner = None
+
+    try:
+        owner = acquire_db_lock("participant_notification_job")
+
+        if not owner:
+            logger.debug(
+                "participant notification job skipped because lock is busy"
+            )
+            return 0
+
+        logger.info("participant notification job started")
+
+        count = process_due_participant_notifications(
+            limit=int(
+                getattr(
+                    Config,
+                    "PARTICIPANT_NOTIFICATION_BATCH_SIZE",
+                    100,
+                )
+            )
+        )
+
+        logger.info(
+            "participant notification job finished",
+            extra={
+                "extra": {
+                    "event_type": "scheduler",
+                    "participant_notifications_sent": count,
+                }
+            },
+        )
+
+        return count
+
+    except Exception:
+        logger.exception("participant notification job failed")
+        return 0
+
+    finally:
+        if owner:
+            release_db_lock("participant_notification_job", owner)
+
+        if not db.is_closed():
+            db.close()
 
 
 def shelve_lifecycle_job():
@@ -768,6 +823,23 @@ def start_scheduler():
         coalesce=True,
         next_run_time=utc_now(),
         id="user_notification_rules_job",
+        replace_existing=True,
+    )
+
+    _scheduler.add_job(
+        participant_notification_job,
+        "interval",
+        seconds=int(
+            getattr(
+                Config,
+                "PARTICIPANT_NOTIFICATION_CHECK_INTERVAL_SECONDS",
+                15,
+            )
+        ),
+        max_instances=1,
+        coalesce=True,
+        next_run_time=utc_now(),
+        id="participant_notification_job",
         replace_existing=True,
     )
 

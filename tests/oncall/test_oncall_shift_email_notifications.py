@@ -1,3 +1,4 @@
+import smtplib
 from datetime import datetime, timedelta
 
 from app.modules.db.models import OnCallShiftEmailNotification
@@ -5,6 +6,58 @@ from app.services.notifications import shift_notifications as shift_email_servic
 from app.services.notifications.shift_notifications import (
     send_due_oncall_shift_email_notifications,
 )
+from app.settings import Config
+
+
+class _RecordingSMTP:
+    """Minimal smtplib.SMTP stand-in recording how it was opened/used."""
+
+    init_calls = []
+
+    def __init__(self, *args, **kwargs):
+        type(self).init_calls.append({"args": args, "kwargs": kwargs})
+        self.sent = []
+
+    def __enter__(self):
+        return self
+
+    def __exit__(self, *exc):
+        return False
+
+    def ehlo(self):
+        pass
+
+    def starttls(self):
+        pass
+
+    def has_extn(self, _name):
+        return True
+
+    def login(self, *_a):
+        pass
+
+    def send_message(self, message):
+        self.sent.append(message)
+
+
+def test_shift_email_uses_shared_smtp_transport(monkeypatch):
+    """The on-call shift email must go through the shared app.modules.smtp
+    transport rather than its own smtplib sequence. The shared transport opens
+    the connection with an explicit timeout, which the old local sender did
+    not pass."""
+    _RecordingSMTP.init_calls = []
+    monkeypatch.setattr(smtplib, "SMTP", _RecordingSMTP)
+    monkeypatch.setattr(Config, "SMTP_HOST", "smtp.test", raising=False)
+    monkeypatch.setattr(Config, "SMTP_PORT", "25", raising=False)
+    monkeypatch.setattr(Config, "SMTP_FROM", "oncall@test", raising=False)
+    monkeypatch.setattr(Config, "SMTP_USER", "", raising=False)
+    monkeypatch.setattr(Config, "SMTP_PASSWORD", "", raising=False)
+    monkeypatch.setattr(Config, "SMTP_USE_TLS", False, raising=False)
+
+    shift_email_service._send_plain_email("ops@test", "subj", "body")
+
+    assert len(_RecordingSMTP.init_calls) == 1
+    assert _RecordingSMTP.init_calls[0]["kwargs"].get("timeout") == 10
 from tests.factories import (
     add_user_to_team,
     create_group,

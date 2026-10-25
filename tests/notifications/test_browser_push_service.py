@@ -619,3 +619,26 @@ def test_execute_push_action_rejects_invalid_action(db):
         "ok": False,
         "error": "invalid_action",
     }
+
+
+def test_stakeholder_added_push_payload_is_dedicated_not_generic(db):
+    """Being added as a stakeholder must get its own push message rather than
+    the generic alert payload, and should name who added the stakeholder."""
+    group = create_group()
+    user = create_user("alice", group)
+    alert_group = create_assigned_group(user, status="firing")
+
+    payload = browser_push.build_stakeholder_alert_push_payload(
+        alert_group,
+        event_type="stakeholder_added",
+        context={"added_by_name": "Ann"},
+    )
+
+    generic_title = browser_push.build_stakeholder_alert_push_payload(
+        alert_group,
+        event_type="some_unknown_event",
+    )["title"]
+
+    assert payload["title"] != generic_title
+    assert "stakeholder" in payload["title"].lower()
+    assert "Ann" in payload["body"]
