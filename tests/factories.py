@@ -29,6 +29,8 @@ from app.modules.db.models import (
     PriorityPolicyRule,
     MatcherPreset,
     Heartbeat,
+    IncidentResponder,
+    IncidentStakeholder,
 )
 from app.modules.common import utc_now
 
@@ -654,4 +656,32 @@ def create_heartbeat(
         labels=labels or {},
         metadata=metadata or {},
     )
+
+
+def create_incident_responder(
+    group: AlertGroup,
+    *,
+    target_type: str = "user",
+    target_user: User | None = None,
+    target_team: Team | None = None,
+    accepted_by: User | None = None,
+    status: str = "requested",
+) -> IncidentResponder:
+    return IncidentResponder.create(
+        group=group,
+        target_type=target_type,
+        target_user=target_user,
+        target_team=target_team,
+        accepted_by=accepted_by,
+        status=status,
+    )
+
+
+def create_incident_stakeholder(
+    group: AlertGroup,
+    user: User,
+    *,
+    active: bool = True,
+) -> IncidentStakeholder:
+    return IncidentStakeholder.create(group=group, user=user, active=active)
 

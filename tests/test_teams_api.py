@@ -32,3 +32,20 @@ def test_add_team_user_respects_active_checkbox(client, admin_headers):
     membership = next(item for item in members if item["user_id"] == user.id)
 
     assert membership["active"] is False
+
+
+def test_team_list_reports_current_user_membership(client, admin_user, admin_headers):
+    from tests.factories import add_user_to_team
+
+    group = create_group()
+    member_team = create_team(group=group)
+    other_team = create_team(group=group)
+    add_user_to_team(member_team, admin_user, role="viewer")
+
+    response = client.get("/api/teams", headers=admin_headers)
+
+    assert response.status_code == 200
+
+    teams = {item["id"]: item for item in response.get_json()}
+    assert teams[member_team.id]["is_member"] is True
+    assert teams[other_team.id]["is_member"] is False

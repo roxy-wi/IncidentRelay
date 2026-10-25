@@ -59,7 +59,7 @@
     </div>
 
     <div class="card dashboard-active-card dashboard-area-active">
-      <div class="card-header">
+      <div class="card-header dashboard-active-header">
         <div>
           <h2>{{ _('overview.active.title') }}</h2>
           <div class="card-subtitle">
@@ -67,11 +67,76 @@
           </div>
         </div>
 
-        <div class="card-header-actions">
-          <a href="/alerts" class="btn btn-small">
+        <div class="card-header-actions dashboard-active-controls">
+          <div
+            class="dashboard-scope-toggle"
+            role="group"
+            aria-label="{{ _('overview.filters.scope_label') }}"
+          >
+            <button
+              id="dashboard-scope-mine"
+              type="button"
+              class="dashboard-scope-btn"
+              aria-pressed="false"
+            >
+              {{ _('overview.filters.my_alerts') }}
+            </button>
+            <button
+              id="dashboard-scope-all"
+              type="button"
+              class="dashboard-scope-btn is-active"
+              aria-pressed="true"
+            >
+              {{ _('overview.filters.all_alerts') }}
+            </button>
+          </div>
+
+          <button
+            id="dashboard-filters-toggle"
+            type="button"
+            class="btn btn-small dashboard-filters-toggle"
+            aria-expanded="false"
+            aria-controls="dashboard-filters-panel"
+          >
+            {{ _('overview.filters.title') }}
+            <span id="dashboard-filters-count" class="dashboard-filters-count is-hidden"></span>
+          </button>
+
+          <a href="/alerts" class="btn btn-small" data-dashboard-view-all>
             {{ _('overview.actions.view_all') }}
           </a>
         </div>
+      </div>
+
+      <div id="dashboard-filters-panel" class="dashboard-filters-panel is-hidden">
+        <label class="dashboard-filter-field">
+          <span class="dashboard-filter-label">{{ _('overview.filters.involvement') }}</span>
+          <select
+            id="dashboard-involvement-filter"
+            class="input table-filter-select page-toolbar-filter"
+            title="{{ _('overview.filters.assigned_hint') }}"
+          >
+            <option value="">{{ _('overview.filters.involvement_all') }}</option>
+            <option value="assigned">{{ _('overview.filters.involvement_assigned') }}</option>
+            <option value="responder">{{ _('overview.filters.involvement_responder') }}</option>
+            <option value="stakeholder">{{ _('overview.filters.involvement_stakeholder') }}</option>
+            <option value="any">{{ _('overview.filters.involvement_any') }}</option>
+          </select>
+        </label>
+
+        <div class="dashboard-filter-field dashboard-filter-field-wide">
+          <span class="dashboard-filter-label">{{ _('overview.filters.services') }}</span>
+          <select
+            id="dashboard-service-filter"
+            multiple
+            data-table-multi-select
+            data-placeholder="{{ _('overview.filters.all_services') }}"
+          ></select>
+        </div>
+
+        <button id="dashboard-filters-reset" type="button" class="btn btn-small dashboard-filters-reset">
+          {{ _('overview.filters.reset') }}
+        </button>
       </div>
 
       <div class="table-wrapper dashboard-alerts-wrapper">
