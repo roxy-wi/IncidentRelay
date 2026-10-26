@@ -1,7 +1,7 @@
 import logging
 
 from app import Config
-from app.modules.db import incidents_repo, alerts_repo
+from app.modules.db import incidents_repo, incident_core_repo
 from app.modules.db.models import User, UserGroup, Team, Rotation, EscalationPolicy, RotationMember, \
     RotationLayer, RotationLayerMember
 from app.services.rbac import can_respond_team, can_write_group
@@ -312,8 +312,8 @@ def require_incident_responder_action_allowed(user, group, responder, status):
     )
 
 
-def create_incident_responder(*, group_id, payload, user_id=None):
-    group = alerts_repo.get_alert_group(group_id)
+def create_incident_responder(*, incident_id, payload, user_id=None):
+    group = incident_core_repo.get_incident(incident_id)
 
     if not group:
         raise LookupError("incident not found")
@@ -350,6 +350,7 @@ def create_incident_responder(*, group_id, payload, user_id=None):
         group.id,
         {
             "target_type": target_type,
+            "role": "responder",
             **target_data,
             "requested_by_id": user_id,
             "message": payload.get("message"),
@@ -366,8 +367,8 @@ def create_incident_responder(*, group_id, payload, user_id=None):
     else:
         event_message = f"Responder requested: {target_label}"
 
-    alerts_repo.create_alert_event(
-        group_id=group.id,
+    incident_core_repo.create_event(
+        incident_id=group.id,
         event_type="responder_requested",
         message=event_message,
         user_id=user_id,
@@ -382,14 +383,14 @@ def create_incident_responder(*, group_id, payload, user_id=None):
 
 def set_incident_responder_status(
     *,
-    group_id,
+    incident_id,
     responder_id,
     status,
     response_message=None,
     user_id=None,
     user=None,
 ):
-    group = alerts_repo.get_alert_group(group_id)
+    group = incident_core_repo.get_incident(incident_id)
 
     if not group:
         raise LookupError("incident not found")
@@ -401,7 +402,7 @@ def set_incident_responder_status(
 
     responder = incidents_repo.get_incident_responder(responder_id)
 
-    if not responder or responder.group_id != group.id:
+    if not responder or responder.incident_id != group.id:
         raise LookupError("responder not found in this incident")
 
     require_incident_responder_action_allowed(
@@ -423,8 +424,8 @@ def set_incident_responder_status(
         response_message=response_message,
     )
 
-    alerts_repo.create_alert_event(
-        group_id=group.id,
+    incident_core_repo.create_event(
+        incident_id=group.id,
         event_type=f"responder_{status}",
         message=responder_status_event_message(
             responder,
@@ -458,8 +459,8 @@ def expire_due_incident_responders(*, limit=100):
 
         expired += 1
 
-        alerts_repo.create_alert_event(
-            group_id=expired_responder.group_id,
+        incident_core_repo.create_event(
+            incident_id=expired_responder.incident_id,
             event_type="responder_expired",
             message=responder_status_event_message(
                 expired_responder,

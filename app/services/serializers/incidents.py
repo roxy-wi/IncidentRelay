@@ -8,7 +8,7 @@ def serialize_incident_stakeholder(stakeholder):
 
     return {
         "id": stakeholder.id,
-        "alert_group_id": stakeholder.group_id,
+        "incident_id": stakeholder.incident_id,
         "user_id": stakeholder.user_id,
         "user": {
             "id": user.id,

@@ -663,3 +663,28 @@ def _build_alert_push_body(alert, event_type):
         return alert.message or alert.source or "Alert has been acknowledged."
 
     return alert.message or alert.source or "IncidentRelay alert"
+
+
+def send_incident_push_to_user(user, incident, event_type="responder_requested", context=None):
+    """Send non-actionable operational Incident push with a stable deep link."""
+    if not Config.BROWSER_PUSH_ENABLED or not user:
+        return 0
+    subscriptions = _active_user_subscriptions(user.id)
+    payload = {
+        "title": f"Incident #{incident.id}: {incident.title}",
+        "body": (context or {}).get("message") or "Incident response update",
+        "url": f"/incidents/{incident.id}",
+        "incident_id": incident.id,
+        "event_type": event_type,
+        "tag": f"incidentrelay-incident-{incident.id}",
+    }
+    sent = 0
+    for subscription in subscriptions:
+        try:
+            _webpush(subscription, payload)
+            subscription.last_seen_at = utc_now()
+            subscription.save()
+            sent += 1
+        except WebPushException:
+            logger.exception("operational incident push failed")
+    return sent

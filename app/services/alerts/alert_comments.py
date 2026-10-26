@@ -52,12 +52,7 @@ def _notify_stakeholders_about_comment(
         context["alert_id"] = child_alert.id
         context["alert_title"] = getattr(child_alert, "title", None)
 
-    notify_stakeholders(
-        group,
-        "comment_added",
-        old_value=context,
-        skip_user_id=user_id,
-    )
+    pass  # Incident collaboration is independent of AlertGroup.
 
 
 def normalize_comment_body(body: str | None) -> str:

@@ -223,7 +223,7 @@ def find_open_incident_responder(group_id, target_type, target_id):
         IncidentResponder
         .select()
         .where(
-            IncidentResponder.group == group_id,
+            IncidentResponder.incident == group_id,
             IncidentResponder.target_type == target_type,
             IncidentResponder.status.in_(OPEN_RESPONDER_STATUSES),
             target_filter,
@@ -265,7 +265,8 @@ def create_incident_responder(group_id, data):
         )
 
     return IncidentResponder.create(
-        group=group_id,
+        incident=group_id,
+        role=data.get("role") or "responder",
         target_type=data["target_type"],
         target_user=data.get("target_user_id"),
         target_team=data.get("target_team_id"),
@@ -288,7 +289,7 @@ def list_incident_responders(group_id):
     return list(
         IncidentResponder
         .select()
-        .where(IncidentResponder.group == group_id)
+        .where(IncidentResponder.incident == group_id)
         .order_by(
             IncidentResponder.created_at.asc(),
             IncidentResponder.id.asc(),
@@ -382,7 +383,7 @@ def expire_incident_responder(responder_id, *, now=None):
 
 def create_incident_stakeholder(group_id, data):
     return IncidentStakeholder.create(
-        group=group_id,
+        incident=group_id,
         user=data.get("user_id"),
         email=data.get("email"),
         display_name=data.get("display_name"),
@@ -404,7 +405,7 @@ def list_incident_stakeholders(group_id, *, include_inactive=False):
     query = (
         IncidentStakeholder
         .select()
-        .where(IncidentStakeholder.group == group_id)
+        .where(IncidentStakeholder.incident == group_id)
         .order_by(
             IncidentStakeholder.created_at.asc(),
             IncidentStakeholder.id.asc(),
@@ -456,7 +457,7 @@ def add_service_stakeholders_to_incident(group):
             IncidentStakeholder
             .select(IncidentStakeholder.user)
             .where(
-                IncidentStakeholder.group == group.id,
+                IncidentStakeholder.incident == group.id,
                 IncidentStakeholder.active == True,  # noqa: E712
                 IncidentStakeholder.user.is_null(False),
             )

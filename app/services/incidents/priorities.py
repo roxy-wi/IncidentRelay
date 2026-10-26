@@ -63,11 +63,7 @@ def set_incident_priority(*, group_id, priority, user_id=None, source="system", 
 
     if old_priority != group.priority_slug:
         update_alert_messages(group, event_type="priority_changed")
-        notify_stakeholders(
-            group,
-            "priority_changed",
-            old_value=old_priority,
-        )
+        pass  # Incident collaboration is independent of AlertGroup.
 
     return group
 
@@ -144,6 +140,6 @@ def reset_incident_priority(*, group_id, user_id=None, source="system", api_toke
 
     if old_priority != group.priority_slug:
         update_alert_messages(group, event_type="priority_changed")
-        notify_stakeholders(group, "priority_changed", old_value=old_priority)
+        pass  # Incident collaboration is independent of AlertGroup.
 
     return group

@@ -5,13 +5,6 @@ from app import Config
 from app.db import database_proxy as db
 from app.modules.db.models import AlertGroup, RecoveryNotificationDelivery
 from app.services.alerts.reopen import lock_grouping_identity
-from app.services.incidents.stakeholders import (
-    build_stakeholder_notification_email,
-    send_stakeholder_email,
-    send_stakeholder_push,
-    stakeholder_email,
-    stakeholder_user,
-)
 from app.modules.db import alerts_repo, incidents_repo, notifications_repo
 from app.services.notifications.delivery import notify_alert
 from app.services.alerts.shelving import is_alert_group_shelved
@@ -122,14 +115,6 @@ def _snapshot_recovery_targets(group, *, now):
     if group.last_notification_at and group.assignee_id:
         targets.append(("user_rules", group.assignee_id))
 
-    for stakeholder in incidents_repo.list_incident_stakeholders(group.id):
-        if not stakeholder.active or not stakeholder.notify_on_resolved:
-            continue
-        if stakeholder_email(stakeholder):
-            targets.append(("stakeholder_email", stakeholder.id))
-        if stakeholder_user(stakeholder):
-            targets.append(("stakeholder_push", stakeholder.id))
-
     for kind, recipient_id in sorted(set(targets)):
         RecoveryNotificationDelivery.create(
             group=group.id,
@@ -168,32 +153,8 @@ def _deliver_recovery_target(group, delivery):
             return "skipped", 0
         return "sent", rules.enqueue_user_notifications(group, event_type="resolved")
 
-    stakeholder = incidents_repo.get_incident_stakeholder(delivery.target_id)
-    if (
-        not stakeholder or stakeholder.group_id != group.id
-        or not stakeholder.active or not stakeholder.notify_on_resolved
-    ):
-        return "skipped", 0
-
-    if kind == "stakeholder_email":
-        recipient = stakeholder_email(stakeholder)
-        if not recipient:
-            return "skipped", 0
-        subject, body = build_stakeholder_notification_email(
-            group, "resolved", old_value=group.previous_status,
-        )
-        send_stakeholder_email(recipient, subject, body)
-        return "sent", 1
-
-    if kind == "stakeholder_push":
-        if not stakeholder_user(stakeholder):
-            return "skipped", 0
-        sent = send_stakeholder_push(
-            stakeholder, group, event_type="incident_resolved",
-        )
-        return ("sent", int(sent)) if sent else ("skipped", 0)
-
     return "skipped", 0
+
 
 
 def _try_recovery_target(group, delivery, *, now):

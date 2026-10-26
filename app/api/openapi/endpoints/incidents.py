@@ -71,6 +71,30 @@ INCIDENT_LINK_SCHEMA = {
 }
 
 
+
+INCIDENT_COMMENT_SCHEMA = {
+    "type": "object",
+    "required": ["id", "incident_id", "author_id", "body", "created_at", "updated_at"],
+    "properties": {
+        "id": {"type": "integer"},
+        "incident_id": {"type": "integer"},
+        "author_id": {"type": "integer"},
+        "body": {"type": "string"},
+        "created_at": {"type": "string", "format": "date-time"},
+        "updated_at": {"type": "string", "format": "date-time"},
+    },
+}
+INCIDENT_AFFECTED_SERVICE_SCHEMA = {
+    "type": "object",
+    "required": ["id", "incident_id", "service_id", "added_at"],
+    "properties": {
+        "id": {"type": "integer"},
+        "incident_id": {"type": "integer"},
+        "service_id": {"type": "integer"},
+        "added_at": {"type": "string", "format": "date-time"},
+    },
+}
+
 def tags():
     return [{
         "name": "incidents",
@@ -183,6 +207,127 @@ def paths():
                 "parameters": [path_param("incident_id", "Incident id."), path_param("group_id", "AlertGroup id.")],
                 "responses": {"200": response("AlertGroup unlinked.", {"type": "object"}), **standard_errors},
             }
+        },
+        "/api/incidents/{incident_id}/responders": {
+            "get": {
+                "tags": ["incidents"], "summary": "List Incident responder requests and assignments",
+                "security": auth, "parameters": [path_param("incident_id", "Incident id.")],
+                "responses": {"200": response("Responders.", {"type": "array", "items": {"type": "object"}}), **standard_errors},
+            },
+            "post": {
+                "tags": ["incidents"], "summary": "Request operational responders",
+                "security": auth, "parameters": [path_param("incident_id", "Incident id.")],
+                "requestBody": json_body("Incident responder target.", {
+                    "type": "object", "required": ["target_type"],
+                    "properties": {
+                        "target_type": {"type": "string", "enum": ["user", "team", "rotation", "escalation_policy"]},
+                        "target_user_id": {"type": "integer"}, "target_team_id": {"type": "integer"},
+                        "target_rotation_id": {"type": "integer"},
+                        "target_escalation_policy_id": {"type": "integer"},
+                        "message": {"type": "string", "maxLength": 2000},
+                        "expires_after_minutes": {"type": "integer"},
+                    },
+                }),
+                "responses": {"201": response("Responder request created.", {"type": "object"}), **standard_errors},
+            },
+        },
+        "/api/incidents/{incident_id}/responders/{responder_id}": {
+            "put": {
+                "tags": ["incidents"], "summary": "Accept/decline/resolve responder request",
+                "security": auth, "parameters": [path_param("incident_id", "Incident id."), path_param("responder_id", "Responder id.")],
+                "requestBody": json_body("Responder status.", {
+                    "type": "object", "required": ["status"],
+                    "properties": {"status": {"type": "string", "enum": ["accepted", "declined", "resolved", "expired"]},
+                                   "response_message": {"type": "string", "nullable": True}},
+                }),
+                "responses": {"200": response("Responder status changed.", {"type": "object"}), **standard_errors},
+            },
+        },
+        "/api/incidents/{incident_id}/participants": {
+            "get": {
+                "tags": ["incidents"], "summary": "List concrete operational Incident assignments",
+                "security": auth, "parameters": [path_param("incident_id", "Incident id.")],
+                "responses": {"200": response("Assigned responders.", {"type": "array", "items": {"type": "object"}}), **standard_errors},
+            },
+            "post": {
+                "tags": ["incidents"], "summary": "Assign concrete Incident commander/responder/communications user",
+                "security": auth, "parameters": [path_param("incident_id", "Incident id.")],
+                "requestBody": json_body("Operational assignment.", {
+                    "type": "object", "required": ["user_id", "role"],
+                    "properties": {"user_id": {"type": "integer", "minimum": 1},
+                                   "role": {"type": "string", "enum": ["commander", "responder", "communications"]}},
+                }),
+                "responses": {"201": response("Assignment created.", {"type": "object"}), **standard_errors},
+            },
+        },
+        "/api/incidents/{incident_id}/participants/{participant_id}": {
+            "delete": {
+                "tags": ["incidents"], "summary": "Remove concrete assignment",
+                "security": auth, "parameters": [path_param("incident_id", "Incident id."), path_param("participant_id", "Assignment id.")],
+                "responses": {"204": {"description": "Assignment removed."}, **standard_errors},
+            },
+        },
+        "/api/incidents/{incident_id}/stakeholders": {
+            "get": {
+                "tags": ["incidents"], "summary": "List Incident stakeholders",
+                "security": auth, "parameters": [path_param("incident_id", "Incident id.")],
+                "responses": {"200": response("Stakeholders.", {"type": "array", "items": {"type": "object"}}), **standard_errors},
+            },
+            "post": {
+                "tags": ["incidents"], "summary": "Add Incident stakeholder",
+                "security": auth, "parameters": [path_param("incident_id", "Incident id.")],
+                "requestBody": json_body("Stakeholder user or email.", {
+                    "type": "object", "properties": {"user_id": {"type": "integer", "minimum": 1},
+                    "email": {"type": "string", "maxLength": 255}, "display_name": {"type": "string"},
+                    "role": {"type": "string", "enum": ["stakeholder", "communications", "observer"]}}}),
+                "responses": {"201": response("Stakeholder created.", {"type": "object"}), **standard_errors},
+            },
+        },
+        "/api/incidents/{incident_id}/stakeholders/{stakeholder_id}": {
+            "delete": {
+                "tags": ["incidents"], "summary": "Deactivate Incident stakeholder",
+                "security": auth, "parameters": [path_param("incident_id", "Incident id."), path_param("stakeholder_id", "Stakeholder id.")],
+                "responses": {"204": {"description": "Stakeholder deactivated."}, **standard_errors},
+            },
+        },
+        "/api/incidents/{incident_id}/comments": {
+            "get": {
+                "tags": ["incidents"], "summary": "List operational Incident comments",
+                "description": "Technical AlertGroup comments are not copied or returned.",
+                "security": auth, "parameters": [path_param("incident_id", "Incident id.")],
+                "responses": {"200": response("Incident comments.", {"type": "array", "items": INCIDENT_COMMENT_SCHEMA}), **standard_errors},
+            },
+            "post": {
+                "tags": ["incidents"], "summary": "Add operational Incident comment",
+                "security": auth, "parameters": [path_param("incident_id", "Incident id.")],
+                "requestBody": json_body("Comment body.", {"type": "object", "required": ["body"],
+                    "additionalProperties": False, "properties": {"body": {"type": "string", "minLength": 1, "maxLength": 10000}}}),
+                "responses": {"201": response("Comment created.", INCIDENT_COMMENT_SCHEMA), **standard_errors},
+            },
+        },
+        "/api/incidents/{incident_id}/affected-services": {
+            "get": {
+                "tags": ["incidents"], "summary": "List visible affected services",
+                "description": "Services outside the caller's team read scope are omitted.",
+                "security": auth, "parameters": [path_param("incident_id", "Incident id.")],
+                "responses": {"200": response("Visible service links.", {"type": "array", "items": INCIDENT_AFFECTED_SERVICE_SCHEMA}), **standard_errors},
+            },
+            "post": {
+                "tags": ["incidents"], "summary": "Link an affected service",
+                "description": "Requires Incident respond and affected Service team respond rights. Existing links return 200.",
+                "security": auth, "parameters": [path_param("incident_id", "Incident id.")],
+                "requestBody": json_body("Service identifier.", {"type": "object", "required": ["service_id"],
+                    "additionalProperties": False, "properties": {"service_id": {"type": "integer", "minimum": 1}}}),
+                "responses": {"200": response("Existing link.", INCIDENT_AFFECTED_SERVICE_SCHEMA),
+                              "201": response("Link created.", INCIDENT_AFFECTED_SERVICE_SCHEMA), **standard_errors},
+            },
+        },
+        "/api/incidents/{incident_id}/affected-services/{service_id}": {
+            "delete": {
+                "tags": ["incidents"], "summary": "Remove affected service link",
+                "security": auth, "parameters": [path_param("incident_id", "Incident id."), path_param("service_id", "Service id.")],
+                "responses": {"200": response("Link removed.", {"type": "object", "properties": {"removed": {"type": "boolean"}}}), **standard_errors},
+            },
         },
         "/api/incidents/{incident_id}/events": {
             "get": {

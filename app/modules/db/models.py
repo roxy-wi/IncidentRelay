@@ -1803,6 +1803,34 @@ class Incident(BaseModel):
         )
 
 
+class IncidentComment(BaseModel):
+    """Operational comment attached to a first-class Incident."""
+
+    id = AutoField()
+    incident = ForeignKeyField(Incident, backref="comments", on_delete="CASCADE")
+    author = ForeignKeyField(User, null=True, backref="incident_comments", on_delete="SET NULL")
+    body = TextField()
+    created_at = DateTimeField(default=utc_now, index=True)
+    updated_at = DateTimeField(default=utc_now)
+
+    class Meta:
+        table_name = "incident_comment"
+        indexes = ((('incident', 'created_at'), False),)
+
+
+class IncidentService(BaseModel):
+    """Affected service associated with an Incident independent of its owning team."""
+
+    id = AutoField()
+    incident = ForeignKeyField(Incident, backref="affected_services", on_delete="CASCADE")
+    service = ForeignKeyField(Service, backref="affected_incidents", on_delete="CASCADE")
+    added_at = DateTimeField(default=utc_now)
+
+    class Meta:
+        table_name = "incident_service"
+        indexes = ((('incident', 'service'), True),)
+
+
 class IncidentEvent(BaseModel):
     """Immutable operational timeline event for a first-class Incident."""
 
@@ -2177,15 +2205,12 @@ class AlertComment(BaseModel):
 
 
 class IncidentResponder(BaseModel):
-    """Responder request attached to an incident / alert group."""
+    """Canonical operational responder request and assignment for Incident."""
 
     id = AutoField()
 
-    group = ForeignKeyField(
-        AlertGroup,
-        backref="incident_responders",
-        on_delete="CASCADE",
-    )
+    incident = ForeignKeyField(Incident, backref="responders", on_delete="CASCADE")
+    role = CharField(default="responder", index=True)
 
     target_type = CharField(index=True)
 
@@ -2253,7 +2278,7 @@ class IncidentResponder(BaseModel):
     class Meta:
         table_name = "incident_responder"
         indexes = (
-            (("group", "status"), False),
+            (("incident", "status"), False),
             (("target_user", "status"), False),
             (("target_team", "status"), False),
             (("target_rotation", "status"), False),
@@ -2266,11 +2291,7 @@ class IncidentStakeholder(BaseModel):
 
     id = AutoField()
 
-    group = ForeignKeyField(
-        AlertGroup,
-        backref="incident_stakeholders",
-        on_delete="CASCADE",
-    )
+    incident = ForeignKeyField(Incident, backref="stakeholders", on_delete="CASCADE")
 
     user = ForeignKeyField(
         User,
@@ -2306,10 +2327,10 @@ class IncidentStakeholder(BaseModel):
     class Meta:
         table_name = "incident_stakeholder"
         indexes = (
-            (("group", "user"), False),
-            (("group", "email"), False),
-            (("group", "role"), False),
-            (("group", "active"), False),
+            (("incident", "user"), False),
+            (("incident", "email"), False),
+            (("incident", "role"), False),
+            (("incident", "active"), False),
         )
 
 

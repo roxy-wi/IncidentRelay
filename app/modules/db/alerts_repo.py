@@ -20,8 +20,6 @@ from app.modules.db.models import (
     Service,
     Team,
     User,
-    IncidentResponder,
-    IncidentStakeholder,
     AlertExplainStep,
     AlertExplainTrace,
 )
@@ -1236,37 +1234,6 @@ def update_alert_comment(
     ])
 
     return comment
-
-
-def list_incident_stakeholders(group_id, *, include_inactive=False):
-    """Return incident stakeholders."""
-    query = (
-        IncidentStakeholder
-        .select()
-        .where(IncidentStakeholder.group == group_id)
-        .order_by(
-            IncidentStakeholder.created_at.asc(),
-            IncidentStakeholder.id.asc(),
-        )
-    )
-
-    if not include_inactive:
-        query = query.where(IncidentStakeholder.active == True)  # noqa: E712
-
-    return list(query)
-
-
-def list_incident_responders(group_id):
-    """Return incident responder requests."""
-    return list(
-        IncidentResponder
-        .select()
-        .where(IncidentResponder.group == group_id)
-        .order_by(
-            IncidentResponder.created_at.asc(),
-            IncidentResponder.id.asc(),
-        )
-    )
 
 
 def create_alert_explain_trace(

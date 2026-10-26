@@ -80,6 +80,43 @@ class IncidentLinkSchema(ApiModel):
     relation_type: Literal["primary", "related"] = "related"
 
 
+class IncidentParticipantCreateSchema(ApiModel):
+    user_id: int = Field(ge=1)
+    role: Literal["commander", "responder", "communications"]
+
+
+class IncidentStakeholderCreateSchema(ApiModel):
+    user_id: int | None = Field(default=None, ge=1)
+    email: str | None = Field(default=None, max_length=255)
+    display_name: str | None = Field(default=None, max_length=255)
+    role: Literal["stakeholder", "communications", "observer"] = "stakeholder"
+
+    @model_validator(mode="after")
+    def validate_target(self):
+        if (self.user_id is None) == (not bool(self.email)):
+            raise ValueError("Specify exactly one of user_id or email")
+        if self.email:
+            self.email = self.email.strip().lower()
+            if not self.email or "@" not in self.email:
+                raise ValueError("Invalid stakeholder email")
+        return self
+
+
+class IncidentCommentCreateSchema(ApiModel):
+    body: str = Field(min_length=1, max_length=10000)
+
+    @model_validator(mode="after")
+    def normalize_body(self):
+        self.body = self.body.strip()
+        if not self.body:
+            raise ValueError("comment body must not be blank")
+        return self
+
+
+class IncidentAffectedServiceSchema(ApiModel):
+    service_id: int = Field(ge=1)
+
+
 class IncidentFromAlertGroupSchema(ApiModel):
     title: str | None = Field(default=None, min_length=1, max_length=255)
     description: str | None = Field(default=None, max_length=10000)

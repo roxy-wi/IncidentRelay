@@ -182,23 +182,9 @@ def _route_for_runtime(alert_data, runtime, *, current_route=None):
 
 
 def _add_service_stakeholders_for_new_group(group):
-    """Auto-add service stakeholders to a newly created incident."""
-    try:
-        stakeholders = incidents_repo.add_service_stakeholders_to_incident(group)
+    """Technical AlertGroup creation must not create Incident stakeholders."""
+    return None
 
-        if stakeholders:
-            notify_stakeholders(group, "created")
-    except Exception as exc:
-        logger.exception(
-            "failed to auto-add service stakeholders to incident",
-            extra={
-                "extra": {
-                    "alert_group_id": getattr(group, "id", None),
-                    "service_id": getattr(group, "service_id", None),
-                    "error": str(exc),
-                }
-            },
-        )
 
 
 def upsert_alert(alert_data):
@@ -610,11 +596,7 @@ def _handle_existing_alert(
             else:
                 alerts_repo.clear_alert_group_notification(group)
                 if old_group_status != "resolved":
-                    notify_stakeholders(
-                        group,
-                        "resolved",
-                        old_value=old_group_status,
-                    )
+                    pass  # Incident collaboration is independent of AlertGroup.
                 if group.last_notification_at:
                     sent_count = notify_alert(group, event_type="resolved")
                     trace.resolved_notification_sent(sent_count=sent_count)

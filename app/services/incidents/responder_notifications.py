@@ -1,6 +1,6 @@
 import logging
 
-from app.modules.db import alerts_repo, incidents_repo
+from app.modules.db import incident_core_repo, incidents_repo
 from app.modules.db.models import TeamUser, User
 from app.notifiers.browser_push import service as browser_push
 from app.services import escalation_policies as escalation_policy_service
@@ -133,8 +133,8 @@ def _mark_notification_failed(responder, error):
         status="failed",
         error=error,
     )
-    alerts_repo.create_alert_event(
-        group_id=responder.group_id,
+    incident_core_repo.create_event(
+        incident_id=responder.incident_id,
         event_type="responder_notification_failed",
         message=f"Responder notification failed: {error}",
         user_id=None,
@@ -163,9 +163,9 @@ def notify_incident_responder_requested(responder):
 
     for user in recipients:
         try:
-            sent = browser_push.send_stakeholder_push_to_user(
+            sent = browser_push.send_incident_push_to_user(
                 user,
-                responder.group,
+                responder.incident,
                 event_type=RESPONDER_NOTIFICATION_EVENT,
                 context=context,
             )
@@ -199,8 +199,8 @@ def notify_incident_responder_requested(responder):
             status="sent",
             error=error,
         )
-        alerts_repo.create_alert_event(
-            group_id=responder.group_id,
+        incident_core_repo.create_event(
+            incident_id=responder.incident_id,
             event_type="responder_notification_sent",
             message=(
                 "Responder notification sent to "

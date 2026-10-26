@@ -431,8 +431,8 @@ def serialize_incident_responder(responder):
     """Serialize legacy AlertGroup responder request."""
     return {
         "id": responder.id,
-        "alert_group_id": responder.group_id,
-        "group_id": responder.group_id,
+        "incident_id": responder.incident_id,
+        "role": responder.role,
 
         "target_type": responder.target_type,
         "target_user_id": responder.target_user_id,
@@ -713,13 +713,6 @@ def serialize_alert_group(
         data["notifications"] = [
             serialize_alert_notification(notification)
             for notification in notifications or []
-        ]
-        if responders is None:
-            responders = incidents_repo.list_incident_responders(group.id)
-
-        data["responders"] = [
-            serialize_incident_responder(item)
-            for item in responders
         ]
         data["correlations"] = serialize_alert_group_correlations(group)
         data["business_impacts"] = [

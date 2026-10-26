@@ -96,11 +96,7 @@ def acknowledge_alert(alert_id, user_id=None, *, source="system", api_token_id=N
     update_alert_messages(group, event_type="acknowledged")
 
     if old_status != group.status:
-        notify_stakeholders(
-            group,
-            "status_changed",
-            old_value=old_status,
-        )
+        pass  # Incident collaboration is independent of AlertGroup.
 
     return group
 
@@ -152,10 +148,6 @@ def resolve_alert(
         update_alert_messages(group, event_type="resolved")
 
     if old_status != group.status and not defer_stakeholder_notification:
-        notify_stakeholders(
-            group,
-            "resolved",
-            old_value=old_status,
-        )
+        pass  # Incident collaboration is independent of AlertGroup.
 
     return group

@@ -5,7 +5,7 @@ from __future__ import annotations
 from app.db import database_proxy as db
 from app.modules.common import utc_now
 from app.modules.db import audit_repo, incident_core_repo, incidents_repo
-from app.modules.db.models import AlertGroup, Incident, Service, Team, User, UserGroup
+from app.modules.db.models import AlertGroup, Incident, IncidentStakeholder, Service, ServiceOwner, Team, User, UserGroup
 from app.modules.redaction import redact_secrets
 
 
@@ -125,6 +125,34 @@ def create_incident(
             "incident.declare", incident, user_id=user_id,
             api_token_id=api_token_id, source=source, data={"status": "declared"},
         )
+
+    # Service owners are snapshotted at declaration, not queried dynamically.
+    if incident.service_id:
+        with db.atomic():
+            for owner in ServiceOwner.select().where(
+                ServiceOwner.service == incident.service_id,
+                ServiceOwner.active == True,  # noqa: E712
+            ):
+                if not owner.user_id:
+                    continue
+                if IncidentStakeholder.select().where(
+                    IncidentStakeholder.incident == incident.id,
+                    IncidentStakeholder.user == owner.user_id,
+                    IncidentStakeholder.active == True,  # noqa: E712
+                ).exists():
+                    continue
+                IncidentStakeholder.create(
+                    incident=incident, user=owner.user_id,
+                    role=owner.role, source="service_owner",
+                    notify_on_created=owner.notify_on_created,
+                    notify_on_priority_change=owner.notify_on_priority_change,
+                    notify_on_status_change=owner.notify_on_status_change,
+                    notify_on_resolved=owner.notify_on_resolved,
+                    notify_on_comment=owner.notify_on_comment,
+                    created_by=user_id,
+                )
+    from app.services.incidents.stakeholders import notify_stakeholders
+    notify_stakeholders(incident, "created", skip_user_id=user_id)
     return incident
 
 
@@ -230,6 +258,9 @@ def transition_incident(
                 "incident.status_change", updated, user_id=user_id,
                 api_token_id=api_token_id, source=source, data=data,
             )
+        from app.services.incidents.stakeholders import notify_stakeholders
+        notify_stakeholders(updated, "resolved" if new_status == "resolved" else "status_changed",
+                            old_value=incident.workflow_status, skip_user_id=user_id)
         return updated
     except incident_core_repo.IncidentConflictError as exc:
         raise IncidentConflictError(str(exc)) from exc

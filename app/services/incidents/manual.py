@@ -42,14 +42,9 @@ def _get_manual_incident_service(service_id, team_id):
 
 
 def _add_service_stakeholders_for_manual_incident(group):
-    try:
-        stakeholders = incidents_repo.add_service_stakeholders_to_incident(group)
+    """Creating a manual AlertGroup must not create Incident stakeholders."""
+    return None
 
-        if stakeholders:
-            notify_stakeholders(group, "created")
-    except Exception:
-        # Do not fail incident creation because stakeholder copy/notify failed.
-        pass
 
 
 def create_manual_alert_group(payload, *, user_id=None):

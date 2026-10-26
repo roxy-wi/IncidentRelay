@@ -34,7 +34,7 @@ NOTIFICATION_CENTER_ACTION_SCHEMA = {
         },
         "url": {
             "type": "string",
-            "example": "/api/alert-groups/14784/responders/15",
+            "example": "/api/incidents/14784/responders/15",
         },
     },
 }
@@ -64,14 +64,14 @@ NOTIFICATION_CENTER_ITEM_SCHEMA = {
         "url": {
             "type": "string",
             "nullable": True,
-            "example": "/alerts/14784",
+            "example": "/incidents/14784",
         },
-        "alert_group_id": {
+        "incident_id": {
             "type": "integer",
             "nullable": True,
             "example": 14784,
         },
-        "alert_group": ALERT_GROUP_SUMMARY_SCHEMA,
+
         "responder": RESPONDER_SCHEMA,
         "actions": {
             "type": "array",
