@@ -514,12 +514,17 @@ def add_incident_comment(incident_id):
         return error
     with db.atomic():
         comment = IncidentComment.create(incident=incident, author=_request_user_id(), body=payload.body)
-        incident_core_repo.create_event(incident.id, "incident_comment_added", user_id=_request_user_id(),
-                                        data={"comment_id": comment.id})
+        event = incident_core_repo.create_event(incident.id, "incident_comment_added", user_id=_request_user_id(),
+                                                data={"comment_id": comment.id})
         _audit("incident.comment_add", incident, user_id=_request_user_id(),
                api_token_id=current_api_token_id(), source="api", data={"comment_id": comment.id})
+        from app.services.notifications.incidents import enqueue_stakeholders
+        enqueue_stakeholders(
+            incident, event, "comment_added", skip_user_id=_request_user_id(),
+            context={"message": comment.body},
+        )
     from app.services.incidents.stakeholders import notify_stakeholders
-    notify_stakeholders(incident, "comment_added", skip_user_id=_request_user_id())
+    notify_stakeholders(incident, "comment_added", skip_user_id=_request_user_id(), event_id=event.id)
     return jsonify(_serialize_comment(comment)), 201
 
 
@@ -556,12 +561,21 @@ def add_incident_affected_service(incident_id):
             return error
     elif not is_admin_user(_request_user()):
         return make_error_response("forbidden", "Service has no team scope", 403)
-    with db.atomic():
+    with incident_core_repo.incident_transaction(incident.id):
         existing = IncidentService.get_or_none(IncidentService.incident == incident.id,
                                                IncidentService.service == service.id)
         if existing:
             return jsonify(_serialize_service(existing)), 200
-        link = IncidentService.create(incident=incident, service=service, added_at=utc_now())
+        try:
+            with db.atomic():
+                link = IncidentService.create(incident=incident, service=service, added_at=utc_now())
+        except IntegrityError:
+            existing = IncidentService.get_or_none(
+                IncidentService.incident == incident.id, IncidentService.service == service.id,
+            )
+            if existing is not None:
+                return jsonify(_serialize_service(existing)), 200
+            raise
         incident_core_repo.create_event(incident.id, "incident_service_added", user_id=_request_user_id(),
                                         data={"service_id": service.id})
         _audit("incident.service_add", incident, user_id=_request_user_id(),
@@ -574,17 +588,17 @@ def remove_incident_affected_service(incident_id, service_id):
     incident, error = _get_incident_or_error(incident_id, respond=True)
     if error:
         return error
-    link = IncidentService.get_or_none(IncidentService.incident == incident.id,
-                                       IncidentService.service == service_id)
-    if link is None:
-        return make_error_response("not_found", "Affected service not found", 404)
-    if link.service.team_id:
-        error = require_team_respond(link.service.team_id)
-        if error:
-            return error
-    elif not is_admin_user(_request_user()):
-        return make_error_response("forbidden", "Service has no team scope", 403)
-    with db.atomic():
+    with incident_core_repo.incident_transaction(incident.id):
+        link = IncidentService.get_or_none(IncidentService.incident == incident.id,
+                                           IncidentService.service == service_id)
+        if link is None:
+            return make_error_response("not_found", "Affected service not found", 404)
+        if link.service.team_id:
+            error = require_team_respond(link.service.team_id)
+            if error:
+                return error
+        elif not is_admin_user(_request_user()):
+            return make_error_response("forbidden", "Service has no team scope", 403)
         link.delete_instance()
         incident_core_repo.create_event(incident.id, "incident_service_removed", user_id=_request_user_id(),
                                         data={"service_id": service_id})
@@ -641,28 +655,20 @@ def add_incident_participant(incident_id):
         ).exists()
         if not in_group:
             return make_error_response("validation_error", "User is outside Incident group", 400)
-    with db.atomic():
-        if payload.role == "commander" and IncidentResponder.select().where(
-            IncidentResponder.incident == incident.id,
-            IncidentResponder.role == "commander",
-            IncidentResponder.status == "accepted",
-        ).exists():
-            return make_error_response("conflict", "Incident already has a commander", 409)
-
-        if IncidentResponder.select().where(
-            IncidentResponder.incident == incident.id,
-            IncidentResponder.target_user == user.id,
-            IncidentResponder.role == payload.role,
-            IncidentResponder.status == "accepted",
-        ).exists():
-            return make_error_response("conflict", "Participant already assigned", 409)
+    with incident_core_repo.incident_transaction(incident.id):
+        if incidents_repo.has_participant_conflict(incident.id, user.id, payload.role):
+            return make_error_response("conflict", "Participant role already assigned", 409)
         try:
-            row = IncidentResponder.create(incident=incident, target_user=user,
-                                             target_type="user", role=payload.role,
-                                             status="accepted", requested_by=actor_id,
-                                             accepted_by=actor_id, responded_at=utc_now())
+            with db.atomic():
+                row = IncidentResponder.create(
+                    incident=incident, target_user=user, target_type="user",
+                    role=payload.role, status="accepted", requested_by=actor_id,
+                    accepted_by=actor_id, responded_at=utc_now(),
+                )
         except IntegrityError:
-            return make_error_response("conflict", "Participant already assigned", 409)
+            if incidents_repo.has_participant_conflict(incident.id, user.id, payload.role):
+                return make_error_response("conflict", "Participant role already assigned", 409)
+            raise
         incident_core_repo.create_event(incident.id, "participant_added", user_id=actor_id,
                                         data={"participant_id": row.id, "user_id": user.id, "role": payload.role})
         _audit("incident.participant_add", incident, user_id=actor_id,
@@ -679,7 +685,7 @@ def remove_incident_participant(incident_id, participant_id):
     actor_id = _request_user_id()
     if actor_id is None:
         return make_error_response("forbidden", "Authenticated user required", 403)
-    with db.atomic():
+    with incident_core_repo.incident_transaction(incident.id):
         row = IncidentResponder.get_or_none(IncidentResponder.id == participant_id,
                                               IncidentResponder.incident == incident.id,
                                               IncidentResponder.status == "accepted")
@@ -749,7 +755,7 @@ def add_operational_stakeholder(incident_id):
                 return make_error_response("forbidden", "User outside incident group", 403)
     else:
         user = None
-    with db.atomic():
+    with incident_core_repo.incident_transaction(incident.id):
         # Include inactive rows so re-subscription never duplicates a stakeholder.
         lookup = ((IncidentStakeholder.user == user.id) if user else
                   (IncidentStakeholder.email == payload.email))
@@ -784,7 +790,7 @@ def remove_operational_stakeholder(incident_id, stakeholder_id):
     actor = _request_user_id()
     if actor is None:
         return make_error_response("forbidden", "Authenticated user required", 403)
-    with db.atomic():
+    with incident_core_repo.incident_transaction(incident.id):
         row = IncidentStakeholder.get_or_none(
             IncidentStakeholder.id == stakeholder_id,
             IncidentStakeholder.incident == incident.id,
@@ -824,14 +830,15 @@ def request_incident_responder_view(incident_id):
         return make_error_response("forbidden", "Authenticated user required", 403)
     try:
         row = request_incident_responder(
-            incident_id=incident.id, payload=payload.model_dump(), user_id=actor)
+            incident_id=incident.id, payload=payload.model_dump(), user_id=actor,
+            api_token_id=current_api_token_id(), source="api")
+    except incident_core_repo.IncidentConflictError:
+        return make_error_response("conflict", "Responder request already exists", 409)
     except (ValueError, KeyError) as exc:
         return safe_exception_response(exc, error="validation_error",
                                        message="Invalid responder request", status_code=400)
     except LookupError:
         return make_error_response("not_found", "Incident not found", 404)
-    _audit("incident.responder.request", incident, user_id=actor,
-           api_token_id=current_api_token_id(), source="api", data={"responder_id": row.id})
     return jsonify(serialize_incident_responder(row)), 201
 
 
@@ -850,7 +857,12 @@ def update_incident_responder_view(incident_id, responder_id):
         row = set_incident_responder_status(
             incident_id=incident.id, responder_id=responder_id,
             status=payload.status, response_message=payload.response_message,
-            user_id=user.id, user=user)
+            user_id=user.id, user=user,
+            api_token_id=current_api_token_id(), source="api")
+    except incident_core_repo.IncidentConflictError:
+        return make_error_response(
+            "conflict", "Responder request changed, expired or participant already assigned", 409,
+        )
     except PermissionError:
         return make_error_response("forbidden", "Responder action forbidden", 403)
     except LookupError:
@@ -858,9 +870,6 @@ def update_incident_responder_view(incident_id, responder_id):
     except ValueError as exc:
         return safe_exception_response(exc, error="validation_error",
                                        message="Invalid responder transition", status_code=400)
-    _audit("incident.responder.status", incident, user_id=user.id,
-           api_token_id=current_api_token_id(), source="api",
-           data={"responder_id": row.id, "status": row.status})
     return jsonify(serialize_incident_responder(row))
 
 # 2.5: canonical Incident collaboration endpoints above.

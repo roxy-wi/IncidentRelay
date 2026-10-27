@@ -301,37 +301,53 @@ def get_incident_responder(responder_id):
     return IncidentResponder.get_or_none(IncidentResponder.id == responder_id)
 
 
+def has_participant_conflict(incident_id, user_id, role, *, exclude_id=None):
+    """Check active role uniqueness, including the single Incident commander."""
+    query = IncidentResponder.select().where(
+        IncidentResponder.incident == incident_id,
+        IncidentResponder.role == role,
+        IncidentResponder.status == "accepted",
+    )
+    if role != "commander":
+        query = query.where(IncidentResponder.target_user == user_id)
+    if exclude_id is not None:
+        query = query.where(IncidentResponder.id != exclude_id)
+    return query.exists()
+
+
 def update_incident_responder_status(
     responder_id,
     status,
     *,
+    expected_status,
     user_id=None,
     response_message=None,
+    target_user_id=None,
 ):
-    responder = IncidentResponder.get_by_id(responder_id)
+    """Change only the state inspected by the caller, before its deadline."""
+    from app.modules.db.incident_core_repo import IncidentConflictError
 
-    responder.status = status
-    responder.response_message = response_message
-    responder.responded_at = utc_now()
-    responder.updated_at = utc_now()
-
-    save_fields = [
-        IncidentResponder.status,
-        IncidentResponder.response_message,
-        IncidentResponder.responded_at,
-        IncidentResponder.updated_at,
-    ]
-
+    now = utc_now()
+    changes = {
+        "status": status, "response_message": response_message,
+        "responded_at": now, "updated_at": now,
+    }
     if status == "accepted":
-        responder.accepted_by = user_id
-        save_fields.append(IncidentResponder.accepted_by)
-
-    if status == "declined":
-        responder.declined_by = user_id
-        save_fields.append(IncidentResponder.declined_by)
-
-    responder.save(only=save_fields)
-    return responder
+        changes.update(accepted_by=user_id, target_user=target_user_id)
+    elif status == "declined":
+        changes["declined_by"] = user_id
+    query = IncidentResponder.update(**changes).where(
+        IncidentResponder.id == responder_id,
+        IncidentResponder.status == expected_status,
+    )
+    if status in {"accepted", "declined"}:
+        query = query.where(
+            IncidentResponder.expires_at.is_null(True)
+            | (IncidentResponder.expires_at > now)
+        )
+    if query.execute() != 1:
+        raise IncidentConflictError("responder request changed or expired")
+    return get_incident_responder(responder_id)
 
 
 def list_expired_requested_responders(*, now=None, limit=100):

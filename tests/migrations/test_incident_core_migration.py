@@ -1,7 +1,13 @@
 from pathlib import Path
 
+import pytest
+
 from app.modules.db import migrations
-from app.modules.db.models import AlertGroup
+from app.modules.db.models import (
+    AlertGroup, IncidentComment, IncidentResponder, IncidentService,
+    IncidentStakeholder,
+    IncidentNotificationDelivery,
+)
 from tests.factories import create_group, create_team, unique
 
 
@@ -11,6 +17,18 @@ INCIDENT_CORE_TABLES = (
     "incident_event",
     "incident_alert_group_link",
 )
+
+
+@pytest.fixture(autouse=True)
+def isolated_core_schema(db):
+    """Remove later dependants while testing the reversible 2.3 migration."""
+    with db.atomic() as transaction:
+        db.drop_tables([
+            IncidentNotificationDelivery,
+            IncidentComment, IncidentResponder, IncidentService, IncidentStakeholder,
+        ])
+        yield
+        transaction.rollback()
 
 
 def _load_migration():

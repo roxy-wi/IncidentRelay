@@ -1,8 +1,7 @@
 import logging
 
-from app.modules.db import incident_core_repo, incidents_repo
+from app.modules.db import incidents_repo
 from app.modules.db.models import TeamUser, User
-from app.notifiers.browser_push import service as browser_push
 from app.services import escalation_policies as escalation_policy_service
 from app.services.oncall import get_current_oncall_user
 from app.services.incidents.responder_display import user_display_name
@@ -127,92 +126,24 @@ def _responder_notification_context(responder):
     }
 
 
-def _mark_notification_failed(responder, error):
-    incidents_repo.update_incident_responder_notification(
-        responder.id,
-        status="failed",
-        error=error,
-    )
-    incident_core_repo.create_event(
-        incident_id=responder.incident_id,
-        event_type="responder_notification_failed",
-        message=f"Responder notification failed: {error}",
-        user_id=None,
-    )
-
-    return {
-        "status": "failed",
-        "sent": 0,
-        "error": error,
-    }
-
-
 def notify_incident_responder_requested(responder):
-    """Send browser push notification for a responder request."""
-    recipients = resolve_responder_recipients(responder)
+    """Dispatch the persisted request event; failed targets remain scheduled."""
+    from app.services.notifications.incidents import (
+        dispatch_event, responder_notification_event,
+    )
 
-    if not recipients:
-        return _mark_notification_failed(
-            responder,
-            "no active responder recipients",
-        )
-
-    sent_devices = 0
-    errors = []
-    context = _responder_notification_context(responder)
-
-    for user in recipients:
-        try:
-            sent = browser_push.send_incident_push_to_user(
-                user,
-                responder.incident,
-                event_type=RESPONDER_NOTIFICATION_EVENT,
-                context=context,
-            )
-        except Exception as exc:
-            logger.exception(
-                "responder browser push failed",
-                extra={
-                    "extra": {
-                        "event_type": "responder_notification_failed",
-                        "responder_id": responder.id,
-                        "user_id": user.id,
-                        "error": str(exc),
-                    }
-                },
-            )
-            errors.append(f"{user_display_name(user)}: {exc}")
-            continue
-
-        if sent:
-            sent_devices += sent
-        else:
-            errors.append(
-                f"{user_display_name(user)}: no active push subscriptions"
-            )
-
-    if sent_devices > 0:
-        error = "; ".join(errors) if errors else None
-
-        incidents_repo.update_incident_responder_notification(
-            responder.id,
-            status="sent",
-            error=error,
-        )
-        incident_core_repo.create_event(
-            incident_id=responder.incident_id,
-            event_type="responder_notification_sent",
-            message=(
-                "Responder notification sent to "
-                f"{sent_devices} browser push device(s)"
-            ),
-            user_id=None,
-        )
+    try:
+        row = responder_notification_event(responder.id)
+        sent = dispatch_event(row.event_id) if row else 0
+        current = incidents_repo.get_incident_responder(responder.id)
         return {
-            "status": "sent",
-            "sent": sent_devices,
-            "error": error,
+            "status": current.notification_status,
+            "sent": sent,
+            "error": current.notification_error,
         }
-
-    error = "; ".join(errors) or "no browser push notifications were sent"
-    return _mark_notification_failed(responder, error)
+    except Exception as exc:
+        logger.error(
+            "Responder dispatch deferred: responder_id=%s error_type=%s",
+            responder.id, type(exc).__name__,
+        )
+        return {"status": "pending", "sent": 0, "error": "dispatch_deferred"}

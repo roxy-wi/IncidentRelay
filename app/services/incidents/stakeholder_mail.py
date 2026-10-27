@@ -25,5 +25,7 @@ def send_incident_mail(recipient, subject, body):
             if not username or not password:
                 raise RuntimeError("SMTP user/password must both be configured")
             connection.login(username, password)
-        connection.send_message(msg)
+        refused = connection.send_message(msg)
+        if refused:
+            raise smtplib.SMTPRecipientsRefused(refused)
     return True

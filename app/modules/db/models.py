@@ -2334,6 +2334,44 @@ class IncidentStakeholder(BaseModel):
         )
 
 
+class IncidentNotificationDelivery(BaseModel):
+    """One event/recipient/transport, with durable per-device push progress.
+
+    Successful targets are not retried. A provider success followed by a
+    process crash before persistence can still cause an at-least-once retry.
+    """
+
+    id = AutoField()
+    incident = ForeignKeyField(Incident, on_delete="CASCADE")
+    event = ForeignKeyField(IncidentEvent, on_delete="CASCADE")
+    # Request identity is historical metadata; Incident owns the lifecycle.
+    responder_id = IntegerField(null=True, index=True)
+    user = ForeignKeyField(User, null=True, on_delete="SET NULL")
+    method = CharField(max_length=32)
+    target_key = CharField(max_length=255)
+    recipient = TextField(null=True)
+    payload = JSONTextField()
+    subscription_ids = JSONTextField(null=True)
+    sent_subscription_ids = JSONTextField(default=list)
+    status = CharField(max_length=16, default="pending", index=True)
+    attempts = IntegerField(default=0)
+    next_attempt_at = DateTimeField(default=utc_now, index=True)
+    claim_token = CharField(null=True)
+    claim_expires_at = DateTimeField(null=True)
+    delivered_count = IntegerField(default=0)
+    delivered_at = DateTimeField(null=True)
+    last_error = TextField(null=True)
+    created_at = DateTimeField(default=utc_now)
+    updated_at = DateTimeField(default=utc_now)
+
+    class Meta:
+        table_name = "incident_notification_delivery"
+        indexes = (
+            (("event", "method", "target_key"), True),
+            (("status", "next_attempt_at"), False),
+        )
+
+
 class AlertEvent(BaseModel):
     """Alert/group history event."""
 

@@ -7,6 +7,7 @@ from app.modules.db.models import AlertGroup, RecoveryNotificationDelivery
 from app.services.alerts.reopen import lock_grouping_identity
 from app.modules.db import alerts_repo, notifications_repo
 from app.services.notifications.delivery import notify_alert
+from app.services.notifications.retries import delivery_attempt
 from app.services.alerts.shelving import is_alert_group_shelved
 from app.services.alerts.maintenance_state import (
     is_notification_lifecycle_suppressed,
@@ -159,14 +160,17 @@ def _deliver_recovery_target(group, delivery):
 
 def _try_recovery_target(group, delivery, *, now):
     """Persist each target's result before processing the next target."""
-    delivery.attempts += 1
-    delivery.updated_at = now
-    try:
-        status, sent = _deliver_recovery_target(group, delivery)
-    except Exception as exc:
-        delivery.last_error = str(exc)[:2000]
-        if delivery.attempts >= RECOVERY_MAX_ATTEMPTS:
-            delivery.status = "failed"
+    values = delivery_attempt(
+        lambda: _deliver_recovery_target(group, delivery),
+        attempt=delivery.attempts + 1, now=now,
+        max_attempts=RECOVERY_MAX_ATTEMPTS,
+        base_seconds=RECOVERY_RETRY_BASE_SECONDS,
+        max_seconds=RECOVERY_RETRY_MAX_SECONDS,
+    )
+    for name, value in values.items():
+        setattr(delivery, name, value)
+    if delivery.last_error is not None:
+        if delivery.status == "failed":
             alerts_repo.create_alert_event(
                 group_id=group.id,
                 event_type="recovery_delivery_exhausted",
@@ -175,12 +179,6 @@ def _try_recovery_target(group, delivery, *, now):
                     f"exhausted {delivery.attempts} attempts"
                 ),
             )
-        else:
-            retry_seconds = min(
-                RECOVERY_RETRY_BASE_SECONDS * (2 ** (delivery.attempts - 1)),
-                RECOVERY_RETRY_MAX_SECONDS,
-            )
-            delivery.next_attempt_at = now + timedelta(seconds=retry_seconds)
         logger.warning(
             "recovery target delivery failed",
             extra={"extra": {
@@ -191,11 +189,6 @@ def _try_recovery_target(group, delivery, *, now):
                 "error": delivery.last_error,
             }},
         )
-    else:
-        delivery.status = status
-        delivery.delivered_count = max(int(sent or 0), 0)
-        delivery.delivered_at = now if status == "sent" else None
-        delivery.last_error = None
     delivery.save()
 
 

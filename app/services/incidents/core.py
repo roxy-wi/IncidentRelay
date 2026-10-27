@@ -7,6 +7,7 @@ from app.modules.common import utc_now
 from app.modules.db import audit_repo, incident_core_repo, incidents_repo
 from app.modules.db.models import AlertGroup, Incident, IncidentStakeholder, Service, ServiceOwner, Team, User, UserGroup
 from app.modules.redaction import redact_secrets
+from app.services.notifications.incidents import enqueue_stakeholders
 
 
 VALID_STATUSES = {
@@ -93,7 +94,13 @@ def _audit(
 def create_incident(
     *, team_id, title, user_id=None, service_id=None, priority_slug=None,
     assignee_id=None, description=None, api_token_id=None, source="system",
+    notify=True,
 ):
+    """Create an Incident and its owner snapshot in one transaction.
+
+    Callers composing creation with another operation can defer notification
+    until their enclosing transaction commits by passing ``notify=False``.
+    """
     team = _require_team(team_id)
     service = _require_service(service_id, team)
     assignee = _require_user_in_team_group(assignee_id, team)
@@ -120,15 +127,14 @@ def create_incident(
             created_at=now,
             updated_at=now,
         )
-        incident_core_repo.create_event(incident.id, "incident_declared", user_id=user_id, data={"status": "declared"})
+        event = incident_core_repo.create_event(incident.id, "incident_declared", user_id=user_id, data={"status": "declared"})
         _audit(
             "incident.declare", incident, user_id=user_id,
             api_token_id=api_token_id, source=source, data={"status": "declared"},
         )
 
-    # Service owners are snapshotted at declaration, not queried dynamically.
-    if incident.service_id:
-        with db.atomic():
+        # Snapshot and declaration must roll back together.
+        if incident.service_id:
             for owner in ServiceOwner.select().where(
                 ServiceOwner.service == incident.service_id,
                 ServiceOwner.active == True,  # noqa: E712
@@ -151,8 +157,10 @@ def create_incident(
                     notify_on_comment=owner.notify_on_comment,
                     created_by=user_id,
                 )
-    from app.services.incidents.stakeholders import notify_stakeholders
-    notify_stakeholders(incident, "created", skip_user_id=user_id)
+        enqueue_stakeholders(incident, event, "created", skip_user_id=user_id)
+    if notify:
+        from app.services.incidents.stakeholders import notify_stakeholders
+        notify_stakeholders(incident, "created", skip_user_id=user_id, event_id=event.id)
     return incident
 
 
@@ -189,11 +197,17 @@ def update_incident(
     try:
         with db.atomic():
             updated = incident_core_repo.compare_and_swap(incident.id, expected_version, **changes)
-            incident_core_repo.create_event(updated.id, "incident_updated", user_id=user_id, data={"fields": sorted(changes)})
+            event = incident_core_repo.create_event(updated.id, "incident_updated", user_id=user_id, data={"fields": sorted(changes)})
             _audit(
                 "incident.update", updated, user_id=user_id,
                 api_token_id=api_token_id, source=source, data={"fields": sorted(changes)},
             )
+            priority_changed = "priority" in changes and updated.priority_id != incident.priority_id
+            if priority_changed:
+                enqueue_stakeholders(updated, event, "priority_changed", skip_user_id=user_id)
+        if priority_changed:
+            from app.services.incidents.stakeholders import notify_stakeholders
+            notify_stakeholders(updated, "priority_changed", event_id=event.id)
         return updated
     except incident_core_repo.IncidentConflictError as exc:
         raise IncidentConflictError(str(exc)) from exc
@@ -257,13 +271,15 @@ def transition_incident(
         with db.atomic():
             updated = incident_core_repo.compare_and_swap(incident.id, expected_version, **changes)
             data = {"from": incident.workflow_status, "to": new_status}
-            incident_core_repo.create_event(updated.id, "incident_status_changed", user_id=user_id, data=data)
+            event = incident_core_repo.create_event(updated.id, "incident_status_changed", user_id=user_id, data=data)
             _audit(
                 "incident.status_change", updated, user_id=user_id,
                 api_token_id=api_token_id, source=source, data=data,
             )
+            event_type = "resolved" if new_status == "resolved" else "status_changed"
+            enqueue_stakeholders(updated, event, event_type, skip_user_id=user_id)
         from app.services.incidents.stakeholders import notify_stakeholders
-        notify_stakeholders(updated, "resolved" if new_status == "resolved" else "status_changed",
+        notify_stakeholders(updated, event_type, event_id=event.id,
                             old_value=incident.workflow_status, skip_user_id=user_id)
         return updated
     except incident_core_repo.IncidentConflictError as exc:
@@ -287,12 +303,12 @@ def link_alert_group(
         raise IncidentValidationError("alert group not found")
     if alert_group.team_id != incident.team_id:
         raise IncidentValidationError("alert group belongs to another team")
-    with db.atomic():
-        # Lock both rows on PostgreSQL so concurrent workers cannot create
-        # two active links for the same AlertGroup or two primary links.
-        locked_incident = incident_core_repo.lock_incident(incident.id)
+    with incident_core_repo.incident_transaction(incident.id) as locked_incident:
+        # The AlertGroup lock also serializes links from different Incidents.
         locked_group = incident_core_repo.lock_alert_group(alert_group.id)
-        if not locked_incident or not locked_group:
+        if locked_incident.workflow_status in TERMINAL_STATUSES:
+            raise IncidentValidationError("cannot link alert groups to a terminal incident")
+        if not locked_group:
             raise IncidentValidationError("incident or alert group disappeared during linking")
         existing = incident_core_repo.active_link(incident.id, alert_group.id)
         if existing:
@@ -324,7 +340,7 @@ def unlink_alert_group(
     incident = incident_core_repo.get_incident(incident_id)
     if not incident:
         raise IncidentValidationError("incident not found")
-    with db.atomic():
+    with incident_core_repo.incident_transaction(incident.id):
         link = incident_core_repo.active_link(incident.id, alert_group_id)
         if not link:
             return None
@@ -356,7 +372,7 @@ def create_incident_from_alert_group(
     if not group.team_id:
         raise IncidentValidationError("alert group has no owning team")
     effective_priority = priority_slug or getattr(group, "priority_slug", None)
-    with db.atomic():
+    with incident_core_repo.write_transaction():
         incident = create_incident(
             team_id=group.team_id,
             service_id=group.service_id,
@@ -367,6 +383,7 @@ def create_incident_from_alert_group(
             user_id=user_id,
             api_token_id=api_token_id,
             source=source,
+            notify=False,
         )
         link_alert_group(
             incident.id,
@@ -376,4 +393,6 @@ def create_incident_from_alert_group(
             api_token_id=api_token_id,
             source=source,
         )
+    from app.services.incidents.stakeholders import notify_stakeholders
+    notify_stakeholders(incident, "created", skip_user_id=user_id)
     return incident

@@ -2,6 +2,10 @@
 
 from __future__ import annotations
 
+from contextlib import contextmanager
+
+from peewee import SqliteDatabase
+
 from app.db import database_proxy as db
 from app.modules.common import utc_now
 from app.modules.db.models import AlertGroup, Incident, IncidentAlertGroupLink, IncidentEvent
@@ -11,9 +15,31 @@ class IncidentConflictError(RuntimeError):
     """Raised when an optimistic-concurrency update loses a race."""
 
 
+def write_transaction():
+    """Reserve SQLite writes before any reads; use a regular transaction otherwise."""
+    database = getattr(db, "obj", db)
+    if isinstance(database, SqliteDatabase):
+        return db.atomic("IMMEDIATE")
+    return db.atomic()
+
+
+@contextmanager
+def incident_transaction(incident_id):
+    """Lock an Incident before reading and changing collaboration records.
+
+    SQLite needs a write reservation before the first read; PostgreSQL locks
+    the parent row so separate requests cannot both pass an existence check.
+    """
+    with write_transaction():
+        incident = lock_incident(incident_id)
+        if incident is None:
+            raise LookupError("incident not found")
+        yield incident
+
+
 def _select_for_update_if_supported(query):
     database = getattr(db, "obj", None)
-    if database is not None and database.__class__.__name__ != "SqliteDatabase":
+    if database is not None and not isinstance(database, SqliteDatabase):
         return query.for_update()
     return query
 

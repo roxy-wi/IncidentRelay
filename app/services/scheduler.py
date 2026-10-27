@@ -16,6 +16,7 @@ from app.services.notifications.shift_notifications import (
     send_due_oncall_shift_mattermost_notifications,
 )
 from app.services.notifications.rules import process_due_user_notifications
+from app.services.notifications.incidents import process_due_incident_notifications
 from app.services.incidents.responders import expire_due_incident_responders
 from app.services.alerts.explain_cleanup import cleanup_alert_explain_traces
 from app.services.alerts.retention import cleanup_alert_history
@@ -184,6 +185,7 @@ def user_notification_rules_job():
         logger.info("user notification rules job started")
 
         count = process_due_user_notifications()
+        count += process_due_incident_notifications()
 
         logger.info(
             "user notification rules job finished",

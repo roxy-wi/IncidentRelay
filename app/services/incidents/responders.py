@@ -1,15 +1,31 @@
 import logging
 
+from peewee import IntegrityError
+
 from app import Config
-from app.modules.db import incidents_repo, incident_core_repo
-from app.modules.db.models import User, UserGroup, Team, Rotation, EscalationPolicy, RotationMember, \
-    RotationLayer, RotationLayerMember
-from app.services.rbac import can_respond_team, can_write_group
-from app.services.incidents.responder_notifications import notify_incident_responder_requested
+from app.db import database_proxy as db
+from app.modules.common import utc_now
+from app.modules.db import incident_core_repo, incidents_repo
+from app.modules.db.models import (
+    EscalationPolicy,
+    Rotation,
+    RotationLayer,
+    RotationLayerMember,
+    RotationMember,
+    Team,
+    User,
+    UserGroup,
+)
+from app.services.incidents.core import _audit
 from app.services.incidents.responder_display import (
     responder_target_label,
     user_display_name,
 )
+from app.services.incidents.responder_notifications import (
+    notify_incident_responder_requested,
+)
+from app.services.rbac import can_respond_team, can_write_group
+from app.services.notifications.incidents import enqueue_responder
 
 logger = logging.getLogger("oncall.incidents.responders")
 
@@ -151,7 +167,9 @@ def _validate_responder_target(group, target_type, target_id):
         target_id,
     )
     if existing:
-        raise ValueError("active responder request already exists for this target")
+        raise incident_core_repo.IncidentConflictError(
+            "active responder request already exists for this target"
+        )
 
 
 def _validate_responder_status_transition(current_status, next_status):
@@ -160,7 +178,7 @@ def _validate_responder_status_transition(current_status, next_status):
 
     allowed = RESPONDER_STATUS_TRANSITIONS.get(current_status, set())
     if next_status not in allowed:
-        raise ValueError(
+        raise incident_core_repo.IncidentConflictError(
             f"cannot change responder status from {current_status} to {next_status}"
         )
 
@@ -312,165 +330,145 @@ def require_incident_responder_action_allowed(user, group, responder, status):
     )
 
 
-def create_incident_responder(*, incident_id, payload, user_id=None):
-    group = incident_core_repo.get_incident(incident_id)
-
-    if not group:
-        raise LookupError("incident not found")
-
+def create_incident_responder(
+    *, incident_id, payload, user_id=None, api_token_id=None, source="system",
+):
+    """Create the request, event and audit record before sending notifications."""
     target_type = payload["target_type"]
     required_field = RESPONDER_TARGET_FIELDS[target_type]
     target_id = payload[required_field]
-
-    _validate_responder_target(
-        group,
-        target_type,
-        target_id,
-    )
-
     expires_after_minutes = payload.get("expires_after_minutes")
     if expires_after_minutes is None:
         expires_after_minutes = int(
-            getattr(
-                Config,
-                "INCIDENT_RESPONDER_DEFAULT_EXPIRES_AFTER_MINUTES",
-                30,
-            )
+            getattr(Config, "INCIDENT_RESPONDER_DEFAULT_EXPIRES_AFTER_MINUTES", 30)
         )
-
-    target_data = {
-        "target_user_id": None,
-        "target_team_id": None,
-        "target_rotation_id": None,
-        "target_escalation_policy_id": None,
-    }
-    target_data[required_field] = target_id
-
-    responder = incidents_repo.create_incident_responder(
-        group.id,
-        {
-            "target_type": target_type,
-            "role": "responder",
-            **target_data,
-            "requested_by_id": user_id,
-            "message": payload.get("message"),
-            "expires_after_minutes": expires_after_minutes,
-            "status": "requested",
-        },
-    )
-
-    target_label = responder_target_label(responder)
-    request_message = payload.get("message")
-
-    if request_message:
-        event_message = f"Responder requested: {target_label}. {request_message}"
-    else:
-        event_message = f"Responder requested: {target_label}"
-
-    incident_core_repo.create_event(
-        incident_id=group.id,
-        event_type="responder_requested",
-        message=event_message,
-        user_id=user_id,
-    )
-
+    with incident_core_repo.incident_transaction(incident_id) as incident:
+        _validate_responder_target(incident, target_type, target_id)
+        responder = incidents_repo.create_incident_responder(
+            incident.id,
+            {
+                "target_type": target_type,
+                required_field: target_id,
+                "role": "responder",
+                "requested_by_id": user_id,
+                "message": payload.get("message"),
+                "expires_after_minutes": expires_after_minutes,
+                "status": "requested",
+            },
+        )
+        message = f"Responder requested: {responder_target_label(responder)}"
+        if payload.get("message"):
+            message += f". {payload['message']}"
+        event = incident_core_repo.create_event(
+            incident.id, "responder_requested", message=message, user_id=user_id,
+            data={"responder_id": responder.id},
+        )
+        _audit(
+            "incident.responder.request", incident, user_id=user_id,
+            api_token_id=api_token_id, source=source,
+            data={"responder_id": responder.id},
+        )
+        enqueue_responder(responder, event)
     notify_incident_responder_requested(responder)
-
-    responder = incidents_repo.get_incident_responder(responder.id)
-
-    return responder
+    return incidents_repo.get_incident_responder(responder.id)
 
 
 def set_incident_responder_status(
-    *,
-    incident_id,
-    responder_id,
-    status,
-    response_message=None,
-    user_id=None,
-    user=None,
+    *, incident_id, responder_id, status, response_message=None, user_id=None,
+    user=None, api_token_id=None, source="system",
 ):
-    group = incident_core_repo.get_incident(incident_id)
-
-    if not group:
-        raise LookupError("incident not found")
-
+    """Change a request and its assignment, event and audit atomically."""
     if status not in VALID_RESPONDER_UPDATE_STATUSES:
-        raise ValueError(
-            "status must be one of: accepted, declined, expired, resolved"
-        )
-
-    responder = incidents_repo.get_incident_responder(responder_id)
-
-    if not responder or responder.incident_id != group.id:
-        raise LookupError("responder not found in this incident")
-
-    require_incident_responder_action_allowed(
-        user,
-        group,
-        responder,
-        status,
-    )
-
-    _validate_responder_status_transition(responder.status, status)
-
+        raise ValueError("status must be one of: accepted, declined, expired, resolved")
     if user_id is None and user:
         user_id = user.id
+    with incident_core_repo.incident_transaction(incident_id) as incident:
+        responder = incidents_repo.get_incident_responder(responder_id)
+        if not responder or responder.incident_id != incident.id:
+            raise LookupError("responder not found in this incident")
+        require_incident_responder_action_allowed(user, incident, responder, status)
+        if responder.status == status:
+            # Repeated requests must not replace the original actor, response or
+            # concrete assignee, nor produce duplicate events and audit entries.
+            if (
+                status == "accepted"
+                and responder.target_type != "user"
+                and responder.target_user_id != user_id
+            ):
+                raise incident_core_repo.IncidentConflictError(
+                    "responder request was accepted by another user"
+                )
+            return responder
+        _validate_responder_status_transition(responder.status, status)
+        if (
+            status in {"accepted", "declined"}
+            and responder.expires_at
+            and responder.expires_at <= utc_now()
+        ):
+            raise incident_core_repo.IncidentConflictError("responder request has expired")
 
-    responder = incidents_repo.update_incident_responder_status(
-        responder.id,
-        status,
-        user_id=user_id,
-        response_message=response_message,
-    )
-
-    incident_core_repo.create_event(
-        incident_id=group.id,
-        event_type=f"responder_{status}",
-        message=responder_status_event_message(
-            responder,
-            status,
-            response_message=response_message,
-            user=user,
-        ),
-        user_id=user_id,
-    )
-
-    return responder
+        assignee_id = None
+        if status == "accepted":
+            assignee_id = (
+                responder.target_user_id if responder.target_type == "user"
+                else user_id
+            )
+            _validate_responder_user(assignee_id, incident)
+            if incidents_repo.has_participant_conflict(
+                incident.id, assignee_id, responder.role, exclude_id=responder.id,
+            ):
+                raise incident_core_repo.IncidentConflictError("participant already assigned")
+        try:
+            # A savepoint keeps PostgreSQL usable if a uniqueness constraint
+            # rejects a competing assignment made outside this service.
+            with db.atomic():
+                updated = incidents_repo.update_incident_responder_status(
+                    responder.id, status, expected_status=responder.status,
+                    user_id=user_id, response_message=response_message,
+                    target_user_id=assignee_id,
+                )
+        except IntegrityError as exc:
+            if status == "accepted" and incidents_repo.has_participant_conflict(
+                incident.id, assignee_id, responder.role, exclude_id=responder.id,
+            ):
+                raise incident_core_repo.IncidentConflictError(
+                    "participant already assigned"
+                ) from exc
+            raise
+        incident_core_repo.create_event(
+            incident.id, f"responder_{status}", user_id=user_id,
+            message=responder_status_event_message(
+                updated, status, response_message=response_message, user=user,
+            ),
+            data={"responder_id": updated.id, "user_id": updated.target_user_id},
+        )
+        _audit(
+            "incident.responder.status", incident, user_id=user_id,
+            api_token_id=api_token_id, source=source,
+            data={"responder_id": updated.id, "status": updated.status},
+        )
+    return updated
 
 
 def expire_due_incident_responders(*, limit=100):
-    """Expire responder requests that were not accepted or declined in time."""
+    """Expire each request together with its event and audit record."""
     expired = 0
     skipped = 0
-
-    responders = incidents_repo.list_expired_requested_responders(
-        limit=limit,
-    )
-
+    responders = incidents_repo.list_expired_requested_responders(limit=limit)
     for responder in responders:
-        expired_responder = incidents_repo.expire_incident_responder(
-            responder.id,
-        )
-
-        if not expired_responder:
-            skipped += 1
-            continue
-
+        with incident_core_repo.incident_transaction(responder.incident_id) as incident:
+            expired_responder = incidents_repo.expire_incident_responder(responder.id)
+            if not expired_responder:
+                skipped += 1
+                continue
+            incident_core_repo.create_event(
+                incident.id, "responder_expired", user_id=None,
+                message=responder_status_event_message(expired_responder, "expired"),
+                data={"responder_id": expired_responder.id},
+            )
+            _audit(
+                "incident.responder.status", incident, source="system",
+                data={"responder_id": expired_responder.id, "status": "expired"},
+            )
         expired += 1
-
-        incident_core_repo.create_event(
-            incident_id=expired_responder.incident_id,
-            event_type="responder_expired",
-            message=responder_status_event_message(
-                expired_responder,
-                "expired",
-            ),
-            user_id=None,
-        )
-
-    return {
-        "processed": expired + skipped,
-        "expired": expired,
-        "skipped": skipped,
-    }
+    return {"processed": expired + skipped, "expired": expired, "skipped": skipped}

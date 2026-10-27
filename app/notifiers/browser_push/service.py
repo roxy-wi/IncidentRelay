@@ -158,7 +158,8 @@ def _subscription_info(subscription):
     }
 
 
-def _webpush(subscription, payload):
+def _webpush(subscription, payload, *, timeout=None):
+    options = {"timeout": timeout} if timeout is not None else {}
     return webpush(
         subscription_info=_subscription_info(subscription),
         data=json.dumps(payload),
@@ -166,6 +167,7 @@ def _webpush(subscription, payload):
         vapid_claims={
             "sub": Config.BROWSER_PUSH_VAPID_SUBJECT,
         },
+        **options,
     )
 
 
@@ -665,26 +667,45 @@ def _build_alert_push_body(alert, event_type):
     return alert.message or alert.source or "IncidentRelay alert"
 
 
-def send_incident_push_to_user(user, incident, event_type="responder_requested", context=None):
-    """Send non-actionable operational Incident push with a stable deep link."""
-    if not Config.BROWSER_PUSH_ENABLED or not user:
-        return 0
-    subscriptions = _active_user_subscriptions(user.id)
-    payload = {
+def build_incident_push_payload(incident, event_type="responder_requested", context=None):
+    """Build an operational Incident payload without AlertGroup action tokens."""
+    context = context or {}
+    suffix = f"-event-{context['event_id']}" if context.get("event_id") else ""
+    return {
         "title": f"Incident #{incident.id}: {incident.title}",
-        "body": (context or {}).get("message") or "Incident response update",
-        "url": f"/incidents/{incident.id}",
+        "body": context.get("message") or "Incident response update",
+        "url": f"{(Config.PUBLIC_BASE_URL or '').rstrip('/')}/incidents/{incident.id}",
         "incident_id": incident.id,
         "event_type": event_type,
-        "tag": f"incidentrelay-incident-{incident.id}",
+        "tag": f"incidentrelay-incident-{incident.id}{suffix}",
+        "action_tokens": {},
     }
+
+
+def send_incident_push_to_subscription(subscription, payload):
+    """Send one device, raising retryable failures and disabling stale endpoints."""
+    try:
+        _webpush(subscription, payload, timeout=10)
+    except WebPushException as exc:
+        status = getattr(getattr(exc, "response", None), "status_code", None)
+        if status not in {404, 410}:
+            raise
+        BrowserPushSubscription.update(
+            enabled=False, deleted=True, deleted_at=utc_now(), updated_at=utc_now(),
+        ).where(BrowserPushSubscription.id == subscription.id).execute()
+        return False
+    BrowserPushSubscription.update(last_seen_at=utc_now()).where(
+        BrowserPushSubscription.id == subscription.id,
+    ).execute()
+    return True
+
+
+def send_incident_push_to_user(user, incident, event_type="responder_requested", context=None):
+    """Send Incident push; durable callers track each subscription separately."""
+    if not Config.BROWSER_PUSH_ENABLED or not user or not user.active or user.deleted:
+        return 0
+    payload = build_incident_push_payload(incident, event_type, context)
     sent = 0
-    for subscription in subscriptions:
-        try:
-            _webpush(subscription, payload)
-            subscription.last_seen_at = utc_now()
-            subscription.save()
-            sent += 1
-        except WebPushException:
-            logger.exception("operational incident push failed")
+    for subscription in _active_user_subscriptions(user.id):
+        sent += int(send_incident_push_to_subscription(subscription, payload))
     return sent
