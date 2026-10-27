@@ -1,4 +1,5 @@
 <div class="first-div-page-layout page-stack incidents-page">
+  <div id="incidents-list-view">
   <div class="summary-grid incidents-summary-grid">
     <div class="summary-card summary-primary">
       <div class="summary-icon">#</div>
@@ -158,17 +159,21 @@
     </div>
   </div>
 
-  <div id="incident-details-modal" class="app-modal is-hidden">
-    <div class="app-modal-dialog app-modal-dialog-wide incidents-details-dialog">
-      <div class="app-modal-header">
+  </div>
+  <section id="incident-details-modal" class="incidents-workspace is-hidden" aria-labelledby="incident-details-title">
+    <div class="incidents-details-dialog">
+      <header class="incidents-workspace-header">
+        <button id="close-incident-details" type="button" class="btn btn-small incidents-back-link">← {{ _('common.back') }}</button>
+        <div class="incidents-workspace-heading">
         <div>
           <h2 id="incident-details-title">{{ _('incidents.details.title') }}</h2>
           <div id="incident-details-subtitle" class="card-subtitle"></div>
         </div>
-        <button id="close-incident-details" type="button" class="app-modal-close" aria-label="{{ _('common.close') }}">×</button>
-      </div>
+        </div>
+      </header>
 
-      <div class="app-modal-body incidents-details-body">
+      <div class="incidents-details-body">
+        <div class="incidents-workspace-grid"><main class="incidents-workspace-main">
         <div id="incident-details-error" class="alert alert-danger is-hidden"></div>
         <div id="incident-details-summary" class="details-grid"></div>
 
@@ -176,9 +181,10 @@
           <div class="card-header">
             <div>
               <h3>{{ _('incidents.details.operations') }}</h3>
-              <div class="card-subtitle">{{ _('incidents.details.operations_help') }}</div>
+
             </div>
           </div>
+          <p class="incidents-card-description">{{ _('incidents.details.operations_help') }}</p>
           <div class="incidents-operation-grid">
             <div>
               <label for="incident-details-status">{{ _('incidents.form.status') }}</label>
@@ -200,13 +206,11 @@
           <div class="card-header">
             <div>
               <h3>{{ _('incidents.links.title') }}</h3>
-              <div class="card-subtitle">
-                {{ _('incidents.links.subtitle') }}
-                <span id="incident-linked-alert-groups-count" class="overview-count-badge">0</span>
-              </div>
+
             </div>
           </div>
 
+          <p class="incidents-card-description">{{ _('incidents.links.subtitle') }} <span id="incident-linked-alert-groups-count" class="overview-count-badge">0</span></p>
           <div id="incident-linked-alert-groups" class="incidents-linked-groups"></div>
 
           <div id="incident-link-controls" class="incidents-link-controls">
@@ -219,22 +223,76 @@
           </div>
         </section>
 
+        </main><aside class="incidents-workspace-side">
+        <section class="card incidents-collaboration-card" id="incident-participants-section">
+          <div class="card-header"><h3>Participants</h3></div>
+          <div id="incident-participants-list" class="incidents-collection"></div>
+          <div class="incidents-inline-form" id="incident-participants-controls">
+            <div class="incidents-form-field"><label for="incident-participant-user">User</label><select id="incident-participant-user" class="input"></select></div>
+            <div class="incidents-form-field"><label for="incident-participant-role">Role</label><select id="incident-participant-role" class="input"><option value="responder">Responder</option><option value="commander">Commander</option><option value="communications">Communications</option></select></div>
+            <button id="incident-participant-add" type="button" class="btn btn-primary btn-small">Add participant</button>
+          </div>
+        </section>
+        <section class="card incidents-collaboration-card" id="incident-stakeholders-section">
+          <div class="card-header"><h3>Stakeholders</h3></div>
+          <div id="incident-stakeholders-list" class="incidents-collection"></div>
+          <div class="incidents-inline-form" id="incident-stakeholders-controls">
+            <div class="incidents-form-field incidents-stakeholder-picker">
+                <label for="incident-stakeholder-user">User (search by name or email)</label>
+                <select id="incident-stakeholder-user">
+                    <option value="">Choose a user or enter an external email</option>
+                </select>
+            </div>
+            <div class="incidents-form-field"><label for="incident-stakeholder-email">External email (optional)</label>
+                <input id="incident-stakeholder-email" class="input" type="email" maxlength="255" autocomplete="off" placeholder="name@example.com">
+            </div>
+            <button id="incident-stakeholder-add" type="button" class="btn btn-primary btn-small">Add stakeholder</button>
+          </div>
+        </section>
+        <section class="card incidents-collaboration-card" id="incident-services-section">
+          <div class="card-header"><h3>Affected services</h3></div>
+          <div id="incident-services-list" class="incidents-collection"></div>
+          <div class="incidents-inline-form" id="incident-services-controls">
+            <div class="incidents-form-field"><label for="incident-service-select">Service</label><select id="incident-service-select" class="input"></select></div>
+            <button id="incident-service-add" type="button" class="btn btn-primary btn-small">Add affected service</button>
+          </div>
+        </section>
+        </aside></div>
+        <div class="incidents-workspace-lower-grid">
+        <section class="card incidents-collaboration-card" id="incident-resolution-section">
+          <div class="card-header"><h3>Resolution</h3></div>
+          <div class="form-body"><label for="incident-root-cause">Root cause</label>
+            <textarea id="incident-root-cause" class="input" rows="3" maxlength="10000"></textarea>
+            <label for="incident-resolution-summary">Resolution summary</label>
+            <textarea id="incident-resolution-summary" class="input" rows="3" maxlength="10000"></textarea>
+            <button id="incident-resolution-save" type="button" class="btn btn-primary btn-small">Save resolution</button>
+          </div>
+        </section>
+        <section class="card incidents-collaboration-card" id="incident-comments-section">
+          <div class="card-header"><h3>Operational comments</h3></div>
+          <div id="incident-comments-list" class="incidents-collection" aria-live="polite"></div>
+          <div id="incident-comments-controls"><label for="incident-comment-input">Comment</label>
+            <textarea id="incident-comment-input" class="input" maxlength="10000" rows="3"></textarea>
+            <button id="incident-comment-add" type="button" class="btn btn-primary btn-small">Post comment</button>
+          </div>
+        </section>
+        </div>
         <section class="card incidents-events-card">
           <div class="card-header">
             <div>
               <h3>{{ _('incidents.activity.title') }}</h3>
-              <div class="card-subtitle">{{ _('incidents.activity.subtitle') }}</div>
+
             </div>
           </div>
+          <p class="incidents-card-description">{{ _('incidents.activity.subtitle') }}</p>
           <div id="incident-events" class="event-list"></div>
         </section>
       </div>
 
-      <div class="app-modal-footer">
+      <div class="incidents-workspace-actions">
         <button id="incident-close-action" type="button" class="btn btn-danger btn-small">{{ _('incidents.actions.close_incident') }}</button>
         <button id="incident-reopen-action" type="button" class="btn btn-primary btn-small">{{ _('incidents.actions.reopen') }}</button>
-        <button id="close-incident-details-footer" type="button" class="btn btn-small">{{ _('common.close') }}</button>
       </div>
     </div>
-  </div>
+  </section>
 </div>

@@ -75,5 +75,19 @@
   "incidents.activity.subtitle": "Operational Incident timeline",
   "incidents.activity.none": "No Incident activity yet.",
   "incidents.activity.reopened_by_alert": "Investigación reanudada al reabrirse el grupo de alertas",
-  "incidents.activity.open_reopened_alert": "Abrir AlertGroup n.º {id}"
+  "incidents.activity.open_reopened_alert": "Abrir AlertGroup n.º {id}",
+  "incidents.workspace.picker_placeholder": "Elegir usuario o introducir correo externo",
+  "incidents.workspace.picker_search": "Buscar por nombre o correo",
+  "incidents.workspace.unknown_user": "Usuario desconocido",
+  "incidents.workspace.empty_entries": "Sin registros",
+  "incidents.workspace.remove": "Quitar",
+  "incidents.workspace.empty_comments": "Aún no hay comentarios",
+  "incidents.workspace.empty_services": "Sin servicios afectados",
+  "incidents.workspace.service": "Servicio",
+  "incidents.workspace.runbook": "Manual",
+  "incidents.workspace.service_link": "Enlace de servicio",
+  "incidents.workspace.depends_on": "Depende de",
+  "incidents.workspace.choose_service": "Elegir servicio",
+  "incidents.workspace.select_user_or_email": "Seleccione un usuario o introduzca un correo externo",
+  "incidents.workspace.invalid_email": "Introduzca un correo válido"
 }

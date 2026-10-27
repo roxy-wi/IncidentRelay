@@ -75,5 +75,19 @@
   "incidents.activity.subtitle": "Operational Incident timeline",
   "incidents.activity.none": "No Incident activity yet.",
   "incidents.activity.reopened_by_alert": "告警组重新打开后，事件调查已恢复",
-  "incidents.activity.open_reopened_alert": "打开告警组 #{id}"
+  "incidents.activity.open_reopened_alert": "打开告警组 #{id}",
+  "incidents.workspace.picker_placeholder": "选择用户或输入外部邮箱",
+  "incidents.workspace.picker_search": "按姓名或邮箱搜索",
+  "incidents.workspace.unknown_user": "未知用户",
+  "incidents.workspace.empty_entries": "暂无记录",
+  "incidents.workspace.remove": "移除",
+  "incidents.workspace.empty_comments": "暂无评论",
+  "incidents.workspace.empty_services": "暂无受影响服务",
+  "incidents.workspace.service": "服务",
+  "incidents.workspace.runbook": "操作手册",
+  "incidents.workspace.service_link": "服务链接",
+  "incidents.workspace.depends_on": "依赖于",
+  "incidents.workspace.choose_service": "选择服务",
+  "incidents.workspace.select_user_or_email": "请选择用户或输入外部邮箱",
+  "incidents.workspace.invalid_email": "请输入有效邮箱地址"
 }

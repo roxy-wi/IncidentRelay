@@ -1,4 +1,4 @@
-from app.modules.db import incidents_repo, maintenance_repo, business_services_repo, notification_policies_repo
+from app.modules.db import maintenance_repo, business_services_repo, notification_policies_repo
 from app.services.incidents.responder_display import responder_target_label
 from app.services.serializers.business_services import serialize_business_service_incident_impact, \
     serialize_alert_group_business_impact_summary

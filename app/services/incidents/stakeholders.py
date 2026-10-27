@@ -1,7 +1,6 @@
 """Operational Incident stakeholders (independent of AlertGroup lifecycle)."""
 import logging
 from app.modules.db import incident_core_repo, incidents_repo
-from app.modules.db.models import User, ServiceOwner, IncidentStakeholder
 from app.notifiers.browser_push import service as browser_push
 
 logger = logging.getLogger("oncall.incidents.stakeholders")

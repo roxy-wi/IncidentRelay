@@ -1,8 +1,5 @@
 from app.login import create_access_token
-from app.modules.db import incidents_repo
 from app.modules.db.models import AlertGroup, ServiceOwner
-from app.services.alerts.alert_comments import create_group_comment
-from app.services.alerts.lifecycle import upsert_alert
 from tests.factories import (
     add_user_to_team,
     create_group,
@@ -12,8 +9,6 @@ from tests.factories import (
     create_user,
     unique,
 )
-import app.notifiers.browser_push.service as browser_push
-from app.services.alerts.actions import acknowledge_alert, resolve_alert
 
 
 def create_upsert_alert_data(route, *, status="firing", dedup_key=None):

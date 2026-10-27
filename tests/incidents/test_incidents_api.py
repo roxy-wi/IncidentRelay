@@ -3,7 +3,7 @@ from uuid import uuid4
 from app.api.schemas.roles import GROUP_USER_ADMIN_ROLE
 from app.login import create_access_token
 from app.modules.db import incidents_repo
-from app.modules.db.models import AlertEvent, AlertGroup, IncidentResponder
+from app.modules.db.models import AlertEvent, AlertGroup
 from tests.factories import (
     add_user_to_team,
     create_group,
@@ -11,7 +11,6 @@ from tests.factories import (
     create_team,
     create_user,
 )
-from app.modules.common import utc_now
 
 
 def disable_responder_notifications(monkeypatch):

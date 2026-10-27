@@ -5,7 +5,7 @@ from app import Config
 from app.db import database_proxy as db
 from app.modules.db.models import AlertGroup, RecoveryNotificationDelivery
 from app.services.alerts.reopen import lock_grouping_identity
-from app.modules.db import alerts_repo, incidents_repo, notifications_repo
+from app.modules.db import alerts_repo, notifications_repo
 from app.services.notifications.delivery import notify_alert
 from app.services.alerts.shelving import is_alert_group_shelved
 from app.services.alerts.maintenance_state import (

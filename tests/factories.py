@@ -85,15 +85,10 @@ def create_user(
     return user
 
 
-def create_incident_stakeholder(
-    alert_group: AlertGroup,
-    user: User,
-    *,
-    notify_on_resolved: bool = True,
-) -> IncidentStakeholder:
-    """Create a stakeholder subscription for notification regression tests."""
+def create_incident_stakeholder(incident, user: User, *, notify_on_resolved: bool = True) -> IncidentStakeholder:
+    """Create an operational Incident stakeholder (not an AlertGroup subscriber)."""
     return IncidentStakeholder.create(
-        group=alert_group,
+        incident=incident,
         user=user,
         email=user.email,
         display_name=user.display_name or user.username,

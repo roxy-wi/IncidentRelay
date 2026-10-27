@@ -159,7 +159,7 @@ def create_incident(
 def update_incident(
     incident_id, *, expected_version, user_id=None, title=None,
     description=None, service_id=None, priority_slug=None, api_token_id=None,
-    source="system",
+    source="system", root_cause=None, resolution_summary=None,
 ):
     incident = incident_core_repo.get_incident(incident_id)
     if not incident:
@@ -180,6 +180,10 @@ def update_incident(
         if not priority:
             raise IncidentValidationError("priority must be an enabled incident priority")
         changes["priority"] = priority
+    if root_cause is not None:
+        changes["root_cause"] = str(root_cause).strip() or None
+    if resolution_summary is not None:
+        changes["resolution_summary"] = str(resolution_summary).strip() or None
     if not changes:
         return incident
     try:

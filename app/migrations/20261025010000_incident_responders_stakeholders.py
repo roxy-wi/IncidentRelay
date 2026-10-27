@@ -7,11 +7,12 @@ records whose mapping is ambiguous; keep a database backup before upgrading.
 import json
 
 from app.db import init_database
+from app.migrations.introspection import get_columns as migration_get_columns, table_exists as migration_table_exists
 from app.modules.db.models import IncidentResponder, IncidentStakeholder, IncidentAlertGroupLink
 
 
 def _table_columns(db, table):
-    return {column.name for column in db.get_columns(table)} if db.table_exists(table) else set()
+    return {column.name for column in migration_get_columns(db, table)} if migration_table_exists(db, table) else set()
 
 
 def _legacy_rows(db, table):
@@ -19,7 +20,7 @@ def _legacy_rows(db, table):
         return []
     cursor = db.execute_sql('SELECT * FROM "' + table + '"')
     columns = [value[0] for value in cursor.description]
-    return [dict(zip(columns, values)) for values in cursor.fetchall()]
+    return [dict(zip(columns, values, strict=True)) for values in cursor.fetchall()]
 
 
 def _mapping(db):

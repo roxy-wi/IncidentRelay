@@ -184,3 +184,183 @@ body.md-theme .incidents-link-controls .ts-wrapper {
 body.md-theme .incidents-link-controls .ts-dropdown {
     z-index: 12;
 }
+
+/* Incident detail is a routed workspace, never a modal overlay. */
+body.md-theme .incidents-workspace { width: 100%; min-width: 0; }
+body.md-theme .incidents-workspace .incidents-details-dialog { width: 100%; height: auto; max-height: none; }
+body.md-theme .incidents-workspace .incidents-details-body { overflow: visible; max-height: none; }
+body.md-theme .incidents-workspace .app-modal-header,
+body.md-theme .incidents-workspace .app-modal-footer { padding: 16px; }
+body.md-theme .incidents-workspace .incidents-events-card { min-width: 0; }
+
+.incidents-collaboration-card { margin-top: 16px; padding: 16px; }
+.incidents-collection { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
+.incidents-collection-row { display: flex; justify-content: space-between; gap: 12px; align-items: center; overflow-wrap: anywhere; }
+.incidents-inline-form { display: flex; align-items: end; flex-wrap: wrap; gap: 10px; }
+.incidents-inline-form .input { min-width: 150px; flex: 1 1 180px; }
+.incidents-text-block { white-space: pre-wrap; overflow-wrap: anywhere; padding: 8px 0; }
+#incident-comments-controls .input { width: 100%; }
+@media (max-width: 680px) { .incidents-collection-row { align-items: flex-start; flex-direction: column; } }
+
+/* Workspace collaboration forms: keep each label with its own control. */
+body.md-theme .incidents-inline-form { display: flex; align-items: flex-end; flex-wrap: wrap; gap: 12px; }
+body.md-theme .incidents-inline-form .incidents-form-field { display: flex; flex-direction: column; flex: 1 1 205px; min-width: 0; gap: 5px; }
+body.md-theme .incidents-inline-form .incidents-form-field .input { min-width: 0; width: 100%; flex: initial; }
+body.md-theme .incidents-inline-form > .btn { flex: 0 0 auto; align-self: flex-end; }
+body.md-theme .incidents-inline-form .ts-wrapper { width: 100%; min-width: 0; }
+body.md-theme .incidents-inline-form .ts-control { min-height: 38px; }
+body.md-theme .incidents-collection-row > span { min-width: 0; white-space: pre-wrap; }
+@media (max-width: 680px) { body.md-theme .incidents-inline-form > .btn { width: 100%; } }
+
+/* Incident workspace: dedicated page, not an embedded modal. */
+body.md-theme .incidents-workspace .incidents-details-dialog { width:100%;max-width:none; height:auto; border:0;box-shadow:none;background:transparent;display:block; }
+body.md-theme .incidents-workspace-header { display:flex;gap:20px;align-items:flex-start;padding:8px 0 22px;border-bottom:1px solid var(--md-border); }
+body.md-theme .incidents-workspace-heading { flex:1;min-width:0; }
+body.md-theme .incidents-workspace-heading h2 { margin:0 0 6px;font-size:clamp(22px,2.2vw,30px); }
+body.md-theme .incidents-back-link {flex-shrink:0;margin-top:3px;}
+body.md-theme .incidents-workspace .incidents-details-body { padding:22px 0;display:block;overflow:visible; }
+body.md-theme .incidents-workspace-grid {display:grid;grid-template-columns:minmax(0,1.8fr) minmax(290px,1fr);gap:18px;align-items:start;}
+body.md-theme .incidents-workspace-main,body.md-theme .incidents-workspace-side {display:grid;gap:18px;min-width:0;align-content:start;}
+body.md-theme .incidents-workspace .card {margin:0;min-width:0;}
+body.md-theme .incidents-workspace .incidents-collaboration-card {padding:18px;}
+body.md-theme .incidents-workspace .card-header {padding:0 0 12px;}
+body.md-theme .incidents-workspace .card-header h3 {font-size:16px;margin:0;}
+body.md-theme .incidents-workspace-actions {display:flex;gap:10px;justify-content:flex-end;padding:18px 0;border-top:1px solid var(--md-border);}
+body.md-theme .incidents-collection {gap:0;margin:4px 0 16px;}
+body.md-theme .incidents-collection-row {padding:10px 0;border-bottom:1px solid var(--md-border);align-items:center;}
+body.md-theme .incidents-collection-row:last-child {border-bottom:none;}
+body.md-theme .incidents-collection-label {min-width:0;overflow-wrap:anywhere;}
+body.md-theme .incidents-service-link {color:var(--md-primary);font-weight:600;text-decoration:none;}
+body.md-theme .incidents-service-link:hover {text-decoration:underline;}
+body.md-theme #incident-comments-list {gap:0;margin:8px 0 18px;}
+body.md-theme .incidents-comment {display:flex;gap:12px;padding:16px 0;border-bottom:1px solid var(--md-border);}
+body.md-theme .incidents-comment-avatar {width:34px;height:34px;flex:0 0 34px;border-radius:50%;background:var(--md-surface-soft);color:var(--md-text);display:grid;place-items:center;font-weight:700;}
+body.md-theme .incidents-comment-content {flex:1;min-width:0;}
+body.md-theme .incidents-comment-meta {display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;font-size:13px;}
+body.md-theme .incidents-comment-meta time {color:var(--md-muted);font-size:12px;}
+body.md-theme .incidents-comment-text {white-space:pre-wrap;overflow-wrap:anywhere;margin-top:6px;line-height:1.55;}
+body.md-theme #incident-comments-controls {display:grid;gap:10px;}
+body.md-theme #incident-comments-controls .btn {justify-self:end;}
+body.md-theme .incidents-inline-form {display:grid;grid-template-columns:minmax(0,1fr);gap:10px;align-items:stretch;}
+body.md-theme .incidents-inline-form .incidents-form-field {display:grid;gap:5px;min-width:0;}
+body.md-theme .incidents-inline-form > .btn {justify-self:end;width:auto;align-self:end;}
+@media(max-width:920px){body.md-theme .incidents-workspace-grid{grid-template-columns:minmax(0,1fr);}body.md-theme .incidents-workspace-header{flex-direction:column;gap:12px;}}
+
+/* 2.5 workspace: one header and content rhythm across EVERY section.
+   Earlier .card-header rules differed between Operations and collaboration cards. */
+body.md-theme .incidents-workspace .incidents-operation-card,
+body.md-theme .incidents-workspace .incidents-links-card,
+body.md-theme .incidents-workspace .incidents-events-card,
+body.md-theme .incidents-workspace .incidents-collaboration-card {
+    padding: 0;
+    overflow: visible;
+}
+body.md-theme .incidents-workspace .incidents-operation-card > .card-header,
+body.md-theme .incidents-workspace .incidents-links-card > .card-header,
+body.md-theme .incidents-workspace .incidents-events-card > .card-header,
+body.md-theme .incidents-workspace .incidents-collaboration-card > .card-header {
+    display: flex;
+    align-items: center;
+    min-height: 68px;
+    box-sizing: border-box;
+    margin: 0;
+    padding: 16px 20px;
+    border-bottom: 1px solid var(--md-border);
+    border-radius: var(--md-radius-md) var(--md-radius-md) 0 0;
+    background: var(--md-surface-soft);
+}
+body.md-theme .incidents-workspace .card > .card-header h3 {
+    margin: 0;
+    padding: 0;
+    font-size: 17px;
+    font-weight: 700;
+    line-height: 1.35;
+    color: var(--md-text);
+}
+body.md-theme .incidents-workspace .card > .card-header .card-subtitle {
+    margin: 4px 0 0;
+    line-height: 1.4;
+}
+/* Empty subtitles remain optional: heading itself must retain the same inset. */
+body.md-theme .incidents-workspace .incidents-operation-grid { padding: 20px; }
+body.md-theme .incidents-workspace .incidents-linked-groups { padding: 20px 20px 16px; }
+body.md-theme .incidents-workspace .incidents-link-controls { padding: 0 20px 20px; }
+body.md-theme .incidents-workspace .incidents-collaboration-card > .incidents-collection,
+body.md-theme .incidents-workspace .incidents-collaboration-card > .form-body,
+body.md-theme .incidents-workspace .incidents-collaboration-card > .incidents-inline-form,
+body.md-theme .incidents-workspace .incidents-collaboration-card > #incident-comments-controls {
+    margin: 0;
+    padding: 16px 20px 20px;
+}
+body.md-theme .incidents-workspace .incidents-collaboration-card > .incidents-collection + .incidents-inline-form,
+body.md-theme .incidents-workspace .incidents-collaboration-card > .incidents-collection + #incident-comments-controls {
+    padding-top: 0;
+}
+body.md-theme .incidents-workspace .incidents-events-card > .event-list { padding: 16px 20px 20px; }
+@media (max-width: 680px) {
+    body.md-theme .incidents-workspace .card > .card-header { padding: 14px 16px; min-height: 60px; }
+    body.md-theme .incidents-workspace .incidents-operation-grid,
+    body.md-theme .incidents-workspace .incidents-linked-groups,
+    body.md-theme .incidents-workspace .incidents-link-controls,
+    body.md-theme .incidents-workspace .incidents-collaboration-card > .incidents-collection,
+    body.md-theme .incidents-workspace .incidents-collaboration-card > .form-body,
+    body.md-theme .incidents-workspace .incidents-collaboration-card > .incidents-inline-form,
+    body.md-theme .incidents-workspace .incidents-collaboration-card > #incident-comments-controls,
+    body.md-theme .incidents-workspace .incidents-events-card > .event-list { padding-left: 16px; padding-right: 16px; }
+}
+
+/* 2.5 Incident Workspace: uniform title-only card headers (Stakeholders pattern). */
+body.md-theme .incidents-workspace .incidents-operation-card > .card-header,
+body.md-theme .incidents-workspace .incidents-links-card > .card-header,
+body.md-theme .incidents-workspace .incidents-events-card > .card-header,
+body.md-theme .incidents-workspace .incidents-collaboration-card > .card-header {
+    height: 68px;
+    min-height: 68px;
+    padding: 16px 20px;
+    align-items: center;
+}
+body.md-theme .incidents-workspace .incidents-card-description {
+    margin: 0;
+    padding: 14px 20px 0;
+    font-size: 13px;
+    line-height: 1.5;
+    color: var(--md-muted);
+}
+body.md-theme .incidents-workspace .incidents-workspace-lower-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px;
+    align-items: start;
+    margin-top: 18px;
+}
+body.md-theme .incidents-workspace .incidents-workspace-lower-grid > .card {
+    margin: 0;
+    min-width: 0;
+    align-self: stretch;
+}
+body.md-theme .incidents-workspace .incidents-events-card { margin-top: 18px; }
+@media (max-width: 920px) {
+    body.md-theme .incidents-workspace .incidents-workspace-lower-grid {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+@media (max-width: 680px) {
+    body.md-theme .incidents-workspace .incidents-operation-card > .card-header,
+    body.md-theme .incidents-workspace .incidents-links-card > .card-header,
+    body.md-theme .incidents-workspace .incidents-events-card > .card-header,
+    body.md-theme .incidents-workspace .incidents-collaboration-card > .card-header {
+        height: 60px;
+        min-height: 60px;
+        padding: 14px 16px;
+    }
+    body.md-theme .incidents-workspace .incidents-card-description { padding-left: 16px; padding-right: 16px; }
+}
+
+/* Incident 2.5 service context: consistent with the workspace card typography. */
+body.md-theme .incidents-service-context { align-items: flex-start; }
+body.md-theme .incidents-service-context-main { min-width: 0; flex: 1; }
+body.md-theme .incidents-service-context-heading { display: flex; gap: 8px; flex-wrap: wrap; align-items: baseline; }
+body.md-theme .incidents-service-meta { font-size: 12px; color: var(--md-muted); }
+body.md-theme .incidents-service-resources { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 7px; }
+body.md-theme .incidents-service-resources a { font-size: 12px; color: var(--md-primary); text-decoration: none; }
+body.md-theme .incidents-service-resources a:hover { text-decoration: underline; }

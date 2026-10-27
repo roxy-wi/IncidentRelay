@@ -63,6 +63,8 @@ class IncidentUpdateSchema(ApiModel):
     description: str | None = Field(default=None, max_length=10000)
     service_id: int | None = Field(default=None, ge=1)
     priority: IncidentPrioritySlug | None = None
+    root_cause: str | None = Field(default=None, max_length=10000)
+    resolution_summary: str | None = Field(default=None, max_length=10000)
 
 
 class IncidentTransitionSchema(ApiModel):

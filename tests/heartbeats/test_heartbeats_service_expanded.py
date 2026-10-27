@@ -1033,10 +1033,6 @@ def test_heartbeat_auto_recovery_can_defer_outbound_notifications(monkeypatch, d
         "app.services.heartbeats.service.notify_alert",
         lambda *a, **kwargs: premature.append("resolved"),
     )
-    monkeypatch.setattr(
-        "app.services.alerts.actions.notify_stakeholders",
-        lambda *a, **kwargs: premature.append("stakeholders"),
-    )
     recovered, error = receive_heartbeat_ping(
         "hysteresis-hb-token", payload={"status": "completed"}, now=now,
     )

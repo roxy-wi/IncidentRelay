@@ -444,9 +444,8 @@ function incidentIdFromLocation() {
 function syncIncidentDetailsFromUrl() {
     const incidentId = incidentIdFromLocation();
     if (!incidentId) {
-        if ($("#incident-details-modal").hasClass("is-open")) {
-            closeAppModal("#incident-details-modal");
-        }
+        $("#incident-details-modal").addClass("is-hidden");
+        $("#incidents-list-view").removeClass("is-hidden");
         return;
     }
     loadIncidentDetails(incidentId);
@@ -454,7 +453,8 @@ function syncIncidentDetailsFromUrl() {
 
 function closeIncidentDetails(options) {
     const settings = $.extend({updateUrl: true}, options || {});
-    closeAppModal("#incident-details-modal");
+    $("#incident-details-modal").addClass("is-hidden");
+    $("#incidents-list-view").removeClass("is-hidden");
     currentIncident = null;
     currentIncidentLinks = [];
     currentIncidentEvents = [];
@@ -478,11 +478,13 @@ function loadIncidentDetails(incidentId) {
         currentIncident = incident;
         renderIncidentDetails(incident);
         loadIncidentDetailCollections(incident);
-        openAppModal("#incident-details-modal");
+        $("#incidents-list-view").addClass("is-hidden");
+        $("#incident-details-modal").removeClass("is-hidden");
     }, function (xhr) {
         if (window.AppLoading) { AppLoading.clear("#incidents-loading-indicator"); }
         showApiError(xhr);
-        closeIncidentDetails({updateUrl: true});
+        $("#incident-details-modal").addClass("is-hidden");
+        $("#incidents-list-view").removeClass("is-hidden");
     });
 }
 
@@ -525,6 +527,7 @@ function loadIncidentDetailCollections(incident) {
     );
 
     loadIncidentEvents(incident, true);
+    loadIncidentCollaboration(incident);
 }
 
 function loadIncidentEvents(incident, showLoading) {
@@ -540,7 +543,7 @@ function loadIncidentEvents(incident, showLoading) {
     }
 
     apiGet(
-        "/api/incidents/" + encodeURIComponent(incidentId) + "/events",
+        "/api/incidents/" + encodeURIComponent(incidentId) + "/activity",
         function (events) {
             if (!currentIncident || Number(currentIncident.id) !== incidentId) {
                 return;
@@ -586,6 +589,11 @@ function renderIncidentDetails(incident) {
     }
 
     const canRespond = incidentCanRespond(incident);
+    $("#incident-root-cause").val(incident.root_cause || "").prop("disabled", !canRespond);
+    $("#incident-resolution-summary").val(incident.resolution_summary || "").prop("disabled", !canRespond);
+    $("#incident-resolution-save").toggleClass("is-hidden", !canRespond);
+    ["#incident-participants-controls", "#incident-stakeholders-controls", "#incident-services-controls", "#incident-comments-controls"]
+        .forEach(function (selector) { $(selector).toggleClass("is-hidden", !canRespond); });
     renderIncidentStatusControl(incident, canRespond);
     renderIncidentAssignmentControl(incident, canRespond);
 
@@ -663,7 +671,7 @@ function renderIncidentEvents(events) {
         target.append($("<div>").addClass("overview-empty").text(i18n.t("incidents.activity.none")));
         return;
     }
-    events.slice().reverse().forEach(function (event) {
+    events.forEach(function (event) {
         const reopened = event.event_type === "incident_reopened_by_alert_group";
         const data = event.data || {};
         const detail = $("<div>")
@@ -673,7 +681,10 @@ function renderIncidentEvents(events) {
                 .text(reopened
                     ? i18n.t("incidents.activity.reopened_by_alert")
                     : (event.message || event.event_type || "-")))
-            .append($("<div>").addClass("event-time").text(formatDateTimeMinutes(event.created_at)));
+            .append($("<div>").addClass("event-time").text(
+                (event.source_type || "Incident") + " #" + (event.source_id || currentIncident.id)
+                + " · " + formatDateTimeMinutes(event.created_at)
+            ));
 
         if (reopened) {
             if (data.from && data.to) {
@@ -705,6 +716,233 @@ function renderIncidentEvents(events) {
         );
     });
 }
+
+// Incident-owned collaboration. Every mutation is permission-checked by the API.
+function incidentUserLabel(user, fallbackId) {
+    if (user) {
+        const name = user.display_name || user.username || user.email;
+        if (name) { return name; }
+    }
+    return fallbackId ? ("User #" + fallbackId) : i18n.t("incidents.workspace.unknown_user");
+}
+
+function loadIncidentStakeholderUsers(incident) {
+    const incidentId = Number(incident.id);
+    const select = $("#incident-stakeholder-user");
+    select.empty().append($("<option>").val("").text(i18n.t("incidents.workspace.picker_placeholder")));
+    if (!incident.team_id) { return; }
+    apiGet("/api/teams/" + encodeURIComponent(incident.team_id) + "/users", function (memberships) {
+        if (!currentIncident || Number(currentIncident.id) !== incidentId) { return; }
+        const seen = new Set();
+        incidentAsArray(memberships).forEach(function (member) {
+            const user = member.user || member;
+            const id = Number(member.user_id || user.id);
+            if (!id || member.active === false || seen.has(id)) { return; }
+            seen.add(id);
+            const label = user.display_name || member.display_name || user.username || member.username || ("User #" + id);
+            const email = user.email || member.email || "";
+            select.append($("<option>").val(String(id)).text(label + (email ? " · " + email : "")));
+        });
+        // Tom Select supports searching names and email within option text.
+        if (select[0] && typeof TomSelect !== "undefined") {
+            if (select[0].tomselect) { select[0].tomselect.destroy(); }
+            new TomSelect(select[0], {create: false, allowEmptyOption: true, maxOptions: 1000,
+                placeholder: i18n.t("incidents.workspace.picker_search"), searchField: ["text"]});
+        }
+    });
+}
+function incidentCollectionMessage(selector, message) {
+    $(selector).empty().append($("<div>").addClass("overview-empty").text(message));
+}
+
+function incidentCollaborationGet(incident, suffix, selector, render) {
+    const id = Number(incident.id);
+    incidentCollectionMessage(selector, i18n.t("common.loading"));
+    apiGet("/api/incidents/" + encodeURIComponent(id) + suffix, function (items) {
+        if (!currentIncident || Number(currentIncident.id) !== id) { return; }
+        render(incidentAsArray(items));
+    }, function (xhr) {
+        if (!currentIncident || Number(currentIncident.id) !== id) { return; }
+        incidentCollectionMessage(selector, getApiErrorMessage(xhr));
+    });
+}
+
+function incidentListRows(selector, items, title, canDelete, onDelete) {
+    const target = $(selector).empty();
+    if (!items.length) { incidentCollectionMessage(selector, i18n.t("incidents.workspace.empty_entries")); return; }
+    items.forEach(function (item) {
+        const row = $("<div>").addClass("incidents-collection-row");
+        row.append($("<span>").addClass("incidents-collection-label").text(title(item)));
+        if (canDelete) {
+            row.append($("<button>").attr("type", "button").addClass("btn btn-small")
+                .text(i18n.t("incidents.workspace.remove")).on("click", function () { onDelete(item); }));
+        }
+        target.append(row);
+    });
+}
+function renderIncidentComments(items) {
+    const target = $("#incident-comments-list").empty();
+    if (!items.length) { incidentCollectionMessage("#incident-comments-list", i18n.t("incidents.workspace.empty_comments")); return; }
+    items.forEach(function (item) {
+        const author = incidentUserLabel(item.author, item.author_id);
+        const initial = String(author).trim().charAt(0).toUpperCase() || "?";
+        const article = $("<article>").addClass("incidents-comment");
+        article.append($("<span>").addClass("incidents-comment-avatar").text(initial));
+        const content = $("<div>").addClass("incidents-comment-content");
+        const header = $("<div>").addClass("incidents-comment-meta");
+        header.append($("<strong>").text(author));
+        if (item.created_at) { header.append($("<time>").text(formatDateTimeMinutes(item.created_at))); }
+        content.append(header).append($("<div>").addClass("incidents-comment-text").text(item.body || ""));
+        article.append(content);
+        target.append(article);
+    });
+}
+
+function loadIncidentCollaboration(incident) {
+    const id = Number(incident.id);
+    const canWrite = incidentCanRespond(incident);
+    incidentCollaborationGet(incident, "/participants", "#incident-participants-list", function (items) {
+        incidentListRows("#incident-participants-list", items, function (item) {
+            return incidentUserLabel(item.user, item.user_id || item.target_user_id)
+                + " · " + (item.role || "responder");
+        }, canWrite, function (item) {
+            incidentCollaborationDelete("/participants/" + item.id);
+        });
+    });
+    incidentCollaborationGet(incident, "/stakeholders", "#incident-stakeholders-list", function (items) {
+        incidentListRows("#incident-stakeholders-list", items, function (item) {
+            return (item.user ? incidentUserLabel(item.user, item.user_id) : (item.display_name || item.email || "—"))
+                + " · " + (item.role || "stakeholder");
+        }, canWrite, function (item) { incidentCollaborationDelete("/stakeholders/" + item.id); });
+    });
+    incidentCollaborationGet(incident, "/affected-services", "#incident-services-list", function (items) {
+        const target = $("#incident-services-list").empty();
+        if (!items.length) { incidentCollectionMessage("#incident-services-list", i18n.t("incidents.workspace.empty_services")); return; }
+        items.forEach(function (item) {
+            const id = Number(item.service_id);
+            const row = $("<div>").addClass("incidents-collection-row incidents-service-context");
+            const content = $("<div>").addClass("incidents-service-context-main");
+            const name = item.service_name || item.service_slug || (i18n.t("incidents.workspace.service") + " #" + id);
+            const heading = $("<div>").addClass("incidents-service-context-heading");
+            if (id > 0) {
+                heading.append($("<a>").addClass("incidents-service-link")
+                    .attr("href", "/services?service_id=" + encodeURIComponent(id))
+                    .text(name).on("click", function (event) {
+                        event.preventDefault(); navigate("/services?service_id=" + encodeURIComponent(id), true);
+                    }));
+            } else { heading.append($("<span>").text(name)); }
+            const meta = [item.status, item.criticality, item.tier, item.environment].filter(Boolean);
+            if (meta.length) { heading.append($("<span>").addClass("incidents-service-meta").text(meta.join(" · "))); }
+            content.append(heading);
+            const resources = $("<div>").addClass("incidents-service-resources");
+            (item.runbooks || []).forEach(function (resource) {
+                resources.append($("<a>").attr({href: resource.url, target: "_blank", rel: "noopener noreferrer"})
+                    .text(i18n.t("incidents.workspace.runbook") + ": " + resource.title));
+            });
+            (item.links || []).forEach(function (resource) {
+                resources.append($("<a>").attr({href: resource.url, target: "_blank", rel: "noopener noreferrer"})
+                    .text(resource.label || resource.type || i18n.t("incidents.workspace.service_link")));
+            });
+            (item.dependencies || []).forEach(function (dependency) {
+                const url = "/services?service_id=" + encodeURIComponent(dependency.service_id);
+                resources.append($("<a>").attr("href", url)
+                    .text(i18n.t("incidents.workspace.depends_on") + ": " + dependency.name).on("click", function (event) {
+                        event.preventDefault(); navigate(url, true);
+                    }));
+            });
+            if (resources.children().length) { content.append(resources); }
+            row.append(content);
+            if (canWrite) {
+                row.append($("<button>").attr("type", "button").addClass("btn btn-small")
+                    .text(i18n.t("incidents.workspace.remove")).on("click", function () { incidentCollaborationDelete("/affected-services/" + id); }));
+            }
+            target.append(row);
+        });
+    });
+    incidentCollaborationGet(incident, "/comments", "#incident-comments-list", renderIncidentComments);
+    if (canWrite) {
+        loadIncidentAssignees(incident.team_id, "#incident-participant-user");
+        loadIncidentStakeholderUsers(incident);
+        const select = $("#incident-service-select").empty().append($("<option>").val("").text(i18n.t("incidents.workspace.choose_service")));
+        apiGet("/api/services", function (response) {
+            if (!currentIncident || Number(currentIncident.id) !== id) { return; }
+            incidentAsArray(response).filter(function (service) { return service.enabled !== false; })
+                .forEach(function (service) {
+                    select.append($("<option>").val(service.id).text(service.name || service.slug || ("#" + service.id)));
+                });
+        });
+    }
+}
+
+function incidentCollaborationPost(suffix, payload, onSuccess) {
+    if (!currentIncident || !incidentCanRespond(currentIncident)) { return; }
+    const id = Number(currentIncident.id);
+    apiPost("/api/incidents/" + encodeURIComponent(id) + suffix, payload, function () {
+        if (!currentIncident || Number(currentIncident.id) !== id) { return; }
+        if (typeof onSuccess === "function") { onSuccess(); }
+        refreshCurrentIncident();
+    }, showIncidentDetailsError);
+}
+
+function incidentCollaborationDelete(suffix) {
+    if (!currentIncident || !incidentCanRespond(currentIncident)) { return; }
+    const id = Number(currentIncident.id);
+    apiDelete("/api/incidents/" + encodeURIComponent(id) + suffix, function () {
+        if (currentIncident && Number(currentIncident.id) === id) { refreshCurrentIncident(); }
+    }, showIncidentDetailsError);
+}
+
+$(document).on("click", "#incident-participant-add", function () {
+    const userId = Number($("#incident-participant-user").val());
+    if (!userId) { return; }
+    incidentCollaborationPost("/participants", {user_id: userId, role: $("#incident-participant-role").val()});
+});
+$(document).on("click", "#incident-stakeholder-add", function () {
+    const userId = Number($("#incident-stakeholder-user").val() || 0);
+    const email = String($("#incident-stakeholder-email").val() || "").trim();
+    if (!userId && !email) {
+        showIncidentDetailsError({responseJSON: {message: i18n.t("incidents.workspace.select_user_or_email")}});
+        return;
+    }
+    if (!userId && !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+        $("#incident-stakeholder-email").trigger("focus");
+        showIncidentDetailsError({responseJSON: {message: i18n.t("incidents.workspace.invalid_email")}});
+        return;
+    }
+    incidentCollaborationPost("/stakeholders", userId
+        ? {user_id: userId, role: "stakeholder"}
+        : {email: email, role: "stakeholder"});
+});
+$(document).on("click", "#incident-service-add", function () {
+    const serviceId = Number($("#incident-service-select").val());
+    if (serviceId) { incidentCollaborationPost("/affected-services", {service_id: serviceId}); }
+});
+$(document).on("click", "#incident-resolution-save", function () {
+    if (!currentIncident || !incidentCanRespond(currentIncident)) { return; }
+    mutateIncident("PATCH", "", {
+        row_version: currentIncident.row_version,
+        root_cause: String($("#incident-root-cause").val() || ""),
+        resolution_summary: String($("#incident-resolution-summary").val() || "")
+    });
+});
+$(document).on("click", "#incident-comment-add", function () {
+    const body = String($("#incident-comment-input").val() || "").trim();
+    if (!body) { return; }
+    const input = $("#incident-comment-input");
+    const submit = $("#incident-comment-add");
+    if (submit.prop("disabled")) { return; }
+    submit.prop("disabled", true);
+    const id = Number(currentIncident && currentIncident.id);
+    apiPost("/api/incidents/" + encodeURIComponent(id) + "/comments", {body: body}, function () {
+        submit.prop("disabled", false);
+        if (!currentIncident || Number(currentIncident.id) !== id) { return; }
+        if (String(input.val() || "").trim() === body) { input.val(""); }
+        refreshCurrentIncident();
+    }, function (xhr) {
+        submit.prop("disabled", false);
+        if (currentIncident && Number(currentIncident.id) === id) { showIncidentDetailsError(xhr); }
+    });
+});
 
 function refreshCurrentIncident() {
     if (currentIncident && currentIncident.id) {
@@ -978,7 +1216,7 @@ $(document).on("change", "#incident-create-team", function () {
 $(document).on("click", "#save-incident-create", saveIncidentCreate);
 
 $(document).on("click", "#close-incident-details, #close-incident-details-footer", function () { closeIncidentDetails(); });
-$(document).on("click", "#incident-details-modal", function (event) { if (event.target === this) { closeIncidentDetails(); } });
+// The Incident workspace is a page, not a dismissible modal overlay.
 
 $(document).on("change", "#incident-details-status", function () {
     if (!currentIncident || $(this).val() === currentIncident.workflow_status) { return; }

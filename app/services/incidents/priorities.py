@@ -1,6 +1,5 @@
 from app.db import database_proxy as db
 from app.modules.db import alerts_repo, audit_repo, incidents_repo
-from app.services.incidents.stakeholders import notify_stakeholders
 from app.services.notifications.delivery import update_alert_messages
 from app.services.incidents.priority_policies import service as policy_service
 from app.services.incidents.priority_policies.constants import (

@@ -3,7 +3,7 @@ import logging
 from app import Config
 from app.db import database_proxy as db
 from app.modules.common import utc_now
-from app.modules.db import alerts_repo, incidents_repo
+from app.modules.db import alerts_repo
 from app.services.alerts.reopen import (
     lock_grouping_identity,
     find_exact_open_group,
@@ -51,7 +51,6 @@ from app.services.orchestration.pending import (
     resolve_pending_event,
     store_paused_event,
 )
-from app.services.incidents.stakeholders import notify_stakeholders
 from app.services.maintenance import get_maintenance_decision
 from app.services.notifications.delivery import notify_alert
 from app.services.routing.routing import (
@@ -179,11 +178,6 @@ def _route_for_runtime(alert_data, runtime, *, current_route=None):
         return find_route_for_alert(alert_data)
 
     return current_route
-
-
-def _add_service_stakeholders_for_new_group(group):
-    """Technical AlertGroup creation must not create Incident stakeholders."""
-    return None
 
 
 
@@ -434,7 +428,6 @@ def _handle_existing_alert(
         created_group = True
         trace.group_created_for_existing_alert(group, existing_alert)
 
-        _add_service_stakeholders_for_new_group(group)
 
         alerts_repo.create_alert_event(
             group_id=group.id,
@@ -991,7 +984,6 @@ def _upsert_alert(alert_data, trace, runtime=None):
     group = existing_group
     created_group = False
     reopened_group = False
-    should_add_service_stakeholders = False
 
     # The group mutation and child Alert insert are one persistence unit. In
     # particular, do not leave an empty AlertGroup behind if PostgreSQL rejects
@@ -1095,7 +1087,6 @@ def _upsert_alert(alert_data, trace, runtime=None):
                 )
 
                 created_group = True
-                should_add_service_stakeholders = True
                 trace.group_created(group)
 
                 alerts_repo.create_alert_event(
@@ -1332,11 +1323,6 @@ def _upsert_alert(alert_data, trace, runtime=None):
     if reopened_group:
         # Metrics must only record a successful persistence transaction.
         record_alert_group_action("reopened")
-
-    # Stakeholder copy/notification may have external side effects. Run it
-    # only after the AlertGroup + child Alert transaction has committed.
-    if should_add_service_stakeholders:
-        _add_service_stakeholders_for_new_group(group)
 
     refresh_alert_group_correlations_safely(group, reason="new_alert")
 

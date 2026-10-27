@@ -4,7 +4,6 @@ from app.modules.redaction import redact_secrets
 from app.modules.db.models import AlertGroup
 from app.services.alerts.correlation import refresh_alert_group_correlations_safely
 from app.services.alerts.shelving import clear_shelve_on_resolve
-from app.services.incidents.stakeholders import notify_stakeholders
 from app.services.notifications.delivery import update_alert_messages
 from app.services.notifications.rules import cancel_pending_group_deliveries
 from app.services.business_services.impact import refresh_business_impacts_safely_for_group

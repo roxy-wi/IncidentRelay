@@ -470,6 +470,14 @@ function refreshServices() {
 
         renderServicesSummary();
         renderServicesTable();
+        // Open service details from an Incident deep link, only for services
+        // already present within the API-scoped catalog.
+        const linkedServiceId = Number(new URLSearchParams(window.location.search).get("service_id"));
+        if (linkedServiceId > 0 && servicesCache.some(function (service) {
+            return Number(service.id) === linkedServiceId;
+        })) {
+            openServiceDetailsModal(linkedServiceId);
+        }
 
         if (typeof window.loadServiceStandards === "function") {
             window.loadServiceStandards();

@@ -208,6 +208,30 @@ def paths():
                 "responses": {"200": response("AlertGroup unlinked.", {"type": "object"}), **standard_errors},
             }
         },
+        "/api/incidents/{incident_id}/activity": {
+            "get": {
+                "tags": ["incidents"],
+                "summary": "Combined Incident and authorized linked AlertGroup activity",
+                "security": auth,
+                "parameters": [path_param("incident_id", "Incident id."),
+                               query_param("limit", "Maximum combined entries (1-500), default 200.",
+                                           schema={"type": "integer", "minimum": 1, "maximum": 500})],
+                "responses": {"200": response("Attributed activity entries.", {
+                    "type": "array", "items": {"type": "object", "required": [
+                        "source_type", "source_id", "target_type", "target_id",
+                        "record_type", "record_id", "created_at"],
+                    "properties": {"source_type": {"type": "string", "enum": ["Incident", "AlertGroup"]},
+                                   "source_id": {"type": "integer"},
+                                   "target_type": {"type": "string", "enum": ["Incident", "AlertGroup"]},
+                                   "target_id": {"type": "integer"},
+                                   "record_type": {"type": "string", "enum": ["event", "comment"]},
+                                   "record_id": {"type": "integer"},
+                                   "actor_id": {"type": "integer", "nullable": True},
+                                   "created_at": {"type": "string", "format": "date-time"},
+                                   "event_type": {"type": "string"},
+                                   "message": {"type": "string", "nullable": True}}}}), **standard_errors},
+            }
+        },
         "/api/incidents/{incident_id}/responders": {
             "get": {
                 "tags": ["incidents"], "summary": "List Incident responder requests and assignments",

@@ -14,7 +14,7 @@ from app.services.orchestration.runtime import RuntimeResult
 from app.settings import Config
 from tests.factories import (
     create_channel, create_group, create_route, create_team,
-    create_user, create_incident_stakeholder,
+    create_user,
 )
 
 
@@ -84,16 +84,10 @@ def test_recovery_grace_disabled_preserves_immediate_delivery(route, monkeypatch
         lifecycle, "notify_alert",
         lambda group, event_type=None: delivered.append(event_type) or 1,
     )
-    stakeholder = []
-    monkeypatch.setattr(
-        lifecycle, "notify_stakeholders",
-        lambda group, event_type, **kwargs: stakeholder.append(event_type),
-    )
 
     resolved = upsert_alert(signal(route, status="resolved"))
     assert resolved.group.status == "resolved"
     assert delivered == ["resolved"]
-    assert stakeholder == ["resolved"]
     assert not AlertGroup.get_by_id(first.group.id).notification_pending
     assert count_events(first.group.id, "recovery_notification_scheduled") == 0
 
@@ -109,9 +103,6 @@ def test_recovery_is_deferred_and_due_process_sends_once(route, monkeypatch):
     immediate_calls = []
     monkeypatch.setattr(
         lifecycle, "notify_alert", lambda *a, **kw: immediate_calls.append("alert"),
-    )
-    monkeypatch.setattr(
-        lifecycle, "notify_stakeholders", lambda *a, **kw: immediate_calls.append("stakeholder"),
     )
 
     resolved = upsert_alert(signal(route, status="resolved"))
@@ -212,26 +203,19 @@ def test_retry_when_worker_crashes_keeps_recovery_pending(route, monkeypatch):
     assert count_events(group.id, "recovery_notification_sent") == 0
 
 
-def test_no_delivered_firing_still_defers_stakeholder_recovery(route, monkeypatch):
+def test_no_delivered_firing_recovery_does_not_notify_incident_stakeholders(route, monkeypatch):
+    """AlertGroup recovery does not send operational Incident stakeholder messages."""
     monkeypatch.setattr(Config, "RECOVERY_NOTIFICATION_DELAY_SECONDS", 20)
     first = upsert_alert(signal(route))
     upsert_alert(signal(route, status="resolved"))
-    assert AlertGroup.get_by_id(first.group.id).last_notification_at is None
     AlertGroup.update(notification_due_at=utc_now() - timedelta(seconds=1)).where(
         AlertGroup.id == first.group.id,
     ).execute()
 
-    stakeholder_user = create_user(group=route.team.group, email="stake@example.com")
-    create_incident_stakeholder(first.group, stakeholder_user)
-    delivered = []
-    monkeypatch.setattr(
-        notification_queue, "send_stakeholder_email",
-        lambda *a: delivered.append("stakeholder"),
-    )
-    monkeypatch.setattr(notification_queue, "send_stakeholder_push", lambda *a, **kw: 0)
     result = notification_queue.process_due_alert_group_notifications()
-    assert result["sent"] == 1
-    assert delivered == ["stakeholder"]
+    assert result["processed"] == 1
+    assert result["sent"] == 0
+    assert result["skipped"] == 1
 
 
 def test_manual_resolve_remains_immediate(route, monkeypatch):
@@ -242,13 +226,9 @@ def test_manual_resolve_remains_immediate(route, monkeypatch):
         "app.services.alerts.actions.update_alert_messages",
         lambda group, event_type: calls.append("update"),
     )
-    monkeypatch.setattr(
-        "app.services.alerts.actions.notify_stakeholders",
-        lambda group, event_type, **kw: calls.append("stakeholder"),
-    )
     resolved = resolve_alert(first.group.id)
     assert resolved.status == "resolved"
-    assert calls == ["update", "stakeholder"]
+    assert calls == ["update"]
     assert not AlertGroup.get_by_id(first.group.id).notification_pending
 
 

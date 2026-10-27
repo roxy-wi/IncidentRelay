@@ -26,7 +26,6 @@ def test_manual_priority_set_records_exactly_one_audit(monkeypatch):
     monkeypatch.setattr(priorities.incidents_repo, "set_incident_priority", fake_set)
     monkeypatch.setattr(priorities.audit_repo, "create_audit_log", lambda **kwargs: writes.append(kwargs))
     monkeypatch.setattr(priorities, "update_alert_messages", lambda *args, **kwargs: None)
-    monkeypatch.setattr(priorities, "notify_stakeholders", lambda *args, **kwargs: None)
 
     priorities.set_incident_priority(
         group_id=21, priority="p2", user_id=16, source="api",
@@ -63,7 +62,6 @@ def test_reset_manual_priority_creates_distinct_audit(monkeypatch):
     monkeypatch.setattr(priorities.incidents_repo, "reset_incident_priority", fake_reset)
     monkeypatch.setattr(priorities.audit_repo, "create_audit_log", lambda **kwargs: audit.append(kwargs))
     monkeypatch.setattr(priorities, "update_alert_messages", lambda *args, **kwargs: None)
-    monkeypatch.setattr(priorities, "notify_stakeholders", lambda *args, **kwargs: None)
 
     priorities.reset_incident_priority(group_id=21, user_id=16, source="api")
     priorities.reset_incident_priority(group_id=21, user_id=16, source="api")

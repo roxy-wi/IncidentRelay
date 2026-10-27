@@ -75,5 +75,19 @@
   "incidents.activity.subtitle": "Операционная timeline инцидента",
   "incidents.activity.none": "Активности пока нет.",
   "incidents.activity.reopened_by_alert": "Расследование возобновлено после повторного открытия AlertGroup",
-  "incidents.activity.open_reopened_alert": "Открыть AlertGroup №{id}"
+  "incidents.activity.open_reopened_alert": "Открыть AlertGroup №{id}",
+  "incidents.workspace.picker_placeholder": "Выберите пользователя или укажите внешний email",
+  "incidents.workspace.picker_search": "Поиск по имени или email",
+  "incidents.workspace.unknown_user": "Неизвестный пользователь",
+  "incidents.workspace.empty_entries": "Нет записей",
+  "incidents.workspace.remove": "Удалить",
+  "incidents.workspace.empty_comments": "Комментариев пока нет",
+  "incidents.workspace.empty_services": "Нет затронутых сервисов",
+  "incidents.workspace.service": "Сервис",
+  "incidents.workspace.runbook": "Инструкция",
+  "incidents.workspace.service_link": "Ссылка на сервис",
+  "incidents.workspace.depends_on": "Зависит от",
+  "incidents.workspace.choose_service": "Выберите сервис",
+  "incidents.workspace.select_user_or_email": "Выберите пользователя или укажите внешний email",
+  "incidents.workspace.invalid_email": "Введите корректный email"
 }
