@@ -143,7 +143,7 @@ Incoming integrations use route intake tokens.
 | Mattermost                               | [Mattermost](integrations/mattermost.md)                   |
 | Telegram                                 | [Telegram](integrations/telegram.md)                       |
 | Email                                    | [Email](integrations/email.md)                             |
-| Slack                                    | [docs/integrations/slack.md](docs/integrations/slack.md)   |
+| Slack                                    | [Slack integration](integrations/slack.md)               |
 | Discord, Microsoft Teams, custom webhook | [Webhook-based channels](integrations/webhook-channels.md) |
 | Voice call                               | [Voice call](integrations/voice-call.md)                   |
 | Browser/PWA push                         | [Browser Push Notifications](usage/browser-push.md)        |
@@ -162,6 +162,10 @@ ICS calendar feeds use secret subscription URLs and do not require login.
 
 
 ## Incident management
+
+- [Incident workspace](incidents/index.md)
+- [2.5 release notes and checks](incidents/release-notes-2.5.md)
+- [2.4 → 2.5 upgrade](incidents/collaboration-migration-2.5.md)
 
 - [Alerts and alert groups](usage/alerts.md)
 - [Incident priorities](incidents/priorities.md)

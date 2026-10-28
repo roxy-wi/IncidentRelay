@@ -364,3 +364,9 @@ body.md-theme .incidents-service-meta { font-size: 12px; color: var(--md-muted);
 body.md-theme .incidents-service-resources { display: flex; flex-wrap: wrap; gap: 6px 14px; margin-top: 7px; }
 body.md-theme .incidents-service-resources a { font-size: 12px; color: var(--md-primary); text-decoration: none; }
 body.md-theme .incidents-service-resources a:hover { text-decoration: underline; }
+
+/* Preserve comments and keep long names/URLs inside mobile cards. */
+.incidents-workspace .event-title { white-space: pre-wrap; overflow-wrap: anywhere; }
+.incidents-workspace .event-content { min-width: 0; overflow-wrap: anywhere; }
+.incidents-workspace .incidents-service-resources a { overflow-wrap: anywhere; }
+.incidents-workspace .incidents-service-impact { margin-top: 6px; font-size: 13px; }

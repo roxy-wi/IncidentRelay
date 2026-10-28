@@ -1,3 +1,5 @@
 pytest>=8.2,<9.0
 pytest-cov>=5.0,<7.0
 psycopg2-binary>=2.9,<3
+openapi-spec-validator>=0.7.2,<0.8
+openapi-schema-validator>=0.6.3,<0.7

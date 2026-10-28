@@ -428,7 +428,7 @@ def serialize_incident_responder_target(responder):
 
 
 def serialize_incident_responder(responder):
-    """Serialize legacy AlertGroup responder request."""
+    """Serialize an operational Incident responder request."""
     return {
         "id": responder.id,
         "incident_id": responder.incident_id,

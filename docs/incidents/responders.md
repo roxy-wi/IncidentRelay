@@ -1,236 +1,75 @@
 ---
 title: Incident Responders
-description: Request and manage additional responders for active incidents.
+description: Responder requests, concrete participants and conflict handling in 2.5.
 ---
 
-# Incident Responders
+# Responders and participants
 
-> **2.3 boundary:** responder records on this page are still attached to technical AlertGroups. Canonical first-class Incident responders are planned for the 2.5 collaboration stage.
+In 2.5 both responder requests and concrete operational assignments belong to
+Incident. The operational assignee is separate from the participant list.
 
-
-Incident responders are people, teams, rotations, or escalation policies explicitly requested to help with an active incident.
-
-Responders are different from the incident assignee:
-
-- **Assignee** is the main owner of the incident.
-- **Responder** is an additional participant asked to help.
-- Accepting a responder request does **not** automatically assign the incident to that user.
-
-## Target types
-
-A responder request can target one of these objects:
-
-| Target type | Required field |
-|---|---|
-| `user` | `target_user_id` |
-| `team` | `target_team_id` |
-| `rotation` | `target_rotation_id` |
-| `escalation_policy` | `target_escalation_policy_id` |
-
-Only one target id must be provided for the selected `target_type`.
-
-## Request a responder
+## Request help
 
 ```http
-POST /api/alert-groups/{alert_group_id}/responders
+POST /api/incidents/17/responders
+Content-Type: application/json
+
+{"target_type":"user","target_user_id":42,"message":"Check database health","expires_after_minutes":30}
 ```
 
-Request body:
+The other target types are `team`, `rotation` and `escalation_policy`. Supply
+exactly one matching `target_*_id`. `message` is at most 2,000 characters;
+`expires_after_minutes`, when supplied, is 1–10,080. A successful request returns
+`201` and a responder record with its target, status, actors and timestamps.
+Repeated POSTs create separate requests; this endpoint has no idempotency key.
 
-```json
-{
-  "target_type": "user",
-  "target_user_id": 42,
-  "message": "Please help with database checks",
-  "expires_after_minutes": 30
-}
-```
-
-Response:
-
-```json
-{
-  "id": 15,
-  "incident_id": 14784,
-  "group_id": 14784,
-  "target_type": "user",
-  "target_user_id": 42,
-  "target_team_id": null,
-  "target_rotation_id": null,
-  "target_escalation_policy_id": null,
-  "target": {
-    "type": "user",
-    "id": 42,
-    "label": "Alice Smith",
-    "user": {
-      "id": 42,
-      "username": "alice",
-      "display_name": "Alice Smith",
-      "email": "alice@example.com"
-    }
-  },
-  "requested_by_id": 1,
-  "requested_by": {
-    "id": 1,
-    "username": "admin",
-    "display_name": "Admin",
-    "email": "admin@example.com"
-  },
-  "accepted_by_id": null,
-  "accepted_by": null,
-  "declined_by_id": null,
-  "declined_by": null,
-  "status": "requested",
-  "message": "Please help with database checks",
-  "response_message": null,
-  "notification_status": "sent",
-  "notification_error": null,
-  "requested_at": "2026-06-17T10:00:00Z",
-  "responded_at": null,
-  "expires_at": "2026-06-17T10:30:00Z",
-  "created_at": "2026-06-17T10:00:00Z",
-  "updated_at": "2026-06-17T10:00:00Z"
-}
-```
-
-## List incident responders
+`GET /api/incidents/17/responders` lists requests. To act on one:
 
 ```http
-GET /api/alert-groups/{alert_group_id}/responders
+PUT /api/incidents/17/responders/8
+Content-Type: application/json
+
+{"status":"accepted","response_message":"Investigating now"}
 ```
 
-Returns all responder requests for the incident.
+The request progresses from `requested` to `accepted`, `declined` or `expired`;
+an accepted request can become `resolved`. The API checks target eligibility and
+Incident access. Accepting a team/rotation/policy request records a concrete user.
+Concurrent accept/expire/role operations are serialized. Repeating the same
+permitted transition is idempotent; a different actor cannot take over an accepted
+request. Expiration or assignment conflicts return `409`; invalid transitions
+return `400`. `response_message` is limited to 2,000 characters.
 
-Example response:
+[Notification Center](notification-center.md) exposes actionable pending requests.
+Delivery is queued durably; email and browser push retry independently. A `201`
+confirms a saved request, not that a recipient has received it. See
+[delivery guarantees](stakeholders.md#delivery-and-retries).
 
-```json
-[
-  {
-    "id": 15,
-    "incident_id": 14784,
-    "group_id": 14784,
-    "target_type": "user",
-    "target_user_id": 42,
-    "target": {
-      "type": "user",
-      "id": 42,
-      "label": "Alice Smith",
-      "user": {
-        "id": 42,
-        "username": "alice",
-        "display_name": "Alice Smith",
-        "email": "alice@example.com"
-      }
-    },
-    "status": "requested",
-    "message": "Please help with database checks",
-    "response_message": null,
-    "requested_at": "2026-06-17T10:00:00Z",
-    "responded_at": null,
-    "expires_at": "2026-06-17T10:30:00Z"
-  }
-]
-```
-
-## Update responder status
+## Assign a participant directly
 
 ```http
-PUT /api/alert-groups/{alert_group_id}/responders/{responder_id}
+POST /api/incidents/17/participants
+Content-Type: application/json
+
+{"user_id":42,"role":"commander"}
 ```
 
-Request body:
+Roles are `commander`, `responder` and `communications`. The user must be active
+and belong to the Incident's group. There can be one active commander and one
+active assignment per user/role pair. A user may hold different roles.
+Creation returns `201`; a conflicting or
+duplicate assignment returns `409`. This does not send a responder invitation.
 
-```json
-{
-  "status": "accepted",
-  "response_message": "I am joining"
-}
-```
+`GET /api/incidents/17/participants` lists accepted assignments. Remove one with
+`DELETE /api/incidents/17/participants/<participant_id>` (`204`). This resolves the
+assignment and retains its history; repeating removal returns `404`.
 
-Allowed statuses:
+Reads require Incident team read access. Writes require response access and an
+authenticated actor. Participant, timeline and audit changes commit together.
+Assignment does not grant the target new team access or alter technical ACK state.
 
-| Status | Description |
-|---|---|
-| `accepted` | The responder accepted the request. |
-| `declined` | The responder declined the request. |
-| `resolved` | The responder request was manually resolved. |
-| `expired` | The responder request expired. Usually set by the scheduler. |
+## Upgrading integrations
 
-Example response:
-
-```json
-{
-  "id": 15,
-  "incident_id": 14784,
-  "group_id": 14784,
-  "target_type": "user",
-  "target_user_id": 42,
-  "target": {
-    "type": "user",
-    "id": 42,
-    "label": "Alice Smith"
-  },
-  "requested_by_id": 1,
-  "accepted_by_id": 42,
-  "accepted_by": {
-    "id": 42,
-    "username": "alice",
-    "display_name": "Alice Smith",
-    "email": "alice@example.com"
-  },
-  "declined_by_id": null,
-  "declined_by": null,
-  "status": "accepted",
-  "message": "Please help with database checks",
-  "response_message": "I am joining",
-  "requested_at": "2026-06-17T10:00:00Z",
-  "responded_at": "2026-06-17T10:05:00Z",
-  "expires_at": "2026-06-17T10:30:00Z"
-}
-```
-
-## Notification center
-
-Pending responder requests are shown in the notification center.
-
-Read more: [Notification Center](notification-center.md).
-
-## Permissions
-
-Responder requests can be created by users who can respond to the incident team.
-
-Responder status can be updated by users who can act as the target responder:
-
-- the targeted user;
-- a user allowed to respond for the targeted team;
-- a user allowed to respond for the targeted rotation team;
-- a user allowed to respond for the targeted escalation policy team.
-
-A random viewer who is not the target cannot accept or decline another user's responder request.
-
-## Timeline events
-
-Responder actions are written to the incident timeline.
-
-| Event type | Example message |
-|---|---|
-| `responder_requested` | `Responder requested: Alice Smith. Please help with this incident.` |
-| `responder_accepted` | `Alice Smith accepted responder request. I am joining` |
-| `responder_declined` | `Alice Smith declined responder request. Busy now` |
-| `responder_expired` | `Responder request expired for Alice Smith` |
-
-## Browser push notification
-
-When browser push is configured for the target responder, IncidentRelay sends a push notification for the responder request.
-
-The notification should include enough context to act without opening the incident first:
-
-- incident title;
-- priority;
-- requester;
-- team;
-- service, when available;
-- request message;
-- link to the incident.
-
-Push delivery failure does not prevent the responder request from being created. In that case `notification_status` and `notification_error` describe the delivery result.
+Use Incident IDs and `/api/incidents/...` paths. The current 2.5 code does not
+register the former AlertGroup responder routes. See the
+[breaking API change](release-notes-2.5.md#compatibility-decision).

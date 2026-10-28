@@ -1,15 +1,16 @@
 from app.api.openapi.common import ERROR_SCHEMA, query_param, response
+from app.api.openapi.endpoints.incidents import INCIDENT_RESPONDER_SCHEMA
 
 
 def date_time_schema(description, nullable=True):
-    schema = {"type": "string", "format": "date-time", "description": description}
+    """Describe legacy UTC item timestamps which can omit the timezone suffix."""
+    schema = {
+        "type": "string",
+        "description": description + " The legacy top-level value may omit its UTC offset.",
+    }
     if nullable:
         schema["nullable"] = True
     return schema
-
-
-ALERT_GROUP_SUMMARY_SCHEMA = {"type": "object", "nullable": True}
-RESPONDER_SCHEMA = {"type": "object"}
 
 
 NOTIFICATION_CENTER_ACTION_SCHEMA = {
@@ -72,7 +73,7 @@ NOTIFICATION_CENTER_ITEM_SCHEMA = {
             "example": 14784,
         },
 
-        "responder": RESPONDER_SCHEMA,
+        "responder": INCIDENT_RESPONDER_SCHEMA,
         "actions": {
             "type": "array",
             "items": NOTIFICATION_CENTER_ACTION_SCHEMA,
@@ -108,7 +109,7 @@ def tags():
             "description": (
                 "Current user's in-app notification center. "
                 "The first implementation exposes actionable pending "
-                "AlertGroup responder requests."
+                "Incident responder requests."
             ),
         }
     ]
@@ -123,7 +124,7 @@ def paths():
                 "summary": "List notification center items",
                 "description": (
                     "Returns actionable notification center items for the "
-                    "current user. Pending AlertGroup responder requests are "
+                    "current user. Pending Incident responder requests are "
                     "shown until they are accepted, declined, resolved or expired."
                 ),
                 "operationId": "listNotificationCenterItems",

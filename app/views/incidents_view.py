@@ -19,9 +19,12 @@ from app.modules.db import incident_core_repo, incidents_repo
 from app.services.audit import current_api_token_id
 from app.services.incidents.core import _audit
 from app.db import database_proxy as db
-from app.modules.common import utc_now
-from app.modules.db.models import (AlertGroup, AlertComment, AlertEvent, IncidentComment, IncidentService,
-                                  IncidentResponder, IncidentStakeholder, Service, ServiceRunbook, ServiceLink, ServiceDependency, User)
+from app.modules.common import as_utc_aware, utc_now
+from app.modules.db.models import (
+    AlertComment, AlertEvent, AlertGroup, IncidentComment, IncidentEvent,
+    IncidentResponder, IncidentService, IncidentStakeholder, Service,
+    ServiceDependency, ServiceLink, ServiceRunbook, User,
+)
 from app.services.incidents.core import (
     IncidentConflictError,
     IncidentValidationError,
@@ -41,6 +44,8 @@ from app.services.rbac import (
     require_team_respond,
 )
 from app.services.serializers.alerts import serialize_incident_priority, serialize_incident_responder
+from app.services.serializers.common import serialize_utc_datetime
+from app.services.service_catalog.impact import build_service_effective_impact_map
 from app.services.serializers.incidents import (
     serialize_incident,
     serialize_incident_event,
@@ -190,7 +195,10 @@ def get_incident(incident_id):
     if error:
         return error
     payload = serialize_incident(incident, current_user=_request_user(), include_details=True)
-    payload["alert_groups"] = [serialize_incident_link(link) for link in _visible_alert_group_links(incident)]
+    payload["alert_groups"] = [
+        serialize_incident_link(link, current_user=_request_user())
+        for link in _visible_alert_group_links(incident)
+    ]
     payload["events"] = [serialize_incident_event(event) for event in incident_core_repo.list_events(incident.id)]
     return jsonify(payload)
 
@@ -336,7 +344,10 @@ def list_incident_alert_groups(incident_id):
     incident, error = _get_incident_or_error(incident_id)
     if error:
         return error
-    return jsonify([serialize_incident_link(link) for link in _visible_alert_group_links(incident)])
+    return jsonify([
+        serialize_incident_link(link, current_user=_request_user())
+        for link in _visible_alert_group_links(incident)
+    ])
 
 
 @incidents_bp.route("/<int:incident_id>/alert-groups", methods=["POST"])
@@ -369,7 +380,7 @@ def link_incident_alert_group(incident_id):
         )
     except (IncidentValidationError, IncidentConflictError) as exc:
         return _service_error(exc)
-    return jsonify(serialize_incident_link(link)), 201
+    return jsonify(serialize_incident_link(link, current_user=_request_user())), 201
 
 
 @incidents_bp.route("/<int:incident_id>/alert-groups/<int:group_id>", methods=["DELETE"])
@@ -398,7 +409,7 @@ def unlink_incident_alert_group(incident_id, group_id):
         return _service_error(exc)
     if not link:
         return make_error_response("not_found", "Active Incident/AlertGroup link not found", 404)
-    return jsonify({"unlinked": True, "link": serialize_incident_link(link)})
+    return jsonify({"unlinked": True, "link": serialize_incident_link(link, current_user=_request_user())})
 
 
 @incidents_bp.route("/<int:incident_id>/events", methods=["GET"])
@@ -418,8 +429,8 @@ def _serialize_comment(comment):
         "author": ({"id": comment.author.id, "display_name": comment.author.display_name,
                     "username": comment.author.username} if comment.author_id else None),
         "body": comment.body,
-        "created_at": comment.created_at.isoformat() if comment.created_at else None,
-        "updated_at": comment.updated_at.isoformat() if comment.updated_at else None,
+        "created_at": serialize_utc_datetime(comment.created_at),
+        "updated_at": serialize_utc_datetime(comment.updated_at),
     }
 
 
@@ -465,7 +476,8 @@ def _visible_service_dependencies(service):
     return result
 
 
-def _serialize_service(link):
+def _serialize_service(link, *, impact=None):
+    """Return service resources and aggregate impact within the caller's scope."""
     service = link.service
     runbooks = (ServiceRunbook.select()
                 .where(ServiceRunbook.service == service.id,
@@ -488,7 +500,14 @@ def _serialize_service(link):
         "links": [{"label": item.label, "type": item.link_type, "url": url}
                   for item in external_links if (url := _safe_service_url(item.url))],
         "dependencies": _visible_service_dependencies(service),
-        "added_at": link.added_at.isoformat() if link.added_at else None,
+        "permissions": {"can_remove": can_respond_team(_request_user(), service.team_id)
+                        if service.team_id else is_admin_user(_request_user())},
+        # The shared calculation includes upstream dependencies. Return only
+        # aggregate status/score; private root causes and paths stay private.
+        "impact": ({key: impact[key] for key in (
+            "own_status", "effective_status", "effective_impact_score",
+        )} if impact else None),
+        "added_at": serialize_utc_datetime(link.added_at),
     }
 
 
@@ -537,10 +556,17 @@ def list_incident_affected_services(incident_id):
     links = IncidentService.select().where(IncidentService.incident == incident.id).order_by(IncidentService.id)
     visible = []
     for link in links:
-        if link.service.team_id and require_team_read(link.service.team_id):
+        service = link.service
+        if service.deleted:
             continue
-        visible.append(_serialize_service(link))
-    return jsonify(visible)
+        if service.team_id:
+            if require_team_read(service.team_id):
+                continue
+        elif not is_admin_user(_request_user()):
+            continue
+        visible.append(link)
+    impacts = build_service_effective_impact_map([link.service_id for link in visible])
+    return jsonify([_serialize_service(link, impact=impacts.get(link.service_id)) for link in visible])
 
 
 @incidents_bp.route("/<int:incident_id>/affected-services", methods=["POST"])
@@ -615,7 +641,7 @@ def _participant_json(row):
             "user": ({"id": user.id, "display_name": user.display_name,
                       "username": user.username, "email": user.email} if user else None),
             "role": row.role, "assigned_by_id": row.requested_by_id,
-            "created_at": row.created_at.isoformat() if row.created_at else None}
+            "created_at": serialize_utc_datetime(row.created_at)}
 
 
 @incidents_bp.route("/<int:incident_id>/participants", methods=["GET"])
@@ -713,7 +739,7 @@ def _operational_stakeholder_json(row):
                   "username": row.user.username, "email": row.user.email} if row.user_id else None),
         "role": row.role,
         "source": row.source,
-        "created_at": row.created_at.isoformat() if row.created_at else None,
+        "created_at": serialize_utc_datetime(row.created_at),
     }
 
 
@@ -877,50 +903,90 @@ def update_incident_responder_view(incident_id, responder_id):
 
 # Activity is a read model, not a migration or a duplication of technical comments.
 # Unlinked and unauthorized AlertGroups must never contribute technical data.
+def _activity_event_data(event, visible_groups):
+    """Expose presentation fields, checking referenced objects independently."""
+    raw = getattr(event, "data", None)
+    raw = raw if isinstance(raw, dict) else {}
+    # Do not serialize arbitrary integration payloads, nested metadata or secrets.
+    keys = ("from", "to", "status", "role", "relation_type", "source",
+            "from_user_id", "to_user_id", "user_id", "responder_id",
+            "participant_id", "stakeholder_id", "comment_id")
+    data = {key: raw[key] for key in keys
+            if key in raw and isinstance(raw[key], (str, int, bool, type(None)))}
+    if isinstance(raw.get("fields"), list):
+        data["fields"] = [field for field in raw["fields"] if isinstance(field, str) and field in {
+            "title", "description", "priority", "service", "root_cause",
+            "resolution_summary", "summary",
+        }]
+    restricted = False
+    if "alert_group_id" in raw:
+        group_id = raw["alert_group_id"]
+        if isinstance(group_id, int) and group_id in visible_groups:
+            data["alert_group_id"] = group_id
+        else:
+            restricted = True
+    if "service_id" in raw:
+        service_id = raw["service_id"]
+        service = Service.get_or_none(Service.id == service_id) if isinstance(service_id, int) else None
+        if service and not service.deleted and (
+            (service.team_id and not require_team_read(service.team_id))
+            or (not service.team_id and is_admin_user(_request_user()))
+        ):
+            data["service_id"] = service.id
+        else:
+            restricted = True
+    return data, restricted
+
+
 def _incident_activity_rows(incident, *, limit=200):
+    """Merge bounded, attributed streams without copying technical comments."""
+    visible_groups = {link.alert_group_id for link in _visible_alert_group_links(incident)}
     entries = []
-    for event in incident_core_repo.list_events(incident.id, limit=limit):
-        entries.append({"source_type": "Incident", "source_id": incident.id,
-                        "target_type": "Incident", "target_id": incident.id,
-                        "record_type": "event", "record_id": event.id,
-                        "event_type": event.event_type, "actor_id": event.user_id,
-                        "message": event.message, "created_at": event.created_at.isoformat(),
-                        "_sort_at": event.created_at})
-    # Incident comments have their own stable IDs and must not be synthesized
-    # from event.data (which contains a reference, not the comment content).
+
+    def append_record(record, source_type, source_id, record_type, actor_id):
+        if record_type == "event":
+            data, restricted = _activity_event_data(record, visible_groups)
+            event_type = record.event_type
+            message = None if restricted else record.message
+        else:
+            data = {}
+            event_type = "comment"
+            message = record.body
+        entries.append({
+            "source_type": source_type, "source_id": source_id,
+            "target_type": source_type, "target_id": source_id,
+            "record_type": record_type, "record_id": record.id,
+            "event_type": event_type,
+            "actor_id": actor_id,
+            "message": message,
+            "data": data,
+            "created_at": serialize_utc_datetime(record.created_at),
+            "_sort_at": as_utc_aware(record.created_at),
+        })
+
+    # A comment has one visible entry. Its audit marker must not consume the
+    # stream limit or appear as a second, empty comment in the UI.
+    events = (IncidentEvent.select()
+              .where(IncidentEvent.incident == incident.id,
+                     IncidentEvent.event_type != "incident_comment_added")
+              .order_by(IncidentEvent.created_at.desc(), IncidentEvent.id.desc())
+              .limit(limit))
+    for event in events:
+        append_record(event, "Incident", incident.id, "event", event.user_id)
     comments = (IncidentComment.select()
                 .where(IncidentComment.incident == incident.id)
                 .order_by(IncidentComment.created_at.desc(), IncidentComment.id.desc())
                 .limit(limit))
     for comment in comments:
-        entries.append({"source_type": "Incident", "source_id": incident.id,
-                        "target_type": "Incident", "target_id": incident.id,
-                        "record_type": "comment", "record_id": comment.id,
-                        "event_type": "comment", "actor_id": comment.author_id,
-                        "message": comment.body, "created_at": comment.created_at.isoformat(),
-                        "_sort_at": comment.created_at})
+        append_record(comment, "Incident", incident.id, "comment", comment.author_id)
 
-    visible_groups = []
-    for link in incident_core_repo.list_active_links(incident.id):
-        group = link.alert_group
-        if group.team_id:
-            if require_team_read(group.team_id):
-                continue
-        elif not is_admin_user(_request_user()):
-            continue
-        visible_groups.append(group.id)
     if visible_groups:
         events = (AlertEvent.select()
                   .where(AlertEvent.group.in_(visible_groups))
                   .order_by(AlertEvent.created_at.desc(), AlertEvent.id.desc())
                   .limit(limit))
         for event in events:
-            entries.append({"source_type": "AlertGroup", "source_id": event.group_id,
-                            "target_type": "AlertGroup", "target_id": event.group_id,
-                            "record_type": "event", "record_id": event.id,
-                            "event_type": event.event_type, "actor_id": event.user_id,
-                            "message": event.message, "created_at": event.created_at.isoformat(),
-                            "_sort_at": event.created_at})
+            append_record(event, "AlertGroup", event.group_id, "event", event.user_id)
         comments = (AlertComment.select()
                     .where(AlertComment.group.in_(visible_groups),
                            AlertComment.alert.is_null(True),
@@ -928,17 +994,19 @@ def _incident_activity_rows(incident, *, limit=200):
                     .order_by(AlertComment.created_at.desc(), AlertComment.id.desc())
                     .limit(limit))
         for comment in comments:
-            entries.append({"source_type": "AlertGroup", "source_id": comment.group_id,
-                            "target_type": "AlertGroup", "target_id": comment.group_id,
-                            "record_type": "comment", "record_id": comment.id,
-                            "event_type": "comment", "actor_id": comment.user_id,
-                            "message": comment.body, "created_at": comment.created_at.isoformat(),
-                            "_sort_at": comment.created_at})
+            append_record(comment, "AlertGroup", comment.group_id, "comment", comment.user_id)
 
     entries.sort(key=lambda item: (item["_sort_at"], item["source_type"],
                                    item["record_type"], item["record_id"]), reverse=True)
-    return [{key: value for key, value in item.items() if key != "_sort_at"}
-            for item in entries[:limit]]
+    entries = entries[:limit]
+    actor_ids = {item["actor_id"] for item in entries if item["actor_id"]}
+    actors = {user.id: {"id": user.id, "username": user.username,
+                       "display_name": user.display_name}
+              for user in User.select().where(User.id.in_(actor_ids))} if actor_ids else {}
+    for entry in entries:
+        del entry["_sort_at"]
+        entry["actor"] = actors.get(entry["actor_id"])
+    return entries
 
 
 @incidents_bp.route("/<int:incident_id>/activity", methods=["GET"])

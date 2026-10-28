@@ -1,36 +1,54 @@
 ---
 title: Incident Management
-description: First-class operational Incidents and technical AlertGroup boundaries in IncidentRelay 2.3.
+description: Operational Incident collaboration and technical AlertGroup boundaries in 2.5.
 ---
 
-# Incident Management
+# Incident management
 
-IncidentRelay 2.3 separates technical signal processing from operational incident response:
+IncidentRelay separates technical signals from operational response:
 
 ```text
 Alert -> AlertGroup -> optional Incident
 ```
 
-An AlertGroup owns grouping, source state, ACK/resolve, notification, escalation, technical assignment and technical comments. A first-class Incident owns an independent operational workflow, priority, service context and operational assignee.
+An AlertGroup owns grouping, source state, ACK/resolve, escalation, technical
+assignment and technical comments. An Incident owns its workflow, operational
+assignee, commander/responders, stakeholders, comments, affected services,
+root cause and resolution summary.
 
-An AlertGroup can exist without an Incident. An Incident can exist without an AlertGroup, and one Incident can link multiple AlertGroups without merging their technical history.
+An AlertGroup can exist without an Incident. An Incident can exist without an
+AlertGroup and can link several groups without merging their technical history.
+Resolving a technical group does not automatically resolve or close the Incident.
+A linked group reopening can move a `resolved` or `monitoring` Incident back to
+`investigating`; explicit closure remains an operational decision.
 
-## APIs
+## Workspace and APIs
 
-- `/api/alert-groups` — technical AlertGroups.
-- `/api/incidents` — first-class operational Incidents.
-- [2.3 API migration](api-migration-2.3.md) — breaking endpoint and identifier changes.
+The workspace at `/incidents/<id>` brings together the workflow, assignments,
+stakeholders, comments, affected services and activity. Read access and response
+permissions are checked on the server. Linked groups and service resources are
+also filtered by their owning team's access rules.
 
-The old `/api/incidents == AlertGroup` contract is not preserved.
+- `/api/alert-groups` manages technical AlertGroups.
+- `/api/incidents` manages operational Incidents. These IDs are not interchangeable.
+- `/api/incidents/<id>/activity` combines operational records with readable,
+  currently linked technical records. Entries retain their source and author;
+  comments appear once. `limit` is 1–500, default 200, newest first, without paging.
+- `/api/incidents/<id>/comments` contains only operational comments.
+- `/api/incidents/<id>/affected-services` exposes service links, runbooks,
+  readable dependencies and aggregate impact. Hidden dependency details stay hidden.
 
-## 2.3 collaboration boundary
+The Incident detail response supplies `row_version`. Send it when changing Incident
+fields, status or assignee. On `409`, reload the current record and reconcile your
+edit before retrying. Collaboration actions have their own conflict rules.
+Workspace and collaboration timestamps use explicit UTC; the UI formats local time.
 
-AlertGroup technical comments remain on AlertGroup. Legacy responders and stakeholders also remain AlertGroup-scoped during 2.3 and move to canonical Incident collaboration in the staged 2.5 work.
+## Reading
 
-## Recommended reading
-
-1. [Alerts and AlertGroups](../usage/alerts.md)
-2. [2.3 API migration](api-migration-2.3.md)
-3. [Incident Management v2 architecture](../architecture/incident-management-v2.md)
-4. [Incident priorities](priorities.md)
-5. [Alert comments](../usage/alert-comments.md)
+1. [2.5 release notes and release gates](release-notes-2.5.md)
+2. [2.4 → 2.5 collaboration migration](collaboration-migration-2.5.md)
+3. [Responders and participants](responders.md)
+4. [Stakeholders and delivery](stakeholders.md)
+5. [Service default stakeholders](../services/default-stakeholders.md)
+6. [Technical alert comments](../usage/alert-comments.md)
+7. [2.3 API migration](api-migration-2.3.md) and [long-term roadmap](../architecture/incident-management-v2.md)

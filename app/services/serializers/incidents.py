@@ -103,9 +103,17 @@ def serialize_alert_group_incident_link(link, *, current_user=None):
     }
 
 
-def serialize_incident_link(link):
+def serialize_incident_link(link, *, current_user=None):
+    """Include the technical team's permission for removing this link."""
+    from app.services.rbac import can_respond_team, is_admin_user
+
     group = link.alert_group
+    can_unlink = bool(current_user and group and (
+        can_respond_team(current_user, group.team_id) if group.team_id
+        else is_admin_user(current_user)
+    ))
     return {
+        "permissions": {"can_unlink": can_unlink},
         "id": link.id,
         "incident_id": link.incident_id,
         "alert_group_id": link.alert_group_id,

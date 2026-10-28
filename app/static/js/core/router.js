@@ -140,6 +140,8 @@ function navigate(path, pushState) {
         && typeof syncIncidentDetailsFromUrl === "function"
     ) {
         syncIncidentDetailsFromUrl();
+    } else if (typeof closeIncidentDetails === "function") {
+        closeIncidentDetails({updateUrl: false});
     }
 
     if (window.PageUrlState && typeof window.PageUrlState.restorePath === "function") {

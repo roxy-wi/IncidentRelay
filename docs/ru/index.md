@@ -163,6 +163,10 @@ ICS-фиды календаря используют секретные URL по
 
 ## Управление инцидентами
 
+- [Рабочая область Incident](incidents/index.md)
+- [Релиз 2.5 и выпускные проверки](incidents/release-notes-2.5.md)
+- [Обновление 2.4 → 2.5](incidents/collaboration-migration-2.5.md)
+
 - [Алерты и группы алертов](usage/alerts.md)
 - [Приоритеты инцидентов](incidents/priorities.md)
 - [Ответственные за инцидент](incidents/responders.md)

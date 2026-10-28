@@ -32,12 +32,15 @@ def query_param(name, description, schema=None, required=False):
     }
 
 
-def json_body(description, schema, required=True):
+def json_body(description, schema, required=True, *, examples=None):
     """Build a JSON request body."""
+    media_type = {"schema": schema}
+    if examples is not None:
+        media_type["examples"] = examples
     return {
         "required": required,
         "description": description,
-        "content": {"application/json": {"schema": schema}},
+        "content": {"application/json": media_type},
     }
 
 

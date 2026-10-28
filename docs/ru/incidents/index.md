@@ -1,36 +1,53 @@
 ---
 title: Управление инцидентами
-description: Граница first-class Incident и технических AlertGroup в IncidentRelay 2.3.
+description: Рабочая область Incident и границы технического AlertGroup в 2.5.
 ---
 
 # Управление инцидентами
 
-IncidentRelay 2.3 разделяет обработку технических сигналов и операционное расследование:
-
 ```text
-Alert -> AlertGroup -> optional Incident
+Alert → AlertGroup → необязательный Incident
 ```
 
-AlertGroup отвечает за grouping, технический статус, ACK/resolve, уведомления, эскалацию, технического assignee и технические комментарии. First-class Incident имеет независимый workflow, priority, service context и операционного assignee.
+AlertGroup отвечает за группировку сигналов, состояние источника, ACK/resolve,
+эскалации, технического ответственного и технические комментарии. Incident
+содержит операционный workflow, assignee, commander/responders, stakeholders,
+комментарии, затронутые сервисы, root cause и resolution summary.
 
-AlertGroup может существовать без Incident. Incident может существовать без AlertGroup, а один Incident может недеструктивно связывать несколько AlertGroup.
+AlertGroup может существовать без Incident; Incident — без AlertGroup. Один
+Incident может связывать несколько групп, сохраняя их техническую историю.
+Технический resolve не завершает и не закрывает Incident автоматически.
+Повторное открытие связанной группы может вернуть Incident из `resolved` или
+`monitoring` в `investigating`. Закрытие остаётся явным операционным действием.
 
-## API
+## Рабочая область и API
 
-- `/api/alert-groups` — технические AlertGroup.
-- `/api/incidents` — first-class операционные Incident.
-- [Миграция API 2.3](api-migration-2.3.md) — несовместимые изменения endpoint'ов и идентификаторов.
+Страница `/incidents/<id>` объединяет workflow, назначения, подписчиков,
+комментарии, сервисы и историю. Сервер проверяет права чтения и реагирования.
+Связанные AlertGroup и ресурсы сервисов дополнительно фильтруются по доступу
+к команде, которой они принадлежат.
 
-Старый контракт `/api/incidents == AlertGroup` не сохраняется.
+- `/api/alert-groups` — технические группы.
+- `/api/incidents` — операционные Incident. Их идентификаторы не взаимозаменяемы.
+- `/api/incidents/<id>/activity` — события и комментарии Incident и доступных,
+  сейчас связанных AlertGroup. Сохраняются источник и автор; комментарий
+  показывается один раз. Сначала новые записи; `limit` от 1 до 500, по умолчанию
+  200. Постраничной навигации нет.
+- `/api/incidents/<id>/comments` — только операционные комментарии.
+- `/api/incidents/<id>/affected-services` — сервисы, инструкции, ссылки,
+  доступные зависимости и агрегированное влияние без скрытых деталей зависимостей.
 
-## Граница collaboration в 2.3
+Для изменения полей Incident, статуса или assignee передавайте текущий
+`row_version`. При `409` перечитайте запись и согласуйте своё изменение с новой
+версией. У операций collaboration отдельные правила конфликтов. Время в API
+workspace/collaboration передаётся с явным UTC; интерфейс показывает местное время.
 
-Технические комментарии остаются на AlertGroup. Legacy responders и stakeholders в 2.3 также остаются AlertGroup-scoped; их канонический перенос в Incident относится к 2.5.
+## Документация
 
-## Рекомендуемое чтение
-
-1. [Алерты и AlertGroup](../usage/alerts.md)
-2. [Миграция API 2.3](api-migration-2.3.md)
-3. [Архитектура Incident Management v2](../architecture/incident-management-v2.md)
-4. [Приоритеты Incident](priorities.md)
-5. [Комментарии AlertGroup](../usage/alert-comments.md)
+1. [Релиз 2.5 и выпускные проверки](release-notes-2.5.md)
+2. [Миграция 2.4 → 2.5](collaboration-migration-2.5.md)
+3. [Responders и participants](responders.md)
+4. [Stakeholders и доставка](stakeholders.md)
+5. [Подписчики сервиса по умолчанию](../services/default-stakeholders.md)
+6. [Технические комментарии](../usage/alert-comments.md)
+7. [Миграция API 2.3](api-migration-2.3.md) и [долгосрочный roadmap](../architecture/incident-management-v2.md)

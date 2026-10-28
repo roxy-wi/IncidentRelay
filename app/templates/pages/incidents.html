@@ -1,4 +1,5 @@
 <div class="first-div-page-layout page-stack incidents-page">
+  <div id="incidents-loading-indicator" role="status" aria-live="polite"></div>
   <div id="incidents-list-view">
   <div class="summary-grid incidents-summary-grid">
     <div class="summary-card summary-primary">
@@ -46,7 +47,6 @@
       </div>
 
       <div class="card-header-actions">
-        <span id="incidents-loading-indicator"></span>
         <button id="open-incident-create-modal" type="button" class="btn btn-primary is-hidden">
           {{ _('incidents.actions.create') }}
         </button>
@@ -174,7 +174,8 @@
 
       <div class="incidents-details-body">
         <div class="incidents-workspace-grid"><main class="incidents-workspace-main">
-        <div id="incident-details-error" class="alert alert-danger is-hidden"></div>
+        <div id="incident-details-error" class="alert alert-danger is-hidden" role="alert"></div>
+        <button id="incident-details-reload" type="button" class="btn is-hidden">{{ _('incidents.workspace.reload') }}</button>
         <div id="incident-details-summary" class="details-grid"></div>
 
         <section class="card incidents-operation-card">
@@ -215,7 +216,7 @@
 
           <div id="incident-link-controls" class="incidents-link-controls">
             <select id="incident-link-alert-group-id" aria-label="{{ _('incidents.links.search_alert_group') }}"><option value=""></option></select>
-            <select id="incident-link-relation" class="input">
+            <select id="incident-link-relation" class="input" aria-label="{{ _('incidents.workspace.role_label') }}">
               <option value="related">{{ _('incidents.links.related') }}</option>
               <option value="primary">{{ _('incidents.links.primary') }}</option>
             </select>
@@ -225,55 +226,55 @@
 
         </main><aside class="incidents-workspace-side">
         <section class="card incidents-collaboration-card" id="incident-participants-section">
-          <div class="card-header"><h3>Participants</h3></div>
+          <div class="card-header"><h3>{{ _('incidents.workspace.participants') }}</h3></div>
           <div id="incident-participants-list" class="incidents-collection"></div>
           <div class="incidents-inline-form" id="incident-participants-controls">
-            <div class="incidents-form-field"><label for="incident-participant-user">User</label><select id="incident-participant-user" class="input"></select></div>
-            <div class="incidents-form-field"><label for="incident-participant-role">Role</label><select id="incident-participant-role" class="input"><option value="responder">Responder</option><option value="commander">Commander</option><option value="communications">Communications</option></select></div>
-            <button id="incident-participant-add" type="button" class="btn btn-primary btn-small">Add participant</button>
+            <div class="incidents-form-field"><label for="incident-participant-user">{{ _('incidents.workspace.user') }}</label><select id="incident-participant-user" class="input"></select></div>
+            <div class="incidents-form-field"><label for="incident-participant-role">{{ _('incidents.workspace.role_label') }}</label><select id="incident-participant-role" class="input"><option value="responder">{{ _('incidents.workspace.role.responder') }}</option><option value="commander">{{ _('incidents.workspace.role.commander') }}</option><option value="communications">{{ _('incidents.workspace.role.communications') }}</option></select></div>
+            <button id="incident-participant-add" type="button" class="btn btn-primary btn-small">{{ _('incidents.workspace.add_participant') }}</button>
           </div>
         </section>
         <section class="card incidents-collaboration-card" id="incident-stakeholders-section">
-          <div class="card-header"><h3>Stakeholders</h3></div>
+          <div class="card-header"><h3>{{ _('incidents.workspace.stakeholders') }}</h3></div>
           <div id="incident-stakeholders-list" class="incidents-collection"></div>
           <div class="incidents-inline-form" id="incident-stakeholders-controls">
             <div class="incidents-form-field incidents-stakeholder-picker">
-                <label for="incident-stakeholder-user">User (search by name or email)</label>
+                <label for="incident-stakeholder-user">{{ _('incidents.workspace.user_search') }}</label>
                 <select id="incident-stakeholder-user">
-                    <option value="">Choose a user or enter an external email</option>
+                    <option value="">{{ _('incidents.workspace.picker_placeholder') }}</option>
                 </select>
             </div>
-            <div class="incidents-form-field"><label for="incident-stakeholder-email">External email (optional)</label>
-                <input id="incident-stakeholder-email" class="input" type="email" maxlength="255" autocomplete="off" placeholder="name@example.com">
+            <div class="incidents-form-field"><label for="incident-workspace-stakeholder-email">{{ _('incidents.workspace.external_email') }}</label>
+                <input id="incident-workspace-stakeholder-email" class="input" type="email" maxlength="255" autocomplete="off" placeholder="name@example.com">
             </div>
-            <button id="incident-stakeholder-add" type="button" class="btn btn-primary btn-small">Add stakeholder</button>
+            <button id="incident-stakeholder-add" type="button" class="btn btn-primary btn-small">{{ _('incidents.workspace.add_stakeholder') }}</button>
           </div>
         </section>
         <section class="card incidents-collaboration-card" id="incident-services-section">
-          <div class="card-header"><h3>Affected services</h3></div>
+          <div class="card-header"><h3>{{ _('incidents.workspace.affected_services') }}</h3></div>
           <div id="incident-services-list" class="incidents-collection"></div>
           <div class="incidents-inline-form" id="incident-services-controls">
-            <div class="incidents-form-field"><label for="incident-service-select">Service</label><select id="incident-service-select" class="input"></select></div>
-            <button id="incident-service-add" type="button" class="btn btn-primary btn-small">Add affected service</button>
+            <div class="incidents-form-field"><label for="incident-service-select">{{ _('incidents.workspace.service') }}</label><select id="incident-service-select" class="input"></select></div>
+            <button id="incident-service-add" type="button" class="btn btn-primary btn-small">{{ _('incidents.workspace.add_service') }}</button>
           </div>
         </section>
         </aside></div>
         <div class="incidents-workspace-lower-grid">
         <section class="card incidents-collaboration-card" id="incident-resolution-section">
-          <div class="card-header"><h3>Resolution</h3></div>
-          <div class="form-body"><label for="incident-root-cause">Root cause</label>
+          <div class="card-header"><h3>{{ _('incidents.workspace.resolution') }}</h3></div>
+          <div class="form-body"><label for="incident-root-cause">{{ _('incidents.workspace.root_cause') }}</label>
             <textarea id="incident-root-cause" class="input" rows="3" maxlength="10000"></textarea>
-            <label for="incident-resolution-summary">Resolution summary</label>
+            <label for="incident-resolution-summary">{{ _('incidents.workspace.resolution_summary') }}</label>
             <textarea id="incident-resolution-summary" class="input" rows="3" maxlength="10000"></textarea>
-            <button id="incident-resolution-save" type="button" class="btn btn-primary btn-small">Save resolution</button>
+            <button id="incident-resolution-save" type="button" class="btn btn-primary btn-small">{{ _('incidents.workspace.save_resolution') }}</button>
           </div>
         </section>
         <section class="card incidents-collaboration-card" id="incident-comments-section">
-          <div class="card-header"><h3>Operational comments</h3></div>
+          <div class="card-header"><h3>{{ _('incidents.workspace.comments') }}</h3></div>
           <div id="incident-comments-list" class="incidents-collection" aria-live="polite"></div>
-          <div id="incident-comments-controls"><label for="incident-comment-input">Comment</label>
+          <div id="incident-comments-controls"><label for="incident-comment-input">{{ _('incidents.workspace.comment') }}</label>
             <textarea id="incident-comment-input" class="input" maxlength="10000" rows="3"></textarea>
-            <button id="incident-comment-add" type="button" class="btn btn-primary btn-small">Post comment</button>
+            <button id="incident-comment-add" type="button" class="btn btn-primary btn-small">{{ _('incidents.workspace.post_comment') }}</button>
           </div>
         </section>
         </div>
@@ -285,7 +286,7 @@
             </div>
           </div>
           <p class="incidents-card-description">{{ _('incidents.activity.subtitle') }}</p>
-          <div id="incident-events" class="event-list"></div>
+          <div id="incident-events" class="event-list" aria-live="polite"></div>
         </section>
       </div>
 

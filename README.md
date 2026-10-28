@@ -90,7 +90,9 @@ Rotation / escalation + notification policy
       ↓
 Shared channels + personal notification rules
       ↓
-ACK / Resolve / Shelve / responders / stakeholders
+AlertGroup: ACK / Resolve / Shelve
+      ↓ optional link
+Incident: workflow / commander / responders / stakeholders / comments
 ```
 
 Routes control how alerts enter IncidentRelay and provide the security boundary for intake tokens. Services describe **what** is affected. Notification delivery can come directly from route channels, from a service Notification Policy, or from both, depending on route configuration. Event Orchestration can override routing, service and policy decisions for matching events.

@@ -85,6 +85,25 @@ jobs:
             --junitxml=pytest-results.xml \
             --cov-fail-under=50
 
+      - name: Set up Node for workspace browser checks
+        if: matrix.python-version == '3.12'
+        uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+
+      - name: Install workspace browser dependencies
+        if: matrix.python-version == '3.12'
+        run: |
+          npm install --no-save --package-lock=false playwright@1.62.1
+          npx playwright install --with-deps chromium
+
+      - name: Check Incident workspace in Chromium
+        if: matrix.python-version == '3.12'
+        env:
+          INCIDENTRELAY_BROWSER_TESTS: "1"
+        run: |
+          pytest tests/ux/test_incident_workspace_browser.py \
+            --junitxml=pytest-browser-results.xml
 
       - name: Upload test reports
         if: always()
@@ -94,6 +113,7 @@ jobs:
           path: |
             pytest-results.xml
             coverage.xml
+            pytest-browser-results.xml
           if-no-files-found: warn
           retention-days: 1
 
@@ -211,7 +231,7 @@ jobs:
 
       - name: Run tests on PostgreSQL
         run: |
-          pytest tests/ \
+          pytest tests/ -o 'norecursedirs=.git .venv .tmp __pycache__' \
             --cov=app \
             --cov-branch \
             --cov-report=term-missing \
