@@ -7,7 +7,7 @@ from threading import Barrier
 import pytest
 
 from app.db import database_proxy
-from app.modules.db.models import Alert, AlertGroup
+from app.modules.db.models import Alert, AlertEvent, AlertGroup, AuditLog
 from app.services.alerts.lifecycle import upsert_alert
 from app.services.alerts import lifecycle
 from app.services.orchestration.runtime import RuntimeResult
@@ -214,7 +214,12 @@ def test_resolved_user_rule_send_is_serialized_before_reopen(db, monkeypatch):
     assert rules.send_delivery(delivery) == 0  # Already sent in the previous cycle.
 
 
-def test_manual_resolve_during_uncommitted_reopen_is_noop(db, monkeypatch):
+@pytest.mark.parametrize(
+    "fail_reopen", [False, True], ids=["commit", "rollback"],
+)
+def test_manual_resolve_during_uncommitted_reopen_is_noop(
+    db, monkeypatch, fail_reopen,
+):
     """A resolve reading the old committed state cannot destroy the new child.
 
     The reopening thread has already locked and changed the group but has not
@@ -226,6 +231,7 @@ def test_manual_resolve_during_uncommitted_reopen_is_noop(db, monkeypatch):
 
     from threading import Event
     from app.modules.db import alerts_repo
+    from app.services.alerts import actions
     from app.services.alerts.actions import resolve_alert
 
     scope = create_group()
@@ -243,6 +249,26 @@ def test_manual_resolve_during_uncommitted_reopen_is_noop(db, monkeypatch):
     }
     initial = upsert_alert(dict(data))
     upsert_alert(dict(data, status="resolved"))
+    resolved_at = AlertGroup.get_by_id(initial.group.id).resolved_at
+    old_child = Alert.get_by_id(initial.alert.id)
+    resolved_events = AlertEvent.select().where(
+        AlertEvent.group == initial.group.id,
+        AlertEvent.event_type == "resolved",
+    )
+    resolve_audits = AuditLog.select().where(
+        AuditLog.object_type == "alert_group",
+        AuditLog.object_id == initial.group.id,
+        AuditLog.action == "alert_group.resolve",
+    )
+    event_count = resolved_events.count()
+    audit_count = resolve_audits.count()
+    message_updates = []
+    monkeypatch.setattr(
+        actions, "update_alert_messages",
+        lambda group, event_type: message_updates.append(
+            (group.id, event_type)
+        ),
+    )
 
     entered = Event()
     release = Event()
@@ -251,6 +277,8 @@ def test_manual_resolve_during_uncommitted_reopen_is_noop(db, monkeypatch):
     def block_new_child(**kwargs):
         entered.set()
         assert release.wait(timeout=20)
+        if fail_reopen:
+            raise RuntimeError("reopen child insert failed")
         return original_create(**kwargs)
 
     monkeypatch.setattr(alerts_repo, "create_alert", block_new_child)
@@ -261,10 +289,7 @@ def test_manual_resolve_during_uncommitted_reopen_is_noop(db, monkeypatch):
 
     def resolve():
         with database_proxy.obj.connection_context():
-            return resolve_alert(
-                initial.group.id, update_messages=False,
-                defer_stakeholder_notification=True,
-            ).status
+            return resolve_alert(initial.group.id)
 
     with ThreadPoolExecutor(max_workers=2) as executor:
         reopening = executor.submit(reopen)
@@ -272,10 +297,34 @@ def test_manual_resolve_during_uncommitted_reopen_is_noop(db, monkeypatch):
             assert entered.wait(timeout=15)
             # Read-committed should see resolved, not the uncommitted reopen.
             resolving = executor.submit(resolve)
-            assert resolving.result(timeout=15) == "resolved"
+            result = resolving.result(timeout=15)
+            assert result.status == "resolved"
+            assert result.resolved_at == resolved_at
+            assert message_updates == []
         finally:
             release.set()
-        result = reopening.result(timeout=30)
+        if fail_reopen:
+            with pytest.raises(
+                RuntimeError, match="reopen child insert failed",
+            ):
+                reopening.result(timeout=30)
+        else:
+            result = reopening.result(timeout=30)
+
+    assert resolved_events.count() == event_count
+    assert resolve_audits.count() == audit_count
+    stored_child = Alert.get_by_id(old_child.id)
+    assert stored_child.status == "resolved"
+    assert stored_child.resolved_at == old_child.resolved_at
+
+    if fail_reopen:
+        stored_group = AlertGroup.get_by_id(initial.group.id)
+        assert stored_group.status == "resolved"
+        assert stored_group.resolved_at == resolved_at
+        assert (
+            Alert.select().where(Alert.group == initial.group.id).count() == 1
+        )
+        return
 
     assert result.outcome == "reopened"
     assert result.group.id == initial.group.id
@@ -284,3 +333,75 @@ def test_manual_resolve_during_uncommitted_reopen_is_noop(db, monkeypatch):
     assert len(children) == 2
     assert sum(child.status == "resolved" for child in children) == 1
     assert sum(child.status == "firing" for child in children) == 1
+
+    # A fresh resolve after reopen commits must still close the new occurrence.
+    message_updates.clear()
+    resolved = resolve_alert(initial.group.id)
+    assert resolved.status == "resolved"
+    assert Alert.get_by_id(result.alert.id).status == "resolved"
+    assert Alert.get_by_id(old_child.id).resolved_at == old_child.resolved_at
+    assert resolved_events.count() == event_count + 1
+    assert resolve_audits.count() == audit_count + 1
+    assert message_updates == [(initial.group.id, "resolved")]
+
+
+def test_concurrent_manual_resolves_record_one_transition(db, monkeypatch):
+    """Only one concurrent resolve writes lifecycle side effects."""
+    if "postgres" not in db.__class__.__name__.lower():
+        pytest.skip("requires PostgreSQL")
+
+    from app.services.alerts import actions
+
+    scope = create_group()
+    team = create_team(scope)
+    route = create_route(team, source="alertmanager", group_by=["alertname"])
+    initial = upsert_alert({
+        "source": "alertmanager", "forced_route_id": route.id,
+        "external_id": unique("resolve"), "dedup_key": unique("resolve-key"),
+        "title": "DiskFull", "severity": "critical", "status": "firing",
+        "labels": {"alertname": "DiskFull"}, "payload": {},
+    })
+    users = [create_user(group=scope) for _ in range(2)]
+    barrier = Barrier(2)
+    original_lock = actions._lock_group_for_lifecycle
+    message_updates = []
+
+    def wait_before_lock(group_id):
+        # Neither request can write until both passed the initial status check.
+        barrier.wait(timeout=10)
+        return original_lock(group_id)
+
+    monkeypatch.setattr(actions, "_lock_group_for_lifecycle", wait_before_lock)
+    monkeypatch.setattr(
+        actions, "update_alert_messages",
+        lambda group, event_type: message_updates.append(
+            (group.id, event_type)
+        ),
+    )
+
+    def resolve(user):
+        with database_proxy.obj.connection_context():
+            return actions.resolve_alert(initial.group.id, user_id=user.id)
+
+    with ThreadPoolExecutor(max_workers=2) as executor:
+        futures = [executor.submit(resolve, user) for user in users]
+        results = [future.result(timeout=20) for future in futures]
+
+    stored = AlertGroup.get_by_id(initial.group.id)
+    assert stored.status == "resolved"
+    assert stored.resolved_by_id in {user.id for user in users}
+    assert all(result.resolved_at == stored.resolved_at for result in results)
+    assert all(
+        result.resolved_by_id == stored.resolved_by_id for result in results
+    )
+    assert Alert.get_by_id(initial.alert.id).status == "resolved"
+    events = list(AlertEvent.select().where(
+        AlertEvent.group == stored.id, AlertEvent.event_type == "resolved",
+    ))
+    audits = list(AuditLog.select().where(
+        AuditLog.object_type == "alert_group", AuditLog.object_id == stored.id,
+        AuditLog.action == "alert_group.resolve",
+    ))
+    assert len(events) == len(audits) == 1
+    assert events[0].user_id == audits[0].user_id == stored.resolved_by_id
+    assert message_updates == [(stored.id, "resolved")]

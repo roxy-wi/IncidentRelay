@@ -101,10 +101,24 @@ def test_initial_schema_includes_foreign_key_dependencies():
                 "in the initial schema"
             )
 
+            if field.deferred:
+                # The constraint is installed after both sides of a cycle
+                # exist; the referenced table must still be bootstrapped.
+                continue
+
             assert positions[related_model] < positions[model], (
                 f"{related_model.__name__} must be created before "
                 f"{model.__name__}"
             )
+
+
+def test_initial_schema_orders_the_deferred_episode_cycle():
+    from app.modules.db.models import AlertEvent, AlertGroup, AlertGroupEpisode
+
+    models = load_initial_migration().BOOTSTRAP_MODELS
+    assert AlertGroup.current_episode.deferred
+    assert models.index(AlertGroup) < models.index(AlertEvent)
+    assert models.index(AlertEvent) < models.index(AlertGroupEpisode)
 
 
 def test_alert_route_dependencies_are_in_initial_schema():

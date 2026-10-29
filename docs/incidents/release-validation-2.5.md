@@ -1,19 +1,22 @@
 ---
 title: IncidentRelay 2.5 release validation
-description: Local release candidate checks on 27 October 2026 and remaining release gates.
+description: Local release checks on 27–28 October 2026, resolved concurrency blocker and remaining CI gates.
 ---
 
-# Release validation — 27 October 2026
+# Release validation — 27–28 October 2026
 
-**Release is blocked by the PostgreSQL resolve/reopen regression below.**
+**The PostgreSQL resolve/reopen blocker is fixed. Linux/POSIX checks and the
+Python 3.10–3.14 CI matrix still need to pass before release.**
 The documentation and OpenAPI update is complete. Legacy AlertGroup responder and
 stakeholder API/storage removal is approved as a 2.5 breaking change.
 
-The checks used `7738f25` plus the uncommitted workspace and documentation changes
-on `release/2.5.0`. No commit or push was made. Application databases were tested
-in isolated copies, not in the development checkout.
+The 27 October checks used `7738f25` plus the workspace and documentation changes
+on `release/2.5.0`, subsequently committed as `7cf123d`. The 28 October follow-up
+used `7cf123d` plus the uncommitted resolve/reopen fix. No commit or push was made
+for this fix. All databases were tested in isolated copies; the development
+checkout's database was not used.
 
-## Results
+## Results — 27 October
 
 | Check | Result |
 |---|---|
@@ -35,26 +38,48 @@ The PostgreSQL follow-up reran the affected tests with UTF-8 enabled and a writa
 temporary directory. It also used the corrected activity test, which checks the
 built specification rather than source formatting. Those failures/errors cleared.
 Two initial failures require POSIX/Linux (container bootstrap and file mode 0600);
-the remaining functional failure is the race below. Do not describe the initial
-PostgreSQL run as green.
+the remaining functional failure was the race fixed on 28 October below. The
+initial PostgreSQL run remains a historical failing run.
 
-## Reproducible blocker
+## Resolve/reopen blocker fixed — 28 October 2026
 
-`tests/postgresql/test_alert_reopen_concurrency.py::test_manual_resolve_during_uncommitted_reopen_is_noop`
-fails with `TimeoutError` at `resolving.result(timeout=15)`. It failed in both the
-PostgreSQL-specific run and the full run; the other nine PostgreSQL-specific tests
-passed. The scenario expects a manual resolve observing the old resolved state
-to finish as a no-op while a new occurrence is still uncommitted. The current
-resolve path waits for the AlertGroup row lock.
+The original regression test reproduced `TimeoutError` before the fix. A manual
+resolve previously waited for an uncommitted reopen's row lock and could then
+resolve its new occurrence. It now returns without a write when it observes an
+already resolved or merged group. Active groups still acquire the row lock and
+recheck their state before writing, so simultaneous resolves remain idempotent.
 
-Reproduce in a disposable PostgreSQL test database with the test configuration:
+Follow-up results on Python 3.12.10 / Windows:
+
+| Check | Result |
+|---|---|
+| PostgreSQL 16.15: alerts, PostgreSQL-specific, incidents, notifications, notifiers | 748 passed, 1 failed, 0 skipped |
+| PostgreSQL smoke retry with its expected database name | 1 passed, 0 failed, 0 skipped |
+| SQLite: alerts, incidents, notifications, notifiers | 737 passed, 0 failed, 0 skipped |
+| Ruff for changed Python files, Python syntax, duplicate tests, `git diff --check` | Passed |
+
+The only PostgreSQL failure was the connection smoke test's hard-coded expectation
+of database name `incidentrelay_test`; the main run used the isolated database
+`incidentrelay_resolve_reopen_test`. The unchanged smoke test passed when rerun
+against the disposable database with its expected name. No functional failures
+remain in these suites.
+
+The tests cover both committed and rolled-back reopen, a fresh resolve after
+reopen commits, simultaneous manual resolves with one event/audit/message update,
+and rollback plus retry when event or audit persistence fails. Existing recovery
+delivery/reopen and Incident concurrency checks also pass. These are targeted
+regression suites; the full release suite was not rerun in this follow-up.
+
+Run against a disposable database using its test configuration:
 
 ```sh
-pytest tests/postgresql/test_alert_reopen_concurrency.py::test_manual_resolve_during_uncommitted_reopen_is_noop -vv
+pytest tests/alerts tests/postgresql tests/incidents tests/notifications tests/notifiers \
+  -o 'norecursedirs=.git .venv .tmp __pycache__' -q
 ```
 
-Resolve the concurrency contract and rerun this test before releasing. Application
-lifecycle behavior was not changed as part of the documentation step.
+For SQLite, omit `tests/postgresql`. The original regression remains at
+`tests/postgresql/test_alert_reopen_concurrency.py::test_manual_resolve_during_uncommitted_reopen_is_noop`,
+now parameterized for commit and rollback.
 
 ## Upgrade evidence and platform limits
 

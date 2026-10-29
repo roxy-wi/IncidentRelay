@@ -110,11 +110,20 @@ def resolve_alert(
     api_token_id: int | None = None,
 ) -> AlertGroup:
     """Resolve an alert group."""
+    group_before = AlertGroup.get_by_id(alert_id)
+    # A completed cycle needs no write or row lock. Waiting for a concurrent
+    # reopen could turn this repeated resolve into a write to the new cycle.
+    if (
+        group_before.status in {"resolved", "merged"}
+        or group_before.merged_into_id
+    ):
+        return group_before
+
     with db.atomic():
         group_before = _lock_group_for_lifecycle(alert_id)
         old_status = group_before.status
 
-        # Repeated resolve is a no-op, even across concurrent workers.
+        # Recheck: another worker may have resolved or merged the group.
         if old_status in {"resolved", "merged"} or group_before.merged_into_id:
             return group_before
 

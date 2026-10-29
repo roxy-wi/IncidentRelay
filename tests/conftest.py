@@ -22,6 +22,15 @@ from app.login import create_access_token  # noqa: E402
 from tests.factories import create_user  # noqa: E402
 from app.modules.db.migrations import migrate  # noqa: E402
 from app.modules.db.models import (  # noqa: E402
+    AlertGroupEpisode,
+    ChangeIntegration,
+    ChangeSource,
+    ChangeGrant,
+    Change,
+    ChangeEvent,
+    ChangeServiceReference,
+    ChangeService,
+    ChangeJob,
     Alert,
     AlertEvent,
     AlertNotification,
@@ -112,6 +121,14 @@ from app.modules.db.models import (  # noqa: E402
 
 
 CLEANUP_MODELS = [
+    ChangeJob,
+    ChangeService,
+    ChangeServiceReference,
+    ChangeEvent,
+    Change,
+    ChangeGrant,
+    ChangeSource,
+    AlertGroupEpisode,
     AutomationExecution,
     OrchestrationWebhookAction,
     PendingOrchestratedEvent,
@@ -188,6 +205,7 @@ CLEANUP_MODELS = [
     UserRole,
     AuditLog,
     ApiToken,
+    ChangeIntegration,
     LoginThrottle,
     AppLock,
     Role,
