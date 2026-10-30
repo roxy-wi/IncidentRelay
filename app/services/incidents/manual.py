@@ -1,7 +1,7 @@
 from uuid import uuid4
 
 from app.db import database_proxy
-from app.modules.db import alerts_repo, incidents_repo
+from app.modules.db import alert_episodes_repo, alerts_repo, incidents_repo
 from app.modules.db.models import Service, Team
 from app.services.alerts.escalation import apply_initial_escalation_policy_assignment
 from app.services.alerts.notification_queue import schedule_group_notification
@@ -161,7 +161,7 @@ def create_manual_alert_group(payload, *, user_id=None):
             **priority_kwargs,
         )
 
-        alerts_repo.create_alert_event(
+        event = alerts_repo.create_alert_event(
             alert_id=alert.id,
             group_id=group.id,
             event_type="manual_created",
@@ -169,6 +169,7 @@ def create_manual_alert_group(payload, *, user_id=None):
             user_id=user_id,
         )
 
+        alert_episodes_repo.open_episode(group, event=event)
         group = alerts_repo.recalculate_alert_group(group)
 
         if notify:

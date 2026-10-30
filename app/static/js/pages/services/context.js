@@ -395,12 +395,39 @@ function resetServiceForm() {
     $("#service-priority-policy").val("");
     $("#service-enabled").prop("checked", true);
     $("#service-public").prop("checked", false);
+    $("#service-metadata").val("{}");
+    clearServiceMetadataError();
 
     loadServiceDefaults();
 }
 
 
+function serviceMetadataOptions() {
+    return {
+        objectOnly: true,
+        errorTarget: "#service-metadata-error",
+        invalidMessage: i18n.t("services.form.metadata_invalid"),
+        objectMessage: i18n.t("services.form.metadata_object_required"),
+    };
+}
+
+function clearServiceMetadataError() {
+    clearJsonInputError("#service-metadata", "#service-metadata-error");
+}
+
+function readServiceMetadata() {
+    return readJsonObjectInput("#service-metadata", serviceMetadataOptions());
+}
+
+
 function collectServicePayload() {
+    const metadata = readServiceMetadata();
+    if (metadata === null) {
+        return null;
+    }
+    const id = Number($("#service-id").val());
+    const service = id ? getServiceById(id) : null;
+
     return {
         team_id: Number($("#service-team").val()),
         name: $("#service-name").val(),
@@ -425,41 +452,51 @@ function collectServicePayload() {
         priority_policy_id: $("#service-priority-policy").val()
             ? Number($("#service-priority-policy").val())
             : null,
-        labels: {},
-        tags: [],
-        metadata: {},
+        labels: service ? service.labels || {} : {},
+        tags: service ? service.tags || [] : [],
+        metadata: metadata,
+        lifecycle: service ? service.lifecycle : "production",
         enabled: $("#service-enabled").is(":checked"),
         public: $("#service-public").is(":checked"),
-        public_name: null,
-        public_description: null,
-        public_order: 100,
+        public_name: service ? service.public_name : null,
+        public_description: service ? service.public_description : null,
+        public_order: service ? service.public_order : 100,
     };
 }
 
 
 function saveService() {
+    if ($("#save-service").prop("disabled")) {
+        return;
+    }
     const id = $("#service-id").val();
     const payload = collectServicePayload();
+
+    if (payload === null) {
+        return;
+    }
 
     if (!payload.team_id) {
         showAppError("Team is required.");
         return;
     }
 
-    if (id) {
-        apiPut("/api/services/" + id, payload, function () {
-            closeAppModal("#service-form-modal");
-            resetServiceForm();
-            refreshServices();
-        });
-        return;
-    }
-
-    apiPost("/api/services", payload, function () {
+    setAppModalSaving("#service-form-modal", true);
+    const onSuccess = function () {
+        setAppModalSaving("#service-form-modal", false);
         closeAppModal("#service-form-modal");
         resetServiceForm();
         refreshServices();
-    });
+    };
+    const onError = function (xhr) {
+        setAppModalSaving("#service-form-modal", false);
+        showApiError(xhr);
+    };
+    if (id) {
+        apiPut("/api/services/" + id, payload, onSuccess, onError);
+    } else {
+        apiPost("/api/services", payload, onSuccess, onError);
+    }
 }
 
 
@@ -478,6 +515,8 @@ function editService(id) {
     $("#service-form-title").text("Edit service");
     $("#service-id").val(service.id);
     $("#service-team").val(service.team_id);
+    $("#service-metadata").val(JSON.stringify(service.metadata || {}, null, 2));
+    clearServiceMetadataError();
 
     loadServiceDefaults(function () {
         $("#service-name").val(service.name || "");
@@ -1243,7 +1282,13 @@ $(document).on("change", "#services-readiness-filter", renderServicesTable);
 $(document).on("click", "#reload-services", refreshServices);
 $(document).on("click", "#open-service-create-modal", openCreateServiceModal);
 $(document).on("click", "#save-service", saveService);
-$(document).on("click", "#reset-service-form", resetServiceForm);
+$(document).on("click", "#cancel-service-form", function () {
+    closeAppModal("#service-form-modal");
+});
+$(document).on("input", "#service-metadata", clearServiceMetadataError);
+$(document).on("click", "#format-service-metadata", function () {
+    formatJsonTextarea("#service-metadata", {}, "", serviceMetadataOptions());
+});
 $(document).on("change", "#service-team", loadServiceDefaults);
 
 $(document).on("input", "#service-links-search", renderAllServiceLinksTable);

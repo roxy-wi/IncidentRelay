@@ -131,5 +131,20 @@
   "services.details.event_orchestrations": "Orquestaciones de eventos",
   "services.details.orchestration_disabled": "Deshabilitada",
   "services.details.orchestration_active": "Activa",
-  "services.details.orchestration_shadow": "Shadow"
+  "services.details.orchestration_shadow": "Shadow",
+  "services.form.subtitle": "Configura responsables, respuesta y detalles del servicio.",
+  "services.form.identity": "Detalles del servicio",
+  "services.form.identity_hint": "Identifica y clasifica este servicio.",
+  "services.form.response": "Respuesta a incidentes",
+  "services.form.response_hint": "Elige quién responde y cómo recibe las notificaciones.",
+  "services.form.status_visibility": "Estado y visibilidad",
+  "services.form.status_hint": "Define el estado actual y la disponibilidad del servicio.",
+  "services.form.metadata": "Metadatos",
+  "services.form.metadata_hint": "Atributos personalizados para estándares e integraciones del servicio.",
+  "services.form.metadata_json": "Objeto JSON",
+  "services.form.format_json": "Formatear JSON",
+  "services.form.metadata_example": "Ejemplo: {\"owner\": \"platform-team\", \"pci\": true}. Usa {} para borrar los metadatos.",
+  "services.form.metadata_invalid": "JSON no válido. Revisa las comillas, comas y corchetes.",
+  "services.form.metadata_object_required": "Los metadatos deben ser un objeto JSON. Usa {} para dejarlos vacíos.",
+  "services.form.cancel": "Cancelar"
 }

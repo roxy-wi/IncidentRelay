@@ -3,7 +3,8 @@ import logging
 from app import Config
 from app.db import database_proxy as db
 from app.modules.common import utc_now
-from app.modules.db import alerts_repo
+from app.modules.db import alert_episodes_repo, alerts_repo, incident_core_repo
+from app.modules.db.models import Alert
 from app.services.alerts.reopen import (
     lock_grouping_identity,
     find_exact_open_group,
@@ -385,166 +386,184 @@ def _handle_existing_alert(
     orchestration_suppress_reason=None,
     runtime=None,
 ):
-    group = existing_alert.group or existing_group
-    priority = priority_resolution.priority
-    created_group = False
-    trace.existing_alert_found(existing_alert, group)
-
-    if not group:
-        policy, policy_rule, rotation, assignee, next_escalation_at = (
-            _resolve_policy_assignment(
-                route,
-                service,
-                rotation,
-                maintenance_decision,
-                trace,
-                policy_override=policy_override,
-                orchestration_suppressed=orchestration_suppressed,
+    with incident_core_repo.write_transaction():
+        group = existing_alert.group or existing_group
+        if group is not None:
+            group = incident_core_repo.lock_alert_group(group.id)
+        existing_alert = Alert.get_by_id(existing_alert.id)
+        if (
+            existing_alert.status == "resolved"
+            or (group is not None and existing_alert.group_id != group.id)
+            or (
+                group is not None
+                and (
+                    group.status in alert_episodes_repo.TERMINAL_STATUSES
+                    or group.merged_into_id
+                )
             )
+        ):
+            # The caller will select a fresh occurrence after this transaction ends.
+            return None
+        priority = priority_resolution.priority
+        created_group = False
+        trace.existing_alert_found(existing_alert, group)
+
+        if not group:
+            policy, policy_rule, rotation, assignee, next_escalation_at = (
+                _resolve_policy_assignment(
+                    route,
+                    service,
+                    rotation,
+                    maintenance_decision,
+                    trace,
+                    policy_override=policy_override,
+                    orchestration_suppressed=orchestration_suppressed,
+                )
+            )
+
+            group = _create_group(
+                alert_data=alert_data,
+                route=route,
+                team=team,
+                service=service,
+                rotation=rotation,
+                policy=policy,
+                policy_rule=policy_rule,
+                notification_policy=notification_policy_override,
+                assignee=assignee,
+                next_escalation_at=next_escalation_at,
+                group_key=group_key,
+                status=status,
+                first_seen_at=existing_alert.first_seen_at or now,
+                last_seen_at=now,
+                silenced=bool(existing_alert.silenced),
+                priority_kwargs=priority_kwargs,
+                maintenance_kwargs=maintenance_kwargs,
+                orchestration_suppressed=orchestration_suppressed,
+                orchestration_suppress_reason=orchestration_suppress_reason,
+            )
+
+            created_group = True
+            trace.group_created_for_existing_alert(group, existing_alert)
+
+            event = alerts_repo.create_alert_event(
+                group_id=group.id,
+                event_type="created",
+                message="Incident created for existing alert",
+            )
+            alert_episodes_repo.open_episode(group, event=event)
+
+            record_maintenance_match(
+                group,
+                maintenance_decision,
+            )
+        else:
+            trace.group_reused(group)
+
+        old_group_status = group.status
+        priority_state_before_recalculate = group_priority_state(group)
+        previous_priority_slug = (
+            None
+            if created_group
+            else priority_state_before_recalculate["priority_slug"]
+        )
+        previous_priority_order = (
+            None
+            if created_group
+            else priority_state_before_recalculate["priority_order"]
         )
 
-        group = _create_group(
-            alert_data=alert_data,
-            route=route,
+        existing_alert, previous_status = alerts_repo.update_alert_from_payload(
+            existing_alert,
+            alert_data,
+            status,
+            group_key,
+        )
+
+        _set_alert_routing_fields(
+            existing_alert,
             team=team,
+            route=route,
             service=service,
             rotation=rotation,
-            policy=policy,
-            policy_rule=policy_rule,
             notification_policy=notification_policy_override,
-            assignee=assignee,
-            next_escalation_at=next_escalation_at,
-            group_key=group_key,
-            status=status,
-            first_seen_at=existing_alert.first_seen_at or now,
-            last_seen_at=now,
-            silenced=bool(existing_alert.silenced),
-            priority_kwargs=priority_kwargs,
-            maintenance_kwargs=maintenance_kwargs,
-            orchestration_suppressed=orchestration_suppressed,
-            orchestration_suppress_reason=orchestration_suppress_reason,
+            group=group,
         )
 
-        created_group = True
-        trace.group_created_for_existing_alert(group, existing_alert)
+        if notification_policy_override is not None:
+            group.notification_policy = notification_policy_override.id
 
+        existing_alert.orchestration_suppressed = orchestration_suppressed
+        existing_alert.orchestration_suppress_reason = orchestration_suppress_reason
+        group.orchestration_suppressed = orchestration_suppressed
+        group.orchestration_suppress_reason = orchestration_suppress_reason
+        group.save()
 
-        alerts_repo.create_alert_event(
-            group_id=group.id,
-            event_type="created",
-            message="Incident created for existing alert",
-        )
+        if maintenance_decision.pause_escalation_only or orchestration_suppressed:
+            existing_alert.next_escalation_at = None
+            group.next_escalation_at = None
+            group.save(only=[group.__class__.next_escalation_at])
 
-        record_maintenance_match(
+        apply_priority_to_existing_alert(existing_alert, priority)
+        apply_maintenance_to_existing_alert(existing_alert, maintenance_decision)
+
+        existing_alert.save()
+
+        trace.alert_updated(
+            existing_alert,
             group,
-            maintenance_decision,
-        )
-    else:
-        trace.group_reused(group)
-
-    old_group_status = group.status
-    priority_state_before_recalculate = group_priority_state(group)
-    previous_priority_slug = (
-        None
-        if created_group
-        else priority_state_before_recalculate["priority_slug"]
-    )
-    previous_priority_order = (
-        None
-        if created_group
-        else priority_state_before_recalculate["priority_order"]
-    )
-
-    existing_alert, previous_status = alerts_repo.update_alert_from_payload(
-        existing_alert,
-        alert_data,
-        status,
-        group_key,
-    )
-
-    _set_alert_routing_fields(
-        existing_alert,
-        team=team,
-        route=route,
-        service=service,
-        rotation=rotation,
-        notification_policy=notification_policy_override,
-        group=group,
-    )
-
-    if notification_policy_override is not None:
-        group.notification_policy = notification_policy_override.id
-
-    existing_alert.orchestration_suppressed = orchestration_suppressed
-    existing_alert.orchestration_suppress_reason = orchestration_suppress_reason
-    group.orchestration_suppressed = orchestration_suppressed
-    group.orchestration_suppress_reason = orchestration_suppress_reason
-    group.save()
-
-    if maintenance_decision.pause_escalation_only or orchestration_suppressed:
-        existing_alert.next_escalation_at = None
-        group.next_escalation_at = None
-        group.save(only=[group.__class__.next_escalation_at])
-
-    apply_priority_to_existing_alert(existing_alert, priority)
-    apply_maintenance_to_existing_alert(existing_alert, maintenance_decision)
-
-    existing_alert.save()
-
-    trace.alert_updated(
-        existing_alert,
-        group,
-        previous_status=previous_status,
-    )
-
-    maybe_apply_maintenance_to_group(group, maintenance_decision)
-
-    if maintenance_decision.matched:
-        record_maintenance_match(
-            group,
-            maintenance_decision,
-            alert_id=existing_alert.id,
+            previous_status=previous_status,
         )
 
-    if status == "resolved" and previous_status != "resolved":
-        if should_record_incoming_alert_event("resolved", runtime=runtime):
+        maybe_apply_maintenance_to_group(group, maintenance_decision)
+
+        if maintenance_decision.matched:
+            record_maintenance_match(
+                group,
+                maintenance_decision,
+                alert_id=existing_alert.id,
+            )
+
+        resolution_event = None
+        if status == "resolved" and previous_status != "resolved":
+            if should_record_incoming_alert_event("resolved", runtime=runtime):
+                resolution_event = alerts_repo.create_alert_event(
+                    alert_id=existing_alert.id,
+                    group_id=group.id,
+                    event_type="resolved",
+                    message="Alert resolved by incoming payload",
+                )
+            trace.alert_resolved(existing_alert, group)
+        elif should_record_incoming_alert_event("updated", runtime=runtime):
             alerts_repo.create_alert_event(
                 alert_id=existing_alert.id,
                 group_id=group.id,
-                event_type="resolved",
-                message="Alert resolved by incoming payload",
+                event_type="updated",
+                message="Alert updated from incoming payload",
             )
-        trace.alert_resolved(existing_alert, group)
-    elif should_record_incoming_alert_event("updated", runtime=runtime):
-        alerts_repo.create_alert_event(
-            alert_id=existing_alert.id,
-            group_id=group.id,
-            event_type="updated",
-            message="Alert updated from incoming payload",
+
+        group = alerts_repo.recalculate_alert_group(group, event=resolution_event)
+        group = restore_group_priority_state(
+            group,
+            priority_state_before_recalculate,
         )
 
-    group = alerts_repo.recalculate_alert_group(group)
-    group = restore_group_priority_state(
-        group,
-        priority_state_before_recalculate,
-    )
+        if group.status == "resolved":
+            clear_shelve_on_resolve(group.id)
 
-    if group.status == "resolved":
-        clear_shelve_on_resolve(group.id)
+        if not created_group:
+            group = apply_priority_resolution_to_group(
+                group,
+                priority_resolution,
+            )
 
-    if not created_group:
-        group = apply_priority_resolution_to_group(
+        trace.priority_applied(
             group,
             priority_resolution,
+            previous_priority_slug=previous_priority_slug,
+            previous_priority_order=previous_priority_order,
+            created_group=created_group,
         )
-
-    trace.priority_applied(
-        group,
-        priority_resolution,
-        previous_priority_slug=previous_priority_slug,
-        previous_priority_order=previous_priority_order,
-        created_group=created_group,
-    )
 
     refresh_alert_group_correlations_safely(group, reason="existing_alert_update")
 
@@ -906,7 +925,7 @@ def _upsert_alert(alert_data, trace, runtime=None):
         )
 
     if existing_alert:
-        return _handle_existing_alert(
+        result = _handle_existing_alert(
             alert_data=alert_data,
             trace=trace,
             existing_alert=existing_alert,
@@ -929,6 +948,15 @@ def _upsert_alert(alert_data, trace, runtime=None):
             orchestration_suppressed=orchestration_suppressed,
             orchestration_suppress_reason=orchestration_suppress_reason,
             runtime=runtime,
+        )
+        if result is not None:
+            return result
+        existing_group = alerts_repo.find_open_alert_group(
+            source=alert_data["source"],
+            group_key=group_key,
+            team_id=team.id if team else None,
+            route_id=route.id if route else None,
+            service_id=service.id if service else None,
         )
 
     if status == "resolved":
@@ -991,12 +1019,7 @@ def _upsert_alert(alert_data, trace, runtime=None):
     try:
         # SQLite needs a writer reservation before SELECTs in the reopen path.
         # PostgreSQL uses a transaction-scoped advisory lock by grouping identity.
-        transaction = (
-            db.atomic(lock_type="IMMEDIATE")
-            if reopen_enabled and db.obj.__class__.__name__ == "SqliteDatabase"
-            else db.atomic()
-        )
-        with transaction:
+        with incident_core_repo.write_transaction():
             if reopen_enabled:
                 lock_grouping_identity(
                     source=alert_data["source"], group_key=group_key,
@@ -1061,6 +1084,13 @@ def _upsert_alert(alert_data, trace, runtime=None):
                         )
                         reopened_group = True
                         trace.group_reopened(group)
+            if group is not None and not reopened_group:
+                group = incident_core_repo.lock_alert_group(group.id)
+                if group and (
+                    group.status in alert_episodes_repo.TERMINAL_STATUSES
+                    or group.merged_into_id
+                ):
+                    group = None
             if not group:
                 group = _create_group(
                     alert_data=alert_data,
@@ -1089,11 +1119,12 @@ def _upsert_alert(alert_data, trace, runtime=None):
                 created_group = True
                 trace.group_created(group)
 
-                alerts_repo.create_alert_event(
+                event = alerts_repo.create_alert_event(
                     group_id=group.id,
                     event_type="created",
                     message="Incident created",
                 )
+                alert_episodes_repo.open_episode(group, event=event)
 
                 record_maintenance_match(
                     group,

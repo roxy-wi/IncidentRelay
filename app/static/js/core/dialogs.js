@@ -181,20 +181,31 @@ $(document).on("keydown", function (event) {
     event.stopImmediatePropagation();
     $("#app-dialog-cancel").trigger("click");
 });
-function formatJsonTextarea(selector, fallbackValue, label) {
+function formatJsonTextarea(selector, fallbackValue, label, options) {
     const $field = $(selector);
-    const raw = String($field.val() || "").trim();
-
     let parsed;
-
-    try {
-        parsed = raw ? JSON.parse(raw) : fallbackValue;
-    } catch (error) {
-        showAppError(
-            i18n.t("shared.json.invalid_field", {label: label, error: error.message}),
-            i18n.t("shared.json.invalid_title")
-        );
-        return false;
+    if (options && options.objectOnly) {
+        parsed = readJsonObjectInput(selector, options);
+        if (parsed === null) {
+            return false;
+        }
+    } else {
+        try {
+            parsed = parseJsonInput(selector, fallbackValue, {
+                trim: true,
+                onError: function (error) {
+                    showAppError(
+                        i18n.t("shared.json.invalid_field", {label: label, error: error.message}),
+                        i18n.t("shared.json.invalid_title")
+                    );
+                },
+            });
+        } catch (error) {
+            if (!(error instanceof SyntaxError)) {
+                throw error;
+            }
+            return false;
+        }
     }
 
     $field.val(JSON.stringify(parsed, null, 2));
@@ -222,7 +233,7 @@ function getAppModal(selectorOrElement) {
 function closeAppModal(selectorOrElement) {
     const modal = getAppModal(selectorOrElement);
 
-    if (!modal.length) {
+    if (!modal.length || modal.data("saving")) {
         return modal;
     }
 
@@ -242,6 +253,19 @@ function closeAppModal(selectorOrElement) {
     resetAppOverlayZIndexIfIdle();
 
     return modal;
+}
+
+function setAppModalSaving(selectorOrElement, saving) {
+    const modal = getAppModal(selectorOrElement);
+    modal.data("saving", saving);
+    if (saving) {
+        modal.attr("aria-busy", "true");
+    } else {
+        modal.removeAttr("aria-busy");
+    }
+    modal.find(".app-modal-footer button, .app-modal-close").each(function () {
+        AppLoading.setButtonLoading(this, saving, {spinner: false});
+    });
 }
 
 function hasOpenAppModals() {

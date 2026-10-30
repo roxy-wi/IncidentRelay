@@ -2,21 +2,22 @@
 
 **Architecture RFC v1.1 (implementation contract)**
 
-**Source baseline:** `release/2.5.0` (verified 2026-10-28)
+**Source baseline:** `release/2.5.0`, `b787074` plus stage 2 changes (verified 2026-10-30)
 
-**Status:** stage 1 storage implemented; stages 2–10 planned
+**Status:** stages 1–2 implemented; stages 3–10 planned
 
 
-## Agreed decisions — 28 October 2026
+## Agreed decisions — 28–30 October 2026
 
-- Separate AlertGroupEpisode history recorded by the new lifecycle writers, without reconstructing past cycles. Public Change Event intake starts only after the complete intake-to-alert-link flow passes acceptance checks.
+- Separate AlertGroupEpisode history starts with new groups and genuine resolved → active transitions. Migrations and ordinary updates of legacy groups create no episodes; past cycles are not reconstructed. Public Change Event intake starts only after the complete intake-to-alert-link flow passes acceptance checks.
 - Stable integration identity, registered source/Team/Service grants and rotating machine credentials.
 - Token revocation blocks new intake; accepted work uses current integration grants.
 - Source selects timestamp or sequence ordering. Timestamp means sender occurred_at, never received_at.
 - Latest terminal event in that order wins; different terminal outcomes at equal time are an explicit conflict until a later terminal event.
 - Automatic potential-cause suggestions only; mitigation is manual in v1.
+- Automatic correlation requires explicit Service opt-in and is disabled by default. Source/label exclusions apply to individual alerts; a group participates when its selected episode contains at least one non-excluded alert. All groups retain episodes; eligibility is checked before search work is queued (§9.1, stage 7).
 
-Stage 1 storage is implemented in the working tree; see [migration and verification notes](change-intelligence-stage-1.md). Runtime behavior and APIs from stages 2–10 remain planned and are not enabled.
+Storage and lifecycle episodes are implemented. APIs, workers and correlation from stages 3–10 remain planned and are not enabled.
 
 ## 1. Purpose and scope
 
@@ -181,7 +182,7 @@ Unique key: `(job_type, entity_id)`. Rescheduling atomically increases `requeste
 
 **Commit protocol:**
 
-1. Ingestion persists ChangeEvent, references, aggregate revision and job request in one transaction. Episode/catalog changes persist their discovery job in their own mutation transaction; discovery creates the affected per-Change jobs durably before acknowledging itself.
+1. Ingestion persists ChangeEvent, references, aggregate revision and job request in one transaction. Episode/catalog changes persist any required discovery job in their own mutation transaction, subject to §9.1 eligibility; discovery creates the affected per-Change jobs durably before acknowledging itself.
 2. Claim atomically selects eligible pending/expired work, assigns a fresh lease token and captures generation. PostgreSQL uses a short transaction/row lock (`SKIP LOCKED` for competing workers); SQLite uses `BEGIN IMMEDIATE` with bounded busy retry. Computation runs outside the write transaction.
 3. Read the input stamp before loading dependencies/mappings. Graph and authorization changes increment their revisions in the mutation transaction. A worker must not label an old snapshot with a newer revision read afterwards.
 4. Publishing is one short transaction: verify the same unexpired lease token, unchanged requested generation and current input stamp, then write projections/timeline rows and mark that generation complete. Lock/recheck the compared revision rows through commit; a check in application memory alone is insufficient.
@@ -189,18 +190,20 @@ Unique key: `(job_type, entity_id)`. Rescheduling atomically increases `requeste
 6. Timeline writes have a unique `(service_id, source='change_intelligence', dedup_key)` derived from event UUID + relation. Projection writes and job acknowledgement share the same DB transaction, so a crash cannot leave an unacknowledged non-idempotent side effect. No external notifications are sent.
 7. Retry only transient errors with bounded exponential backoff/jitter. Keep validation/permission denials visible on references and exhausted jobs in `dead`; an audited operator retry creates a new generation. Expose backlog, oldest age and failure class without payloads/secrets.
 
-Use one documented lock order: graph-state row → integration/auth row → Change rows in ID order → job rows. Claim/reclaim locks only job rows. Existing lifecycle order remains Incident → AlertGroup → episode; lifecycle transactions only enqueue discovery work and never acquire graph/Change locks. Discovery publishes per-Change job requests before locking its own acknowledgement row, preventing job-to-Change lock inversion. No network calls or graph traversal while holding these locks.
+Use one documented lock order: graph-state row → integration/auth row → Change rows in ID order → episode rows in ID order when publishing correlations → job rows. Claim/reclaim locks only job rows. Existing lifecycle order remains Incident → AlertGroup → episode; lifecycle transactions only enqueue discovery work and never acquire graph/Change locks. Discovery publishes per-Change job requests before locking its own acknowledgement row, preventing job-to-Change lock inversion. No network calls or graph traversal while holding these locks.
 
 ### 4.9. `AlertGroupEpisode` — stable technical lifecycle history
 
-Storage added in stage 1: `id`, `uid`, `alert_group_id`, `ordinal`, nullable `started_at`, nullable `ended_at`, `state` (`open`, `resolved`, `merged`), `start_quality` (`exact`, `unknown`), nullable `start_event_id`, `end_event_id`, `created_at`. Unique `(alert_group_id, ordinal)` and at most one open episode per group (partial unique constraint for PostgreSQL/SQLite). Add nullable `AlertGroup.current_episode_id`; after the stage 2 writer rollout, an open group must reference its open episode. Stage 1 leaves existing groups' pointers NULL. An episode's ID never changes on acknowledgement, shelving or repeated intake.
+Storage added in stage 1: `id`, `uid`, `alert_group_id`, `ordinal`, nullable `started_at`, nullable `ended_at`, `state` (`open`, `resolved`, `merged`), `start_quality` (`exact`, `unknown`), nullable `start_event_id`, `end_event_id`, `created_at`. Unique `(alert_group_id, ordinal)` and at most one open episode per group (partial unique constraint for PostgreSQL/SQLite). Add nullable `AlertGroup.current_episode_id`; a tracked open group references its open episode; a legacy group without a tracked cycle keeps NULL until a genuine reopen. Stage 1 leaves existing groups' pointers NULL. An episode's ID never changes on acknowledgement, shelving or repeated intake.
 
 - Initial live group creation creates its first episode atomically with the first child and lifecycle event. A genuine `resolved → active` reuse creates the next episode and the new child in that same transaction. A duplicate reopen creates neither another episode nor another child.
 - Acknowledged → firing, unshelve and severity/assignee changes stay in the same episode. An operational Incident reopen alone does not open a technical episode. Terminal groups created only from resolved input have no fabricated open episode.
 - Resolve/merge closes the current episode in the transaction that closes the group; `current_episode_id` is cleared. Repeated resolve of an already resolved group is a no-op and cannot close an uncommitted new episode. Merge closes the source's episode without relabelling it as the target's episode.
-- All technical lifecycle writers must use this contract: intake/recovery, manual actions/callbacks, heartbeat, orchestration, merge and resource-deletion paths. A database error rolls back group, child, episode, lifecycle event and discovery job together. Existing AlertGroup/Incident API and notification behavior remain unchanged.
-- Stage 1 creates storage only: it does not reconstruct old cycles or create episodes, Changes or discovery jobs from existing alerts/events. When all lifecycle writers switch in stage 2, an already-active group receives one current episode with `started_at=NULL, start_quality=unknown`, without parsing old events or reusing `first_seen_at`. This records current state, not a recovered history. Repeating initialization must preserve existing episodes. Automatic time-based correlation skips unknown starts; new cycles are recorded from actual lifecycle transitions. Previously closed cycles are not imported. A new terminal-only group likewise cannot manufacture a known start.
+- All technical lifecycle writers must use this contract: intake/recovery, manual actions/callbacks, heartbeat, orchestration, merge and resource-deletion paths. A database error rolls back group, child, episode, lifecycle event and any requested discovery job together. Existing AlertGroup/Incident API and notification behavior remain unchanged.
+- Migrations create storage only: existing groups receive no episodes or discovery jobs. Stage 2 initialization of legacy active groups has been removed. Ordinary intake, a new child within an already-active group, acknowledgement, recalculation, silence/maintenance and shelve/unshelve do not create a missing episode. Resolve/recovery/resource deletion close only an existing episode; NULL remains untracked. The first genuine resolved → active after writer rollout creates the first tracked episode with a known start and ordinal=1 when no episode history exists. Merging into a legacy active group does not start a cycle; a merge that actually reactivates a resolved group does. Past cycles and the original start of a legacy group are not reconstructed, and no new unknown-start episodes are created. Previously stored episodes are preserved; no automatic data deletion is performed.
 - Reviewed correlation evidence and Incident-linked history pin relevant Changes/events/episodes against retention. Cleanup removes only eligible unreviewed derived rows before their parents; it does not cascade away retained investigation evidence. New foreign-key and retention rules are part of the episode migration.
+
+Episodes are retained regardless of Service correlation opt-in and alert exclusions. §9.1 controls search work and automatic suggestions, not episode creation/closure. It does not reduce the episode count or override retention rules.
 
 ### 4.10. Stable integration identity, sources and grants
 
@@ -217,11 +220,13 @@ Token rotation/revocation prevents **new requests** with that credential; accept
 
 ### 4.11. Graph revision and projection inputs
 
-Add `ChangeGraphState` with one monotonic `revision` row for v1. Dependency creation/update/delete and relevant Service changes (ownership, environment, enabled/deleted state) bump it and enqueue bounded invalidation/discovery in the same transaction. Global revision is deliberately simple; per-component revisions are a future optimization, not a prerequisite.
+Add `ChangeGraphState` with one monotonic `revision` row for v1. Dependency creation/update/delete and relevant Service changes (ownership, environment, enabled/deleted state, correlation policy from §9.1) bump it and enqueue bounded invalidation/discovery in the same transaction. Global revision is deliberately simple; per-component revisions are a future optimization, not a prerequisite.
 
 Because the stamp is global, each graph revision schedules a paginated sweep of **all Changes in the automatic horizon plus all running Changes**, not just those first guessed to be affected; otherwise unrelated rows would remain permanently stale. Coalesce this sweep into one discovery job keyed by the graph-state ID, retaining requested generation and a durable cursor. Capture an upper Change-ID bound and scan in ID order; each bounded batch atomically queues per-Change work and advances the cursor under its lease/generation check. A new graph revision restarts the sweep's generation/cursor; new Change intake has its own job. Authorization sweeps cover all still-publishable Changes of the affected integration. Per-reference retries remain indexed by namespace/slug.
 
 The full calculation stamp is `(Change.revision, ChangeGraphState.revision, ChangeIntegration.auth_revision, engine_version)`, plus the job's requested generation. Mapping/verification changes bump Change.revision; new episodes have their own durable discovery trigger. A new trigger arriving during computation cannot be lost when the old worker acknowledges its generation. Manual review has its own row_version and immutable evidence snapshot; automated projection replacement does not write those columns.
+
+For a correlation to a specific episode, the input stamp also includes that episode's eligibility-context revision (§9.1). In stage 7, changes to episode membership/source/labels/Service advance this revision in the mutation transaction; closure freezes the context for historical searches. Publication rechecks it. Stages 1–2 do not yet implement these data or checks.
 
 ## 5. Universal API contract
 
@@ -436,11 +441,25 @@ Service references accumulate across events; omitted or empty lists do not remov
 4. Only known episode starts participate automatically. For an operation's exposure interval `[start, end]`, candidate episodes start in `[start, end + W]`, where W defaults to two hours. start is defined in §8.3; end is the winning terminal time, or calculation time for a running operation. Inverted intervals are excluded with a diagnostic. Evaluate running operations on new episode triggers as well as ChangeEvents; do not use AlertGroup.first_seen_at as a reopened episode start. Retroactive discovery of completed operations/old episode starts has an explicit horizon (default seven days); do not discard a still-running operation solely because it began earlier. Older history remains available for manual linking.
 5. Automatic rows always suggest `potential_cause`. A Change whose exposure starts after an episode start is not automatically its cause. **Mitigation is manual in v1**: an operator can link the later Change to that exact episode, or directly to an Incident, including without an automatic candidate. Manual links outside the automatic time window are allowed with an audited explanation; no score is invented for mitigation.
 6. Score is versioned deterministic relevance, not probability. Candidate selection/ties, weights, missing-data behavior and limits are part of engine_version and must have fixed fixtures before phase 2 acceptance. Do not let unordered SQL/graph iteration change ranking. Never overwrite a manual role/review or export private path segments in Explain.
-7. New ChangeEvents, episode creation/closure, mapping changes and catalog/grant changes create durable bounded discovery/recompute work. Retrying or restarting workers neither loses a trigger nor duplicates projections (§4.8).
+7. New ChangeEvents, episode creation/closure, changes to its eligibility context, mapping changes and catalog/grant changes request durable bounded discovery/recompute work subject to §9.1. Retrying or restarting workers neither loses a trigger nor duplicates projections (§4.8).
 
 No automatic rollback, paging/escalation, Incident creation/status change or technical status change follows from a correlation. A manual confirmed_cause is an operator's recorded judgement, not a claim that timing alone proves causation.
 
+### 9.1. Alert eligibility for automatic correlation — stage 7
+
+This is the agreed contract for future implementation. Current stage 2 code creates episodes and discovery requests for new groups and genuine reopens; ordinary updates of legacy groups without episodes remain untracked; the following settings and filters do not yet exist.
+
+1. **Explicit Service opt-in.** Stage 7 adds `change_correlation_enabled`, default `false` for new and existing Services, and `change_correlation_exclusions`, default `[]`. Settings use the Service API/UI, existing Service edit permissions and audit. A missing, disabled or deleted Service, or a disabled flag, excludes its groups from automatic correlation. The flag applies to the alerts' Service: an intermediate Service opted out of alert correlation does not cut off paths to opted-in consumers. It does not replace `ServiceDependency.correlation_enabled`, grants or RBAC, and does not block Change Event intake or Service mapping.
+2. **Per-alert exclusions.** In v1, each rule contains the alert source and/or labels with exact value matching; this is not the Change producer's source. All conditions in one rule must match one alert; any matching rule excludes that alert. An empty list excludes nothing, an empty rule is invalid, and an absent label does not match a specified value. Reuse the applicable subset of the existing matcher without introducing another condition language. Do not implicitly exclude heartbeat, severity levels or alert types. Example: `{"source":"alertmanager","labels":{"alertname":"CertificateExpiresSoon"}}`.
+3. **Mixed groups.** An AlertGroup participates when its selected episode has at least one non-excluded child Alert; one excluded child does not exclude the others. Never combine conditions from different children's labels or rely only on common_labels. Resolved children of the same episode still count when searching for its causes. Historical evaluation uses that episode's retained membership/source/labels and Service, not children from a later reopen or the result of a later merge. Stage 7 adds a reliable context and its revision; old episodes without that context are skipped automatically, without reconstructing it from the timeline. Eligibility changes do not change started_at/ended_at or create another episode.
+4. **Check before queueing.** The same Service/exclusion check runs before lifecycle-triggered correlation search and when selecting episodes from Change triggers, retries and reconciliation. Ineligible episodes enqueue no new correlation-search jobs and trigger no dependency traversal. This does not cancel required Change processing, mapping or impact work for other Services. Eligible episodes still pass grants, environment, known-start, time-window and graph-limit checks from §9. Filtering reduces search work; 1000 new groups plus 500 reopens still produce 1500 episodes.
+5. **Recheck and policy changes.** Workers check eligibility before computation and again before publication under the revision protocol in §4.8–4.11. Policy changes and their invalidation/discovery requests commit together. Disabling or excluding immediately hides automatic suggestions that are no longer eligible; an already-running worker cannot publish its stale result. Previously queued search work, including stage 2 requests, completes without endless retries for ineligible episodes. Bounded deactivation work for existing suggestions is allowed and does not initiate a new search.
+6. **Re-enablement.** Service opt-in, exclusion removal, a newly eligible child or Service assignment requests bounded discovery for eligible episodes within §9's horizon, retaining its running-operation and unknown-start rules. Periodic bounded reconciliation catches triggers missed during concurrent policy changes. Retries do not duplicate results, and changes never trigger an unbounded replay of all historical data.
+7. **Manual decisions and diagnostics.** Settings control automatic suggestions; manual links, confirm/reject decisions and their evidence remain intact. Manual linking remains available under §7 permissions even when automation is disabled or an alert is excluded. UI distinguishes Service opt-out, missing Service, all children excluded, unknown context/start, no candidates and processing failure; a missing job must not appear permanently queued.
+
 ## 10. UI
+
+Technical Service settings expose explicit correlation opt-in and source/label exclusions (§9.1) under Service edit permissions. AlertGroup displays its eligibility result and skip reason; this is separate from Inbox display filters.
 
 **Operations → Changes** is a separate Inbox, with one row per Change.
 
@@ -469,7 +488,7 @@ No automatic rollback, paging/escalation, Incident creation/status change or tec
 
 ## 12. Delivery plan
 
-Implementation is split into **10 sequential stages**. Each stage ends with a reviewable change set and its own tests; the next starts after the previous readiness criteria pass. Stage 1 storage is implemented; stages 2–10 remain planned. See [the stage 1 guide](change-intelligence-stage-1.md) for rollout restrictions and checks. Distribute the scenarios in §13 across stages rather than deferring them all to release checks.
+Implementation is split into **10 sequential stages**. Each stage ends with a reviewable change set and its own tests; the next starts after the previous readiness criteria pass. Stages 1–2 are implemented; stages 3–10 remain planned. Distribute the scenarios in §13 across stages rather than deferring them all to release checks.
 
 | Milestone | Stages | Result |
 |---|---|---|
@@ -487,8 +506,8 @@ A development stage is not a separate production release. Enable public Change E
 
 ### 12.2. Stage 2 — Episodes across all AlertGroup writers
 
-- **Work:** atomically create/close episodes on intake, genuine reopen, resolve, recovery, callbacks, heartbeat, orchestration, merge and resource deletion. At writer rollout, initialize one unknown-start current episode for already-active groups without reconstructing closed cycles. Persist discovery work in the same transaction; processing arrives in stage 5. Preserve Incident → AlertGroup → episode lock order and existing notifications.
-- **Tests:** idempotent initialization of existing active groups without guessing a start; closed groups receive no historical episodes; two reopens; resolve racing reopen; repeated resolve; failures writing child, event or job. Ack → firing, unshelve and Incident-only reopen do not create an episode.
+- **Work:** atomically create/close episodes on intake, genuine reopen, resolve, recovery, callbacks, heartbeat, orchestration, merge and resource deletion. Legacy groups without episodes keep NULL until a genuine reopen; migrations and ordinary updates do not initialize their history. Persist discovery work in the same transaction; processing arrives in stage 5 and search-job filtering from §9.1 in stage 7. Preserve Incident → AlertGroup → episode lock order and existing notifications.
+- **Tests:** migrations leave legacy groups of every status without episodes/jobs; ordinary updates, ack, silence/maintenance and resolve create no episode; a legacy group's first genuine reopen creates ordinal=1 with a known start; two reopens; resolve racing reopen; repeated resolve; failures writing child, event or job. Ack → firing, unshelve and Incident-only reopen do not create an episode.
 - **Ready when:** every writer follows one contract, failed transactions leave no partial episode, and existing lifecycle tests pass on both databases.
 
 ### 12.3. Stage 3 — Integrations, grants and credentials
@@ -517,9 +536,9 @@ A development stage is not a separate production release. Enable public Change E
 
 ### 12.7. Stage 7 — Automatic correlation
 
-- **Work:** ChangeImpact and ChangeAlertGroupCorrelation migrations; bounded reverse graph traversal and exact episode association. Fix the rule version and reference ranking fixtures before implementing score. Connect every recomputation trigger, including a sweep of the eligible history on global graph revision changes; publish only with a current input_stamp. Automation suggests potential_cause only.
-- **Tests:** direct/indirect relationships, cycles, diamonds, disabled edges, environment, window boundaries, long-running operations and unknown episode start; Change before/after AlertGroup; graph/grant changes during calculation; repeated jobs and stable ranking.
-- **Ready when:** identical inputs produce the same result and explanation, stale calculations cannot publish, and there is no automatic mitigation or operational status/notification mutation.
+- **Work:** ChangeImpact and ChangeAlertGroupCorrelation migrations; Service default-off settings, API/UI and source/label exclusions from §9.1; retained episode eligibility context and its revision; shared pre-queue eligibility and pre-publication rechecks; bounded reverse graph traversal and exact episode association. Fix the rule version and reference ranking fixtures before implementing score. Connect every recomputation trigger, including a sweep of the eligible history on global graph revision changes; publish only with a current input_stamp. Automation suggests potential_cause only.
+- **Tests:** default off, missing Service, source/label exclusions and mixed groups, eligibility changes while a worker runs, bounded re-enablement and preserved manual decisions; direct/indirect relationships, cycles, diamonds, disabled edges, environment, window boundaries, long-running operations and unknown episode start; Change before/after AlertGroup; graph/grant changes during calculation; repeated jobs and stable ranking.
+- **Ready when:** ineligible episodes create no search work, all episodes remain recorded, identical inputs produce the same result and explanation, stale calculations cannot publish, and there is no automatic mitigation or operational status/notification mutation.
 
 ### 12.8. Stage 8 — Manual review and Incident links
 
@@ -555,13 +574,15 @@ All applicable persistence/concurrency scenarios run on PostgreSQL and SQLite. U
 | Ingest atomicity | Inject failures after Change insert, event insert, reference merge, projection and outbox write: no partial Change/event/job remains; retry succeeds once |
 | Integration authority | Token for source A cannot impersonate source B or another owner; ingest cannot read, review, administer credentials or edit Incidents; personal wildcard/JWT cannot bypass machine identity |
 | Revocation | Accepted pending work survives token rotation/expiry/revocation; new requests with old token fail; integration/source disable or grant withdrawal prevents mapping/publication, including a worker already computing |
-| Episode rollout | Stage 1 preserves alerts/events and creates no episodes/Changes/jobs; stage 2 initializes one unknown-start current episode per already-active group without reconstructing closed cycles; acknowledged → firing is not mistaken for resolved reopen; old ServiceEvents are not invented as Changes |
+| Episode rollout | Migrations preserve legacy groups of every status without episodes/Changes/jobs; ordinary updates and resolve of a legacy group create no episode; acknowledged → firing is not mistaken for resolved reopen; genuine reopen creates the first tracked cycle with an exact start; merging into an active legacy group creates no cycle, reactivating a resolved group does; previously stored history is preserved; old ServiceEvents are not invented as Changes |
 | Episode atomicity | Two simultaneous reopens create one episode/child; child/event/job failure rolls everything back; manual resolve during uncommitted reopen cannot close its new episode; duplicate resolve closes once |
 | All lifecycle paths | Recovery/manual callbacks, heartbeat, orchestration, merge and resource deletion close/open episodes correctly; ack/unshelve/Incident-only reopen do not create episodes |
 | Job fencing | Worker A loses lease; B publishes; A resumes: A cannot publish/ack/change B's retry. Trigger arriving during computation is not lost. Crash before/after projection publication creates neither lost jobs nor duplicate timeline rows |
 | Input revisions | Graph, grant or mapping changes while worker computes: stale input stamp cannot publish; stale cross-team visibility is withheld before pagination/counts; unrelated manual review is retained |
 | Discovery/expiry | Change-before-AlertGroup and AlertGroup-before-Change; late CMDB provisioning; periodic fallback; bounded batch/depth/horizon; graph sweep covers unrelated Changes too, survives a batch crash and restarts on a new revision; pending expiry/dead job and audited requeue |
 | Correlation | Direct/dependent match, cycles/diamonds/multiple paths, disabled/deleted edges, correlation_enabled=false, environment mismatch/unknown, long-running operation, exact window boundaries and unknown episode start |
+| Alert eligibility | New/existing Service defaults off; missing/disabled/deleted Service; empty list/invalid empty rule, absent labels, AND within one child's rule and OR across exclusions; one eligible child keeps a mixed group eligible, all excluded means no search; resolved children and historical context retained; unknown context skipped; an opted-out intermediate Service does not cut off an opted-in consumer |
+| Eligibility changes | Disabling/excluding during computation prevents stale publication; source/labels/Service/membership changes advance the episode revision; bounded re-enablement without duplicates; reconciliation covers enable/new-episode races; old stage 2 jobs do not retry forever; manual decisions and all episodes survive; configuration changes require permissions and audit |
 | Human review | Concurrent confirm/reject yields one accepted version and 409 for stale review; recomputation preserves role and reviewed evidence; a new episode never inherits the previous review |
 | Manual mitigation | A later change has no automatic cause suggestion but can be manually linked to an earlier episode or Incident with an audited explanation; no fake relevance probability or paging |
 | Incident links | Unlinked Incident supported; duplicate add/reactivation/remove/role change obey 200/201/409; link/event/audit rollback together; no Incident status or notification mutation |
@@ -572,7 +593,7 @@ Document payload/retention/retry limits in configuration and OpenAPI before phas
 
 ## 14. Compatibility with IncidentRelay 2.5
 
-Checked against `release/2.5.0` on 2026-10-28 (`7cf123d` plus the local resolve/reopen fix). Stage 1 adds storage in the working tree; the remaining behavior and routes are future work. This does not enable Change Intelligence or claim it was included in the released 2.5 baseline.
+Checked against `release/2.5.0` on 2026-10-30 (`b787074` plus local stage 2 changes). Stages 1–2 provide storage and lifecycle episode recording; Change intake, workers and correlation remain future work. This does not enable Change Intelligence or claim it was included in the released 2.5 baseline.
 
 Reusable existing contracts: globally unique Team.slug; Service(team,slug) and Service.uid; ServiceDependency; ServiceEvent with its dedup key; AlertGroupCorrelation for AlertGroup ↔ AlertGroup; separate operational Incident/IncidentAlertGroupLink; hashed ApiToken; centralized API scopes; scheduler/database locks. Incident collaboration in 2.5 uses its own state/version and must not be coupled to technical Change ingestion.
 

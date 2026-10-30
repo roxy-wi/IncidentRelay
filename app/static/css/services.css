@@ -1,3 +1,280 @@
+:is(#service-form-modal, .standard-editor-modal) .service-editor-dialog {
+    width: min(1060px, calc(100vw - 48px));
+}
+
+:is(#service-form-modal, .standard-editor-modal) .app-modal-header {
+    flex-shrink: 0;
+    background: var(--md-surface);
+}
+
+:is(#service-form-modal, .standard-editor-modal) .service-editor-body {
+    min-height: 0;
+    padding: 24px;
+    background: var(--md-bg);
+}
+
+.service-editor-grid,
+.service-editor-fields {
+    display: grid;
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+}
+
+.service-editor-grid {
+    gap: 20px;
+    align-items: start;
+}
+
+.service-editor-section {
+    min-width: 0;
+    padding: 20px;
+    border: 1px solid var(--md-border);
+    border-radius: 16px;
+    background: var(--md-surface);
+}
+
+.service-editor-heading {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    margin-bottom: 20px;
+}
+
+.service-editor-heading h3 {
+    margin: 0 0 5px;
+    color: var(--md-text);
+    font-size: 15px;
+    line-height: 1.4;
+}
+
+.service-editor-heading p {
+    margin: 0;
+    color: var(--md-muted);
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+.service-editor-icon {
+    display: inline-flex;
+    flex: 0 0 34px;
+    height: 34px;
+    align-items: center;
+    justify-content: center;
+    border-radius: 10px;
+    color: var(--md-primary);
+    background: var(--md-primary-soft);
+}
+
+.service-editor-code-icon {
+    font-family: var(--md-font-mono);
+    font-weight: 700;
+}
+
+.service-editor-fields {
+    gap: 16px;
+}
+
+.service-editor-field {
+    display: flex;
+    flex-direction: column;
+    gap: 7px;
+    min-width: 0;
+}
+
+.service-editor-field label,
+.service-editor-label {
+    color: var(--md-text-soft);
+    font-size: 12px;
+    font-weight: 600;
+}
+
+:is(#service-form-modal, .standard-editor-modal) .input {
+    width: 100%;
+    min-width: 0;
+    box-sizing: border-box;
+}
+
+:is(#service-form-modal, .standard-editor-modal) textarea {
+    resize: vertical;
+}
+
+#service-description,
+#service-status-message {
+    font: inherit;
+}
+
+:is(#service-form-modal, .standard-editor-modal) .btn:not(.btn-primary) {
+    color: var(--md-text-soft);
+    background: var(--md-surface-soft);
+}
+
+:is(#service-form-modal, .standard-editor-modal) .btn:not(.btn-primary):hover {
+    background: var(--md-surface-hover);
+}
+
+.service-editor-full {
+    grid-column: 1 / -1;
+}
+
+:is(#service-form-modal, .standard-editor-modal) .help-text {
+    margin: 0;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+
+.service-editor-options {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding-top: 4px;
+}
+
+.service-metadata-toolbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 8px;
+}
+
+#service-metadata {
+    min-height: 200px;
+    tab-size: 2;
+}
+
+#service-metadata,
+.standard-editor-modal .service-editor-field .standard-editor-json {
+    font: 13px/1.6 var(--md-font-mono);
+    background: var(--md-surface-soft);
+}
+
+:is(#service-form-modal, .standard-editor-modal) [aria-invalid="true"] {
+    border-color: var(--md-danger);
+}
+
+.service-editor-error {
+    margin: 0;
+    color: var(--md-danger);
+    font-size: 12px;
+    line-height: 1.5;
+}
+
+:is(#service-form-modal, .standard-editor-modal) .service-editor-footer {
+    background: var(--md-surface);
+}
+
+@media (max-width: 720px) {
+    :is(#service-form-modal, .standard-editor-modal) {
+        padding: 12px;
+    }
+
+    :is(#service-form-modal, .standard-editor-modal) .service-editor-dialog {
+        width: calc(100vw - 24px);
+        max-height: calc(100dvh - 24px);
+    }
+
+    :is(#service-form-modal, .standard-editor-modal) .app-modal-header,
+    :is(#service-form-modal, .standard-editor-modal) .service-editor-body,
+    :is(#service-form-modal, .standard-editor-modal) .service-editor-footer {
+        padding: 16px;
+    }
+
+    .service-editor-grid {
+        grid-template-columns: minmax(0, 1fr);
+        gap: 14px;
+    }
+
+    .service-editor-section {
+        padding: 16px;
+    }
+}
+
+@media (max-width: 420px) {
+    .service-editor-fields {
+        grid-template-columns: minmax(0, 1fr);
+    }
+}
+
+.standard-editor-stack {
+    display: flex;
+    flex-direction: column;
+    gap: 20px;
+    min-width: 0;
+}
+
+.standard-editor-note {
+    margin: 4px 0 0;
+    padding: 12px;
+    border-radius: 10px;
+    background: var(--md-primary-soft);
+    color: var(--md-text-soft);
+    font-size: 12px;
+    line-height: 1.6;
+}
+
+#service-standard-modal .standard-editor-labels {
+    margin: 0;
+    padding: 12px;
+    border: 1px solid var(--md-border);
+    border-radius: 10px;
+    background: var(--md-surface-soft);
+    color: var(--md-text-soft);
+    font: 12px/1.6 var(--md-font-mono);
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.standard-editor-modal .service-editor-field textarea {
+    font: inherit;
+}
+
+.standard-editor-modal .service-editor-field .standard-editor-json {
+    min-height: 260px;
+}
+
+.standard-editor-modal .app-modal-footer {
+    flex-wrap: wrap;
+}
+
+.standard-editor-error {
+    flex-basis: 100%;
+    overflow-wrap: anywhere;
+}
+
+.standard-editor-modal .ts-wrapper {
+    min-width: 0;
+}
+
+/* Only editor-specific differences; shared Tom Select rules are in table_filters.css. */
+.standard-editor-modal .ts-control {
+    border-radius: 10px;
+    padding: 8px 10px;
+    background: var(--md-input-bg);
+    gap: 4px;
+}
+
+.standard-editor-modal .ts-control input {
+    color: var(--md-text);
+}
+
+.standard-editor-modal .ts-wrapper.multi .ts-control > div {
+    background: var(--md-primary-soft);
+    color: var(--md-text-soft);
+    border-radius: 5px;
+    max-width: 100%;
+    overflow-wrap: anywhere;
+}
+
+.standard-editor-modal .ts-dropdown {
+    background: var(--md-surface);
+    color: var(--md-text);
+    border-radius: 10px;
+    box-shadow: var(--md-shadow-md);
+}
+
+.standard-editor-modal .ts-dropdown .active {
+    background: var(--md-primary-soft);
+}
+
 .impact-alert-cell {
     display: flex;
     flex-direction: column;

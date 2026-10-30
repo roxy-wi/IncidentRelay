@@ -733,122 +733,137 @@
   </div>
 </div>
 
-<div id="service-form-modal" class="app-modal" style="display: none;">
-  <div class="app-modal-dialog app-modal-dialog-wide">
+<div id="service-form-modal" class="app-modal" role="dialog" aria-modal="true" aria-labelledby="service-form-title" style="display: none;">
+  <div class="app-modal-dialog service-editor-dialog">
     <div class="app-modal-header">
       <div>
         <h2 id="service-form-title">Create service</h2>
-        <div class="card-subtitle">Technical service or system affected by alerts.</div>
+        <div class="card-subtitle">{{ _('services.form.subtitle') }}</div>
       </div>
-      <button id="close-service-form-modal" type="button" class="app-modal-close" aria-label="Close">×</button>
+      <button id="close-service-form-modal" type="button" class="app-modal-close" aria-label="{{ _('services.form.cancel') }}">×</button>
     </div>
 
-    <div class="app-modal-body">
-      <div class="grid-two">
-        <section class="card">
-          <div class="card-header">
-            <div>
-              <h2>Service</h2>
-              <div class="card-subtitle">Ownership, identity and classification.</div>
-            </div>
+    <div class="app-modal-body service-editor-body">
+      <input id="service-id" type="hidden">
+      <div class="service-editor-grid">
+        <section class="service-editor-section" aria-labelledby="service-identity-heading">
+          <div class="service-editor-heading">
+            <span class="service-editor-icon" aria-hidden="true"><i class="fas fa-cube"></i></span>
+            <div><h3 id="service-identity-heading">{{ _('services.form.identity') }}</h3><p>{{ _('services.form.identity_hint') }}</p></div>
           </div>
-
-          <div class="form-body">
-            <input id="service-id" type="hidden">
-
-            <label for="service-team">Team</label>
-            <select id="service-team" class="input"></select>
-
-            <label for="service-name">Name</label>
-            <input id="service-name" class="input" type="text" placeholder="Cloud PostgreSQL">
-
-            <label for="service-slug">Slug</label>
-            <input id="service-slug" class="input" type="text" placeholder="cloud-postgresql">
-
-            <label for="service-description">Description</label>
-            <textarea id="service-description" class="input" rows="3"></textarea>
-
-            <label for="service-type">Type</label>
-            <select id="service-type" class="input">
-                </select>
-
-            <div class="form-grid-3">
-              <div>
-                <label for="service-environment">Environment</label>
-                <select id="service-environment" class="input">
-                </select>
-              </div>
-              <div>
-                <label for="service-criticality">Criticality</label>
-                <select id="service-criticality" class="input">
-                </select>
-              </div>
-              <div>
-                <label for="service-tier">Tier</label>
-                <select id="service-tier" class="input">
-                </select>
-              </div>
+          <div class="service-editor-fields">
+            <div class="service-editor-field">
+              <label for="service-name">Name</label>
+              <input id="service-name" class="input" type="text" placeholder="Cloud PostgreSQL" autocomplete="off">
+            </div>
+            <div class="service-editor-field">
+              <label for="service-team">Team</label>
+              <select id="service-team" class="input"></select>
+            </div>
+            <div class="service-editor-field service-editor-full">
+              <label for="service-slug">Slug</label>
+              <input id="service-slug" class="input" type="text" placeholder="cloud-postgresql" spellcheck="false" autocomplete="off">
+            </div>
+            <div class="service-editor-field service-editor-full">
+              <label for="service-description">Description</label>
+              <textarea id="service-description" class="input" rows="3"></textarea>
+            </div>
+            <div class="service-editor-field">
+              <label for="service-type">Type</label>
+              <select id="service-type" class="input"></select>
+            </div>
+            <div class="service-editor-field">
+              <label for="service-environment">Environment</label>
+              <select id="service-environment" class="input"></select>
+            </div>
+            <div class="service-editor-field">
+              <label for="service-criticality">Criticality</label>
+              <select id="service-criticality" class="input"></select>
+            </div>
+            <div class="service-editor-field">
+              <label for="service-tier">Tier</label>
+              <select id="service-tier" class="input"></select>
             </div>
           </div>
         </section>
 
-        <section class="card">
-          <div class="card-header">
-            <div>
-              <h2>Status and defaults</h2>
-              <div class="card-subtitle">Status, rotation, escalation, notification and priority policies.</div>
+        <section class="service-editor-section" aria-labelledby="service-response-heading">
+          <div class="service-editor-heading">
+            <span class="service-editor-icon" aria-hidden="true"><i class="fas fa-bell"></i></span>
+            <div><h3 id="service-response-heading">{{ _('services.form.response') }}</h3><p>{{ _('services.form.response_hint') }}</p></div>
+          </div>
+          <div class="service-editor-fields">
+            <div class="service-editor-field service-editor-full">
+              <label for="service-default-rotation">Default rotation</label>
+              <select id="service-default-rotation" class="input"><option value="">No default rotation</option></select>
+            </div>
+            <div class="service-editor-field service-editor-full">
+              <label for="service-default-policy">Default escalation policy</label>
+              <select id="service-default-policy" class="input"><option value="">No default policy</option></select>
+            </div>
+            <div class="service-editor-field service-editor-full">
+              <label for="service-notification-policy">Notification policy</label>
+              <select id="service-notification-policy" class="input" aria-describedby="service-notification-hint"><option value="">No notification policy</option></select>
+              <p id="service-notification-hint" class="help-text">Used when a route is configured to deliver through the service notification policy.</p>
+            </div>
+            <div class="service-editor-field service-editor-full">
+              <label for="service-priority-policy">Priority policy</label>
+              <select id="service-priority-policy" class="input" aria-describedby="service-priority-hint"><option value="">Use team default</option></select>
+              <p id="service-priority-hint" class="help-text">Overrides the team's default priority policy for incidents assigned to this service.</p>
             </div>
           </div>
+        </section>
 
-          <div class="form-body">
-            <label for="service-status">Status</label>
-            <select id="service-status" class="input">
-              <option value="operational">Operational</option>
-              <option value="degraded">Degraded</option>
-              <option value="partial_outage">Partial outage</option>
-              <option value="major_outage">Major outage</option>
-              <option value="maintenance">Maintenance</option>
-              <option value="disabled">Disabled</option>
-              <option value="unknown">Unknown</option>
-            </select>
-
-            <label for="service-status-message">Status message</label>
-            <textarea id="service-status-message" class="input" rows="3"></textarea>
-
-            <label for="service-default-rotation">Default rotation</label>
-            <select id="service-default-rotation" class="input"><option value="">No default rotation</option></select>
-
-            <label for="service-default-policy">Default escalation policy</label>
-            <select id="service-default-policy" class="input"><option value="">No default policy</option></select>
-
-              <label for="service-notification-policy">Notification policy</label>
-                <select id="service-notification-policy" class="input">
-                  <option value="">No notification policy</option>
-                </select>
-
-                <div class="help-text">
-                  Used when a route is configured to deliver through the service notification policy.
-                </div>
-
-              <label for="service-priority-policy">Priority policy</label>
-              <select id="service-priority-policy" class="input">
-                  <option value="">Use team default</option>
+        <section class="service-editor-section" aria-labelledby="service-status-heading">
+          <div class="service-editor-heading">
+            <span class="service-editor-icon" aria-hidden="true"><i class="fas fa-signal"></i></span>
+            <div><h3 id="service-status-heading">{{ _('services.form.status_visibility') }}</h3><p>{{ _('services.form.status_hint') }}</p></div>
+          </div>
+          <div class="service-editor-fields">
+            <div class="service-editor-field service-editor-full">
+              <label for="service-status">Status</label>
+              <select id="service-status" class="input">
+                <option value="operational">Operational</option>
+                <option value="degraded">Degraded</option>
+                <option value="partial_outage">Partial outage</option>
+                <option value="major_outage">Major outage</option>
+                <option value="maintenance">Maintenance</option>
+                <option value="disabled">Disabled</option>
+                <option value="unknown">Unknown</option>
               </select>
-
-              <div class="help-text">
-                  Overrides the team's default priority policy for incidents assigned to this service.
-              </div>
-
-            <label class="md-checkbox"><input id="service-enabled" type="checkbox" checked><span>Enabled</span></label>
-            <label class="md-checkbox"><input id="service-public" type="checkbox"><span>Show on status page later</span></label>
-
-            <div class="form-actions">
-              <button id="reset-service-form" type="button" class="btn">Reset</button>
-              <button id="save-service" type="button" class="btn btn-primary">Save service</button>
             </div>
+            <div class="service-editor-field service-editor-full">
+              <label for="service-status-message">Status message</label>
+              <textarea id="service-status-message" class="input" rows="3"></textarea>
+            </div>
+            <div class="service-editor-options service-editor-full">
+              <label class="md-checkbox"><input id="service-enabled" type="checkbox" checked><span>Enabled</span></label>
+              <label class="md-checkbox"><input id="service-public" type="checkbox"><span>Show on status page later</span></label>
+            </div>
+          </div>
+        </section>
+
+        <section class="service-editor-section" aria-labelledby="service-metadata-heading">
+          <div class="service-editor-heading">
+            <span class="service-editor-icon service-editor-code-icon" aria-hidden="true">{ }</span>
+            <div><h3 id="service-metadata-heading">{{ _('services.form.metadata') }}</h3><p>{{ _('services.form.metadata_hint') }}</p></div>
+          </div>
+          <div class="service-editor-field">
+            <div class="service-metadata-toolbar">
+              <label for="service-metadata">{{ _('services.form.metadata_json') }}</label>
+              <button id="format-service-metadata" class="btn btn-sm" type="button">{{ _('services.form.format_json') }}</button>
+            </div>
+            <textarea id="service-metadata" class="input service-metadata-input" rows="9" spellcheck="false" autocapitalize="off" autocomplete="off" aria-describedby="service-metadata-hint service-metadata-error">{}</textarea>
+            <p id="service-metadata-hint" class="help-text">{{ _('services.form.metadata_example') }}</p>
+            <p id="service-metadata-error" class="service-editor-error" role="alert" hidden></p>
           </div>
         </section>
       </div>
+    </div>
+
+    <div class="app-modal-footer service-editor-footer">
+      <button id="cancel-service-form" type="button" class="btn">{{ _('services.form.cancel') }}</button>
+      <button id="save-service" type="button" class="btn btn-primary">Save service</button>
     </div>
   </div>
 </div>

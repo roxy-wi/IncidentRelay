@@ -2,6 +2,7 @@ import logging
 from datetime import timedelta
 
 from app.modules.db import alerts_repo
+from app.modules.db.models import AlertGroup
 from app.services import escalation_policies as escalation_policy_service
 from app.services.alerts.escalation import maybe_escalate_alert
 from app.services.alerts.shelving import is_alert_group_shelved
@@ -67,7 +68,7 @@ def send_unacked_reminders():
             if group.next_escalation_at is not None:
                 group.next_escalation_at = None
                 group.updated_at = now
-                group.save()
+                group.save(only=[AlertGroup.next_escalation_at, AlertGroup.updated_at])
             logger.debug(
                 "reminder and escalation skipped while alert group is shelved",
                 extra={"extra": {"alert_group_id": group.id}},

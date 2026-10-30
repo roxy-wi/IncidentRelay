@@ -131,5 +131,20 @@
   "services.details.event_orchestrations": "Event orchestrations",
   "services.details.orchestration_disabled": "Disabled",
   "services.details.orchestration_active": "Active",
-  "services.details.orchestration_shadow": "Shadow"
+  "services.details.orchestration_shadow": "Shadow",
+  "services.form.subtitle": "Configure ownership, response and service details.",
+  "services.form.identity": "Service details",
+  "services.form.identity_hint": "Identify and classify this service.",
+  "services.form.response": "Incident response",
+  "services.form.response_hint": "Choose who responds and how they are notified.",
+  "services.form.status_visibility": "Status and visibility",
+  "services.form.status_hint": "Set the current status and service availability.",
+  "services.form.metadata": "Metadata",
+  "services.form.metadata_hint": "Custom attributes used by service standards and integrations.",
+  "services.form.metadata_json": "JSON object",
+  "services.form.format_json": "Format JSON",
+  "services.form.metadata_example": "Example: {\"owner\": \"platform-team\", \"pci\": true}. Use {} to clear metadata.",
+  "services.form.metadata_invalid": "Invalid JSON. Check quotes, commas and brackets.",
+  "services.form.metadata_object_required": "Metadata must be a JSON object. Use {} for empty metadata.",
+  "services.form.cancel": "Cancel"
 }

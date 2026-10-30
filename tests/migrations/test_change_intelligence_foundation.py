@@ -109,7 +109,10 @@ def test_upgrade_empty_schema_creates_storage_without_episodes(db, migration):
     assert column_exists(db, "apitoken", "change_integration_id")
 
 
-@pytest.mark.parametrize("status", ["firing", "acknowledged", "resolved", "merged"])
+@pytest.mark.parametrize(
+    "status",
+    ["firing", "acknowledged", "silenced", "maintenance", "resolved", "merged"],
+)
 def test_upgrade_preserves_legacy_data_without_reconstructing_episodes(
     db, migration, status
 ):

@@ -131,5 +131,20 @@
   "services.details.event_orchestrations": "Ereignis-Orchestrierungen",
   "services.details.orchestration_disabled": "Deaktiviert",
   "services.details.orchestration_active": "Aktiv",
-  "services.details.orchestration_shadow": "Schattenmodus"
+  "services.details.orchestration_shadow": "Schattenmodus",
+  "services.form.subtitle": "Zuständigkeit, Reaktion und Servicedetails konfigurieren.",
+  "services.form.identity": "Servicedetails",
+  "services.form.identity_hint": "Diesen Service benennen und klassifizieren.",
+  "services.form.response": "Vorfallreaktion",
+  "services.form.response_hint": "Zuständigkeiten und Benachrichtigungen festlegen.",
+  "services.form.status_visibility": "Status und Sichtbarkeit",
+  "services.form.status_hint": "Aktuellen Status und Verfügbarkeit festlegen.",
+  "services.form.metadata": "Metadaten",
+  "services.form.metadata_hint": "Eigene Attribute für Servicestandards und Integrationen.",
+  "services.form.metadata_json": "JSON-Objekt",
+  "services.form.format_json": "JSON formatieren",
+  "services.form.metadata_example": "Beispiel: {\"owner\": \"platform-team\", \"pci\": true}. Mit {} die Metadaten leeren.",
+  "services.form.metadata_invalid": "Ungültiges JSON. Anführungszeichen, Kommas und Klammern prüfen.",
+  "services.form.metadata_object_required": "Metadaten müssen ein JSON-Objekt sein. Für leere Metadaten {} verwenden.",
+  "services.form.cancel": "Abbrechen"
 }

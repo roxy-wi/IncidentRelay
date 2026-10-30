@@ -4,6 +4,8 @@ import logging
 import uuid
 from dataclasses import dataclass
 
+from peewee import SqliteDatabase
+
 from app.modules.db.models import (
     AlertRoute,
     EscalationPolicy,
@@ -44,10 +46,18 @@ class CheckOutcome:
 def evaluate_service_readiness(service, *, trigger="system", actor_user=None):
     batch_uid = uuid.uuid4()
     evaluated_at = utc_now()
-    standards = list_applicable_standards(service)
     database = Service._meta.database
+    backend = getattr(database, "obj", database)
+    # Reserve SQLite writes before reading so another writer cannot invalidate
+    # the snapshot before evaluation results are inserted.
+    transaction = (
+        database.atomic("IMMEDIATE")
+        if isinstance(backend, SqliteDatabase)
+        else database.atomic()
+    )
 
-    with database.atomic():
+    with transaction:
+        standards = list_applicable_standards(service)
         evaluation_records = [
             _evaluate_standard(
                 service,

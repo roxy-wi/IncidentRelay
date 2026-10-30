@@ -116,7 +116,7 @@
         resolveElement(target).removeAttr("aria-busy");
     }
 
-    function setButtonLoading(target, active) {
+    function setButtonLoading(target, active, options) {
         const button = resolveElement(target);
 
         if (!button.length) {
@@ -133,8 +133,11 @@
             button.data("ui-loading-original-disabled", button.prop("disabled"));
             button
                 .prop("disabled", true)
-                .attr("aria-busy", "true")
-                .addClass("is-loading")
+                .attr("aria-busy", "true");
+            if (options && options.spinner === false) {
+                return;
+            }
+            button.addClass("is-loading")
                 .empty()
                 .append(spinner({small: true}))
                 .append(

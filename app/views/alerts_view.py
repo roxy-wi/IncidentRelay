@@ -580,25 +580,32 @@ def merge_alert_groups_view(target_group_id):
     user_id = getattr(user, "id", None)
 
     # Merge mutation, timeline and audit must commit or roll back together.
-    with db.atomic():
-        group = alerts_repo.merge_alert_groups(
-            target_group_id=target_group_id,
-            source_group_ids=source_group_ids,
-            user_id=user_id,
-            reason=reason,
-        )
+    try:
+        with incident_core_repo.write_transaction():
+            group = alerts_repo.merge_alert_groups(
+                target_group_id=target_group_id,
+                source_group_ids=source_group_ids,
+                user_id=user_id,
+                reason=reason,
+            )
 
-        write_audit(
-            "alert_group.merge",
-            object_type="alert_group",
-            object_id=group.id,
-            team_id=group.team.id if group.team else None,
-            user_id=user_id,
-            data={
-                "target_group_id": target_group_id,
-                "source_group_ids": source_group_ids,
-                "reason": reason,
-            },
+            write_audit(
+                "alert_group.merge",
+                object_type="alert_group",
+                object_id=group.id,
+                team_id=group.team.id if group.team else None,
+                user_id=user_id,
+                data={
+                    "target_group_id": target_group_id,
+                    "source_group_ids": source_group_ids,
+                    "reason": reason,
+                },
+            )
+    except alerts_repo.AlertGroupMergeConflict as exc:
+        return make_error_response(
+            error="conflict",
+            message=str(exc),
+            status_code=409,
         )
 
     return jsonify(

@@ -131,5 +131,20 @@
   "services.details.event_orchestrations": "Оркестрации событий",
   "services.details.orchestration_disabled": "Отключена",
   "services.details.orchestration_active": "Активна",
-  "services.details.orchestration_shadow": "Теневой режим"
+  "services.details.orchestration_shadow": "Теневой режим",
+  "services.form.subtitle": "Настройте владельца, реагирование и сведения о сервисе.",
+  "services.form.identity": "Сведения о сервисе",
+  "services.form.identity_hint": "Название, команда и классификация сервиса.",
+  "services.form.response": "Реагирование на инциденты",
+  "services.form.response_hint": "Кто реагирует на инциденты и как получает уведомления.",
+  "services.form.status_visibility": "Статус и видимость",
+  "services.form.status_hint": "Текущее состояние и доступность сервиса.",
+  "services.form.metadata": "Метаданные",
+  "services.form.metadata_hint": "Дополнительные атрибуты для стандартов сервиса и интеграций.",
+  "services.form.metadata_json": "JSON-объект",
+  "services.form.format_json": "Форматировать JSON",
+  "services.form.metadata_example": "Пример: {\"owner\": \"platform-team\", \"pci\": true}. Для очистки метаданных укажите {}.",
+  "services.form.metadata_invalid": "Некорректный JSON. Проверьте кавычки, запятые и скобки.",
+  "services.form.metadata_object_required": "Метаданные должны быть JSON-объектом. Для пустых метаданных укажите {}.",
+  "services.form.cancel": "Отмена"
 }

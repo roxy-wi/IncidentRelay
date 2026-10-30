@@ -4,7 +4,7 @@ from datetime import datetime
 
 from app.db import database_proxy
 from app.modules.common import utc_now
-from app.modules.db import alerts_repo, audit_repo, silences_repo
+from app.modules.db import alerts_repo, audit_repo, incident_core_repo, silences_repo
 from app.modules.db.models import (
     Alert,
     AlertGroup,
@@ -14,6 +14,21 @@ from app.modules.db.models import (
 from app.services.alerts.escalation import apply_initial_escalation_policy_assignment
 from app.services.alerts.notification_queue import schedule_group_notification
 from app.services.routing.matcher.match_context import alert_rule_matches
+
+
+def _lock_groups_for_alerts(alert_ids):
+    """Lock parents before changing children, in the lifecycle lock order."""
+    group_ids = sorted(
+        {
+            row.group_id
+            for row in Alert.select(Alert.group).where(Alert.id.in_(alert_ids))
+            if row.group_id is not None
+        }
+    )
+    return {
+        group_id: incident_core_repo.lock_alert_group(group_id)
+        for group_id in group_ids
+    }
 
 
 RELEASE_REASON_DISABLED = "disabled"
@@ -304,8 +319,18 @@ def apply_silence_to_existing_alerts(
     )
     changed_group_ids: set[int] = set()
 
-    with database_proxy.atomic():
+    with incident_core_repo.write_transaction():
+        alerts = list(alerts)
+        groups = _lock_groups_for_alerts([alert.id for alert in alerts])
         for alert in alerts:
+            alert = Alert.get_by_id(alert.id)
+            group = groups.get(alert.group_id)
+            if (
+                not group
+                or group.status in {"resolved", "merged"}
+                or alert.status == "resolved"
+            ):
+                continue
             if not _alert_matches_silence(alert, silence):
                 continue
 
@@ -354,7 +379,7 @@ def apply_silence_to_existing_alerts(
             changed_group_ids.add(alert.group_id)
             result["silenced"] += 1
 
-        for group_id in changed_group_ids:
+        for group_id in sorted(changed_group_ids):
             group = AlertGroup.get_by_id(group_id)
             previous_status = group.status
             group = alerts_repo.recalculate_alert_group(group)
@@ -386,7 +411,7 @@ def _release_application_alert(
     actor_user_id: int | None = None,
     api_token_id: int | None = None,
 ) -> int | None:
-    alert = application.alert
+    alert = Alert.get_by_id(application.alert_id)
     silences_repo.release_application(application, reason=reason, now=now)
 
     if alert.status == "resolved":
@@ -488,8 +513,16 @@ def release_silence_applications(
 
     changed_group_ids: set[int] = set()
 
-    with database_proxy.atomic():
+    with incident_core_repo.write_transaction():
+        groups = _lock_groups_for_alerts(
+            [application.alert_id for application in applications]
+        )
         for application in applications:
+            alert = Alert.get_by_id(application.alert_id)
+            if alert.group_id not in groups:
+                # Merge moved this child before we locked its former parent.
+                # Leave the application active for the next reconciliation.
+                continue
             group_id = _release_application_alert(
                 application,
                 silence=silence,
@@ -504,7 +537,7 @@ def release_silence_applications(
                 changed_group_ids.add(group_id)
                 result["reactivated"] += 1
 
-        for group_id in changed_group_ids:
+        for group_id in sorted(changed_group_ids):
             group = AlertGroup.get_by_id(group_id)
             previous_status = group.status
             group = alerts_repo.recalculate_alert_group(group)
@@ -630,8 +663,17 @@ def reconcile_orphan_silenced_alerts(
     result = {"backfilled": 0, "reactivated": 0, "groups_changed": 0}
     changed_group_ids: set[int] = set()
 
-    with database_proxy.atomic():
+    with incident_core_repo.write_transaction():
+        groups = _lock_groups_for_alerts([alert.id for alert in alerts])
         for alert in alerts:
+            alert = Alert.get_by_id(alert.id)
+            group = groups.get(alert.group_id)
+            if (
+                not group
+                or group.status in {"resolved", "merged"}
+                or alert.status != "silenced"
+            ):
+                continue
             matching = find_active_silences(
                 alert.team_id,
                 alert,
@@ -668,7 +710,7 @@ def reconcile_orphan_silenced_alerts(
             changed_group_ids.add(alert.group_id)
             result["reactivated"] += 1
 
-        for group_id in changed_group_ids:
+        for group_id in sorted(changed_group_ids):
             group = AlertGroup.get_by_id(group_id)
             previous_status = group.status
             group = alerts_repo.recalculate_alert_group(group)

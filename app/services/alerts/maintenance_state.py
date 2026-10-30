@@ -2,7 +2,7 @@ from datetime import datetime, timezone as dt_timezone
 from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
 from app.modules.common import utc_now
-from app.modules.db import alerts_repo, audit_repo, maintenance_repo
+from app.modules.db import alerts_repo, audit_repo, incident_core_repo, maintenance_repo
 from app.modules.db.models import (
     Alert,
     AlertGroup,
@@ -216,7 +216,16 @@ def pause_notification_lifecycle(group: AlertGroup) -> bool:
         changed = True
     if changed:
         group.updated_at = utc_now()
-        group.save()
+        group.save(
+            only=[
+                AlertGroup.maintenance_suppressed,
+                AlertGroup.notification_pending,
+                AlertGroup.notification_due_at,
+                AlertGroup.notification_reason,
+                AlertGroup.next_escalation_at,
+                AlertGroup.updated_at,
+            ]
+        )
     if newly_suppressed:
         alerts_repo.create_alert_event(
             group_id=group.id,
@@ -341,6 +350,8 @@ def _recompute_group_effects(
     fallback_status: str | None = None,
     notify_on_resume: bool = False,
 ) -> None:
+    if group.status == "merged" or group.merged_into_id:
+        return
     applications = _active_group_applications(group)
     behaviors = {application.behavior for application in applications}
     create_maintenance = MAINTENANCE_INCIDENT_BEHAVIOR in behaviors
@@ -447,78 +458,96 @@ def _apply_window_to_group(
     actor_user_id: int | None,
     api_token_id: int | None,
 ) -> bool:
-    application = maintenance_repo.get_window_group_application(window, group)
-    source = "existing"
-    if occurrence_start and (group.first_seen_at or group.created_at) >= occurrence_start:
-        source = "new"
-    created_or_reactivated = application is None or not application.active
-    previous_behavior = application.behavior if application else None
-    behavior_changed = bool(application and previous_behavior != window.behavior)
-    previous_state = group.status
+    with incident_core_repo.write_transaction():
+        group = incident_core_repo.lock_alert_group(group.id)
+        if (
+            group is None
+            or group.status in {"resolved", "merged"}
+            or group.merged_into_id
+        ):
+            return False
+        application = maintenance_repo.get_window_group_application(window, group)
+        source = "existing"
+        if (
+            occurrence_start
+            and (group.first_seen_at or group.created_at) >= occurrence_start
+        ):
+            source = "new"
+        created_or_reactivated = application is None or not application.active
+        previous_behavior = application.behavior if application else None
+        behavior_changed = bool(application and previous_behavior != window.behavior)
+        previous_state = group.status
 
-    if application is None:
-        previous_status = group.status
-        if previous_status == "maintenance":
-            previous_status = _original_status_for_group(group)
-        application = MaintenanceWindowAlertApplication.create(
-            maintenance_window=window,
-            alert_group=group,
-            behavior=window.behavior,
-            application_source=source,
-            previous_status=previous_status,
-            occurrence_started_at=occurrence_start,
-            active=True,
-            applied_at=now,
-        )
-    else:
-        if window.behavior == MAINTENANCE_INCIDENT_BEHAVIOR and not application.previous_status:
-            application.previous_status = _original_status_for_group(group)
-        application.behavior = window.behavior
-        application.application_source = source
-        application.occurrence_started_at = occurrence_start
-        application.active = True
-        application.applied_at = now if created_or_reactivated else application.applied_at
-        application.retained_at = None
-        application.released_at = None
-        application.release_reason = None
-        application.save()
+        if application is None:
+            previous_status = group.status
+            if previous_status == "maintenance":
+                previous_status = _original_status_for_group(group)
+            application = MaintenanceWindowAlertApplication.create(
+                maintenance_window=window,
+                alert_group=group,
+                behavior=window.behavior,
+                application_source=source,
+                previous_status=previous_status,
+                occurrence_started_at=occurrence_start,
+                active=True,
+                applied_at=now,
+            )
+        else:
+            if (
+                window.behavior == MAINTENANCE_INCIDENT_BEHAVIOR
+                and not application.previous_status
+            ):
+                application.previous_status = _original_status_for_group(group)
+            application.behavior = window.behavior
+            application.application_source = source
+            application.occurrence_started_at = occurrence_start
+            application.active = True
+            application.applied_at = (
+                now if created_or_reactivated else application.applied_at
+            )
+            application.retained_at = None
+            application.released_at = None
+            application.release_reason = None
+            application.save()
 
-    notify_on_resume = bool(
-        behavior_changed
-        and previous_behavior in {
-            SUPPRESS_NOTIFICATIONS_BEHAVIOR,
-            MAINTENANCE_INCIDENT_BEHAVIOR,
-        }
-        and window.behavior not in {
-            SUPPRESS_NOTIFICATIONS_BEHAVIOR,
-            MAINTENANCE_INCIDENT_BEHAVIOR,
-        }
-    )
-    _recompute_group_effects(
-        group,
-        now=now,
-        fallback_status=application.previous_status,
-        notify_on_resume=notify_on_resume,
-    )
+        notify_on_resume = bool(
+            behavior_changed
+            and previous_behavior
+            in {
+                SUPPRESS_NOTIFICATIONS_BEHAVIOR,
+                MAINTENANCE_INCIDENT_BEHAVIOR,
+            }
+            and window.behavior
+            not in {
+                SUPPRESS_NOTIFICATIONS_BEHAVIOR,
+                MAINTENANCE_INCIDENT_BEHAVIOR,
+            }
+        )
+        _recompute_group_effects(
+            group,
+            now=now,
+            fallback_status=application.previous_status,
+            notify_on_resume=notify_on_resume,
+        )
 
-    if created_or_reactivated or behavior_changed:
-        alerts_repo.create_alert_event(
-            group_id=group.id,
-            event_type="maintenance_applied",
-            message=f"Maintenance applied: {window.name} ({window.behavior})",
-            user_id=actor_user_id,
-        )
-        _write_application_audit(
-            "maintenance_window.alert_group_applied",
-            application,
-            trigger_source=trigger_source,
-            actor_user_id=actor_user_id,
-            api_token_id=api_token_id,
-            previous_state=previous_state,
-            new_state=AlertGroup.get_by_id(group.id).status,
-        )
-        return True
-    return False
+        if created_or_reactivated or behavior_changed:
+            alerts_repo.create_alert_event(
+                group_id=group.id,
+                event_type="maintenance_applied",
+                message=f"Maintenance applied: {window.name} ({window.behavior})",
+                user_id=actor_user_id,
+            )
+            _write_application_audit(
+                "maintenance_window.alert_group_applied",
+                application,
+                trigger_source=trigger_source,
+                actor_user_id=actor_user_id,
+                api_token_id=api_token_id,
+                previous_state=previous_state,
+                new_state=AlertGroup.get_by_id(group.id).status,
+            )
+            return True
+        return False
 
 
 def _release_application(
@@ -530,44 +559,49 @@ def _release_application(
     actor_user_id: int | None,
     api_token_id: int | None,
 ) -> bool:
-    if not application.active:
-        return False
-    group = application.alert_group
-    previous_state = group.status
-    fallback_status = application.previous_status
-    application.active = False
-    application.retained_at = None
-    application.released_at = now
-    application.release_reason = reason
-    application.save()
-    if application.behavior == PAUSE_ESCALATION_BEHAVIOR:
-        group.reminder_count = 0
-        group.save(only=[group.__class__.reminder_count])
-    _recompute_group_effects(
-        group,
-        now=now,
-        fallback_status=fallback_status,
-        notify_on_resume=application.behavior in {
-            SUPPRESS_NOTIFICATIONS_BEHAVIOR,
-            MAINTENANCE_INCIDENT_BEHAVIOR,
-        },
-    )
-    alerts_repo.create_alert_event(
-        group_id=group.id,
-        event_type="maintenance_released",
-        message=f"Maintenance effect released: {application.maintenance_window.name}",
-        user_id=actor_user_id,
-    )
-    _write_application_audit(
-        "maintenance_window.alert_group_released",
-        application,
-        trigger_source=trigger_source,
-        actor_user_id=actor_user_id,
-        api_token_id=api_token_id,
-        previous_state=previous_state,
-        new_state=AlertGroup.get_by_id(group.id).status,
-    )
-    return True
+    with incident_core_repo.write_transaction():
+        group = incident_core_repo.lock_alert_group(application.alert_group_id)
+        if group is None:
+            return False
+        application = MaintenanceWindowAlertApplication.get_by_id(application.id)
+        if not application.active:
+            return False
+        previous_state = group.status
+        fallback_status = application.previous_status
+        application.active = False
+        application.retained_at = None
+        application.released_at = now
+        application.release_reason = reason
+        application.save()
+        if application.behavior == PAUSE_ESCALATION_BEHAVIOR:
+            group.reminder_count = 0
+            group.save(only=[group.__class__.reminder_count])
+        _recompute_group_effects(
+            group,
+            now=now,
+            fallback_status=fallback_status,
+            notify_on_resume=application.behavior
+            in {
+                SUPPRESS_NOTIFICATIONS_BEHAVIOR,
+                MAINTENANCE_INCIDENT_BEHAVIOR,
+            },
+        )
+        alerts_repo.create_alert_event(
+            group_id=group.id,
+            event_type="maintenance_released",
+            message=f"Maintenance effect released: {application.maintenance_window.name}",
+            user_id=actor_user_id,
+        )
+        _write_application_audit(
+            "maintenance_window.alert_group_released",
+            application,
+            trigger_source=trigger_source,
+            actor_user_id=actor_user_id,
+            api_token_id=api_token_id,
+            previous_state=previous_state,
+            new_state=AlertGroup.get_by_id(group.id).status,
+        )
+        return True
 
 
 def _retain_application(

@@ -131,5 +131,20 @@
   "services.details.event_orchestrations": "事件编排",
   "services.details.orchestration_disabled": "已禁用",
   "services.details.orchestration_active": "生效",
-  "services.details.orchestration_shadow": "影子模式"
+  "services.details.orchestration_shadow": "影子模式",
+  "services.form.subtitle": "配置负责人、事件响应和服务详情。",
+  "services.form.identity": "服务详情",
+  "services.form.identity_hint": "标识此服务并设置分类。",
+  "services.form.response": "事件响应",
+  "services.form.response_hint": "选择响应人员及其通知方式。",
+  "services.form.status_visibility": "状态与可见性",
+  "services.form.status_hint": "设置当前状态和服务可用性。",
+  "services.form.metadata": "元数据",
+  "services.form.metadata_hint": "用于服务标准和集成的自定义属性。",
+  "services.form.metadata_json": "JSON 对象",
+  "services.form.format_json": "格式化 JSON",
+  "services.form.metadata_example": "示例：{\"owner\": \"platform-team\", \"pci\": true}。使用 {} 清空元数据。",
+  "services.form.metadata_invalid": "JSON 无效。请检查引号、逗号和括号。",
+  "services.form.metadata_object_required": "元数据必须是 JSON 对象。使用 {} 表示空元数据。",
+  "services.form.cancel": "取消"
 }

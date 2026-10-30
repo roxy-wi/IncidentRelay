@@ -6,6 +6,7 @@ import hashlib
 from peewee import Case, JOIN, fn
 
 from app.db import database_proxy as db
+from app.modules.db import alert_episodes_repo, incident_core_repo
 
 from app.modules.db.models import (
     Alert,
@@ -499,13 +500,15 @@ def find_open_alert_group(source, group_key, team_id=None, route_id=None, servic
 def create_alert_group(**kwargs):
     """Create alert group."""
 
-    group_key = kwargs.get("group_key") or ""
-    kwargs["group_key_hash"] = hash_group_key(group_key)
-    group = AlertGroup.create(**kwargs)
-    # Single hook point for group creation, whatever path created the
-    # group: integration intake, manual creation, scheduler-side intakes.
-    record_alert_group_action("created")
-    return group
+    with incident_core_repo.write_transaction():
+        group_key = kwargs.get("group_key") or ""
+        kwargs["group_key_hash"] = hash_group_key(group_key)
+        group = AlertGroup.create(**kwargs)
+        alert_episodes_repo.open_episode(group, started_at=group.first_seen_at)
+        # Single hook point for group creation, whatever path created the
+        # group: integration intake, manual creation, scheduler-side intakes.
+        record_alert_group_action("created")
+        return group
 
 
 def list_alerts_for_group(group_id):
@@ -546,9 +549,20 @@ def _collect_group_labels(alerts):
     return common, values
 
 
-def recalculate_alert_group(group):
+def recalculate_alert_group(group, *, event=None):
+    """Recalculate persisted state while serializing with lifecycle writers."""
+    with incident_core_repo.write_transaction():
+        locked = incident_core_repo.lock_alert_group(group.id)
+        if locked is None:
+            raise AlertGroup.DoesNotExist()
+        return _recalculate_alert_group(locked, event=event)
+
+
+def _recalculate_alert_group(group, *, event=None):
     """Recalculate alert group counters, labels and effective status."""
 
+    if group.merged_into_id or group.status == "merged":
+        return group
     now = utc_now()
 
     alerts = list(
@@ -646,6 +660,18 @@ def recalculate_alert_group(group):
 
     group.updated_at = now
     group.save()
+    if group.status == "resolved":
+        alert_episodes_repo.close_episode(
+            group,
+            state="resolved",
+            ended_at=group.resolved_at,
+            event=event,
+        )
+    elif previous_status == "resolved":
+        alert_episodes_repo.open_episode(
+            group,
+            started_at=now,
+        )
 
     return group
 
@@ -653,42 +679,61 @@ def recalculate_alert_group(group):
 def acknowledge_alert_group(group_id, user_id=None):
     """Acknowledge alert group."""
 
-    group = AlertGroup.get_by_id(group_id)
-    group.previous_status = group.status
-    group.status = "acknowledged"
-    group.acknowledged_by = user_id
-    group.acknowledged_at = utc_now()
-    group.save()
-    record_alert_group_action("acknowledged")
-    return group
+    with incident_core_repo.write_transaction():
+        group = incident_core_repo.lock_alert_group(group_id)
+        if group is None:
+            raise AlertGroup.DoesNotExist()
+        if (
+            group.status in alert_episodes_repo.TERMINAL_STATUSES
+            or group.merged_into_id
+        ):
+            return group
+        group.previous_status = group.status
+        group.status = "acknowledged"
+        group.acknowledged_by = user_id
+        group.acknowledged_at = utc_now()
+        group.save()
+        record_alert_group_action("acknowledged")
+        return group
 
 
-def resolve_alert_group(group_id, user_id=None):
+def resolve_alert_group(group_id, user_id=None, *, event=None):
     """Resolve alert group and all child alerts."""
 
-    now = utc_now()
-    group = AlertGroup.get_by_id(group_id)
+    with incident_core_repo.write_transaction():
+        group = incident_core_repo.lock_alert_group(group_id)
+        if group is None:
+            raise AlertGroup.DoesNotExist()
+        if (
+            group.status in alert_episodes_repo.TERMINAL_STATUSES
+            or group.merged_into_id
+        ):
+            return group
 
-    (
-        Alert.update(status="resolved", resolved_at=now)
-        .where(
-            (Alert.group == group.id)
-            & (Alert.status != "resolved")
+        now = utc_now()
+        (
+            Alert.update(status="resolved", resolved_at=now)
+            .where((Alert.group == group.id) & (Alert.status != "resolved"))
+            .execute()
         )
-        .execute()
-    )
 
-    group.previous_status = group.status
-    group.status = "resolved"
-    group.resolved_by = user_id
-    group.resolved_at = now
-    group.firing_count = 0
-    group.acknowledged_count = 0
-    group.resolved_count = Alert.select().where(Alert.group == group.id).count()
-    group.updated_at = now
-    group.save()
-    record_alert_group_action("resolved")
-    return group
+        group.previous_status = group.status
+        group.status = "resolved"
+        group.resolved_by = user_id
+        group.resolved_at = now
+        group.firing_count = 0
+        group.acknowledged_count = 0
+        group.resolved_count = Alert.select().where(Alert.group == group.id).count()
+        group.updated_at = now
+        group.save()
+        alert_episodes_repo.close_episode(
+            group,
+            state="resolved",
+            ended_at=now,
+            event=event,
+        )
+        record_alert_group_action("resolved")
+        return group
 
 
 def list_firing_alert_groups():
@@ -711,14 +756,14 @@ def list_firing_alert_groups():
 
 def record_group_notification_time(group, now):
     group.last_notification_at = now
-    group.save()
+    group.save(only=[AlertGroup.last_notification_at])
     return group
 
 
 def increment_group_reminder(group, now):
     group.reminder_count += 1
     group.last_notification_at = now
-    group.save()
+    group.save(only=[AlertGroup.reminder_count, AlertGroup.last_notification_at])
     return group
 
 
@@ -872,18 +917,34 @@ def paginate_group_events(group_id, page=1, page_size=50):
     }
 
 
+class AlertGroupMergeConflict(ValueError):
+    """The requested merge target is no longer available."""
+
+
 def merge_alert_groups(target_group_id, source_group_ids, user_id=None, reason=None):
     """Merge source groups into target group."""
 
-    with db.atomic():
-        target = AlertGroup.get_by_id(target_group_id)
+    with incident_core_repo.write_transaction():
+        ids = sorted(
+            {int(target_group_id), *(int(value) for value in source_group_ids)}
+        )
+        locked = {
+            group_id: incident_core_repo.lock_alert_group(group_id) for group_id in ids
+        }
+        if any(group is None for group in locked.values()):
+            raise AlertGroup.DoesNotExist()
+        target = locked[int(target_group_id)]
+        if target.merged_into_id or target.status == "merged":
+            raise AlertGroupMergeConflict("Cannot merge into an already merged group.")
         now = utc_now()
 
-        for source_id in source_group_ids:
+        for source_id in sorted(set(map(int, source_group_ids))):
             if int(source_id) == int(target_group_id):
                 continue
 
-            source = AlertGroup.get_by_id(source_id)
+            source = locked[source_id]
+            if source.merged_into_id:
+                continue
 
             (
                 Alert.update(group=target.id, group_key=target.group_key)
@@ -923,14 +984,21 @@ def merge_alert_groups(target_group_id, source_group_ids, user_id=None, reason=N
                 reason=reason,
             )
 
-            create_alert_event(
+            event = create_alert_event(
                 group_id=source.id,
                 event_type="merged",
                 message=f"Merged into group #{target.id}",
                 user_id=user_id,
             )
 
-        recalculate_alert_group(target)
+            alert_episodes_repo.close_episode(
+                source,
+                state="merged",
+                ended_at=now,
+                event=event,
+            )
+
+        target = recalculate_alert_group(target)
 
         create_alert_event(
             group_id=target.id,
@@ -1079,7 +1147,14 @@ def schedule_alert_group_notification(group, due_at, reason="notification"):
     group.notification_due_at = due_at
     group.notification_reason = reason
     group.updated_at = utc_now()
-    group.save()
+    group.save(
+        only=[
+            AlertGroup.notification_pending,
+            AlertGroup.notification_due_at,
+            AlertGroup.notification_reason,
+            AlertGroup.updated_at,
+        ]
+    )
 
     return group
 
@@ -1091,7 +1166,14 @@ def clear_alert_group_notification(group):
     group.notification_due_at = None
     group.notification_reason = None
     group.updated_at = utc_now()
-    group.save()
+    group.save(
+        only=[
+            AlertGroup.notification_pending,
+            AlertGroup.notification_due_at,
+            AlertGroup.notification_reason,
+            AlertGroup.updated_at,
+        ]
+    )
 
     return group
 
@@ -1106,7 +1188,15 @@ def mark_alert_group_notification_sent(group, now=None):
     group.notification_reason = None
     group.last_notification_at = now
     group.updated_at = now
-    group.save()
+    group.save(
+        only=[
+            AlertGroup.notification_pending,
+            AlertGroup.notification_due_at,
+            AlertGroup.notification_reason,
+            AlertGroup.last_notification_at,
+            AlertGroup.updated_at,
+        ]
+    )
 
     return group
 

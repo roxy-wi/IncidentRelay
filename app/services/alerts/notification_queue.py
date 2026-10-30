@@ -293,7 +293,7 @@ def schedule_group_notification(group, reason="notification", now=None):
         if group.next_escalation_at is not None:
             group.next_escalation_at = None
             group.updated_at = now
-            group.save()
+            group.save(only=[AlertGroup.next_escalation_at, AlertGroup.updated_at])
         return group
 
     if is_notification_lifecycle_suppressed(group, now=now):

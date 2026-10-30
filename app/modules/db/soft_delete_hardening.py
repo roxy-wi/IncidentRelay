@@ -6,8 +6,10 @@ or queued operational state is stopped.
 """
 
 from app.modules.common import utc_now
+from app.modules.db import alert_episodes_repo, incident_core_repo
 from app.modules.db.models import (
     Alert,
+    AlertEvent,
     AlertGroup,
     AutomationExecution,
     BrowserPushActionToken,
@@ -95,76 +97,78 @@ def deactivate_user_runtime(user_id, *, now=None, reason="user_deleted"):
 
 
 def resolve_alert_groups_by_ids(group_ids, *, now=None, reason="resource_deleted"):
-    """Resolve selected alert groups without triggering new notifications."""
-    group_ids = [int(value) for value in set(group_ids or []) if value]
+    """Resolve groups, children, episodes and discovery work atomically."""
+    group_ids = sorted({int(value) for value in group_ids or [] if value})
     if not group_ids:
         return 0
     now = now or utc_now()
-
-    Alert.update(
-        previous_status=Alert.status,
-        status="resolved",
-        resolved_at=now,
-        next_escalation_at=None,
-    ).where(
-        (Alert.group.in_(group_ids))
-        & (Alert.status != "resolved")
-    ).execute()
-
-    return AlertGroup.update(
-        previous_status=AlertGroup.status,
-        status="resolved",
-        resolved_at=now,
-        next_escalation_at=None,
-        notification_due_at=None,
-        notification_pending=False,
-        notification_reason=reason,
-        firing_count=0,
-        acknowledged_count=0,
-        silenced_count=0,
-        resolved_count=AlertGroup.alert_count,
-        updated_at=now,
-    ).where(
-        (AlertGroup.id.in_(group_ids))
-        & (~AlertGroup.status.in_(("resolved", "merged")))
-    ).execute()
+    changed = 0
+    with incident_core_repo.write_transaction():
+        for group_id in group_ids:
+            group = incident_core_repo.lock_alert_group(group_id)
+            if (
+                group is None
+                or group.status in alert_episodes_repo.TERMINAL_STATUSES
+                or group.merged_into_id
+            ):
+                continue
+            # A newer cycle may have started while the group lock was pending.
+            closed_at = max(now, utc_now())
+            Alert.update(
+                previous_status=Alert.status,
+                status="resolved",
+                resolved_at=closed_at,
+                next_escalation_at=None,
+            ).where(Alert.group == group.id, Alert.status != "resolved").execute()
+            group.previous_status = group.status
+            group.status = "resolved"
+            group.resolved_at = closed_at
+            group.next_escalation_at = None
+            group.notification_due_at = None
+            group.notification_pending = False
+            group.notification_reason = reason
+            group.firing_count = 0
+            group.acknowledged_count = 0
+            group.silenced_count = 0
+            group.resolved_count = group.alert_count
+            group.updated_at = closed_at
+            group.save()
+            event = AlertEvent.create(
+                group=group.id,
+                event_type="resolved",
+                message=f"Alert group resolved: {reason}",
+                created_at=closed_at,
+            )
+            alert_episodes_repo.close_episode(
+                group,
+                state="resolved",
+                ended_at=closed_at,
+                event=event,
+            )
+            changed += 1
+    return changed
 
 
 def resolve_team_runtime_alerts(team_id, *, now=None):
-    """Make unresolved alerts owned by a deleted team terminal.
-
-    This prevents old incidents from re-entering reminder/escalation processing
-    if a team with the same row is restored later.
-    """
+    """Terminate a deleted team's current cycles while preserving history."""
     now = now or utc_now()
-
-    Alert.update(
-        previous_status=Alert.status,
-        status="resolved",
-        resolved_at=now,
-        next_escalation_at=None,
-    ).where(
-        (Alert.team == team_id)
-        & (Alert.status != "resolved")
-    ).execute()
-
-    AlertGroup.update(
-        previous_status=AlertGroup.status,
-        status="resolved",
-        resolved_at=now,
-        next_escalation_at=None,
-        notification_due_at=None,
-        notification_pending=False,
-        notification_reason="team_deleted",
-        firing_count=0,
-        acknowledged_count=0,
-        silenced_count=0,
-        resolved_count=AlertGroup.alert_count,
-        updated_at=now,
-    ).where(
-        (AlertGroup.team == team_id)
-        & (~AlertGroup.status.in_(("resolved", "merged")))
-    ).execute()
+    with incident_core_repo.write_transaction():
+        group_ids = [
+            group.id
+            for group in AlertGroup.select(AlertGroup.id).where(
+                AlertGroup.team == team_id
+            )
+        ]
+        resolve_alert_groups_by_ids(group_ids, now=now, reason="team_deleted")
+        # Legacy orphan children have no group/episode to close.
+        Alert.update(
+            previous_status=Alert.status,
+            status="resolved",
+            resolved_at=now,
+            next_escalation_at=None,
+        ).where(
+            Alert.team == team_id, Alert.group.is_null(True), Alert.status != "resolved"
+        ).execute()
 
 
 def _combine_or_conditions(conditions):

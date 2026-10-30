@@ -131,5 +131,20 @@
   "services.details.event_orchestrations": "Orchestrations d’événements",
   "services.details.orchestration_disabled": "Désactivée",
   "services.details.orchestration_active": "Active",
-  "services.details.orchestration_shadow": "Simulation"
+  "services.details.orchestration_shadow": "Simulation",
+  "services.form.subtitle": "Configurez les responsables, la réponse et les détails du service.",
+  "services.form.identity": "Détails du service",
+  "services.form.identity_hint": "Identifiez et classez ce service.",
+  "services.form.response": "Réponse aux incidents",
+  "services.form.response_hint": "Choisissez les intervenants et leurs notifications.",
+  "services.form.status_visibility": "État et visibilité",
+  "services.form.status_hint": "Définissez l’état actuel et la disponibilité du service.",
+  "services.form.metadata": "Métadonnées",
+  "services.form.metadata_hint": "Attributs personnalisés pour les standards du service et les intégrations.",
+  "services.form.metadata_json": "Objet JSON",
+  "services.form.format_json": "Formater le JSON",
+  "services.form.metadata_example": "Exemple : {\"owner\": \"platform-team\", \"pci\": true}. Utilisez {} pour vider les métadonnées.",
+  "services.form.metadata_invalid": "JSON invalide. Vérifiez les guillemets, virgules et accolades.",
+  "services.form.metadata_object_required": "Les métadonnées doivent être un objet JSON. Utilisez {} pour les laisser vides.",
+  "services.form.cancel": "Annuler"
 }

@@ -1,6 +1,7 @@
 
 from peewee import JOIN
 
+from app.modules.db import incident_core_repo
 from app.modules.db.models import Group, Heartbeat, HeartbeatInstance, HeartbeatPing, Service, Team
 from app.services.integrations.auth import hash_token
 from app.modules.common import utc_now
@@ -245,33 +246,36 @@ def soft_delete_heartbeat(heartbeat):
     """Soft-delete a heartbeat and terminate its current runtime state."""
     from app.modules.db.soft_delete_hardening import resolve_alert_groups_by_ids
 
-    now = utc_now()
-    group_ids = {getattr(heartbeat, "current_alert_group_id", None)}
-    group_ids.update(
-        row.current_alert_group_id
-        for row in HeartbeatInstance.select(HeartbeatInstance.current_alert_group).where(
-            HeartbeatInstance.heartbeat == heartbeat.id
+    with incident_core_repo.write_transaction():
+        now = utc_now()
+        group_ids = {getattr(heartbeat, "current_alert_group_id", None)}
+        group_ids.update(
+            row.current_alert_group_id
+            for row in HeartbeatInstance.select(
+                HeartbeatInstance.current_alert_group
+            ).where(HeartbeatInstance.heartbeat == heartbeat.id)
+            if row.current_alert_group_id
         )
-        if row.current_alert_group_id
-    )
-    resolve_alert_groups_by_ids(
-        group_ids,
-        now=now,
-        reason="heartbeat_deleted",
-    )
-    # Instances are mutable scheduler state. Ping history remains preserved.
-    HeartbeatInstance.delete().where(HeartbeatInstance.heartbeat == heartbeat.id).execute()
+        resolve_alert_groups_by_ids(
+            group_ids,
+            now=now,
+            reason="heartbeat_deleted",
+        )
+        # Instances are mutable scheduler state. Ping history remains preserved.
+        HeartbeatInstance.delete().where(
+            HeartbeatInstance.heartbeat == heartbeat.id
+        ).execute()
 
-    heartbeat.deleted = True
-    heartbeat.deleted_at = now
-    heartbeat.enabled = False
-    heartbeat.status = "paused"
-    heartbeat.next_expected_at = None
-    heartbeat.overdue_since = None
-    heartbeat.current_alert_group = None
-    heartbeat.updated_at = now
-    heartbeat.save()
-    return heartbeat
+        heartbeat.deleted = True
+        heartbeat.deleted_at = now
+        heartbeat.enabled = False
+        heartbeat.status = "paused"
+        heartbeat.next_expected_at = None
+        heartbeat.overdue_since = None
+        heartbeat.current_alert_group = None
+        heartbeat.updated_at = now
+        heartbeat.save()
+        return heartbeat
 
 
 def record_ping(
