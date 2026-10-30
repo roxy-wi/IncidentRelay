@@ -2069,7 +2069,7 @@ function renderAlertPrimaryDetails(alert, modal) {
     const header = $("<div>").addClass("alert-primary-header");
 
     const primaryBadges = $("<div>")
-    .addClass("badge-success")
+    .addClass("alert-primary-badges")
     .append(makeAlertBadge(statusLabel(alert.status), statusBadgeClass(alert.status)))
     .append(alert.shelved ? makeAlertBadge(i18n.t("alerts.status.shelved"), "badge-muted") : $())
     .append(makeAlertBadge(severityLabel(alert.severity), severityBadgeClass(alert.severity)))
