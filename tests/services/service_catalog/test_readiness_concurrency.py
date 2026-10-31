@@ -3,6 +3,7 @@
 import sqlite3
 
 import pytest
+from peewee import SqliteDatabase
 
 from app.modules.db.models import (
     Service,
@@ -28,11 +29,12 @@ def _service_with_standard():
     return service
 
 
-def test_readiness_survives_a_competing_writer(monkeypatch):
+def test_readiness_survives_a_competing_writer(db, monkeypatch):
     """A write between check reads and result inserts must not break evaluation."""
+    if not isinstance(db, SqliteDatabase):
+        pytest.skip("SQLite-specific writer locking regression")
     service = _service_with_standard()
-    database = Service._meta.database
-    other_connection = sqlite3.connect(database.database, timeout=0)
+    other_connection = sqlite3.connect(db.database, timeout=0)
     evaluate_check = readiness.evaluate_check
     write_attempts = []
 
@@ -58,7 +60,7 @@ def test_readiness_survives_a_competing_writer(monkeypatch):
         result = readiness.evaluate_service_readiness(service)
         assert result["state"].status == "ready"
         assert len(result["evaluations"]) == 1
-        assert len(write_attempts) == 1
+        assert write_attempts == ["deferred"]
         assert ServiceReadinessCheckResult.select().count() == 1
 
         # The competing update can complete once evaluation releases its lock.
