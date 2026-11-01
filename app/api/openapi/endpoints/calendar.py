@@ -48,6 +48,7 @@ ERROR_SCHEMA = {
 CALENDAR_EVENT_SCHEMA = {
     "type": "object",
     "properties": {
+        "color": {"type": "string", "pattern": "^#[0-9a-f]{6}$", "readOnly": True},
         "title": {
             "type": "string",
             "description": "Calendar event title.",

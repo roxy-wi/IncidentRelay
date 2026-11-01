@@ -1,4 +1,5 @@
 from app.modules.db.models import ServiceEvent
+from app.modules.user_colors import user_color
 from app.services.service_catalog.timeline import (
     build_next_cursor,
     list_service_events,
@@ -34,6 +35,7 @@ def test_serialize_service_event_includes_actor_display_name():
     assert payload["actor"] == {
         "type": "user",
         "user_id": user.id,
+        "color": user_color(user),
         "display_name": "Alice Doe",
         "email": "alice@example.com",
         "label": None,

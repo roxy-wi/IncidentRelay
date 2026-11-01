@@ -23,6 +23,7 @@ PUBLIC_API_PREFIXES = (
 # Stable, user-facing granular scopes. Keep the order intentional because the
 # profile API returns this sequence to the UI.
 READ_WRITE_SCOPE_DOMAINS = (
+    "changes",
     "alerts",
     "incidents",
     "services",
@@ -162,6 +163,8 @@ def required_scopes_for_path(path, method):
     therefore be denied for API-token principals (fail closed).
     """
     method = str(method or "").upper()
+    if path == "/api/change-events":
+        return ["changes:ingest"] if method == "POST" else None
     action = None
     if method in READ_METHODS:
         action = "read"
@@ -218,6 +221,8 @@ def token_has_scopes(token_scopes, required_scopes):
         return True
 
     raw = set(token_scopes or [])
+    if "changes:ingest" in required_scopes and "changes:ingest" not in raw:
+        return False
     if "*" in raw:
         # Wildcard keeps its historical meaning for explicitly declared view
         # scopes. Unmapped API routes are rejected before this check.
@@ -225,6 +230,11 @@ def token_has_scopes(token_scopes, required_scopes):
 
     effective = expand_token_scopes(raw)
     return all(scope in effective for scope in required_scopes)
+
+
+def is_jwt_only_api_path(path):
+    """Administration has no API-token scopes, including personal wildcard."""
+    return path_matches_prefix(path, "/api/admin/change-integrations")
 
 
 def token_can_grant_scopes(current_scopes, requested_scopes):

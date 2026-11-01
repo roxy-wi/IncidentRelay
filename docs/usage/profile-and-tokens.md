@@ -13,6 +13,12 @@ Profile
 
 The profile page contains user identity, contact fields, active group context and personal API tokens.
 
+## User color
+
+Each account has a stable automatic color based on its ID. In **Profile → User color**, choose a different color and save. The color is shared across avatars, comments, incident participants and stakeholders, and on-call shifts. Text uses a contrasting black or white color. Manual color choices may match another user.
+
+The profile API accepts `color` as `#RRGGBB` and returns lowercase hex. Send `null` to restore the automatic color. Existing accounts receive their automatic color without rewriting historical records.
+
 ## Contact fields
 
 Fill contact fields used by notification channels.

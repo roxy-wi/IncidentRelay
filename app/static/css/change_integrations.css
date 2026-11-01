@@ -1,0 +1,30 @@
+#view-change-integrations [hidden] {display: none !important;}
+#ci-modal .app-modal-dialog {width: min(1100px, calc(100vw - 48px)); min-width: 0;}
+#ci-modal .form-stack {margin-top: 0;}
+#ci-modal .input {width: 100%; min-width: 0; box-sizing: border-box;}
+#ci-modal p {margin: 0;}
+#ci-modal .form-actions-inline {justify-content: flex-start;}
+#ci-modal .ci-field-label {font-weight: 750;}
+#ci-modal .page-tabs {margin: 16px 0 12px;}
+#ci-modal .data-table {min-width: 760px;}
+#ci-modal .data-table td {vertical-align: top; white-space: normal;}
+#ci-modal .data-table .btn {white-space: nowrap; overflow-wrap: normal;}
+#ci-modal .ci-source-owner {display: block; margin-top: 4px;}
+#ci-modal .ci-hint {margin: 12px 0; font-size: 12px;}
+#ci-modal .ci-add-form {padding: 0; border: 0; background: none;}
+#ci-modal .ci-add-form > summary {display: inline-flex; cursor: pointer;}
+#ci-modal .ci-add-form > summary::-webkit-details-marker {display: none;}
+#ci-modal .ci-add-form > form {margin-top: 14px;}
+#ci-technical-details {margin-top: 10px; padding: 0; border: 0; background: none; font-size: 12px;}
+#ci-technical-details > summary {cursor: pointer; color: var(--md-text-soft);}
+#ci-technical-details > p {padding-top: 6px;}
+#ci-secret-box {margin-top: 16px;}
+#ci-secret {font-family: monospace;}
+#ci-modal .ci-token-prefix {font-family: monospace; white-space: nowrap;}
+#ci-table td, #ci-modal td, #ci-identity, #ci-modal-title {overflow-wrap: anywhere;}
+#ci-list-status:empty, #ci-editor-status:empty {display: none;}
+@media (max-width: 600px) {
+    #ci-modal .app-modal-dialog {width: calc(100vw - 24px);}
+    #ci-modal .app-modal-body {padding: 12px;}
+    #view-change-integrations .card-header {flex-wrap: wrap; gap: 12px;}
+}

@@ -91,6 +91,11 @@ def authenticate_api_token(raw_token=None):
         request.current_api_token = None
         return None
 
+    # Machine credentials have their own authentication and exact route allowlist.
+    if api_token.change_integration_id is not None:
+        request.current_api_token = None
+        return None
+
     if api_token.expires_at and api_token.expires_at <= utc_now():
         request.current_api_token = None
         return None

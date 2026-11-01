@@ -23,6 +23,15 @@ ROTATION_SCHEMA = {
         "duration_seconds": {"type": "integer", "nullable": True, "description": "Calculated or custom slot duration."},
         "reminder_interval_seconds": {"type": "integer", "minimum": 0, "default": 300, "description": "How often reminders are sent for unacknowledged alerts assigned to this rotation. 0 disables reminders. Otherwise, use 1 minute or more."},
         "enabled": {"type": "boolean", "default": True},
+        "current_oncall_user": {
+            "type": "object", "nullable": True, "readOnly": True,
+            "properties": {
+                "id": {"type": "integer"},
+                "username": {"type": "string"},
+                "display_name": {"type": "string", "nullable": True},
+                "color": {"type": "string", "pattern": "^#[0-9a-f]{6}$"},
+            },
+        },
         "add_team_members": {
             "type": "boolean",
             "default": True,
@@ -34,6 +43,7 @@ ROTATION_SCHEMA = {
 ROTATION_MEMBER_SCHEMA = {
     "type": "object",
     "properties": {
+        "color": {"type": "string", "pattern": "^#[0-9a-f]{6}$", "readOnly": True},
         "id": {"type": "integer", "readOnly": True},
         "user_id": {"type": "integer", "minimum": 1},
         "username": {"type": "string", "readOnly": True},
@@ -115,6 +125,7 @@ ROTATION_LAYER_SCHEMA = {
 ROTATION_LAYER_MEMBER_SCHEMA = {
     "type": "object",
     "properties": {
+        "color": {"type": "string", "pattern": "^#[0-9a-f]{6}$", "readOnly": True},
         "id": {"type": "integer", "readOnly": True},
         "layer_id": {"type": "integer", "readOnly": True},
         "user_id": {"type": "integer", "minimum": 1},

@@ -5,6 +5,7 @@ from datetime import datetime, timedelta
 import pytest
 
 from app.login import create_access_token
+from app.modules.user_colors import user_color
 from app.modules.db.models import (
     AlertComment, AlertEvent, Incident, IncidentAlertGroupLink, IncidentComment,
     IncidentEvent, IncidentResponder, IncidentService, IncidentStakeholder,
@@ -50,7 +51,8 @@ def test_reopen_activity_keeps_transition_source_author_and_utc(client, workspac
     assert row["record_id"] == event.id
     assert row["source_type"] == "Incident"
     assert row["data"] == {"from": "resolved", "to": "investigating", "alert_group_id": group.id}
-    assert row["actor"] == {"id": user.id, "username": user.username, "display_name": user.display_name}
+    assert row["actor"] == {"id": user.id, "username": user.username,
+                            "display_name": user.display_name, "color": user_color(user)}
     assert row["created_at"] == "2026-10-25T01:30:00Z"
 
 

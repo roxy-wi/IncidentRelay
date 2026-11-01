@@ -128,6 +128,8 @@ def pwa_service_worker():
 @pages_bp.route("/admin/audit-log/")
 @pages_bp.route("/admin/sso")
 @pages_bp.route("/admin/sso/")
+@pages_bp.route("/admin/change-integrations")
+@pages_bp.route("/admin/change-integrations/")
 @pages_bp.route("/login")
 def app_page(alert_id=None, incident_id=None):
     """
@@ -147,8 +149,15 @@ def app_page(alert_id=None, incident_id=None):
 
     normalized_path = request.path.rstrip("/") or "/"
 
-    if normalized_path in ("/admin/users", "/groups", "/admin/sso") and not user.is_admin:
+    admin_paths = ("/admin/users", "/groups", "/admin/sso")
+    if normalized_path in admin_paths and not user.is_admin:
         abort(403)
+
+    if normalized_path == "/admin/change-integrations":
+        from app.services.change_intelligence.management import can_manage_integrations
+
+        if not can_manage_integrations(user):
+            abort(403)
 
     if normalized_path == "/admin/audit-log" and not can_read_audit_logs(user):
         abort(403)

@@ -1,5 +1,6 @@
 from flask import Blueprint, jsonify, request
 
+from app.modules.user_colors import user_color
 from app.modules.db import audit_repo
 from app.modules.db.models import ApiToken, Group, Team, User
 from app.services.rbac import (
@@ -19,6 +20,7 @@ def _serialize_actor(user):
         "id": user.id,
         "username": user.username,
         "display_name": user.display_name,
+        "color": user_color(user),
     }
 
 

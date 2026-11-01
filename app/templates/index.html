@@ -85,6 +85,7 @@
     <link rel="stylesheet" href="/static/css/incidents.css">
     <link rel="stylesheet" href="/static/css/orchestrations.css">
     <link rel="stylesheet" href="/static/css/audit_log.css">
+    <link rel="stylesheet" href="/static/css/change_integrations.css?v=3a4824f00c4b">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/vendor/tom-select/tom-select.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/table_filters.css') }}">
     <link rel="stylesheet" href="/static/css/vendor/select2/select2.min.css">
@@ -105,6 +106,7 @@
     <script src="{{ url_for('static', filename='js/vendor/chart.min.js') }}"></script>
     <script>window.AppTheme && window.AppTheme.applyChartDefaults();</script>
     <script src="{{ url_for('static', filename='js/vendor/cytoscape.min.js') }}"></script>
+    <link rel="stylesheet" href="/static/css/user_appearance.css">
 </head>
 <body class="md-theme{% if initial_alert_id %} modal-open{% endif %}">
 <div id="pwa-navigation-mask" aria-hidden="true">
@@ -276,6 +278,9 @@
                             <svg class="menu-icon"><use href="#icon-audit-log"></use></svg>
                             <span class="menu-text">{{ _('nav.audit_log') }}</span>
                         </a>
+            <a href="/admin/change-integrations" data-page="change-integrations" class="menu-link menu-link-change-integrations is-hidden" title="{{ _('ci.title') }}">
+              <svg class="menu-icon"><use href="#icon-routes"></use></svg><span class="menu-text">{{ _('ci.title') }}</span>
+            </a>
             <a href="/admin/sso" data-page="sso" class="menu-link menu-link-global-admin is-hidden" title="{{ _('nav.sso') }}">
                             <svg class="menu-icon"><use href="#icon-sso"></use></svg>
                             <span class="menu-text">{{ _('nav.sso') }}</span>
@@ -362,6 +367,7 @@
             <div id="view-admin-users" class="view">{% include "pages/admin_users.html" %}</div>
             <div id="view-audit-log" class="view">{% include "pages/audit_log.html" %}</div>
             <div id="view-sso" class="view">{% include "pages/sso.html" %}</div>
+            <div id="view-change-integrations" class="view">{% include "pages/change_integrations.html" %}</div>
             <div id="view-groups" class="view">{% include "pages/groups.html" %}</div>
             <div id="view-profile" class="view">{% include "pages/profile.html" %}</div>
         </section>
@@ -408,6 +414,7 @@
 <script src="{{ url_for('static', filename='js/components/matcher_editor.js', v='20260625') }}"></script>
 <script src="/static/js/core/rbac_roles.js"></script>
 <script src="/static/js/core/state.js"></script>
+<script src="/static/js/core/user_appearance.js"></script>
 <script src="/static/js/core/dialogs.js"></script>
 <script src="/static/js/core/api.js"></script>
 <script src="/static/js/core/auth.js"></script>
@@ -423,7 +430,7 @@
 <script src="/static/js/core/sortable_table.js"></script>
 <script src="/static/js/core/pwa.js"></script>
 <script src="/static/js/core/browser_push.js"></script>
-<script src="/static/js/core/router.js"></script>
+<script src="/static/js/core/router.js?v=c21a53cbfb7e"></script>
 <script src="/static/js/core/forms.js"></script>
 <script src="{{ url_for('static', filename='js/core/timezones.js') }}"></script>
 <script src="/static/js/sidebar.js"></script>
@@ -469,6 +476,7 @@
 <script src="/static/js/pages/groups.js"></script>
 <script src="/static/js/pages/profile.js"></script>
 <script src="/static/js/pages/sso.js"></script>
+<script src="/static/js/pages/change_integrations.js?v=645df8733ed3"></script>
 <script src="/static/js/pages/services_standards.js"></script>
 <script src="{{ url_for('static', filename='js/core/list_url_state_registry.js') }}"></script>
 </body>

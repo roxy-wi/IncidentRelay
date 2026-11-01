@@ -2,6 +2,7 @@ from flask import Blueprint, jsonify, request
 from peewee import IntegrityError
 from urllib.parse import urlsplit
 
+from app.modules.user_colors import user_color
 from app.api.schemas.incidents import (
     IncidentAssignmentSchema,
     IncidentParticipantCreateSchema,
@@ -426,8 +427,12 @@ def _serialize_comment(comment):
         "id": comment.id,
         "incident_id": comment.incident_id,
         "author_id": comment.author_id,
-        "author": ({"id": comment.author.id, "display_name": comment.author.display_name,
-                    "username": comment.author.username} if comment.author_id else None),
+        "author": ({
+            "id": comment.author.id,
+            "display_name": comment.author.display_name,
+            "username": comment.author.username,
+            "color": user_color(comment.author),
+        } if comment.author_id else None),
         "body": comment.body,
         "created_at": serialize_utc_datetime(comment.created_at),
         "updated_at": serialize_utc_datetime(comment.updated_at),
@@ -637,11 +642,21 @@ def remove_incident_affected_service(incident_id, service_id):
 # cannot silently reassign these persisted operational roles.
 def _participant_json(row):
     user = row.target_user if row.target_user_id else None
-    return {"id": row.id, "incident_id": row.incident_id, "user_id": row.target_user_id,
-            "user": ({"id": user.id, "display_name": user.display_name,
-                      "username": user.username, "email": user.email} if user else None),
-            "role": row.role, "assigned_by_id": row.requested_by_id,
-            "created_at": serialize_utc_datetime(row.created_at)}
+    return {
+        "id": row.id,
+        "incident_id": row.incident_id,
+        "user_id": row.target_user_id,
+        "user": ({
+            "id": user.id,
+            "display_name": user.display_name,
+            "username": user.username,
+            "email": user.email,
+            "color": user_color(user),
+        } if user else None),
+        "role": row.role,
+        "assigned_by_id": row.requested_by_id,
+        "created_at": serialize_utc_datetime(row.created_at),
+    }
 
 
 @incidents_bp.route("/<int:incident_id>/participants", methods=["GET"])
@@ -735,8 +750,13 @@ def _operational_stakeholder_json(row):
         "user_id": row.user_id,
         "email": row.email,
         "display_name": row.display_name,
-        "user": ({"id": row.user.id, "display_name": row.user.display_name,
-                  "username": row.user.username, "email": row.user.email} if row.user_id else None),
+        "user": ({
+            "id": row.user.id,
+            "display_name": row.user.display_name,
+            "username": row.user.username,
+            "email": row.user.email,
+            "color": user_color(row.user),
+        } if row.user_id else None),
         "role": row.role,
         "source": row.source,
         "created_at": serialize_utc_datetime(row.created_at),
@@ -1001,7 +1021,7 @@ def _incident_activity_rows(incident, *, limit=200):
     entries = entries[:limit]
     actor_ids = {item["actor_id"] for item in entries if item["actor_id"]}
     actors = {user.id: {"id": user.id, "username": user.username,
-                       "display_name": user.display_name}
+                       "display_name": user.display_name, "color": user_color(user)}
               for user in User.select().where(User.id.in_(actor_ids))} if actor_ids else {}
     for entry in entries:
         del entry["_sort_at"]

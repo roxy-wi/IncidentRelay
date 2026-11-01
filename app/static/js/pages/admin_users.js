@@ -203,7 +203,7 @@ function renderAdminUserRow(user) {
                 $("<button>")
                     .attr("type", "button")
                     .addClass("name-button")
-                    .text(user.display_name || user.username || i18n.t("users.row.user_fallback", {id: user.id}))
+                    .append(UserAppearance.label(user, user.display_name || user.username || i18n.t("users.row.user_fallback", {id: user.id})))
                     .on("click", function () {
                         openExistingAdminUserModal(user);
                     })

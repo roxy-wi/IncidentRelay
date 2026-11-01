@@ -20,6 +20,7 @@ INCIDENT_STATUS_VALUES = [
 INCIDENT_ACTOR_SCHEMA = {
     "nullable": True,
     "properties": {
+        "color": {"type": "string", "pattern": "^#[0-9a-f]{6}$", "readOnly": True},
         "display_name": {"nullable": True, "type": "string"},
         "id": {"type": "integer"},
         "username": {"type": "string"},
@@ -31,6 +32,7 @@ INCIDENT_ACTOR_SCHEMA = {
 INCIDENT_USER_SCHEMA = {
     "nullable": True,
     "properties": {
+        "color": {"type": "string", "pattern": "^#[0-9a-f]{6}$", "example": "#3b82f6"},
         "display_name": {"nullable": True, "type": "string"},
         "email": {"nullable": True, "type": "string"},
         "id": {"type": "integer"},

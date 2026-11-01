@@ -1,3 +1,4 @@
+from app.modules.user_colors import user_color
 from app.modules.db import maintenance_repo, business_services_repo, notification_policies_repo
 from app.services.incidents.responder_display import responder_target_label
 from app.services.serializers.business_services import serialize_business_service_incident_impact, \
@@ -61,6 +62,7 @@ def serialize_alert_activity_event(event, group, user=None):
             "id": user.id,
             "username": user.username,
             "display_name": user.display_name,
+            "color": user_color(user),
         }
 
     return {
@@ -741,6 +743,7 @@ def serialize_alert_comment(comment):
             "username": getattr(user, "username", None),
             "email": getattr(user, "email", None),
             "display_name": getattr(user, "display_name", None),
+            "color": user_color(user),
         } if user else None,
         "body": comment.body,
         "created_at": created_at,

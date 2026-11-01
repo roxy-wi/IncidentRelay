@@ -98,6 +98,7 @@ USER_SHORT_SCHEMA = {
     "type": "object",
     "nullable": True,
     "properties": {
+        "color": {"type": "string", "pattern": "^#[0-9a-f]{6}$", "readOnly": True},
         "id": {"type": "integer"},
         "username": {"type": "string", "nullable": True},
         "display_name": {"type": "string", "nullable": True},
@@ -333,6 +334,7 @@ SERVICE_READINESS_RESPONSE_SCHEMA = {
 TIMELINE_ACTOR_SCHEMA = {
     "type": "object",
     "properties": {
+        "color": {"type": "string", "pattern": "^#[0-9a-f]{6}$", "readOnly": True},
         "type": {"type": "string", "nullable": True, "example": "user"},
         "user_id": {"type": "integer", "nullable": True},
         "display_name": {"type": "string", "nullable": True},

@@ -703,7 +703,7 @@ function renderDashboardActivity(events, unavailable) {
             });
 
         item.append(
-            $("<span>")
+            event.user ? UserAppearance.avatar(event.user) : $("<span>")
                 .addClass("overview-list-dot")
                 .addClass(dashboardActivityDotClass(event.event_type))
         );
@@ -754,21 +754,6 @@ function loadDashboardOncall() {
     );
 }
 
-function dashboardOncallInitials(value) {
-    const text = String(value || "?").trim();
-    const parts = text.split(/\s+/).filter(Boolean);
-
-    if (!parts.length) {
-        return "?";
-    }
-
-    if (parts.length > 1) {
-        return (parts[0][0] + parts[1][0]).toUpperCase();
-    }
-
-    return parts[0].slice(0, 2).toUpperCase();
-}
-
 function renderDashboardOncall(rotations) {
     const target = $("#dashboard-oncall-now");
     target.empty();
@@ -815,9 +800,7 @@ function renderDashboardOncall(rotations) {
                     );
                 })
                 .append(
-                    $("<span>")
-                        .addClass("avatar")
-                        .text(dashboardOncallInitials(userName))
+                    UserAppearance.avatar(rotation.current_oncall_user, "avatar", userName)
                 )
                 .append(
                     $("<span>")

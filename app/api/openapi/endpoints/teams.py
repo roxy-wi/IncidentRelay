@@ -45,6 +45,7 @@ TEAM_SCHEMA = {
 TEAM_MEMBER_SCHEMA = {
     "type": "object",
     "properties": {
+        "color": {"type": "string", "pattern": "^#[0-9a-f]{6}$", "readOnly": True},
         "id": {"type": "integer", "readOnly": True},
         "user_id": {"type": "integer", "minimum": 1},
         "username": {"type": "string", "readOnly": True},

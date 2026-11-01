@@ -31,6 +31,9 @@ class ProfileUpdateSchema(ApiModel):
     timezone: Optional[str] = Field(default=None, max_length=64)
     locale: Optional[str] = Field(default=None, max_length=16)
     theme: Optional[str] = Field(default=None, max_length=16)
+    color: str | None = Field(
+        default=None, min_length=7, max_length=7, pattern=r"^#[0-9a-fA-F]{6}$",
+    )
     telegram_user_id: Optional[str] = Field(
         default=None,
         max_length=CONTACT_ID_MAX_LENGTH,
@@ -52,6 +55,12 @@ class ProfileUpdateSchema(ApiModel):
     def validate_phone_field(cls, value):
         """Validate profile phone number."""
         return normalize_phone(value)
+
+    @field_validator("color")
+    @classmethod
+    def normalize_color(cls, value: str | None) -> str | None:
+        """Normalize RGB hex colors; null restores the automatic color."""
+        return value.lower() if value is not None else None
 
     @field_validator("timezone")
     @classmethod

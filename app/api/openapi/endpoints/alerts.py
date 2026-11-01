@@ -59,6 +59,7 @@ def user_short_schema():
             "id": {"type": "integer"},
             "username": {"type": "string"},
             "display_name": {"type": "string", "nullable": True},
+            "color": {"type": "string", "pattern": "^#[0-9a-f]{6}$"},
             "email": {"type": "string", "nullable": True},
             "telegram_user_id": {"type": "string", "nullable": True},
             "slack_user_id": {"type": "string", "nullable": True},
@@ -163,6 +164,7 @@ def alert_activity_schema():
                     "id": {"type": "integer"},
                     "username": {"type": "string"},
                     "display_name": {"type": "string", "nullable": True},
+                    "color": {"type": "string", "pattern": "^#[0-9a-f]{6}$"},
                 },
             },
             "alert_group": {

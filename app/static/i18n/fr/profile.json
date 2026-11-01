@@ -226,5 +226,7 @@
   "profile.oncall.no_next_primary": "Aucune astreinte principale à venir dans la fenêtre sélectionnée.",
   "profile.oncall.next_backup": "Prochains relais d’escalade",
   "profile.oncall.no_next_backup": "Aucun relais d’escalade à venir dans la fenêtre sélectionnée.",
-  "profile.push.device_placeholder": "Mon ordinateur portable, mon téléphone professionnel..."
+  "profile.push.device_placeholder": "Mon ordinateur portable, mon téléphone professionnel...",
+  "profile.fields.color": "Couleur du profil",
+  "profile.fields.color_help": "Utilisée pour votre avatar et vos périodes d’astreinte dans IncidentRelay."
 }

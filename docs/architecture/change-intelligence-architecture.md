@@ -2,9 +2,9 @@
 
 **Architecture RFC v1.1 (implementation contract)**
 
-**Source baseline:** `release/2.5.0`, `b787074` plus stage 2 changes (verified 2026-10-30)
+**Source baseline:** `release/2.5.0`, `363697e` plus stage 3 changes (verified 2026-10-30)
 
-**Status:** stages 1–2 implemented; stages 3–10 planned
+**Status:** stages 1–3 implemented; stages 4–10 planned
 
 
 ## Agreed decisions — 28–30 October 2026
@@ -17,7 +17,7 @@
 - Automatic potential-cause suggestions only; mitigation is manual in v1.
 - Automatic correlation requires explicit Service opt-in and is disabled by default. Source/label exclusions apply to individual alerts; a group participates when its selected episode contains at least one non-excluded alert. All groups retain episodes; eligibility is checked before search work is queued (§9.1, stage 7).
 
-Storage and lifecycle episodes are implemented. APIs, workers and correlation from stages 3–10 remain planned and are not enabled.
+Storage, lifecycle episodes and integration administration are implemented. Change intake, workers and correlation from stages 4–10 remain planned and are not enabled.
 
 ## 1. Purpose and scope
 
@@ -92,7 +92,7 @@ HTTP `201` means **the event has been durably stored**, not that every slug has 
 ### 4.1. `Change` — canonical operation
 
 - `id`, `uid` (UUID), `integration_id`, `source_id` (FK `ChangeSource`);
-- `owner_team_id`, `external_change_id` (API `change_id`); the sender name is `ChangeSource.source`; owner and source identity are immutable;
+- `owner_team_id`, `external_change_id` (API `change_id`); the sender name is `ChangeSource.source`; owner and source identity are immutable after the first Change;
 - `kind`: `deployment`, `configuration`, `infrastructure`, `database`, `feature_flag`, `other`;
 - `kind`, `environment` are immutable operation identity; a different operation or execution retry uses a new `change_id`;
 - bounded `title`, `description`, `external_url`;
@@ -210,11 +210,15 @@ Episodes are retained regardless of Service correlation opt-in and alert exclusi
 The storage models are added in stage 1; administration and machine authorization are implemented in stage 3:
 
 - `ChangeIntegration`: `id`, `uid`, name, `active`, `auth_revision`, audit timestamps. It is a machine principal independent of a person's account and of any single credential.
-- `ChangeSource`: `id`, `integration_id`, `owner_team_id`, `source`, `active`, default `ordering_mode`. Unique `(owner_team_id, source)` reserves one producer namespace. Revoking a grant/token does not free that namespace for another integration; source/owner changes require a new namespace, not rewriting historical ownership. Updating ordering mode affects only new Changes.
+- `ChangeSource`: `id`, `integration_id`, `owner_team_id`, `source`, `active`, default `ordering_mode`. Unique `(owner_team_id, source)` reserves one producer namespace. Revoking a grant/token does not free that namespace for another integration. The source name and owner Team can be edited before the first Change. Afterwards these edits return `409` and a different namespace requires a new source. The check and update serialize with admitted writes through the integration lock. The UI disables these fields with an explanation; status and ordering for new Changes remain editable. Updating ordering mode affects only new Changes.
 - `ChangeGrant`: `source_id`, `capability` (`reference`, `changed`, `reported_affected`), `target_team_id`, optional `target_service_id`, normalized `target_key` (`team:9` or `service:12`), `active`. Unique `(source_id, capability, target_key)` avoids backend-dependent NULL uniqueness. `reference` permits an unverified claim and scoped identity lookup, not trusted publication; the other capabilities also permit lookup for their target. A Service grant is valid only while it belongs to the pinned target Team. A Team grant explicitly covers future Services in that Team and therefore permits pending references of its capability; a Service-only grant does not.
 - Extend `ApiToken` with nullable `change_integration_id`. Integration credentials use only `changes:ingest`, have no personal `user/group/team` authority, and cannot mint credentials or access other APIs. Reuse existing secret generation, hash storage, expiry and revocation; do not introduce another token-secret store. Existing personal tokens retain their current behavior.
 
-An active registered source grants its integration permission to submit operations for that owner/source, but not blanket permission to claim changes on all owner Services. Explicit ChangeGrants define trusted Service claims, including claims within the owner Team. Only installation administrators manage integrations, sources, grants and machine credentials in v1; ordinary ingest tokens cannot grant themselves rights. Every such mutation is audited. Changes to grants/source activity or authorization-relevant Team/Service state advance the affected integration's auth revision transactionally.
+Public integration creation requires `owner_team_id`: the integration and one source are created in one transaction. Its name is derived from the integration name, with a suffix on a Team namespace collision. Ordering defaults to `timestamp`; no grants or tokens are issued implicitly. Current Group/Team authority is checked. Existing identities are not backfilled. The integration list reports `source_count` and `permission_count` for all configured records, including disabled ones.
+
+An administrator may explicitly edit a permission's capability, source and target within the integration. The new target is reauthorized; duplicate targets return `409` without partial changes. The row retains its ID; the previous and new settings are audited, and auth_revision/invalidation change in the same transaction. Moving a Service in the catalog still does not transfer its grant automatically. Sources, permissions and credentials use the shared ellipsis action menu with icons.
+
+An active registered source grants its integration permission to submit operations for that owner/source, but not blanket permission to claim changes on all owner Services. Explicit ChangeGrants define trusted Service claims, including claims within the owner Team. Global administrators and the owning Group user_admin members manage integrations, sources, grants and machine credentials; ordinary ingest tokens cannot grant themselves rights. Every such mutation is audited. Changes to grants/source activity or authorization-relevant Team/Service state advance the affected integration's auth revision transactionally.
 
 Token rotation/revocation prevents **new requests** with that credential; accepted work remains owned by the integration and continues under its current grants. Disabling the integration/source or revoking a required grant blocks new mapping/publication. Neither credential deletion nor rotation deletes immutable events. §7 defines read visibility separately from ingest authority.
 
@@ -362,9 +366,11 @@ Record the path snapshot and revision used for a computation. A current graph ca
 
 ### 7.1. Machine intake and administration
 
+Each integration has an immutable `owner_group_id`: `NULL` denotes a central identity managed only by global administrators. New Group-owned integrations are managed by active Group `user_admin` members; sources and grants stay within that Group, including after Team moves. The `editor` role does not grant access. Page, API and service operations enforce this boundary, with membership changes serialized against writes. The active Group UI filter does not expand authority. Migration leaves existing integrations central without automatically delegating credentials. The entry page is a table; its action menu opens a modal editor. Secrets are cleared on close, navigation and editor section changes.
+
 `POST /api/change-events` requires an active integration-bound `ApiToken` with `changes:ingest`, even when global API authentication is disabled. A JWT, a personal token or wildcard scope without a ChangeIntegration identity is not sufficient. After authentication, resolve owner Team and verify that the active registered `(owner_team_id, source)` belongs to this integration, then apply grants. The client cannot select another principal through payload fields.
 
-Machine credentials are issued/rotated in a new admin-only Change Integrations UI/API, using existing ApiToken secret handling. The existing `Profile → API Tokens` remains for human read/review tokens; it does not issue integration identities. Proposed administration routes under `/api/admin/change-integrations` manage sources, grants and tokens, require an authenticated administrator JWT, and audit every mutation. Neither an ingest token nor a personal API token can administer this namespace in v1.
+Machine credentials are issued/rotated in a new admin-only Change Integrations UI/API, using existing ApiToken secret handling. The existing `Profile → API Tokens` remains for human read/review tokens; it does not issue integration identities. Administration routes under `/api/admin/change-integrations` manage sources, grants and tokens, require an authenticated administrator JWT, and audit every mutation. Neither an ingest token nor a personal API token can administer this namespace in v1.
 
 Scopes: `changes:ingest` for machine POST; `changes:read` for reading; `changes:write` for manual reviews/links. No implicit `changes:ingest` through `resources:write` or personal `*`. Integration tokens are accepted only on the ingestion endpoint. Human JWTs use current RBAC; personal API tokens additionally use explicit scopes and their existing Group restriction. Nested Service/AlertGroup/Incident read endpoints require both `changes:read` and the parent resource's read scope; review/link writes require `changes:write` and the target resource's write scope. Add explicit method/path rules in `api_token_scopes.py`; do not rely on a broad prefix accidentally granting an entire new domain.
 
@@ -511,6 +517,8 @@ A development stage is not a separate production release. Enable public Change E
 - **Ready when:** every writer follows one contract, failed transactions leave no partial episode, and existing lifecycle tests pass on both databases.
 
 ### 12.3. Stage 3 — Integrations, grants and credentials
+
+Implemented: `/admin/change-integrations` and the `/api/admin/change-integrations` namespace (global or owning Group administrator JWT) manage identities, owner/source namespaces locked after the first Change, explicitly editable grants and credentials. Configuration mutations require `expected_revision`; stale edits return `409`. Permission and relevant catalog mutations lock graph state then affected integrations in ID order, advance `auth_revision` and enqueue `discover_auth` atomically; the worker is still stage 5. Credential rotation atomically revokes the old token without changing integration identity or auth revision. Secrets are returned once with `Cache-Control: no-store`; lists/audits contain no secret or hash. `authorized_source` keeps authorization locked through the future caller’s writes; accepted work supplies the stable identity, while new intake also checks its credential. No `/api/change-events` view is registered yet.
 
 - **Work:** administrative integration/source/grant/rotation APIs and UI; machine ApiToken, explicit scopes and route allowlist; audit and auth_revision. Implement owner/source and Service-scope checks, including reference-only grants. Preserve existing personal-token behavior.
 - **Tests:** source/Team impersonation; exceeding grants; uniform safe errors for inaccessible IDs; ingest credentials cannot read or administer; rotation, revocation and concurrent permission edits. Personal wildcard scope cannot replace integration identity.

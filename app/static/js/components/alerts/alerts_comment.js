@@ -45,7 +45,7 @@ function renderAlertComment(comment) {
 
     const meta = $("<div>")
         .addClass("alert-comment-meta")
-        .append($("<strong>").text(author));
+        .append(UserAppearance.label(comment.user, author));
 
     const timeText = comment.edited
         ? formatDateTimeMinutes(comment.created_at) + " · " + i18n.t("alert_details.comments.edited") + " " + formatDateTimeMinutes(comment.updated_at)

@@ -1,0 +1,144 @@
+<section class="card">
+  <div class="card-header">
+    <div><h2>{{ _('ci.title') }}</h2><p>{{ _('ci.intro') }}</p></div>
+    <div class="card-header-actions">
+      <button id="ci-new" class="btn btn-primary" type="button">{{ _('ci.add_integration') }}</button>
+      <button id="ci-reload" class="btn btn-secondary" type="button">{{ _('ci.reload') }}</button>
+    </div>
+  </div>
+  <div class="table-wrapper">
+    <table class="data-table">
+      <thead><tr>
+          <th>{{ _('ci.name') }}</th><th>{{ _('ci.group') }}</th>
+          <th>{{ _('ci.sources') }}</th><th>{{ _('ci.grants') }}</th>
+          <th>{{ _('ci.status') }}</th><th>{{ _('ci.updated') }}</th>
+          <th class="actions-th">{{ _('ci.actions') }}</th>
+        </tr></thead>
+      <tbody id="ci-table"></tbody>
+    </table>
+  </div>
+  <p id="ci-list-status" class="form-body" role="status"></p>
+  <div id="ci-pagination" class="form-body" hidden><button id="ci-more" class="btn" type="button" hidden>{{ _('ci.more') }}</button></div>
+</section>
+<div id="ci-modal" class="app-modal is-hidden" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="ci-modal-title">
+  <div class="app-modal-dialog app-modal-dialog-wide">
+    <div class="app-modal-header">
+      <h2 id="ci-modal-title">{{ _('ci.edit') }}</h2>
+      <button id="ci-close" class="app-modal-close" type="button" aria-label="{{ _('ci.close') }}"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+    </div>
+    <div class="app-modal-body">
+      <p id="ci-editor-status" role="status"></p>
+      <form id="ci-create" class="form-stack" hidden>
+        <div class="form-grid-2">
+          <div class="form-group"><label for="ci-new-name">{{ _('ci.name') }}</label><input id="ci-new-name" class="input" required maxlength="255"></div>
+          <div class="form-group"><label for="ci-new-group">{{ _('ci.group') }}</label><select id="ci-new-group" class="input" required></select></div>
+          <div class="form-group"><label for="ci-new-owner">{{ _('ci.owner') }}</label><select id="ci-new-owner" class="input" required></select><small id="ci-new-owner-hint" class="muted"></small></div>
+        </div>
+        <p class="muted">{{ _('ci.group_hint') }}</p>
+        <div class="form-actions-inline"><button class="btn btn-primary" type="submit">{{ _('ci.create') }}</button></div>
+      </form>
+      <div id="ci-detail" hidden>
+        <form id="ci-edit" class="form-stack">
+          <div class="form-grid-2">
+            <div class="form-group"><label for="ci-name">{{ _('ci.name') }}</label><input id="ci-name" class="input" required maxlength="255"></div>
+            <div class="form-group">
+              <span class="ci-field-label">{{ _('ci.group') }}</span>
+              <div id="ci-group-label"></div>
+              <small id="ci-central-hint" class="muted" hidden>{{ _('ci.central_hint') }}</small>
+            </div>
+          </div>
+          <div class="form-actions-inline">
+            <label class="checkbox-label"><input id="ci-active" type="checkbox"><span>{{ _('ci.active') }}</span></label>
+            <button class="btn" type="submit">{{ _('ci.save') }}</button>
+          </div>
+        </form>
+        <details id="ci-technical-details">
+          <summary>{{ _('ci.technical_details') }}</summary>
+          <p><strong>{{ _('ci.integration_id') }}:</strong> <code id="ci-identity"></code></p>
+          <p class="muted">{{ _('ci.identity_hint') }}</p>
+        </details>
+        <div class="page-tabs" role="group" aria-label="{{ _('ci.edit') }}">
+          <button type="button" class="page-tab is-active" data-ci-panel="sources" aria-pressed="true">{{ _('ci.sources') }}</button>
+          <button type="button" class="page-tab" data-ci-panel="grants" aria-pressed="false">{{ _('ci.grants') }}</button>
+          <button type="button" class="page-tab" data-ci-panel="tokens" aria-pressed="false">{{ _('ci.tokens') }}</button>
+        </div>
+        <section class="ci-panel" id="ci-panel-sources" aria-label="{{ _('ci.sources') }}">
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead><tr><th>{{ _('ci.source') }}</th><th>{{ _('ci.owner') }}</th><th>{{ _('ci.ordering') }}</th><th>{{ _('ci.status') }}</th><th>{{ _('ci.actions') }}</th></tr></thead>
+              <tbody id="ci-sources"></tbody>
+            </table>
+          </div>
+          <p class="muted ci-hint">{{ _('ci.namespace_hint') }}</p>
+          <details class="ci-add-form">
+            <summary id="ci-source-form-toggle" class="btn btn-secondary">{{ _('ci.add_source') }}</summary>
+            <form id="ci-add-source" class="form-stack">
+              <div class="form-grid-2">
+                <div class="form-group"><label for="ci-owner">{{ _('ci.owner') }}</label><select id="ci-owner" class="input" required aria-describedby="ci-source-lock-hint"></select></div>
+                <div class="form-group"><label for="ci-source-name">{{ _('ci.source') }}</label><input id="ci-source-name" class="input" required aria-describedby="ci-source-lock-hint" maxlength="255"></div>
+                <div class="form-group"><label for="ci-ordering">{{ _('ci.ordering') }}</label><select id="ci-ordering" class="input" required><option value="timestamp">{{ _('ci.order_timestamp') }}</option><option value="sequence">{{ _('ci.order_sequence') }}</option></select></div>
+              </div>
+              <p id="ci-source-lock-hint" class="muted" hidden>{{ _('ci.source_locked_hint') }}</p>
+              <div class="form-actions-inline">
+                <label id="ci-source-edit-status" class="checkbox-label" hidden><input id="ci-source-active" type="checkbox"><span>{{ _('ci.active') }}</span></label>
+                <button class="btn btn-primary" type="submit">{{ _('ci.add_source') }}</button>
+                <button id="ci-source-cancel" class="btn" type="button" hidden>{{ _('ci.cancel') }}</button>
+              </div>
+            </form>
+          </details>
+        </section>
+        <section class="ci-panel" id="ci-panel-grants" aria-label="{{ _('ci.grants') }}" hidden>
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead><tr><th>{{ _('ci.source') }}</th><th>{{ _('ci.capability') }}</th><th>{{ _('ci.target_team') }}</th><th>{{ _('ci.target_service') }}</th><th>{{ _('ci.status') }}</th><th>{{ _('ci.actions') }}</th></tr></thead>
+              <tbody id="ci-grants"></tbody>
+            </table>
+          </div>
+          <p class="muted ci-hint">{{ _('ci.grant_hint') }}</p>
+          <details class="ci-add-form">
+            <summary id="ci-grant-form-toggle" class="btn btn-secondary">{{ _('ci.add_grant') }}</summary>
+            <form id="ci-add-grant" class="form-stack">
+              <div class="form-grid-2">
+                <div class="form-group"><label for="ci-grant-source">{{ _('ci.source') }}</label><select id="ci-grant-source" class="input" required></select></div>
+                <div class="form-group"><label for="ci-capability">{{ _('ci.capability') }}</label><select id="ci-capability" class="input" required><option value="reference">{{ _('ci.reference') }}</option><option value="changed">{{ _('ci.changed') }}</option><option value="reported_affected">{{ _('ci.reported') }}</option></select></div>
+                <div class="form-group"><label for="ci-team">{{ _('ci.target_team') }}</label><select id="ci-team" class="input" required></select></div>
+                <div class="form-group"><label for="ci-service">{{ _('ci.target_service') }}</label><select id="ci-service" class="input"></select></div>
+              </div>
+              <div class="form-actions-inline">
+                <label id="ci-grant-edit-status" class="checkbox-label" hidden><input id="ci-grant-active" type="checkbox"><span>{{ _('ci.active') }}</span></label>
+                <button class="btn btn-primary" type="submit">{{ _('ci.add_grant') }}</button>
+                <button id="ci-grant-cancel" class="btn" type="button" hidden>{{ _('ci.cancel') }}</button>
+              </div>
+            </form>
+          </details>
+        </section>
+        <section class="ci-panel" id="ci-panel-tokens" aria-label="{{ _('ci.tokens') }}" hidden>
+          <div class="table-wrapper">
+            <table class="data-table">
+              <thead><tr><th>{{ _('ci.name') }}</th><th>{{ _('ci.token_prefix') }}</th><th>{{ _('ci.status') }}</th><th>{{ _('ci.expires') }}</th><th>{{ _('ci.last_used') }}</th><th>{{ _('ci.actions') }}</th></tr></thead>
+              <tbody id="ci-tokens"></tbody>
+            </table>
+          </div>
+          <p class="muted ci-hint">{{ _('ci.credentials_hint') }}</p>
+          <details class="ci-add-form">
+            <summary id="ci-token-form-toggle" class="btn btn-secondary">{{ _('ci.issue') }}</summary>
+            <form id="ci-issue" class="form-stack">
+              <div class="form-grid-2">
+                <div class="form-group"><label for="ci-token-name">{{ _('ci.name') }}</label><input id="ci-token-name" class="input" required maxlength="255"></div>
+                <div class="form-group"><label for="ci-days">{{ _('ci.days') }}</label><input id="ci-days" class="input" type="number" min="1" max="3650" value="90" required></div>
+                <div class="form-group"><label for="ci-rotate">{{ _('ci.replace') }}</label><select id="ci-rotate" class="input"></select></div>
+              </div>
+              <div class="form-actions-inline"><button class="btn btn-primary" type="submit">{{ _('ci.issue') }}</button></div>
+            </form>
+          </details>
+          <div id="ci-secret-box" class="form-stack" hidden role="status">
+            <label for="ci-secret">{{ _('ci.secret_once') }}</label>
+            <textarea id="ci-secret" class="input" readonly rows="3" autocomplete="off" spellcheck="false"></textarea>
+            <div class="form-actions-inline"><button id="ci-clear-secret" type="button" class="btn">{{ _('ci.hide') }}</button></div>
+          </div>
+        </section>
+      </div>
+    </div>
+    <div class="app-modal-footer"><button id="ci-close-footer" class="btn" type="button">{{ _('ci.close') }}</button></div>
+  </div>
+</div>

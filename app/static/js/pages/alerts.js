@@ -1272,7 +1272,7 @@ function renderAlertPageRow(alert) {
             )
     );
 
-    row.append($("<td>").text(alert.assignee || "-"));
+    row.append($("<td>").append(UserAppearance.label(alert.assignee_details, alert.assignee || "-")));
     row.append($("<td>").text(formatDateTimeMinutes(alertCreatedValue(alert))));
     row.append($("<td>").text(formatDateTimeMinutes(alert.last_seen_at)));
     row.append($("<td>").append(renderEscalationCell(alert)));
@@ -2690,8 +2690,8 @@ function renderAlertCorrelation(alert, modal) {
 
 function renderAlertDetailsActionBar(alert, modal) {
     modal.find("#alert-details-context-status").text(statusLabel(alert.status) || "-");
-    modal.find("#alert-details-context-assignee").text(alert.assignee || "-");
-    modal.find("#alert-details-context-acknowledged").text(alert.acknowledged_by || "-");
+    modal.find("#alert-details-context-assignee").empty().append(UserAppearance.label(alert.assignee_details, alert.assignee || "-"));
+    modal.find("#alert-details-context-acknowledged").empty().append(UserAppearance.label(alert.acknowledged_by_details, alert.acknowledged_by || "-"));
     modal.find("#alert-details-context-escalation")
         .text(alert.next_escalation_at ? formatDateTimeMinutes(alert.next_escalation_at) : "-");
     modal.find("#alert-details-action-bar").removeClass("is-hidden");
@@ -2745,7 +2745,9 @@ function renderAlertDetailsSummary(alert, modal) {
     ));
     summary.append(detailItem(i18n.t("alert_details.detail.policy_rule"), alertPolicyRuleLabel(alert)));
     summary.append(detailItem(i18n.t("alert_details.target.rotation"), alert.rotation_name));
-    summary.append(detailItem(i18n.t("alert_details.detail.assignee"), alert.assignee));
+    const assigneeCard = detailItem(i18n.t("alert_details.detail.assignee"), "");
+    assigneeCard.find(".detail-value").empty().append(UserAppearance.label(alert.assignee_details, alert.assignee || "-"));
+    summary.append(assigneeCard);
     summary.append(detailItem(i18n.t("alert_details.detail.next_escalation"), formatDateTimeMinutes(alert.next_escalation_at)));
     summary.append(detailItem(i18n.t("alert_details.detail.last_escalated"), formatDateTimeMinutes(alert.last_escalated_at)));
     summary.append(detailItem(i18n.t("alert_details.detail.escalation_level"), alert.escalation_level || 0));
@@ -2963,6 +2965,8 @@ function renderEvents(events, modal, pagination, append) {
                     .addClass("table-subtitle")
                     .text(formatDateTimeMinutes(event.created_at) + " " + (event.message || ""))
             );
+
+        if (event.user) { row.prepend(UserAppearance.label(event.user)); }
 
         if (event.event_type === "reopened" && event.alert_id) {
             row.append(

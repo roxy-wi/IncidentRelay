@@ -226,5 +226,7 @@
   "profile.oncall.no_next_primary": "所选前瞻窗口内没有后续主值班班次。",
   "profile.oncall.next_backup": "后续升级后备班次",
   "profile.oncall.no_next_backup": "所选前瞻窗口内没有后续升级后备班次。",
-  "profile.push.device_placeholder": "我的笔记本、工作手机..."
+  "profile.push.device_placeholder": "我的笔记本、工作手机...",
+  "profile.fields.color": "用户颜色",
+  "profile.fields.color_help": "用于 IncidentRelay 中的头像和值班班次。"
 }

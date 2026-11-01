@@ -284,6 +284,7 @@ def update_user(user_id, data):
     for field in [
         "username",
         "display_name",
+        "color",
         "email",
         "phone",
         "timezone",

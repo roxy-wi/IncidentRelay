@@ -177,6 +177,10 @@
             .text(notificationCenterItemBody(item))
             .appendTo(row);
 
+        if (item.responder && item.responder.requested_by) {
+            row.find(".notification-center-item-body").prepend(UserAppearance.avatar(item.responder.requested_by));
+        }
+
         if (item.alert_group) {
             $("<div>")
                 .addClass("notification-center-item-meta")

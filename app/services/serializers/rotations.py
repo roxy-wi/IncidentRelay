@@ -1,3 +1,5 @@
+from app.services.serializers.users import serialize_user_identity
+from app.modules.user_colors import user_color
 from app.services.serializers.common import attach_team_permissions, serialize_utc_datetime
 
 
@@ -60,6 +62,7 @@ def serialize_rotation(rotation, current_user=None, request_user=None):
         "timezone": rotation.timezone,
         "enabled": rotation.enabled,
         "current_oncall": current_user.username if current_user else None,
+        "current_oncall_user": serialize_user_identity(current_user),
     }
 
     return attach_team_permissions(data, rotation.team.id, request_user)
@@ -99,6 +102,7 @@ def serialize_rotation_layer_member(member):
         "user_id": member.user.id,
         "username": member.user.username,
         "display_name": member.user.display_name,
+        "color": user_color(member.user),
         "position": member.position,
         "active": member.active,
         "starts_at": serialize_utc_datetime(member.starts_at),

@@ -1,3 +1,18 @@
+from app.modules.user_colors import user_color
+
+
+def serialize_user_identity(user):
+    """Serialize display-only identity without personal contact information."""
+    if user is None:
+        return None
+    return {
+        "id": user.id,
+        "username": user.username,
+        "display_name": user.display_name,
+        "color": user_color(user),
+    }
+
+
 def serialize_user_group(membership):
     """
     Serialize a group membership.
@@ -22,6 +37,7 @@ def serialize_user(user, groups=None):
         "id": user.id,
         "username": user.username,
         "display_name": user.display_name,
+        "color": user_color(user),
         "email": user.email,
         "phone": user.phone,
         "timezone": user.timezone,
@@ -63,6 +79,7 @@ def serialize_user_short(user):
         "id": user.id,
         "username": user.username,
         "display_name": user.display_name,
+        "color": user_color(user),
         "email": user.email,
         "telegram_user_id": user.telegram_user_id,
         "slack_user_id": user.slack_user_id,

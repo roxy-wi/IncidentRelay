@@ -12,6 +12,7 @@ from app.api.schemas.roles import GROUP_ROLE_VALUES, GROUP_VIEWER_ROLE
 USER_RESPONSE_SCHEMA = {
     "type": "object",
     "properties": {
+        "color": {"type": "string", "pattern": "^#[0-9a-f]{6}$", "readOnly": True},
         "id": {"type": "integer", "readOnly": True, "description": "User id.", "example": 2},
         "username": {"type": "string", "description": "Login username.", "example": "ivan"},
         "display_name": {"type": "string", "nullable": True, "description": "Human-readable display name.", "example": "Ivan"},

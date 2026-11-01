@@ -61,6 +61,7 @@ GROUP_SCHEMA = {
 GROUP_MEMBER_SCHEMA = {
     "type": "object",
     "properties": {
+        "color": {"type": "string", "pattern": "^#[0-9a-f]{6}$", "readOnly": True},
         "id": {"type": "integer", "readOnly": True},
         "user_id": {"type": "integer", "minimum": 1},
         "username": {"type": "string", "readOnly": True},
@@ -123,6 +124,7 @@ GROUP_USER_CREATE_SCHEMA = {
 USER_RESPONSE_SCHEMA = {
     "type": "object",
     "properties": {
+        "color": {"type": "string", "pattern": "^#[0-9a-f]{6}$", "readOnly": True},
         "id": {"type": "integer", "readOnly": True},
         "username": {"type": "string"},
         "display_name": {"type": "string", "nullable": True},

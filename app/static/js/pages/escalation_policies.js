@@ -360,7 +360,7 @@ function renderEscalationPolicyRules(policy) {
             $("<div>")
                 .addClass("details-item")
                 .append($("<div>").addClass("details-label").text(i18n.t("escalations.details.rule", {position: rule.position})))
-                .append($("<div>").addClass("details-value").text(formatEscalationPolicyRule(rule)))
+                .append($("<div>").addClass("details-value").append(UserAppearance.label(rule.target_user, formatEscalationPolicyRule(rule))))
         );
     });
 
@@ -843,7 +843,7 @@ function renderEscalationRuleSummary(rule) {
         $("<div>")
             .addClass("rotation-layer-summary-item")
             .append($("<span>").text(i18n.t("escalations.rules.target")))
-            .append($("<strong>").text(formatRuleTargetSummary(rule)))
+            .append(UserAppearance.label(rule.target_user, formatRuleTargetSummary(rule)))
     );
 
     summary.append(

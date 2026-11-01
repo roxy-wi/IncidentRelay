@@ -105,6 +105,11 @@ function navigate(path, pushState) {
     let appPath = splitAppPath(path);
     let routePath = appPath.routePath;
 
+    if (routePath !== "/admin/change-integrations" && typeof closeChangeIntegrationModal === "function") closeChangeIntegrationModal();
+    if (routePath === "/admin/change-integrations" && !hasGroupUserAdminAccess()) {
+        showAppError(i18n.t("errors.group_admin_role_required"));
+        path = "/";
+    }
     if (routePath === "/admin/sso" && (!currentUser || !currentUser.is_admin)) {
         showAppError(i18n.t("errors.admin_role_required"));
         path = "/";
@@ -182,7 +187,7 @@ function updateAuthUi() {
     adminSection.addClass("is-hidden");
     $(".menu-link-users").addClass("is-hidden");
     $(".menu-link-groups").addClass("is-hidden");
-    $(".menu-link-global-admin").addClass("is-hidden");
+    $(".menu-link-global-admin, .menu-link-change-integrations").addClass("is-hidden");
     $(".menu-link-audit").addClass("is-hidden");
 
     if (canViewAuditLog) {
@@ -191,6 +196,7 @@ function updateAuthUi() {
     }
 
     if (canManageUsers) {
+        $(".menu-link-change-integrations").removeClass("is-hidden");
         adminSection.removeClass("is-hidden");
         $(".menu-link-users").removeClass("is-hidden");
         $(".menu-link-groups").removeClass("is-hidden");
@@ -206,6 +212,7 @@ function updateAuthUi() {
 
     if (currentUser) {
         $("#topbar-username").text(currentUser.display_name || currentUser.username);
+        $(".topbar-user-avatar").replaceWith(UserAppearance.avatar(currentUser, "topbar-user-avatar"));
         fillActiveGroupSelect();
     }
 

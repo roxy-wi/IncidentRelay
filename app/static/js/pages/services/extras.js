@@ -281,7 +281,7 @@ function renderServiceTimelineRow(event) {
         .append(serviceDetailsTableCell(formatServiceTimelineTime(event.occurred_at), false))
         .append(serviceDetailsTableCell(renderServiceTimelineEventCell(event), true))
         .append(serviceDetailsTableCell(renderServiceTimelineCategoryBadge(event.category), false))
-        .append(serviceDetailsTableCell(formatServiceTimelineActor(actor), false));
+        .append($("<td>").append(UserAppearance.label(actor.user_id ? actor : null, formatServiceTimelineActor(actor))));
 }
 
 function renderServiceTimelineEventCell(event) {
@@ -802,7 +802,7 @@ function renderServiceOwnerCompactRow(service, owner) {
             $("<td>")
                 .addClass("table-cell-truncate")
                 .attr("title", serviceOwnerDisplayName(owner))
-                .append($("<strong>").text(serviceOwnerDisplayName(owner)))
+                .append(UserAppearance.label(owner.user_id ? owner : null, serviceOwnerDisplayName(owner)))
                 .append($("<div>").addClass("row-subtitle").text(owner.user_email || owner.username || ""))
         )
         .append($("<td>").text(owner.role || "owner"))

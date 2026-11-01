@@ -1,6 +1,7 @@
 from datetime import datetime, time, timedelta
 from zoneinfo import ZoneInfo
 
+from app.modules.user_colors import user_color
 from app.modules.db import rotations_repo
 from app.modules.common import as_utc_aware, as_utc_naive
 from app.services.rotation_schedule import (
@@ -199,6 +200,7 @@ def build_layer_candidate_events(rotation, layer, start_at, end_at):
                             "user_id": user.id,
                             "username": user.username,
                             "display_name": user.display_name,
+                            "color": user_color(user),
                             "type": "layer",
                         },
                     }
@@ -244,6 +246,7 @@ def build_override_candidate_events(rotation, start_at, end_at):
                     "user_id": override.user.id,
                     "username": override.user.username,
                     "display_name": override.user.display_name,
+                    "color": user_color(override.user),
                     "reason": override.reason,
                     "type": "override",
                 },

@@ -1,8 +1,8 @@
-
 from peewee import IntegrityError
 
 from app.modules.db.models import ServiceEvent
 from app.modules.common import utc_now
+from app.modules.user_colors import user_color
 
 
 def publish_service_event(service, *, category, event_type, title, summary=None, source="incidentrelay", source_ref=None, dedup_key=None, external_url=None, actor_user=None, actor_type=None, actor_label=None, severity=None, status=None, occurred_at=None, payload=None):
@@ -68,6 +68,7 @@ def _serialize_actor(event):
         return {
             "type": "user",
             "user_id": user.id,
+            "color": user_color(user),
             "display_name": user.display_name or user.username or user.email,
             "email": user.email,
             "label": event.actor_label,

@@ -226,5 +226,7 @@
   "profile.oncall.no_next_primary": "No hay próximos turnos principales en la ventana seleccionada.",
   "profile.oncall.next_backup": "Próximos turnos de respaldo de escalado",
   "profile.oncall.no_next_backup": "No hay próximos turnos de respaldo de escalado en la ventana seleccionada.",
-  "profile.push.device_placeholder": "Mi portátil, teléfono de trabajo..."
+  "profile.push.device_placeholder": "Mi portátil, teléfono de trabajo...",
+  "profile.fields.color": "Color de usuario",
+  "profile.fields.color_help": "Se usa en tu avatar y tus turnos de guardia en IncidentRelay."
 }

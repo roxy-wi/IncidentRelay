@@ -135,6 +135,7 @@ class User(SoftDeleteModel):
     id = AutoField()
     username = CharField(unique=True)
     display_name = CharField(null=True)
+    color = CharField(null=True, max_length=7)
     email = CharField(null=True)
     phone = CharField(null=True)
     timezone = CharField(null=True)
@@ -2679,6 +2680,9 @@ class ChangeIntegration(BaseModel):
     """Stable machine identity, independent of its rotating credentials."""
 
     id = AutoField()
+    owner_group = ForeignKeyField(
+        Group, null=True, backref="change_integrations", on_delete="RESTRICT"
+    )
     uid = UUIDField(default=uuid.uuid4, unique=True)
     name = CharField(max_length=255)
     active = BooleanField(default=True)

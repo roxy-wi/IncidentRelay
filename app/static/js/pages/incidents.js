@@ -214,11 +214,8 @@ function renderIncidentsTable(items) {
         row.append($("<td>").append(incidentPriorityBadge(incident.priority)));
         row.append($("<td>").text(incident.team_name || incident.team_slug || "-"));
         row.append($("<td>").text(incident.service_name || incident.service_slug || "-"));
-        row.append($("<td>").text(
-            incident.assignee
-                ? (incident.assignee.display_name || incident.assignee.username || "-")
-                : i18n.t("incidents.labels.unassigned")
-        ));
+        row.append($("<td>").append(UserAppearance.label(incident.assignee,
+            incident.assignee ? incidentUserLabel(incident.assignee) : i18n.t("incidents.labels.unassigned"))));
         row.append($("<td>").text(formatDateTimeMinutes(incident.updated_at)));
         row.append(
             $("<td>")
@@ -636,7 +633,10 @@ function renderIncidentDetails(incident) {
     summary.append(incidentDetailItem(i18n.t("incidents.form.priority"), String(incident.priority || "p3").toUpperCase()));
     summary.append(incidentDetailItem(i18n.t("incidents.form.team"), incident.team_name || incident.team_slug || "-"));
     summary.append(incidentDetailItem(i18n.t("incidents.form.service"), incident.service_name || incident.service_slug || "-"));
-    summary.append(incidentDetailItem(i18n.t("incidents.form.assignee"), incident.assignee ? (incident.assignee.display_name || incident.assignee.username) : i18n.t("incidents.labels.unassigned")));
+    const assigneeCard = incidentDetailItem(i18n.t("incidents.form.assignee"), "");
+    assigneeCard.find(".details-value").empty().append(UserAppearance.label(incident.assignee,
+        incident.assignee ? incidentUserLabel(incident.assignee) : i18n.t("incidents.labels.unassigned")));
+    summary.append(assigneeCard);
     summary.append(incidentDetailItem(i18n.t("incidents.details.declared_at"), formatDateTimeMinutes(incident.declared_at)));
     if (incident.description) {
         summary.append(incidentDetailItem(i18n.t("incidents.form.description"), incident.description));
@@ -772,7 +772,7 @@ function renderIncidentEvents(events) {
         }
         target.append(
             $("<div>").addClass("event-item")
-                .append($("<div>").addClass("event-dot"))
+                .append(event.actor ? UserAppearance.avatar(event.actor) : $("<div>").addClass("event-dot"))
                 .append(detail)
         );
     });
@@ -803,13 +803,20 @@ function loadIncidentStakeholderUsers(incident) {
             seen.add(id);
             const label = user.display_name || member.display_name || user.username || member.username || i18n.t("incidents.workspace.user_number", {id: id});
             const email = user.email || member.email || "";
-            select.append($("<option>").val(String(id)).text(label + (email ? " · " + email : "")));
+            select.append($("<option>").val(String(id))
+                .attr("data-color", UserAppearance.color(user))
+                .attr("data-display_name", label)
+                .text(label + (email ? " · " + email : "")));
         });
         // Tom Select supports searching names and email within option text.
         if (select[0] && typeof TomSelect !== "undefined") {
             if (select[0].tomselect) { select[0].tomselect.destroy(); }
             new TomSelect(select[0], {create: false, allowEmptyOption: true, maxOptions: 1000,
-                placeholder: i18n.t("incidents.workspace.picker_search"), searchField: ["text"]});
+                placeholder: i18n.t("incidents.workspace.picker_search"), searchField: ["text"],
+                render: {
+                    option: function (data) { return UserAppearance.option(data); },
+                    item: function (data) { return UserAppearance.option(data); }
+                }});
         }
     }, function (xhr) {
         if (!incidentIsCurrent(incident)) { return; }
@@ -838,7 +845,7 @@ function incidentListRows(selector, items, title, canDelete, onDelete) {
     if (!items.length) { incidentCollectionMessage(selector, i18n.t("incidents.workspace.empty_entries")); return; }
     items.forEach(function (item) {
         const row = $("<div>").addClass("incidents-collection-row");
-        row.append($("<span>").addClass("incidents-collection-label").text(title(item)));
+        row.append(UserAppearance.label(item.user, title(item)).addClass("incidents-collection-label"));
         if (canDelete) {
             row.append($("<button>").attr("type", "button").addClass("btn btn-small")
                 .text(i18n.t("incidents.workspace.remove")).on("click", function () { onDelete(item); }));
@@ -851,9 +858,8 @@ function renderIncidentComments(items) {
     if (!items.length) { incidentCollectionMessage("#incident-comments-list", i18n.t("incidents.workspace.empty_comments")); return; }
     items.forEach(function (item) {
         const author = incidentUserLabel(item.author, item.author_id);
-        const initial = String(author).trim().charAt(0).toUpperCase() || "?";
         const article = $("<article>").addClass("incidents-comment");
-        article.append($("<span>").addClass("incidents-comment-avatar").text(initial));
+        article.append(UserAppearance.avatar(item.author, "incidents-comment-avatar", author));
         const content = $("<div>").addClass("incidents-comment-content");
         const header = $("<div>").addClass("incidents-comment-meta");
         header.append($("<strong>").text(author));

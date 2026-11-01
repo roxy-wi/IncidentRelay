@@ -101,6 +101,7 @@
             "admin-users": "nav.users",
             "audit-log": "nav.audit_log",
             "sso": "nav.sso",
+            "change-integrations": "ci.title",
         };
 
         Object.keys(pageKeys).forEach(function (page) {

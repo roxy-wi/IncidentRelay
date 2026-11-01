@@ -1,18 +1,6 @@
 let lastGeneratedProfileToken = "";
 let currentProfileData = null;
 
-function getProfileInitials(profile) {
-    /*
-     * Build short initials for the profile avatar.
-     */
-    const source = profile.display_name || profile.username || "?";
-    const parts = source.trim().split(/\s+/);
-    if (parts.length >= 2) {
-        return (parts[0][0] + parts[1][0]).toUpperCase();
-    }
-    return source.substring(0, 2).toUpperCase();
-}
-
 function setProfileStatus(selector, message, isError) {
     /*
      * Render a small inline status message.
@@ -48,7 +36,7 @@ function renderProfileHeader(profile) {
         metaItems.push(profile.email);
     }
 
-    $("#profile-avatar").text(getProfileInitials(profile));
+    $("#profile-avatar").replaceWith(UserAppearance.avatar(profile, "person-avatar").attr("id", "profile-avatar"));
     $("#profile-display-title").text(title);
     $("#profile-display-meta").text(metaItems.join(" · ") || i18n.t("profile.header.no_contact"));
     renderProfileGroupsSummary(profile.groups || []);
@@ -217,6 +205,7 @@ function loadProfile() {
         $("#profile-timezone").val(profile.timezone || "");
         $("#profile-language").val(profile.locale || i18n.locale || "en");
         $("#profile-theme").val(profile.theme || "system");
+        $("#profile-color").val(UserAppearance.color(profile));
         $("#profile-telegram").val(profile.telegram_user_id || "");
         $("#profile-slack").val(profile.slack_user_id || "");
         $("#profile-mattermost").val(profile.mattermost_user_id || "");
@@ -269,6 +258,7 @@ function saveProfile() {
                 : ($("#profile-timezone").val() || null),
             locale: $("#profile-language").val() || previousLocale,
             theme: $("#profile-theme").val() || "system",
+            color: $("#profile-color").val(),
             telegram_user_id: $("#profile-telegram").val() || null,
             slack_user_id: $("#profile-slack").val() || null,
             mattermost_user_id: $("#profile-mattermost").val() || null,
@@ -279,6 +269,9 @@ function saveProfile() {
         function (profile) {
             currentProfileData = profile;
             setProfileStatus("#profile-save-status", i18n.t("profile.status.saved"), false);
+            currentUser = profile;
+            updateAuthUi();
+            UserAppearance.refresh(profile);
             renderProfileHeader(profile);
 
             if (window.AppTheme) {

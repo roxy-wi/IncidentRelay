@@ -374,11 +374,8 @@ function formatLayerMembersSummary(layerId) {
     }
 
     return members.map(function (member) {
-        return escapeHtml(
-            member.display_name
-            || member.username
-            || i18n.t("rotations.layers.user_number", {id: member.user_id})
-        );
+        return UserAppearance.label(member, member.display_name || member.username
+            || i18n.t("rotations.layers.user_number", {id: member.user_id}))[0].outerHTML;
     }).join(" → ");
 }
 
@@ -807,11 +804,8 @@ function renderLayerMemberRow(layerId, member) {
         $("<div>")
             .addClass("layer-member-name")
             .append(
-                $("<strong>").text(
-                    member.display_name
-                    || member.username
-                    || i18n.t("rotations.layers.user_number", {id: member.user_id})
-                )
+                UserAppearance.label(member, member.display_name || member.username
+                    || i18n.t("rotations.layers.user_number", {id: member.user_id}))
             )
             .append(
                 $("<small>").text(
@@ -1377,17 +1371,6 @@ function formatSeconds(seconds) {
     return seconds + "s";
 }
 
-function rotationInitials(value) {
-    return String(value || "?")
-        .trim()
-        .split(/\s+/)
-        .slice(0, 2)
-        .map(function (part) {
-            return part.substring(0, 1).toUpperCase();
-        })
-        .join("") || "?";
-}
-
 function getRotationCurrentUser(rotation) {
     return rotation.current_oncall || rotation.current_user || rotation.current_username || "";
 }
@@ -1861,7 +1844,7 @@ function loadOverrides() {
         overrides.forEach(function (override) {
             const row = $("<tr>");
             row.append($("<td>").text(override.id));
-            row.append($("<td>").text(override.display_name || override.username));
+            row.append($("<td>").append(UserAppearance.label(override)));
             row.append($("<td>").text(formatDateTime24(override.starts_at)));
             row.append($("<td>").text(formatDateTime24(override.ends_at)));
             row.append($("<td>").text(override.reason || "-"));
@@ -1998,9 +1981,7 @@ function renderRotationRow(rotation) {
                 $("<div>")
                     .addClass("person-inline")
                     .append(
-                        $("<div>")
-                            .addClass("person-avatar")
-                            .text(rotationInitials(currentUser))
+                        UserAppearance.avatar(rotation.current_oncall_user, "person-avatar", currentUser)
                     )
                     .append(
                         $("<div>")
@@ -2157,7 +2138,8 @@ function renderRotationDetails(rotation) {
             .addClass("details-list")
             .append(rotationDetailsItem(i18n.t("rotations.details.name"), rotation.name))
             .append(rotationDetailsItem(i18n.t("rotations.details.team"), rotation.team_name || rotation.team_slug))
-            .append(rotationDetailsItem(i18n.t("rotations.details.current_oncall"), getRotationCurrentUser(rotation) || "-"))
+            .append(rotationDetailsItem(i18n.t("rotations.details.current_oncall"), "")
+                .find(".details-value").empty().append(UserAppearance.label(rotation.current_oncall_user, getRotationCurrentUser(rotation) || "-")).end())
             .append(rotationDetailsItem(i18n.t("rotations.details.cadence"), getRotationCadence(rotation)))
             .append(rotationDetailsItem(i18n.t("rotations.details.handoff_time"), rotation.handoff_time))
             .append(rotationDetailsItem(i18n.t("rotations.details.reminder"), formatSeconds(rotation.reminder_interval_seconds)))

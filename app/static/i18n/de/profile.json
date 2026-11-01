@@ -226,5 +226,7 @@
   "profile.oncall.no_next_primary": "Keine bevorstehenden Primärverschiebungen im ausgewählten Lookahead-Fenster.",
   "profile.oncall.next_backup": "Nächste Eskalations-Backup-Shifts",
   "profile.oncall.no_next_backup": "Keine bevorstehende Eskalationssicherung verschiebt sich im ausgewählten Lookahead-Fenster.",
-  "profile.push.device_placeholder": "Mein Laptop, Arbeitstelefon..."
+  "profile.push.device_placeholder": "Mein Laptop, Arbeitstelefon...",
+  "profile.fields.color": "Benutzerfarbe",
+  "profile.fields.color_help": "Wird in IncidentRelay für Ihren Avatar und Ihre Bereitschaftsschichten verwendet."
 }

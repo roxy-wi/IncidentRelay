@@ -1,5 +1,6 @@
 import json
 
+from app.modules.user_colors import user_color
 from app.services.serializers.common import serialize_utc_datetime
 
 
@@ -14,6 +15,7 @@ def serialize_incident_stakeholder(stakeholder):
             "id": user.id,
             "username": user.username,
             "display_name": user.display_name,
+            "color": user_color(user),
             "email": user.email,
         } if user else None,
         "email": stakeholder.email,
@@ -55,6 +57,7 @@ def serialize_incident(incident, *, current_user=None, include_details=False):
             "id": assignee.id,
             "username": assignee.username,
             "display_name": assignee.display_name,
+            "color": user_color(assignee),
             "email": assignee.email,
         } if assignee else None),
         "workflow_status": incident.workflow_status,
