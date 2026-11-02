@@ -200,6 +200,36 @@ class Config:
     CHANGE_EVENTS_ENABLED = settings.get_bool(
         "change_intelligence", "intake_enabled", False
     )
+    CHANGE_WORKER_ENABLED = settings.get_bool(
+        "change_intelligence", "worker_enabled", True
+    )
+    CHANGE_WORKER_INTERVAL_SECONDS = max(
+        1, settings.get_int("change_intelligence", "worker_interval_seconds", 5)
+    )
+    CHANGE_WORKER_LEASE_SECONDS = max(
+        10, settings.get_int("change_intelligence", "worker_lease_seconds", 60)
+    )
+    CHANGE_WORKER_MAX_ATTEMPTS = max(
+        1, settings.get_int("change_intelligence", "worker_max_attempts", 8)
+    )
+    CHANGE_WORKER_RETRY_BASE_SECONDS = max(
+        1, settings.get_int("change_intelligence", "worker_retry_base_seconds", 5)
+    )
+    CHANGE_WORKER_RETRY_MAX_SECONDS = max(
+        1, settings.get_int("change_intelligence", "worker_retry_max_seconds", 300)
+    )
+    CHANGE_WORKER_JOBS_PER_TICK = max(
+        1, min(100, settings.get_int("change_intelligence", "worker_jobs_per_tick", 20))
+    )
+    CHANGE_WORKER_BATCH_SIZE = max(
+        1, min(1000, settings.get_int("change_intelligence", "worker_batch_size", 100))
+    )
+    CHANGE_PENDING_TTL_SECONDS = max(
+        60, settings.get_int("change_intelligence", "pending_ttl_seconds", 604800)
+    )
+    CHANGE_PENDING_POLL_SECONDS = max(
+        5, settings.get_int("change_intelligence", "pending_poll_seconds", 60)
+    )
     CHANGE_EVENTS_MAX_FUTURE_SECONDS = max(
         0, settings.get_int("change_intelligence", "max_future_seconds", 300)
     )

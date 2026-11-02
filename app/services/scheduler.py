@@ -696,6 +696,22 @@ def orchestration_webhook_job():
             db.close()
 
 
+def change_intelligence_job():
+    """Database leases, rather than the scheduler singleton, fence this work."""
+    from app.services.change_intelligence.worker import process_change_jobs
+
+    try:
+        if db.is_closed():
+            db.connect(reuse_if_open=True)
+        return process_change_jobs()
+    except Exception as error:
+        logger.error("Change Intelligence worker tick failed: %s", type(error).__name__)
+        return 0
+    finally:
+        if not db.is_closed():
+            db.close()
+
+
 def start_scheduler():
     """
     Start the background scheduler.
@@ -710,6 +726,17 @@ def start_scheduler():
         return _scheduler
 
     _scheduler = BackgroundScheduler()
+    if Config.CHANGE_WORKER_ENABLED:
+        _scheduler.add_job(
+            change_intelligence_job,
+            "interval",
+            seconds=Config.CHANGE_WORKER_INTERVAL_SECONDS,
+            max_instances=1,
+            coalesce=True,
+            next_run_time=utc_now(),
+            id="change_intelligence_job",
+            replace_existing=True,
+        )
     _scheduler.add_job(
         reminder_job,
         "interval",

@@ -2,9 +2,11 @@
 
 from contextlib import contextmanager
 
-from app.modules.db import incident_core_repo
+from app.modules.db import changes_repo, incident_core_repo
+from app.modules.common import utc_now
 from app.modules.db.models import (
     ChangeGrant,
+    ChangeGraphState,
     ChangeIntegration,
     ChangeSource,
     Group,
@@ -16,6 +18,25 @@ from app.services.change_intelligence.administration import (
     lock_catalog,
 )
 from app.services.change_intelligence.authorization import lock_row
+
+
+def advance_graph_revision():
+    """Publish catalog invalidation with the mutation, including new namespaces."""
+    state = lock_catalog()
+    revision = state.revision + 1
+    ChangeGraphState.update(revision=revision, updated_at=utc_now()).where(
+        ChangeGraphState.id == 1
+    ).execute()
+    changes_repo.request_job("discover_graph", 1, target_revision=revision)
+
+
+@contextmanager
+def graph_change():
+    """Serialize dependency edits with publication without changing grants."""
+    with incident_core_repo.write_transaction():
+        lock_catalog()
+        yield
+        advance_graph_revision()
 
 
 @contextmanager
@@ -73,6 +94,7 @@ def catalog_authorization_change(
             for value in ids
         ]
         yield
+        advance_graph_revision()
         for integration in integrations:
             # Nested Team/Service deletion may have already advanced this row.
             integration = ChangeIntegration.get_by_id(integration.id)

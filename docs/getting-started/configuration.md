@@ -479,7 +479,7 @@ For systemd and containers, also check journal or container logs.
 ## Change Intelligence experimental intake
 
 Public Change Event intake remains disabled until the complete intake, worker,
-correlation and authorized alert-link flow passes acceptance. Stage 4 can be
+correlation and authorized alert-link flow passes acceptance. Intake and worker can be
 tested in an isolated environment with an integration machine credential:
 
 ```ini
@@ -491,7 +491,7 @@ events_per_change = 1000
 ```
 
 `intake_enabled=true` enables `POST /api/change-events` for internal testing only.
-It does not start a worker or enable correlation. `events_per_minute` limits new
+The worker has a separate switch; intake does not enable correlation. `events_per_minute` limits new
 accepted events over a rolling minute per integration across all tokens/sources;
 exact retries do not consume quota. `events_per_change` bounds rebuild cost
 (1–10000, default 1000). Future skew cannot be negative; both quotas must be
@@ -516,7 +516,138 @@ errors are retried up to three times. Other write errors return `500`; failures
 before commit roll back. A connection loss during commit may leave acceptance
 uncertain: retry the same identity/content to discover the stored result safely.
 Neither diagnostic responses nor logs include the submitted payload.
-Pending resolution waits for stage 5; stage 4 does not expire or purge events.
+The stage 5 worker resolves pending references; it does not purge events.
 Stored identities remain retryable while retained. See OpenAPI and the
 [architecture](../architecture/change-intelligence-architecture.md) for ordering,
 grants, namespace pinning and the remaining stages.
+
+### Durable Change worker
+
+The existing scheduler runs the worker independently of the intake switch:
+
+```ini
+[change_intelligence]
+worker_enabled = true
+worker_interval_seconds = 5
+worker_lease_seconds = 60
+worker_max_attempts = 8
+worker_retry_base_seconds = 5
+worker_retry_max_seconds = 300
+worker_jobs_per_tick = 20
+worker_batch_size = 100
+pending_ttl_seconds = 604800
+pending_poll_seconds = 60
+```
+
+Each tick starts up to 20 jobs and stops starting jobs after 10 seconds. Reference
+and discovery batches contain at most 100 rows by default (configurable 1–1000);
+the job limit is 1–100. A lease lasts 60 seconds (minimum 10). Reference calculation
+renews it every ten rows. Publication checks the lease token, generation, expiry
+and Change/auth/graph revisions under locks, including a final fence before
+acknowledgement. PostgreSQL claims use `SKIP LOCKED`; SQLite reserves writes before
+reading. A lost worker cannot publish or alter a replacement worker's retry state.
+
+Successful batches checkpoint their cursor durably and reset their technical
+failure budget. Transient database failures use exponential backoff with jitter
+between half and all of the configured delay, capped at 300 seconds. Eight failed
+attempts, including crashes with expired leases, exhaust the budget. Unexpected
+errors immediately mark a job `dead`; diagnostics contain a safe error category.
+The periodic sweep does not restart dead jobs. A new accepted event or an audited
+operator action may request a new generation.
+
+Pending TTL is seven days from reference acceptance (minimum 60 seconds), not the
+sender's occurrence time. Older pending rows without an expiry use their original
+`created_at`. Successful resolution preserves the canonical Service ID permanently.
+An unavailable namespace/Service gives `invalid`, missing current authority gives
+`denied`, and an elapsed pending window gives `expired`. These states remain until
+an explicit operator retry or a newly accepted event containing the same reference.
+An exact duplicate event_id leaves the state and TTL unchanged. Both retry paths
+check current authority and preserve the pinned identity. Polling unresolved
+references defaults to 60 seconds (minimum 5); waiting for a Service is not a technical failure. Token revocation or
+expiry does not cancel already accepted work; the worker uses current integration,
+source and grants.
+
+Catalog and dependency mutations atomically advance graph revision and request a
+bounded discovery pass over retained Changes; authorization mutations scan the
+affected integration. Each pass has a high-water mark and durable cursor. The
+periodic fallback scans only indexed pending references, not full Change history.
+It restores missing work without resetting an active sweep or reviving dead jobs.
+Mapping publication may span batches. A current whole mapping requires a matching
+input stamp, no remaining batch cursor, and claimed_generation=requested_generation.
+The job can be done or pending its next missing-Service poll; a fresh request or an
+unfinished batch is not a completed pass. During a pass, individual canonical links
+may still carry an earlier Change revision.
+
+Global administrators can inspect `GET /api/admin/change-integrations/jobs`;
+Group administrators use `GET /api/admin/change-integrations/{integration_id}/jobs`
+for their owned integrations. These endpoints require JWT, return only queue
+metadata, support `state` and `after`, and paginate at 50 records. Retry with
+`POST` to the corresponding `/jobs/{job_id}/retry`, supplying
+`{"expected_generation": <requested_generation>}`. A stale request returns `409`.
+Retry is audited, resets the TTL of blocked unresolved references, and retains
+original submitted identities and resolved IDs. It never bypasses current grants.
+
+Metrics: `incidentrelay_change_worker_results_total` records fixed claim/outcome
+categories; `incidentrelay_change_jobs`,
+`incidentrelay_change_queue_oldest_due_age_seconds`,
+`incidentrelay_change_references`, and `incidentrelay_change_dead_jobs` expose
+queue size, age and error states without source/Team/Service labels. Correlation,
+impact and timeline handlers remain disabled; their existing requests finish with
+`not_enabled` instead of repeatedly retrying. No automatic episode search runs.
+
+For rollback, disable both intake and worker and restart web/scheduler processes.
+Keep rows and cursors intact; expired leases can be reclaimed after re-enabling.
+Stage 5 does not delete events, jobs or identity digests, so retries remain possible
+while history is retained. Retention/tombstone policy and automatic correlation
+horizons remain release work in later stages.
+
+### Changes Inbox and read API
+
+Open **Operations → Changes** to search and inspect accepted Changes. Filters and
+pagination are saved in the URL; detail links use the opaque Change UUID. The
+Team selector includes owned Changes and readable related Services. Owner-only
+filters (status, source and environment) exclude limited cross-team cards.
+
+Owner readers see lifecycle conflicts, service mapping diagnostics and immutable
+event history. A reader of a related Service sees a limited card, without the
+sender's title, source, actor, external IDs, URL or event payload. Stale or revoked
+cross-team links disappear until revalidated. Refresh reloads processing state;
+failed loads clear the previous data and offer a retry. Mapping is not automatic
+incident correlation: that engine is a later stage.
+
+Read endpoints require a human JWT or an active user's personal token with
+`changes:read`, even if global API authentication is optional. Personal token
+Group/Team restrictions still apply. `/api/services/{id}/changes` additionally
+requires `services:read`. Machine integration tokens cannot read. Responses are
+`Cache-Control: no-store`; inaccessible and absent resources share `404`.
+
+```sh
+curl --fail-with-body "$IR_URL/api/changes?kind=deployment&page_size=25" \
+  -H "Authorization: Bearer $PERSONAL_TOKEN"
+curl --fail-with-body "$IR_URL/api/changes/$CHANGE_UID/events?page=1" \
+  -H "Authorization: Bearer $PERSONAL_TOKEN"
+```
+
+Events are owner-only. `/services` returns scoped canonical links and, for owners,
+separately paginated submitted-reference diagnostics. Both collections use the
+requested `page`/`page_size` (1–100). Summary safe cards include up to five links;
+use `/services` for the complete accessible set. SQL filtering precedes counts
+and pagination. `service_id`, or `service_slug` with exactly one `team_id` or
+`team_slug`, selects a readable Service. `scope_team_id` selects Team context;
+`owner_team_id` selects readable ownership. `occurred_from`/`occurred_to` are
+inclusive ISO timestamps with a timezone. Unknown/duplicate selectors are `400`.
+
+For an internal acceptance environment with intake enabled, first create an
+integration/Source, a `changed` grant for the target Service, and a machine token.
+Replace the IDs, source name and event time below with that environment's values:
+
+```sh
+curl --fail-with-body "$IR_URL/api/change-events" \
+  -H "Authorization: Bearer $CHANGE_TOKEN" -H "Content-Type: application/json" \
+  --data '{"schema_version":1,"event_id":"deploy-42-started","change_id":"deploy-42","owner_team_id":1,"source":"deploy","kind":"deployment","event_type":"change.started","occurred_at":"2026-11-02T12:00:00Z","title":"Deploy checkout 42","changed_service_ids":[1]}'
+```
+
+Reuse the exact `event_id` and payload after transport failures (`200` for an exact
+retry). A completion has the same `change_id` and a new `event_id`, event type and
+sender time. Use `source_sequence` only for a source configured for sequence
+ordering. Public intake stays disabled until end-to-end acceptance in stage 10.

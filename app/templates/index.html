@@ -83,6 +83,7 @@
     <link rel="stylesheet" href="/static/css/loading.css">
     <link rel="stylesheet" href="/static/css/table_pages.css">
     <link rel="stylesheet" href="/static/css/incidents.css">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/changes.css', v='68d6af8c32bc') }}">
     <link rel="stylesheet" href="/static/css/orchestrations.css">
     <link rel="stylesheet" href="/static/css/audit_log.css">
     <link rel="stylesheet" href="/static/css/change_integrations.css?v=3a4824f00c4b">
@@ -99,7 +100,7 @@
   messages: {{ i18n_messages | tojson }}
  };
  </script>
- <script src="{{ url_for('static', filename='js/core/i18n.js') }}"></script>
+ <script src="{{ url_for('static', filename='js/core/i18n.js', v='fbb7918e3be1') }}"></script>
     <script src="/static/js/vendor/jquery-3.7.1.min.js"></script>
     <script src="/static/js/vendor/select2.min.js"></script>
     <script src="{{ url_for('static', filename='js/vendor/tom-select.complete.min.js') }}"></script>
@@ -142,6 +143,10 @@
                         <svg class="menu-icon"><use href="#icon-alerts"></use></svg>
                         <span class="menu-text">{{ _('nav.alerts') }}</span>
                     </a>
+            <a href="/changes" data-page="changes" class="menu-link" title="{{ _('changes.title') }}">
+                <svg class="menu-icon"><use href="#icon-routes"></use></svg>
+                <span class="menu-text">{{ _('changes.title') }}</span>
+            </a>
             <a href="/incidents" data-page="incidents" class="menu-link" title="{{ _('nav.incidents') }}">
                         <svg class="menu-icon"><use href="#icon-incidents"></use></svg>
                         <span class="menu-text">{{ _('nav.incidents') }}</span>
@@ -349,6 +354,7 @@
             <div id="view-dashboard" class="view{% if initial_page == '/' %} view-visible{% endif %}">{% include "pages/dashboard.html" %}</div>
             <div id="view-alerts" class="view{% if initial_alert_page %} view-visible{% endif %}">{% include "pages/alerts.html" %}</div>
             <div id="view-incidents" class="view{% if initial_incident_page %} view-visible{% endif %}">{% include "pages/incidents.html" %}</div>
+            <div id="view-changes" class="view{% if initial_page.startswith('/changes') %} view-visible{% endif %}">{% include "pages/changes.html" %}</div>
             <div id="view-rotations" class="view">{% include "pages/rotations.html" %}</div>
             <div id="view-calendar" class="view">{% include "pages/calendar.html" %}</div>
             <div id="view-routes" class="view">{% include "pages/routes.html" %}</div>
@@ -413,7 +419,7 @@
 </section>
 <script src="{{ url_for('static', filename='js/components/matcher_editor.js', v='20260625') }}"></script>
 <script src="/static/js/core/rbac_roles.js"></script>
-<script src="/static/js/core/state.js"></script>
+<script src="/static/js/core/state.js?v=172ef17c8391"></script>
 <script src="/static/js/core/user_appearance.js"></script>
 <script src="/static/js/core/dialogs.js"></script>
 <script src="/static/js/core/api.js"></script>
@@ -430,7 +436,7 @@
 <script src="/static/js/core/sortable_table.js"></script>
 <script src="/static/js/core/pwa.js"></script>
 <script src="/static/js/core/browser_push.js"></script>
-<script src="/static/js/core/router.js?v=c21a53cbfb7e"></script>
+<script src="/static/js/core/router.js?v=cad83973e8f9"></script>
 <script src="/static/js/core/forms.js"></script>
 <script src="{{ url_for('static', filename='js/core/timezones.js') }}"></script>
 <script src="/static/js/sidebar.js"></script>
@@ -448,6 +454,7 @@
 <script src="{{ url_for('static', filename='js/pages/alerts.js') }}"></script>
 <script src="{{ url_for('static', filename='js/pages/alert_analytics.js') }}"></script>
 <script src="{{ url_for('static', filename='js/pages/incidents.js') }}"></script>
+<script src="{{ url_for('static', filename='js/pages/changes.js', v='5474bd13c100') }}"></script>
 <script src="/static/js/pages/rotations.js"></script>
 <script src="{{ url_for('static', filename='js/pages/oncall_health.js') }}"></script>
 <script src="/static/js/pages/calendar.js"></script>

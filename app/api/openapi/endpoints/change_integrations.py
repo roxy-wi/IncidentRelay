@@ -175,11 +175,42 @@ def paths():
             )
         },
     }
+    for prefix in (BASE, BASE + "/{integration_id}"):
+        result[prefix + "/jobs"] = {
+            "get": operation(
+                "List queue metadata only; root listing requires a global administrator"
+            )
+        }
+        result[prefix + "/jobs/{job_id}/retry"] = {
+            "post": operation(
+                "Audited retry of a job and blocked references; keeps pinned identities; root endpoint requires a global administrator",
+                properties={"expected_generation": ID},
+                required=["expected_generation"],
+            )
+        }
+        for method in (
+            result[prefix + "/jobs"]["get"],
+            result[prefix + "/jobs/{job_id}/retry"]["post"],
+        ):
+            method["description"] = (
+                "JWT only, even when API authentication is optional. Global administrators manage all jobs; "
+                "Group user_admin members use the integration-scoped route for their own Group. "
+                "Listing returns up to 50 queue metadata records, without event payloads, Services or lease credentials. "
+                "Retry requires expected_generation; a stale generation returns 409. It renews the pending window "
+                "for blocked unresolved references and records an audit, retaining original identities and canonical IDs. "
+                "Current source/grants are rechecked by the worker. Responses are not cached."
+            )
     for path, methods in result.items():
         for operation_data in methods.values():
             operation_data["parameters"] = [
                 path_param(name, name)
-                for name in ["integration_id", "source_id", "grant_id", "token_id"]
+                for name in [
+                    "integration_id",
+                    "source_id",
+                    "grant_id",
+                    "token_id",
+                    "job_id",
+                ]
                 if "{" + name + "}" in path
             ]
     result[BASE]["get"]["parameters"] = [
@@ -189,4 +220,22 @@ def paths():
         {"name": "team_id", "in": "query", "schema": ID},
         {"name": "integration_id", "in": "query", "schema": ID},
     ]
+    for prefix in (BASE, BASE + "/{integration_id}"):
+        result[prefix + "/jobs"]["get"]["parameters"].extend(
+            [
+                {
+                    "name": "after",
+                    "in": "query",
+                    "schema": {"type": "integer", "minimum": 0},
+                },
+                {
+                    "name": "state",
+                    "in": "query",
+                    "schema": {
+                        "type": "string",
+                        "enum": ["pending", "running", "done", "dead"],
+                    },
+                },
+            ]
+        )
     return result

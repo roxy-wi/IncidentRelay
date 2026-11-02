@@ -12,12 +12,14 @@ from app.modules.db.models import (
     Change,
     ChangeGrant,
     ChangeIntegration,
+    ChangeJob,
     ChangeSource,
     Group,
     Service,
     Team,
 )
 from app.services.change_intelligence import administration as admin
+from app.services.change_intelligence import job_administration
 from app.services.change_intelligence.authorization import ChangeAccessDenied
 from app.services.change_intelligence.management import (
     can_manage_integrations,
@@ -365,3 +367,76 @@ def revoke_token(integration_id, token_id):
         integration_id, token_id, payload, actor_id=request.current_user.id
     )
     return jsonify(detail(integration_id))
+
+
+def job_data(job):
+    """Operational metadata only; no event payload or Service identity details."""
+    return {
+        "id": job.id,
+        "job_type": job.job_type,
+        "state": job.state,
+        "requested_generation": job.requested_generation,
+        "claimed_generation": job.claimed_generation,
+        "completed_generation": job.completed_generation,
+        "attempts": job.attempts,
+        "last_error_class": job.last_error_class,
+        "next_attempt_at": serialize_utc_datetime(job.next_attempt_at),
+        "updated_at": serialize_utc_datetime(job.updated_at),
+    }
+
+
+@change_integrations_bp.get("/jobs")
+@change_integrations_bp.get("/<int:integration_id>/jobs")
+def list_jobs(integration_id=None):
+    if integration_id is None:
+        if not request.current_user.is_admin:
+            raise ChangeAccessDenied()
+        query = ChangeJob.select()
+    else:
+        visible_integrations(request.current_user).where(
+            ChangeIntegration.id == integration_id
+        ).get()
+        query = job_administration.integration_jobs(integration_id)
+    try:
+        after = int(request.args.get("after", "0"))
+        if after < 0:
+            raise ValueError()
+    except ValueError:
+        return make_error_response("validation_error", "Invalid pagination cursor", 400)
+    state = request.args.get("state")
+    if state:
+        if state not in {"pending", "running", "done", "dead"}:
+            return make_error_response("validation_error", "Invalid job state", 400)
+        query = query.where(ChangeJob.state == state)
+    jobs = list(query.where(ChangeJob.id > after).order_by(ChangeJob.id).limit(51))
+    return jsonify(
+        {
+            "items": [job_data(job) for job in jobs[:50]],
+            "next_after": jobs[49].id if len(jobs) > 50 else None,
+        }
+    )
+
+
+@change_integrations_bp.post("/jobs/<int:job_id>/retry")
+@change_integrations_bp.post("/<int:integration_id>/jobs/<int:job_id>/retry")
+def retry_job(job_id, integration_id=None):
+    if integration_id is None:
+        if not request.current_user.is_admin:
+            raise ChangeAccessDenied()
+    else:
+        visible_integrations(request.current_user).where(
+            ChangeIntegration.id == integration_id
+        ).get()
+    payload, error = validate_body(schemas.JobRetryInput)
+    if error:
+        return error
+    return jsonify(
+        job_data(
+            job_administration.retry_job(
+                job_id,
+                payload.expected_generation,
+                actor_id=request.current_user.id,
+                integration_id=integration_id,
+            )
+        )
+    )

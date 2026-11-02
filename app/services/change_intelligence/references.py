@@ -1,5 +1,7 @@
 """Resolve scoped identities while preserving the first pinned namespace."""
 
+from datetime import timedelta
+
 from peewee import fn
 
 from app.modules.common import utc_now
@@ -15,6 +17,7 @@ from app.services.change_intelligence.authorization import (
     authorize_reference,
     scoped_team,
 )
+from app.settings import Config
 
 
 class InvalidChangeInput(ValueError):
@@ -129,6 +132,7 @@ def resolve_reference(change, event, source, relation, submitted, auth_revision)
         "basis": f"{relation if trusted else 'reference'}_grant",
         "auth_revision": auth_revision,
     }
+    now = utc_now()
     if reference is None:
         reference = ChangeServiceReference.create(
             change=change.id,
@@ -145,19 +149,35 @@ def resolve_reference(change, event, source, relation, submitted, auth_revision)
             resolution_status="resolved" if service else "pending_resolution",
             verification_state=verification,
             verification_evidence=evidence,
-            resolved_at=utc_now() if service else None,
+            resolved_at=now if service else None,
+            expires_at=(
+                None
+                if service
+                else now + timedelta(seconds=Config.CHANGE_PENDING_TTL_SECONDS)
+            ),
         )
     else:
         updates = {
             "verification_state": verification,
             "verification_evidence": evidence,
             "verification_version": reference.verification_version + 1,
+            "resolution_status": "resolved" if service else "pending_resolution",
+            "last_error_code": None,
         }
-        if reference.resolved_service_id is None and service:
+        if service:
             updates.update(
                 resolved_service=service.id,
-                resolution_status="resolved",
-                resolved_at=utc_now(),
+                resolved_at=reference.resolved_at or now,
+            )
+        elif (
+            reference.resolution_status in {"denied", "invalid", "expired"}
+            or reference.expires_at is None
+            or reference.expires_at <= now
+        ):
+            # A new event is an explicit retry; duplicate event IDs never reach
+            # this code. Keep the pinned identity and open a fresh pending window.
+            updates["expires_at"] = now + timedelta(
+                seconds=Config.CHANGE_PENDING_TTL_SECONDS
             )
         ChangeServiceReference.update(**updates).where(
             ChangeServiceReference.id == reference.id

@@ -67,6 +67,23 @@ ALERT_GROUP_ACTIONS = Counter(
     registry=REGISTRY,
 )
 
+CHANGE_WORKER_RESULTS = Counter(
+    "incidentrelay_change_worker_results",
+    "Change worker claims and outcomes.",
+    labelnames=("outcome",),
+    registry=REGISTRY,
+)
+
+
+def record_change_worker_result(outcome):
+    """Fixed outcome labels only; no sender identities or exception messages."""
+    if not Config.METRICS_ENABLED:
+        return
+    if outcome not in {"claimed", "reclaimed", "processed", "stale", "failed"}:
+        raise ValueError("Unsupported Change worker outcome")
+    CHANGE_WORKER_RESULTS.labels(outcome=outcome).inc()
+
+
 WORKER_HEARTBEAT_LOCK_NAMES = {
     "scheduler": "scheduler_heartbeat",
     "telegram": "telegram_worker_heartbeat",
@@ -108,6 +125,9 @@ class DatabaseGaugeCollector(Collector):
     def collect(self):
         yield from self._database_gauges()
         yield from self._operational_gauges()
+        from app.services.change_intelligence.metrics import change_worker_gauges
+
+        yield from change_worker_gauges()
         yield self._build_info_gauge()
 
     def _database_gauges(self):

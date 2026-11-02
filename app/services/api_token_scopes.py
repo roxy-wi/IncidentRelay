@@ -4,6 +4,8 @@ Keep this module dependency-free: it is imported by middleware, profile token
 creation, integration authentication, tests, and documentation helpers.
 """
 
+import re
+
 READ_METHODS = frozenset({"GET", "HEAD"})
 WRITE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 
@@ -165,6 +167,13 @@ def required_scopes_for_path(path, method):
     method = str(method or "").upper()
     if path == "/api/change-events":
         return ["changes:ingest"] if method == "POST" else None
+    if path_matches_prefix(path, "/api/changes"):
+        known_read = path == "/api/changes" or re.fullmatch(
+            r"/api/changes/[0-9a-fA-F-]{36}(?:/events|/services)?", path
+        )
+        return ["changes:read"] if known_read and method in READ_METHODS else None
+    if re.fullmatch(r"/api/services/\d+/changes", path):
+        return ["changes:read", "services:read"] if method in READ_METHODS else None
     action = None
     if method in READ_METHODS:
         action = "read"

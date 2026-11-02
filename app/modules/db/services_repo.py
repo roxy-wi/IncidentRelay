@@ -699,6 +699,14 @@ def get_service_dependency(dependency_id):
 
 def create_service_dependency(service_id, data):
     """Create or restore a service dependency."""
+    from app.services.change_intelligence.catalog import graph_change
+
+    with graph_change():
+        return _create_service_dependency(service_id, data)
+
+
+def _create_service_dependency(service_id, data):
+    """Write while the caller holds the graph revision lock."""
     data = dict(data)
     target_id = data["depends_on_service"]
     existing = ServiceDependency.get_or_none(
@@ -724,26 +732,29 @@ def create_service_dependency(service_id, data):
 
 def update_service_dependency(dependency_id, data):
     """Update a service dependency."""
-    dependency = get_service_dependency(dependency_id)
+    from app.services.change_intelligence.catalog import graph_change
 
-    for field, value in data.items():
-        setattr(dependency, field, value)
-
-    dependency.updated_at = utc_now()
-    dependency.save()
-
-    return dependency
+    with graph_change():
+        dependency = get_service_dependency(dependency_id)
+        for field, value in data.items():
+            setattr(dependency, field, value)
+        dependency.updated_at = utc_now()
+        dependency.save()
+        return dependency
 
 
 def soft_delete_service_dependency(dependency_id):
     """Soft-delete a service dependency."""
-    dependency = get_service_dependency(dependency_id)
-    dependency.enabled = False
-    dependency.deleted = True
-    dependency.deleted_at = utc_now()
-    dependency.updated_at = utc_now()
-    dependency.save()
-    return dependency
+    from app.services.change_intelligence.catalog import graph_change
+
+    with graph_change():
+        dependency = get_service_dependency(dependency_id)
+        dependency.enabled = False
+        dependency.deleted = True
+        dependency.deleted_at = utc_now()
+        dependency.updated_at = utc_now()
+        dependency.save()
+        return dependency
 
 
 def list_downstream_service_dependencies(service_id=None, service_ids=None):

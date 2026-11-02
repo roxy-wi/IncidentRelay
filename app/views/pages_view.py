@@ -88,6 +88,9 @@ def pwa_service_worker():
 @pages_bp.route("/incidents")
 @pages_bp.route("/incidents/")
 @pages_bp.route("/incidents/<int:incident_id>")
+@pages_bp.route("/changes")
+@pages_bp.route("/changes/")
+@pages_bp.route("/changes/<uuid:change_uid>")
 @pages_bp.route("/rotations")
 @pages_bp.route("/rotations/")
 @pages_bp.route("/calendar")
@@ -131,7 +134,7 @@ def pwa_service_worker():
 @pages_bp.route("/admin/change-integrations")
 @pages_bp.route("/admin/change-integrations/")
 @pages_bp.route("/login")
-def app_page(alert_id=None, incident_id=None):
+def app_page(alert_id=None, incident_id=None, change_uid=None):
     """
     Render the frontend application for direct page URLs.
     """

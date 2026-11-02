@@ -24,6 +24,12 @@ class RevisionInput(ApiModel):
     expected_revision: PositiveId
 
 
+class JobRetryInput(ApiModel):
+    """Avoid repeating an operator action against a newer job generation."""
+
+    expected_generation: PositiveId
+
+
 class IntegrationUpdate(RevisionInput):
     """Only name and activity may change."""
 

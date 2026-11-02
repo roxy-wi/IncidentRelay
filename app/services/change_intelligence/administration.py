@@ -34,6 +34,7 @@ def lock_catalog():
     state = lock_row(ChangeGraphState.select().where(ChangeGraphState.id == 1))
     if state is None:
         raise RuntimeError("Change graph state is missing; run migrations")
+    return state
 
 
 def advance_revision(integration):

@@ -8,6 +8,7 @@ from app.i18n import register_i18n
 from app.middleware import enforce_api_authentication
 from app.views.change_integrations_view import change_integrations_bp
 from app.views.change_events_view import change_events_bp
+from app.views.changes_view import changes_bp
 from app.views.admin_users_view import admin_users_bp
 from app.views.audit_logs_view import audit_logs_bp
 from app.views.alerts_view import alerts_bp
@@ -125,6 +126,7 @@ def register_blueprints(flask_app):
     flask_app.register_blueprint(admin_users_bp, url_prefix="/api/admin/users")
     flask_app.register_blueprint(change_integrations_bp, url_prefix="/api/admin/change-integrations")
     flask_app.register_blueprint(change_events_bp, url_prefix="/api/change-events")
+    flask_app.register_blueprint(changes_bp, url_prefix="/api")
     flask_app.register_blueprint(audit_logs_bp, url_prefix="/api/admin/audit-logs")
     flask_app.register_blueprint(rotations_bp, url_prefix="/api/rotations")
     flask_app.register_blueprint(oncall_health_bp, url_prefix="/api/oncall-health")

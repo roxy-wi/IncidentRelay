@@ -1,3 +1,5 @@
+import re
+
 import pytest
 
 from app.login import create_access_token
@@ -171,7 +173,9 @@ def test_every_protected_flask_api_route_has_scope_mapping(app):
             if is_jwt_only_api_path(rule.rule):
                 continue
 
-            if required_scopes_for_path(rule.rule, method) is None:
+            path = re.sub(r"<uuid:[^>]+>", "00000000-0000-0000-0000-000000000001", rule.rule)
+            path = re.sub(r"<int:[^>]+>", "1", path)
+            if required_scopes_for_path(path, method) is None:
                 missing.append((method, rule.rule))
 
     assert missing == []

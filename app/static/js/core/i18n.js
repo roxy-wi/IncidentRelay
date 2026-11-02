@@ -102,6 +102,7 @@
             "audit-log": "nav.audit_log",
             "sso": "nav.sso",
             "change-integrations": "ci.title",
+            "changes": "changes.title",
         };
 
         Object.keys(pageKeys).forEach(function (page) {

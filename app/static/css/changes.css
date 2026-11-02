@@ -1,0 +1,38 @@
+.changes-page [hidden] {
+    display: none !important;
+}
+.changes-description,
+.changes-page pre {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+.changes-page .form-grid-2 {
+    margin-top: 12px;
+}
+.changes-page .changes-title-link {
+    display: block;
+    overflow-wrap: anywhere;
+}
+.changes-page .changes-row-context {
+    margin-top: 4px;
+}
+body.md-theme .changes-page .form-body {
+    padding: 12px 16px;
+    gap: 10px;
+}
+body.md-theme .changes-page .form-body > p {
+    margin: 0;
+}
+body.md-theme .changes-page .card-header h3 {
+    margin: 0;
+    font-size: 16px;
+}
+body.md-theme .changes-page .form-grid-2 > .form-group {
+    gap: 4px;
+}
+.changes-page #changes-metadata {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+.changes-page #changes-message:empty {
+    display: none;
+}

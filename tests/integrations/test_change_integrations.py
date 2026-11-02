@@ -679,7 +679,7 @@ def test_openapi_covers_administration_and_marks_intake_experimental(app):
         if not rule.rule.startswith(BASE):
             continue
         path = rule.rule
-        for key in ["integration_id", "source_id", "grant_id", "token_id"]:
+        for key in ["integration_id", "source_id", "grant_id", "token_id", "job_id"]:
             path = path.replace(f"<int:{key}>", "{" + key + "}")
         for method in rule.methods - {"HEAD", "OPTIONS"}:
             assert method.lower() in spec["paths"][path]

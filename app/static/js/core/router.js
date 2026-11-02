@@ -15,6 +15,9 @@ function normalizeAppRoutePath(pathname) {
     if (/^\/incidents\/\d+$/.test(normalizedPath)) {
         return "/incidents";
     }
+    if (/^\/changes\/[0-9a-f-]{36}$/i.test(normalizedPath)) {
+        return "/changes";
+    }
     return normalizedPath || "/";
 }
 
@@ -104,6 +107,8 @@ function navigate(path, pushState) {
      */
     let appPath = splitAppPath(path);
     let routePath = appPath.routePath;
+
+    if (routePath !== "/changes" && typeof leaveChanges === "function") leaveChanges();
 
     if (routePath !== "/admin/change-integrations" && typeof closeChangeIntegrationModal === "function") closeChangeIntegrationModal();
     if (routePath === "/admin/change-integrations" && !hasGroupUserAdminAccess()) {
@@ -223,6 +228,7 @@ const TEAM_SCOPED_ROUTE_PATHS = {
     "/": true,
     "/alerts": true,
     "/incidents": true,
+    "/changes": true,
     "/rotations": true,
     "/calendar": true,
     "/routes": true,
