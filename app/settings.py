@@ -196,6 +196,19 @@ class Config:
     LOG_REQUESTS = False
 
     API_AUTH_REQUIRED = settings.get_bool("auth", "api_auth_required", False)
+    # Internal acceptance only until the complete Change Intelligence path ships.
+    CHANGE_EVENTS_ENABLED = settings.get_bool(
+        "change_intelligence", "intake_enabled", False
+    )
+    CHANGE_EVENTS_MAX_FUTURE_SECONDS = max(
+        0, settings.get_int("change_intelligence", "max_future_seconds", 300)
+    )
+    CHANGE_EVENTS_PER_MINUTE = max(
+        1, settings.get_int("change_intelligence", "events_per_minute", 600)
+    )
+    CHANGE_EVENTS_PER_CHANGE = max(
+        1, min(10000, settings.get_int("change_intelligence", "events_per_change", 1000))
+    )
     RBAC_ENFORCED = settings.get_bool("auth", "rbac_enforced", False)
     JWT_SECRET_KEY = settings.get("auth", "jwt_secret", SECRET_KEY) or SECRET_KEY
     JWT_EXPIRE_MINUTES = settings.get_int("auth", "jwt_expire_minutes", 1440)

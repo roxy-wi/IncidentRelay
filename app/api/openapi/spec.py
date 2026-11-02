@@ -6,6 +6,7 @@ from app.api.openapi.endpoints import (
     calendar,
     channels,
     change_integrations,
+    change_events,
     escalation_policies,
     groups,
     heartbeats,
@@ -33,6 +34,7 @@ from app.version import get_service_version
 
 
 ENDPOINT_MODULES = [
+    change_events,
     change_integrations,
     version,
     auth,

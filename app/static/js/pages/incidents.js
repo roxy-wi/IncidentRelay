@@ -772,7 +772,7 @@ function renderIncidentEvents(events) {
         }
         target.append(
             $("<div>").addClass("event-item")
-                .append(event.actor ? UserAppearance.avatar(event.actor) : $("<div>").addClass("event-dot"))
+                .append($("<div>").addClass("event-dot"))
                 .append(detail)
         );
     });

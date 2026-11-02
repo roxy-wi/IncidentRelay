@@ -2,9 +2,9 @@
 
 **Architecture RFC v1.1 (implementation contract)**
 
-**Source baseline:** `release/2.5.0`, `363697e` plus stage 3 changes (verified 2026-10-30)
+**Source baseline:** `release/2.5.0`, `1eac1dd` plus stage 4 changes (2026-11-01)
 
-**Status:** stages 1–3 implemented; stages 4–10 planned
+**Status:** stages 1–4 implemented; stages 5–10 planned. Public intake remains disabled.
 
 
 ## Agreed decisions — 28–30 October 2026
@@ -494,7 +494,7 @@ Technical Service settings expose explicit correlation opt-in and source/label e
 
 ## 12. Delivery plan
 
-Implementation is split into **10 sequential stages**. Each stage ends with a reviewable change set and its own tests; the next starts after the previous readiness criteria pass. Stages 1–2 are implemented; stages 3–10 remain planned. Distribute the scenarios in §13 across stages rather than deferring them all to release checks.
+Implementation is split into **10 sequential stages**. Each stage ends with a reviewable change set and its own tests; the next starts after the previous readiness criteria pass. Stages 1–4 are implemented; stages 5–10 remain planned. Distribute the scenarios in §13 across stages rather than deferring them all to release checks.
 
 | Milestone | Stages | Result |
 |---|---|---|
@@ -518,13 +518,19 @@ A development stage is not a separate production release. Enable public Change E
 
 ### 12.3. Stage 3 — Integrations, grants and credentials
 
-Implemented: `/admin/change-integrations` and the `/api/admin/change-integrations` namespace (global or owning Group administrator JWT) manage identities, owner/source namespaces locked after the first Change, explicitly editable grants and credentials. Configuration mutations require `expected_revision`; stale edits return `409`. Permission and relevant catalog mutations lock graph state then affected integrations in ID order, advance `auth_revision` and enqueue `discover_auth` atomically; the worker is still stage 5. Credential rotation atomically revokes the old token without changing integration identity or auth revision. Secrets are returned once with `Cache-Control: no-store`; lists/audits contain no secret or hash. `authorized_source` keeps authorization locked through the future caller’s writes; accepted work supplies the stable identity, while new intake also checks its credential. No `/api/change-events` view is registered yet.
+Implemented: `/admin/change-integrations` and the `/api/admin/change-integrations` namespace (global or owning Group administrator JWT) manage identities, owner/source namespaces locked after the first Change, explicitly editable grants and credentials. Configuration mutations require `expected_revision`; stale edits return `409`. Permission and relevant catalog mutations lock graph state then affected integrations in ID order, advance `auth_revision` and enqueue `discover_auth` atomically; the worker is still stage 5. Credential rotation atomically revokes the old token without changing integration identity or auth revision. Secrets are returned once with `Cache-Control: no-store`; lists/audits contain no secret or hash. `authorized_source` keeps authorization locked through the future caller’s writes; accepted work supplies the stable identity, while new intake also checks its credential. The disabled-by-default `/api/change-events` view is implemented in stage 4.
 
 - **Work:** administrative integration/source/grant/rotation APIs and UI; machine ApiToken, explicit scopes and route allowlist; audit and auth_revision. Implement owner/source and Service-scope checks, including reference-only grants. Preserve existing personal-token behavior.
 - **Tests:** source/Team impersonation; exceeding grants; uniform safe errors for inaccessible IDs; ingest credentials cannot read or administer; rotation, revocation and concurrent permission edits. Personal wildcard scope cannot replace integration identity.
 - **Ready when:** an administrator can provision an integration and replace its secret without changing event ownership; permission edits atomically advance revision. Continuing accepted work is tested with the worker in stage 5.
 
 ### 12.4. Stage 4 — Atomic intake and Change projection
+
+Implemented: `POST /api/change-events`, gated by `[change_intelligence] intake_enabled=false`. Only internal acceptance environments may enable it before stage 10. Authentication, mutable owner lookup, grants and writes share the integration lock; PostgreSQL locks the Change afterward and SQLite reserves writes before reads. A new event, references, canonical links, aggregate revision and `resolve_references` request commit together. No worker or correlation job is started here. Exact retries return the original event UID and current safe aggregate status without increasing revision/job generation.
+
+Sender timestamps use UTC microseconds; timestamp ties with different terminal outcomes remain conflicts. Sequence mode is captured per Change. Missing metadata does not overwrite supplied fields; an operation without a title temporarily uses `change_id`. Environment is trimmed, case-sensitive, and absent/null both mean no environment. Reference identities remain pinned after renames; a subsequent event can resolve a pending reference but cannot rebind a resolved one. Invalid IDs in an explicitly permitted Team return `422`; unqualified missing IDs and inaccessible references receive the same `403`.
+
+Limits: 256 KiB body before parsing, 100 total references per request, 64 KiB details with depth 10 and 2000 nodes, timezone-qualified timestamps with at most six fractional digits. Duplicate JSON keys, non-finite numbers, NUL and invalid Unicode are rejected. Defaults: 300 seconds future skew, 600 accepted new events/minute/integration, 1000 events/Change (configurable up to 10000); exact retries are exempt from these new-event limits. Digest is computed before redaction; only redacted payload/metadata are persisted. PostgreSQL lock/statement budgets are 2/5 seconds per attempt; transient database contention is retried at most three times, then returns `503` with `Retry-After`. WSGI/reverse-proxy request timeouts still apply to body transport. No cleanup runs at this stage, so stored identities remain retryable; pending TTL, retention/tombstones and worker retries are stage 5/10 work. See [configuration](../getting-started/configuration.md#change-intelligence-experimental-intake) and OpenAPI for the contract.
 
 - **Work:** validate the common payload; resolve ID/slug with pinned namespace_team_id; implement digest/idempotency and deterministic timestamp/sequence projection. Write event, references, Change state, revision and job request in one transaction that rechecks authorization. Keep the endpoint disabled in production until the stage 10 end-to-end acceptance checks pass.
 - **Tests:** event permutations, tied conflicting terminals and a later terminal; late started; sequence gaps/reuse; absent/null; rotation and event_id retries; concurrent first requests; failure at every write step.
@@ -601,7 +607,7 @@ Document payload/retention/retry limits in configuration and OpenAPI before phas
 
 ## 14. Compatibility with IncidentRelay 2.5
 
-Checked against `release/2.5.0` on 2026-10-30 (`b787074` plus local stage 2 changes). Stages 1–2 provide storage and lifecycle episode recording; Change intake, workers and correlation remain future work. This does not enable Change Intelligence or claim it was included in the released 2.5 baseline.
+Checked against `release/2.5.0` on 2026-11-01 (`1eac1dd` plus stage 4 changes). Stages 1–4 provide storage, lifecycle episodes, integration administration and disabled-by-default Change intake. Workers, read UI and correlation remain future work. This does not enable public Change Intelligence or claim it was included in the released 2.5 baseline.
 
 Reusable existing contracts: globally unique Team.slug; Service(team,slug) and Service.uid; ServiceDependency; ServiceEvent with its dedup key; AlertGroupCorrelation for AlertGroup ↔ AlertGroup; separate operational Incident/IncidentAlertGroupLink; hashed ApiToken; centralized API scopes; scheduler/database locks. Incident collaboration in 2.5 uses its own state/version and must not be coupled to technical Change ingestion.
 

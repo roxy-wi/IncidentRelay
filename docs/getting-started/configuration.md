@@ -475,3 +475,48 @@ log_file = /var/log/incidentrelay/incidentrelay.log
 ```
 
 For systemd and containers, also check journal or container logs.
+
+## Change Intelligence experimental intake
+
+Public Change Event intake remains disabled until the complete intake, worker,
+correlation and authorized alert-link flow passes acceptance. Stage 4 can be
+tested in an isolated environment with an integration machine credential:
+
+```ini
+[change_intelligence]
+intake_enabled = false
+max_future_seconds = 300
+events_per_minute = 600
+events_per_change = 1000
+```
+
+`intake_enabled=true` enables `POST /api/change-events` for internal testing only.
+It does not start a worker or enable correlation. `events_per_minute` limits new
+accepted events over a rolling minute per integration across all tokens/sources;
+exact retries do not consume quota. `events_per_change` bounds rebuild cost
+(1–10000, default 1000). Future skew cannot be negative; both quotas must be
+positive (out-of-range configuration is clamped). Environment overrides use
+`INCIDENTRELAY__CHANGE_INTELLIGENCE__INTAKE_ENABLED`, and the same convention for
+the other options. Disable intake and restart web processes to roll back access;
+keep stored events, references and pending jobs intact.
+
+The body is limited to 256 KiB before parsing; at most 100 Service references may
+be submitted, and details are limited to 64 KiB, 10 nesting levels and 2000 nodes.
+The entire payload is limited to 15 levels and 5000 nodes. Duplicate keys,
+non-finite numbers, NUL and invalid Unicode are rejected. Timestamps require a
+timezone and at most six fractional digits. Titles are limited to 500 characters,
+descriptions to 10000, URLs to 2048; URLs must be HTTP(S) without credentials.
+Configure the existing WSGI/reverse-proxy request timeouts to bound body transport.
+
+`201` confirms durable acceptance; `200` acknowledges an identical retry. An
+event-ID/content or immutable identity conflict returns `409`. Retry `429` after
+60 seconds and `503` after at least one second with the same event ID and content.
+PostgreSQL lock/statement timeouts are 2/5 seconds per attempt; transient database
+errors are retried up to three times. Other write errors return `500`; failures
+before commit roll back. A connection loss during commit may leave acceptance
+uncertain: retry the same identity/content to discover the stored result safely.
+Neither diagnostic responses nor logs include the submitted payload.
+Pending resolution waits for stage 5; stage 4 does not expire or purge events.
+Stored identities remain retryable while retained. See OpenAPI and the
+[architecture](../architecture/change-intelligence-architecture.md) for ordering,
+grants, namespace pinning and the remaining stages.

@@ -141,11 +141,12 @@ def test_machine_token_cannot_access_other_routes(
     assert response.status_code == 403
 
 
-def test_no_intake_route_is_enabled_yet(
+def test_intake_route_remains_disabled_by_default(
     app, client, setup_identity, admin_headers, monkeypatch
 ):
     monkeypatch.setattr(Config, "API_AUTH_REQUIRED", False)
-    assert all(rule.rule != "/api/change-events" for rule in app.url_map.iter_rules())
+    assert any(rule.rule == "/api/change-events" for rule in app.url_map.iter_rules())
+    assert Config.CHANGE_EVENTS_ENABLED is False
     assert (
         client.post("/api/change-events", json={}, headers=admin_headers).status_code
         == 401
@@ -667,11 +668,13 @@ def test_team_rename_keeps_pinned_namespace_and_service_restore_invalidates(
         )
 
 
-def test_openapi_covers_only_administration(app):
+def test_openapi_covers_administration_and_marks_intake_experimental(app):
     from app.api.openapi.spec import build_openapi_spec
 
     spec = build_openapi_spec()
-    assert "/api/change-events" not in spec["paths"]
+    assert "disabled by default" in (
+        spec["paths"]["/api/change-events"]["post"]["description"].lower()
+    )
     for rule in app.url_map.iter_rules():
         if not rule.rule.startswith(BASE):
             continue
