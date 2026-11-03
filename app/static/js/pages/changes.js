@@ -1,6 +1,5 @@
 /* Each load invalidates previous responses, including after SPA navigation. */
 let changesRequest = 0;
-let changesListPath = "/changes";
 let changesUid = null;
 let changesServicePage = 1;
 let changesEventPage = 1;
@@ -32,9 +31,9 @@ function leaveChanges() {
     $(
         "#changes-rows, #changes-services, #changes-references, #changes-events, #changes-metadata",
     ).empty();
-    $("#changes-detail-title, #changes-description, #changes-processing, #changes-message").text(
-        "",
-    );
+    $(
+        "#changes-detail-title, #changes-description, #changes-processing, #changes-message, #changes-filter-message",
+    ).text("");
     $("#changes-external").removeAttr("href").prop("hidden", true);
 }
 function changesFailure(xhr, requestId) {
@@ -66,6 +65,7 @@ function loadChanges() {
     const match = location.pathname.match(/^\/changes\/([0-9a-f-]{36})\/?$/i);
     changesUid = match ? match[1] : null;
     $("#changes-message").text(changesText("loading"));
+    $("#changes-filter-message").text("");
     $("#changes-list").prop("hidden", !!changesUid);
     $("#changes-detail").prop("hidden", true);
     $("#changes-error-actions").prop("hidden", true);
@@ -90,8 +90,14 @@ function loadChanges() {
         );
         return;
     }
-    changesListPath = location.pathname + location.search;
     const params = new URLSearchParams(location.search);
+    // Old Inbox links used a separate owner selector. Use the global Team filter.
+    if (params.has("owner_team_id")) {
+        if (!params.has("team")) params.set("team", params.get("owner_team_id"));
+        params.delete("owner_team_id");
+        navigate("/changes?" + params.toString(), true);
+        return;
+    }
     ["search", "status", "kind", "source", "environment"].forEach((key) =>
         $("#changes-" + key).val(params.get(key) || ""),
     );
@@ -165,7 +171,7 @@ function loadChanges() {
 }
 function loadChangeFilters(params, requestId) {
     [
-        ["team", "/api/teams", "owner_team_id", "all_teams"],
+        ["source", "/api/changes/sources", "source", "all_sources"],
         ["service", "/api/services", "service_id", "all_services"],
     ].forEach(([field, endpoint, key, empty]) => {
         const select = $("#changes-" + field)
@@ -177,28 +183,33 @@ function loadChangeFilters(params, requestId) {
             function (response) {
                 if (!changesActive(requestId)) return;
                 const items = Array.isArray(response) ? response : response.items || [];
-                const readable = items.filter(
-                    (item) => field !== "team" || item.permissions?.can_read,
-                );
-                readable.forEach((item) =>
+                items.forEach((item) =>
                     select.append(
                         $("<option>")
-                            .val(item.id)
-                            .text(item.name + (item.slug ? " (" + item.slug + ")" : "")),
+                            .val(field === "source" ? item : item.id)
+                            .text(
+                                field === "source"
+                                    ? item
+                                    : item.name + (item.slug ? " (" + item.slug + ")" : ""),
+                            ),
                     ),
                 );
-                select.val(params.get(key) || "").prop("disabled", false);
+                const selected = params.get(key) || "";
+                // Keep a bookmarked source filter even after its catalog entry disappears.
+                if (field === "source" && selected && !items.includes(selected))
+                    select.append($("<option>").val(selected).text(selected));
+                select.val(selected).prop("disabled", false);
             },
             function () {
                 if (changesActive(requestId))
-                    $("#changes-message").text(changesText("filter_error"));
+                    $("#changes-filter-message").text(changesText("filter_error"));
             },
         );
     });
 }
 function changesApply(page) {
-    if ($("#changes-team, #changes-service").is(":disabled")) {
-        $("#changes-message").text(changesText("filter_error"));
+    if ($("#changes-source, #changes-service").is(":disabled")) {
+        $("#changes-filter-message").text(changesText("filter_error"));
         return;
     }
     const params = new URLSearchParams();
@@ -208,13 +219,8 @@ function changesApply(page) {
         const value = String($("#changes-" + key).val() || "").trim();
         if (value) params.set(key, value);
     });
-    [
-        ["team", "owner_team_id"],
-        ["service", "service_id"],
-    ].forEach(([field, key]) => {
-        const value = $("#changes-" + field).val();
-        if (value) params.set(key, value);
-    });
+    const service = $("#changes-service").val();
+    if (service) params.set("service_id", service);
     ["from", "to"].forEach((key) => {
         const value = $("#changes-" + key).val();
         if (value) params.set("occurred_" + key, new Date(value).toISOString());
@@ -361,9 +367,6 @@ $(document).on("submit", "#changes-filters", function (event) {
 $(document).on("click", ".changes-reload", loadChanges);
 $(document).on("click", "#changes-reset", function () {
     navigate(appUrlWithGlobalTeamScope("/changes"), true);
-});
-$(document).on("click", "#changes-back, #changes-error-back", function () {
-    navigate(changesListPath, true);
 });
 $(document).on("click", ".changes-title-link", function (event) {
     if (event.ctrlKey || event.metaKey || event.shiftKey || event.altKey) return;

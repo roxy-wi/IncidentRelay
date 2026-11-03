@@ -135,7 +135,7 @@ function translateServicesWorkspace() {
 
     setServicesStaticText("#services-tab-services h2", "services.section.services");
     setServicesStaticText("#open-service-create-modal", "services.actions.new_service");
-    setServicesStaticText("#reload-services", "services.actions.reload");
+    setServicesStaticText("#reload-services", "common.reload");
     setServicesStaticPlaceholder("#services-search", "services.search.services");
 
     setServicesStaticText("#services-status-filter option[value='']", "services.filters.all_statuses");
@@ -222,7 +222,7 @@ function translateServicesWorkspace() {
     setServicesStaticText("#services-tab-dependencies h2", "services.section.dependencies");
     setServicesStaticText("#services-tab-dependencies .card-header .card-subtitle", "services.section.dependencies_subtitle");
     setServicesStaticText("#open-service-dependency-create-modal", "services.actions.new_dependency");
-    setServicesStaticText('[id="reload-service-context"]', "services.actions.reload");
+    setServicesStaticText('[id="reload-service-context"]', "common.reload");
     setServicesStaticPlaceholder("#service-dependencies-search", "services.search.dependencies");
     setServicesStaticPlaceholder("#service-dependency-graph-search", "services.search.graph");
 

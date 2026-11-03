@@ -1,14 +1,11 @@
 <div class="page-stack changes-page">
   <p id="changes-message" role="status" aria-live="polite"></p>
-  <div id="changes-error-actions" class="card-header-actions" hidden><button class="btn changes-reload" type="button">{{ _('changes.reload') }}</button><button id="changes-error-back" class="btn" type="button">{{ _('changes.back') }}</button></div>
+  <p id="changes-filter-message" role="status" aria-live="polite"></p>
+  <div id="changes-error-actions" class="card-header-actions" hidden><button class="btn changes-reload btn-reload" type="button">{{ _('common.reload') }}</button></div>
   <section id="changes-list" class="card">
-    <div class="card-header">
-      <div><h2>{{ _('changes.title') }}</h2><p>{{ _('changes.intro') }}</p></div>
-      <button class="btn changes-reload" type="button">{{ _('changes.reload') }}</button>
-    </div>
     <form id="changes-filters">
       <div class="page-toolbar is-flush-top">
-        <div class="page-toolbar-search"><input id="changes-search" class="input" type="search" maxlength="200" placeholder="{{ _('changes.search') }}" aria-label="{{ _('changes.search') }}"></div>
+        <div class="page-toolbar-search"><span class="page-toolbar-search-icon" aria-hidden="true">⌕</span><input id="changes-search" class="input" type="search" maxlength="200" placeholder="{{ _('changes.search') }}" aria-label="{{ _('changes.search') }}"></div>
         <select id="changes-status" class="input page-toolbar-filter" aria-label="{{ _('changes.status') }}">
           <option value="">{{ _('changes.all_statuses') }}</option>
           {% for status in ['unknown', 'running', 'succeeded', 'failed', 'rolled_back', 'cancelled'] %}<option value="{{ status }}">{{ _('changes.' ~ status) }}</option>{% endfor %}
@@ -19,13 +16,13 @@
         </select>
         <button class="btn btn-primary" type="submit">{{ _('changes.apply') }}</button>
         <button id="changes-reset" class="btn" type="button">{{ _('changes.reset') }}</button>
+        <button class="btn changes-reload btn-reload" type="button">{{ _('common.reload') }}</button>
       </div>
       <details class="form-body">
         <summary>{{ _('changes.more_filters') }}</summary>
         <div class="form-grid-2">
-          <div class="form-group"><label for="changes-team">{{ _('changes.owner') }}</label><select id="changes-team" class="input"><option value="">{{ _('changes.all_teams') }}</option></select></div>
-          <div class="form-group"><label for="changes-service">{{ _('changes.service') }}</label><select id="changes-service" class="input"><option value="">{{ _('changes.all_services') }}</option></select></div>
-          <div class="form-group"><label for="changes-source">{{ _('changes.source') }}</label><input id="changes-source" class="input" maxlength="255"></div>
+          <div class="form-group"><label for="changes-service">{{ _('changes.service') }}</label><select id="changes-service" class="input" disabled><option value="">{{ _('changes.all_services') }}</option></select></div>
+          <div class="form-group"><label for="changes-source">{{ _('changes.source') }}</label><select id="changes-source" class="input" disabled><option value="">{{ _('changes.all_sources') }}</option></select></div>
           <div class="form-group"><label for="changes-environment">{{ _('changes.environment') }}</label><input id="changes-environment" class="input" maxlength="255"></div>
           <div class="form-group"><label for="changes-from">{{ _('changes.from') }}</label><input id="changes-from" class="input" type="datetime-local"></div>
           <div class="form-group"><label for="changes-to">{{ _('changes.to') }}</label><input id="changes-to" class="input" type="datetime-local"></div>
@@ -43,7 +40,7 @@
     </div>
   </section>
   <section id="changes-detail" class="card" hidden>
-    <div class="card-header"><h2 id="changes-detail-title"></h2><div class="card-header-actions"><button id="changes-back" class="btn" type="button">{{ _('changes.back') }}</button><button class="btn changes-reload" type="button">{{ _('changes.reload') }}</button></div></div>
+    <div class="card-header"><h2 id="changes-detail-title"></h2><div class="card-header-actions"><button class="btn changes-reload btn-reload" type="button">{{ _('common.reload') }}</button></div></div>
     <div class="form-body">
       <p id="changes-limited" class="alert alert-info" hidden>{{ _('changes.limited') }}</p>
       <p id="changes-conflict" class="alert alert-warning" hidden>{{ _('changes.conflict') }}</p>

@@ -11,6 +11,7 @@ import pytest
 from werkzeug.serving import make_server
 
 from app.login import create_access_token
+from app.modules.db.models import ChangeSource
 from tests.integrations.test_changes_read import changes, intake, setup_identity
 
 __all__ = ["changes", "intake", "setup_identity"]
@@ -22,6 +23,11 @@ __all__ = ["changes", "intake", "setup_identity"]
 )
 def test_changes_inbox_in_browser(app, db, changes, tmp_path):
     """Check XSS, filters, navigation, safe projections and failed refreshes."""
+    ChangeSource.create(
+        integration=changes["change"].integration_id,
+        owner_team=changes["change"].owner_team_id,
+        source="no-history",
+    )
     server = make_server("127.0.0.1", 0, app, threaded=True)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
     thread.start()

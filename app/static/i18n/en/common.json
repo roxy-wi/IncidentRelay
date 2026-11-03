@@ -4,6 +4,7 @@
   "common.message": "Message",
   "common.cancel": "Cancel",
   "common.ok": "OK",
+  "common.reload": "Reload",
   "common.back": "Back",
   "common.close": "Close",
   "common.logout": "Logout",

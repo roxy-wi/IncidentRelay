@@ -1313,7 +1313,6 @@ $(document).on("change", "#incident-create-team", function () {
 });
 $(document).on("click", "#save-incident-create", saveIncidentCreate);
 
-$(document).on("click", "#close-incident-details, #close-incident-details-footer", function () { closeIncidentDetails(); });
 // The Incident workspace is a page, not a dismissible modal overlay.
 
 $(document).on("change", "#incident-details-status", function () {

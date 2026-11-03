@@ -50,9 +50,7 @@
         <button id="open-incident-create-modal" type="button" class="btn btn-primary is-hidden">
           {{ _('incidents.actions.create') }}
         </button>
-        <button id="reload-incidents" type="button" class="btn">
-          {{ _('incidents.actions.reload') }}
-        </button>
+        <button id="reload-incidents" type="button" class="btn btn-reload">{{ _('common.reload') }}</button>
       </div>
     </div>
 
@@ -163,7 +161,6 @@
   <section id="incident-details-modal" class="incidents-workspace is-hidden" aria-labelledby="incident-details-title">
     <div class="incidents-details-dialog">
       <header class="incidents-workspace-header">
-        <button id="close-incident-details" type="button" class="btn btn-small incidents-back-link">← {{ _('common.back') }}</button>
         <div class="incidents-workspace-heading">
         <div>
           <h2 id="incident-details-title">{{ _('incidents.details.title') }}</h2>
@@ -175,7 +172,7 @@
       <div class="incidents-details-body">
         <div class="incidents-workspace-grid"><main class="incidents-workspace-main">
         <div id="incident-details-error" class="alert alert-danger is-hidden" role="alert"></div>
-        <button id="incident-details-reload" type="button" class="btn is-hidden">{{ _('incidents.workspace.reload') }}</button>
+        <button id="incident-details-reload" type="button" class="btn is-hidden btn-reload">{{ _('common.reload') }}</button>
         <div id="incident-details-summary" class="details-grid"></div>
 
         <section class="card incidents-operation-card">

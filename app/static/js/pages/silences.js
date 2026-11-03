@@ -1,6 +1,5 @@
 let silencesCache = [];
 let silenceMatcherPresetsCache = [];
-let selectedSilenceDetailsId = null;
 let selectedSilenceSummaryFilter = "";
 
 function buildSilencesApiUrl() {
@@ -100,7 +99,6 @@ function refreshSilences() {
         silencesCache = asArray(silences);
         renderSilencesSummary(silencesCache);
         renderSilencesTable();
-        restoreSilenceDetails();
     });
 }
 
@@ -188,7 +186,6 @@ function getFilteredSilences() {
 
 function applySilenceFilters() {
     renderSilencesTable();
-    restoreSilenceDetails();
 }
 
 function renderSilencesCounter(filteredSilences, allSilences) {
@@ -207,7 +204,7 @@ function renderSilencesTable() {
     if (!silences.length) {
         tbody.append(
             $("<tr>").append(
-                $("<td>").attr("colspan", "7").addClass("empty-cell").text(i18n.t("silences.empty.found"))
+                $("<td>").attr("colspan", "9").addClass("empty-cell").text(i18n.t("silences.empty.found"))
             )
         );
         return;
@@ -224,19 +221,18 @@ function renderSilenceRow(silence) {
 
     row.append(
         $("<td>")
-            .append(
-                $("<button>")
-                    .attr("type", "button")
-                    .addClass("name-button")
-                    .text(silence.name || "-")
-                    .on("click", function () {
-                        renderSilenceDetails(silence);
-                    })
-            )
+            .addClass("silence-name-cell")
+            .append($("<div>").addClass("item-title").text(silence.name || "-"))
             .append($("<div>").addClass("row-subtitle").text(i18n.t("silences.row.id", {id: silence.id})))
     );
-    row.append($("<td>").append($("<span>").addClass("pill").text(silence.team_name || silence.team_slug || "-")));
-    row.append($("<td>").text(silence.reason || "-"));
+    const teamCell = $("<td>").addClass("silence-team-cell").append(
+        $("<div>").addClass("item-title").text(silence.team_name || silence.team_slug || "-"),
+    );
+    if (silence.team_slug && silence.team_slug !== silence.team_name) {
+        teamCell.append($("<div>").addClass("row-subtitle").text(silence.team_slug));
+    }
+    row.append(teamCell);
+    row.append($("<td>").addClass("silence-reason-cell").text(silence.reason || "-"));
     row.append(
         $("<td>").append(
             $("<div>")
@@ -245,28 +241,19 @@ function renderSilenceRow(silence) {
                 .append($("<div>").addClass("item-subtitle").text(i18n.t("silences.row.until", {time: formatDateTime24(silence.ends_at)})))
         )
     );
-    const matchingCell = $("<td>");
-
-    if (silence.matcher_preset) {
-        matchingCell.append(
-            $("<div>")
-                .addClass("row-subtitle")
-                .text(
-                    i18n.t("silences.row.preset", {
-                        preset: formatMatcherPresetOption(silence.matcher_preset)
-                    })
-                )
-        );
-    }
-
+    const matchingCell = $("<td>").addClass("silence-matching-cell");
     matchingCell.append(
-        $("<code>")
-            .addClass("details-code")
-            .attr(
-                "title",
-                JSON.stringify(silence.matchers || {})
-            )
-            .text(JSON.stringify(silence.matchers || {}))
+        $("<div>")
+            .addClass("row-subtitle")
+            .text(
+                silence.matcher_preset
+                    ? i18n.t("silences.row.preset", {
+                        preset: formatMatcherPresetOption(silence.matcher_preset),
+                    })
+                    : i18n.t("silences.form.no_preset"),
+            ),
+        $("<div>").addClass("row-subtitle").text(i18n.t("silences.details.additional_matchers")),
+        $("<code>").addClass("details-code").text(JSON.stringify(silence.matchers || {}, null, 2)),
     );
 
     row.append(matchingCell);
@@ -277,6 +264,18 @@ function renderSilenceRow(silence) {
                 .addClass("status-" + status)
                 .text(getSilenceStatusLabel(status))
         )
+    );
+    row.append(
+        $("<td>").text(i18n.t(
+            silence.apply_to_existing
+                ? "silences.details.apply_to_existing_enabled"
+                : "silences.details.apply_to_existing_disabled",
+        )),
+        $("<td>").text(i18n.t(
+            silence.reactivate_on_end !== false
+                ? "silences.details.reactivate_on_end_enabled"
+                : "silences.details.reactivate_on_end_disabled",
+        )),
     );
     row.append($("<td>").addClass("actions-cell").append(renderSilenceActions(silence)));
     return row;
@@ -317,124 +316,6 @@ function renderSilenceActions(silence) {
     });
 }
 
-function silenceDetailsItem(label, value) {
-    return $("<div>")
-        .addClass("details-item")
-        .append($("<div>").addClass("details-label").text(label))
-        .append($("<div>").addClass("details-value").text(value || "-"));
-}
-
-function silenceDetailsCode(label, value) {
-    return $("<div>")
-        .addClass("details-item")
-        .append($("<div>").addClass("details-label").text(label))
-        .append($("<pre>").addClass("details-code").text(JSON.stringify(value || {}, null, 2)));
-}
-
-function renderSilenceDetails(silence) {
-    const status = getSilenceStatus(silence);
-    selectedSilenceDetailsId = silence.id;
-
-    $("#silence-details-subtitle").text((silence.team_slug || "-") + " / " + getSilenceStatusLabel(status));
-
-    const body = $("#silence-details-body");
-    body.empty().append(
-        $("<div>")
-            .addClass("details-list")
-            .append(silenceDetailsItem(i18n.t("silences.details.name"), silence.name))
-            .append(silenceDetailsItem(i18n.t("silences.details.team"), silence.team_slug))
-            .append(silenceDetailsItem(i18n.t("silences.details.reason"), silence.reason))
-            .append(silenceDetailsItem(i18n.t("silences.details.starts_at"), formatDateTime24(silence.starts_at)))
-            .append(silenceDetailsItem(i18n.t("silences.details.ends_at"), formatDateTime24(silence.ends_at)))
-            .append(silenceDetailsItem(i18n.t("silences.details.status"), getSilenceStatusLabel(status)))
-            .append(
-                silenceDetailsItem(
-                    i18n.t("silences.details.apply_to_existing"),
-                    silence.apply_to_existing
-                        ? i18n.t("silences.details.apply_to_existing_enabled")
-                        : i18n.t("silences.details.apply_to_existing_disabled")
-                )
-            )
-            .append(
-                silenceDetailsItem(
-                    i18n.t("silences.details.reactivate_on_end"),
-                    silence.reactivate_on_end !== false
-                        ? i18n.t("silences.details.reactivate_on_end_enabled")
-                        : i18n.t("silences.details.reactivate_on_end_disabled")
-                )
-            )
-            .append(
-                silenceDetailsItem(
-                    i18n.t("silences.details.matcher_preset"),
-                    silence.matcher_preset
-                        ? formatMatcherPresetOption(silence.matcher_preset)
-                        : i18n.t("silences.form.no_preset")
-                )
-            )
-            .append(
-                silenceDetailsCode(
-                    i18n.t("silences.details.additional_matchers"),
-                    silence.matchers || {}
-                )
-            )
-    );
-
-    const actions = $("<div>").addClass("details-actions");
-    appendIconActionIfAllowed(actions, silence, {
-        required: "write",
-        icon: "fas fa-edit",
-        label: i18n.t("silences.actions.edit_silence"),
-        onClick: function () {
-            editSilence(silence.id);
-        },
-    });
-    if (silence.enabled) {
-        appendIconActionIfAllowed(actions, silence, {
-            required: "write",
-            icon: "fas fa-pause",
-            label: i18n.t("silences.actions.disable_silence"),
-            className: "btn-warning",
-            onClick: function () {
-                disableSilence(silence.id);
-            },
-        });
-    } else if (typeof enableSilence === "function") {
-        appendIconActionIfAllowed(actions, silence, {
-            required: "write",
-            icon: "fas fa-play",
-            label: i18n.t("silences.actions.enable_silence"),
-            className: "btn-success",
-            onClick: function () {
-                enableSilence(silence.id);
-            },
-        });
-    }
-
-    if (actions.children().length) {
-        body.append(actions);
-    }
-}
-
-function restoreSilenceDetails() {
-    const silences = getFilteredSilences();
-    if (!silences.length) {
-        renderSilenceDetailsEmpty();
-        return;
-    }
-
-    if (selectedSilenceDetailsId) {
-        const selected = silences.find(function (silence) {
-            return Number(silence.id) === Number(selectedSilenceDetailsId);
-        });
-        if (selected) {
-            renderSilenceDetails(selected);
-            return;
-        }
-    }
-
-    renderSilenceDetails(silences[0]);
-}
-
 function applySilenceSummaryFilter(status) {
     selectedSilenceSummaryFilter = status || "";
     $("#silences-status-filter").val(selectedSilenceSummaryFilter);
@@ -442,18 +323,6 @@ function applySilenceSummaryFilter(status) {
         window.PageUrlState.write("silences");
     }
     applySilenceFilters();
-}
-
-function renderSilenceDetailsEmpty() {
-    selectedSilenceDetailsId = null;
-    $("#silence-details-subtitle").text(i18n.t("silences.details.select"));
-    $("#silence-details-body")
-        .empty()
-        .append(
-            $("<p>")
-                .addClass("muted")
-                .text(i18n.t("silences.details.select_help"))
-        );
 }
 
 function updateSilenceReactivationWarning() {

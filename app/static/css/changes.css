@@ -33,6 +33,7 @@ body.md-theme .changes-page .form-grid-2 > .form-group {
 .changes-page #changes-metadata {
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 }
-.changes-page #changes-message:empty {
+.changes-page #changes-message:empty,
+.changes-page #changes-filter-message:empty {
     display: none;
 }

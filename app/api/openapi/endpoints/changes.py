@@ -153,6 +153,9 @@ def components():
                 {"$ref": "#/components/schemas/ChangeSafe"},
             ]
         },
+        "ChangeSourceOptions": object_schema(
+            {"items": {"type": "array", "items": TEXT, "uniqueItems": True}}
+        ),
         "ChangeReadPage": page_schema({"$ref": "#/components/schemas/ChangeRead"}),
         "ChangeEventPage": page_schema(event),
         "ChangeServicePage": services,
@@ -247,6 +250,12 @@ def paths():
     for path, schema, summary, parameters in (
         ("/api/changes", "ChangeReadPage", "List visible Changes", filters),
         (
+            "/api/changes/sources",
+            "ChangeSourceOptions",
+            "List distinct source names in readable owner Teams (including inactive sources)",
+            [],
+        ),
+        (
             "/api/changes/{change_uid}",
             "ChangeRead",
             "Read a full or safe Change projection",
@@ -314,4 +323,13 @@ def paths():
                 },
             }
         }
+        if path == "/api/changes/sources":
+            result[path]["get"]["description"] = (
+                "Authentication is mandatory: human JWT or a personal token with changes:read. "
+                "Token Group/Team restrictions apply; machine tokens cannot read. "
+                "Returns all distinct source names in readable owner Teams, sorted by name. "
+                "Includes inactive sources/integrations and sources without Changes for historical filtering. "
+                "Cross-team Service links do not grant access to the owner's source names. "
+                "No query parameters are accepted. Cache-Control: no-store."
+            )
     return result

@@ -24,6 +24,11 @@
   --md-placeholder: #94a3b8;
   --md-on-accent: #ffffff;
 
+  --md-reload-bg: #ecfdf5;
+  --md-reload-hover: #d1fae5;
+  --md-reload-text: #047857;
+  --md-reload-border: #a7f3d0;
+
   --md-primary: #2563eb;
   --md-primary-hover: #1d4ed8;
   --md-primary-soft: #dbeafe;
@@ -991,6 +996,23 @@ body.md-theme .btn-icon {
   height: 36px;
   min-height: 36px;
   padding: 0;
+}
+
+/* A single secondary action style for reloading data throughout the app. */
+body.md-theme .btn.btn-reload {
+  background: var(--md-reload-bg);
+  color: var(--md-reload-text);
+  border-color: var(--md-reload-border);
+  box-shadow: none;
+}
+
+body.md-theme .btn.btn-reload:hover:not(:disabled) {
+  background: var(--md-reload-hover);
+}
+
+body.md-theme .btn.btn-reload:focus-visible {
+  outline: 2px solid var(--md-reload-text);
+  outline-offset: 2px;
 }
 
 /* Compact actions */

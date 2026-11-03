@@ -46,7 +46,7 @@
     </div>
   </div>
 
-  <div class="page-layout-grid">
+  <div class="page-layout-grid is-full-width">
     <section class="card page-layout-main">
       <div class="card-header">
         <div>
@@ -62,9 +62,7 @@
             {{ _('silences.actions.new') }}
           </button>
 
-          <button id="reload-silences" type="button" class="btn">
-            {{ _('silences.actions.reload') }}
-          </button>
+          <button id="reload-silences" type="button" class="btn btn-reload">{{ _('common.reload') }}</button>
         </div>
       </div>
 
@@ -90,7 +88,7 @@
       </div>
 
       <div class="table-wrapper">
-        <table class="data-table">
+        <table class="data-table silences-table">
           <thead>
             <tr>
               <th>{{ _('silences.table.silence') }}</th>
@@ -99,35 +97,21 @@
               <th>{{ _('silences.table.window') }}</th>
               <th>{{ _('silences.table.matching') }}</th>
               <th>{{ _('silences.table.status') }}</th>
+              <th>{{ _('silences.details.apply_to_existing') }}</th>
+              <th>{{ _('silences.details.reactivate_on_end') }}</th>
               <th class="actions-th">{{ _('silences.table.actions') }}</th>
             </tr>
           </thead>
 
           <tbody id="silences-table">
             <tr>
-              <td colspan="7" class="empty-cell">{{ _('silences.empty.loaded') }}</td>
+              <td colspan="9" class="empty-cell">{{ _('silences.empty.loaded') }}</td>
             </tr>
           </tbody>
         </table>
       </div>
     </section>
 
-    <aside class="card page-details-card">
-      <div class="card-header">
-        <div>
-          <h2>{{ _('silences.details.title') }}</h2>
-          <div id="silence-details-subtitle" class="card-subtitle">
-            {{ _('silences.details.select') }}
-          </div>
-        </div>
-      </div>
-
-      <div id="silence-details-body" class="details-body">
-        <div class="details-empty">
-          {{ _('silences.details.select_help') }}
-        </div>
-      </div>
-    </aside>
   </div>
 
   <div id="silence-form-modal" class="app-modal" style="display: none;">

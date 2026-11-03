@@ -168,7 +168,7 @@ def required_scopes_for_path(path, method):
     if path == "/api/change-events":
         return ["changes:ingest"] if method == "POST" else None
     if path_matches_prefix(path, "/api/changes"):
-        known_read = path == "/api/changes" or re.fullmatch(
+        known_read = path in ("/api/changes", "/api/changes/sources") or re.fullmatch(
             r"/api/changes/[0-9a-fA-F-]{36}(?:/events|/services)?", path
         )
         return ["changes:read"] if known_read and method in READ_METHODS else None

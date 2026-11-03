@@ -36,8 +36,47 @@ async function main() {
         async function waitForText(selector, text) {
             await page.locator(selector).getByText(text, {exact: false}).first().waitFor({state: "visible"});
         }
-        await page.goto(url);
+        await page.goto(url.replace("/" + fixture.incidentId + "?", "?"));
+        await page.locator(".incident-title-button").first().click();
         await ready();
+        assert.equal(await page.locator("#close-incident-details").count(), 0);
+
+        // Reload has one label and one palette across pages and dialogs in both themes.
+        for (const scheme of ["light", "dark"]) {
+            await page.evaluate(value => window.AppTheme.apply(value), scheme);
+            await page.waitForFunction(() => {
+                const buttons = Array.from(document.querySelectorAll(".btn-reload"));
+                return new Set(buttons.map(button => getComputedStyle(button).backgroundColor)).size === 1;
+            });
+            const buttons = await page.evaluate(() =>
+                Array.from(document.querySelectorAll("button"))
+                    .filter(button => /reload|refresh/i.test(button.id) || button.classList.contains("btn-reload"))
+                    .map(button => {
+                        const style = getComputedStyle(button);
+                        return {
+                            id: button.id,
+                            label: button.textContent.trim(),
+                            shared: button.classList.contains("btn-reload"),
+                            primary: button.classList.contains("btn-primary"),
+                            background: style.backgroundColor,
+                            color: style.color,
+                            border: style.borderTopColor,
+                        };
+                    }),
+            );
+            assert(buttons.length > 0);
+            assert.equal(new Set(buttons.map(button => button.background)).size, 1);
+            assert.equal(new Set(buttons.map(button => button.color)).size, 1);
+            assert.equal(new Set(buttons.map(button => button.border)).size, 1);
+            for (const button of buttons) {
+                assert.equal(button.label, "Reload", button.id);
+                assert.equal(button.shared, true, button.id);
+                assert.equal(button.primary, false, button.id);
+            }
+            const [red, green, blue] = buttons[0].color.match(/\d+/g).map(Number);
+            assert(green > red && green > blue, scheme + " reload text must stay green");
+        }
+        await page.evaluate(() => window.AppTheme.apply("light"));
         const activity = page.locator("#incident-events");
         await waitForText("#incident-events", "Resolved → Investigating");
         assert.match(await activity.innerText(), /04:30/);
@@ -89,13 +128,14 @@ async function main() {
         await page.locator("#incident-details-reload").click();
         await page.waitForFunction(() => document.querySelector("#incident-root-cause").value === "Concurrent update");
 
-        await page.locator("#close-incident-details").click();
+        // Browser history still returns to the filtered list without a page Back button.
+        await page.goBack();
         await page.waitForURL(/\/incidents\?/);
         assert.equal(new URL(page.url()).searchParams.get("search"), "Workspace");
         assert.equal(await page.locator("#incidents-search").inputValue(), "Workspace");
-        await page.goBack();
-        await ready();
         await page.goForward();
+        await ready();
+        await page.goBack();
         await page.locator("#incidents-list-view").waitFor({state: "visible"});
         await page.goto(url);
         await ready();
@@ -103,7 +143,7 @@ async function main() {
         await ready();
         assert.equal(await page.locator("#incident-root-cause").inputValue(), "Concurrent update");
 
-        // Delayed detail success cannot resurrect a workspace after Back.
+        // Delayed detail success cannot resurrect a workspace after menu navigation.
         let release;
         let received;
         const held = new Promise(resolve => { release = resolve; });
@@ -115,7 +155,7 @@ async function main() {
         });
         await page.locator("#incident-resolution-save").click();
         await requested;
-        await page.locator("#close-incident-details").click();
+        await page.locator('.menu-link[href="/incidents"]').click();
         const completed = page.waitForResponse(response => response.request().method() === "GET"
             && new URL(response.url()).pathname === `/api/incidents/${fixture.incidentId}`);
         release();
@@ -139,6 +179,9 @@ async function main() {
             await context.addCookies([{name: "incidentrelay_locale", value: locale, url: fixture.baseUrl}]);
             await page.goto(url);
             await ready(locale);
+            const common = JSON.parse(fs.readFileSync("app/static/i18n/" + locale + "/common.json", "utf8"));
+            const reloadLabels = await page.locator(".btn-reload").allTextContents();
+            assert(reloadLabels.every(label => label.trim() === common["common.reload"]), locale);
             const dictionary = JSON.parse(fs.readFileSync(`app/static/i18n/${locale}/incidents.json`, "utf8"));
             assert.equal(await page.locator("#incident-participants-section h3").innerText(), dictionary["incidents.workspace.participants"]);
             await waitForText("#incident-participants-list", dictionary["incidents.workspace.role.commander"]);

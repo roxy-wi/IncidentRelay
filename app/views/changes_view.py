@@ -4,6 +4,7 @@ from flask import Blueprint, jsonify, request
 from peewee import DoesNotExist
 from pydantic import ValidationError
 
+from app.api.schemas.base import EmptySchema
 from app.api.schemas.changes import ChangePageQuery, ChangeQuery, InvalidChangeQuery
 from app.modules.db.models import Change, ChangeEvent
 from app.services.change_intelligence import reading
@@ -58,6 +59,14 @@ def list_changes(service_id=None):
         teams = reading.reader_teams()
         query = reading.filter_changes(filters, teams, service_id=service_id)
         return jsonify(reading.changes_page(query, filters, teams))
+
+
+@changes_bp.get("/changes/sources")
+def sources():
+    """Offer filter values without exposing integration administration details."""
+    query_input(EmptySchema)
+    with reading.read_snapshot():
+        return jsonify({"items": reading.source_names(reading.reader_teams())})
 
 
 @changes_bp.get("/changes/<uuid:change_uid>")

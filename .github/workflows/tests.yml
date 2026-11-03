@@ -97,13 +97,14 @@ jobs:
           npm install --no-save --package-lock=false playwright@1.62.1
           npx playwright install --with-deps chromium
 
-      - name: Check Incident workspace and Changes Inbox in Chromium
+      - name: Check Incident, Changes and Silences in Chromium
         if: matrix.python-version == '3.12'
         env:
           INCIDENTRELAY_BROWSER_TESTS: "1"
         run: |
           pytest tests/ux/test_incident_workspace_browser.py \
             tests/ux/test_changes_browser.py \
+            tests/ux/test_silences_browser.py \
             --junitxml=pytest-browser-results.xml
 
       - name: Upload test reports

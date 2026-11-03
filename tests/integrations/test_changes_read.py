@@ -17,6 +17,7 @@ from app.modules.db.models import (
     ChangeEvent,
     ChangeJob,
     ChangeServiceReference,
+    ChangeSource,
     TeamUser,
 )
 from app.services.change_intelligence import administration as admin, ingestion
@@ -305,15 +306,16 @@ def personal(user, scopes, **restrictions):
     return {"Authorization": f"Bearer {raw}"}
 
 
+@pytest.mark.parametrize("endpoint", [BASE, BASE + "/sources"])
 @pytest.mark.parametrize("auth_required", [False, True])
 def test_authentication_and_scopes_are_required_even_with_optional_auth(
-    client, changes, monkeypatch, auth_required
+    client, changes, monkeypatch, auth_required, endpoint
 ):
     monkeypatch.setattr(Config, "API_AUTH_REQUIRED", auth_required)
-    assert client.get(BASE).status_code == 401
+    assert client.get(endpoint).status_code == 401
     assert (
         client.get(
-            BASE, headers={"Authorization": f"Bearer {changes['intake'][3]}"}
+            endpoint, headers={"Authorization": f"Bearer {changes['intake'][3]}"}
         ).status_code
         == 403
     )
@@ -323,7 +325,7 @@ def test_authentication_and_scopes_are_required_even_with_optional_auth(
         (["changes:read"], 200),
         (["*"], 200),
     ]:
-        response = client.get(BASE, headers=personal(changes["owner"], scopes))
+        response = client.get(endpoint, headers=personal(changes["owner"], scopes))
         assert response.status_code == status
     token = personal(changes["foreign"], ["changes:read"])
     nested = f"/api/services/{changes['service'].id}/changes"
@@ -518,6 +520,12 @@ def test_read_contract_matches_full_safe_and_nested_responses(client, changes):
     validate_spec(spec)
     resolver = RefResolver.from_schema(spec)
     for role in ("owner", "foreign"):
+        source_options = client.get(
+            BASE + "/sources", headers=headers(changes[role])
+        ).json
+        OAS30Validator(
+            spec["components"]["schemas"]["ChangeSourceOptions"], resolver=resolver
+        ).validate(source_options)
         for suffix, name in (("", "ChangeRead"), ("/services", "ChangeServicePage")):
             payload = client.get(
                 url(changes, suffix), headers=headers(changes[role])
@@ -536,3 +544,59 @@ def test_read_contract_matches_full_safe_and_nested_responses(client, changes):
     OAS30Validator(
         spec["components"]["schemas"]["ChangeEventPage"], resolver=resolver
     ).validate(events)
+
+
+def test_source_options_include_complete_catalog_without_events(client, setup_identity):
+    integration, source, service, _ = setup_identity
+    user = reader(service.team)
+    other_team = create_team(service.team.group)
+    add_user_to_team(other_team, user, role="viewer")
+    ChangeSource.create(
+        integration=integration, owner_team=other_team, source=source.source
+    )
+    names = [f"source-{index:02d}" for index in range(30)]
+    for name in names:
+        ChangeSource.create(
+            integration=integration, owner_team=service.team, source=name
+        )
+    ChangeSource.create(
+        integration=integration, owner_team=create_team(create_group()), source="hidden"
+    )
+    source.active = False
+    source.save()
+    integration.active = False
+    integration.save()
+    assert Change.select().count() == 0
+    response = client.get(BASE + "/sources", headers=headers(user))
+    assert response.status_code == 200
+    assert response.json == {"items": sorted([source.source, *names])}
+    assert response.headers["Cache-Control"] == "no-store"
+
+
+def test_source_options_respect_reader_token_and_revoked_membership(client, changes):
+    endpoint = BASE + "/sources"
+    assert client.get(endpoint, headers=headers(changes["foreign"])).json == {
+        "items": []
+    }
+    actor = changes["intake"][0][3]
+    for restriction in (
+        {"group_id": changes["service"].team.group_id},
+        {"team_id": changes["service"].team_id},
+    ):
+        token = personal(actor, ["changes:read"], **restriction)
+        assert client.get(endpoint, headers=token).json == {"items": []}
+    auth = headers(changes["owner"])
+    assert client.get(endpoint, headers=auth).json == {"items": ["deploy"]}
+    TeamUser.update(active=False).where(
+        TeamUser.user == changes["owner"].id
+    ).execute()
+    assert client.get(endpoint, headers=auth).json == {"items": []}
+
+
+@pytest.mark.parametrize("query", ["unexpected=1", "source=a&source=b"])
+def test_source_options_reject_unknown_and_duplicate_filters(client, changes, query):
+    response = client.get(
+        BASE + "/sources?" + query, headers=headers(changes["owner"])
+    )
+    assert response.status_code == 400
+    assert response.json["message"] == "Invalid Change query parameters"

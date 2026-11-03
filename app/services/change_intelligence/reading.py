@@ -41,6 +41,18 @@ def reader_teams():
     return teams
 
 
+def source_names(team_ids):
+    """List distinct readable source names, including inactive sources for history."""
+    query = (
+        ChangeSource.select(ChangeSource.source)
+        .where(ChangeSource.owner_team.in_(team_ids))
+        .distinct()
+        .order_by(ChangeSource.source)
+        .tuples()
+    )
+    return [name for (name,) in query]
+
+
 def readable_services(team_ids):
     """Include disabled Services for owner history, but never deleted resources."""
     return Service.select().where(Service.team.in_(team_ids), Service.deleted == False)

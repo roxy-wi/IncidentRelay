@@ -39,6 +39,16 @@ async function main() {
         assert.equal(await page.locator(".changes-title-link").textContent(), fixture.title);
         assert.equal(await page.locator("#changes-rows script").count(), 0);
         assert.equal(await page.locator("#page-title").textContent(), "Changes");
+        assert.equal(await page.locator("#changes-list > .card-header").count(), 0);
+        assert.equal(await page.locator("#changes-team").count(), 0);
+        assert.equal(await page.locator("#changes-back, #changes-error-back").count(), 0);
+        assert.equal(await page.locator("#changes-list .changes-reload").innerText(), "Reload");
+        assert.equal(
+            await page.locator("#changes-list .page-toolbar-search-icon").isVisible(), true,
+        );
+        assert.equal(
+            await page.locator("#changes-list .page-toolbar .changes-reload").isVisible(), true,
+        );
         const scoped = page.waitForResponse((response) =>
             response.url().includes("scope_team_id=" + fixture.ownerTeamId),
         );
@@ -46,9 +56,51 @@ async function main() {
         assert.equal((await scoped).status(), 200);
         await page.waitForFunction(
             () =>
-                !document.querySelector("#changes-team").disabled &&
+                !document.querySelector("#changes-source").disabled &&
                 !document.querySelector("#changes-service").disabled,
         );
+        await page.locator("#changes-filters summary").click();
+        assert.deepEqual(
+            await page.locator("#changes-source option").evaluateAll(
+                (options) => options.map((option) => option.value),
+            ),
+            ["", "deploy", "no-history"],
+        );
+        await page.locator("#changes-source").selectOption("no-history");
+        await page.locator("#changes-filters button[type=submit]").click();
+        await page.waitForFunction(() =>
+            document.querySelector("#changes-rows").textContent.includes("No entries"),
+        );
+        assert.ok(page.url().includes("source=no-history"));
+        assert.ok(page.url().includes("team=" + fixture.ownerTeamId));
+        await page.waitForFunction(() =>
+            !document.querySelector("#changes-source").disabled &&
+            !document.querySelector("#changes-service").disabled,
+        );
+        await page.locator("#changes-source").selectOption("deploy");
+        await page.locator("#changes-filters button[type=submit]").click();
+        await page.locator(".changes-title-link").waitFor();
+        await page.route("**/api/changes/sources", (route) => route.fulfill({
+            status: 503,
+            contentType: "application/json",
+            body: '{"message":"temporary"}',
+        }), { times: 1 });
+        await page.locator("#changes-list .changes-reload").click();
+        await page.waitForFunction(() =>
+            document.querySelector("#changes-filter-message").textContent.includes("Could not load"),
+        );
+        await page.locator(".changes-title-link").waitFor();
+        assert.equal(await page.locator("#changes-source").isDisabled(), true);
+        const failedFilterUrl = page.url();
+        await page.locator("#changes-filters button[type=submit]").click();
+        assert.equal(page.url(), failedFilterUrl);
+        await page.locator("#changes-list .changes-reload").click();
+        await page.waitForFunction(() =>
+            !document.querySelector("#changes-source").disabled &&
+            !document.querySelector("#changes-service").disabled,
+        );
+        assert.equal(await page.locator("#changes-source").inputValue(), "deploy");
+        assert.equal(await page.locator("#changes-filter-message").textContent(), "");
         await page.locator("#changes-search").fill("no-match");
         await page.locator("#changes-filters button[type=submit]").click();
         await page.waitForFunction(() =>
@@ -61,6 +113,20 @@ async function main() {
             path: path.join(fixture.screenshotDir, "changes-list.png"),
             fullPage: true,
         });
+        // Old owner links use the global Team selector; unknown source values survive.
+        await page.goto(
+            "/changes?owner_team_id=" + fixture.ownerTeamId + "&source=removed-source",
+        );
+        await page.waitForURL((url) => !url.searchParams.has("owner_team_id"));
+        await page.waitForFunction(() =>
+            !document.querySelector("#changes-source").disabled &&
+            !document.querySelector("#changes-service").disabled,
+        );
+        assert.equal(new URL(page.url()).searchParams.has("owner_team_id"), false);
+        assert.equal(new URL(page.url()).searchParams.get("team"), String(fixture.ownerTeamId));
+        assert.equal(await page.locator("#changes-source").inputValue(), "removed-source");
+        await page.locator("#changes-reset").click();
+        await page.locator(".changes-title-link").waitFor();
         await page.locator(".changes-title-link").click();
         await page.locator("#changes-events tr").waitFor();
         assert.ok(page.url().endsWith(fixture.uid));
