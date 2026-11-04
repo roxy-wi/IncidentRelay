@@ -192,6 +192,8 @@ def serialize_service(service, current_user=None, readiness_state=None):
         "labels": service.labels or {},
         "tags": service.tags or [],
         "metadata": service.metadata or {},
+        "change_correlation_enabled": service.change_correlation_enabled,
+        "change_correlation_exclusions": service.change_correlation_exclusions or [],
 
         "enabled": service.enabled,
         "public": service.public,

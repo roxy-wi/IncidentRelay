@@ -1,5 +1,6 @@
 from pathlib import Path
 
+import pytest
 from flask import Flask, render_template_string
 
 from app.i18n import (
@@ -112,3 +113,30 @@ def test_authenticated_user_locale_has_priority_over_cookie():
     ):
         request.current_user = SimpleNamespace(locale="de")
         assert get_current_locale() == "de"
+
+
+@pytest.mark.parametrize(
+    "locale, title, deployment, pagination",
+    [
+        ("en", "Changes", "Deployment", "Page 2 of 3 · 51 entries"),
+        ("de", "Änderungen", "Deployment", "Seite 2 von 3 · 51 Einträge"),
+        ("fr", "Changements", "Déploiement", "Page 2 sur 3 · 51 entrées"),
+        ("es", "Cambios", "Despliegue", "Página 2 de 3 · 51 entradas"),
+        ("ru", "Изменения", "Деплой", "Страница 2 из 3 · записей: 51"),
+        ("zh", "变更", "部署", "第 2 页，共 3 页 · 51 条记录"),
+    ],
+)
+def test_changes_messages_render_in_selected_locale(
+    locale, title, deployment, pagination
+):
+    """Load Changes labels and format pagination without English fallback."""
+    app = create_test_app()
+    with app.test_request_context(
+        "/", headers={"Cookie": f"incidentrelay_locale={locale}"}
+    ):
+        rendered = render_template_string(
+            "{{ _('changes.title') }}|{{ _('changes.deployment') }}|"
+            "{{ _('changes.pagination', page=2, pages=3, count=51) }}"
+        )
+
+    assert rendered == f"{title}|{deployment}|{pagination}"

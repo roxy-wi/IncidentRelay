@@ -104,7 +104,7 @@ def components():
                     for name in ("total", "resolved", "pending")
                 },
             },
-            "correlation_status": {"type": "string", "enum": ["not_enabled"]},
+            "correlation_status": {"type": "string", "enum": ["queued", "not_enabled"]},
         },
     }
     return schemas
@@ -128,7 +128,7 @@ def paths():
                     "Same-source event_id plus identical canonical content returns 200 without new writes/jobs; different content returns 409. "
                     "ID and slug forms remain distinct; reference sets are sorted/deduplicated and UTC timestamps normalized. "
                     "Slug namespaces are pinned to a Team ID; unknown authorized slugs remain pending. Reference-only affected claims are unverified. "
-                    "Response includes safe counts, no Service metadata; correlation_status is not_enabled. "
+                    "Response includes safe counts, no Service metadata; correlation_status is queued when the worker is enabled, otherwise not_enabled. "
                     "Defaults: 600 accepted new events/minute/integration and 1000 events/change; exact retries are exempt. "
                     "No worker, correlation, read API or history cleanup is enabled by this endpoint."
                 ),

@@ -146,5 +146,11 @@
   "services.form.metadata_example": "示例：{\"owner\": \"platform-team\", \"pci\": true}。使用 {} 清空元数据。",
   "services.form.metadata_invalid": "JSON 无效。请检查引号、逗号和括号。",
   "services.form.metadata_object_required": "元数据必须是 JSON 对象。使用 {} 表示空元数据。",
-  "services.form.cancel": "取消"
+  "services.form.cancel": "取消",
+  "services.form.change_correlation": "变更建议",
+  "services.form.change_correlation_hint": "建议可能导致此服务告警的部署和其他变更。建议不会更改事件状态。",
+  "services.form.change_correlation_enabled": "启用自动建议",
+  "services.form.change_exclusions": "排除告警（JSON）",
+  "services.form.change_exclusions_hint": "精确匹配告警来源和标签。例如：[{\"source\":\"heartbeat\"},{\"labels\":{\"kind\":\"synthetic\"}}]。只要有一个告警未被排除，该组就会参与。",
+  "services.form.change_exclusions_invalid": "请输入有效的 JSON 规则数组，或用 [] 表示无排除规则。"
 }

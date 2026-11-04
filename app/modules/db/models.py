@@ -499,6 +499,8 @@ class Service(SoftDeleteModel):
     public_name = CharField(null=True)
     public_description = TextField(null=True)
     public_order = IntegerField(default=100)
+    change_correlation_enabled = BooleanField(default=False)
+    change_correlation_exclusions = JSONTextField(default=list)
 
     created_at = DateTimeField(default=utc_now)
     updated_at = DateTimeField(default=utc_now)
@@ -4017,12 +4019,25 @@ class AlertGroupEpisode(BaseModel):
     end_event = ForeignKeyField(
         AlertEvent, null=True, backref="ended_episodes", on_delete="SET NULL"
     )
+    correlation_context = JSONTextField(null=True)
+    correlation_service_id = IntegerField(null=True)
+    context_revision = BigIntegerField(
+        default=1, constraints=[Check("context_revision > 0")]
+    )
     created_at = DateTimeField(default=utc_now)
 
     class Meta:
         table_name = "alert_group_episode"
         indexes = (
             (("alert_group", "ordinal"), True),
+            SQL(
+                "CREATE INDEX IF NOT EXISTS episode_correlation_service_start "
+                "ON alert_group_episode (correlation_service_id, started_at, id)"
+            ),
+            SQL(
+                "CREATE INDEX IF NOT EXISTS episode_correlation_start "
+                "ON alert_group_episode (started_at, id)"
+            ),
             SQL(
                 "CREATE UNIQUE INDEX IF NOT EXISTS alert_group_episode_one_open "
                 "ON alert_group_episode (alert_group_id) WHERE state = 'open'"
@@ -4036,3 +4051,71 @@ class AlertGroupEpisode(BaseModel):
             Check("state <> 'open' OR ended_at IS NULL"),
             Check("started_at IS NULL OR ended_at IS NULL OR ended_at >= started_at"),
         ]
+
+
+class ChangeImpact(BaseModel):
+    """Rebuildable dependency evidence rooted in an authorized changed Service."""
+
+    id = AutoField()
+    change = ForeignKeyField(Change, backref="impacts", on_delete="RESTRICT")
+    service = ForeignKeyField(Service, backref="change_impacts", on_delete="RESTRICT")
+    origin_service = ForeignKeyField(
+        Service, backref="origin_change_impacts", on_delete="RESTRICT"
+    )
+    dependency_path_snapshot = JSONTextField(default=list)
+    depth = IntegerField(constraints=[Check("depth >= 0 AND depth <= 5")])
+    reason = CharField(max_length=64)
+    input_stamp = JSONTextField(default=dict)
+    engine_version = CharField(max_length=64)
+    computed_at = DateTimeField(default=utc_now)
+    active = BooleanField(default=True)
+
+    class Meta:
+        table_name = "change_impact"
+        indexes = (
+            (("change", "origin_service", "service"), True),
+            (("service", "active", "change"), False),
+        )
+
+
+class ChangeAlertGroupCorrelation(BaseModel):
+    """Computed suggestion with separately retained human review and evidence."""
+
+    id = AutoField()
+    change = ForeignKeyField(Change, backref="correlations", on_delete="RESTRICT")
+    episode = ForeignKeyField(
+        AlertGroupEpisode, backref="change_correlations", on_delete="RESTRICT"
+    )
+    score = IntegerField(constraints=[Check("score >= 0 AND score <= 100")])
+    reason = CharField(max_length=64)
+    evidence = JSONTextField(default=dict)
+    input_stamp = JSONTextField(default=dict)
+    engine_version = CharField(max_length=64)
+    computed_at = DateTimeField(default=utc_now)
+    active = BooleanField(default=True)
+    review_status = CharField(
+        default="suggested",
+        constraints=[Check("review_status IN ('suggested', 'confirmed', 'rejected')")],
+    )
+    relation_type = CharField(
+        default="potential_cause",
+        constraints=[
+            Check(
+                "relation_type IN ('potential_cause', 'confirmed_cause', 'mitigation', 'context')"
+            )
+        ],
+    )
+    reviewed_by = ForeignKeyField(
+        User, null=True, backref="change_reviews", on_delete="SET NULL"
+    )
+    reviewed_at = DateTimeField(null=True)
+    review_evidence = JSONTextField(null=True)
+    row_version = BigIntegerField(default=1, constraints=[Check("row_version > 0")])
+    updated_at = DateTimeField(default=utc_now)
+
+    class Meta:
+        table_name = "change_alert_group_correlation"
+        indexes = (
+            (("change", "episode"), True),
+            (("episode", "active", "score"), False),
+        )

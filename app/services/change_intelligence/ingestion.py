@@ -261,5 +261,5 @@ def _result(event, change):
         "lifecycle_conflict": change.lifecycle_conflict,
         "mapping_status": change.mapping_status,
         "references": mapping_summary(change.id)[1],
-        "correlation_status": "not_enabled",
+        "correlation_status": "queued" if Config.CHANGE_WORKER_ENABLED else "not_enabled",
     }

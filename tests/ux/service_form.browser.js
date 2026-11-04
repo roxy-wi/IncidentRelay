@@ -131,6 +131,25 @@ async function main() {
         assert.equal(saved.public_order, 0);
 
         await openEdit();
+        const exclusions = page.locator("#service-change-exclusions");
+        assert.equal(await page.locator("#service-change-correlation-enabled").isChecked(), false);
+        assert.equal(await exclusions.inputValue(), "[]");
+        const beforeInvalidRules = writes;
+        for (const invalid of ["{", "{}", "null"]) {
+            await exclusions.fill(invalid);
+            await page.locator("#save-service").click();
+            assert(await page.locator("#service-change-exclusions-error").isVisible());
+        }
+        assert.equal(writes, beforeInvalidRules);
+        const rules = [{source: "heartbeat"}, {labels: {kind: "synthetic"}}];
+        await exclusions.fill(JSON.stringify(rules));
+        await page.locator("#service-change-correlation-enabled").check();
+        const policySaved = await save();
+        assert.equal(policySaved.change_correlation_enabled, true);
+        assert.deepEqual(policySaved.change_correlation_exclusions, rules);
+        await openEdit();
+        assert.equal(await page.locator("#service-change-correlation-enabled").isChecked(), true);
+        assert.deepEqual(JSON.parse(await exclusions.inputValue()), rules);
         const writesBeforeInvalid = writes;
         for (const invalid of ["", "{", "[]", "null", "true", "42", '"owner"']) {
             await editor.fill(invalid);
@@ -192,6 +211,8 @@ async function main() {
         await page.locator("#open-service-create-modal").click();
         await modal.waitFor({state: "visible"});
         assert.equal(await editor.inputValue(), "{}");
+        assert.equal(await page.locator("#service-change-correlation-enabled").isChecked(), false);
+        assert.equal(await exclusions.inputValue(), "[]");
         assert.equal(await page.locator("#service-id").inputValue(), "");
         await page.locator("#service-team").selectOption(String(fixture.teamId));
         await page.locator("#service-name").fill("New service with metadata");

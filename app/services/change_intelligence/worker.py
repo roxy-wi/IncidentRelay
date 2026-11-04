@@ -1,4 +1,4 @@
-"""Process durable jobs in bounded batches; no correlation or timeline yet."""
+"""Process durable reference, discovery and correlation jobs in bounded batches."""
 
 import logging
 import os
@@ -13,6 +13,8 @@ from app.modules.db import changes_repo, incident_core_repo
 from app.modules.db.models import (
     Change,
     ChangeGraphState,
+    ChangeImpact,
+    ChangeAlertGroupCorrelation,
     ChangeIntegration,
     ChangeJob,
     ChangeServiceReference,
@@ -23,14 +25,24 @@ from app.services.change_intelligence.resolver import (
     compute_reference_batch,
     publish_reference_batch,
 )
+from app.services.change_intelligence.correlation import (
+    automatic_work_needed,
+    compute_correlation_batch,
+    input_stamp,
+    history_changes,
+    mapping_current,
+    publish_correlation_batch,
+)
+from app.services.change_intelligence.eligibility import eligible_episode_query
+from app.services.change_intelligence.episode_discovery import (
+    compute_episode_discovery,
+    publish_episode_discovery,
+)
 from app.services.metrics import record_change_worker_result
 from app.settings import Config
 
 logger = logging.getLogger("oncall.change_intelligence")
 DISABLED_JOB_TYPES = {
-    "discover_episode",
-    "refresh_impacts",
-    "refresh_correlations",
     "sync_service_timeline",
 }
 
@@ -48,15 +60,23 @@ def schedule_pending_reconciliation():
             < Config.CHANGE_PENDING_POLL_SECONDS
         ):
             return
-        if (
+        correlations = eligible_episode_query().exists() or (
+            ChangeAlertGroupCorrelation.select()
+            .where(ChangeAlertGroupCorrelation.active == True)
+            .exists()
+        )
+        if correlations or (
             ChangeServiceReference.select()
             .where(ChangeServiceReference.resolution_status == "pending_resolution")
             .exists()
         ):
             pending_job = changes_repo.request_job("discover_graph", 1)
-            ChangeJob.update(cursor={"pending_only": True}).where(
-                ChangeJob.id == pending_job.id
-            ).execute()
+            ChangeJob.update(
+                cursor={
+                    "pending_only": not correlations,
+                    "reconcile": correlations,
+                }
+            ).where(ChangeJob.id == pending_job.id).execute()
 
 
 def compute_discovery_batch(claim):
@@ -72,6 +92,7 @@ def compute_discovery_batch(claim):
     pending_only = claim.job_type == "discover_graph" and cursor.get(
         "pending_only", False
     )
+    reconcile = cursor.get("reconcile", False)
     stamp = {"graph_revision": graph_revision, "auth_revision": auth_revision}
     if any(cursor.get(key) != value for key, value in stamp.items()):
         cursor = {}
@@ -81,6 +102,25 @@ def compute_discovery_batch(claim):
             if claim.job_type == "discover_auth"
             else True
         )
+        if reconcile:
+            query = query.where(
+                Change.id.in_(history_changes(utc_now()).select(Change.id))
+                | Change.id.in_(
+                    ChangeServiceReference.select(ChangeServiceReference.change).where(
+                        ChangeServiceReference.resolution_status == "pending_resolution"
+                    )
+                )
+                | Change.id.in_(
+                    ChangeImpact.select(ChangeImpact.change).where(
+                        ChangeImpact.active == True
+                    )
+                )
+                | Change.id.in_(
+                    ChangeAlertGroupCorrelation.select(
+                        ChangeAlertGroupCorrelation.change
+                    ).where(ChangeAlertGroupCorrelation.active == True)
+                )
+            )
         column = Change.id
     else:
         query = ChangeServiceReference.select(
@@ -105,6 +145,7 @@ def compute_discovery_batch(claim):
         "after_id": after,
         "complete": after >= upper or len(rows) < Config.CHANGE_WORKER_BATCH_SIZE,
         "pending_only": pending_only,
+        "reconcile": reconcile,
     }
 
 
@@ -130,6 +171,26 @@ def publish_discovery_batch(claim, plan):
             for change_id in plan["change_ids"]
         ]
         for change in filter(None, changes):
+            if (
+                plan["reconcile"]
+                and automatic_work_needed(change)
+                and mapping_current(
+                    change,
+                    change.integration,
+                    input_stamp(change, change.integration, graph.revision),
+                )
+            ):
+                existing = ChangeJob.get_or_none(
+                    ChangeJob.job_type == "refresh_correlations",
+                    ChangeJob.entity_id == change.id,
+                )
+                if existing is None or existing.state == "done":
+                    changes_repo.request_job(
+                        "refresh_correlations",
+                        change.id,
+                        target_revision=change.revision,
+                    )
+                continue
             existing = lock_row(
                 ChangeJob.select().where(
                     ChangeJob.job_type == "resolve_references",
@@ -160,6 +221,7 @@ def publish_discovery_batch(claim, plan):
                 "upper_id": plan["upper_id"],
                 "after_id": plan["after_id"],
                 "pending_only": plan["pending_only"],
+                "reconcile": plan["reconcile"],
             }
         )
         changes_repo.finish_claim(
@@ -179,6 +241,12 @@ def process_claim(claim):
         elif claim.job_type in {"discover_auth", "discover_graph"}:
             plan = compute_discovery_batch(claim)
             publish_discovery_batch(claim, plan)
+        elif claim.job_type == "discover_episode":
+            plan = compute_episode_discovery(claim)
+            publish_episode_discovery(claim, plan)
+        elif claim.job_type in {"refresh_impacts", "refresh_correlations"}:
+            plan = compute_correlation_batch(claim)
+            publish_correlation_batch(claim, plan)
         elif claim.job_type in DISABLED_JOB_TYPES:
             with incident_core_repo.write_transaction():
                 changes_repo.lock_claim(claim)

@@ -7,6 +7,27 @@ let changesEventPage = 1;
 function changesText(key, values) {
     return i18n.t("changes." + key, values || {}, key);
 }
+function changesKindIcon(kind) {
+    const icons = {
+        deployment: "fa-rocket",
+        configuration: "fa-sliders-h",
+        infrastructure: "fa-server",
+        database: "fa-database",
+        feature_flag: "fa-flag",
+        other: "fa-exchange-alt",
+    };
+    const knownKind = Object.prototype.hasOwnProperty.call(icons, kind) ? kind : "other";
+    const label = changesText(knownKind);
+    return $("<span>")
+        .addClass("changes-kind-icon")
+        .attr({
+            "data-kind": knownKind,
+            role: "img",
+            "aria-label": label,
+            title: label,
+        })
+        .append($("<i>").addClass("fas " + icons[knownKind]).attr("aria-hidden", "true"));
+}
 function changesCell(value) {
     return $("<td>").text(value === null || value === undefined || value === "" ? "—" : value);
 }
@@ -135,8 +156,13 @@ function loadChanges() {
                     ? [changesText(change.kind), change.environment].filter(Boolean).join(" · ")
                     : change.services.map((item) => item.service.name).join(", ");
                 const cell = $("<td>").append(
-                    link,
-                    $("<small>").addClass("muted changes-row-context").text(context),
+                    $("<div>").addClass("changes-row-heading").append(
+                        changesKindIcon(change.kind),
+                        $("<div>").addClass("changes-row-text").append(
+                            link,
+                            $("<small>").addClass("muted changes-row-context").text(context),
+                        ),
+                    ),
                 );
                 const status = full
                     ? changesText(change.lifecycle_conflict ? "conflict_short" : change.status)

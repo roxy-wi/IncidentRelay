@@ -95,7 +95,7 @@ def test_accept_retry_canonical_forms_and_conflict(client, intake):
     first = send(client, intake)
     assert first.status_code == 201, first.json
     assert first.json["status"] == "succeeded"
-    assert first.json["correlation_status"] == "not_enabled"
+    assert first.json["correlation_status"] == "queued"
     assert first.json["references"] == {"total": 1, "resolved": 1, "pending": 0}
     identity, _, _, raw = intake
     body = event_payload(identity, occurred_at="2026-01-01T15:00:00.000000+03:00")

@@ -43,7 +43,10 @@ from tests.factories import (
 @pytest.fixture
 def intake(db, monkeypatch):
     team = create_team(create_group())
-    route = create_route(team, source="alertmanager", group_by=["alertname"])
+    service = create_service(team)
+    service.change_correlation_enabled = True
+    service.save()
+    route = create_route(team, source="alertmanager", group_by=["alertname"], service=service)
     monkeypatch.setattr(
         lifecycle,
         "run_event_orchestration",
@@ -168,13 +171,13 @@ def test_ack_shelve_unshelve_and_ack_to_firing_keep_episode(intake, legacy):
     if legacy:
         assert not ChangeJob.select().exists()
     else:
-        assert _job(AlertGroupEpisode.get_by_id(episode_id)).requested_generation == 1
+        assert _job(AlertGroupEpisode.get_by_id(episode_id)).requested_generation == 2
 
 
 def test_manual_creation_and_callback_resolution_share_episode_contract(intake):
     team, _, _ = intake
     group = create_manual_alert_group(
-        {"team_id": team.id, "title": "Manual", "notify": False}
+        {"team_id": team.id, "service_id": intake[1].service_id, "title": "Manual", "notify": False}
     )
     episode = _episodes(group.id)[0]
     assert episode.start_event.event_type == "manual_created"
@@ -260,7 +263,7 @@ def test_merge_tracks_legacy_target_only_when_it_reopens(intake, resolved_target
     if resolved_target:
         actions.resolve_alert(target.id)
     source = create_manual_alert_group(
-        {"team_id": team.id, "title": "Source", "notify": False}
+        {"team_id": team.id, "service_id": intake[1].service_id, "title": "Source", "notify": False}
     )
 
     merged = alerts_repo.merge_alert_groups(target.id, [source.id])
@@ -335,10 +338,10 @@ def test_failed_resolution_rolls_back_child_episode_event_and_job(
 def test_merge_closes_source_without_transferring_its_episode(intake):
     team, _, _ = intake
     first = create_manual_alert_group(
-        {"team_id": team.id, "title": "Target", "notify": False}
+        {"team_id": team.id, "service_id": intake[1].service_id, "title": "Target", "notify": False}
     )
     second = create_manual_alert_group(
-        {"team_id": team.id, "title": "Source", "notify": False}
+        {"team_id": team.id, "service_id": intake[1].service_id, "title": "Source", "notify": False}
     )
     source_episode = second.current_episode
     target_episode_id = first.current_episode_id
@@ -362,7 +365,7 @@ def test_merge_into_already_merged_target_returns_conflict(
 ):
     team, _, _ = intake
     target, source, destination = [
-        create_manual_alert_group({"team_id": team.id, "title": title, "notify": False})
+        create_manual_alert_group({"team_id": team.id, "service_id": intake[1].service_id, "title": title, "notify": False})
         for title in ("Target", "Source", "Destination")
     ]
     alerts_repo.merge_alert_groups(destination.id, [target.id])
@@ -382,7 +385,7 @@ def test_merge_into_already_merged_target_returns_conflict(
 def test_merge_failure_rolls_back_children_and_both_groups(intake, monkeypatch):
     team, _, _ = intake
     groups = [
-        create_manual_alert_group({"team_id": team.id, "title": title, "notify": False})
+        create_manual_alert_group({"team_id": team.id, "service_id": intake[1].service_id, "title": title, "notify": False})
         for title in ("One", "Two")
     ]
     before = _snapshot()
@@ -440,7 +443,10 @@ def test_resource_closure_does_not_use_a_timestamp_from_before_the_cycle(intake)
 
 def test_heartbeat_overdue_and_ping_close_the_same_episode(db):
     team = create_team(create_group())
-    route = create_route(team, source="heartbeat")
+    service = create_service(team)
+    service.change_correlation_enabled = True
+    service.save()
+    route = create_route(team, source="heartbeat", service=service)
     now = utc_now()
     heartbeat = create_heartbeat(
         team,
@@ -514,6 +520,8 @@ def test_maintenance_and_silence_preserve_the_current_episode(intake, legacy):
 
     team, _, data = intake
     service = create_service(team)
+    service.change_correlation_enabled = True
+    service.save()
     first = upsert_alert(dict(data, _forced_service_id=service.id))
     group = _remove_episode_tracking(first.group) if legacy else first.group
     episode_id = group.current_episode_id
@@ -544,7 +552,7 @@ def test_silence_release_retries_a_child_moved_after_parent_selection(
     team, _, data = intake
     source = upsert_alert(dict(data)).group
     target = create_manual_alert_group(
-        {"team_id": team.id, "title": "Target", "notify": False}
+        {"team_id": team.id, "service_id": intake[1].service_id, "title": "Target", "notify": False}
     )
     silence = create_silence(
         team,
@@ -577,7 +585,7 @@ def test_maintenance_release_cannot_reactivate_a_merged_group(intake):
     service = create_service(team)
     source = upsert_alert(dict(data, _forced_service_id=service.id)).group
     target = create_manual_alert_group(
-        {"team_id": team.id, "title": "Target", "notify": False}
+        {"team_id": team.id, "service_id": intake[1].service_id, "title": "Target", "notify": False}
     )
     windows = [
         _window(team, service, behavior="create_maintenance_incident") for _ in range(2)

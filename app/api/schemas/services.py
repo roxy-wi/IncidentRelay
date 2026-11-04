@@ -155,6 +155,25 @@ class ServiceStandardPresetApplySchema(ApiModel):
     group_id: int = Field(ge=1)
 
 
+class ChangeCorrelationExclusion(ApiModel):
+    """An exact source/label match against one child of an alert episode."""
+
+    source: str | None = Field(default=None, min_length=1, max_length=255)
+    labels: Dict[str, str] = Field(default_factory=dict, max_length=50)
+
+    @model_validator(mode="after")
+    def require_match(self):
+        """Reject empty rules and unbounded label values."""
+        if not self.source and not self.labels:
+            raise ValueError("An exclusion needs a source or labels")
+        if any(
+            not key or len(key) > 255 or len(value) > 1024
+            for key, value in self.labels.items()
+        ):
+            raise ValueError("Exclusion labels exceed the supported limits")
+        return self
+
+
 class ServiceBaseSchema(ApiModel):
     """Validate service input."""
 
@@ -195,6 +214,10 @@ class ServiceBaseSchema(ApiModel):
     tags: List[str] = Field(default_factory=list)
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
+    change_correlation_enabled: bool = False
+    change_correlation_exclusions: List[ChangeCorrelationExclusion] = Field(
+        default_factory=list, max_length=50
+    )
     enabled: bool = True
     public: bool = False
     public_name: str | None = Field(

@@ -146,5 +146,11 @@
   "services.form.metadata_example": "Exemple : {\"owner\": \"platform-team\", \"pci\": true}. Utilisez {} pour vider les métadonnées.",
   "services.form.metadata_invalid": "JSON invalide. Vérifiez les guillemets, virgules et accolades.",
   "services.form.metadata_object_required": "Les métadonnées doivent être un objet JSON. Utilisez {} pour les laisser vides.",
-  "services.form.cancel": "Annuler"
+  "services.form.cancel": "Annuler",
+  "services.form.change_correlation": "Suggestions de changements",
+  "services.form.change_correlation_hint": "Proposer des déploiements et changements pouvant expliquer les alertes du service. Les suggestions ne modifient pas le statut des incidents.",
+  "services.form.change_correlation_enabled": "Activer les suggestions automatiques",
+  "services.form.change_exclusions": "Exclure des alertes (JSON)",
+  "services.form.change_exclusions_hint": "Correspondance exacte de la source et des labels. Exemple : [{\"source\":\"heartbeat\"},{\"labels\":{\"kind\":\"synthetic\"}}]. Un groupe participe si au moins une alerte reste.",
+  "services.form.change_exclusions_invalid": "Saisissez un tableau JSON de règles valide, ou [] sans exclusion."
 }

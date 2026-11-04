@@ -591,15 +591,12 @@ Metrics: `incidentrelay_change_worker_results_total` records fixed claim/outcome
 categories; `incidentrelay_change_jobs`,
 `incidentrelay_change_queue_oldest_due_age_seconds`,
 `incidentrelay_change_references`, and `incidentrelay_change_dead_jobs` expose
-queue size, age and error states without source/Team/Service labels. Correlation,
-impact and timeline handlers remain disabled; their existing requests finish with
-`not_enabled` instead of repeatedly retrying. No automatic episode search runs.
+queue size, age and errors without source/Team/Service labels. Stage 7 enables impact, correlation and eligible episode discovery. Timeline publication remains disabled until stage 9.
 
 For rollback, disable both intake and worker and restart web/scheduler processes.
 Keep rows and cursors intact; expired leases can be reclaimed after re-enabling.
 Stage 5 does not delete events, jobs or identity digests, so retries remain possible
-while history is retained. Retention/tombstone policy and automatic correlation
-horizons remain release work in later stages.
+while history is retained. Retention/tombstone policy remains release work for later stages; the automatic horizon is documented below.
 
 ### Changes Inbox and read API
 
@@ -612,8 +609,8 @@ Owner readers see lifecycle conflicts, service mapping diagnostics and immutable
 event history. A reader of a related Service sees a limited card, without the
 sender's title, source, actor, external IDs, URL or event payload. Stale or revoked
 cross-team links disappear until revalidated. Refresh reloads processing state;
-failed loads clear the previous data and offer a retry. Mapping is not automatic
-incident correlation: that engine is a later stage.
+failed loads clear the previous data and offer a retry. Mapping and automatic correlation are separate worker steps. Review and
+related-change presentation follow in stages 8–9.
 
 Read endpoints require a human JWT or an active user's personal token with
 `changes:read`, even if global API authentication is optional. Personal token
@@ -651,3 +648,26 @@ Reuse the exact `event_id` and payload after transport failures (`200` for an ex
 retry). A completion has the same `change_id` and a new `event_id`, event type and
 sender time. Use `source_sequence` only for a source configured for sequence
 ordering. Public intake stays disabled until end-to-end acceptance in stage 10.
+
+### Opt-in automatic Change suggestions
+
+Enable Automatic suggestions in the Service editor for Services whose alerts should
+be checked against changes. The default is off, including after upgrade. Service
+POST/PUT accept change_correlation_enabled and change_correlation_exclusions;
+omitted settings are preserved on PUT, and [] clears exclusions.
+
+Example exclusions: [{"source":"heartbeat"},{"labels":{"kind":"synthetic"}}].
+Source means the alert source. All clauses of one rule must match one child exactly.
+Any matching rule excludes the child; the episode participates if a non-excluded
+child remains, including resolved children observed in that cycle. Existing Service
+edit permissions apply; settings and audit commit in one transaction.
+
+The history horizon is seven days, including still-running older Changes; the
+post-operation window is two hours. Old groups/episodes without context are not
+reconstructed. Stage 7 stores potential-cause suggestions without status or
+notification effects; review and related-change display follow in stages 8–9.
+Public intake stays disabled until stage 10. Engine limits are depth 5, 200 links/
+impact rows, 1,000 edges and five seconds per calculation; existing worker batch,
+lease and retry settings apply. A graph limit records limit_exceeded in the job.
+
+When rolling back to an application version without correlation-aware retention, also disable alert history cleanup ([retention] alert_days=0). Keep the additive tables and evidence intact.

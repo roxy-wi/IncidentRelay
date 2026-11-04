@@ -146,5 +146,11 @@
   "services.form.metadata_example": "Example: {\"owner\": \"platform-team\", \"pci\": true}. Use {} to clear metadata.",
   "services.form.metadata_invalid": "Invalid JSON. Check quotes, commas and brackets.",
   "services.form.metadata_object_required": "Metadata must be a JSON object. Use {} for empty metadata.",
-  "services.form.cancel": "Cancel"
+  "services.form.cancel": "Cancel",
+  "services.form.change_correlation": "Change suggestions",
+  "services.form.change_correlation_hint": "Suggest deployments and other changes that may explain this service's alerts. Suggestions never change incident status.",
+  "services.form.change_correlation_enabled": "Enable automatic suggestions",
+  "services.form.change_exclusions": "Exclude alerts (JSON)",
+  "services.form.change_exclusions_hint": "Exact matches on alert source and labels. Example: [{\"source\":\"heartbeat\"},{\"labels\":{\"kind\":\"synthetic\"}}]. A group participates if any alert remains.",
+  "services.form.change_exclusions_invalid": "Enter a valid JSON array of exclusion rules, or [] for no exclusions."
 }

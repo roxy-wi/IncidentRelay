@@ -9,6 +9,35 @@
 .changes-page .form-grid-2 {
     margin-top: 12px;
 }
+.changes-page .changes-row-heading {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+}
+.changes-page .changes-row-text {
+    min-width: 0;
+}
+.changes-page .changes-kind-icon {
+    flex: 0 0 20px;
+    font-size: 16px;
+    text-align: center;
+    color: var(--md-muted);
+}
+.changes-page .changes-kind-icon[data-kind="deployment"] {
+    color: var(--md-primary);
+}
+.changes-page .changes-kind-icon[data-kind="configuration"] {
+    color: var(--md-warning);
+}
+.changes-page .changes-kind-icon[data-kind="infrastructure"] {
+    color: var(--md-info);
+}
+.changes-page .changes-kind-icon[data-kind="database"] {
+    color: var(--md-maintenance);
+}
+.changes-page .changes-kind-icon[data-kind="feature_flag"] {
+    color: var(--md-success);
+}
 .changes-page .changes-title-link {
     display: block;
     overflow-wrap: anywhere;

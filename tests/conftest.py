@@ -23,6 +23,8 @@ from tests.factories import create_user  # noqa: E402
 from app.modules.db.migrations import migrate  # noqa: E402
 from app.modules.db.models import (  # noqa: E402
     AlertGroupEpisode,
+    ChangeImpact,
+    ChangeAlertGroupCorrelation,
     ChangeIntegration,
     ChangeSource,
     ChangeGrant,
@@ -121,6 +123,8 @@ from app.modules.db.models import (  # noqa: E402
 
 
 CLEANUP_MODELS = [
+    ChangeAlertGroupCorrelation,
+    ChangeImpact,
     ChangeJob,
     ChangeService,
     ChangeServiceReference,

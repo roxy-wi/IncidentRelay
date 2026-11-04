@@ -508,6 +508,7 @@ def _handle_existing_alert(
         apply_maintenance_to_existing_alert(existing_alert, maintenance_decision)
 
         existing_alert.save()
+        alert_episodes_repo.refresh_context(group, observed_alert=existing_alert)
 
         trace.alert_updated(
             existing_alert,

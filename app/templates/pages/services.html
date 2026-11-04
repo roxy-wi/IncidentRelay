@@ -837,7 +837,23 @@
           </div>
         </section>
 
-        <section class="service-editor-section" aria-labelledby="service-metadata-heading">
+        <section class="service-editor-section" aria-labelledby="service-change-correlation-heading">
+          <div class="service-editor-heading">
+            <span class="service-editor-icon" aria-hidden="true"><i class="fas fa-code-branch"></i></span>
+            <div><h3 id="service-change-correlation-heading">{{ _('services.form.change_correlation') }}</h3><p>{{ _('services.form.change_correlation_hint') }}</p></div>
+          </div>
+          <div class="service-editor-fields">
+            <label class="md-checkbox service-editor-full"><input id="service-change-correlation-enabled" type="checkbox"><span>{{ _('services.form.change_correlation_enabled') }}</span></label>
+            <div class="service-editor-field service-editor-full">
+              <label for="service-change-exclusions">{{ _('services.form.change_exclusions') }}</label>
+              <textarea id="service-change-exclusions" class="input service-metadata-input" rows="4" spellcheck="false" aria-describedby="service-change-exclusions-hint service-change-exclusions-error">[]</textarea>
+              <p id="service-change-exclusions-hint" class="help-text">{{ _('services.form.change_exclusions_hint') }}</p>
+              <p id="service-change-exclusions-error" class="service-editor-error" role="alert" hidden></p>
+            </div>
+          </div>
+        </section>
+
+        <section class="service-editor-section service-editor-full" aria-labelledby="service-metadata-heading">
           <div class="service-editor-heading">
             <span class="service-editor-icon service-editor-code-icon" aria-hidden="true">{ }</span>
             <div><h3 id="service-metadata-heading">{{ _('services.form.metadata') }}</h3><p>{{ _('services.form.metadata_hint') }}</p></div>

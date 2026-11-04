@@ -5,6 +5,67 @@ const path = require("node:path");
 const { chromium } = require("playwright");
 const fixture = JSON.parse(process.env.CHANGES_FIXTURE);
 
+async function checkKindIcons(page) {
+    const kinds = [
+        "deployment", "configuration", "infrastructure", "database", "feature_flag", "other",
+    ];
+    const unknownKinds = [null, "future_kind", "__proto__", '<img src=x onerror="unsafe()">'];
+    await page.route("**/api/changes?*", async (route) => {
+        const response = await route.fetch();
+        const body = await response.json();
+        assert.ok(body.items.length);
+        // Exercise the real list renderer with every kind, including future/invalid values.
+        body.items = [...kinds, ...unknownKinds].map((kind) => ({
+            ...body.items[0],
+            kind,
+            title: kinds.includes(kind) ? kind : "Future change",
+        }));
+        body.pagination.total = body.items.length;
+        await route.fulfill({ response, json: body });
+    }, { times: 1 });
+    await page.goto("/changes");
+    const icons = page.locator("#changes-rows .changes-kind-icon");
+    await icons.nth(kinds.length + unknownKinds.length - 1).waitFor();
+    for (const scheme of ["light", "dark"]) {
+        await page.emulateMedia({ colorScheme: scheme });
+        await page.waitForFunction(
+            (expected) => document.documentElement.dataset.colorScheme === expected, scheme,
+        );
+        await page.evaluate(() => document.fonts.ready);
+        const rendered = await icons.evaluateAll((elements) => elements.map((element) => ({
+            color: getComputedStyle(element).color,
+            glyph: getComputedStyle(element.querySelector("i"), "::before").content,
+            label: element.getAttribute("aria-label"),
+            title: element.title,
+            role: element.getAttribute("role"),
+        })));
+        const known = rendered.slice(0, kinds.length);
+        assert.equal(new Set(known.map((icon) => icon.color)).size, kinds.length);
+        assert.equal(new Set(known.map((icon) => icon.glyph)).size, kinds.length);
+        for (const icon of rendered) {
+            assert.ok(icon.glyph && !["none", "normal", '""'].includes(icon.glyph));
+            assert.ok(icon.label);
+            assert.equal(icon.title, icon.label);
+            assert.equal(icon.role, "img");
+        }
+        for (const icon of rendered.slice(kinds.length)) {
+            assert.deepEqual(icon, known[kinds.indexOf("other")]);
+        }
+        assert.equal(await page.locator("#changes-rows img, #changes-rows script").count(), 0);
+        await page.screenshot({
+            path: path.join(fixture.screenshotDir, "changes-kinds-" + scheme + ".png"),
+            fullPage: true,
+        });
+    }
+    await page.setViewportSize({ width: 390, height: 844 });
+    assert.equal(await icons.first().isVisible(), true);
+    assert.equal(await page.locator(".changes-title-link").first().isVisible(), true);
+    await page.screenshot({
+        path: path.join(fixture.screenshotDir, "changes-kinds-mobile.png"),
+        fullPage: true,
+    });
+}
+
 async function main() {
     const browser = await chromium.launch({
         headless: true,
@@ -196,7 +257,13 @@ async function main() {
         await lateResponse;
         assert.equal(await page.locator("#changes-detail-title").textContent(), "");
         assert.equal(await page.locator("#changes-events tr").count(), 0);
+        await checkKindIcons(page);
         const safe = await session(fixture.readerToken);
+        await safe.page.goto("/changes");
+        const safeIcon = safe.page.locator("#changes-rows .changes-kind-icon");
+        await safeIcon.waitFor();
+        assert.equal(await safeIcon.getAttribute("aria-label"), "Deployment");
+        assert.equal((await safe.page.locator("#changes-rows").textContent()).includes("PRIVATE"), false);
         await safe.page.goto("/changes/" + fixture.uid);
         await safe.page.locator("#changes-services tr").waitFor();
         assert.equal(

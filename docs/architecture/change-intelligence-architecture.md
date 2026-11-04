@@ -2,9 +2,9 @@
 
 **Architecture RFC v1.1 (implementation contract)**
 
-**Source baseline:** `release/2.5.0`, `259b9a1` plus stages 5–6 changes (2026-11-02)
+**Source baseline:** release/2.5.0, d43a309 plus stage 7 working changes (2026-11-03)
 
-**Status:** stages 1–6 implemented; stages 7–10 planned. Public intake remains disabled.
+**Status:** stages 1–7 implemented; stages 8–10 planned. Public intake remains disabled.
 
 
 ## Agreed decisions — 28–30 October 2026
@@ -17,7 +17,7 @@
 - Automatic potential-cause suggestions only; mitigation is manual in v1.
 - Automatic correlation requires explicit Service opt-in and is disabled by default. Source/label exclusions apply to individual alerts; a group participates when its selected episode contains at least one non-excluded alert. All groups retain episodes; eligibility is checked before search work is queued (§9.1, stage 7).
 
-Storage, lifecycle episodes and integration administration are implemented. Change intake, workers and correlation from stages 4–10 remain planned and are not enabled.
+Internal intake, durable workers, Changes Inbox and automatic correlation are implemented. Manual review/Incident links and related-change/timeline UI remain stages 8–9; public intake stays disabled until stage 10.
 
 ## 1. Purpose and scope
 
@@ -453,7 +453,7 @@ No automatic rollback, paging/escalation, Incident creation/status change or tec
 
 ### 9.1. Alert eligibility for automatic correlation — stage 7
 
-This is the agreed contract for future implementation. Current stage 2 code creates episodes and discovery requests for new groups and genuine reopens; ordinary updates of legacy groups without episodes remain untracked; the following settings and filters do not yet exist.
+Stage 7 implements this selection policy. New groups and genuine reopens retain episodes, but only eligible episodes request search. Older episodes without recorded context remain unknown.
 
 1. **Explicit Service opt-in.** Stage 7 adds `change_correlation_enabled`, default `false` for new and existing Services, and `change_correlation_exclusions`, default `[]`. Settings use the Service API/UI, existing Service edit permissions and audit. A missing, disabled or deleted Service, or a disabled flag, excludes its groups from automatic correlation. The flag applies to the alerts' Service: an intermediate Service opted out of alert correlation does not cut off paths to opted-in consumers. It does not replace `ServiceDependency.correlation_enabled`, grants or RBAC, and does not block Change Event intake or Service mapping.
 2. **Per-alert exclusions.** In v1, each rule contains the alert source and/or labels with exact value matching; this is not the Change producer's source. All conditions in one rule must match one alert; any matching rule excludes that alert. An empty list excludes nothing, an empty rule is invalid, and an absent label does not match a specified value. Reuse the applicable subset of the existing matcher without introducing another condition language. Do not implicitly exclude heartbeat, severity levels or alert types. Example: `{"source":"alertmanager","labels":{"alertname":"CertificateExpiresSoon"}}`.
@@ -462,6 +462,18 @@ This is the agreed contract for future implementation. Current stage 2 code crea
 5. **Recheck and policy changes.** Workers check eligibility before computation and again before publication under the revision protocol in §4.8–4.11. Policy changes and their invalidation/discovery requests commit together. Disabling or excluding immediately hides automatic suggestions that are no longer eligible; an already-running worker cannot publish its stale result. Previously queued search work, including stage 2 requests, completes without endless retries for ineligible episodes. Bounded deactivation work for existing suggestions is allowed and does not initiate a new search.
 6. **Re-enablement.** Service opt-in, exclusion removal, a newly eligible child or Service assignment requests bounded discovery for eligible episodes within §9's horizon, retaining its running-operation and unknown-start rules. Periodic bounded reconciliation catches triggers missed during concurrent policy changes. Retries do not duplicate results, and changes never trigger an unbounded replay of all historical data.
 7. **Manual decisions and diagnostics.** Settings control automatic suggestions; manual links, confirm/reject decisions and their evidence remain intact. Manual linking remains available under §7 permissions even when automation is disabled or an alert is excluded. UI distinguishes Service opt-out, missing Service, all children excluded, unknown context/start, no candidates and processing failure; a missing job must not appear permanently queued.
+
+### 9.2. Implemented correlation-v1 rules
+
+- Relation precedes time: changed has base 90, trusted reported_affected 80, and dependency depth d has base 70 - 5 × (d - 1). Affected assertions never seed a graph traversal.
+- Gap is seconds from operation end to episode start, or zero inside a running operation. Recency adds max(0, 4 - floor(4 × gap / 7200)); an explicitly matching known environment adds 1. Unknown adds zero and stays labelled unknown. Known mismatches exclude the path or candidate.
+- Fixed examples: direct known-environment overlap = 95; direct at two hours = 91; direct unknown-environment overlap = 94; reported overlap = 85; depth-one overlap = 75; depth-two after one hour = 68. Score is relevance, not probability. Equal scores sort by exact gap, then stable Change UID.
+- Traverse hard, soft and external edges, skipping informational/disabled/deleted edges. Choose the shortest path, then the lexicographic consumer-ID path. Diamonds produce one origin/target row. Limits: depth 5, 200 canonical links/impact rows, 1,000 visited edges, five seconds per calculation; episode publication uses worker_batch_size. Graph exhaustion records limit_exceeded instead of publishing an arbitrary partial graph. Propagation delay stays in evidence and does not extend the two-hour window.
+- New episodes save correlation_context (Service/Team/environment and observed children with source/labels), indexed correlation_service_id and context_revision. Resolved children observed in the cycle remain members. Reopen starts fresh membership; timestamps never reconstruct it. Closed snapshots remain frozen. Migration leaves old context NULL, and ordinary updates never backfill it.
+- Resolver completion queues automatic work; eligible episode creation/closure/context updates discover recent and still-running Changes in bounded pages. Graph/auth sweeps and periodic reconciliation recover missed triggers. Publication locks graph → integration → Change → episodes → job and fences inputs, lease and generation.
+- Consumers use current_suggestions, never the active flag alone: current eligibility and stamps immediately hide stale suggestions. Human review, role, evidence and row version are untouched. Stage 9 adds scoped related-change explanations and episode diagnostics; stage 7 exposes no raw path through existing read APIs.
+
+Alert retention deletes unreviewed derived suggestions before their parent episodes, under group/episode locks. Reviewed rows or manual roles/evidence pin the group; Change/event retention is separate.
 
 ## 10. UI
 

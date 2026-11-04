@@ -393,6 +393,9 @@ function resetServiceForm() {
     $("#service-default-policy").val("");
     $("#service-notification-policy").val("");
     $("#service-priority-policy").val("");
+    $("#service-change-correlation-enabled").prop("checked", false);
+    $("#service-change-exclusions").val("[]");
+    clearJsonInputError("#service-change-exclusions", "#service-change-exclusions-error");
     $("#service-enabled").prop("checked", true);
     $("#service-public").prop("checked", false);
     $("#service-metadata").val("{}");
@@ -420,7 +423,32 @@ function readServiceMetadata() {
 }
 
 
+function readServiceChangeExclusions() {
+    const selector = "#service-change-exclusions";
+    const errorTarget = "#service-change-exclusions-error";
+    try {
+        const value = JSON.parse($(selector).val());
+        if (!Array.isArray(value)) {
+            throw new TypeError("Expected an array");
+        }
+        clearJsonInputError(selector, errorTarget);
+        return value;
+    } catch (error) {
+        if (!(error instanceof SyntaxError) && !(error instanceof TypeError)) {
+            throw error;
+        }
+        $(errorTarget).text(i18n.t("services.form.change_exclusions_invalid")).prop("hidden", false);
+        $(selector).attr("aria-invalid", "true").trigger("focus");
+        return null;
+    }
+}
+
+
 function collectServicePayload() {
+    const exclusions = readServiceChangeExclusions();
+    if (exclusions === null) {
+        return null;
+    }
     const metadata = readServiceMetadata();
     if (metadata === null) {
         return null;
@@ -456,6 +484,8 @@ function collectServicePayload() {
         tags: service ? service.tags || [] : [],
         metadata: metadata,
         lifecycle: service ? service.lifecycle : "production",
+        change_correlation_enabled: $("#service-change-correlation-enabled").is(":checked"),
+        change_correlation_exclusions: exclusions,
         enabled: $("#service-enabled").is(":checked"),
         public: $("#service-public").is(":checked"),
         public_name: service ? service.public_name : null,
@@ -515,6 +545,9 @@ function editService(id) {
     $("#service-form-title").text("Edit service");
     $("#service-id").val(service.id);
     $("#service-team").val(service.team_id);
+    $("#service-change-correlation-enabled").prop("checked", !!service.change_correlation_enabled);
+    $("#service-change-exclusions").val(JSON.stringify(service.change_correlation_exclusions || [], null, 2));
+    clearJsonInputError("#service-change-exclusions", "#service-change-exclusions-error");
     $("#service-metadata").val(JSON.stringify(service.metadata || {}, null, 2));
     clearServiceMetadataError();
 
@@ -580,6 +613,8 @@ function setServiceEnabled(service, enabled) {
         labels: service.labels || {},
         tags: service.tags || [],
         metadata: service.metadata || {},
+        change_correlation_enabled: !!service.change_correlation_enabled,
+        change_correlation_exclusions: service.change_correlation_exclusions || [],
         enabled: enabled,
         public: !!service.public,
         public_name: service.public_name || null,

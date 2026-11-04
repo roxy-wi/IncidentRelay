@@ -16,7 +16,7 @@ from app.modules.db.models import (
 from app.services.alerts import actions, lifecycle
 from app.services.alerts.lifecycle import upsert_alert
 from app.services.orchestration.runtime import RuntimeResult
-from tests.factories import create_group, create_route, create_team, unique
+from tests.factories import create_group, create_route, create_service, create_team, unique
 from tests.alerts.test_alert_episodes import _remove_episode_tracking
 
 
@@ -28,7 +28,10 @@ def incoming(db, monkeypatch):
     if "postgres" not in db.__class__.__name__.lower():
         pytest.skip("requires PostgreSQL")
     team = create_team(create_group())
-    route = create_route(team, source="alertmanager", group_by=["alertname"])
+    service = create_service(team)
+    service.change_correlation_enabled = True
+    service.save()
+    route = create_route(team, source="alertmanager", group_by=["alertname"], service=service)
     monkeypatch.setattr(
         lifecycle,
         "run_event_orchestration",
@@ -102,7 +105,7 @@ def test_concurrent_child_recoveries_close_one_episode(incoming):
     job = ChangeJob.get(
         ChangeJob.job_type == "discover_episode", ChangeJob.entity_id == episode_id
     )
-    assert job.requested_generation == 2
+    assert job.requested_generation == 3
     assert AlertEvent.select().where(AlertEvent.event_type == "resolved").count() == 2
 
 
