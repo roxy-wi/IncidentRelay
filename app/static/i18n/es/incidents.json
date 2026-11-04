@@ -141,5 +141,8 @@
   "incidents.activity.events.responder_accepted": "Solicitud aceptada",
   "incidents.activity.events.responder_declined": "Solicitud rechazada",
   "incidents.activity.events.responder_removed": "Responsable eliminado",
-  "incidents.activity.events.responder_expired": "Solicitud caducada"
+  "incidents.activity.events.responder_expired": "Solicitud caducada",
+  "incidents.activity.events.change_linked": "Cambio vinculado",
+  "incidents.activity.events.change_relation_changed": "Relación del cambio actualizada",
+  "incidents.activity.events.change_unlinked": "Vínculo del cambio eliminado"
 }

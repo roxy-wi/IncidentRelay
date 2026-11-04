@@ -2,7 +2,7 @@
 
 from contextlib import contextmanager
 
-from peewee import PostgresqlDatabase, fn
+from peewee import JOIN, PostgresqlDatabase, fn
 
 from app.db import database_proxy as db
 from app.api.schemas.changes import InvalidChangeQuery
@@ -270,8 +270,15 @@ def readable_references(team_ids):
 
 def reference_query(change, team_ids):
     """Select owner diagnostics for one Change inside the resource boundary."""
-    return readable_references(team_ids).where(
-        ChangeServiceReference.change == change.id
+    return (
+        readable_references(team_ids)
+        .select(ChangeServiceReference, Service)
+        .join(
+            Service,
+            JOIN.LEFT_OUTER,
+            on=(ChangeServiceReference.resolved_service == Service.id),
+        )
+        .where(ChangeServiceReference.change == change.id)
     )
 
 
@@ -336,6 +343,7 @@ def reference_data(ref):
         "relation_type": ref.relation_type,
         "team_id": ref.namespace_team_id,
         "service_id": ref.resolved_service_id,
+        "service": service_data(ref.resolved_service) if ref.resolved_service_id else None,
         "requested_service_id": ref.requested_service_id,
         "requested_service_slug": ref.requested_service_slug,
         "resolution_status": ref.resolution_status,

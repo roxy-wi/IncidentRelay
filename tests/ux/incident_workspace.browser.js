@@ -40,6 +40,17 @@ async function main() {
         await page.locator(".incident-title-button").first().click();
         await ready();
         assert.equal(await page.locator("#close-incident-details").count(), 0);
+        assert.equal(await page.locator(".incidents-workspace .incidents-card-description").count(), 0);
+        assert.equal(await page.locator(".incidents-operation-card > .card-header .card-subtitle").count(), 1);
+        assert.equal(await page.locator(".incidents-links-card > .card-header .card-subtitle").count(), 1);
+        assert.equal(await page.locator(".incidents-events-card > .card-header .card-subtitle").count(), 1);
+        const headers = await page.locator(".incidents-workspace .workspace-section > .card-header").evaluateAll(elements => elements.map(element => ({
+            height: element.getBoundingClientRect().height,
+            subtitle: !!element.querySelector(".card-subtitle"),
+            icon: !!element.querySelector(".section-icon i"),
+        })));
+        assert.equal(headers.length, 8);
+        assert(headers.every(header => header.icon && (header.subtitle || header.height < 60)));
 
         // Reload has one label and one palette across pages and dialogs in both themes.
         for (const scheme of ["light", "dark"]) {

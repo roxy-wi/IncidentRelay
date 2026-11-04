@@ -141,5 +141,8 @@
   "incidents.activity.events.responder_accepted": "Responder accepted",
   "incidents.activity.events.responder_declined": "Responder declined",
   "incidents.activity.events.responder_removed": "Responder removed",
-  "incidents.activity.events.responder_expired": "Responder request expired"
+  "incidents.activity.events.responder_expired": "Responder request expired",
+  "incidents.activity.events.change_linked": "Change linked",
+  "incidents.activity.events.change_relation_changed": "Change relation updated",
+  "incidents.activity.events.change_unlinked": "Change unlinked"
 }

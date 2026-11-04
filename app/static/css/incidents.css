@@ -60,9 +60,6 @@ body.md-theme .incidents-details-dialog {
 body.md-theme .incidents-details-dialog > .app-modal-header {
   flex: 0 0 auto;
 }
-body.md-theme #incident-details-modal .card {
-    overflow: visible;
-}
 body.md-theme .incidents-details-body {
   display: flex;
   flex: 1 1 auto;
@@ -193,7 +190,6 @@ body.md-theme .incidents-workspace .app-modal-header,
 body.md-theme .incidents-workspace .app-modal-footer { padding: 16px; }
 body.md-theme .incidents-workspace .incidents-events-card { min-width: 0; }
 
-.incidents-collaboration-card { margin-top: 16px; padding: 16px; }
 .incidents-collection { display: flex; flex-direction: column; gap: 8px; margin: 12px 0; }
 .incidents-collection-row { display: flex; justify-content: space-between; gap: 12px; align-items: center; overflow-wrap: anywhere; }
 .incidents-inline-form { display: flex; align-items: end; flex-wrap: wrap; gap: 10px; }
@@ -221,9 +217,6 @@ body.md-theme .incidents-workspace .incidents-details-body { padding:22px 0;disp
 body.md-theme .incidents-workspace-grid {display:grid;grid-template-columns:minmax(0,1.8fr) minmax(290px,1fr);gap:18px;align-items:start;}
 body.md-theme .incidents-workspace-main,body.md-theme .incidents-workspace-side {display:grid;gap:18px;min-width:0;align-content:start;}
 body.md-theme .incidents-workspace .card {margin:0;min-width:0;}
-body.md-theme .incidents-workspace .incidents-collaboration-card {padding:18px;}
-body.md-theme .incidents-workspace .card-header {padding:0 0 12px;}
-body.md-theme .incidents-workspace .card-header h3 {font-size:16px;margin:0;}
 body.md-theme .incidents-workspace-actions {display:flex;gap:10px;justify-content:flex-end;padding:18px 0;border-top:1px solid var(--md-border);}
 body.md-theme .incidents-collection {gap:0;margin:4px 0 16px;}
 body.md-theme .incidents-collection-row {padding:10px 0;border-bottom:1px solid var(--md-border);align-items:center;}
@@ -245,42 +238,7 @@ body.md-theme .incidents-inline-form .incidents-form-field {display:grid;gap:5px
 body.md-theme .incidents-inline-form > .btn {justify-self:end;width:auto;align-self:end;}
 @media(max-width:920px){body.md-theme .incidents-workspace-grid{grid-template-columns:minmax(0,1fr);}body.md-theme .incidents-workspace-header{flex-direction:column;gap:12px;}}
 
-/* 2.5 workspace: one header and content rhythm across EVERY section.
-   Earlier .card-header rules differed between Operations and collaboration cards. */
-body.md-theme .incidents-workspace .incidents-operation-card,
-body.md-theme .incidents-workspace .incidents-links-card,
-body.md-theme .incidents-workspace .incidents-events-card,
-body.md-theme .incidents-workspace .incidents-collaboration-card {
-    padding: 0;
-    overflow: visible;
-}
-body.md-theme .incidents-workspace .incidents-operation-card > .card-header,
-body.md-theme .incidents-workspace .incidents-links-card > .card-header,
-body.md-theme .incidents-workspace .incidents-events-card > .card-header,
-body.md-theme .incidents-workspace .incidents-collaboration-card > .card-header {
-    display: flex;
-    align-items: center;
-    min-height: 68px;
-    box-sizing: border-box;
-    margin: 0;
-    padding: 16px 20px;
-    border-bottom: 1px solid var(--md-border);
-    border-radius: var(--md-radius-md) var(--md-radius-md) 0 0;
-    background: var(--md-surface-soft);
-}
-body.md-theme .incidents-workspace .card > .card-header h3 {
-    margin: 0;
-    padding: 0;
-    font-size: 17px;
-    font-weight: 700;
-    line-height: 1.35;
-    color: var(--md-text);
-}
-body.md-theme .incidents-workspace .card > .card-header .card-subtitle {
-    margin: 4px 0 0;
-    line-height: 1.4;
-}
-/* Empty subtitles remain optional: heading itself must retain the same inset. */
+/* Incident-specific content spacing; section headers use workspace_sections.css. */
 body.md-theme .incidents-workspace .incidents-operation-grid { padding: 20px; }
 body.md-theme .incidents-workspace .incidents-linked-groups { padding: 20px 20px 16px; }
 body.md-theme .incidents-workspace .incidents-link-controls { padding: 0 20px 20px; }
@@ -297,7 +255,6 @@ body.md-theme .incidents-workspace .incidents-collaboration-card > .incidents-co
 }
 body.md-theme .incidents-workspace .incidents-events-card > .event-list { padding: 16px 20px 20px; }
 @media (max-width: 680px) {
-    body.md-theme .incidents-workspace .card > .card-header { padding: 14px 16px; min-height: 60px; }
     body.md-theme .incidents-workspace .incidents-operation-grid,
     body.md-theme .incidents-workspace .incidents-linked-groups,
     body.md-theme .incidents-workspace .incidents-link-controls,
@@ -308,23 +265,6 @@ body.md-theme .incidents-workspace .incidents-events-card > .event-list { paddin
     body.md-theme .incidents-workspace .incidents-events-card > .event-list { padding-left: 16px; padding-right: 16px; }
 }
 
-/* 2.5 Incident Workspace: uniform title-only card headers (Stakeholders pattern). */
-body.md-theme .incidents-workspace .incidents-operation-card > .card-header,
-body.md-theme .incidents-workspace .incidents-links-card > .card-header,
-body.md-theme .incidents-workspace .incidents-events-card > .card-header,
-body.md-theme .incidents-workspace .incidents-collaboration-card > .card-header {
-    height: 68px;
-    min-height: 68px;
-    padding: 16px 20px;
-    align-items: center;
-}
-body.md-theme .incidents-workspace .incidents-card-description {
-    margin: 0;
-    padding: 14px 20px 0;
-    font-size: 13px;
-    line-height: 1.5;
-    color: var(--md-muted);
-}
 body.md-theme .incidents-workspace .incidents-workspace-lower-grid {
     display: grid;
     grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -343,18 +283,6 @@ body.md-theme .incidents-workspace .incidents-events-card { margin-top: 18px; }
         grid-template-columns: minmax(0, 1fr);
     }
 }
-@media (max-width: 680px) {
-    body.md-theme .incidents-workspace .incidents-operation-card > .card-header,
-    body.md-theme .incidents-workspace .incidents-links-card > .card-header,
-    body.md-theme .incidents-workspace .incidents-events-card > .card-header,
-    body.md-theme .incidents-workspace .incidents-collaboration-card > .card-header {
-        height: 60px;
-        min-height: 60px;
-        padding: 14px 16px;
-    }
-    body.md-theme .incidents-workspace .incidents-card-description { padding-left: 16px; padding-right: 16px; }
-}
-
 /* Incident 2.5 service context: consistent with the workspace card typography. */
 body.md-theme .incidents-service-context { align-items: flex-start; }
 body.md-theme .incidents-service-context-main { min-width: 0; flex: 1; }

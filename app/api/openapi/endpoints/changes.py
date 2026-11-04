@@ -134,6 +134,7 @@ def components():
             "relation_type": relation,
             "team_id": ID,
             "service_id": {**ID, "nullable": True},
+            "service": {**service, "nullable": True},
             "requested_service_id": {**ID, "nullable": True},
             "requested_service_slug": {**TEXT, "nullable": True},
             "resolution_status": TEXT,

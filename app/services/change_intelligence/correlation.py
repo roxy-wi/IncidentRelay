@@ -478,6 +478,25 @@ def publish_correlation_batch(claim, plan):
         )
 
 
+def is_current_suggestion(row, *, episode=None, graph_revision=None):
+    """Check one proposal without scanning every Change for the episode."""
+    if not row.active or row.review_status != "suggested":
+        return False
+    episode = episode or AlertGroupEpisode.get_by_id(row.episode_id)
+    if episode_eligibility(episode) != "eligible":
+        return False
+    if graph_revision is None:
+        graph_revision = ChangeGraphState.get_by_id(1).revision
+    change = row.change
+    integration = change.integration
+    stamp = input_stamp(change, integration, graph_revision)
+    return (
+        row.engine_version == ENGINE_VERSION
+        and row.input_stamp == {**stamp, "episode_revision": episode.context_revision}
+        and mapping_current(change, integration, stamp)
+    )
+
+
 def current_suggestions(episode):
     """Internal projection gate; callers must authorize the episode before use.
 
@@ -495,15 +514,7 @@ def current_suggestions(episode):
         ChangeAlertGroupCorrelation.review_status == "suggested",
     )
     for row in query:
-        change = row.change
-        integration = change.integration
-        stamp = input_stamp(change, integration, graph_revision)
-        if (
-            row.engine_version == ENGINE_VERSION
-            and row.input_stamp
-            == {**stamp, "episode_revision": episode.context_revision}
-            and mapping_current(change, integration, stamp)
-        ):
+        if is_current_suggestion(row, episode=episode, graph_revision=graph_revision):
             rows.append(row)
     return sorted(
         rows,

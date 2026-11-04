@@ -6,9 +6,25 @@ from pydantic import ValidationError
 
 from app.api.schemas.base import EmptySchema
 from app.api.schemas.changes import ChangePageQuery, ChangeQuery, InvalidChangeQuery
-from app.modules.db.models import Change, ChangeEvent
-from app.services.change_intelligence import reading
-from app.services.validation import make_error_response
+from app.api.schemas.change_reviews import (
+    CorrelationCreate,
+    CorrelationReview,
+    IncidentChangeCreate,
+    IncidentChangeQuery,
+    IncidentChangeRemove,
+    IncidentChangeUpdate,
+    ReviewTargetQuery,
+)
+from app.modules.db.models import (
+    AlertGroup,
+    AlertGroupEpisode,
+    Change,
+    ChangeEvent,
+    Incident,
+)
+from app.services.change_intelligence import incident_links, reading, reviewing
+from app.services.change_intelligence.administration import ChangeConflict
+from app.services.validation import make_error_response, validate_body
 
 changes_bp = Blueprint("changes_api", __name__)
 
@@ -31,7 +47,22 @@ def no_cache(response):
 
 @changes_bp.errorhandler(DoesNotExist)
 def missing(_error):
-    return make_error_response("not_found", "Change or Service not found", 404)
+    return make_error_response("not_found", "Change or related resource not found", 404)
+
+
+@changes_bp.errorhandler(ChangeConflict)
+def conflicting(error):
+    return make_error_response("conflict", str(error), 409)
+
+
+@changes_bp.errorhandler(reviewing.ReviewConflict)
+def review_conflicting(error):
+    return make_error_response("conflict", str(error), 409, reason=error.reason)
+
+
+@changes_bp.errorhandler(reviewing.ReviewDenied)
+def review_denied(error):
+    return make_error_response("forbidden", str(error), 403)
 
 
 @changes_bp.errorhandler(InvalidChangeQuery)
@@ -117,3 +148,104 @@ def services(change_uid):
                 reading.reference_query(change, teams), filters, reading.reference_data
             )
         return jsonify(result)
+
+
+@changes_bp.get("/changes/<uuid:change_uid>/correlations")
+def correlations(change_uid):
+    filters = query_input(ChangePageQuery)
+    with reading.read_snapshot():
+        teams = reading.reader_teams()
+        change = reviewing.visible_change(change_uid, teams)
+        return jsonify(
+            reading.page_result(
+                reviewing.correlation_query(change, teams),
+                filters,
+                lambda row: reviewing.review_data(row, teams),
+            )
+        )
+
+
+@changes_bp.get("/changes/<uuid:change_uid>/correlation-targets")
+def correlation_targets(change_uid):
+    """Offer existing episodes by title; legacy groups never gain synthetic ones."""
+    filters = query_input(ReviewTargetQuery)
+    with reading.read_snapshot():
+        teams = reading.reader_teams()
+        reviewing.visible_change(change_uid, teams)
+        query = reviewing.episode_query(teams)
+        if filters.search:
+            query = query.where(AlertGroup.title.contains(filters.search))
+        return jsonify(
+            reading.page_result(
+                query.order_by(AlertGroupEpisode.id.desc()),
+                filters,
+                lambda episode: {
+                    **reviewing.episode_data(episode),
+                    "can_review": reviewing.can_respond(episode.alert_group, teams),
+                },
+            )
+        )
+
+
+@changes_bp.post("/changes/<uuid:change_uid>/correlations")
+def create_correlation(change_uid):
+    payload, error = validate_body(CorrelationCreate)
+    if error:
+        return error
+    return jsonify(reviewing.create_correlation(change_uid, payload)), 201
+
+
+@changes_bp.post("/changes/<uuid:change_uid>/correlations/<int:correlation_id>/review")
+def review_correlation(change_uid, correlation_id):
+    payload, error = validate_body(CorrelationReview)
+    if error:
+        return error
+    return jsonify(reviewing.review_correlation(change_uid, correlation_id, payload))
+
+
+@changes_bp.get("/changes/<uuid:change_uid>/incidents")
+@changes_bp.get("/incidents/<int:incident_id>/changes")
+def incident_changes(change_uid=None, incident_id=None):
+    filters = query_input(IncidentChangeQuery)
+    with reading.read_snapshot():
+        teams = reading.reader_teams()
+        change = reviewing.visible_change(change_uid, teams) if change_uid else None
+        if incident_id is not None:
+            incident_links.incident_query(teams).where(Incident.id == incident_id).get()
+        query = incident_links.link_query(
+            teams,
+            incident_id=incident_id,
+            change_id=change.id if change else None,
+            include_removed=filters.include_removed,
+        )
+        return jsonify(
+            reading.page_result(
+                query,
+                filters,
+                lambda link: incident_links.link_data(link, teams),
+            )
+        )
+
+
+@changes_bp.post("/incidents/<int:incident_id>/changes")
+def add_incident_change(incident_id):
+    payload, error = validate_body(IncidentChangeCreate)
+    if error:
+        return error
+    result, status = incident_links.add_link(incident_id, payload)
+    return jsonify(result), status
+
+
+@changes_bp.route(
+    "/incidents/<int:incident_id>/changes/<int:link_id>", methods=["PATCH", "DELETE"]
+)
+def mutate_incident_change(incident_id, link_id):
+    remove = request.method == "DELETE"
+    payload, error = validate_body(
+        IncidentChangeRemove if remove else IncidentChangeUpdate
+    )
+    if error:
+        return error
+    return jsonify(
+        incident_links.update_link(incident_id, link_id, payload, remove=remove)
+    )

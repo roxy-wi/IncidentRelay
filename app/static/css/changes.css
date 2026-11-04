@@ -1,4 +1,5 @@
-.changes-page [hidden] {
+.changes-page [hidden],
+#change-review-modal [hidden] {
     display: none !important;
 }
 .changes-description,
@@ -43,7 +44,10 @@
     overflow-wrap: anywhere;
 }
 .changes-page .changes-row-context {
+    display: block;
     margin-top: 4px;
+    white-space: normal;
+    overflow-wrap: anywhere;
 }
 body.md-theme .changes-page .form-body {
     padding: 12px 16px;
@@ -52,10 +56,6 @@ body.md-theme .changes-page .form-body {
 body.md-theme .changes-page .form-body > p {
     margin: 0;
 }
-body.md-theme .changes-page .card-header h3 {
-    margin: 0;
-    font-size: 16px;
-}
 body.md-theme .changes-page .form-grid-2 > .form-group {
     gap: 4px;
 }
@@ -63,6 +63,38 @@ body.md-theme .changes-page .form-grid-2 > .form-group {
     grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
 }
 .changes-page #changes-message:empty,
-.changes-page #changes-filter-message:empty {
+.changes-page #changes-filter-message:empty,
+#change-review-error:empty,
+#change-review-subject:empty {
     display: none;
 }
+.changes-detail {
+    display: grid;
+    gap: 16px;
+    min-width: 0;
+}
+body.md-theme .changes-detail > .card {
+    margin: 0;
+    min-width: 0;
+}
+.changes-page .table-pagination > span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+body.md-theme #change-review-modal .form-stack { margin: 0; gap: 12px; }
+body.md-theme #change-review-modal .app-modal-header {
+    align-items: center;
+    padding: 10px 16px;
+}
+body.md-theme #change-review-modal .app-modal-header h2 { font-size: 18px; }
+body.md-theme #change-review-modal .app-modal-body { padding: 14px 16px; }
+body.md-theme #change-review-modal .app-modal-footer { padding: 12px 16px; }
+body.md-theme #change-review-modal .app-modal-body > p { margin: 0; }
+#change-review-form { display: flex; flex-direction: column; min-height: 0; }
+#change-review-target-fields { min-width: 0; }
+#change-review-target-fields .ts-wrapper { width: 100%; min-width: 0; }
+#change-review-target-fields .ts-control { min-height: 38px; }
+#change-review-target-fields .ts-dropdown-content { max-height: 180px; }
+#change-review-target-fields .option { white-space: normal; overflow-wrap: anywhere; }
+#change-review-target-fields .option small { display: block; color: var(--md-muted); margin-top: 3px; }
+#change-review-target-fields .ts-wrapper.single .item { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

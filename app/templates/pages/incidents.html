@@ -175,14 +175,13 @@
         <button id="incident-details-reload" type="button" class="btn is-hidden btn-reload">{{ _('common.reload') }}</button>
         <div id="incident-details-summary" class="details-grid"></div>
 
-        <section class="card incidents-operation-card">
+        <section class="card incidents-operation-card workspace-section" data-section="operations">
           <div class="card-header">
-            <div>
-              <h3>{{ _('incidents.details.operations') }}</h3>
-
+            <div class="section-heading">
+              <span class="section-icon" aria-hidden="true"><i class="fas fa-sliders-h"></i></span>
+              <div><h3>{{ _('incidents.details.operations') }}</h3><div class="card-subtitle">{{ _('incidents.details.operations_help') }}</div></div>
             </div>
           </div>
-          <p class="incidents-card-description">{{ _('incidents.details.operations_help') }}</p>
           <div class="incidents-operation-grid">
             <div>
               <label for="incident-details-status">{{ _('incidents.form.status') }}</label>
@@ -200,15 +199,13 @@
           </div>
         </section>
 
-        <section class="card incidents-links-card">
+        <section class="card incidents-links-card workspace-section" data-section="alerts">
           <div class="card-header">
-            <div>
-              <h3>{{ _('incidents.links.title') }}</h3>
-
+            <div class="section-heading">
+              <span class="section-icon" aria-hidden="true"><i class="fas fa-bell"></i></span>
+              <div><h3>{{ _('incidents.links.title') }}</h3><div class="card-subtitle">{{ _('incidents.links.subtitle') }} <span id="incident-linked-alert-groups-count" class="overview-count-badge">0</span></div></div>
             </div>
           </div>
-
-          <p class="incidents-card-description">{{ _('incidents.links.subtitle') }} <span id="incident-linked-alert-groups-count" class="overview-count-badge">0</span></p>
           <div id="incident-linked-alert-groups" class="incidents-linked-groups"></div>
 
           <div id="incident-link-controls" class="incidents-link-controls">
@@ -222,8 +219,8 @@
         </section>
 
         </main><aside class="incidents-workspace-side">
-        <section class="card incidents-collaboration-card" id="incident-participants-section">
-          <div class="card-header"><h3>{{ _('incidents.workspace.participants') }}</h3></div>
+        <section class="card incidents-collaboration-card workspace-section" data-section="people" id="incident-participants-section">
+          <div class="card-header"><div class="section-heading"><span class="section-icon" aria-hidden="true"><i class="fas fa-user-friends"></i></span><h3>{{ _('incidents.workspace.participants') }}</h3></div></div>
           <div id="incident-participants-list" class="incidents-collection"></div>
           <div class="incidents-inline-form" id="incident-participants-controls">
             <div class="incidents-form-field"><label for="incident-participant-user">{{ _('incidents.workspace.user') }}</label><select id="incident-participant-user" class="input"></select></div>
@@ -231,8 +228,8 @@
             <button id="incident-participant-add" type="button" class="btn btn-primary btn-small">{{ _('incidents.workspace.add_participant') }}</button>
           </div>
         </section>
-        <section class="card incidents-collaboration-card" id="incident-stakeholders-section">
-          <div class="card-header"><h3>{{ _('incidents.workspace.stakeholders') }}</h3></div>
+        <section class="card incidents-collaboration-card workspace-section" data-section="stakeholders" id="incident-stakeholders-section">
+          <div class="card-header"><div class="section-heading"><span class="section-icon" aria-hidden="true"><i class="fas fa-users"></i></span><h3>{{ _('incidents.workspace.stakeholders') }}</h3></div></div>
           <div id="incident-stakeholders-list" class="incidents-collection"></div>
           <div class="incidents-inline-form" id="incident-stakeholders-controls">
             <div class="incidents-form-field incidents-stakeholder-picker">
@@ -247,8 +244,8 @@
             <button id="incident-stakeholder-add" type="button" class="btn btn-primary btn-small">{{ _('incidents.workspace.add_stakeholder') }}</button>
           </div>
         </section>
-        <section class="card incidents-collaboration-card" id="incident-services-section">
-          <div class="card-header"><h3>{{ _('incidents.workspace.affected_services') }}</h3></div>
+        <section class="card incidents-collaboration-card workspace-section" data-section="services" id="incident-services-section">
+          <div class="card-header"><div class="section-heading"><span class="section-icon" aria-hidden="true"><i class="fas fa-server"></i></span><h3>{{ _('incidents.workspace.affected_services') }}</h3></div></div>
           <div id="incident-services-list" class="incidents-collection"></div>
           <div class="incidents-inline-form" id="incident-services-controls">
             <div class="incidents-form-field"><label for="incident-service-select">{{ _('incidents.workspace.service') }}</label><select id="incident-service-select" class="input"></select></div>
@@ -257,8 +254,8 @@
         </section>
         </aside></div>
         <div class="incidents-workspace-lower-grid">
-        <section class="card incidents-collaboration-card" id="incident-resolution-section">
-          <div class="card-header"><h3>{{ _('incidents.workspace.resolution') }}</h3></div>
+        <section class="card incidents-collaboration-card workspace-section" data-section="resolution" id="incident-resolution-section">
+          <div class="card-header"><div class="section-heading"><span class="section-icon" aria-hidden="true"><i class="fas fa-check-circle"></i></span><h3>{{ _('incidents.workspace.resolution') }}</h3></div></div>
           <div class="form-body"><label for="incident-root-cause">{{ _('incidents.workspace.root_cause') }}</label>
             <textarea id="incident-root-cause" class="input" rows="3" maxlength="10000"></textarea>
             <label for="incident-resolution-summary">{{ _('incidents.workspace.resolution_summary') }}</label>
@@ -266,8 +263,8 @@
             <button id="incident-resolution-save" type="button" class="btn btn-primary btn-small">{{ _('incidents.workspace.save_resolution') }}</button>
           </div>
         </section>
-        <section class="card incidents-collaboration-card" id="incident-comments-section">
-          <div class="card-header"><h3>{{ _('incidents.workspace.comments') }}</h3></div>
+        <section class="card incidents-collaboration-card workspace-section" data-section="comments" id="incident-comments-section">
+          <div class="card-header"><div class="section-heading"><span class="section-icon" aria-hidden="true"><i class="fas fa-comments"></i></span><h3>{{ _('incidents.workspace.comments') }}</h3></div></div>
           <div id="incident-comments-list" class="incidents-collection" aria-live="polite"></div>
           <div id="incident-comments-controls"><label for="incident-comment-input">{{ _('incidents.workspace.comment') }}</label>
             <textarea id="incident-comment-input" class="input" maxlength="10000" rows="3"></textarea>
@@ -275,14 +272,13 @@
           </div>
         </section>
         </div>
-        <section class="card incidents-events-card">
+        <section class="card incidents-events-card workspace-section" data-section="history">
           <div class="card-header">
-            <div>
-              <h3>{{ _('incidents.activity.title') }}</h3>
-
+            <div class="section-heading">
+              <span class="section-icon" aria-hidden="true"><i class="fas fa-history"></i></span>
+              <div><h3>{{ _('incidents.activity.title') }}</h3><div class="card-subtitle">{{ _('incidents.activity.subtitle') }}</div></div>
             </div>
           </div>
-          <p class="incidents-card-description">{{ _('incidents.activity.subtitle') }}</p>
           <div id="incident-events" class="event-list" aria-live="polite"></div>
         </section>
       </div>

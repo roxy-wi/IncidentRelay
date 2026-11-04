@@ -141,5 +141,8 @@
   "incidents.activity.events.responder_accepted": "Anfrage angenommen",
   "incidents.activity.events.responder_declined": "Anfrage abgelehnt",
   "incidents.activity.events.responder_removed": "Einsatzkraft entfernt",
-  "incidents.activity.events.responder_expired": "Anfrage abgelaufen"
+  "incidents.activity.events.responder_expired": "Anfrage abgelaufen",
+  "incidents.activity.events.change_linked": "Änderung verknüpft",
+  "incidents.activity.events.change_relation_changed": "Änderungsbeziehung aktualisiert",
+  "incidents.activity.events.change_unlinked": "Änderungsverknüpfung entfernt"
 }

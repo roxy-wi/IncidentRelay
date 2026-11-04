@@ -18,6 +18,7 @@ from app.modules.db.models import (
     ChangeGraphState,
     ChangeImpact,
     ChangeAlertGroupCorrelation,
+    ChangeIncidentLink,
     Migration,
 )
 from tests.factories import create_group, create_team, unique
@@ -91,7 +92,7 @@ def _drop_column(db, table, column):
 def _legacy_schema(db, migration):
     _drop_column(db, "alert_group", "current_episode_id")
     _drop_column(db, "apitoken", "change_integration_id")
-    db.drop_tables([ChangeAlertGroupCorrelation, ChangeImpact])
+    db.drop_tables([ChangeIncidentLink, ChangeAlertGroupCorrelation, ChangeImpact])
     db.drop_tables(list(reversed(migration.MODELS)))
 
 

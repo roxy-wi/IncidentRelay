@@ -2,9 +2,9 @@
 
 **Architecture RFC v1.1 (implementation contract)**
 
-**Source baseline:** release/2.5.0, d43a309 plus stage 7 working changes (2026-11-03)
+**Source baseline:** release/2.5.0, 2d9f931 plus stage 8 working changes (2026-11-04)
 
-**Status:** stages 1–7 implemented; stages 8–10 planned. Public intake remains disabled.
+**Status:** stages 1–8 implemented; stages 9–10 planned. Public intake remains disabled.
 
 
 ## Agreed decisions — 28–30 October 2026
@@ -17,7 +17,7 @@
 - Automatic potential-cause suggestions only; mitigation is manual in v1.
 - Automatic correlation requires explicit Service opt-in and is disabled by default. Source/label exclusions apply to individual alerts; a group participates when its selected episode contains at least one non-excluded alert. All groups retain episodes; eligibility is checked before search work is queued (§9.1, stage 7).
 
-Internal intake, durable workers, Changes Inbox and automatic correlation are implemented. Manual review/Incident links and related-change/timeline UI remain stages 8–9; public intake stays disabled until stage 10.
+Internal intake, durable workers, Changes Inbox, automatic correlation and manual review/Incident links are implemented. Related Changes on AlertGroup/Incident pages and Service Timeline remain stage 9; public intake stays disabled until stage 10.
 
 ## 1. Purpose and scope
 
@@ -325,6 +325,8 @@ GET    /api/changes/{id}
 GET    /api/changes/{id}/events
 GET    /api/changes/{id}/services
 GET    /api/changes/{id}/correlations
+GET    /api/changes/{id}/correlation-targets
+GET    /api/changes/{id}/incidents
 POST   /api/changes/{id}/correlations
 POST   /api/changes/{id}/correlations/{correlation_id}/review
 GET    /api/services/{service_id}/changes
@@ -589,6 +591,16 @@ The Inbox uses existing table, filter and pagination styles. It displays lifecyc
 - **Work:** manual episode-link creation, confirm/reject, context/mitigation; row_version, audit and retained evidence. Add ChangeIncidentLink and add/change/remove/reactivate APIs using Incident transactions/CAS. Protect linked evidence from retention as links are introduced. Change Details actions use the authorized full or safe projection.
 - **Tests:** concurrent confirm/reject and link edit/removal; no automatic suggestion; mitigation outside the automatic window; duplicate add/reactivation; link/event/audit write failures; recomputation after review; a new episode; parent cleanup.
 - **Ready when:** stale writes return `409`, retries obey `200/201`, manual decisions and evidence survive recomputation/cleanup without moving to another episode. A link grants no access to private Change data.
+
+Stage 8 is implemented in Change Details. Every manual write requires a nonempty note (up to 2000 characters). Change visibility and responder permission on the target AlertGroup/Incident are independent. Personal tokens need changes:write plus alerts:write or incidents:write; nested reads require both read scopes. Group/Team restrictions also apply to global administrators' personal tokens.
+
+Review accepts row_version, decision (confirmed/rejected), relation_type and note. Automatic candidates additionally require the returned evidence_version: recalculation invalidates the displayed evidence even when the manual row version is unchanged. The separate Set manual relation action sends manual=true and works without a current automatic basis, including disabled policies. Stale candidates are explicitly labeled, have no score, and cannot be confirmed through the ordinary suggestion action. Unscored manual relations store score=NULL.
+
+The decision snapshot retains the operator-visible Change projection, exact episode, displayed score/reason/computation time, time proximity and note. Reconsideration retains the original basis; recomputation cannot rewrite it. Reads recheck current permissions: private fields from an older full snapshot and inaccessible Services never enter a safe projection. Raw graph paths are not published at this stage. Shared Incident events contain only identifiers and roles; the human note is retained in the audit. Neither automatically copies private Change title/source/payload.
+
+Incident POST returns 200 for the same active role and 201 for a new link. Role edits and soft removal require row_version. Restoring via POST requires the removed version returned with include_removed=true and returns 201; missing/stale versions return 409. Incident CAS/event, link and audit are atomic. Duplicates create no event/audit; the UI never retries conflicts automatically.
+
+Migration 20261104010000_change_reviews preserves existing suggestions, allows NULL scores and creates ChangeIncidentLink with a unique (Change, Incident) pair. RESTRICT protects both parents, including removed links. Existing retention preserves reviewed episodes; legacy groups gain no episodes. Application rollback keeps tables and decisions; the previous-version retention shutdown guidance in §9.2 still applies.
 
 ### 12.9. Stage 9 — Service Timeline and AlertGroup/Incident pages
 

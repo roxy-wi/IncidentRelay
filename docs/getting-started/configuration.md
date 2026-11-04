@@ -609,8 +609,7 @@ Owner readers see lifecycle conflicts, service mapping diagnostics and immutable
 event history. A reader of a related Service sees a limited card, without the
 sender's title, source, actor, external IDs, URL or event payload. Stale or revoked
 cross-team links disappear until revalidated. Refresh reloads processing state;
-failed loads clear the previous data and offer a retry. Mapping and automatic correlation are separate worker steps. Review and
-related-change presentation follow in stages 8–9.
+failed loads clear the previous data and offer a retry. Mapping and automatic correlation are separate worker steps. Manual review and Incident links are available in Change Details; related-change presentation on AlertGroup/Incident pages remains stage 9.
 
 Read endpoints require a human JWT or an active user's personal token with
 `changes:read`, even if global API authentication is optional. Personal token
@@ -665,9 +664,16 @@ edit permissions apply; settings and audit commit in one transaction.
 The history horizon is seven days, including still-running older Changes; the
 post-operation window is two hours. Old groups/episodes without context are not
 reconstructed. Stage 7 stores potential-cause suggestions without status or
-notification effects; review and related-change display follow in stages 8–9.
+notification effects; manual review is available in Change Details; related-change display on AlertGroup/Incident pages remains stage 9.
 Public intake stays disabled until stage 10. Engine limits are depth 5, 200 links/
 impact rows, 1,000 edges and five seconds per calculation; existing worker batch,
 lease and retry settings apply. A graph limit records limit_exceeded in the job.
 
 When rolling back to an application version without correlation-aware retention, also disable alert history cleanup ([retention] alert_days=0). Keep the additive tables and evidence intact.
+
+
+### Manual Change relations
+
+Change Details supports confirming/rejecting suggestions, manually assigning context/mitigation/cause to existing episodes, and linking Changes to Incidents. Each operation requires Change visibility, the target's responder role and a reason. Manual relations work independently of automatic correlation policy and time windows. Legacy AlertGroups without episodes are not reconstructed; direct Incident links remain available.
+
+On a version conflict, close the dialog and reload. Removed Incident links can be restored through their action menu. These operations do not change alert/Incident status or send notifications. Apply migrations, including 20261104010000_change_reviews, before starting the updated application. Public intake remains disabled until stage 10.

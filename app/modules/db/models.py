@@ -4086,7 +4086,7 @@ class ChangeAlertGroupCorrelation(BaseModel):
     episode = ForeignKeyField(
         AlertGroupEpisode, backref="change_correlations", on_delete="RESTRICT"
     )
-    score = IntegerField(constraints=[Check("score >= 0 AND score <= 100")])
+    score = IntegerField(null=True, constraints=[Check("score >= 0 AND score <= 100")])
     reason = CharField(max_length=64)
     evidence = JSONTextField(default=dict)
     input_stamp = JSONTextField(default=dict)
@@ -4118,4 +4118,33 @@ class ChangeAlertGroupCorrelation(BaseModel):
         indexes = (
             (("change", "episode"), True),
             (("episode", "active", "score"), False),
+        )
+
+
+class ChangeIncidentLink(BaseModel):
+    """A versioned manual link retained even after removal from an Incident."""
+
+    id = AutoField()
+    change = ForeignKeyField(Change, backref="incident_links", on_delete="RESTRICT")
+    incident = ForeignKeyField(Incident, backref="change_links", on_delete="RESTRICT")
+    relation_type = CharField(
+        constraints=[Check(
+            "relation_type IN ('context', 'potential_cause', 'confirmed_cause', 'mitigation')"
+        )]
+    )
+    linked_by = ForeignKeyField(
+        User, null=True, backref="linked_incident_changes", on_delete="SET NULL"
+    )
+    linked_at = DateTimeField(default=utc_now)
+    removed_by = ForeignKeyField(
+        User, null=True, backref="removed_incident_changes", on_delete="SET NULL"
+    )
+    removed_at = DateTimeField(null=True)
+    row_version = BigIntegerField(default=1, constraints=[Check("row_version > 0")])
+
+    class Meta:
+        table_name = "change_incident_link"
+        indexes = (
+            (("change", "incident"), True),
+            (("incident", "removed_at"), False),
         )

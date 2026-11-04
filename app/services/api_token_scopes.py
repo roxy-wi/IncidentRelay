@@ -167,7 +167,23 @@ def required_scopes_for_path(path, method):
     method = str(method or "").upper()
     if path == "/api/change-events":
         return ["changes:ingest"] if method == "POST" else None
+    if re.fullmatch(r"/api/incidents/\d+/changes(?:/\d+)?", path):
+        item = bool(re.fullmatch(r"/api/incidents/\d+/changes/\d+", path))
+        if method in READ_METHODS and not item:
+            return ["changes:read", "incidents:read"]
+        if (method == "POST" and not item) or (item and method in {"PATCH", "DELETE"}):
+            return ["changes:write", "incidents:write"]
+        return None
+    if re.match(r"/api/incidents/\d+/changes(?:/|$)", path):
+        return None
     if path_matches_prefix(path, "/api/changes"):
+        change_path = r"/api/changes/[0-9a-fA-F-]{36}"
+        if re.fullmatch(change_path + r"/(correlations|correlation-targets)", path) and method in READ_METHODS:
+            return ["changes:read", "alerts:read"]
+        if re.fullmatch(change_path + r"/correlations(?:/\d+/review)?", path) and method == "POST":
+            return ["changes:write", "alerts:write"]
+        if re.fullmatch(change_path + r"/incidents", path) and method in READ_METHODS:
+            return ["changes:read", "incidents:read"]
         known_read = path in ("/api/changes", "/api/changes/sources") or re.fullmatch(
             r"/api/changes/[0-9a-fA-F-]{36}(?:/events|/services)?", path
         )

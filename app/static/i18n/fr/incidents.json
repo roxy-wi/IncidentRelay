@@ -141,5 +141,8 @@
   "incidents.activity.events.responder_accepted": "Invitation acceptée",
   "incidents.activity.events.responder_declined": "Invitation refusée",
   "incidents.activity.events.responder_removed": "Intervenant retiré",
-  "incidents.activity.events.responder_expired": "Invitation expirée"
+  "incidents.activity.events.responder_expired": "Invitation expirée",
+  "incidents.activity.events.change_linked": "Changement associé",
+  "incidents.activity.events.change_relation_changed": "Relation du changement modifiée",
+  "incidents.activity.events.change_unlinked": "Lien du changement supprimé"
 }

@@ -141,5 +141,8 @@
   "incidents.activity.events.responder_accepted": "Приглашение принято",
   "incidents.activity.events.responder_declined": "Приглашение отклонено",
   "incidents.activity.events.responder_removed": "Участник удалён",
-  "incidents.activity.events.responder_expired": "Приглашение просрочено"
+  "incidents.activity.events.responder_expired": "Приглашение просрочено",
+  "incidents.activity.events.change_linked": "Изменение связано с инцидентом",
+  "incidents.activity.events.change_relation_changed": "Роль изменения обновлена",
+  "incidents.activity.events.change_unlinked": "Связь с изменением удалена"
 }

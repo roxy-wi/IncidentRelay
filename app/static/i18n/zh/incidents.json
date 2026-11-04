@@ -141,5 +141,8 @@
   "incidents.activity.events.responder_accepted": "已接受邀请",
   "incidents.activity.events.responder_declined": "已拒绝邀请",
   "incidents.activity.events.responder_removed": "已移除响应人员",
-  "incidents.activity.events.responder_expired": "邀请已过期"
+  "incidents.activity.events.responder_expired": "邀请已过期",
+  "incidents.activity.events.change_linked": "已关联变更",
+  "incidents.activity.events.change_relation_changed": "已更新变更关系",
+  "incidents.activity.events.change_unlinked": "已移除变更关联"
 }

@@ -91,6 +91,13 @@ def test_owner_history_and_scoped_service_diagnostics(client, changes):
     services = client.get(url(changes, "/services"), headers=auth).json
     assert services["pagination"]["total"] == 1
     assert services["references"]["pagination"]["total"] == 1
+    own_service = changes["intake"][0][2]
+    assert services["references"]["items"][0]["service"] == {
+        "id": own_service.id,
+        "name": own_service.name,
+        "slug": own_service.slug,
+        "team_id": own_service.team_id,
+    }
     assert "Visible checkout" not in json.dumps(services)
     events = client.get(url(changes, "/events"), headers=auth).json
     assert events["items"][0]["details"] == {"note": "PRIVATE detail"}
@@ -98,6 +105,37 @@ def test_owner_history_and_scoped_service_diagnostics(client, changes):
     assert "request_digest" not in events["items"][0]
     assert "ingest_token" not in json.dumps(events)
     assert detail.headers["Cache-Control"] == "no-store"
+
+
+def test_unresolved_reference_has_no_invented_service_name(client, changes):
+    ref = ChangeServiceReference.get(
+        ChangeServiceReference.change == changes["change"].id,
+        ChangeServiceReference.requested_service_id == changes["intake"][0][2].id,
+    )
+    pending = ChangeServiceReference.create(
+        change=ref.change_id,
+        first_event=ref.first_event_id,
+        relation_type="changed",
+        namespace_team=ref.namespace_team_id,
+        ref_type="slug",
+        requested_service_slug="future-service",
+        normalized_ref_key=f"slug:team-id:{ref.namespace_team_id}/future-service",
+    )
+    response = client.get(url(changes, "/services"), headers=headers(changes["owner"]))
+    assert response.status_code == 200
+    item = next(row for row in response.json["references"]["items"] if row["id"] == pending.id)
+    assert item["service"] is None and item["service_id"] is None
+    assert item["requested_service_slug"] == "future-service"
+
+
+def test_resolved_reference_does_not_reveal_service_moved_to_another_team(client, changes):
+    own_service = changes["intake"][0][2]
+    services_repo.update_service(own_service.id, {"team": changes["service"].team_id})
+    response = client.get(url(changes, "/services"), headers=headers(changes["owner"]))
+    assert response.status_code == 200
+    assert response.json["references"]["items"] == []
+    assert response.json["references"]["pagination"]["total"] == 0
+    assert own_service.name not in json.dumps(response.json)
 
 
 def test_safe_projection_is_whitelisted_on_list_detail_and_services(client, changes):

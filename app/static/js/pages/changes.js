@@ -2,7 +2,9 @@
 let changesRequest = 0;
 let changesUid = null;
 let changesServicePage = 1;
+let changesReferencePage = 1;
 let changesEventPage = 1;
+const changesServiceRequests = {services: 0, references: 0};
 
 function changesText(key, values) {
     return i18n.t("changes." + key, values || {}, key);
@@ -31,6 +33,20 @@ function changesKindIcon(kind) {
 function changesCell(value) {
     return $("<td>").text(value === null || value === undefined || value === "" ? "—" : value);
 }
+function changesBadge(value) {
+    if (!value) return $("<span>").text("—");
+    const tones = {
+        succeeded: "success", resolved: "success", trusted: "success", confirmed: "success", active_link: "success",
+        failed: "danger", rejected: "danger", denied: "danger", invalid: "danger", dead: "danger", conflict_short: "danger",
+        running: "info", changed: "info", context: "info", confirmed_cause: "danger",
+        suggested: "warning", potential_cause: "warning", pending_resolution: "warning", unverified: "warning",
+        reported_affected: "accent", mitigation: "success", rolled_back: "accent", stale_suggestion: "warning",
+    };
+    return uiStatusBadge(changesText(value), tones[value] || "muted");
+}
+function changesBadgeCell(value) {
+    return $("<td>").append(changesBadge(value));
+}
 function changesEmpty(target, columns) {
     $(target)
         .empty()
@@ -47,6 +63,7 @@ function changesActive(requestId) {
     return requestId === changesRequest && normalizeAppRoutePath(location.pathname) === "/changes";
 }
 function leaveChanges() {
+    clearChangeReviews();
     changesRequest += 1;
     changesUid = null;
     $(
@@ -59,6 +76,7 @@ function leaveChanges() {
 }
 function changesFailure(xhr, requestId) {
     if (!changesActive(requestId)) return;
+    clearChangeReviews();
     changesRequest += 1;
     $("#changes-message").text(changesText(xhr.status === 404 ? "unavailable" : "load_error"));
     // Clear previously authorized content on every failed refresh.
@@ -70,18 +88,22 @@ function changesFailure(xhr, requestId) {
     $("#changes-error-actions").prop("hidden", false);
     $("#changes-external").removeAttr("href").prop("hidden", true);
 }
-function changesPagination(prefix, pagination) {
+function changesPagination(prefix, pagination, section) {
+    const pages = Math.max(1, pagination.pages);
     $(prefix + "-pagination").text(
-        changesText("pagination", {
+        changesText(section ? (pages > 1 ? "section_pagination" : "section_count") : "pagination", {
+            section: section ? changesText(section) : "",
             page: pagination.page,
-            pages: pagination.pages,
+            pages,
             count: pagination.total,
         }),
     );
     $(prefix + "-prev").prop("disabled", pagination.page <= 1);
     $(prefix + "-next").prop("disabled", pagination.page >= pagination.pages);
+    if (section) $(prefix + "-next").parent().prop("hidden", pages <= 1);
 }
 function loadChanges() {
+    clearChangeReviews();
     const requestId = ++changesRequest;
     const match = location.pathname.match(/^\/changes\/([0-9a-f-]{36})\/?$/i);
     changesUid = match ? match[1] : null;
@@ -95,13 +117,14 @@ function loadChanges() {
     ).empty();
     $("#changes-external").removeAttr("href").prop("hidden", true);
     if (changesUid) {
-        changesServicePage = changesEventPage = 1;
+        changesServicePage = changesReferencePage = changesEventPage = 1;
         apiGet(
             "/api/changes/" + changesUid,
             function (change) {
                 if (!changesActive(requestId)) return;
                 $("#changes-message").text("");
                 renderChangeDetail(change);
+                loadChangeReviews(requestId);
                 loadChangeServices(requestId);
                 if (change.projection === "full") loadChangeEvents(requestId);
             },
@@ -165,8 +188,8 @@ function loadChanges() {
                     ),
                 );
                 const status = full
-                    ? changesText(change.lifecycle_conflict ? "conflict_short" : change.status)
-                    : changesText("limited_short");
+                    ? (change.lifecycle_conflict ? "conflict_short" : change.status)
+                    : "limited_short";
                 const mapping = full
                     ? changesText(
                           change.processing.state === "dead"
@@ -179,7 +202,7 @@ function loadChanges() {
                 rows.append(
                     $("<tr>").append(
                         cell,
-                        changesCell(status),
+                        changesBadgeCell(status),
                         changesCell(full ? change.owner_team.name : null),
                         changesCell(full ? change.source : null),
                         changesCell(mapping),
@@ -255,12 +278,12 @@ function changesApply(page) {
     params.set("page", String(page || 1));
     navigate("/changes?" + params.toString(), true);
 }
-function changeMetadata(label, value) {
+function changeMetadata(label, value, badge) {
     if (value === null || value === undefined || value === "") return;
     $("#changes-metadata").append(
         $("<div>")
             .addClass("form-group")
-            .append($("<label>").text(changesText(label)), $("<div>").text(value)),
+            .append($("<label>").text(changesText(label)), $("<div>").append(badge ? changesBadge(value) : document.createTextNode(value))),
     );
 }
 function renderChangeDetail(change) {
@@ -285,7 +308,7 @@ function renderChangeDetail(change) {
     changeMetadata("kind", changesText(change.kind));
     changeMetadata("occurred", formatDateTimeMinutes(change.occurred_at));
     if (!full) return;
-    changeMetadata("status", changesText(change.status));
+    changeMetadata("status", change.lifecycle_conflict ? "conflict_short" : change.status, true);
     changeMetadata("owner", change.owner_team.name);
     changeMetadata("source", change.source);
     changeMetadata("environment", change.environment);
@@ -302,46 +325,43 @@ function renderChangeDetail(change) {
         }
     }
 }
-function loadChangeServices(requestId) {
-    const page = changesServicePage;
-    $("#changes-services, #changes-references").empty();
+function loadChangeServices(requestId, collection) {
+    // The API returns two independently counted collections. Initial loading
+    // shares one request; navigating either table leaves the other one intact.
+    const collections = collection ? [collection] : ["services", "references"];
+    const page = collection === "references" ? changesReferencePage : changesServicePage;
+    const generations = {};
+    collections.forEach(function (kind) {
+        generations[kind] = ++changesServiceRequests[kind];
+        $("#changes-" + kind).empty();
+    });
     apiGet(
         "/api/changes/" + changesUid + "/services?page=" + page,
         function (response) {
-            if (!changesActive(requestId) || page !== changesServicePage) return;
-            response.items.forEach((item) =>
-                $("#changes-services").append(
-                    $("<tr>").append(
-                        changesCell(item.service.name + " (" + item.service.slug + ")"),
-                        changesCell(changesText(item.relation_type)),
-                        changesCell(
-                            item.verification_state ? changesText(item.verification_state) : null,
-                        ),
-                    ),
-                ),
-            );
-            if (!response.items.length) changesEmpty("#changes-services", 3);
-            if (response.references) {
-                response.references.items.forEach((ref) =>
-                    $("#changes-references").append(
+            if (!changesActive(requestId)) return;
+            collections.forEach(function (kind) {
+                if (generations[kind] !== changesServiceRequests[kind]) return;
+                const result = kind === "services" ? response : response.references;
+                if (!result) return;
+                const target = "#changes-" + kind;
+                result.items.forEach(function (item) {
+                    const service = item.service;
+                    const label = service ? service.name + " (" + service.slug + ")"
+                        : item.requested_service_slug || changesText("service_id", {id: item.requested_service_id});
+                    $(target).append(
                         $("<tr>").append(
-                            changesCell(ref.requested_service_slug || ref.requested_service_id),
-                            changesCell(changesText(ref.relation_type)),
-                            changesCell(changesText(ref.resolution_status)),
+                            changesCell(label),
+                            changesBadgeCell(item.relation_type),
+                            changesBadgeCell(kind === "services" ? item.verification_state : item.resolution_status),
                         ),
-                    ),
-                );
-                if (!response.references.items.length) changesEmpty("#changes-references", 3);
-            }
-            const pagination = { ...response.pagination };
-            if (response.references) {
-                pagination.pages = Math.max(pagination.pages, response.references.pagination.pages);
-                pagination.total += response.references.pagination.total;
-            }
-            changesPagination("#changes-services", pagination);
+                    );
+                });
+                if (!result.items.length) changesEmpty(target, 3);
+                changesPagination(target, result.pagination, kind);
+            });
         },
         function (xhr) {
-            if (page === changesServicePage) changesFailure(xhr, requestId);
+            if (collections.some((kind) => generations[kind] === changesServiceRequests[kind])) changesFailure(xhr, requestId);
         },
     );
 }
@@ -371,7 +391,7 @@ function loadChangeEvents(requestId) {
                 );
                 $("#changes-events").append(
                     $("<tr>").append(
-                        changesCell(changesText(event.event_type.replace("change.", ""))),
+                        changesBadgeCell(event.event_type.replace("change.", "")),
                         changesCell(formatDateTimeMinutes(event.occurred_at)),
                         changesCell(event.actor.name),
                         $("<td>").append(details),
@@ -379,7 +399,7 @@ function loadChangeEvents(requestId) {
                 );
             });
             if (!response.items.length) changesEmpty("#changes-events", 4);
-            changesPagination("#changes-events", response.pagination);
+            changesPagination("#changes-events", response.pagination, "events");
         },
         function (xhr) {
             if (page === changesEventPage) changesFailure(xhr, requestId);
@@ -413,7 +433,11 @@ $(document).on("click", "#changes-prev, #changes-next", function () {
 });
 $(document).on("click", "#changes-services-prev, #changes-services-next", function () {
     changesServicePage += this.id.endsWith("next") ? 1 : -1;
-    loadChangeServices(changesRequest);
+    loadChangeServices(changesRequest, "services");
+});
+$(document).on("click", "#changes-references-prev, #changes-references-next", function () {
+    changesReferencePage += this.id.endsWith("next") ? 1 : -1;
+    loadChangeServices(changesRequest, "references");
 });
 $(document).on("click", "#changes-events-prev, #changes-events-next", function () {
     changesEventPage += this.id.endsWith("next") ? 1 : -1;

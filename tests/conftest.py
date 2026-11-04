@@ -25,6 +25,7 @@ from app.modules.db.models import (  # noqa: E402
     AlertGroupEpisode,
     ChangeImpact,
     ChangeAlertGroupCorrelation,
+    ChangeIncidentLink,
     ChangeIntegration,
     ChangeSource,
     ChangeGrant,
@@ -123,6 +124,7 @@ from app.modules.db.models import (  # noqa: E402
 
 
 CLEANUP_MODELS = [
+    ChangeIncidentLink,
     ChangeAlertGroupCorrelation,
     ChangeImpact,
     ChangeJob,

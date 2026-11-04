@@ -3136,6 +3136,19 @@ body.md-theme .incident-priority-reset {
     font-size: 12px;
     line-height: 1.4;
 }
+
+body.md-theme .alert.alert-danger {
+    padding: 12px 14px;
+    border: 1px solid var(--md-danger);
+    border-left-width: 4px;
+    border-radius: var(--md-radius-sm);
+    background: var(--md-danger-soft);
+    color: var(--md-danger);
+    font-weight: 600;
+    line-height: 1.5;
+    overflow-wrap: anywhere;
+}
+
 .service-detail-hero,
 .service-detail-section {
     display: grid;
@@ -3291,6 +3304,12 @@ body.md-theme .ui-status-badge-muted {
     background: var(--md-surface-soft);
     color: var(--md-muted);
     border-color: var(--md-border);
+}
+
+body.md-theme .ui-status-badge-accent {
+    background: color-mix(in srgb, var(--md-maintenance) 10%, transparent);
+    color: var(--md-maintenance);
+    border-color: color-mix(in srgb, var(--md-maintenance) 25%, transparent);
 }
 
 /* Profile interface settings layout */
