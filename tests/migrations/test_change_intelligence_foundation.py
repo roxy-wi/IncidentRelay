@@ -90,6 +90,7 @@ def _drop_column(db, table, column):
 
 
 def _legacy_schema(db, migration):
+    _drop_column(db, "service_event", "change_event_id")
     _drop_column(db, "alert_group", "current_episode_id")
     _drop_column(db, "apitoken", "change_integration_id")
     db.drop_tables([ChangeIncidentLink, ChangeAlertGroupCorrelation, ChangeImpact])

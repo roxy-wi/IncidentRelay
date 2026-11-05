@@ -1,13 +1,43 @@
-from peewee import IntegrityError
+from flask import has_request_context, request
+from peewee import JOIN, IntegrityError, fn
 
-from app.modules.db.models import ServiceEvent
+from app.modules.db.models import (
+    Change,
+    ChangeEvent,
+    ChangeImpact,
+    ChangeService,
+    Service,
+    ServiceEvent,
+)
 from app.modules.common import utc_now
 from app.modules.user_colors import user_color
 
 
-def publish_service_event(service, *, category, event_type, title, summary=None, source="incidentrelay", source_ref=None, dedup_key=None, external_url=None, actor_user=None, actor_type=None, actor_label=None, severity=None, status=None, occurred_at=None, payload=None):
+def publish_service_event(
+    service,
+    *,
+    category,
+    event_type,
+    title,
+    summary=None,
+    source="incidentrelay",
+    source_ref=None,
+    dedup_key=None,
+    external_url=None,
+    actor_user=None,
+    actor_type=None,
+    actor_label=None,
+    severity=None,
+    status=None,
+    occurred_at=None,
+    payload=None,
+):
     if dedup_key:
-        existing = ServiceEvent.get_or_none(ServiceEvent.service == service.id, ServiceEvent.source == source, ServiceEvent.dedup_key == dedup_key)
+        existing = ServiceEvent.get_or_none(
+            ServiceEvent.service == service.id,
+            ServiceEvent.source == source,
+            ServiceEvent.dedup_key == dedup_key,
+        )
         if existing:
             return existing
 
@@ -38,15 +68,83 @@ def publish_service_event(service, *, category, event_type, title, summary=None,
         if not dedup_key:
             raise
 
-        existing = ServiceEvent.get_or_none(ServiceEvent.service == service.id, ServiceEvent.source == source, ServiceEvent.dedup_key == dedup_key)
+        existing = ServiceEvent.get_or_none(
+            ServiceEvent.service == service.id,
+            ServiceEvent.source == source,
+            ServiceEvent.dedup_key == dedup_key,
+        )
         if existing:
             return existing
 
         raise
 
 
-def list_service_events(service_id, *, category=None, event_type=None, limit=50, before=None, before_id=None):
+def _change_reader_teams():
+    """Timeline access alone does not grant a personal token Change read scope."""
+    from app.services.api_token_scopes import token_has_scopes
+    from app.services.change_intelligence.reading import reader_teams
+    from app.services.rbac import current_api_token
+
+    if not has_request_context() or not getattr(request, "current_user", None):
+        return []
+    token = current_api_token()
+    if token and not token_has_scopes(token.scopes, ["changes:read"]):
+        return []
+    return reader_teams()
+
+
+def _visible_change_events(query, team_ids):
+    """Apply current Service and Change visibility in SQL, before cursor/limit."""
+    from app.services.change_intelligence.reading import (
+        current_impacts,
+        current_links,
+        readable_services,
+    )
+
+    direct = (
+        current_links(team_ids)
+        .where(
+            ChangeService.change == ChangeEvent.change,
+            ChangeService.service == ServiceEvent.service,
+            ChangeService.relation_type == ServiceEvent.change_relation_type,
+        )
+        .select(ChangeService.id)
+    )
+    inferred = (
+        current_impacts(team_ids)
+        .where(
+            ChangeImpact.change == ChangeEvent.change,
+            ChangeImpact.service == ServiceEvent.service,
+            ServiceEvent.change_relation_type == "inferred_impact",
+        )
+        .select(ChangeImpact.id)
+    )
+    legacy = ServiceEvent.change_event.is_null(True) & (
+        ServiceEvent.source != "change_intelligence"
+    )
+    allowed = ServiceEvent.service.in_(readable_services(team_ids).select(Service.id))
+    allowed &= Change.owner_team.in_(team_ids) | fn.EXISTS(direct) | fn.EXISTS(inferred)
+    return (
+        query.join(ChangeEvent, JOIN.LEFT_OUTER)
+        .join_from(ChangeEvent, Change, JOIN.LEFT_OUTER)
+        .where(legacy | (ServiceEvent.change_event.is_null(False) & allowed))
+    )
+
+
+def list_service_events(
+    service_id,
+    *,
+    category=None,
+    event_type=None,
+    limit=50,
+    before=None,
+    before_id=None,
+    team_ids=None,
+):
     query = ServiceEvent.select().where(ServiceEvent.service == service_id)
+    query = _visible_change_events(
+        query, _change_reader_teams() if team_ids is None else team_ids
+    )
 
     if category:
         query = query.where(ServiceEvent.category == category)
@@ -55,11 +153,18 @@ def list_service_events(service_id, *, category=None, event_type=None, limit=50,
         query = query.where(ServiceEvent.event_type == event_type)
 
     if before is not None and before_id is not None:
-        query = query.where((ServiceEvent.occurred_at < before) | ((ServiceEvent.occurred_at == before) & (ServiceEvent.id < before_id)))
+        query = query.where(
+            (ServiceEvent.occurred_at < before)
+            | ((ServiceEvent.occurred_at == before) & (ServiceEvent.id < before_id))
+        )
     elif before is not None:
         query = query.where(ServiceEvent.occurred_at < before)
 
-    return list(query.order_by(ServiceEvent.occurred_at.desc(), ServiceEvent.id.desc()).limit(limit))
+    return list(
+        query.order_by(ServiceEvent.occurred_at.desc(), ServiceEvent.id.desc()).limit(
+            limit
+        )
+    )
 
 
 def _serialize_actor(event):
@@ -93,6 +198,39 @@ def _serialize_actor(event):
 
 
 def serialize_service_event(event):
+    if event.change_event_id:
+        # Only the persisted whitelist is used; provider fields are never loaded.
+        return {
+            "id": event.id,
+            "uid": str(event.uid),
+            "service_id": event.service_id,
+            "group_id": None,
+            "team_id": None,
+            "category": "change",
+            "event_type": "change.recorded",
+            "title": "Related change",
+            "summary": None,
+            "source": "change_intelligence",
+            "source_ref": None,
+            "dedup_key": None,
+            "external_url": None,
+            "actor": {
+                "type": "system",
+                "user_id": None,
+                "display_name": "system",
+                "email": None,
+                "label": None,
+            },
+            "severity": None,
+            "status": None,
+            "occurred_at": _serialize_datetime(event.occurred_at),
+            "recorded_at": _serialize_datetime(event.recorded_at),
+            "schema_version": event.schema_version,
+            "payload": {
+                key: event.payload.get(key)
+                for key in ("change_uid", "kind", "relation_type")
+            },
+        }
     return {
         "id": event.id,
         "uid": str(event.uid),

@@ -78,6 +78,20 @@ def components():
             IncidentChangeRemove,
         )
     }
+    alert_changes = page_schema(
+        object_schema(
+            {
+                **correlation["properties"],
+                "change": {"$ref": "#/components/schemas/ChangeRead"},
+            }
+        )
+    )
+    alert_changes["properties"].update(
+        episode={**episode, "nullable": True},
+        eligibility=TEXT,
+        can_review={"type": "boolean"},
+    )
+    alert_changes["required"] += ["episode", "eligibility", "can_review"]
     return {
         **requests,
         "ChangeReviewConflict": object_schema(
@@ -113,6 +127,8 @@ def components():
         ),
         "ChangeIncidentLink": link,
         "ChangeIncidentLinkPage": page_schema(link),
+        "AlertEpisodePage": page_schema(episode),
+        "AlertRelatedChangesPage": alert_changes,
     }
 
 
@@ -121,6 +137,20 @@ def paths():
     changes = "/api/changes/{change_uid}"
     incidents = "/api/incidents/{incident_id}/changes"
     routes = [
+        (
+            "/api/alert-groups/{alert_group_id}/episodes",
+            "get",
+            None,
+            "AlertEpisodePage",
+            "alerts:read",
+        ),
+        (
+            "/api/alert-groups/{alert_group_id}/related-changes",
+            "get",
+            None,
+            "AlertRelatedChangesPage",
+            "alerts:read",
+        ),
         (
             changes + "/correlations",
             "get",
@@ -182,7 +212,13 @@ def paths():
     result = {}
     for path, method, request_schema, result_schema, target_scope in routes:
         parameters = []
-        for name in ("change_uid", "incident_id", "correlation_id", "link_id"):
+        for name in (
+            "change_uid",
+            "incident_id",
+            "correlation_id",
+            "link_id",
+            "alert_group_id",
+        ):
             if "{" + name + "}" in path:
                 parameters.append(
                     {
@@ -216,7 +252,16 @@ def paths():
                     "page_size", "Rows per page", {**ID, "maximum": 100, "default": 25}
                 ),
             ]
-            if "correlation-targets" in path:
+            if "related-changes" in path:
+                parameters.append(
+                    query_param(
+                        "episode_id",
+                        "Existing episode of this AlertGroup; defaults to its latest tracked episode",
+                        ID,
+                    )
+                )
+                description += " Legacy groups return episode=null; reads never create episodes. Eligibility reports why automatic suggestions are skipped; manual linking remains independent."
+            elif "correlation-targets" in path:
                 parameters.append(
                     query_param(
                         "search",

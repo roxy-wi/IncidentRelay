@@ -788,6 +788,20 @@ class ServiceEvent(BaseModel):
     recorded_at = DateTimeField(default=utc_now)
     schema_version = IntegerField(default=1)
     payload = JSONTextField(default=dict)
+    change_event = DeferredForeignKey(
+        "ChangeEvent",
+        null=True,
+        backref="service_events",
+        on_delete="RESTRICT",
+        index=True,
+    )
+    change_relation_type = CharField(
+        max_length=32,
+        null=True,
+        constraints=[Check(
+            "change_relation_type IN ('changed', 'reported_affected', 'inferred_impact')"
+        )],
+    )
 
     class Meta:
         table_name = "service_event"
@@ -799,6 +813,7 @@ class ServiceEvent(BaseModel):
             (("service", "event_type", "occurred_at"), False),
             (("source", "source_ref"), False),
             (("service", "source", "dedup_key"), True),
+            (("service", "change_event", "change_relation_type"), True),
         )
 
 

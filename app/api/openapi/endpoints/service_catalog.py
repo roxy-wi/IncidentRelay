@@ -68,6 +68,7 @@ STANDARD_CHECK_SEVERITIES = ["info", "warning", "critical"]
 READINESS_STATUSES = ["ready", "warning", "not_ready", "not_applicable", "unknown"]
 CHECK_RESULT_STATUSES = ["passed", "failed", "skipped", "not_applicable"]
 TIMELINE_CATEGORIES = [
+    "change",
     "configuration",
     "routing",
     "readiness",
@@ -345,6 +346,7 @@ TIMELINE_ACTOR_SCHEMA = {
 
 SERVICE_TIMELINE_EVENT_SCHEMA = {
     "type": "object",
+    "description": "Legacy events retain their original contract. Change Intelligence events always use source=change_intelligence, event_type=change.recorded and title=Related change. Their payload contains only change_uid (UUID), kind and relation_type (changed, reported_affected or inferred_impact); actor, original source identifiers, provider text and external URL are not copied. Current Service/Change visibility is checked before cursor pagination. Personal tokens also need changes:read to see these events. Responses containing timelines use Cache-Control: no-store.",
     "properties": {
         "id": {"type": "integer"},
         "uid": {"type": "string", "format": "uuid"},

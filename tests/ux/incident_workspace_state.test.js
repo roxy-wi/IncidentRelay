@@ -8,6 +8,7 @@ const source = fs.readFileSync("app/static/js/pages/incidents.js", "utf8");
 const requests = [];
 const rendered = [];
 const errors = [];
+const clearedRelations = [];
 const elements = new Map();
 function $(selector) {
     if (elements.has(selector)) { return elements.get(selector); }
@@ -28,6 +29,7 @@ const context = {
     $, document: {}, URL, URLSearchParams,
     window: {location: {pathname: "/incidents/1", search: "", origin: "http://localhost"}},
     i18n: {t: key => key},
+    RelatedChanges: {clear: kind => clearedRelations.push(kind)},
     apiGet: (url, ok, fail) => requests.push({url, ok, fail}),
     apiRequest: (method, url, payload, ok, fail) => requests.push({method, url, payload, ok, fail}),
     showApiError: xhr => errors.push(xhr),
@@ -45,6 +47,7 @@ const incident = id => ({id, permissions: {can_respond: true}});
 context.loadIncidentDetails(1);
 context.window.location.pathname = "/incidents/2";
 context.loadIncidentDetails(2);
+assert.deepEqual(clearedRelations, ["incident", "incident"]);
 requests[1].ok(incident(2));
 requests[0].ok(incident(1));
 assert.deepEqual(rendered, [2]);
@@ -62,7 +65,10 @@ context.window.location.pathname = "/incidents/3";
 context.syncIncidentDetailsFromUrl();
 context.syncIncidentDetailsFromUrl();
 assert.equal(requests.length, before + 1);
+const clearsBeforeClose = clearedRelations.length;
 context.closeIncidentDetails({updateUrl: false});
+assert.equal(clearedRelations.length, clearsBeforeClose + 1);
+assert.equal(clearedRelations.at(-1), "incident");
 context.window.location.pathname = "/incidents";
 requests.at(-1).ok(incident(3));
 assert.equal(vm.runInContext("currentIncident", context), null);

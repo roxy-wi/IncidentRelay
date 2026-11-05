@@ -12,7 +12,6 @@ let allServiceGraphDependenciesCache = [];
 let businessServiceComponentsCache = [];
 let serviceAnalyticsCache = [];
 let serviceImpactCache = [];
-let serviceDetailsCache = {};
 let serviceImpactPayload = null;
 let serviceImpactHistoryPayload = null;
 let serviceImpactHistoryCache = [];
@@ -425,7 +424,6 @@ function refreshServices() {
     const generation = ++servicesLoadGeneration;
     let delayedIndicator = null;
 
-    serviceDetailsCache = {};
 
     if (window.AppLoading) {
         if (!servicesHasLoaded) {

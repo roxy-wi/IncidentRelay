@@ -485,6 +485,7 @@ function syncIncidentDetailsFromUrl() {
 }
 
 function closeIncidentDetails(options) {
+    RelatedChanges.clear("incident");
     const settings = $.extend({updateUrl: true}, options || {});
     incidentDetailsGeneration += 1;
     incidentDetailsRequestedId = null;
@@ -500,6 +501,7 @@ function closeIncidentDetails(options) {
 }
 
 function loadIncidentDetails(incidentId) {
+    RelatedChanges.clear("incident");
     const generation = ++incidentDetailsGeneration;
     incidentDetailsRequestedId = Number(incidentId);
     if (!currentIncident || Number(currentIncident.id) !== Number(incidentId)) {
@@ -545,6 +547,10 @@ function loadIncidentDetailCollections(incident) {
     }
 
     const canRespond = incidentCanRespond(incident);
+    RelatedChanges.mount("incident", incidentId, {
+        title: incident.title, canManage: canRespond,
+        isCurrent: () => incidentIsCurrent(incident), onSaved: refreshCurrentIncident,
+    });
     const encodedIncidentId = encodeURIComponent(incidentId);
     currentIncidentLinks = [];
     currentIncidentEvents = [];

@@ -1,4 +1,3 @@
-<link rel="stylesheet" href="/static/css/services.css">
 <link rel="stylesheet" href="/static/css/services-impact-v2.css">
 <div class="first-div-page-layout services-page page-stack">
     <div class="summary-grid">
@@ -711,7 +710,7 @@
     </div>
   </div>
 
-<div id="service-details-modal" class="app-modal" style="display: none;">
+<div id="service-details-modal" class="app-modal workspace-modal" style="display: none;">
   <div class="app-modal-dialog app-modal-dialog-wide">
     <div class="app-modal-header">
       <div>
@@ -721,13 +720,13 @@
       <button id="close-service-details-modal" type="button" class="app-modal-close" aria-label="Close">×</button>
     </div>
 
-    <div id="service-details-modal-body" class="app-modal-body">
+    <div id="service-details-modal-body" class="app-modal-body workspace-stack">
       <div class="empty-state">Select a service to view details.</div>
     </div>
   </div>
 </div>
 
-<div id="service-form-modal" class="app-modal" role="dialog" aria-modal="true" aria-labelledby="service-form-title" style="display: none;">
+<div id="service-form-modal" class="app-modal workspace-modal" role="dialog" aria-modal="true" aria-labelledby="service-form-title" style="display: none;">
   <div class="app-modal-dialog service-editor-dialog">
     <div class="app-modal-header">
       <div>
@@ -739,13 +738,13 @@
 
     <div class="app-modal-body service-editor-body">
       <input id="service-id" type="hidden">
-      <div class="service-editor-grid">
-        <section class="service-editor-section" aria-labelledby="service-identity-heading">
-          <div class="service-editor-heading">
-            <span class="service-editor-icon" aria-hidden="true"><i class="fas fa-cube"></i></span>
-            <div><h3 id="service-identity-heading">{{ _('services.form.identity') }}</h3><p>{{ _('services.form.identity_hint') }}</p></div>
-          </div>
-          <div class="service-editor-fields">
+      <div class="service-editor-grid workspace-stack">
+        <section class="card workspace-section service-editor-section" data-section="services" aria-labelledby="service-identity-heading">
+          <div class="card-header"><div class="section-heading">
+            <span class="section-icon" aria-hidden="true"><i class="fas fa-server"></i></span>
+            <div><h3 id="service-identity-heading">{{ _('services.form.identity') }}</h3><p class="card-subtitle">{{ _('services.form.identity_hint') }}</p></div>
+          </div></div>
+          <div class="service-editor-fields section-body">
             <div class="service-editor-field">
               <label for="service-name">Name</label>
               <input id="service-name" class="input" type="text" placeholder="Cloud PostgreSQL" autocomplete="off">
@@ -781,12 +780,12 @@
           </div>
         </section>
 
-        <section class="service-editor-section" aria-labelledby="service-response-heading">
-          <div class="service-editor-heading">
-            <span class="service-editor-icon" aria-hidden="true"><i class="fas fa-bell"></i></span>
-            <div><h3 id="service-response-heading">{{ _('services.form.response') }}</h3><p>{{ _('services.form.response_hint') }}</p></div>
-          </div>
-          <div class="service-editor-fields">
+        <section class="card workspace-section service-editor-section" data-section="alerts" aria-labelledby="service-response-heading">
+          <div class="card-header"><div class="section-heading">
+            <span class="section-icon" aria-hidden="true"><i class="fas fa-bell"></i></span>
+            <div><h3 id="service-response-heading">{{ _('services.form.response') }}</h3><p class="card-subtitle">{{ _('services.form.response_hint') }}</p></div>
+          </div></div>
+          <div class="service-editor-fields section-body">
             <div class="service-editor-field service-editor-full">
               <label for="service-default-rotation">Default rotation</label>
               <select id="service-default-rotation" class="input"><option value="">No default rotation</option></select>
@@ -808,12 +807,12 @@
           </div>
         </section>
 
-        <section class="service-editor-section" aria-labelledby="service-status-heading">
-          <div class="service-editor-heading">
-            <span class="service-editor-icon" aria-hidden="true"><i class="fas fa-signal"></i></span>
-            <div><h3 id="service-status-heading">{{ _('services.form.status_visibility') }}</h3><p>{{ _('services.form.status_hint') }}</p></div>
-          </div>
-          <div class="service-editor-fields">
+        <section class="card workspace-section service-editor-section" data-section="status" aria-labelledby="service-status-heading">
+          <div class="card-header"><div class="section-heading">
+            <span class="section-icon" aria-hidden="true"><i class="fas fa-signal"></i></span>
+            <div><h3 id="service-status-heading">{{ _('services.form.status_visibility') }}</h3><p class="card-subtitle">{{ _('services.form.status_hint') }}</p></div>
+          </div></div>
+          <div class="service-editor-fields section-body">
             <div class="service-editor-field service-editor-full">
               <label for="service-status">Status</label>
               <select id="service-status" class="input">
@@ -837,12 +836,12 @@
           </div>
         </section>
 
-        <section class="service-editor-section" aria-labelledby="service-change-correlation-heading">
-          <div class="service-editor-heading">
-            <span class="service-editor-icon" aria-hidden="true"><i class="fas fa-code-branch"></i></span>
-            <div><h3 id="service-change-correlation-heading">{{ _('services.form.change_correlation') }}</h3><p>{{ _('services.form.change_correlation_hint') }}</p></div>
-          </div>
-          <div class="service-editor-fields">
+        <section class="card workspace-section service-editor-section" data-section="changes" aria-labelledby="service-change-correlation-heading">
+          <div class="card-header"><div class="section-heading">
+            <span class="section-icon" aria-hidden="true"><i class="fas fa-code-branch"></i></span>
+            <div><h3 id="service-change-correlation-heading">{{ _('services.form.change_correlation') }}</h3><p class="card-subtitle">{{ _('services.form.change_correlation_hint') }}</p></div>
+          </div></div>
+          <div class="service-editor-fields section-body">
             <label class="md-checkbox service-editor-full"><input id="service-change-correlation-enabled" type="checkbox"><span>{{ _('services.form.change_correlation_enabled') }}</span></label>
             <div class="service-editor-field service-editor-full">
               <label for="service-change-exclusions">{{ _('services.form.change_exclusions') }}</label>
@@ -853,12 +852,12 @@
           </div>
         </section>
 
-        <section class="service-editor-section service-editor-full" aria-labelledby="service-metadata-heading">
-          <div class="service-editor-heading">
-            <span class="service-editor-icon service-editor-code-icon" aria-hidden="true">{ }</span>
-            <div><h3 id="service-metadata-heading">{{ _('services.form.metadata') }}</h3><p>{{ _('services.form.metadata_hint') }}</p></div>
-          </div>
-          <div class="service-editor-field">
+        <section class="card workspace-section service-editor-section service-editor-full" data-section="metadata" aria-labelledby="service-metadata-heading">
+          <div class="card-header"><div class="section-heading">
+            <span class="section-icon" aria-hidden="true"><i class="fas fa-code"></i></span>
+            <div><h3 id="service-metadata-heading">{{ _('services.form.metadata') }}</h3><p class="card-subtitle">{{ _('services.form.metadata_hint') }}</p></div>
+          </div></div>
+          <div class="service-editor-field section-body">
             <div class="service-metadata-toolbar">
               <label for="service-metadata">{{ _('services.form.metadata_json') }}</label>
               <button id="format-service-metadata" class="btn btn-sm" type="button">{{ _('services.form.format_json') }}</button>
@@ -878,7 +877,7 @@
   </div>
 </div>
 
-<div id="service-link-modal" class="app-modal" style="display: none;">
+<div id="service-link-modal" class="app-modal workspace-modal" style="display: none;">
   <div class="app-modal-dialog">
     <div class="app-modal-header">
       <div>
@@ -931,7 +930,7 @@
   </div>
 </div>
 
-<div id="service-runbook-modal" class="app-modal" style="display: none;">
+<div id="service-runbook-modal" class="app-modal workspace-modal" style="display: none;">
   <div class="app-modal-dialog app-modal-dialog-wide">
     <div class="app-modal-header">
       <div>
@@ -943,12 +942,12 @@
 
     <div class="app-modal-body">
       <div class="grid-two">
-        <section class="card">
+        <section class="card workspace-section" data-section="runbooks">
           <div class="card-header">
-            <div>
-              <h2>Runbook</h2>
+            <div class="section-heading"><span class="section-icon" aria-hidden="true"><i class="fas fa-book"></i></span><div>
+              <h3>Runbook</h3>
               <div class="card-subtitle">Service, title, URL and severity.</div>
-            </div>
+            </div></div>
           </div>
 
           <div class="form-body">
@@ -973,12 +972,12 @@
           </div>
         </section>
 
-        <section class="card">
+        <section class="card workspace-section" data-section="alerts">
           <div class="card-header">
-            <div>
-              <h2>Matching</h2>
+            <div class="section-heading"><span class="section-icon" aria-hidden="true"><i class="fas fa-bell"></i></span><div>
+              <h3>Matching</h3>
               <div class="card-subtitle">Optional labels matcher for this runbook.</div>
-            </div>
+            </div></div>
           </div>
 
           <div class="form-body">
@@ -1013,7 +1012,7 @@
   </div>
 </div>
 
-<div id="service-dependency-modal" class="app-modal" style="display: none;">
+<div id="service-dependency-modal" class="app-modal workspace-modal" style="display: none;">
   <div class="app-modal-dialog">
     <div class="app-modal-header">
       <div>
@@ -1084,7 +1083,7 @@
     </div>
   </div>
 </div>
-<div id="service-owner-modal" class="app-modal is-hidden" style="display: none;">
+<div id="service-owner-modal" class="app-modal workspace-modal is-hidden" style="display: none;">
     <div class="app-modal-dialog">
         <div class="app-modal-header">
             <h2 id="service-owner-form-title">Add default stakeholder</h2>

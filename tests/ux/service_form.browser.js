@@ -62,6 +62,76 @@ async function main() {
                 dialog.right <= innerWidth && footer.bottom <= innerHeight && footer.top > 0;
         }), "Form must fit the viewport with a visible footer and no horizontal overflow");
     }
+    async function checkServiceWorkspaces() {
+        await context.addCookies([{name: "incidentrelay_locale", value: "en", url: fixture.baseUrl}]);
+        await page.setViewportSize({width: 1440, height: 1080});
+        await page.goto("/services");
+        await page.waitForFunction(id => typeof getServiceById === "function" && getServiceById(id), fixture.serviceId);
+        await page.evaluate(id => openServiceDetailsModal(id), fixture.serviceId);
+        await page.locator("#service-details-modal .workspace-section[data-section=history]").waitFor();
+        const reference = {};
+        for (const [selector, kind] of [
+            ["#service-details-modal", "service"],
+            ["#business-service-details-modal", "business"],
+        ]) {
+            if (kind === "business") {
+                await page.locator("#close-service-details-modal").click();
+                await page.goto("/business-services");
+                await page.waitForFunction(() => typeof openBusinessServiceDetailsModal === "function" &&
+                    document.querySelector("#business-services-table .app-action-menu-toggle"));
+                await page.evaluate(id => openBusinessServiceDetailsModal(id), fixture.businessServiceId);
+            }
+            const details = page.locator(selector);
+            await details.waitFor({state: "visible"});
+            for (const theme of ["light", "dark"]) {
+                await page.evaluate(value => window.AppTheme.apply(value), theme);
+                const appearance = await details.evaluate(element => {
+                    const sections = Array.from(element.querySelectorAll(".workspace-section"));
+                    return sections.map(section => {
+                        const header = section.querySelector(":scope > .card-header");
+                        const heading = header.querySelector(".section-heading");
+                        const icon = heading.querySelector(".section-icon");
+                        const style = getComputedStyle(section);
+                        return {category: section.dataset.section, icon: icon.querySelector("i").className,
+                            color: getComputedStyle(icon).color, border: style.borderTopColor,
+                            titleSize: getComputedStyle(heading.querySelector("h3")).fontSize,
+                            subtitleInside: !section.querySelector(":scope > .card-subtitle")};
+                    });
+                });
+                assert(appearance.length >= (kind === "service" ? 13 : 4));
+                for (const item of appearance) {
+                    assert.equal(item.titleSize, "16px");
+                    assert(item.subtitleInside);
+                    const key = theme + ":" + item.category;
+                    if (reference[key]) assert.deepEqual(item, reference[key], "Same category must share appearance: " + key);
+                    else reference[key] = item;
+                }
+                await details.locator(".app-modal-body").evaluate(element => element.scrollTop = 0);
+                await screenshot(`${kind}-details-${theme}.png`);
+            }
+            for (const width of [768, 390, 320]) {
+                await page.setViewportSize({width, height: 844});
+                assert(await details.evaluate(element => {
+                    const dialog = element.querySelector(".app-modal-dialog").getBoundingClientRect();
+                    const body = element.querySelector(".app-modal-body");
+                    return dialog.left >= 0 && dialog.right <= innerWidth + 1 &&
+                        body.scrollWidth <= body.clientWidth + 1;
+                }), `${kind} details must fit ${width}px; tables scroll within their sections`);
+                if (width === 390) await screenshot(`${kind}-details-mobile.png`);
+            }
+            await page.setViewportSize({width: 1440, height: 1080});
+        }
+        // Existing nested actions still open the component editor and save changes.
+        await page.locator("#open-business-service-component-modal").click();
+        await page.locator("#business-service-component-modal").waitFor({state: "visible"});
+        await page.locator("#close-business-service-component-modal").click();
+        await page.locator("#business-service-manual-status").selectOption("degraded");
+        await page.locator("#business-service-manual-status-message").fill("Layout regression check");
+        const saved = page.waitForResponse(response => response.url().includes("/manual-status") && response.request().method() === "POST");
+        await page.locator("#set-business-service-manual-status").click();
+        assert.equal((await saved).status(), 200);
+        await page.locator("#close-business-service-details-modal").click();
+    }
     try {
         await page.goto("/services");
         // Shared helpers must retain their legacy behavior for other pages.
@@ -243,6 +313,8 @@ async function main() {
             await assertLayout();
             if (width === 390) await screenshot("service-form-mobile-ru.png");
         }
+        await page.locator("#cancel-service-form").click();
+        await checkServiceWorkspaces();
         assert.deepEqual(errors, []);
     } catch (error) {
         await screenshot("service-form-failure.png");

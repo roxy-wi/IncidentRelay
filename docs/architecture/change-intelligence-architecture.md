@@ -2,9 +2,9 @@
 
 **Architecture RFC v1.1 (implementation contract)**
 
-**Source baseline:** release/2.5.0, 2d9f931 plus stage 8 working changes (2026-11-04)
+**Source baseline:** release/2.5.0, 92bd4c6 plus stage 9 working changes (2026-11-04)
 
-**Status:** stages 1–8 implemented; stages 9–10 planned. Public intake remains disabled.
+**Status:** stages 1–9 implemented; stage 10 release checks remain. Public intake remains disabled.
 
 
 ## Agreed decisions — 28–30 October 2026
@@ -17,7 +17,7 @@
 - Automatic potential-cause suggestions only; mitigation is manual in v1.
 - Automatic correlation requires explicit Service opt-in and is disabled by default. Source/label exclusions apply to individual alerts; a group participates when its selected episode contains at least one non-excluded alert. All groups retain episodes; eligibility is checked before search work is queued (§9.1, stage 7).
 
-Internal intake, durable workers, Changes Inbox, automatic correlation and manual review/Incident links are implemented. Related Changes on AlertGroup/Incident pages and Service Timeline remain stage 9; public intake stays disabled until stage 10.
+Internal intake, durable workers, Changes Inbox, automatic correlation and manual review/Incident links are implemented. Related Changes on AlertGroup/Incident pages and Service Timeline are implemented in stage 9; public intake stays disabled until stage 10.
 
 ## 1. Purpose and scope
 
@@ -388,7 +388,7 @@ Scopes: `changes:ingest` for machine POST; `changes:read` for reading; `changes:
 
 An owner-Team reader may see operation fields, but foreign Service details/path segments still require permission for those resources. A reader with access only to an affected Service receives a whitelist projection: opaque Change UUID, that accessible Service, event time, safe kind and relation type. Use a constant title such as “Related change”; omit sender title/description, source name, external IDs, actor, URLs, raw details and private path segments. Never serialize the full object and then try to remove a few known keys.
 
-Service Timeline must follow the same policy. The current `serialize_service_event()` returns actor, URL and payload without Change-owner checks. Therefore new change-related ServiceEvent rows contain **only the safe projection even on owner Services**; full details are fetched from the separately authorized Change endpoint. Use constant `source=change_intelligence`, safe title/summary, null actor/URL and a whitelisted payload. Add nullable indexed `change_event_id` provenance and `change_relation_type`; existing non-Change timeline events keep their behavior. A plain source_ref URL or a raw JSON copy is insufficient.
+Service Timeline must follow the same policy. Legacy ServiceEvent serialization returns actor, URL and payload without Change-owner checks; Change events use a separate safe branch. Therefore new change-related ServiceEvent rows contain **only the safe projection even on owner Services**; full details are fetched from the separately authorized Change endpoint. Use constant `source=change_intelligence`, safe title/summary, null actor/URL and a whitelisted payload. Stage 9 adds nullable indexed `change_event_id` provenance and `change_relation_type`; existing non-Change timeline events keep their behavior. A plain source_ref URL or a raw JSON copy is insufficient.
 
 Before pagination/counting, the timeline/related-change SQL query verifies current Service access and visibility of the matching canonical Change relation/impact. After grant, graph or Service ownership changes, stale derived visibility is withheld until revalidated; a delayed worker must not preserve an obsolete authorization decision. Owner audit/history and manually reviewed evidence are retained without exposing them through a foreign projection. Manual review uses the same redacted evidence when full owner data is unavailable; linking a Change to an Incident does not grant its participants owner-data access.
 
@@ -574,7 +574,7 @@ SQL visibility, private-field filters, totals and pagination share one read snap
 
 Cross-team visibility requires the resolver's completed pass: matching Change/auth/graph revisions and engine version, no cursor/error, claimed=requested generation and done/pending state. Changes to grants, catalog or processing invalidate visibility before pagination, without waiting for the worker. Owner diagnostics remain readable. Search and status/source/environment filters cannot match private fields of safe projections. `scope_team_id` filters owner or accessible related-Service context; `owner_team_id` filters readable ownership only. ID and namespaced slug Service filters have the same access boundary.
 
-The Inbox uses existing table, filter and pagination styles. It displays lifecycle conflicts, scoped mapping/expiry states, processing failures and event history; direct links, back/forward, failed refresh and late responses after navigation are covered by browser tests. Public intake remains disabled until stage 10; review actions, correlations and Service Timeline publication remain later stages. See [configuration and sender example](../getting-started/configuration.md#changes-inbox-and-read-api).
+The Inbox uses existing table, filter and pagination styles. It displays lifecycle conflicts, scoped mapping/expiry states, processing failures and event history; direct links, back/forward, failed refresh and late responses after navigation are covered by browser tests. Public intake remains disabled until stage 10; review actions, correlations and Service Timeline publication are implemented in stages 7–9. See [configuration and sender example](../getting-started/configuration.md#changes-inbox-and-read-api).
 
 - **Work:** list/details/events/services; search, filters, counts and pagination with SQL RBAC; full owner projection and safe projection for an accessible affected Service. UI shows terminal conflicts, mapping, pending/expired/dead and processing state. Document the common API and a sender example.
 - **Tests:** one multi-Team Change is not duplicated; owner, affected-team and unrelated readers see only authorized fields; filters/search/counts leak no hidden data; end-to-end intake → pending → Service creation → display.
@@ -607,6 +607,14 @@ Migration 20261104010000_change_reviews preserves existing suggestions, allows N
 - **Work:** ServiceEvent provenance fields and safe stored projection; idempotent timeline publication with SQL visibility checks. Add episode selection and Related Changes to AlertGroup, and link display/actions to Incident. Connect the preceding APIs without modifying Service status or notifications.
 - **Tests:** publication retry and crash/retry create no duplicate timeline entries; one Change across every screen reveals no extra fields; access revocation, Service move, stale input_stamp and browser navigation; existing ServiceEvents retain their behavior.
 - **Ready when:** owner and affected-team views are consistent across pages; private title/source/actor/URL/payload never enter another team's timeline or cache.
+
+Stage 9 uses one Related Changes table template, one review dialog and shared CSS across the workspaces. AlertGroup selects an existing episode (latest by default), reports automatic eligibility and allows manual decisions for that episode. The paginated episode API never reconstructs old history. Incident workspace supports add/change/remove/restore with the same row versions, permissions and audit as Change Details.
+
+Migration `20261104020000_change_service_timeline` adds nullable provenance and a unique `(service_id, change_event_id, change_relation_type)` index without rewriting legacy events. The deferred FK is completed after the historical Service migration, so both fresh installations and upgrades work. An upgrade queues a bounded revalidation of already accepted Changes; it does not create AlertGroup episodes or invent deployments.
+
+The `sync_service_timeline` worker publishes at most the configured batch size. Each immutable ChangeEvent gets one safe ServiceEvent per authorized Service/relation. Existing provenance is excluded in SQL; publication and job progress commit atomically under graph/integration/Change/lease fences. Repeated unchanged mapping does not reset a failed job’s retry limit. Canonical links and current inferred impacts are distinguished. Changing graph/auth/Change inputs invalidates derived visibility before pagination on every surface; owner history remains scoped to accessible Services.
+
+Persisted Change timeline fields use constant title/source/event type, no provider actor or external URL, and payload `{change_uid, kind, relation_type}`. Even owner Services receive only this projection. Personal tokens need `changes:read` in addition to Service access; AlertGroup endpoints need both `changes:read` and `alerts:read`. Service detail/timeline responses are `no-store`; the browser reauthorizes history on open and discards responses for closed or replaced views. Legacy events keep their original serializer and pagination.
 
 ### 12.10. Stage 10 — Release checks
 

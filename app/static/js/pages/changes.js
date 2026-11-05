@@ -40,7 +40,7 @@ function changesBadge(value) {
         failed: "danger", rejected: "danger", denied: "danger", invalid: "danger", dead: "danger", conflict_short: "danger",
         running: "info", changed: "info", context: "info", confirmed_cause: "danger",
         suggested: "warning", potential_cause: "warning", pending_resolution: "warning", unverified: "warning",
-        reported_affected: "accent", mitigation: "success", rolled_back: "accent", stale_suggestion: "warning",
+        reported_affected: "accent", inferred_impact: "accent", mitigation: "success", rolled_back: "accent", stale_suggestion: "warning",
     };
     return uiStatusBadge(changesText(value), tones[value] || "muted");
 }

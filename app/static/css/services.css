@@ -24,7 +24,7 @@
     align-items: start;
 }
 
-.service-editor-section {
+.service-editor-section:not(.workspace-section) {
     min-width: 0;
     padding: 20px;
     border: 1px solid var(--md-border);
@@ -183,7 +183,7 @@
         gap: 14px;
     }
 
-    .service-editor-section {
+    .service-editor-section:not(.workspace-section) {
         padding: 16px;
     }
 }

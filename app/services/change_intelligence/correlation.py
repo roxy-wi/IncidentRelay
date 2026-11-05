@@ -476,6 +476,10 @@ def publish_correlation_batch(claim, plan):
             stamp=stamp,
             error_class=plan["error"],
         )
+        if plan["complete"] and any(path["depth"] > 0 for path in plan["impacts"]):
+            from app.services.change_intelligence.timeline import request_publication
+
+            request_publication(change)
 
 
 def is_current_suggestion(row, *, episode=None, graph_revision=None):

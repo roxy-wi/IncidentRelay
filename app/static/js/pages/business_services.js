@@ -597,18 +597,6 @@ function openBusinessServiceDetailsModal(id) {
 
 
 function showBusinessServiceDetailsModal() {
-    const modal = $("#business-service-details-modal");
-    const dialog = modal.find(".app-modal-dialog");
-
-    dialog.css({
-        width: "calc(100vw - 48px)",
-        maxWidth: "calc(100vw - 48px)"
-    });
-
-    modal.find(".table-wrapper").css({
-        width: "100%"
-    });
-
     openAppModal("#business-service-details-modal");
 
     if (typeof scheduleStickyTableScrollbars === "function") {

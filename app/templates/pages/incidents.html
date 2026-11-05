@@ -218,6 +218,7 @@
           </div>
         </section>
 
+        {% with related_kind='incident' %}{% include 'pages/include/related_changes.html' %}{% endwith %}
         </main><aside class="incidents-workspace-side">
         <section class="card incidents-collaboration-card workspace-section" data-section="people" id="incident-participants-section">
           <div class="card-header"><div class="section-heading"><span class="section-icon" aria-hidden="true"><i class="fas fa-user-friends"></i></span><h3>{{ _('incidents.workspace.participants') }}</h3></div></div>

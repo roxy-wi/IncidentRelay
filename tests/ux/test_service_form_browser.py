@@ -11,6 +11,7 @@ import pytest
 from werkzeug.serving import make_server
 
 from app.login import create_access_token
+from app.modules.db.models import BusinessService, BusinessServiceComponent
 from tests.factories import create_group, create_service, create_team, create_user
 
 
@@ -61,6 +62,13 @@ def test_service_form_in_browser(app, db, tmp_path):
     service.public_order = 0
     service.description = "Payment authorization and transaction processing."
     service.save()
+    business = BusinessService.create(
+        group=group, owner_team=team, name="Checkout", slug="checkout", enabled=True,
+    )
+    BusinessServiceComponent.create(
+        business_service=business, service=service, criticality="required",
+        impact_weight=100, enabled=True,
+    )
     token, _ = create_access_token(admin)
     server = make_server("127.0.0.1", 0, app, threaded=True)
     thread = threading.Thread(target=server.serve_forever, daemon=True)
@@ -72,6 +80,7 @@ def test_service_form_in_browser(app, db, tmp_path):
             "token": token,
             "serviceId": service.id,
             "teamId": team.id,
+            "businessServiceId": business.id,
             "metadata": metadata,
             "screenshotDir": os.environ.get(
                 "SERVICE_FORM_SCREENSHOTS", str(tmp_path)

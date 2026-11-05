@@ -80,11 +80,12 @@
     <link rel="stylesheet" href="{{ url_for('static', filename='css/vendor/fontawesome/all.min.css') }}">
     <link rel="stylesheet" href="/static/css/oncall.css">
     <link rel="stylesheet" href="/static/css/material.css?v=c50eab6cb50b">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/workspace_sections.css', v='e67f35a9bca4') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/workspace_sections.css', v='5095e31a315b') }}">
     <link rel="stylesheet" href="/static/css/loading.css">
     <link rel="stylesheet" href="/static/css/table_pages.css?v=460f18264e50">
     <link rel="stylesheet" href="/static/css/incidents.css?v=59ff81b5e92e">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/changes.css', v='116b74e67e48') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/changes.css', v='ce3ddb5625aa') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/change_relations.css', v='b5dfbd9a45be') }}">
     <link rel="stylesheet" href="/static/css/orchestrations.css">
     <link rel="stylesheet" href="/static/css/audit_log.css">
     <link rel="stylesheet" href="/static/css/change_integrations.css?v=3a4824f00c4b">
@@ -93,6 +94,7 @@
     <link rel="stylesheet" href="/static/css/vendor/select2/select2.min.css">
     <link rel="stylesheet" href="/static/css/vendor/select2/override-select2.css">
     <link rel="stylesheet" href="/static/css/theme_dark.css?v=425497c16706">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/services.css', v='a8a41bb6652c') }}">
 
  <script>
  window.__INCIDENTRELAY_I18N__ = {
@@ -381,6 +383,7 @@
         {% include 'pages/include/alerts_modal.html' %}
         {% include 'pages/include/rotation_overrides_modal.html' %}
         {% include "pages/include//oncall_health_modal.html" %}
+        {% include "pages/include/change_review.html" %}
         <div id="app-dialog-modal" class="app-modal is-hidden" role="dialog" aria-modal="true">
             <div class="app-modal-dialog app-modal-dialog-small">
             <div class="app-modal-header">
@@ -437,7 +440,7 @@
 <script src="/static/js/core/sortable_table.js"></script>
 <script src="/static/js/core/pwa.js"></script>
 <script src="/static/js/core/browser_push.js"></script>
-<script src="/static/js/core/router.js?v=cad83973e8f9"></script>
+<script src="/static/js/core/router.js?v=288e5a75c0a7"></script>
 <script src="/static/js/core/forms.js"></script>
 <script src="{{ url_for('static', filename='js/core/timezones.js') }}"></script>
 <script src="/static/js/sidebar.js"></script>
@@ -452,23 +455,24 @@
 <script src="{{ url_for('static', filename='js/components/notification_center.js') }}"></script>
 <script src="{{ url_for('static', filename='js/components/dependency_graph.js') }}"></script>
 <script src="{{ url_for('static', filename='js/common/slug.js') }}"></script>
-<script src="{{ url_for('static', filename='js/pages/alerts.js') }}"></script>
+<script src="{{ url_for('static', filename='js/pages/alerts.js', v='6fa094403ce2') }}"></script>
 <script src="{{ url_for('static', filename='js/pages/alert_analytics.js') }}"></script>
-<script src="{{ url_for('static', filename='js/pages/incidents.js', v='e9f4f3020fc2') }}"></script>
-<script src="{{ url_for('static', filename='js/pages/changes.js', v='5e654e018cf0') }}"></script>
-<script src="{{ url_for('static', filename='js/pages/changes_review.js', v='258ea348cea9') }}"></script>
+<script src="{{ url_for('static', filename='js/pages/incidents.js', v='c015af96aaf4') }}"></script>
+<script src="{{ url_for('static', filename='js/pages/changes.js', v='a45ecf42677f') }}"></script>
+<script src="{{ url_for('static', filename='js/pages/changes_review.js', v='4e0f502e498f') }}"></script>
+<script src="{{ url_for('static', filename='js/pages/related_changes.js', v='b6abb1391c12') }}"></script>
 <script src="/static/js/pages/rotations.js"></script>
 <script src="{{ url_for('static', filename='js/pages/oncall_health.js') }}"></script>
 <script src="/static/js/pages/calendar.js"></script>
 <script src="/static/js/pages/routes.js"></script>
 <script src="{{ url_for('static', filename='js/pages/services/i18n_runtime.js', v='b8bf7ede656d') }}"></script>
-<script src="{{ url_for('static', filename='js/pages/services/core.js', v='6c0364a24ab5') }}"></script>
-<script src="{{ url_for('static', filename='js/pages/services/details.js') }}"></script>
+<script src="{{ url_for('static', filename='js/pages/services/core.js', v='4f132e1c00e4') }}"></script>
+<script src="{{ url_for('static', filename='js/pages/services/details.js', v='5024bcaf83f9') }}"></script>
 <script src="{{ url_for('static', filename='js/pages/services/context.js') }}?v=62cdc5d6083b"></script>
 <script src="{{ url_for('static', filename='js/pages/services/analytics.js') }}"></script>
 <script src="{{ url_for('static', filename='js/pages/services/impact.js') }}"></script>
-<script src="{{ url_for('static', filename='js/pages/services/extras.js') }}"></script>
-<script src="{{ url_for('static', filename='js/pages/business_services.js') }}"></script>
+<script src="{{ url_for('static', filename='js/pages/services/extras.js', v='9b81eb2c371c') }}"></script>
+<script src="{{ url_for('static', filename='js/pages/business_services.js', v='8f2bde6b8979') }}"></script>
 <script src="{{ url_for('static', filename='js/pages/heartbeats.js') }}"></script>
 <script src="{{ url_for('static', filename='js/pages/maintenance_windows.js') }}"></script>
 <script src="{{ url_for('static', filename='js/pages/orchestrations.js') }}"></script>

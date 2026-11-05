@@ -358,7 +358,21 @@ def publish_reference_batch(claim, plan):
             ):
                 delay = Config.CHANGE_PENDING_POLL_SECONDS
         if plan["complete"]:
-            from app.services.change_intelligence.correlation import request_after_mapping
+            from app.services.change_intelligence.correlation import (
+                request_after_mapping,
+            )
 
             request_after_mapping(change)
         changes_repo.finish_claim(claim, cursor=cursor, delay=delay, stamp=stamp)
+        if (
+            plan["complete"]
+            and ChangeService.select()
+            .where(
+                ChangeService.change == change.id,
+                ChangeService.verification_state == "trusted",
+            )
+            .exists()
+        ):
+            from app.services.change_intelligence.timeline import request_publication
+
+            request_publication(change)

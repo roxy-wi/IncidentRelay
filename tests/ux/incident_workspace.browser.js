@@ -49,7 +49,7 @@ async function main() {
             subtitle: !!element.querySelector(".card-subtitle"),
             icon: !!element.querySelector(".section-icon i"),
         })));
-        assert.equal(headers.length, 8);
+        assert.equal(headers.length, 9);
         assert(headers.every(header => header.icon && (header.subtitle || header.height < 60)));
 
         // Reload has one label and one palette across pages and dialogs in both themes.

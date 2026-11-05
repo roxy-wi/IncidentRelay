@@ -591,7 +591,7 @@ Metrics: `incidentrelay_change_worker_results_total` records fixed claim/outcome
 categories; `incidentrelay_change_jobs`,
 `incidentrelay_change_queue_oldest_due_age_seconds`,
 `incidentrelay_change_references`, and `incidentrelay_change_dead_jobs` expose
-queue size, age and errors without source/Team/Service labels. Stage 7 enables impact, correlation and eligible episode discovery. Timeline publication remains disabled until stage 9.
+queue size, age and errors without source/Team/Service labels. Stage 7 enables impact, correlation and eligible episode discovery. Stage 9 enables safe Service Timeline publication through the same worker.
 
 For rollback, disable both intake and worker and restart web/scheduler processes.
 Keep rows and cursors intact; expired leases can be reclaimed after re-enabling.
@@ -609,7 +609,7 @@ Owner readers see lifecycle conflicts, service mapping diagnostics and immutable
 event history. A reader of a related Service sees a limited card, without the
 sender's title, source, actor, external IDs, URL or event payload. Stale or revoked
 cross-team links disappear until revalidated. Refresh reloads processing state;
-failed loads clear the previous data and offer a retry. Mapping and automatic correlation are separate worker steps. Manual review and Incident links are available in Change Details; related-change presentation on AlertGroup/Incident pages remains stage 9.
+failed loads clear the previous data and offer a retry. Mapping and automatic correlation are separate worker steps. Manual review and Incident links are available in Change Details; Related Changes are also available on AlertGroup and Incident pages.
 
 Read endpoints require a human JWT or an active user's personal token with
 `changes:read`, even if global API authentication is optional. Personal token
@@ -664,7 +664,7 @@ edit permissions apply; settings and audit commit in one transaction.
 The history horizon is seven days, including still-running older Changes; the
 post-operation window is two hours. Old groups/episodes without context are not
 reconstructed. Stage 7 stores potential-cause suggestions without status or
-notification effects; manual review is available in Change Details; related-change display on AlertGroup/Incident pages remains stage 9.
+notification effects; manual review is available in Change Details; Related Changes are also available on AlertGroup and Incident pages.
 Public intake stays disabled until stage 10. Engine limits are depth 5, 200 links/
 impact rows, 1,000 edges and five seconds per calculation; existing worker batch,
 lease and retry settings apply. A graph limit records limit_exceeded in the job.
@@ -677,3 +677,11 @@ When rolling back to an application version without correlation-aware retention,
 Change Details supports confirming/rejecting suggestions, manually assigning context/mitigation/cause to existing episodes, and linking Changes to Incidents. Each operation requires Change visibility, the target's responder role and a reason. Manual relations work independently of automatic correlation policy and time windows. Legacy AlertGroups without episodes are not reconstructed; direct Incident links remain available.
 
 On a version conflict, close the dialog and reload. Removed Incident links can be restored through their action menu. These operations do not change alert/Incident status or send notifications. Apply migrations, including 20261104010000_change_reviews, before starting the updated application. Public intake remains disabled until stage 10.
+
+### Related Changes and Service Timeline
+
+Apply `20261104020000_change_service_timeline` before starting the updated application and worker. It preserves legacy Service events and queues revalidation of accepted Changes; it creates no old alert episodes. Failed timeline jobs follow the existing retry/backoff/dead-letter controls and can be retried by integration administrators.
+
+Alert details → Related Changes lets you select the latest or a historical episode and review/link Changes for that episode. Incident workspace provides the same link role/edit/remove/restore actions. Manual links remain available when automatic correlation is disabled. A legacy group without an episode shows an explanation; it gains an episode only on a genuine reopen.
+
+Service Timeline links to the authorized Change page. Its stored projection contains only the Change UUID, kind, relation and event time, even for the owner. Inferred impact is labelled separately. Service details reload history on open; stale derived links disappear after access or graph changes. Public intake remains disabled until stage 10 acceptance.

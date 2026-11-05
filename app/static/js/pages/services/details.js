@@ -1,4 +1,5 @@
 // Service details, SLI/SLO forms, readiness, compact cards and helper renderers.
+let serviceDetailsGeneration = 0;
 
 
 function isServiceDetailsModalOpen() {
@@ -22,11 +23,14 @@ function openServiceDetailsModal(serviceId) {
 
 
 function closeServiceDetailsModal() {
+    serviceDetailsGeneration += 1;
     closeAppModal("#service-details-modal");
+    $("#service-details-modal-body").empty();
 }
 
 
 function loadServiceDetails(serviceId) {
+    const generation = ++serviceDetailsGeneration;
     const service = getServiceById(serviceId);
 
     if (!service) {
@@ -39,21 +43,17 @@ function loadServiceDetails(serviceId) {
     renderServiceDetailsLoading(service);
 
     const days = Number($("#service-analytics-days").val() || 30);
-    const cacheKey = String(service.id) + ":" + String(days);
-
-    if (serviceDetailsCache[cacheKey]) {
-        renderServiceDetailsPayload(serviceDetailsCache[cacheKey]);
-        return;
-    }
-
+    // Timeline visibility depends on current grants and graph projections.
+    // Reopening details must reauthorize it, including previously empty history.
     apiGet(
         "/api/services/" + encodeURIComponent(service.id) +
         "/details?days=" + encodeURIComponent(days),
         function (payload) {
-            serviceDetailsCache[cacheKey] = payload;
+            if (generation !== serviceDetailsGeneration || !isServiceDetailsModalOpen()) return;
             renderServiceDetailsPayload(payload);
         },
         function (xhr) {
+            if (generation !== serviceDetailsGeneration || !isServiceDetailsModalOpen()) return;
             if (window.AppLoading) {
                 AppLoading.clear("#service-details-modal-body");
             }
@@ -90,17 +90,15 @@ function renderServiceDetailsLoading(service) {
 }
 
 
-function serviceDetailsSection(title, subtitle) {
-    const section = $("<section>").addClass("service-detail-section");
-
-    section.append(
-        $("<div>")
-            .addClass("section-header")
-            .append($("<h3>").text(title))
-            .append(subtitle ? $("<p>").text(subtitle) : null)
-    );
-
-    return section;
+function serviceDetailsSection(category, icon, title, subtitle) {
+    const heading = $("<div>").append($("<h3>").text(title));
+    if (subtitle) heading.append($("<p>").addClass("card-subtitle").text(subtitle));
+    return $("<section>").addClass("card workspace-section").attr("data-section", category)
+        .append($("<div>").addClass("card-header")
+            .append($("<div>").addClass("section-heading")
+                .append($("<span>").addClass("section-icon").attr("aria-hidden", "true")
+                    .append($("<i>").addClass("fas " + icon)))
+                .append(heading)));
 }
 
 
@@ -139,7 +137,7 @@ function renderServiceDetailsPayload(payload) {
 function renderServiceDetailsMetrics(payload) {
     const summary = payload.summary || {};
     const alerts = summary.alerts || {};
-    const section = serviceDetailsSection("Metrics", null);
+    const section = serviceDetailsSection("metrics", "fa-chart-line", "Metrics", null);
 
     const table = $("<table>").addClass("data-table");
     const tbody = $("<tbody>");
@@ -185,7 +183,7 @@ function renderServiceDetailsSliSlo(payload) {
     const slis = asArray(sliSlo.slis);
     const slos = asArray(sliSlo.slos);
     const section = serviceDetailsSection(
-        "SLI / SLO",
+        "metrics", "fa-chart-line", "SLI / SLO",
         "Indicators describe what is measured. Objectives define the target for those indicators."
     );
     const actions = $("<div>").addClass("details-actions");
@@ -208,7 +206,7 @@ function renderServiceDetailsSliSlo(payload) {
         },
     });
 
-    section.append(actions);
+    section.children(".card-header").append(actions);
 
     if (!slis.length && !slos.length) {
         section.append(
@@ -1119,13 +1117,13 @@ function renderServiceDetailsImpact(payload) {
     const impact = payload.impact || {};
     const blastRadius = impact.blast_radius || {};
     const section = serviceDetailsSection(
-        "Impact",
+        "impact", "fa-project-diagram", "Impact",
         "Effective status, root cause and downstream blast radius."
     );
 
     section.append(
         $("<div>")
-            .addClass("grid-two")
+            .addClass("grid-two section-body")
             .append(
                 serviceDetailsCompactCard("Status", [
                     ["Effective status", formatImpactStatusText(impact.effective_status || "unknown")],
@@ -1149,7 +1147,9 @@ function renderServiceDetailsImpact(payload) {
             )
     );
 
-    section.append(renderImpactExplanationPanel(impact, { compact: true }));
+    section.append($("<div>").addClass("section-body").append(
+        renderImpactExplanationPanel(impact, { compact: true })
+    ));
 
     return section;
 }
@@ -1159,7 +1159,7 @@ function renderServiceDetailsReadiness(payload) {
     const readiness = payload.readiness || {};
     const state = readiness.state || null;
     const evaluations = asArray(readiness.evaluations);
-    const section = serviceDetailsSection(i18n.t("service_standards.readiness.title"), null);
+    const section = serviceDetailsSection("readiness", "fa-clipboard-check", i18n.t("service_standards.readiness.title"), null);
 
     const headerActions = $("<div>").addClass("details-actions");
 
@@ -1172,7 +1172,7 @@ function renderServiceDetailsReadiness(payload) {
         },
     });
 
-    section.append(headerActions);
+    section.children(".card-header").append(headerActions);
 
     if (!state) {
         section.append(
@@ -1448,7 +1448,6 @@ function evaluateServiceReadiness(service) {
         "/api/services/" + encodeURIComponent(service.id) + "/readiness/evaluate",
         {},
         function () {
-            serviceDetailsCache = {};
             refreshServices();
 
             if ($("#service-details-modal").is(":visible")) {
@@ -1638,11 +1637,11 @@ function renderServiceDetailsHero(payload) {
         ? priorityResolution.name + " (" + prioritySource + ")"
         : prioritySource;
     const section = serviceDetailsSection(
-        "Overview",
+        "services", "fa-server", "Overview",
         service.description || service.slug || "No description"
     );
 
-    const badges = $("<div>").addClass("service-detail-badges");
+    const badges = $("<div>").addClass("service-detail-badges section-body");
 
     badges.append(renderServiceStatusBadge(service));
     badges.append(renderServiceReadinessBadge(service));
@@ -1654,7 +1653,7 @@ function renderServiceDetailsHero(payload) {
 
     section.append(
         $("<div>")
-            .addClass("grid-two")
+            .addClass("grid-two section-body")
             .append(
                 serviceDetailsCompactCard("Identity", [
                     ["Team", service.team_name || service.team_slug],
@@ -1686,7 +1685,7 @@ function renderServiceDetailsHero(payload) {
 
 function renderServiceDetailsQuickActions(payload) {
     const service = payload.service || {};
-    const section = serviceDetailsSection("Quick actions", null);
+    const section = serviceDetailsSection("operations", "fa-sliders-h", "Quick actions", null);
     const actions = $("<div>").addClass("details-actions");
 
     appendIconActionIfAllowed(actions, service, {
@@ -1785,7 +1784,7 @@ function renderServiceDetailsQuickActions(payload) {
             })
     );
 
-    section.append(actions);
+    section.children(".card-header").append(actions);
     return section;
 }
 

@@ -2,7 +2,7 @@
 
 from contextlib import contextmanager
 
-from peewee import JOIN, PostgresqlDatabase, fn
+from peewee import JOIN, SQL, PostgresqlDatabase, Value, fn
 
 from app.db import database_proxy as db
 from app.api.schemas.changes import InvalidChangeQuery
@@ -10,6 +10,7 @@ from app.modules.db.models import (
     Change,
     ChangeGraphState,
     ChangeIntegration,
+    ChangeImpact,
     ChangeJob,
     ChangeService,
     ChangeServiceReference,
@@ -19,6 +20,9 @@ from app.modules.db.models import (
     Team,
 )
 from app.services.change_intelligence.resolver import ENGINE_VERSION
+from app.services.change_intelligence.correlation import (
+    ENGINE_VERSION as CORRELATION_ENGINE,
+)
 from app.services.rbac import current_api_token, get_allowed_team_ids
 from app.services.serializers.common import serialize_utc_datetime as timestamp
 
@@ -58,12 +62,8 @@ def readable_services(team_ids):
     return Service.select().where(Service.team.in_(team_ids), Service.deleted == False)
 
 
-def current_links(team_ids):
-    """Trust only a complete mapping pass under the current graph and authority.
-
-    A completed pass stamps every canonical link. New requests, partial batches,
-    disabled principals and changed inputs fail closed before counts/pagination.
-    """
+def current_projection_changes(job_types, engine_version):
+    """SQL gate for complete projections under current inputs and authority."""
     active_groups = Group.select(Group.id).where(
         Group.active == True, Group.deleted == False
     )
@@ -71,25 +71,16 @@ def current_links(team_ids):
         Team.active == True, Team.deleted == False, Team.group.in_(active_groups)
     )
     return (
-        ChangeService.select(ChangeService)
-        .join(Change)
+        Change.select(Change.id)
         .join(ChangeIntegration)
         .join_from(Change, ChangeSource)
-        .join_from(ChangeService, Service)
         .join_from(
             Change,
             ChangeJob,
-            on=(
-                (ChangeJob.entity_id == Change.id)
-                & (ChangeJob.job_type == "resolve_references")
-            ),
+            on=((ChangeJob.entity_id == Change.id) & ChangeJob.job_type.in_(job_types)),
         )
         .join_from(ChangeJob, ChangeGraphState, on=(ChangeGraphState.id == 1))
         .where(
-            Service.team.in_(team_ids),
-            Service.deleted == False,
-            Service.enabled == True,
-            ChangeService.verification_state == "trusted",
             ChangeIntegration.active == True,
             ChangeSource.active == True,
             Change.owner_team.in_(active_teams),
@@ -102,7 +93,48 @@ def current_links(team_ids):
             ChangeJob.target_revision == Change.revision,
             ChangeJob.auth_revision == ChangeIntegration.auth_revision,
             ChangeJob.graph_revision == ChangeGraphState.revision,
-            ChangeJob.engine_version == ENGINE_VERSION,
+            ChangeJob.engine_version == engine_version,
+        )
+    )
+
+
+def current_links(team_ids):
+    """Trust complete projections; None is reserved for internal publication."""
+    return (
+        ChangeService.select(ChangeService)
+        .join(Service)
+        .where(
+            Service.team.in_(team_ids) if team_ids is not None else True,
+            Service.deleted == False,
+            Service.enabled == True,
+            ChangeService.verification_state == "trusted",
+            ChangeService.change.in_(
+                current_projection_changes(["resolve_references"], ENGINE_VERSION)
+            ),
+        )
+    )
+
+
+def current_impacts(team_ids):
+    """Inferred access expires with either its mapping or its graph projection."""
+    return (
+        ChangeImpact.select(ChangeImpact)
+        .join(Service)
+        .where(
+            Service.team.in_(team_ids) if team_ids is not None else True,
+            Service.deleted == False,
+            Service.enabled == True,
+            ChangeImpact.active == True,
+            ChangeImpact.depth > 0,
+            ChangeImpact.engine_version == CORRELATION_ENGINE,
+            ChangeImpact.change.in_(
+                current_projection_changes(["resolve_references"], ENGINE_VERSION)
+            ),
+            ChangeImpact.change.in_(
+                current_projection_changes(
+                    ["refresh_impacts", "refresh_correlations"], CORRELATION_ENGINE
+                )
+            ),
         )
     )
 
@@ -117,6 +149,7 @@ def visible_changes(team_ids):
         .where(
             Change.owner_team.in_(team_ids)
             | Change.id.in_(current_links(team_ids).select(ChangeService.change))
+            | Change.id.in_(current_impacts(team_ids).select(ChangeImpact.change))
         )
     )
 
@@ -153,10 +186,14 @@ def filter_changes(filters, team_ids, *, service_id=None):
             ChangeService.service.in_(team_services)
         )
         safe_links = current_links([filters.scope_team_id]).select(ChangeService.change)
+        safe_impacts = current_impacts([filters.scope_team_id]).select(
+            ChangeImpact.change
+        )
         query = query.where(
             (Change.owner_team == filters.scope_team_id)
             | (owned & Change.id.in_(owned_links))
             | Change.id.in_(safe_links)
+            | Change.id.in_(safe_impacts)
         )
     if filters.owner_team_id is not None:
         if filters.owner_team_id not in team_ids:
@@ -177,8 +214,15 @@ def filter_changes(filters, team_ids, *, service_id=None):
             .where(Service.id == selected_service)
             .select(ChangeService.change)
         )
+        safe_impacts = (
+            current_impacts(team_ids)
+            .where(Service.id == selected_service)
+            .select(ChangeImpact.change)
+        )
         query = query.where(
-            (owned & Change.id.in_(owned_links)) | Change.id.in_(safe_links)
+            (owned & Change.id.in_(owned_links))
+            | Change.id.in_(safe_links)
+            | Change.id.in_(safe_impacts)
         )
     if filters.search:
         term = filters.search.lower()
@@ -251,6 +295,32 @@ def service_links(change, team_ids, *, full):
         .where(ChangeService.change == change.id)
         .order_by(ChangeService.id)
     )
+
+
+def service_rows(change, team_ids, *, full):
+    """Paginate canonical and inferred relations as one authorized SQL result."""
+    columns = (
+        Service.id.alias("id"),
+        Service.name,
+        Service.slug,
+        Service.team.alias("team_id"),
+    )
+    direct = (
+        service_links(change, team_ids, full=full)
+        .select(*columns, ChangeService.relation_type, ChangeService.verification_state)
+        .order_by()
+    )
+    inferred = (
+        current_impacts(team_ids)
+        .where(ChangeImpact.change == change.id)
+        .select(
+            *columns,
+            Value("inferred_impact").alias("relation_type"),
+            Value(None).alias("verification_state"),
+        )
+        .distinct()
+    )
+    return (direct | inferred).order_by(SQL("id"), SQL("relation_type")).dicts()
 
 
 def readable_references(team_ids):
@@ -343,7 +413,9 @@ def reference_data(ref):
         "relation_type": ref.relation_type,
         "team_id": ref.namespace_team_id,
         "service_id": ref.resolved_service_id,
-        "service": service_data(ref.resolved_service) if ref.resolved_service_id else None,
+        "service": service_data(ref.resolved_service)
+        if ref.resolved_service_id
+        else None,
         "requested_service_id": ref.requested_service_id,
         "requested_service_slug": ref.requested_service_slug,
         "resolution_status": ref.resolution_status,
@@ -368,6 +440,25 @@ def change_data(change, team_ids, *, detail=False, context=None):
             {"service": service_data(link.service), "relation_type": link.relation_type}
             for link in service_links(change, team_ids, full=False).limit(5)
         ]
+        remaining = 5 - len(public["services"])
+        if remaining:
+            impacts = (
+                current_impacts(team_ids)
+                .select(Service)
+                .where(
+                    ChangeImpact.change == change.id,
+                    Service.id.not_in(
+                        [item["service"]["id"] for item in public["services"]]
+                    ),
+                )
+                .distinct()
+                .order_by(Service.id)
+                .limit(remaining)
+            )
+            public["services"].extend(
+                {"service": service_data(service), "relation_type": "inferred_impact"}
+                for service in impacts.objects(Service)
+            )
         return public
     context = context or owner_context([change], team_ids)
     job = context["jobs"].get(change.id)

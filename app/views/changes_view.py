@@ -7,6 +7,7 @@ from pydantic import ValidationError
 from app.api.schemas.base import EmptySchema
 from app.api.schemas.changes import ChangePageQuery, ChangeQuery, InvalidChangeQuery
 from app.api.schemas.change_reviews import (
+    AlertRelatedChangesQuery,
     CorrelationCreate,
     CorrelationReview,
     IncidentChangeCreate,
@@ -20,9 +21,11 @@ from app.modules.db.models import (
     AlertGroupEpisode,
     Change,
     ChangeEvent,
+    ChangeAlertGroupCorrelation,
     Incident,
 )
 from app.services.change_intelligence import incident_links, reading, reviewing
+from app.services.change_intelligence.eligibility import episode_eligibility
 from app.services.change_intelligence.administration import ChangeConflict
 from app.services.validation import make_error_response, validate_body
 
@@ -133,15 +136,17 @@ def services(change_uid):
 
         def serialize(link):
             result = {
-                "service": reading.service_data(link.service),
-                "relation_type": link.relation_type,
+                "service": {
+                    key: link[key] for key in ("id", "name", "slug", "team_id")
+                },
+                "relation_type": link["relation_type"],
             }
-            if full:
-                result["verification_state"] = link.verification_state
+            if full and link["verification_state"] is not None:
+                result["verification_state"] = link["verification_state"]
             return result
 
         result = reading.page_result(
-            reading.service_links(change, teams, full=full), filters, serialize
+            reading.service_rows(change, teams, full=full), filters, serialize
         )
         if full:
             result["references"] = reading.page_result(
@@ -163,6 +168,70 @@ def correlations(change_uid):
                 lambda row: reviewing.review_data(row, teams),
             )
         )
+
+
+@changes_bp.get("/alert-groups/<int:alert_group_id>/episodes")
+def alert_episodes(alert_group_id):
+    """List tracked episodes without reconstructing legacy alert history."""
+    filters = query_input(ChangePageQuery)
+    with reading.read_snapshot():
+        teams = reading.reader_teams()
+        AlertGroup.get(
+            AlertGroup.id == alert_group_id,
+            reviewing.visible_teams(AlertGroup.team, teams),
+        )
+        query = (
+            reviewing.episode_query(teams)
+            .where(AlertGroupEpisode.alert_group == alert_group_id)
+            .order_by(AlertGroupEpisode.ordinal.desc())
+        )
+        return jsonify(reading.page_result(query, filters, reviewing.episode_data))
+
+
+@changes_bp.get("/alert-groups/<int:alert_group_id>/related-changes")
+def alert_related_changes(alert_group_id):
+    """Return visible Changes and review actions for one existing episode."""
+    filters = query_input(AlertRelatedChangesQuery)
+    with reading.read_snapshot():
+        teams = reading.reader_teams()
+        group = AlertGroup.get(
+            AlertGroup.id == alert_group_id,
+            reviewing.visible_teams(AlertGroup.team, teams),
+        )
+        episodes = reviewing.episode_query(teams).where(
+            AlertGroupEpisode.alert_group == group.id
+        )
+        if filters.episode_id is not None:
+            episode = episodes.where(AlertGroupEpisode.id == filters.episode_id).get()
+        else:
+            episode = episodes.order_by(AlertGroupEpisode.ordinal.desc()).first()
+        query = (
+            ChangeAlertGroupCorrelation.select()
+            .where(
+                ChangeAlertGroupCorrelation.episode
+                == (episode.id if episode else None),
+                ChangeAlertGroupCorrelation.change.in_(
+                    reading.visible_changes(teams).select(Change.id)
+                ),
+            )
+            .order_by(
+                ChangeAlertGroupCorrelation.score.desc(), ChangeAlertGroupCorrelation.id
+            )
+        )
+        result = reading.page_result(
+            query,
+            filters,
+            lambda row: {
+                **reviewing.review_data(row, teams),
+                "change": reading.change_data(row.change, teams),
+            },
+        )
+        result.update(
+            episode=reviewing.episode_data(episode) if episode else None,
+            eligibility=episode_eligibility(episode) if episode else "no_episode",
+            can_review=reviewing.can_respond(group, teams),
+        )
+        return jsonify(result)
 
 
 @changes_bp.get("/changes/<uuid:change_uid>/correlation-targets")

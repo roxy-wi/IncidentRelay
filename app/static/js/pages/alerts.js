@@ -1696,6 +1696,7 @@ function loadAlertExplainForCurrentDetails() {
 }
 
 function showAlertDetails(alertId) {
+    RelatedChanges.clear("alert");
     const isDifferentAlert = currentDetailsAlertId !== alertId;
     currentDetailsAlertId = alertId;
 
@@ -1761,9 +1762,11 @@ function showAlertDetails(alertId) {
 
         currentDetailsAlertId = alert.id;
         currentDetailsAlertCanRespond = canRespondObject(alert);
+        RelatedChanges.mount("alert", alert.id, {
+            isCurrent: () => currentDetailsAlertId === alert.id && alertDetailsModal().hasClass("is-open"),
+        });
         renderAlertDetailsActionBar(alert, modal);
         currentDetailsAlertShelved = Boolean(alert.shelved || (alert.shelve && alert.shelve.active));
-        resetAlertDetailsTabs(alert.id);
 
         modal.find("#alert-details-title").text(alert.title || i18n.t("alert_details.entity.alert_number", {id: alert.id}));
         modal.find("#alert-details-subtitle").text(buildAlertDetailsSubtitle(alert));
@@ -3052,6 +3055,7 @@ function openAlertDetailsModal() {
 }
 
 function closeAlertDetailsModal(options) {
+    RelatedChanges.clear("alert");
     options = options || {};
 
     closeAppModal("#alert-details-modal");

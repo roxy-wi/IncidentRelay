@@ -66,3 +66,9 @@ class IncidentChangeQuery(ChangePageQuery):
     """Removed links can be read explicitly to obtain their restore version."""
 
     include_removed: bool = False
+
+
+class AlertRelatedChangesQuery(ChangePageQuery):
+    """Choose an existing episode without creating or reconstructing history."""
+
+    episode_id: QueryId | None = None

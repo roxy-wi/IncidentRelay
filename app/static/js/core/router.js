@@ -109,6 +109,7 @@ function navigate(path, pushState) {
     let routePath = appPath.routePath;
 
     if (routePath !== "/changes" && typeof leaveChanges === "function") leaveChanges();
+    if (routePath !== "/services" && typeof closeServiceDetailsModal === "function") closeServiceDetailsModal();
 
     if (routePath !== "/admin/change-integrations" && typeof closeChangeIntegrationModal === "function") closeChangeIntegrationModal();
     if (routePath === "/admin/change-integrations" && !hasGroupUserAdminAccess()) {
@@ -144,6 +145,8 @@ function navigate(path, pushState) {
         && typeof syncAlertDetailsFromUrl === "function"
     ) {
         syncAlertDetailsFromUrl();
+    } else if (typeof closeAlertDetailsModal === "function") {
+        closeAlertDetailsModal({updateUrl: false});
     }
     if (
         normalizedPath.routePath === "/incidents"

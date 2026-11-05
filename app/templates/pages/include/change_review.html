@@ -1,0 +1,28 @@
+<div id="change-review-modal" class="app-modal workspace-modal is-hidden" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="change-review-title">
+  <div class="app-modal-dialog">
+    <div class="app-modal-header">
+      <h2 id="change-review-title"></h2>
+      <button id="change-review-close" class="app-modal-close" type="button" aria-label="{{ _('common.cancel') }}"><i class="fas fa-xmark" aria-hidden="true"></i></button>
+    </div>
+    <form id="change-review-form">
+      <div class="app-modal-body form-stack">
+        <p id="change-review-error" class="alert alert-danger" role="alert"></p>
+        <p id="change-review-subject"></p>
+        <div id="change-review-target-fields" class="form-group">
+          <label id="change-review-target-label" for="change-review-target">{{ _('changes.select_target') }}</label>
+          <select id="change-review-target" aria-describedby="change-review-target-hint"><option value=""></option></select>
+          <small id="change-review-target-hint" class="muted"></small>
+        </div>
+        <div id="change-review-role-field" class="form-group"><label for="change-review-role">{{ _('changes.relation') }}</label><select id="change-review-role" class="input">
+          {% for role in ['context', 'potential_cause', 'confirmed_cause', 'mitigation'] %}<option value="{{ role }}">{{ _('changes.' ~ role) }}</option>{% endfor %}
+        </select></div>
+        <div class="form-group"><label for="change-review-note">{{ _('changes.review_note') }}</label><textarea id="change-review-note" class="input" rows="3" maxlength="2000" required></textarea></div>
+        <small class="muted">{{ _('changes.review_hint') }}</small>
+      </div>
+      <div class="app-modal-footer">
+        <button id="change-review-cancel" class="btn" type="button">{{ _('common.cancel') }}</button>
+        <button id="change-review-save" class="btn btn-primary" type="submit">{{ _('changes.save') }}</button>
+      </div>
+    </form>
+  </div>
+</div>

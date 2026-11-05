@@ -46,8 +46,16 @@ def components():
     """Describe full and safe responses as mutually exclusive projections."""
     service = object_schema({"id": ID, "name": TEXT, "slug": TEXT, "team_id": ID})
     relation = {"type": "string", "enum": ["changed", "reported_affected"]}
+    visible_relation = {
+        "type": "string",
+        "enum": ["changed", "reported_affected", "inferred_impact"],
+    }
     link = object_schema(
-        {"service": service, "relation_type": relation, "verification_state": TEXT},
+        {
+            "service": service,
+            "relation_type": visible_relation,
+            "verification_state": TEXT,
+        },
         ["service", "relation_type"],
     )
     shared = {
@@ -64,7 +72,9 @@ def components():
             "services": {
                 "type": "array",
                 "maxItems": 5,
-                "items": object_schema({"service": service, "relation_type": relation}),
+                "items": object_schema(
+                    {"service": service, "relation_type": visible_relation}
+                ),
             },
         }
     )

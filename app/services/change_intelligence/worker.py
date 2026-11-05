@@ -38,13 +38,14 @@ from app.services.change_intelligence.episode_discovery import (
     compute_episode_discovery,
     publish_episode_discovery,
 )
+from app.services.change_intelligence.timeline import (
+    compute_timeline_batch,
+    publish_timeline_batch,
+)
 from app.services.metrics import record_change_worker_result
 from app.settings import Config
 
 logger = logging.getLogger("oncall.change_intelligence")
-DISABLED_JOB_TYPES = {
-    "sync_service_timeline",
-}
 
 
 def schedule_pending_reconciliation():
@@ -247,10 +248,9 @@ def process_claim(claim):
         elif claim.job_type in {"refresh_impacts", "refresh_correlations"}:
             plan = compute_correlation_batch(claim)
             publish_correlation_batch(claim, plan)
-        elif claim.job_type in DISABLED_JOB_TYPES:
-            with incident_core_repo.write_transaction():
-                changes_repo.lock_claim(claim)
-                changes_repo.finish_claim(claim, error_class="not_enabled")
+        elif claim.job_type == "sync_service_timeline":
+            plan = compute_timeline_batch(claim)
+            publish_timeline_batch(claim, plan)
         else:
             raise ValueError("Unsupported Change job type")
         record_change_worker_result("processed")

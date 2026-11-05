@@ -42,7 +42,8 @@ function clearChangeReviews() {
 }
 function changeEpisodeLabel(episode) {
     return episode.title + " · " + changesText("episode_number", { number: episode.ordinal })
-        + " · " + (episode.started_at ? formatDateTimeMinutes(episode.started_at) : changesText("unknown"));
+        + " · " + (episode.started_at ? formatDateTimeMinutes(episode.started_at) : changesText("unknown"))
+        + " · " + changesText(episode.state);
 }
 function loadChangeReviews(requestId) {
     loadChangeRelations("correlations", requestId);
@@ -96,21 +97,27 @@ function loadChangeRelations(kind, requestId) {
         if (page === changeReviewPages[kind] && generation === changeRelationRequests[kind]) changesFailure(xhr, requestId);
     });
 }
-function openChangeReview(action, item) {
+function openChangeReview(action, item, context) {
     closeChangeReview();
     const version = changeReviewVersion;
-    changeReviewEditor = {action, item, uid: changesUid, requestId: changesRequest, busy: false};
+    const requestId = changesRequest;
+    changeReviewEditor = {action, item, uid: changesUid, busy: false,
+        isCurrent: () => changesActive(requestId),
+        onSaved: () => loadChangeReviews(requestId),
+        onDenied: (xhr) => changesFailure(xhr, requestId),
+        ...context};
     $("#change-review-form")[0].reset();
     $("#change-review-form :input").prop("disabled", false);
-    const creating = action === "episode" || action === "incident";
+    const creating = ["episode", "incident", "episode_change", "incident_change"].includes(action);
     $("#change-review-target-fields").prop("hidden", !creating);
     $("#change-review-target").prop("required", creating);
     $("#change-review-role-field").prop("hidden", action === "remove");
     $("#change-review-title").text(changesText({
         episode: "add_episode", incident: "add_incident", confirm: "confirm", reject: "reject",
         manual: "manual_relation", edit: "edit_relation", remove: "remove_link", restore: "restore_link",
+        episode_change: "link_change", incident_change: "link_change",
     }[action]));
-    $("#change-review-subject").text(item ? (item.episode ? changeEpisodeLabel(item.episode) : item.incident.title) : "");
+    $("#change-review-subject").text(changeReviewEditor.subject || (item ? (item.episode ? changeEpisodeLabel(item.episode) : item.incident.title) : ""));
     const role = action === "confirm" && item.relation_type === "potential_cause" ? "confirmed_cause"
         : action === "manual" ? "context" : item ? item.relation_type : "context";
     $("#change-review-role").val(role);
@@ -120,19 +127,20 @@ function openChangeReview(action, item) {
     else $("#change-review-note").trigger("focus");
 }
 function changeReviewCurrent(version) {
-    return version === changeReviewVersion && changeReviewEditor && changesActive(changeReviewEditor.requestId)
+    return version === changeReviewVersion && changeReviewEditor && changeReviewEditor.isCurrent()
         && $("#change-review-modal").hasClass("is-open");
 }
 function initChangeReviewTargetPicker(version) {
     const editor = changeReviewEditor;
     const episode = editor.action === "episode";
-    const endpoint = episode ? "/api/changes/" + editor.uid + "/correlation-targets" : "/api/incidents";
+    const pickingChange = editor.action.endsWith("_change");
+    const endpoint = pickingChange ? "/api/changes" : episode ? "/api/changes/" + editor.uid + "/correlation-targets" : "/api/incidents";
     let pending = null;
     function searchUrl(query, page) {
         return endpoint + "?" + new URLSearchParams({search: query.trim(), page: String(page), page_size: "25"});
     }
-    $("#change-review-target-label").text(changesText(episode ? "episode" : "incident"));
-    $("#change-review-target-hint").text(changesText(episode ? "episode_picker_hint" : "incident_picker_hint"));
+    $("#change-review-target-label").text(changesText(pickingChange ? "change" : episode ? "episode" : "incident"));
+    $("#change-review-target-hint").text(changesText(pickingChange ? "change_picker_hint" : episode ? "episode_picker_hint" : "incident_picker_hint"));
     return new TomSelect("#change-review-target", {
         plugins: ["virtual_scroll"],
         create: false,
@@ -180,10 +188,12 @@ function initChangeReviewTargetPicker(version) {
                 const paging = response.pagination;
                 picker.setNextUrl(query, paging.page < paging.pages ? searchUrl(query, paging.page + 1) : false);
                 callback(response.items.map(function (item) {
-                    const allowed = episode ? item.can_review : item.permissions && item.permissions.can_respond;
+                    const allowed = pickingChange || (episode ? item.can_review : item.permissions && item.permissions.can_respond);
                     return {
-                        id: item.id,
-                        label: episode ? changeEpisodeLabel(item) : "#" + item.id + " · " + item.title,
+                        id: pickingChange ? item.uid : item.id,
+                        label: pickingChange ? (item.projection === "safe" ? changesText("related") : item.title)
+                            + " · " + changesText(item.kind) + " · " + formatDateTimeMinutes(item.occurred_at)
+                            : episode ? changeEpisodeLabel(item) : "#" + item.id + " · " + item.title,
                         disabled: !allowed,
                     };
                 }));
@@ -193,7 +203,7 @@ function initChangeReviewTargetPicker(version) {
                 picker.setNextUrl(query, false);
                 callback([]);
                 $("#change-review-error").text(changesText("load_error"));
-                if (xhr.status === 403 || xhr.status === 404) changesFailure(xhr, editor.requestId);
+                if (xhr.status === 403 || xhr.status === 404) editor.onDenied(xhr);
             });
         },
     });
@@ -217,9 +227,9 @@ $(document).on("submit", "#change-review-form", function (event) {
     const payload = {note: $("#change-review-note").val().trim(), relation_type: $("#change-review-role").val()};
     let method = "POST";
     let url;
-    if (editor.action === "episode") {
-        url = "/api/changes/" + editor.uid + "/correlations";
-        payload.episode_id = Number($("#change-review-target").val());
+    if (editor.action === "episode" || editor.action === "episode_change") {
+        url = "/api/changes/" + (editor.action === "episode_change" ? $("#change-review-target").val() : editor.uid) + "/correlations";
+        payload.episode_id = editor.action === "episode_change" ? editor.targetId : Number($("#change-review-target").val());
     } else if (["confirm", "reject", "manual"].includes(editor.action)) {
         url = "/api/changes/" + editor.uid + "/correlations/" + item.id + "/review";
         payload.row_version = item.row_version;
@@ -227,10 +237,10 @@ $(document).on("submit", "#change-review-form", function (event) {
         payload.evidence_version = item.evidence_version;
         payload.manual = editor.action === "manual";
     } else {
-        const incidentId = item ? item.incident.id : Number($("#change-review-target").val());
+        const incidentId = editor.action === "incident_change" ? editor.targetId : item ? item.incident.id : Number($("#change-review-target").val());
         url = "/api/incidents/" + incidentId + "/changes";
-        if (editor.action === "incident" || editor.action === "restore") {
-            payload.change_uid = editor.uid;
+        if (["incident", "restore", "incident_change"].includes(editor.action)) {
+            payload.change_uid = editor.action === "incident_change" ? $("#change-review-target").val() : editor.uid;
             if (item) payload.row_version = item.row_version;
         } else {
             url += "/" + item.id;
@@ -248,7 +258,7 @@ $(document).on("submit", "#change-review-form", function (event) {
     apiRequest(method, url, payload, function () {
         if (!changeReviewCurrent(version)) return;
         closeChangeReview();
-        loadChangeReviews(editor.requestId);
+        editor.onSaved();
     }, function (xhr) {
         if (!changeReviewCurrent(version)) return;
         editor.busy = false;
@@ -258,7 +268,7 @@ $(document).on("submit", "#change-review-form", function (event) {
         $("#change-review-error").text(xhr.status === 409 ? changeReviewConflictMessage(xhr) : changesText("save_error"));
         document.getElementById("change-review-error").scrollIntoView({block: "nearest"});
         if (xhr.status === 409) $("#change-review-save").prop("disabled", true);
-        if (xhr.status === 403 || xhr.status === 404) changesFailure(xhr, editor.requestId);
+        if (xhr.status === 403 || xhr.status === 404) editor.onDenied(xhr);
     });
 });
 $(document).on("click", "[data-change-relations-page]", function () {

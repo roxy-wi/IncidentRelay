@@ -448,14 +448,13 @@ def test_group_admin_job_access_stays_in_owned_integration(
     )
 
 
-def test_disabled_engines_and_episodes_do_not_loop(intake):
+def test_timeline_job_for_missing_change_finishes_without_looping(intake):
     ChangeJob.delete().execute()
     with incident_core_repo.write_transaction():
-        for job_type in worker.DISABLED_JOB_TYPES:
-            queue.request_job(job_type, 1)
-    assert worker.process_change_jobs() == len(worker.DISABLED_JOB_TYPES)
-    for job in ChangeJob.select():
-        assert job.state == "done" and job.last_error_class == "not_enabled"
+        queue.request_job("sync_service_timeline", 1)
+    assert worker.process_change_jobs() == 1
+    job = ChangeJob.get(ChangeJob.job_type == "sync_service_timeline")
+    assert job.state == "done" and job.last_error_class == "entity_missing"
     assert worker.process_change_jobs() == 0
 
 

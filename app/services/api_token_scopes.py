@@ -167,6 +167,8 @@ def required_scopes_for_path(path, method):
     method = str(method or "").upper()
     if path == "/api/change-events":
         return ["changes:ingest"] if method == "POST" else None
+    if re.fullmatch(r"/api/alert-groups/\d+/(episodes|related-changes)", path):
+        return ["changes:read", "alerts:read"] if method in READ_METHODS else None
     if re.fullmatch(r"/api/incidents/\d+/changes(?:/\d+)?", path):
         item = bool(re.fullmatch(r"/api/incidents/\d+/changes/\d+", path))
         if method in READ_METHODS and not item:

@@ -63,6 +63,31 @@ async function checkSharedSections(page) {
     await page.locator("#changes-correlations tr[data-relation-id]").first().waitFor();
 }
 
+async function checkRelationColumns(page) {
+    for (const width of [2240, 1440, 390]) {
+        await page.setViewportSize({width, height: 1050});
+        const positions = await page.locator(".change-relations-table").evaluateAll(tables => tables.map(table => {
+            const left = table.getBoundingClientRect().left;
+            return Array.from(table.querySelectorAll("thead th")).slice(0, 3)
+                .map(cell => cell.getBoundingClientRect().left - left);
+        }));
+        assert.equal(positions.length, 4);
+        for (const columns of positions) {
+            columns.forEach((left, index) => assert(Math.abs(left - positions[0][index]) < 1,
+                `Relation columns must align at ${width}px: ${JSON.stringify(positions)}`));
+        }
+        assert(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1),
+            "Wide relation tables must scroll inside their cards on mobile");
+        if (width === 2240) {
+            await page.locator("#changes-detail").screenshot({
+                path: path.join(fixture.screenshotDir, "change-aligned-columns.png"),
+                animations: "disabled",
+            });
+        }
+    }
+    await page.setViewportSize({width: 1440, height: 1050});
+}
+
 async function main() {
     const browser = await chromium.launch({headless: true, channel: process.env.PLAYWRIGHT_CHANNEL || undefined});
     const errors = [];
@@ -154,6 +179,7 @@ async function main() {
         const page = await session(fixture.ownerToken);
         await checkSharedSections(page);
         await page.locator("#changes-references .ui-status-badge").first().waitFor();
+        await checkRelationColumns(page);
         assert((await page.locator("#changes-references").innerText()).includes(fixture.serviceName));
         assert.equal(await page.locator("#changes-services-pagination").innerText(), "Linked services: 1");
         assert.equal(await page.locator("#changes-services-next").isVisible(), false);

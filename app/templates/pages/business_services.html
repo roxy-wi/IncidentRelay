@@ -1,4 +1,3 @@
-<link rel="stylesheet" href="/static/css/services.css">
 
 <div id="view-business-services" class="view first-div-page-layout services-page page-stack">
     <div class="summary-grid">
@@ -104,7 +103,7 @@
         </section>
     </div>
 
-    <div id="business-service-details-modal" class="app-modal" style="display: none;">
+    <div id="business-service-details-modal" class="app-modal workspace-modal" style="display: none;">
         <div class="app-modal-dialog app-modal-dialog-wide">
             <div class="app-modal-header">
                 <div>
@@ -116,28 +115,32 @@
                 <button id="close-business-service-details-modal" type="button" class="app-modal-close" aria-label="{{ _('business_services.actions.close') }}">×</button>
             </div>
 
-            <div class="app-modal-body">
-                <div class="card-header">
-                    <div>
-                        <h2>{{ _('business_services.details.impact_title') }}</h2>
-                        <div class="card-subtitle">{{ _('business_services.details.impact_help') }}</div>
-                    </div>
-                    <div class="card-header-actions">
-                        <button id="business-service-recalculate" class="btn" type="button" disabled>{{ _('business_services.actions.recalculate') }}</button>
-                        <button id="open-business-service-component-modal" class="btn btn-primary" type="button" disabled>{{ _('business_services.actions.add_component') }}</button>
-                    </div>
-                </div>
-
-                <div id="business-service-details-body" class="details-grid">
-                    <div class="empty-state">{{ _('business_services.empty.selected') }}</div>
-                </div>
-
-                <section class="card">
+            <div class="app-modal-body workspace-stack">
+                <section class="card workspace-section" data-section="impact">
                     <div class="card-header">
-                        <div>
-                            <h2>{{ _('business_services.components.title') }}</h2>
-                            <div class="card-subtitle">{{ _('business_services.components.help') }}</div>
+                        <div class="section-heading">
+                            <span class="section-icon" aria-hidden="true"><i class="fas fa-project-diagram"></i></span>
+                            <div>
+                                <h3>{{ _('business_services.details.impact_title') }}</h3>
+                                <div class="card-subtitle">{{ _('business_services.details.impact_help') }}</div>
+                            </div>
                         </div>
+                        <div class="card-header-actions">
+                            <button id="business-service-recalculate" class="btn" type="button" disabled>{{ _('business_services.actions.recalculate') }}</button>
+                            <button id="open-business-service-component-modal" class="btn btn-primary" type="button" disabled>{{ _('business_services.actions.add_component') }}</button>
+                        </div>
+                    </div>
+                    <div id="business-service-details-body" class="details-grid section-body">
+                        <div class="empty-state">{{ _('business_services.empty.selected') }}</div>
+                    </div>
+                </section>
+
+                <section class="card workspace-section" data-section="services">
+                    <div class="card-header">
+                        <div class="section-heading"><span class="section-icon" aria-hidden="true"><i class="fas fa-server"></i></span><div>
+                            <h3>{{ _('business_services.components.title') }}</h3>
+                            <div class="card-subtitle">{{ _('business_services.components.help') }}</div>
+                        </div></div>
                     </div>
 
                     <div class="table-wrapper">
@@ -162,14 +165,14 @@
                     </div>
                 </section>
 
-                <section class="card">
+                <section class="card workspace-section" data-section="operations">
                         <div class="card-header">
-                            <div>
+                            <div class="section-heading"><span class="section-icon" aria-hidden="true"><i class="fas fa-sliders-h"></i></span><div>
                                 <h3>{{ _('business_services.manual.title') }}</h3>
                                 <div class="card-subtitle">
                                     {{ _('business_services.manual.help') }}
                                 </div>
-                            </div>
+                            </div></div>
                         </div>
 
                         <div class="form-body">
@@ -234,12 +237,12 @@
                         </div>
                     </section>
 
-                <section class="card">
+                <section class="card workspace-section" data-section="history">
                     <div class="card-header">
-                        <div>
-                            <h2>{{ _('business_services.history.title') }}</h2>
+                        <div class="section-heading"><span class="section-icon" aria-hidden="true"><i class="fas fa-history"></i></span><div>
+                            <h3>{{ _('business_services.history.title') }}</h3>
                             <div class="card-subtitle">{{ _('business_services.history.help') }}</div>
-                        </div>
+                        </div></div>
                     </div>
 
                     <div class="table-wrapper">
@@ -265,7 +268,7 @@
         </div>
     </div>
 
-    <div id="business-service-modal" class="app-modal" style="display: none;">
+    <div id="business-service-modal" class="app-modal workspace-modal" style="display: none;">
         <div class="app-modal-dialog app-modal-dialog-wide">
             <div class="app-modal-header">
                 <div>
@@ -276,13 +279,13 @@
             </div>
 
             <div class="app-modal-body">
-                <div class="grid-two">
-                    <section class="card">
+                <div class="grid-two workspace-stack">
+                    <section class="card workspace-section" data-section="services">
                         <div class="card-header">
-                            <div>
-                                <h2>{{ _('business_services.form.identity_title') }}</h2>
+                            <div class="section-heading"><span class="section-icon" aria-hidden="true"><i class="fas fa-server"></i></span><div>
+                                <h3>{{ _('business_services.form.identity_title') }}</h3>
                                 <div class="card-subtitle">{{ _('business_services.form.identity_help') }}</div>
-                            </div>
+                            </div></div>
                         </div>
 
                         <div class="form-body">
@@ -331,12 +334,12 @@
                         </div>
                     </section>
 
-                    <section class="card">
+                    <section class="card workspace-section" data-section="status">
                         <div class="card-header">
-                            <div>
-                                <h2>{{ _('business_services.form.status_page_title') }}</h2>
+                            <div class="section-heading"><span class="section-icon" aria-hidden="true"><i class="fas fa-signal"></i></span><div>
+                                <h3>{{ _('business_services.form.status_page_title') }}</h3>
                                 <div class="card-subtitle">{{ _('business_services.form.status_page_help') }}</div>
-                            </div>
+                            </div></div>
                         </div>
 
                         <div class="form-body">
@@ -367,7 +370,7 @@
         </div>
     </div>
 
-    <div id="business-service-component-modal" class="app-modal" style="display: none;">
+    <div id="business-service-component-modal" class="app-modal workspace-modal" style="display: none;">
         <div class="app-modal-dialog">
             <div class="app-modal-header">
                 <div>

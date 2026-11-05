@@ -124,6 +124,7 @@ from app.modules.db.models import (  # noqa: E402
 
 
 CLEANUP_MODELS = [
+    ServiceEvent,
     ChangeIncidentLink,
     ChangeAlertGroupCorrelation,
     ChangeImpact,
@@ -176,8 +177,6 @@ CLEANUP_MODELS = [
     ServiceReadinessState,
     ServiceStandardCheck,
     ServiceStandard,
-    ServiceEvent,
-    ServiceEvent,
     ServiceMatchRule,
     ServiceChannel,
     ServiceDependency,
