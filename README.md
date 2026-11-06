@@ -15,7 +15,7 @@ It is designed for SRE, DevOps, platform, infrastructure and operations teams th
 ### Alert intake, routing and orchestration
 
 - route-based intake tokens and source-specific webhook endpoints;
-- native integrations for Alertmanager, AWS SNS / CloudWatch, Azure Monitor, Cloud.ru Cloud Eye / SMN, Datadog, Grafana, LibreNMS, Nagios, New Relic, RMON, Sentry, Uptime Kuma and Zabbix;
+- native integrations for Alertmanager, AWS SNS / CloudWatch, Azure Monitor, Cloud.ru Cloud Eye / SMN, Datadog, Google Cloud Monitoring, Grafana, LibreNMS, Nagios, New Relic, RMON, Sentry, Uptime Kuma and Zabbix;
 - generic webhook intake with PagerDuty Events API v2-compatible trigger, acknowledge and resolve events;
 - Global and Service Event Orchestration;
 - orchestration Builder and JSON editor, validation, simulation, shadow mode, replay, immutable published versions and rollback;
@@ -137,6 +137,7 @@ Read more: [Event Orchestration](docs/usage/event-orchestration.md) and [Explain
 |---|---|---|
 | Alertmanager | `POST /api/integrations/alertmanager` | [Alertmanager](docs/integrations/alertmanager.md) |
 | AWS SNS / CloudWatch | `POST /api/integrations/aws-sns/<route_id>` | [AWS SNS / CloudWatch](docs/integrations/aws-sns-cloudwatch.md) |
+| Google Cloud Monitoring | `POST /api/integrations/google-cloud-monitoring` | [Google Cloud Monitoring](docs/integrations/google-cloud-monitoring.md) |
 | Azure Monitor | `POST /api/integrations/azure-monitor` | [Azure Monitor](docs/integrations/azure-monitor.md) |
 | Cloud.ru Cloud Eye / SMN | `POST /api/integrations/cloud-ru/<route_id>` | [Cloud.ru](docs/integrations/cloud-ru.md) |
 | Datadog | `POST /api/integrations/datadog` | [Datadog](docs/integrations/datadog.md) |
@@ -307,6 +308,8 @@ password = change-me
 ```
 
 Important operational settings include retention, outbound HTTP network policy and Explain Trace detail. See [Configuration](docs/getting-started/configuration.md) for the canonical reference.
+
+Monitor IR itself with the [Grafana Operations dashboard](tools/grafana/incidentrelay-overview.json). See [Prometheus scrape and dashboard import instructions](docs/getting-started/configuration.md#grafana-dashboard).
 
 ---
 

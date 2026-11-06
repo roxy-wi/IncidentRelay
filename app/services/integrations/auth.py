@@ -41,7 +41,7 @@ def get_bearer_token():
 
 
 def get_basic_route_token():
-    """Return a route token from HTTP Basic auth used by Azure webhooks."""
+    """Return a route token from HTTP Basic auth used by monitoring webhooks."""
 
     authorization = request.authorization
     if not authorization:

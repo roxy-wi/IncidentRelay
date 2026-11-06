@@ -13,7 +13,7 @@ It provides:
 - teams and rotations;
 - service directory with affected systems, links, runbooks, dependencies and impact analytics;
 - route-based alert intake tokens;
-- Alertmanager, Zabbix and generic webhook intake;
+- Alertmanager, Zabbix, [Google Cloud Monitoring](integrations/google-cloud-monitoring.md) and generic webhook intake;
 - Mattermost, Telegram, email, webhook-based and voice call notification channels;
 - ACK, Resolve and Alert Shelving workflows;
 - temporary per-AlertGroup shelving with automatic expiry and resume;

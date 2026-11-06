@@ -124,6 +124,7 @@ Team roles:  viewer, responder, manager
 
 | Источник            | Эндпоинт                                   | Документация                                              |
 |---------------------|--------------------------------------------|-----------------------------------------------------------|
+| Google Cloud Monitoring | `POST /api/integrations/google-cloud-monitoring` | [Google Cloud Monitoring](integrations/google-cloud-monitoring.md) |
 | Alertmanager        | `POST /api/integrations/alertmanager`      | [Alertmanager](integrations/alertmanager.md)              |
 | AWS SNS/Cloud watch | `POST /api/integrations/aws-sns`           | [AWS SNS/Cloud watch](integrations/aws-sns-cloudwatch.md) |
 | Grafana             | `POST /api/integrations/grafana`           | [Grafana](integrations/grafana.md)                        |

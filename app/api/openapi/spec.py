@@ -113,7 +113,7 @@ def build_openapi_spec():
                     "type": "http",
                     "scheme": "basic",
                     "description": (
-                        "Provider-specific route authentication. Azure Monitor "
+                        "Provider-specific route authentication. Azure Monitor and Google Cloud Monitoring "
                         "webhooks use username incidentrelay and the route intake "
                         "token as the HTTP Basic password."
                     ),

@@ -448,6 +448,12 @@ The user-notification queue gauges describe current backlog, not history. `state
 
 `incidentrelay_orchestration_pending_events` exposes the current paused-event inventory. `failed` means activation exhausted its automatic retries and needs attention. `incidentrelay_orchestration_oldest_due_age_seconds` includes only `pending` rows whose activation/retry time has arrived, so future pauses do not inflate the age.
 
+### Grafana dashboard
+
+After Prometheus has successfully scraped the IR web service, import the [tools/grafana/incidentrelay-overview.json](https://github.com/roxy-wi/IncidentRelay/blob/release/2.5.0/tools/grafana/incidentrelay-overview.json) via **Dashboards → New → Import** in Grafana. Select the Prometheus data source at import, then choose **IR scrape job** and **Web target** on the dashboard. Set the data source's scrape interval to the actual Prometheus interval so the rate panels use the right window.
+
+Use one job per IR deployment sharing a database. Scrape each web replica as a separate target: the dashboard adds request and event rates, but counts a shared database queue only once. Notification outcomes are rolling **24-hour** counts regardless of the dashboard time range. Missing data is not zero: for example, a database outage can hide the migration count, and an optional worker has no heartbeat line until it first reports. In Docker and Kubernetes, web scrapes may not include counters from separate scheduler or worker containers; their database-backed queue gauges are still available.
+
 ## Scheduler settings
 
 The scheduler process checks reminders, escalations and periodic jobs.

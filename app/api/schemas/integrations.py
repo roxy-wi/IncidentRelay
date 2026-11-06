@@ -1,4 +1,4 @@
-from typing import Annotated, Any, Dict, List
+from typing import Annotated, Any, Dict, List, Literal
 
 from pydantic import BeforeValidator, ConfigDict, Field, model_validator
 
@@ -289,6 +289,33 @@ class DatadogWebhookSchema(ApiModel):
             )
 
         return self
+
+
+class GoogleMonitoringIncidentSchema(ApiModel):
+    """Fields used from a version 1.2 Cloud Monitoring incident."""
+
+    model_config = ConfigDict(extra="allow")
+
+    incident_id: str = Field(min_length=1)
+    scoping_project_id: str = Field(min_length=1)
+    state: Literal["open", "closed"]
+    policy_name: str | None = None
+    condition_name: str | None = None
+    summary: str | None = None
+    severity: str | None = None
+    resource: dict[str, Any] | None = None
+    resource_display_name: str | None = None
+    resource_name: str | None = None
+    url: str | None = None
+
+
+class GoogleCloudMonitoringWebhookSchema(ApiModel):
+    """Validate a direct Cloud Monitoring webhook, not a Pub/Sub envelope."""
+
+    model_config = ConfigDict(extra="allow")
+
+    version: Literal["1.2"]
+    incident: GoogleMonitoringIncidentSchema
 
 
 class AzureMonitorWebhookSchema(ApiModel):

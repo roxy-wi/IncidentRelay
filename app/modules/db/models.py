@@ -2188,6 +2188,16 @@ class Alert(BaseModel):
         )
 
 
+class ClosedGoogleMonitoringIncident(BaseModel):
+    """A provider close is final, even if its opening webhook has not arrived."""
+
+    dedup_key = CharField(primary_key=True, max_length=64)
+    route = ForeignKeyField(AlertRoute, on_delete="CASCADE")
+
+    class Meta:
+        table_name = "closed_google_monitoring_incident"
+
+
 class AlertComment(BaseModel):
     """Human comment attached to an alert group or concrete alert."""
 

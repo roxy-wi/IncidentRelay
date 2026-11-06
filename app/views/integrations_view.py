@@ -13,6 +13,7 @@ from app.api.schemas.integrations import (
     NewRelicWebhookSchema,
     NagiosWebhookSchema,
     GenericWebhookSchema,
+    GoogleCloudMonitoringWebhookSchema,
     GrafanaWebhookSchema,
     OpenSearchWebhookSchema,
     KibanaWebhookSchema,
@@ -28,7 +29,12 @@ from app.modules.db import channels_repo, users_repo, alerts_repo, routes_repo
 from app.services.alerts.actions import acknowledge_alert, resolve_alert
 from app.services.alerts.shelving import shelve_alert_group, unshelve_alert_group
 from app.services.alerts.lifecycle import upsert_alert
-from app.services.integrations.auth import require_alert_token
+from app.services.integrations.auth import (
+    authenticate_route_token,
+    get_basic_route_token,
+    require_alert_token,
+)
+from app.services.integrations.google_cloud_monitoring import process_google_monitoring_alert
 from app.services.metrics import record_alert_received
 from app.services.integrations.normalizers.registry import normalize_for_source
 from app.services.integrations.normalizers.webhook import is_pagerduty_events_v2
@@ -169,6 +175,34 @@ def new_relic_webhook():
             payload.model_dump(exclude_none=True),
         )
     )
+
+
+@integrations_bp.route("/google-cloud-monitoring", methods=["POST"])
+def google_cloud_monitoring_webhook():
+    """Receive Cloud Monitoring notifications authenticated by their route."""
+    token = get_basic_route_token()
+    route = authenticate_route_token(token) if token else None
+    if route is None:
+        return (
+            jsonify({"error": "A valid Basic route credential is required."}),
+            401,
+            {"WWW-Authenticate": 'Basic realm="IncidentRelay"'},
+        )
+    if route.source != "google_cloud_monitoring":
+        return make_error_response(
+            error="route_source_mismatch",
+            message="Route source must be google_cloud_monitoring.",
+            status_code=400,
+        )
+    payload, error = validate_body(GoogleCloudMonitoringWebhookSchema)
+    if error:
+        return error
+
+    events = normalize_for_source(
+        "google_cloud_monitoring", payload.model_dump(exclude_unset=True),
+        route_config={"route_id": route.id},
+    )
+    return process_incoming_alerts(events, process_alert=process_google_monitoring_alert)
 
 
 @integrations_bp.route("/azure-monitor", methods=["POST"])
@@ -718,7 +752,7 @@ def librenms_webhook():
     )
 
 
-def process_incoming_alerts(normalized_alerts):
+def process_incoming_alerts(normalized_alerts, *, process_alert=None):
     """
     Store normalized alerts and return created, updated, ignored or failed records.
 
@@ -729,6 +763,7 @@ def process_incoming_alerts(normalized_alerts):
     items = []
     intake_route = getattr(request, "current_intake_route", None)
 
+    process_alert = process_alert or upsert_alert
     for alert_data in normalized_alerts:
         record_alert_received(alert_data.get("source"))
 
@@ -740,7 +775,7 @@ def process_incoming_alerts(normalized_alerts):
             alert_data["forced_team_id"] = intake_route.team.id
             alert_data["team_slug"] = intake_route.team.slug
 
-        result = upsert_alert(alert_data)
+        result = process_alert(alert_data)
 
         item = serialize_alert_processing_result(
             result,

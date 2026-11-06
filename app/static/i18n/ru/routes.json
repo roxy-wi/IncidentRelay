@@ -202,6 +202,8 @@
   "routes.intake.new_relic_example_comment": "Пример webhook payload New Relic Alerts Workflows",
   "routes.intake.new_relic_subtitle": "Используйте этот endpoint в webhook destination New Relic Alerts Workflow и добавьте token маршрута в заголовок Authorization: Bearer.",
   "routes.intake.new_relic_help": "Передавайте issueId как issue_id, чтобы open/update/close обновляли один и тот же алерт IncidentRelay. Рекомендуемый шаблон также передаёт priority, URL issue, policy, condition, entity и labels.",
+  "routes.intake.google_cloud_monitoring_subtitle": "Укажите этот HTTPS-адрес для канала Webhook в Cloud Monitoring.",
+  "routes.intake.google_cloud_monitoring_help": "Выберите HTTP Basic. Введите incidentrelay в поле имени пользователя и токен приёма маршрута в поле пароля.",
   "routes.form.azure_monitor_help": "Для Azure Monitor Action Group Webhook включите Common Alert Schema. Используйте сгенерированный webhook URI с HTTP Basic credentials этого маршрута.",
   "routes.intake.azure_monitor_example_comment": "Пример Azure Monitor Common Alert Schema webhook",
   "routes.intake.azure_monitor_subtitle": "Используйте этот URI в Azure Monitor Action Group Webhook и включите Common Alert Schema.",
