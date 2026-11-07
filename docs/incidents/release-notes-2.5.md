@@ -10,6 +10,9 @@ the Linux/Python CI matrix.
 
 ## Delivered behavior
 
+- Global administrators can change event intake and background change processing
+  without restarting IR under **Administration → System settings**.
+  See [Change Intelligence settings](../getting-started/configuration.md#change-intelligence-experimental-intake).
 - Incident owns commander/responders, stakeholders, its ServiceOwner snapshot,
   operational comments, root cause and resolution summary.
 - The workspace combines attributed operational and authorized technical activity,

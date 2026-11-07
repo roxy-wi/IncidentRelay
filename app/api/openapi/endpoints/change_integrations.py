@@ -1,4 +1,4 @@
-"""Administration contracts only; Change Event intake is not enabled yet."""
+"""JWT administration of Change Intelligence integrations."""
 
 from app.api.openapi.common import json_body, path_param, response
 

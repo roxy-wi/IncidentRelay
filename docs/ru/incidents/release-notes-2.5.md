@@ -10,6 +10,8 @@ description: Переход collaboration на Incident, API и выпускны
 
 ## Изменения
 
+- Глобальный администратор может менять приём событий и фоновую обработку
+  изменений без перезапуска IR в разделе **Администрирование → Системные настройки**. См. [настройки Change Intelligence](../getting-started/configuration.md).
 - Incident владеет commander/responders, stakeholders, снимком ServiceOwner,
   операционными комментариями, root cause и resolution summary.
 - Workspace объединяет операционную и доступную техническую историю с автором и

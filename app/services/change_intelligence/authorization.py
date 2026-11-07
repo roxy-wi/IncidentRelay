@@ -2,11 +2,10 @@
 
 from contextlib import contextmanager
 
-from peewee import SqliteDatabase
-
 from app.db import database_proxy as db
 from app.modules.common import utc_now
 from app.modules.db import incident_core_repo
+from app.modules.db.transactions import lock_row
 from app.modules.db.models import (
     ApiToken,
     ChangeGrant,
@@ -21,15 +20,6 @@ from app.services.integrations.auth import hash_token
 
 class ChangeAccessDenied(PermissionError):
     """A uniform denial that does not disclose resource existence."""
-
-
-def lock_row(query):
-    """Lock a row on PostgreSQL; callers reserve SQLite writes up front."""
-    if not db.in_transaction():
-        raise RuntimeError("Change authorization requires a transaction")
-    if not isinstance(db.obj, SqliteDatabase):
-        query = query.for_update()
-    return query.first()
 
 
 def active_team(team_id):

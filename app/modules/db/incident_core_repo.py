@@ -8,19 +8,12 @@ from peewee import SqliteDatabase
 
 from app.db import database_proxy as db
 from app.modules.common import utc_now
+from app.modules.db.transactions import write_transaction
 from app.modules.db.models import AlertGroup, Incident, IncidentAlertGroupLink, IncidentEvent
 
 
 class IncidentConflictError(RuntimeError):
     """Raised when an optimistic-concurrency update loses a race."""
-
-
-def write_transaction():
-    """Reserve SQLite writes before any reads; use a regular transaction otherwise."""
-    database = getattr(db, "obj", db)
-    if isinstance(database, SqliteDatabase):
-        return db.atomic("IMMEDIATE")
-    return db.atomic()
 
 
 @contextmanager

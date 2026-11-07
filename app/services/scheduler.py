@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime, timedelta, timezone
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.schedulers.base import SchedulerAlreadyRunningError, SchedulerNotRunningError
@@ -29,6 +30,7 @@ from app.services.orchestration.pending import (
     process_due_pending_events,
 )
 from app.services.orchestration.webhooks import process_due_webhooks
+from app.services.system_settings import get_settings
 
 logger = logging.getLogger("oncall.scheduler")
 _scheduler = None
@@ -712,6 +714,21 @@ def change_intelligence_job():
             db.close()
 
 
+def refresh_change_worker_schedule(scheduler):
+    """Apply the committed interval even while queue processing is paused."""
+    with db.connection_context():
+        seconds = get_settings().change_worker_interval_seconds
+    job_id = "change_intelligence_job"
+    job = scheduler.get_job(job_id)
+    if job is None:
+        scheduler.add_job(
+            change_intelligence_job, "interval", seconds=seconds, id=job_id,
+            max_instances=1, coalesce=True, next_run_time=datetime.now(timezone.utc),
+        )
+    elif job.trigger.interval != timedelta(seconds=seconds):
+        scheduler.reschedule_job(job_id, trigger="interval", seconds=seconds)
+
+
 def start_scheduler():
     """
     Start the background scheduler.
@@ -726,17 +743,17 @@ def start_scheduler():
         return _scheduler
 
     _scheduler = BackgroundScheduler()
-    if Config.CHANGE_WORKER_ENABLED:
-        _scheduler.add_job(
-            change_intelligence_job,
-            "interval",
-            seconds=Config.CHANGE_WORKER_INTERVAL_SECONDS,
-            max_instances=1,
-            coalesce=True,
-            next_run_time=utc_now(),
-            id="change_intelligence_job",
-            replace_existing=True,
-        )
+    _scheduler.add_job(
+        refresh_change_worker_schedule,
+        "interval",
+        seconds=5,
+        args=(_scheduler,),
+        max_instances=1,
+        coalesce=True,
+        next_run_time=datetime.now(timezone.utc),
+        id="refresh_change_worker_schedule",
+        replace_existing=True,
+    )
     _scheduler.add_job(
         reminder_job,
         "interval",

@@ -484,27 +484,43 @@ For systemd and containers, also check journal or container logs.
 
 ## Change Intelligence experimental intake
 
-Public Change Event intake remains disabled until the complete intake, worker,
-correlation and authorized alert-link flow passes acceptance. Intake and worker can be
-tested in an isolated environment with an integration machine credential:
+All Change Intelligence settings apply to the entire installation. The [system settings design](../architecture/system-settings.md) describes inheritance for future Group settings.
 
-```ini
-[change_intelligence]
-intake_enabled = false
-max_future_seconds = 300
-events_per_minute = 600
-events_per_change = 1000
-```
+Global administrators control **Accept Change Events** and **Background change processing**
+under **Administration → System settings**, or through `GET` and `PATCH` on
+`/api/admin/system-settings`. Send only the fields you want to change, for example
+`{"change_worker_enabled": false}` to pause processing. The intake field is
+`change_intake_enabled`.
+On a new installation intake is off and background processing is on. Turning intake
+on allows authorized integrations to send events to `POST /api/change-events`.
 
-`intake_enabled=true` enables `POST /api/change-events` for internal testing only.
-The worker has a separate switch; intake does not enable correlation. `events_per_minute` limits new
-accepted events over a rolling minute per integration across all tokens/sources;
-exact retries do not consume quota. `events_per_change` bounds rebuild cost
-(1–10000, default 1000). Future skew cannot be negative; both quotas must be
-positive (out-of-range configuration is clamped). Environment overrides use
-`INCIDENTRELAY__CHANGE_INTELLIGENCE__INTAKE_ENABLED`, and the same convention for
-the other options. Disable intake and restart web processes to roll back access;
-keep stored events, references and pending jobs intact.
+Intake changes take effect on the next request. The scheduler checks background
+processing at the start of each cycle. A running cycle can finish, and jobs created
+during a pause stay in the queue until processing resumes. Changes take effect
+without a restart. The audit log records the administrator, time, old and new values.
+
+### Advanced Change Intelligence settings
+
+Under **Administration → System settings → Advanced settings**, edit the numbers and select **Save**. The API accepts the same integers in a partial `PATCH /api/admin/system-settings`. The database stores the values for all IR processes. If you customized limits in a prerelease configuration file or environment, enter them here after running the migration.
+
+| API field | Purpose | Default | Range |
+|---|---|---:|---:|
+| `change_max_future_seconds` | Allowed future event time (seconds) | 300 | ≥ 0 |
+| `change_events_per_minute` | New events per integration per minute | 600 | ≥ 1 |
+| `change_events_per_change` | Events per change | 1000 | 1–10000 |
+| `change_worker_interval_seconds` | Worker interval (seconds) | 5 | ≥ 1 |
+| `change_worker_jobs_per_tick` | Jobs per worker tick | 20 | 1–100 |
+| `change_worker_batch_size` | Rows per batch | 100 | 1–1000 |
+| `change_worker_lease_seconds` | Job lease duration (seconds) | 60 | ≥ 10 |
+| `change_worker_max_attempts` | Maximum attempts per job | 8 | ≥ 1 |
+| `change_worker_retry_base_seconds` | Base retry delay (seconds) | 5 | ≥ 1 |
+| `change_worker_retry_max_seconds` | Maximum retry delay (seconds) | 300 | ≥ 1 |
+| `change_pending_ttl_seconds` | Pending reference lifetime (seconds) | 604800 | ≥ 60 |
+| `change_pending_poll_seconds` | Pending reference check interval (seconds) | 60 | ≥ 5 |
+
+The common integer ceiling is 2,147,483,647. The base retry delay must fit within the maximum. Both can be edited in one request. An integration’s rolling one-minute quota covers all its sources and tokens. Exact event retries return the stored result without consuming quota.
+
+Each scheduler instance checks the worker interval every five seconds, including while processing is paused. When it changes, the next tick is scheduled one new interval from that check. A batch in progress finishes with its original limit. Existing reference expiries, leases and scheduled retries keep their deadlines. The new duration applies the next time a deadline is assigned or a lease is renewed.
 
 The body is limited to 256 KiB before parsing; at most 100 Service references may
 be submitted, and details are limited to 64 KiB, 10 nesting levels and 2000 nodes.
@@ -529,21 +545,7 @@ grants, namespace pinning and the remaining stages.
 
 ### Durable Change worker
 
-The existing scheduler runs the worker independently of the intake switch:
-
-```ini
-[change_intelligence]
-worker_enabled = true
-worker_interval_seconds = 5
-worker_lease_seconds = 60
-worker_max_attempts = 8
-worker_retry_base_seconds = 5
-worker_retry_max_seconds = 300
-worker_jobs_per_tick = 20
-worker_batch_size = 100
-pending_ttl_seconds = 604800
-pending_poll_seconds = 60
-```
+The worker runs independently of event intake. The values below are the defaults.
 
 Each tick starts up to 20 jobs and stops starting jobs after 10 seconds. Reference
 and discovery batches contain at most 100 rows by default (configurable 1–1000);
@@ -599,7 +601,7 @@ categories; `incidentrelay_change_jobs`,
 `incidentrelay_change_references`, and `incidentrelay_change_dead_jobs` expose
 queue size, age and errors without source/Team/Service labels. Stage 7 enables impact, correlation and eligible episode discovery. Stage 9 enables safe Service Timeline publication through the same worker.
 
-For rollback, disable both intake and worker and restart web/scheduler processes.
+To pause the entire flow, turn off both switches in System settings.
 Keep rows and cursors intact; expired leases can be reclaimed after re-enabling.
 Stage 5 does not delete events, jobs or identity digests, so retries remain possible
 while history is retained. Retention/tombstone policy remains release work for later stages; the automatic horizon is documented below.

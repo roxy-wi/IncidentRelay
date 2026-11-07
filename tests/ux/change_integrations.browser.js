@@ -35,6 +35,56 @@ async function main() {
         await page.goto("/admin/change-integrations");
         assert.equal(await page.locator("#ci-modal").isVisible(), false);
         await page.waitForFunction(() => document.querySelector("#ci-list-status").textContent.includes("No integrations"));
+        assert.equal(await page.locator("#view-change-integrations [role=switch]").count(), 0);
+        const link = page.locator('.menu-link[href="/admin/system-settings"]');
+        const settings = page.locator("#system-settings");
+        const settingsApi = "/api/admin/system-settings";
+        if (fixture.groupAdmin) {
+            assert.equal(await link.isVisible(), false);
+            assert.equal((await page.request.get("/admin/system-settings")).status(), 403);
+        } else {
+            const adminMenu = page.locator("#administration-menu-toggle");
+            if (await adminMenu.getAttribute("aria-expanded") === "false") {
+                await adminMenu.click();
+            }
+            await link.click();
+            const intake = settings.getByRole("switch", {name: "Accept Change Events"});
+            await page.waitForFunction(() => !document.querySelector('#system-settings-controls input').disabled);
+            const queue = settings.getByRole("switch", {name: "Background change processing"});
+            assert.equal(await queue.isChecked(), true);
+            assert.equal(await queue.isEnabled(), true);
+            assert.equal(await intake.isChecked(), false);
+            await settings.locator("summary").click();
+            const advanced = settings.locator("#system-settings-advanced");
+            assert.equal(await advanced.getByRole("spinbutton").count(), 12);
+            const interval = advanced.getByLabel("Worker interval (seconds)");
+            await interval.fill("0");
+            assert.equal(await interval.evaluate(input => input.validity.rangeUnderflow), true);
+            await interval.fill("13");
+            const saved = page.waitForResponse(r => r.url().endsWith(settingsApi) && r.request().method() === "PATCH");
+            await intake.check();
+            assert.equal((await (await saved).json()).change_intake_enabled, true);
+            assert.equal(await interval.inputValue(), "13");
+            const baseDelay = advanced.getByLabel("Base retry delay (seconds)");
+            await baseDelay.fill("301");
+            await advanced.getByRole("button", {name: "Save"}).click();
+            assert.equal(await baseDelay.evaluate(input => input.validity.customError), true);
+            await baseDelay.fill("5");
+            const edit = page.waitForResponse(r => r.url().endsWith(settingsApi) && r.request().method() === "PATCH");
+            await advanced.getByRole("button", {name: "Save"}).click();
+            const result = await edit;
+            assert.deepEqual(result.request().postDataJSON(), {change_worker_interval_seconds: 13});
+            assert.equal((await result.json()).change_worker_interval_seconds, 13);
+            const paused = page.waitForResponse(r => r.url().endsWith(settingsApi) && r.request().method() === "PATCH");
+            await queue.uncheck();
+            assert.equal((await (await paused).json()).change_worker_enabled, false);
+            await page.reload();
+            await page.waitForFunction(() => document.querySelector('#system-settings-controls input').checked);
+            assert.equal(await queue.isChecked(), false);
+            assert.equal(await interval.inputValue(), "13");
+            await page.locator('.menu-link[href="/admin/change-integrations"]').click();
+            await page.waitForFunction(() => document.querySelector("#ci-list-status").textContent.includes("No integrations"));
+        }
         await page.locator("#ci-new").click();
         await page.locator("#ci-new-group").selectOption(String(fixture.groupId));
         await page.locator("#ci-new-owner").selectOption(String(fixture.teamId));

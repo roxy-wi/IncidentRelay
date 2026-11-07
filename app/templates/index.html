@@ -103,7 +103,7 @@
   messages: {{ i18n_messages | tojson }}
  };
  </script>
- <script src="{{ url_for('static', filename='js/core/i18n.js', v='fbb7918e3be1') }}"></script>
+ <script src="{{ url_for('static', filename='js/core/i18n.js', v='b91b059d9f49') }}"></script>
     <script src="/static/js/vendor/jquery-3.7.1.min.js"></script>
     <script src="/static/js/vendor/select2.min.js"></script>
     <script src="{{ url_for('static', filename='js/vendor/tom-select.complete.min.js') }}"></script>
@@ -286,6 +286,9 @@
                             <svg class="menu-icon"><use href="#icon-audit-log"></use></svg>
                             <span class="menu-text">{{ _('nav.audit_log') }}</span>
                         </a>
+            <a href="/admin/system-settings" data-page="system-settings" class="menu-link menu-link-global-admin is-hidden" title="{{ _('pages.system-settings.title') }}">
+              <i class="fa-solid fa-sliders menu-icon" aria-hidden="true"></i><span class="menu-text">{{ _('pages.system-settings.title') }}</span>
+            </a>
             <a href="/admin/change-integrations" data-page="change-integrations" class="menu-link menu-link-change-integrations is-hidden" title="{{ _('ci.title') }}">
               <svg class="menu-icon"><use href="#icon-routes"></use></svg><span class="menu-text">{{ _('ci.title') }}</span>
             </a>
@@ -376,6 +379,7 @@
             <div id="view-admin-users" class="view">{% include "pages/admin_users.html" %}</div>
             <div id="view-audit-log" class="view">{% include "pages/audit_log.html" %}</div>
             <div id="view-sso" class="view">{% include "pages/sso.html" %}</div>
+            <div id="view-system-settings" class="view">{% include "pages/system_settings.html" %}</div>
             <div id="view-change-integrations" class="view">{% include "pages/change_integrations.html" %}</div>
             <div id="view-groups" class="view">{% include "pages/groups.html" %}</div>
             <div id="view-profile" class="view">{% include "pages/profile.html" %}</div>
@@ -423,7 +427,7 @@
 </section>
 <script src="{{ url_for('static', filename='js/components/matcher_editor.js', v='20260625') }}"></script>
 <script src="/static/js/core/rbac_roles.js"></script>
-<script src="/static/js/core/state.js?v=172ef17c8391"></script>
+<script src="/static/js/core/state.js?v=1d0efc471f21"></script>
 <script src="/static/js/core/user_appearance.js"></script>
 <script src="/static/js/core/dialogs.js"></script>
 <script src="/static/js/core/api.js"></script>
@@ -440,7 +444,7 @@
 <script src="/static/js/core/sortable_table.js"></script>
 <script src="/static/js/core/pwa.js"></script>
 <script src="/static/js/core/browser_push.js"></script>
-<script src="/static/js/core/router.js?v=288e5a75c0a7"></script>
+<script src="/static/js/core/router.js?v=ff115628149a"></script>
 <script src="/static/js/core/forms.js"></script>
 <script src="{{ url_for('static', filename='js/core/timezones.js') }}"></script>
 <script src="/static/js/sidebar.js"></script>
@@ -489,7 +493,8 @@
 <script src="/static/js/pages/groups.js"></script>
 <script src="/static/js/pages/profile.js"></script>
 <script src="/static/js/pages/sso.js"></script>
-<script src="/static/js/pages/change_integrations.js?v=645df8733ed3"></script>
+<script src="/static/js/pages/system_settings.js?v=7c93f59c849d"></script>
+<script src="/static/js/pages/change_integrations.js?v=8c42f9f7fefe"></script>
 <script src="/static/js/pages/services_standards.js"></script>
 <script src="{{ url_for('static', filename='js/core/list_url_state_registry.js') }}"></script>
 </body>

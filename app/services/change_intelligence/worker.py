@@ -38,12 +38,12 @@ from app.services.change_intelligence.episode_discovery import (
     compute_episode_discovery,
     publish_episode_discovery,
 )
+from app.services.system_settings import get_settings
 from app.services.change_intelligence.timeline import (
     compute_timeline_batch,
     publish_timeline_batch,
 )
 from app.services.metrics import record_change_worker_result
-from app.settings import Config
 
 logger = logging.getLogger("oncall.change_intelligence")
 
@@ -58,7 +58,7 @@ def schedule_pending_reconciliation():
         if job and (
             job.state != "done"
             or (utc_now() - job.updated_at).total_seconds()
-            < Config.CHANGE_PENDING_POLL_SECONDS
+            < get_settings().change_pending_poll_seconds
         ):
             return
         correlations = eligible_episode_query().exists() or (
@@ -131,10 +131,11 @@ def compute_discovery_batch(claim):
     upper = cursor.get("upper_id")
     if upper is None:
         upper = query.select(fn.MAX(column)).scalar() or 0
+    batch_size = get_settings().change_worker_batch_size
     rows = list(
         query.where(column > cursor.get("after_id", 0), column <= upper)
         .order_by(column)
-        .limit(Config.CHANGE_WORKER_BATCH_SIZE)
+        .limit(batch_size)
         .dicts()
     )
     after = rows[-1]["id"] if rows else upper
@@ -144,7 +145,7 @@ def compute_discovery_batch(claim):
         "change_ids": sorted({row["change_id"] for row in rows}),
         "upper_id": upper,
         "after_id": after,
-        "complete": after >= upper or len(rows) < Config.CHANGE_WORKER_BATCH_SIZE,
+        "complete": after >= upper or len(rows) < batch_size,
         "pending_only": pending_only,
         "reconcile": reconcile,
     }
@@ -274,13 +275,14 @@ def process_claim(claim):
 
 def process_change_jobs():
     """One bounded scheduler tick; independent processes may safely compete."""
-    if not Config.CHANGE_WORKER_ENABLED:
+    settings = get_settings()
+    if not settings.change_worker_enabled:
         return 0
     changes_repo.retry_contention(schedule_pending_reconciliation)
     owner = f"{socket.gethostname()[:100]}:{os.getpid()}:{uuid.uuid4().hex}"
     processed = 0
     deadline = time.monotonic() + 10
-    for _ in range(Config.CHANGE_WORKER_JOBS_PER_TICK):
+    for _ in range(settings.change_worker_jobs_per_tick):
         if time.monotonic() >= deadline:
             break
         claim = changes_repo.claim_job(owner)

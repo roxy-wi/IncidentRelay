@@ -21,6 +21,7 @@ from app.modules.db.models import (
     ChangeEvent,
     ChangeGraphState,
     ChangeJob,
+    SystemSettings,
     ChangeService,
     ChangeServiceReference,
     Service,
@@ -324,7 +325,7 @@ def test_failure_after_publication_before_ack_rolls_back(intake, monkeypatch):
 
 def test_transient_failure_backoff_exhaustion_and_crash_budget(intake, monkeypatch):
     change = pending_change(intake)
-    monkeypatch.setattr(Config, "CHANGE_WORKER_MAX_ATTEMPTS", 2)
+    SystemSettings.update(change_worker_max_attempts=2).execute()
     error = OperationalError("parameters must never be logged")
     error.__cause__ = Exception()
     error.__cause__.pgcode = "40001"
@@ -356,8 +357,8 @@ def test_transient_failure_backoff_exhaustion_and_crash_budget(intake, monkeypat
     assert ChangeJob.get_by_id(first.id).last_error_class == "attempts_exhausted"
 
 
-def test_batched_resolver_resumes_and_publishes_final_stamps(intake, monkeypatch):
-    monkeypatch.setattr(Config, "CHANGE_WORKER_BATCH_SIZE", 1)
+def test_batched_resolver_resumes_and_publishes_final_stamps(intake):
+    SystemSettings.update(change_worker_batch_size=1).execute()
     change = pending_change(intake, slugs=["one", "two", "three"])
     for slug in ["one", "two", "three"]:
         create_service(intake[0][2].team, slug=slug)
@@ -513,8 +514,8 @@ def test_worker_counters_respect_metrics_switch(monkeypatch):
         metrics.record_change_worker_result("sender-defined-label")
 
 
-def test_discovery_cursor_survives_retry_and_requests_each_change(intake, monkeypatch):
-    monkeypatch.setattr(Config, "CHANGE_WORKER_BATCH_SIZE", 1)
+def test_discovery_cursor_survives_retry_and_requests_each_change(intake):
+    SystemSettings.update(change_worker_batch_size=1).execute()
     changes = [pending_change(intake, change_id=f"build-{index}") for index in range(3)]
     ChangeJob.delete().execute()
     with incident_core_repo.write_transaction():
@@ -629,15 +630,15 @@ def test_retry_audit_failure_rolls_back_generation_and_reference_reset(
     assert ChangeServiceReference.get().last_error_code == "pending_ttl_expired"
 
 
-def test_disabled_worker_does_not_claim_jobs(intake, monkeypatch):
+def test_disabled_worker_does_not_claim_jobs(intake):
     pending_change(intake)
-    monkeypatch.setattr(Config, "CHANGE_WORKER_ENABLED", False)
+    SystemSettings.update(change_worker_enabled=False).execute()
     assert worker.process_change_jobs() == 0
     assert not ChangeJob.select().where(ChangeJob.state == "running").exists()
 
 
-def test_pending_sweep_deduplicates_change_across_pages(intake, monkeypatch):
-    monkeypatch.setattr(Config, "CHANGE_WORKER_BATCH_SIZE", 1)
+def test_pending_sweep_deduplicates_change_across_pages(intake):
+    SystemSettings.update(change_worker_batch_size=1).execute()
     change = pending_change(intake, slugs=["one", "two", "three"])
     ChangeJob.delete().where(ChangeJob.job_type != "resolve_references").execute()
     worker.schedule_pending_reconciliation()
@@ -697,7 +698,68 @@ def test_scheduler_registers_worker_and_closes_its_connection(intake, monkeypatc
     registered = [
         options
         for function, options in jobs
-        if function is scheduler.change_intelligence_job
+        if function is scheduler.refresh_change_worker_schedule
     ]
     assert registered[0]["max_instances"] == 1
-    assert registered[0]["seconds"] == Config.CHANGE_WORKER_INTERVAL_SECONDS
+    assert registered[0]["seconds"] == 5
+    assert registered[0]["args"] == (scheduler._scheduler,)
+
+
+def test_running_scheduler_tracks_interval_even_when_queue_is_paused(client, admin_headers):
+    from threading import Event
+
+    from apscheduler.events import EVENT_JOB_EXECUTED
+    from apscheduler.schedulers.background import BackgroundScheduler
+
+    from app.services.scheduler import refresh_change_worker_schedule
+
+    def update(**values):
+        response = client.patch("/api/admin/system-settings", json=values, headers=admin_headers)
+        assert response.status_code == 200
+
+    update(change_worker_interval_seconds=3600, change_worker_enabled=False)
+    scheduler = BackgroundScheduler()
+    registered, ran_at_short_interval, lengthened = Event(), Event(), Event()
+
+    def observe(event):
+        job = scheduler.get_job("change_intelligence_job")
+        if job is None:
+            return
+        seconds = job.trigger.interval.total_seconds()
+        if seconds == 3600:
+            registered.set()
+        if seconds == 1 and event.job_id == job.id and event.retval == 0:
+            ran_at_short_interval.set()
+        if seconds == 7200:
+            lengthened.set()
+
+    scheduler.add_listener(observe, EVENT_JOB_EXECUTED)
+    scheduler.add_job(refresh_change_worker_schedule, "interval", seconds=0.2, args=(scheduler,))
+    scheduler.start()
+    try:
+        assert registered.wait(10)
+        update(change_worker_interval_seconds=1)
+        # Several unchanged refreshes happen before this tick. They must not postpone it.
+        assert ran_at_short_interval.wait(10)
+        update(change_worker_interval_seconds=7200)
+        assert lengthened.wait(10)
+    finally:
+        scheduler.shutdown()
+
+
+def test_new_timing_applies_to_next_claim_and_reference_only(intake):
+    SystemSettings.update(change_worker_lease_seconds=25, change_pending_ttl_seconds=120).execute()
+    first = pending_change(intake)
+    first_reference = ChangeServiceReference.get(ChangeServiceReference.change == first)
+    claim = claim_resolution(first)
+    assert claim.lease_expires_at - claim.updated_at == timedelta(seconds=25)
+    assert abs((first_reference.expires_at - first_reference.created_at).total_seconds() - 120) < 2
+    SystemSettings.update(change_worker_lease_seconds=40, change_pending_ttl_seconds=600).execute()
+    assert ChangeJob.get_by_id(claim.id).lease_expires_at == claim.lease_expires_at
+    assert ChangeServiceReference.get_by_id(first_reference.id).expires_at == first_reference.expires_at
+    queue.renew_lease(claim)
+    renewed = ChangeJob.get_by_id(claim.id)
+    assert abs((renewed.lease_expires_at - renewed.updated_at).total_seconds() - 40) < 2
+    second = pending_change(intake, change_id="second")
+    newer = ChangeServiceReference.get(ChangeServiceReference.change == second)
+    assert abs((newer.expires_at - newer.created_at).total_seconds() - 600) < 2

@@ -24,6 +24,7 @@ from app.modules.db.migrations import migrate  # noqa: E402
 from app.modules.db.models import (  # noqa: E402
     AlertGroupEpisode,
     ClosedGoogleMonitoringIncident,
+    SystemSettings,
     ChangeImpact,
     ChangeAlertGroupCorrelation,
     ChangeIncidentLink,
@@ -256,6 +257,9 @@ def clean_database(migrated_database):
         if db.table_exists(model._meta.table_name):
             model.delete().execute()
 
+    SystemSettings.update({
+        field: field.default for field in SystemSettings._meta.sorted_fields if not field.primary_key
+    }).execute()
     yield
 
     if db.is_closed():

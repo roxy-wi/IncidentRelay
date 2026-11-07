@@ -14,7 +14,7 @@ from app.services.audit import record_audit
 from app.services.change_intelligence.administration import ChangeConflict, lock_catalog
 from app.services.change_intelligence.authorization import lock_row
 from app.services.change_intelligence.management import require_manager
-from app.settings import Config
+from app.services.system_settings import get_settings
 
 
 def integration_jobs(integration_id):
@@ -90,7 +90,7 @@ def retry_job(job_id, expected_generation, *, actor_id, integration_id=None):
             )
             ChangeServiceReference.update(
                 expires_at=utc_now()
-                + timedelta(seconds=Config.CHANGE_PENDING_TTL_SECONDS),
+                + timedelta(seconds=get_settings().change_pending_ttl_seconds),
             ).where(
                 blocked, ChangeServiceReference.resolved_service.is_null(True)
             ).execute()

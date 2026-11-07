@@ -28,7 +28,7 @@ from app.services.change_intelligence.references import (
     mapping_summary,
     resolve_reference,
 )
-from app.settings import Config
+from app.services.system_settings import get_settings
 
 
 class ChangeEventConflict(ValueError):
@@ -104,6 +104,7 @@ def _ingest_once(payload, content, digest, raw_token):
         with authorized_source(
             token.change_integration_id, owner.id, payload.source, raw_token=raw_token
         ) as (source, auth_revision):
+            settings = get_settings()
             existing = ChangeEvent.get_or_none(
                 ChangeEvent.source == source.id,
                 ChangeEvent.external_event_id == payload.event_id,
@@ -113,11 +114,11 @@ def _ingest_once(payload, content, digest, raw_token):
                     raise ChangeEventConflict(
                         "event_id was already used with different content"
                     )
-                return _result(existing, existing.change), False
+                return _result(existing, existing.change, settings.change_worker_enabled), False
             now = utc_now()
             occurred_at = payload.occurred_at.replace(tzinfo=None)
             if occurred_at > now + timedelta(
-                seconds=Config.CHANGE_EVENTS_MAX_FUTURE_SECONDS
+                seconds=settings.change_max_future_seconds
             ):
                 raise InvalidChangeInput(
                     "occurred_at exceeds the allowed future clock skew"
@@ -128,9 +129,9 @@ def _ingest_once(payload, content, digest, raw_token):
                     ChangeEvent.integration == token.change_integration_id,
                     ChangeEvent.received_at >= now - timedelta(minutes=1),
                 )
-                .limit(Config.CHANGE_EVENTS_PER_MINUTE)
+                .limit(settings.change_events_per_minute)
             )
-            if len(list(recent)) >= Config.CHANGE_EVENTS_PER_MINUTE:
+            if recent.count() >= settings.change_events_per_minute:
                 raise ChangeRateLimited("Integration event rate exceeded")
             change = lock_row(
                 Change.select().where(
@@ -165,7 +166,7 @@ def _ingest_once(payload, content, digest, raw_token):
             if (
                 change
                 and ChangeEvent.select().where(ChangeEvent.change == change.id).count()
-                >= Config.CHANGE_EVENTS_PER_CHANGE
+                >= settings.change_events_per_change
             ):
                 raise InvalidChangeInput("Change event history limit reached")
             if change is None:
@@ -223,7 +224,8 @@ def _ingest_once(payload, content, digest, raw_token):
             ):
                 for reference in content[name]:
                     resolve_reference(
-                        change, event, source, relation, reference, auth_revision
+                        change, event, source, relation, reference, auth_revision,
+                        ttl_seconds=settings.change_pending_ttl_seconds,
                     )
             events = list(
                 ChangeEvent.select(
@@ -246,10 +248,10 @@ def _ingest_once(payload, content, digest, raw_token):
             changes_repo.request_job(
                 "resolve_references", change.id, target_revision=change.revision
             )
-            return _result(event, Change.get_by_id(change.id)), True
+            return _result(event, Change.get_by_id(change.id), settings.change_worker_enabled), True
 
 
-def _result(event, change):
+def _result(event, change, worker_enabled):
     """A machine credential receives acknowledgements, not a Change read API."""
     return {
         "event_uid": str(event.uid),
@@ -261,5 +263,5 @@ def _result(event, change):
         "lifecycle_conflict": change.lifecycle_conflict,
         "mapping_status": change.mapping_status,
         "references": mapping_summary(change.id)[1],
-        "correlation_status": "queued" if Config.CHANGE_WORKER_ENABLED else "not_enabled",
+        "correlation_status": "queued" if worker_enabled else "not_enabled",
     }

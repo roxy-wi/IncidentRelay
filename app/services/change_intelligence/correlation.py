@@ -37,7 +37,7 @@ from app.services.change_intelligence.resolver import (
     ENGINE_VERSION as REFERENCE_ENGINE,
     StaleChangeInputs,
 )
-from app.settings import Config
+from app.services.system_settings import get_settings
 
 ENGINE_VERSION = "correlation-v1"
 WINDOW_SECONDS = 7200
@@ -361,13 +361,14 @@ def compute_correlation_batch(claim):
     upper = cursor.get("upper_id")
     if upper is None:
         upper = query.select(fn.MAX(AlertGroupEpisode.id)).scalar() or 0
+    batch_size = get_settings().change_worker_batch_size
     episodes = list(
         query.where(
             AlertGroupEpisode.id > cursor.get("after_id", 0),
             AlertGroupEpisode.id <= upper,
         )
         .order_by(AlertGroupEpisode.id)
-        .limit(Config.CHANGE_WORKER_BATCH_SIZE)
+        .limit(batch_size)
     )
     results = []
     for episode in episodes:
@@ -384,7 +385,7 @@ def compute_correlation_batch(claim):
         "error": error,
         "upper_id": upper,
         "after_id": after,
-        "complete": after >= upper or len(episodes) < Config.CHANGE_WORKER_BATCH_SIZE,
+        "complete": after >= upper or len(episodes) < batch_size,
     }
 
 

@@ -146,7 +146,6 @@ def test_intake_route_remains_disabled_by_default(
 ):
     monkeypatch.setattr(Config, "API_AUTH_REQUIRED", False)
     assert any(rule.rule == "/api/change-events" for rule in app.url_map.iter_rules())
-    assert Config.CHANGE_EVENTS_ENABLED is False
     assert (
         client.post("/api/change-events", json={}, headers=admin_headers).status_code
         == 401

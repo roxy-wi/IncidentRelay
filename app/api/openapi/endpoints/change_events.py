@@ -118,7 +118,7 @@ def paths():
                 "summary": "Persist one Change Event atomically (experimental)",
                 "security": [{"bearerAuth": []}],
                 "description": (
-                    "Disabled by default; enable change_intelligence.intake_enabled only in an internal acceptance environment. "
+                    "Disabled by default. Global administrators can enable intake for internal acceptance in System settings. "
                     "Requires an active integration Bearer credential with changes:ingest even when global API auth is optional. "
                     "JWTs and personal tokens cannot ingest. Maximum body 256 KiB, 100 total references, details 64 KiB/10 levels/2000 nodes. "
                     "occurred_at requires a timezone and at most six fractional digits; default future skew is 300 seconds. "

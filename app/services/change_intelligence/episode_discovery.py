@@ -9,7 +9,7 @@ from app.services.change_intelligence.authorization import lock_row
 from app.services.change_intelligence.correlation import history_changes
 from app.services.change_intelligence.eligibility import episode_eligibility
 from app.services.change_intelligence.resolver import StaleChangeInputs
-from app.settings import Config
+from app.services.system_settings import get_settings
 
 
 def compute_episode_discovery(claim):
@@ -40,19 +40,20 @@ def compute_episode_discovery(claim):
     upper = cursor.get("upper_id")
     if upper is None:
         upper = query.select(fn.MAX(Change.id)).scalar() or 0
+    batch_size = get_settings().change_worker_batch_size
     ids = [
         row.id
         for row in query.select(Change.id)
         .where(Change.id > cursor.get("after_id", 0), Change.id <= upper)
         .order_by(Change.id)
-        .limit(Config.CHANGE_WORKER_BATCH_SIZE)
+        .limit(batch_size)
     ]
     after = ids[-1] if ids else upper
     plan.update(
         ids=ids,
         after_id=after,
         upper_id=upper,
-        complete=after >= upper or len(ids) < Config.CHANGE_WORKER_BATCH_SIZE,
+        complete=after >= upper or len(ids) < batch_size,
     )
     return plan
 

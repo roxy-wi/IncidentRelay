@@ -11,7 +11,7 @@ from app.db import database_proxy
 from app.modules.common import utc_now
 from app.modules.db.models import ChangeJob
 from app.modules.db.incident_core_repo import write_transaction
-from app.settings import Config
+from app.services.system_settings import get_settings
 
 
 class LostChangeLease(RuntimeError):
@@ -72,7 +72,8 @@ def claim_job(owner):
                 if job.claimed_generation == job.requested_generation
                 else 0
             )
-            if attempts >= Config.CHANGE_WORKER_MAX_ATTEMPTS:
+            settings = get_settings()
+            if attempts >= settings.change_worker_max_attempts:
                 ChangeJob.update(
                     state="dead",
                     last_error_class="attempts_exhausted",
@@ -88,7 +89,7 @@ def claim_job(owner):
                 lease_owner=owner,
                 lease_token=uuid.uuid4(),
                 lease_expires_at=now
-                + timedelta(seconds=Config.CHANGE_WORKER_LEASE_SECONDS),
+                + timedelta(seconds=settings.change_worker_lease_seconds),
                 attempts=attempts + 1,
                 updated_at=now,
             ).where(ChangeJob.id == job.id).execute()
@@ -120,7 +121,7 @@ def renew_lease(claim):
         changed = (
             ChangeJob.update(
                 lease_expires_at=utc_now()
-                + timedelta(seconds=Config.CHANGE_WORKER_LEASE_SECONDS),
+                + timedelta(seconds=get_settings().change_worker_lease_seconds),
                 updated_at=utc_now(),
             )
             .where(lease_predicate(claim))
@@ -207,10 +208,11 @@ def fail_claim(claim, *, transient):
             return False
         if current.requested_generation != claim.claimed_generation:
             return release_stale_claim(claim)
-        retry = transient and current.attempts < Config.CHANGE_WORKER_MAX_ATTEMPTS
+        settings = get_settings()
+        retry = transient and current.attempts < settings.change_worker_max_attempts
         delay = min(
-            Config.CHANGE_WORKER_RETRY_MAX_SECONDS,
-            Config.CHANGE_WORKER_RETRY_BASE_SECONDS
+            settings.change_worker_retry_max_seconds,
+            settings.change_worker_retry_base_seconds
             * 2 ** min(current.attempts - 1, 16),
         )
         delay = random.uniform(delay / 2, delay)

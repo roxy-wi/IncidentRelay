@@ -261,7 +261,10 @@ def token_has_scopes(token_scopes, required_scopes):
 
 def is_jwt_only_api_path(path):
     """Administration has no API-token scopes, including personal wildcard."""
-    return path_matches_prefix(path, "/api/admin/change-integrations")
+    return any(
+        path_matches_prefix(path, prefix)
+        for prefix in ("/api/admin/change-integrations", "/api/admin/system-settings")
+    )
 
 
 def token_can_grant_scopes(current_scopes, requested_scopes):

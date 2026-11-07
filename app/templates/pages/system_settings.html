@@ -1,0 +1,38 @@
+<section id="system-settings" class="card" aria-labelledby="system-change-title">
+  <div class="card-header">
+    <h2 id="system-change-title">{{ _('system_settings.change_title') }}</h2>
+    <button id="system-settings-reload" class="btn btn-reload" type="button">{{ _('common.reload') }}</button>
+  </div>
+  <div id="system-settings-controls" class="form-body is-hidden">
+    <div class="form-grid-2">
+      {% for option in ('change_intake_enabled', 'change_worker_enabled') %}
+      <div class="form-group">
+        <label class="md-switch">
+          <input type="checkbox" role="switch" name="{{ option }}" disabled
+                 aria-describedby="system-{{ option }}-hint">
+          <span>{{ _('system_settings.' ~ option) }}</span>
+        </label>
+        <small id="system-{{ option }}-hint">{{ _('system_settings.' ~ option ~ '_hint') }}</small>
+      </div>
+      {% endfor %}
+    </div>
+    <details>
+      <summary>{{ _('system_settings.advanced') }}</summary>
+      <form id="system-settings-advanced" class="form-body">
+        <div class="form-grid-2">
+          {% for name, bounds in advanced_settings.items() %}
+          <div class="form-group">
+            <label for="system-{{ name }}">{{ _('system_settings.' ~ name) }}</label>
+            <input class="input" id="system-{{ name }}" name="{{ name }}" type="number"
+                   min="{{ bounds.minimum }}" max="{{ bounds.maximum }}" step="1" required disabled>
+          </div>
+          {% endfor %}
+        </div>
+        <div class="form-actions-inline">
+          <button type="submit" class="btn btn-primary" disabled>{{ _('system_settings.save') }}</button>
+        </div>
+      </form>
+    </details>
+  </div>
+  <p id="system-settings-status" class="form-body is-hidden" role="status"></p>
+</section>

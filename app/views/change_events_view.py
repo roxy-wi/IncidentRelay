@@ -14,9 +14,9 @@ from app.services.change_intelligence.ingestion import (
     ingest_event,
 )
 from app.services.change_intelligence.references import InvalidChangeInput
+from app.services.system_settings import get_settings
 from app.services.integrations.auth import get_bearer_token
 from app.services.validation import make_error_response
-from app.settings import Config
 
 change_events_bp = Blueprint("change_events_api", __name__)
 
@@ -43,7 +43,7 @@ def no_store(response):
 @change_events_bp.post("")
 def receive_change_event():
     """Accept one bounded event only after global machine authentication."""
-    if not Config.CHANGE_EVENTS_ENABLED:
+    if not get_settings().change_intake_enabled:
         return make_error_response("not_found", "Change Event intake is disabled", 404)
     if not request.is_json:
         return make_error_response("invalid_json", "A JSON object is required", 400)

@@ -27,7 +27,7 @@ from app.services.change_intelligence.authorization import (
     scoped_team,
 )
 from app.services.change_intelligence.references import mapping_summary
-from app.settings import Config
+from app.services.system_settings import get_settings
 
 ENGINE_VERSION = "references-v1"
 BLOCKED_STATES = {"denied", "invalid", "expired"}
@@ -52,13 +52,13 @@ def _usable_namespace(team_id):
     )
 
 
-def _reference_result(reference, source, integration, stamp):
+def _reference_result(reference, source, integration, stamp, ttl_seconds):
     """Resolve only a pinned ID/namespace, without consulting the ingest token."""
     now = utc_now()
     expires = reference.expires_at
     if reference.resolved_service_id is None and expires is None:
         expires = reference.created_at + timedelta(
-            seconds=Config.CHANGE_PENDING_TTL_SECONDS
+            seconds=ttl_seconds
         )
     state, service_id, verification, error = (
         "resolved",
@@ -175,6 +175,7 @@ def compute_reference_batch(claim):
             .scalar()
             or 0
         )
+    settings = get_settings()
     rows = list(
         ChangeServiceReference.select()
         .where(
@@ -183,15 +184,16 @@ def compute_reference_batch(claim):
             ChangeServiceReference.id <= upper,
         )
         .order_by(ChangeServiceReference.id)
-        .limit(Config.CHANGE_WORKER_BATCH_SIZE)
+        .limit(settings.change_worker_batch_size)
     )
     results = []
     for index, reference in enumerate(rows):
         if index % 10 == 0:
             changes_repo.renew_lease(claim)
-        results.append(
-            (reference, _reference_result(reference, source, integration, stamp))
+        result = _reference_result(
+            reference, source, integration, stamp, settings.change_pending_ttl_seconds
         )
+        results.append((reference, result))
     after = rows[-1].id if rows else upper
     return {
         "change": change,
@@ -199,7 +201,7 @@ def compute_reference_batch(claim):
         "results": results,
         "upper_id": upper,
         "after_id": after,
-        "complete": after >= upper or len(rows) < Config.CHANGE_WORKER_BATCH_SIZE,
+        "complete": after >= upper or len(rows) < settings.change_worker_batch_size,
     }
 
 
@@ -356,7 +358,7 @@ def publish_reference_batch(claim, plan):
                 )
                 .exists()
             ):
-                delay = Config.CHANGE_PENDING_POLL_SECONDS
+                delay = get_settings().change_pending_poll_seconds
         if plan["complete"]:
             from app.services.change_intelligence.correlation import (
                 request_after_mapping,

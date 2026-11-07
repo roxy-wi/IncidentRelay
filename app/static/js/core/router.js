@@ -116,7 +116,7 @@ function navigate(path, pushState) {
         showAppError(i18n.t("errors.group_admin_role_required"));
         path = "/";
     }
-    if (routePath === "/admin/sso" && (!currentUser || !currentUser.is_admin)) {
+    if (["/admin/sso", "/admin/system-settings"].includes(routePath) && (!currentUser || !currentUser.is_admin)) {
         showAppError(i18n.t("errors.admin_role_required"));
         path = "/";
     }

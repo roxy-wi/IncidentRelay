@@ -7,6 +7,7 @@ from app.modules.logger import setup_json_logging
 from app.i18n import register_i18n
 from app.middleware import enforce_api_authentication
 from app.views.change_integrations_view import change_integrations_bp
+from app.views.system_settings_view import system_settings_bp
 from app.views.change_events_view import change_events_bp
 from app.views.changes_view import changes_bp
 from app.views.admin_users_view import admin_users_bp
@@ -124,6 +125,7 @@ def register_blueprints(flask_app):
     flask_app.register_blueprint(teams_bp, url_prefix="/api/teams")
     flask_app.register_blueprint(users_bp, url_prefix="/api/users")
     flask_app.register_blueprint(admin_users_bp, url_prefix="/api/admin/users")
+    flask_app.register_blueprint(system_settings_bp, url_prefix="/api/admin/system-settings")
     flask_app.register_blueprint(change_integrations_bp, url_prefix="/api/admin/change-integrations")
     flask_app.register_blueprint(change_events_bp, url_prefix="/api/change-events")
     flask_app.register_blueprint(changes_bp, url_prefix="/api")

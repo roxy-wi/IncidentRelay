@@ -2703,6 +2703,54 @@ class SilenceAlertApplication(BaseModel):
         )
 
 
+class SystemSettings(BaseModel):
+    """Installation-wide operational settings."""
+
+    id = IntegerField(primary_key=True, default=1, constraints=[Check("id = 1")])
+    change_intake_enabled = BooleanField(default=False)
+    change_worker_enabled = BooleanField(default=True)
+    change_max_future_seconds = IntegerField(
+        default=300, constraints=[Check("change_max_future_seconds BETWEEN 0 AND 2147483647")]
+    )
+    change_events_per_minute = IntegerField(
+        default=600, constraints=[Check("change_events_per_minute BETWEEN 1 AND 2147483647")]
+    )
+    change_events_per_change = IntegerField(
+        default=1000, constraints=[Check("change_events_per_change BETWEEN 1 AND 10000")]
+    )
+    change_worker_interval_seconds = IntegerField(
+        default=5, constraints=[Check("change_worker_interval_seconds BETWEEN 1 AND 2147483647")]
+    )
+    change_worker_jobs_per_tick = IntegerField(
+        default=20, constraints=[Check("change_worker_jobs_per_tick BETWEEN 1 AND 100")]
+    )
+    change_worker_batch_size = IntegerField(
+        default=100, constraints=[Check("change_worker_batch_size BETWEEN 1 AND 1000")]
+    )
+    change_worker_lease_seconds = IntegerField(
+        default=60, constraints=[Check("change_worker_lease_seconds BETWEEN 10 AND 2147483647")]
+    )
+    change_worker_max_attempts = IntegerField(
+        default=8, constraints=[Check("change_worker_max_attempts BETWEEN 1 AND 2147483647")]
+    )
+    change_worker_retry_base_seconds = IntegerField(
+        default=5, constraints=[Check("change_worker_retry_base_seconds BETWEEN 1 AND 2147483647")]
+    )
+    change_worker_retry_max_seconds = IntegerField(
+        default=300, constraints=[Check("change_worker_retry_max_seconds BETWEEN 1 AND 2147483647")]
+    )
+    change_pending_ttl_seconds = IntegerField(
+        default=604800, constraints=[Check("change_pending_ttl_seconds BETWEEN 60 AND 2147483647")]
+    )
+    change_pending_poll_seconds = IntegerField(
+        default=60, constraints=[Check("change_pending_poll_seconds BETWEEN 5 AND 2147483647")]
+    )
+
+    class Meta:
+        table_name = "system_settings"
+        constraints = [Check("change_worker_retry_base_seconds <= change_worker_retry_max_seconds")]
+
+
 class ChangeIntegration(BaseModel):
     """Stable machine identity, independent of its rotating credentials."""
 

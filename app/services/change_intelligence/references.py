@@ -17,14 +17,13 @@ from app.services.change_intelligence.authorization import (
     authorize_reference,
     scoped_team,
 )
-from app.settings import Config
 
 
 class InvalidChangeInput(ValueError):
     """Invalid identity inside a namespace the sender is allowed to inspect."""
 
 
-def resolve_reference(change, event, source, relation, submitted, auth_revision):
+def resolve_reference(change, event, source, relation, submitted, auth_revision, *, ttl_seconds):
     """Persist one original reference and, when resolved, its canonical link."""
     service_id = submitted.get("service_id")
     slug = submitted.get("service_slug")
@@ -153,7 +152,7 @@ def resolve_reference(change, event, source, relation, submitted, auth_revision)
             expires_at=(
                 None
                 if service
-                else now + timedelta(seconds=Config.CHANGE_PENDING_TTL_SECONDS)
+                else now + timedelta(seconds=ttl_seconds)
             ),
         )
     else:
@@ -177,7 +176,7 @@ def resolve_reference(change, event, source, relation, submitted, auth_revision)
             # A new event is an explicit retry; duplicate event IDs never reach
             # this code. Keep the pinned identity and open a fresh pending window.
             updates["expires_at"] = now + timedelta(
-                seconds=Config.CHANGE_PENDING_TTL_SECONDS
+                seconds=ttl_seconds
             )
         ChangeServiceReference.update(**updates).where(
             ChangeServiceReference.id == reference.id

@@ -389,7 +389,7 @@ function editChangeGrant(source, grant) {
 }
 
 $(document).on("click", "#ci-new", openNewChangeIntegration);
-$(document).on("click", "#ci-reload", () => loadChangeIntegrationList(false));
+$(document).on("click", "#ci-reload", loadChangeIntegrations);
 $(document).on("click", "#ci-more", () => loadChangeIntegrationList(true));
 $(document).on("click", "#ci-close, #ci-close-footer, #ci-modal", function (event) {
     if (this.id === "ci-modal" && event.target !== this) return;

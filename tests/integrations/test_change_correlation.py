@@ -14,6 +14,7 @@ from app.modules.db import (
     services_repo,
 )
 from app.modules.db.models import (
+    SystemSettings,
     Alert,
     AlertGroup,
     AlertGroupEpisode,
@@ -37,7 +38,6 @@ from app.services.change_intelligence.eligibility import (
     exclusion_matches,
 )
 from app.services.change_intelligence.resolver import StaleChangeInputs
-from app.settings import Config
 from tests.factories import create_service, unique
 from tests.integrations.test_change_events import event_payload, intake, setup_identity
 from tests.integrations.test_change_worker import process_resolution
@@ -401,11 +401,11 @@ def test_manual_decision_survives_recompute_and_disable_hides_immediately(intake
     assert ChangeAlertGroupCorrelation.get().review_evidence == {"original": "snapshot"}
 
 
-def test_bounded_batches_continue_without_duplicate_rows(intake, monkeypatch):
+def test_bounded_batches_continue_without_duplicate_rows(intake):
     service = opt_in(intake[0][2])
     episodes = [episode_for(service) for _ in range(3)]
     change = operation(intake)
-    monkeypatch.setattr(Config, "CHANGE_WORKER_BATCH_SIZE", 1)
+    SystemSettings.update(change_worker_batch_size=1).execute()
     for _ in episodes:
         run_change(change)
     job = ChangeJob.get(ChangeJob.job_type == "refresh_impacts")
@@ -464,7 +464,7 @@ def test_unverified_assertion_does_not_seed_graph_but_explicit_grant_does(intake
     assert ChangeImpact.select().count() == 0  # Reported assertions never seed paths.
 
 
-def test_graph_sweep_reenables_eligible_history_in_bounded_batches(intake, monkeypatch):
+def test_graph_sweep_reenables_eligible_history_in_bounded_batches(intake):
     service = intake[0][2]
     episode = episode_for(service)
     changes = [
@@ -475,7 +475,7 @@ def test_graph_sweep_reenables_eligible_history_in_bounded_batches(intake, monke
         run_change(change)
     assert not ChangeAlertGroupCorrelation.select().exists()
     services_repo.update_service(service.id, {"change_correlation_enabled": True})
-    monkeypatch.setattr(Config, "CHANGE_WORKER_BATCH_SIZE", 1)
+    SystemSettings.update(change_worker_batch_size=1).execute()
     for _ in range(4):
         claim = claim_kind("discover_graph", 1)
         if claim is None:

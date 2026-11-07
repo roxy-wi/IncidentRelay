@@ -8,6 +8,7 @@ import pytest
 from app.modules.common import utc_now
 from app.modules.db import changes_repo, incident_core_repo, services_repo
 from app.modules.db.models import (
+    SystemSettings,
     AlertGroup,
     AlertGroupEpisode,
     Change,
@@ -21,7 +22,6 @@ from app.services.service_catalog.timeline import (
     list_service_events,
     publish_service_event,
 )
-from app.settings import Config
 from tests.factories import create_group, create_service, create_team, unique
 from tests.integrations.test_changes_read import changes, personal, reader
 from tests.integrations.test_change_events import intake, setup_identity
@@ -128,8 +128,8 @@ def test_stale_or_reclaimed_publication_cannot_write(changes, changed):
     assert not ServiceEvent.select().exists()
 
 
-def test_batch_limit_resumes_without_skipping_or_duplicating(changes, monkeypatch):
-    monkeypatch.setattr(Config, "CHANGE_WORKER_BATCH_SIZE", 1)
+def test_batch_limit_resumes_without_skipping_or_duplicating(changes):
+    SystemSettings.update(change_worker_batch_size=1).execute()
     change = changes["change"]
     assert run_change(change, "sync_service_timeline").state == "pending"
     assert ServiceEvent.select().count() == 1

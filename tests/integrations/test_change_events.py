@@ -18,6 +18,7 @@ from app.modules.db.models import (
     Change,
     ChangeEvent,
     ChangeJob,
+    SystemSettings,
     ChangeService,
     ChangeServiceReference,
     Service,
@@ -57,8 +58,8 @@ def event_payload(identity, **overrides):
 
 
 @pytest.fixture
-def intake(setup_identity, monkeypatch):
-    monkeypatch.setattr(Config, "CHANGE_EVENTS_ENABLED", True)
+def intake(setup_identity):
+    SystemSettings.update(change_intake_enabled=True).execute()
     permission = grant(setup_identity)
     token, raw = credential(setup_identity)
     return setup_identity, permission, token, raw
@@ -76,9 +77,9 @@ def send(client, intake, **overrides):
 def test_disabled_by_default_and_no_public_auth_bypass(
     client, intake, admin_headers, monkeypatch
 ):
-    monkeypatch.setattr(Config, "CHANGE_EVENTS_ENABLED", False)
+    SystemSettings.update(change_intake_enabled=False).execute()
     assert send(client, intake).status_code == 404
-    monkeypatch.setattr(Config, "CHANGE_EVENTS_ENABLED", True)
+    SystemSettings.update(change_intake_enabled=True).execute()
     for optional_auth in (False, True):
         monkeypatch.setattr(Config, "API_AUTH_REQUIRED", optional_auth)
         for headers in ({}, admin_headers):
@@ -301,9 +302,9 @@ def test_equal_terminal_outcomes_and_metadata_tie_use_event_id(client, intake):
 
 
 def test_service_only_grant_cannot_create_pending_reference(
-    client, setup_identity, monkeypatch
+    client, setup_identity
 ):
-    monkeypatch.setattr(Config, "CHANGE_EVENTS_ENABLED", True)
+    SystemSettings.update(change_intake_enabled=True).execute()
     grant(setup_identity, service=setup_identity[2].id)
     _, raw = credential(setup_identity)
     body = event_payload(setup_identity)
@@ -524,13 +525,13 @@ def test_each_failed_write_rolls_back_then_retries_once(
     assert ChangeEvent.select().count() == 1
 
 
-def test_quota_and_history_limits_keep_exact_retries(client, intake, monkeypatch):
-    monkeypatch.setattr(Config, "CHANGE_EVENTS_PER_MINUTE", 1)
+def test_quota_and_history_limits_keep_exact_retries(client, intake):
+    SystemSettings.update(change_events_per_minute=1).execute()
     assert send(client, intake).status_code == 201
     assert send(client, intake).status_code == 200
     assert send(client, intake, event_id="too-fast").status_code == 429
-    monkeypatch.setattr(Config, "CHANGE_EVENTS_PER_MINUTE", 600)
-    monkeypatch.setattr(Config, "CHANGE_EVENTS_PER_CHANGE", 1)
+    SystemSettings.update(change_events_per_minute=600).execute()
+    SystemSettings.update(change_events_per_change=1).execute()
     assert send(client, intake, event_id="too-many").status_code == 422
 
 

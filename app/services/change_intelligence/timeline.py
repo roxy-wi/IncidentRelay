@@ -17,7 +17,7 @@ from app.modules.db.models import (
 from app.services.change_intelligence.authorization import lock_row
 from app.services.change_intelligence.reading import current_impacts, current_links
 from app.services.change_intelligence.resolver import StaleChangeInputs
-from app.settings import Config
+from app.services.system_settings import get_settings
 
 ENGINE_VERSION = "timeline-v1"
 
@@ -85,7 +85,7 @@ def compute_timeline_batch(claim):
     stamp = input_stamp(
         change, change.integration, ChangeGraphState.get_by_id(1).revision
     )
-    limit = Config.CHANGE_WORKER_BATCH_SIZE
+    limit = get_settings().change_worker_batch_size
     rows = list(missing_events(change).limit(limit).dicts())
     if len(rows) < limit:
         for row in (

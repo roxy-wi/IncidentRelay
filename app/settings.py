@@ -196,49 +196,6 @@ class Config:
     LOG_REQUESTS = False
 
     API_AUTH_REQUIRED = settings.get_bool("auth", "api_auth_required", False)
-    # Internal acceptance only until the complete Change Intelligence path ships.
-    CHANGE_EVENTS_ENABLED = settings.get_bool(
-        "change_intelligence", "intake_enabled", False
-    )
-    CHANGE_WORKER_ENABLED = settings.get_bool(
-        "change_intelligence", "worker_enabled", True
-    )
-    CHANGE_WORKER_INTERVAL_SECONDS = max(
-        1, settings.get_int("change_intelligence", "worker_interval_seconds", 5)
-    )
-    CHANGE_WORKER_LEASE_SECONDS = max(
-        10, settings.get_int("change_intelligence", "worker_lease_seconds", 60)
-    )
-    CHANGE_WORKER_MAX_ATTEMPTS = max(
-        1, settings.get_int("change_intelligence", "worker_max_attempts", 8)
-    )
-    CHANGE_WORKER_RETRY_BASE_SECONDS = max(
-        1, settings.get_int("change_intelligence", "worker_retry_base_seconds", 5)
-    )
-    CHANGE_WORKER_RETRY_MAX_SECONDS = max(
-        1, settings.get_int("change_intelligence", "worker_retry_max_seconds", 300)
-    )
-    CHANGE_WORKER_JOBS_PER_TICK = max(
-        1, min(100, settings.get_int("change_intelligence", "worker_jobs_per_tick", 20))
-    )
-    CHANGE_WORKER_BATCH_SIZE = max(
-        1, min(1000, settings.get_int("change_intelligence", "worker_batch_size", 100))
-    )
-    CHANGE_PENDING_TTL_SECONDS = max(
-        60, settings.get_int("change_intelligence", "pending_ttl_seconds", 604800)
-    )
-    CHANGE_PENDING_POLL_SECONDS = max(
-        5, settings.get_int("change_intelligence", "pending_poll_seconds", 60)
-    )
-    CHANGE_EVENTS_MAX_FUTURE_SECONDS = max(
-        0, settings.get_int("change_intelligence", "max_future_seconds", 300)
-    )
-    CHANGE_EVENTS_PER_MINUTE = max(
-        1, settings.get_int("change_intelligence", "events_per_minute", 600)
-    )
-    CHANGE_EVENTS_PER_CHANGE = max(
-        1, min(10000, settings.get_int("change_intelligence", "events_per_change", 1000))
-    )
     RBAC_ENFORCED = settings.get_bool("auth", "rbac_enforced", False)
     JWT_SECRET_KEY = settings.get("auth", "jwt_secret", SECRET_KEY) or SECRET_KEY
     JWT_EXPIRE_MINUTES = settings.get_int("auth", "jwt_expire_minutes", 1440)
