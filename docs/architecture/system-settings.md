@@ -1,6 +1,6 @@
 # System settings and Group inheritance
 
-This is the design for settings that administrators can change while IR is running. The database stores two switches and twelve numeric Change Intelligence settings. All apply to the entire installation. The [configuration guide](../getting-started/configuration.md#advanced-change-intelligence-settings) lists their ranges and when edits take effect. The first setting eligible for a Group override will be chosen separately.
+This is the design for settings that administrators can change while IR is running. The database stores two switches and twelve numeric Change Intelligence settings. All apply to the entire installation. The [configuration guide](../getting-started/configuration.md#advanced-change-intelligence-settings) lists their ranges and when edits take effect. The correlation window is selected as the first Group setting for stage 2.4 of the second Change Intelligence iteration. It uses the Group of the selected alert episode's Service and inherits the system value. Implementation is planned in the [Change Intelligence architecture](change-intelligence-architecture.md).
 
 ## Resolving a setting
 

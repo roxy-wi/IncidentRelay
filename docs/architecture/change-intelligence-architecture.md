@@ -1,10 +1,10 @@
 # IncidentRelay — Change Intelligence
 
-**Architecture RFC v1.1 (implementation contract)**
+**Architecture RFC v1.2 — implemented first iteration and second-iteration plan**
 
-**Source baseline:** release/2.5.0, 92bd4c6 plus stage 9 working changes (2026-11-04)
+**Source baseline:** release/2.5.0, d1dc817 (reviewed 2026-11-07)
 
-**Status:** stages 1–9 implemented; stage 10 release checks remain. Public intake remains disabled.
+**Status:** the first iteration is functionally complete. The second iteration has six agreed stages 2.1–2.6 (§15), with implementation planned. Release checks apply to a specific build (§12.10).
 
 
 ## Agreed decisions — 28–30 October 2026
@@ -17,7 +17,7 @@
 - Automatic potential-cause suggestions only; mitigation is manual in v1.
 - Automatic correlation requires explicit Service opt-in and is disabled by default. Source/label exclusions apply to individual alerts; a group participates when its selected episode contains at least one non-excluded alert. All groups retain episodes; eligibility is checked before search work is queued (§9.1, stage 7).
 
-Internal intake, durable workers, Changes Inbox, automatic correlation and manual review/Incident links are implemented. Related Changes on AlertGroup/Incident pages and Service Timeline are implemented in stage 9; public intake stays disabled until stage 10.
+Change Event intake, durable workers, Changes Inbox, automatic cause suggestions, manual review, Incident links, Related Changes and Service Timeline are implemented. Two switches and twelve numeric settings reside in the database and apply without restarting, including the scheduler interval. New installations start with intake off and queue processing on. Global administrators manage them under Administration → System settings. See the [configuration guide](../getting-started/configuration.md).
 
 ## 1. Purpose and scope
 
@@ -354,9 +354,9 @@ Resolve owner Team and registered source, pin the target namespace_team_id, then
 3. Catalog creation/change enqueues indexed resolution work in the catalog transaction; a periodic sweep over due pending references is a bounded fallback. It does not scan full Change history.
 4. Resolve only `(namespace_team_id, requested_service_slug)`, checking current integration/source activity, grants and resource state. A Team rename is harmless; no second lookup of the original Team slug is allowed. Persist mapping/evidence, increment Change.revision and request downstream jobs atomically.
 5. Token rotation/revocation alone does not stop accepted work. Missing current grants give `denied`; invalid/deleted namespace gives `invalid`; expiry gives `expired`. No fallback to a new Team/Service with a reused slug. Owner diagnostics and an audited authorized requeue are available.
-6. After successful late mapping, bounded discovery also considers eligible existing episodes. Older history beyond the automatic horizon can still be linked manually. Correlation status is `not_enabled` before phase 2, rather than an endless `queued` state.
+6. After successful late mapping, bounded discovery also considers eligible existing episodes. Older history beyond the automatic horizon can still be linked manually. While background processing is disabled, intake returns `correlation_status=not_enabled`; accepted jobs resume when processing is enabled.
 
-Pending TTL, retry budget and batch size are configuration limits documented before phase 1 rollout. An explicit retry never mutates the original submitted reference; correcting a Service slug uses a new event/reference. Revoked evidence, expiry and dead jobs stay inspectable rather than disappearing silently.
+Pending TTL, retry budget and batch size reside in database-backed system settings. An explicit retry never mutates the original submitted reference; correcting a Service slug uses a new event/reference. Revoked evidence, expiry and dead jobs stay inspectable rather than disappearing silently.
 
 ### 6.3. Catalog/grant changes and historical evidence
 
@@ -448,7 +448,7 @@ Service references accumulate across events; omitted or empty lists do not remov
 3. Capture path snapshots and the full input stamp. Recomputing from today's graph does not claim it was the historical graph; show computation time/revision and retain reviewed evidence separately. Ingestion does not call the existing operational Service Impact engine's status-writing side effects.
 4. Only known episode starts participate automatically. For an operation's exposure interval `[start, end]`, candidate episodes start in `[start, end + W]`, where W defaults to two hours. start is defined in §8.3; end is the winning terminal time, or calculation time for a running operation. Inverted intervals are excluded with a diagnostic. Evaluate running operations on new episode triggers as well as ChangeEvents; do not use AlertGroup.first_seen_at as a reopened episode start. Retroactive discovery of completed operations/old episode starts has an explicit horizon (default seven days); do not discard a still-running operation solely because it began earlier. Older history remains available for manual linking.
 5. Automatic rows always suggest `potential_cause`. A Change whose exposure starts after an episode start is not automatically its cause. **Mitigation is manual in v1**: an operator can link the later Change to that exact episode, or directly to an Incident, including without an automatic candidate. Manual links outside the automatic time window are allowed with an audited explanation; no score is invented for mitigation.
-6. Score is versioned deterministic relevance, not probability. Candidate selection/ties, weights, missing-data behavior and limits are part of engine_version and must have fixed fixtures before phase 2 acceptance. Do not let unordered SQL/graph iteration change ranking. Never overwrite a manual role/review or export private path segments in Explain.
+6. Score is versioned deterministic relevance, not probability. Candidate selection/ties, weights, missing-data behavior and limits are part of engine_version and are covered by fixed ranking fixtures. Do not let unordered SQL/graph iteration change ranking. Never overwrite a manual role/review or export private path segments in Explain.
 7. New ChangeEvents, episode creation/closure, changes to its eligibility context, mapping changes and catalog/grant changes request durable bounded discovery/recompute work subject to §9.1. Retrying or restarting workers neither loses a trigger nor duplicates projections (§4.8).
 
 No automatic rollback, paging/escalation, Incident creation/status change or technical status change follows from a correlation. A manual confirmed_cause is an operator's recorded judgement, not a claim that timing alone proves causation.
@@ -484,7 +484,7 @@ Technical Service settings expose explicit correlation opt-in and source/label e
 **Operations → Changes** is a separate Inbox, with one row per Change.
 
 - Search by ID, title, source, external ID, accessible services, and `service_slug`.
-- Filters: Team (owner **or** accessible affected), Service (ID or slug + Team namespace), kind, status, source, environment, date range, correlation, `unmapped/pending`.
+- Implemented filters cover Team (owner or accessible affected Team), Service (ID or slug with Team namespace), kind, status, source, environment and dates. Incident-relation, problematic-reference and processing-state filters are planned in §15.6.
 - A Change spanning multiple Teams still appears once; SQL-side authorization, distinct selection, counts, and pagination must be correct.
 - Change Details displays lifecycle history with occurred_at and received_at, ordering mode, explicit terminal conflict, **Changed**, **Reported affected**, **Inferred impact**, mapping/expiry/job state and authorized evidence. A foreign reader receives only the safe projection, not the owner's details page.
 - For `pending_resolution`, show the original slug/Team namespace, pending reason, and last attempt in the authorized owner context. Do **not** automatically create Services from the UI.
@@ -501,22 +501,25 @@ Technical Service settings expose explicit correlation opt-in and source/label e
 - Index Change(owner_team_id,last_occurred_at), source/external unique identities, ChangeService(service_id,change_id), ChangeServiceReference(resolution_status,namespace_team_id,requested_service_slug), ChangeImpact(service_id,active), correlation(episode_id,review_status), ChangeJob(state,next_attempt_at), timeline provenance and episode(group,ordinal). Validate query plans on a bounded representative dataset before enabling discovery.
 - Apply current RBAC/projection validity in SQL before counts, search and pagination. Never put full owner payload/actor/URL into a cross-team timeline entry or a client cache accessible after permission changes.
 - Keep received event time and sender time distinct; UI displays UTC offsets and explicit conflict/unknown-boundary/stale/mapping states. Unknown duration or cause is not silently guessed.
-- No high-cardinality IDs/slugs/uncontrolled source names in Prometheus labels. Measure ingest accepted/duplicate/rejected, pending/denied/expired references, queue age, claims/reclaims, discarded stale work, correlation duration/error classes and lifecycle conflicts.
+- Queue state/age, worker outcomes, reference states and dead-job reasons already have metrics and Grafana panels. Intake counts, processing duration and lifecycle conflicts are extended in §15.1. Prometheus labels use bounded categories without IDs/slugs or arbitrary sender names.
 - Redact secrets before persistence of diagnostic data and logging; allow safe URL schemes and escape content. Document payload limits, future skew, pending TTL, retry budget, discovery horizon, retention and idempotency retry horizon. Reviewed/Incident evidence is protected from cleanup (§4.9).
 - Preserve old ServiceEvents without reliable external Change IDs; do not synthesize a Change or episode history from guesses. Document additive migration, writer/worker rollout and operational rollback; do not drop evidence on rollback.
 - EN/RU/DE/FR/ES/ZH UI, OpenAPI, all §13 scenarios and supported Python CI. Architecture changes are not a claim that implementation or release verification is complete.
 
 ## 12. Delivery plan
 
-Implementation is split into **10 sequential stages**. Each stage ends with a reviewable change set and its own tests; the next starts after the previous readiness criteria pass. Stages 1–6 are implemented; stages 7–10 remain planned. Distribute the scenarios in §13 across stages rather than deferring them all to release checks.
+The first iteration delivered stages 1–9 below and database-backed system settings. Their work/test lists remain the contract for implemented behavior. Stage 10 defines release verification for a particular build. The second iteration is specified in §15.
 
-| Milestone | Stages | Result |
+| First-iteration area | Stages | Current status |
 |---|---|---|
-| Phase 1 — Registry and durable foundations | 1–6 | Intake, history, a working pending-reference worker and Changes Inbox in a test deployment; `correlation_status=not_enabled` |
-| Phase 2 — Explainable correlation | 7–8 | Cause suggestions, protected manual decisions and episode/Incident link APIs |
-| Phase 3 — UI integrations and release | 9–10 | Service Timeline, AlertGroup/Incident pages and verified deployment |
+| Storage and AlertGroup episodes | 1–2 | Implemented |
+| Integrations, intake, queue and Changes Inbox | 3–6 | Implemented |
+| Correlation, review and Incident links | 7–8 | Implemented |
+| Related Changes and Service Timeline | 9 | Implemented |
+| Shared system settings and live interval updates | Addition d1dc817 | Implemented |
+| Release checks | 10 | Repeated for the build being released; local results appear in §14 |
 
-A development stage is not a separate production release. Enable public Change Event intake only after stage 10 verifies the complete path: intake → authorization and Service resolution → worker → correlation with the exact AlertGroup episode → authorized link display. Stage 6 is an internal milestone, not an independent registry release. Stage 1 creates storage without capturing episodes or reconstructing past cycles; stage 2 coordinates all lifecycle writers when episode recording starts. Deploy schema, writers, worker and read policy before enabling intake. Document and localize APIs, settings and UI as they appear; stage 10 checks completeness.
+Deploy the schema, lifecycle writers, worker and read policy before enabling intake. An administrator enables intake after checking the complete path on that installation. New installations start with intake disabled. Episodes start for new groups and genuine reopens, including a legacy group's first tracked reopen. Historical cycles follow the agreed contract in §4.9.
 
 ### 12.1. Stage 1 — Models, constraints and migrations
 
@@ -540,11 +543,11 @@ Implemented: `/admin/change-integrations` and the `/api/admin/change-integration
 
 ### 12.4. Stage 4 — Atomic intake and Change projection
 
-Implemented: `POST /api/change-events`, gated by the database-backed **Accept Change Events** switch (off on new installations). Only internal acceptance environments may enable it before stage 10. Authentication, mutable owner lookup, grants and writes share the integration lock; PostgreSQL locks the Change afterward and SQLite reserves writes before reads. A new event, references, canonical links, aggregate revision and `resolve_references` request commit together. No worker or correlation job is started here. Exact retries return the original event UID and current safe aggregate status without increasing revision/job generation.
+Implemented: `POST /api/change-events`, gated by the database-backed **Accept Change Events** switch (off on new installations). A global administrator enables it after end-to-end deployment verification. Authentication, mutable owner lookup, grants and writes share the integration lock; PostgreSQL locks the Change afterward and SQLite reserves writes before reads. A new event, references, canonical links, aggregate revision and `resolve_references` request commit together. No worker or correlation job is started here. Exact retries return the original event UID and current safe aggregate status without increasing revision/job generation.
 
 Sender timestamps use UTC microseconds; timestamp ties with different terminal outcomes remain conflicts. Sequence mode is captured per Change. Missing metadata does not overwrite supplied fields; an operation without a title temporarily uses `change_id`. Environment is trimmed, case-sensitive, and absent/null both mean no environment. Reference identities remain pinned after renames; a subsequent event can resolve a pending reference but cannot rebind a resolved one. Invalid IDs in an explicitly permitted Team return `422`; unqualified missing IDs and inaccessible references receive the same `403`.
 
-Limits: 256 KiB body before parsing, 100 total references per request, 64 KiB details with depth 10 and 2000 nodes, timezone-qualified timestamps with at most six fractional digits. Duplicate JSON keys, non-finite numbers, NUL and invalid Unicode are rejected. Defaults: 300 seconds future skew, 600 accepted new events/minute/integration, 1000 events/Change (configurable up to 10000); exact retries are exempt from these new-event limits. Digest is computed before redaction; only redacted payload/metadata are persisted. PostgreSQL lock/statement budgets are 2/5 seconds per attempt; transient database contention is retried at most three times, then returns `503` with `Retry-After`. WSGI/reverse-proxy request timeouts still apply to body transport. No cleanup runs at this stage, so stored identities remain retryable; pending TTL and worker retries are implemented in stage 5; retention/tombstones remain stage 10 work. See [configuration](../getting-started/configuration.md#change-intelligence-experimental-intake) and OpenAPI for the contract.
+Limits: 256 KiB body before parsing, 100 total references per request, 64 KiB details with depth 10 and 2000 nodes, timezone-qualified timestamps with at most six fractional digits. Duplicate JSON keys, non-finite numbers, NUL and invalid Unicode are rejected. Defaults: 300 seconds future skew, 600 accepted new events/minute/integration, 1000 events/Change (configurable up to 10000); exact retries are exempt from these new-event limits. Digest is computed before redaction; only redacted payload/metadata are persisted. PostgreSQL lock/statement budgets are 2/5 seconds per attempt; transient database contention is retried at most three times, then returns `503` with `Retry-After`. WSGI/reverse-proxy request timeouts still apply to body transport. No cleanup runs at this stage, so stored identities remain retryable; pending TTL and worker retries are implemented in stage 5; retention/tombstones are planned for stage 2.2 (§15.2). See [configuration](../getting-started/configuration.md#change-intelligence-experimental-intake) and OpenAPI for the contract.
 
 - **Work:** validate the common payload; resolve ID/slug with pinned namespace_team_id; implement digest/idempotency and deterministic timestamp/sequence projection. Write event, references, Change state, revision and job request in one transaction that rechecks authorization. Keep the endpoint disabled in production until the stage 10 end-to-end acceptance checks pass.
 - **Tests:** event permutations, tied conflicting terminals and a later terminal; late started; sequence gaps/reuse; absent/null; rotation and event_id retries; concurrent first requests; failure at every write step.
@@ -556,9 +559,9 @@ Implemented in the existing scheduler: durable claims/reclaims, lease renewal, g
 
 Pending references use their pinned Team ID and current integration/source/grants, never the original token or a second Team-slug lookup. A resolved Service ID is never rebound. Missing authority, invalid resources and expired pending windows become visible `denied`/`invalid`/`expired` states; an explicit audited retry or a newly accepted event containing the same reference rechecks current authority and the pinned identity, reopening the pending window when needed. An exact duplicate event_id never changes the reference or queues work. Submitted evidence remains immutable. Reference-only affected claims remain unverified. No graph-based trust, impact traversal, episode search, correlation or timeline publication is implemented in this stage.
 
-Defaults: scheduler tick 5 seconds, lease 60 seconds, 20 jobs/tick with a 10-second start budget, batches of 100 rows, eight technical attempts with jittered 5–300 second exponential backoff, pending TTL seven days from acceptance and pending poll 60 seconds. Successful checkpoints reset the technical attempt budget; waiting for provisioning is not a technical failure. Dead work requires an operator retry or a new accepted event, not periodic resurrection. Catalog/dependency changes atomically advance graph revision and request a bounded pass over retained Changes; auth discovery is integration-scoped. Periodic reconciliation uses an indexed pending-only pass and preserves active cursor progress. No retention deletion runs; stored event digests remain retryable. Automatic correlation horizons and protected-evidence retention are later-stage work.
+Defaults: scheduler tick 5 seconds, lease 60 seconds, 20 jobs/tick with a 10-second start budget, batches of 100 rows, eight technical attempts with jittered 5–300 second exponential backoff, pending TTL seven days from acceptance and pending poll 60 seconds. Successful checkpoints reset the technical attempt budget; waiting for provisioning is not a technical failure. Dead work requires an operator retry or a new accepted event, not periodic resurrection. Catalog/dependency changes atomically advance graph revision and request a bounded pass over retained Changes; auth discovery is integration-scoped. Periodic reconciliation uses an indexed pending-only pass and preserves active cursor progress. No retention deletion runs; stored event digests remain retryable. Current correlation uses a two-hour window and seven-day horizon. Configuring them is planned in §15.4, and Change/event cleanup in §15.2. Existing constraints and alert retention protect reviewed evidence.
 
-Reference publication may span batches. Consumers must check the matching input stamp, `cursor IS NULL` and `claimed_generation=requested_generation` before using a whole mapping as current; a completed pass may remain pending until the next missing-Service poll. A new input revision or request restarts the pass. Existing episode/impact/correlation/timeline requests finish with `not_enabled`; stage 7 must perform its bounded eligible-history catch-up when enabling correlation.
+Reference publication may span batches. Consumers must check the matching input stamp, `cursor IS NULL` and `claimed_generation=requested_generation` before using a whole mapping as current; a completed pass may remain pending until the next missing-Service poll. A new input revision or request restarts the pass. Episode, impact, correlation and timeline handlers are implemented in stages 7–9. Paused processing retains jobs for resumption, and Service eligibility changes request bounded discovery of eligible history.
 
 Operational API: JWT `GET /api/admin/change-integrations/jobs` for global administrators, or `/{integration_id}/jobs` for the owning Group administrator; metadata only, state filter, keyset pagination. `POST` on the corresponding `/jobs/{job_id}/retry` uses `expected_generation`, returns `409` for a stale request and records an audit in the same transaction. Metrics expose fixed outcome/state/error categories and queue age without sender IDs. See [configuration](../getting-started/configuration.md#durable-change-worker) for settings and rollback.
 
@@ -574,11 +577,11 @@ SQL visibility, private-field filters, totals and pagination share one read snap
 
 Cross-team visibility requires the resolver's completed pass: matching Change/auth/graph revisions and engine version, no cursor/error, claimed=requested generation and done/pending state. Changes to grants, catalog or processing invalidate visibility before pagination, without waiting for the worker. Owner diagnostics remain readable. Search and status/source/environment filters cannot match private fields of safe projections. `scope_team_id` filters owner or accessible related-Service context; `owner_team_id` filters readable ownership only. ID and namespaced slug Service filters have the same access boundary.
 
-The Inbox uses existing table, filter and pagination styles. It displays lifecycle conflicts, scoped mapping/expiry states, processing failures and event history; direct links, back/forward, failed refresh and late responses after navigation are covered by browser tests. Public intake remains disabled until stage 10; review actions, correlations and Service Timeline publication are implemented in stages 7–9. See [configuration and sender example](../getting-started/configuration.md#changes-inbox-and-read-api).
+The Inbox uses existing table, filter and pagination styles. It displays lifecycle conflicts, scoped mapping/expiry states, processing failures and event history; direct links, back/forward, failed refresh and late responses after navigation are covered by browser tests. The system switch controls intake; review actions, correlations and Service Timeline publication are implemented in stages 7–9. See [configuration and sender example](../getting-started/configuration.md#changes-inbox-and-read-api).
 
 - **Work:** list/details/events/services; search, filters, counts and pagination with SQL RBAC; full owner projection and safe projection for an accessible affected Service. UI shows terminal conflicts, mapping, pending/expired/dead and processing state. Document the common API and a sender example.
 - **Tests:** one multi-Team Change is not duplicated; owner, affected-team and unrelated readers see only authorized fields; filters/search/counts leak no hidden data; end-to-end intake → pending → Service creation → display.
-- **Ready when:** phase 1 works in a test deployment with a worker, configuration limits are documented, and correlation is explicitly `not_enabled`. Production intake remains disabled until episode linking and the final acceptance checks are complete.
+- **Ready when:** accessible Changes, reference states and processing states are displayed consistently with current permissions; intake → pending → Service creation → display works end to end. The current implementation also includes correlation and relations from stages 7–9.
 
 ### 12.7. Stage 7 — Automatic correlation
 
@@ -618,6 +621,8 @@ Persisted Change timeline fields use constant title/source/event type, no provid
 
 ### 12.10. Stage 10 — Release checks
 
+The first iteration is functionally complete. This section retains the required release procedure for a particular build. The latest local regression run appears in §14; the full Linux/Python CI matrix and deployment verification are recorded separately at release time.
+
 - **Work:** reconcile OpenAPI, CI/CD and CMDB examples, six locales, settings/limits, metrics, migration/worker/rollback instructions. Document feature enablement order and stopping processing without deleting history. Check key SQL query plans and bounded traversal on representative data.
 - **Tests:** all §13 scenarios on PostgreSQL/SQLite, supported Python CI, upgrades with existing data, repeated/failed migrations, worker restart, end-to-end roles and AlertGroup/Incident/notification regressions. Verify intake through authorized episode-link display, including retries and Change/Alert arrival in either order, before enabling public intake. Explicitly record any unexecuted required check as a blocker.
 - **Ready when:** mandatory results are recorded, no blockers remain, and deployment/recovery is reproducible. Completing the RFC or one stage does not establish release readiness for the whole Change Intelligence subsystem.
@@ -651,23 +656,127 @@ All applicable persistence/concurrency scenarios run on PostgreSQL and SQLite. U
 | Manual mitigation | A later change has no automatic cause suggestion but can be manually linked to an earlier episode or Incident with an audited explanation; no fake relevance probability or paging |
 | Incident links | Unlinked Incident supported; duplicate add/reactivation/remove/role change obey 200/201/409; link/event/audit rollback together; no Incident status or notification mutation |
 | Redaction | Same Change via inbox/details/search/counts/Explain/timeline/Incident links: affected-team viewer sees no private title/source/IDs/actor/URL/payload/path; Service move, access withdrawal and browser cache navigation do not expose stale full data |
-| Retention and rollout | Reviewed/Incident evidence retained across parent cleanup; idempotency tombstones preserve retry horizon; no machine auth regression on legacy APIs; schema upgrade/retry, rollback procedure and worker deployment documented |
+| Retention and rollout | Reviewed/Incident evidence protection during parent cleanup is implemented; migration upgrade/retry, rollback and worker deployment are checked for release. Change/event cleanup and duplicate protection afterward belong to §15.2 |
 
-Document payload/retention/retry limits in configuration and OpenAPI before phase 1 acceptance. Provide fixed scoring/ranking fixtures before phase 2 acceptance. Treat unknown historical boundaries and withheld stale projections as explicit UI states, not silent data loss.
+Payload/retry limits are documented in configuration and OpenAPI, and fixed examples test ranking. Change/event retention horizons and duplicate protection afterward are specified in §15.2. Unknown historical boundaries and withheld stale projections have explicit UI states.
 
-## 14. Compatibility with IncidentRelay 2.5
+## 14. Current state of the first iteration
 
-Checked against `release/2.5.0` on 2026-11-02 (`259b9a1` plus stages 5–6 changes). Stages 1–6 provide storage, lifecycle episodes, integration administration, disabled-by-default intake, durable reference processing and a human read API/Inbox. Correlation remains future work. This does not enable public Change Intelligence or claim it was included in the released 2.5 baseline.
+Reviewed against `release/2.5.0`, `d1dc817`, on 7 November 2026. The first iteration's functional scope is complete.
 
-Reusable existing contracts: globally unique Team.slug; Service(team,slug) and Service.uid; ServiceDependency; ServiceEvent with its dedup key; AlertGroupCorrelation for AlertGroup ↔ AlertGroup; separate operational Incident/IncidentAlertGroupLink; hashed ApiToken; centralized API scopes; scheduler/database locks. Incident collaboration in 2.5 uses its own state/version and must not be coupled to technical Change ingestion.
+- Technical lifecycle writers persist episodes atomically. Legacy groups start tracked history on a genuine reopen.
+- Integrations, Sources, grants and rotating tokens establish stable sender identity. Intake and workers recheck current authority.
+- Changes and immutable event history support both ordering modes, idempotent retries, explicit conflicts and deferred Service resolution.
+- Durable work uses lease/generation fencing, retries, audited manual requeue, graph/auth revision and bounded history traversal.
+- Correlation suggests causes. Operators confirm/reject relations and add context/mitigation. Decision snapshots are protected from recomputation and alert cleanup.
+- Inbox, Change/AlertGroup/Incident pages and Service Timeline use current RBAC, safe projections and freshness checks.
+- Shared system settings contain two switches and twelve numeric parameters. Each scheduler checks for an interval change every five seconds, including while queue processing is disabled.
 
-Required integration changes are explicit:
+The implementation resides in `app/services/change_intelligence/`, `app/modules/db/changes_repo.py`, Change schemas/APIs, `app/services/system_settings.py` and `app/services/scheduler.py`. It reuses existing Team/Service, dependencies, episodes, Incident, API scopes and audit.
 
-- Add episode persistence to every technical lifecycle writer. `reopen.py` currently preserves historical AlertGroup.first_seen_at and reuses the group with a new child; a stable cycle key cannot be inferred from that field. Preserve its Incident → AlertGroup lock order and resolved no-op behavior.
-- Reuse the Incident transaction/CAS helpers for manual links and audit; preserve the independence of Incident and AlertGroup lifecycle.
-- Extend ApiToken and middleware with an integration-bound principal, a route allowlist and explicit scope rules. ApiToken.team alone is not a multi-team/source grant model; the Profile endpoint remains personal-token management.
-- Extend catalog write transactions with graph/auth revision and discovery hooks. Existing `db_lock.py` scheduler locks do not replace per-job lease fencing and publication checks.
-- ServiceEvent's current serializer exposes actor/URL/payload. Add safe stored Change projection, provenance and SQL visibility before enabling timeline publication; retain existing event contracts for other categories.
-- Update retention so new retained evidence is not removed by existing AlertGroup/Service cascades. Migration and rollback/deployment order must prevent a mix of old lifecycle writers and episode-aware readers.
+The latest local regression on 6 November 2026 for changes included in `d1dc817` passed 466 SQLite tests, 92 PostgreSQL tests and two Chrome browser tests. Ruff and diff checks also passed. These are selected regression suites. The full CI matrix and §12.10 release checks accompany the specific build; the general procedure is described in the [2.5 release notes](../incidents/release-notes-2.5.md).
 
-Proposed modules: `app/services/change_intelligence/` (identity, projection, grants, jobs, reconciliation, correlation), `app/modules/db/changes_repo.py`, Change schemas/views/OpenAPI, episode persistence helpers, and Changes/Admin UI assets, plus migrations, translations and tests. Keep these as domain modules inside the existing application; a generic plugin/event-sourcing platform is not required.
+Further diagnostics, retention, explanation, correlation policy, CI/CD and analytics work is specified in §15.
+
+## 15. Second iteration — agreed scope and stages
+
+Scope agreed on 7 November 2026. The second iteration includes all six areas below. Each stage produces a reviewable change with documentation, OpenAPI and translations for affected UI. Every stage is planned.
+
+| Stage | Outcome | Dependencies |
+|---|---|---|
+| 2.1. Integration and processing diagnostics | Events, failed jobs and retry controls in the UI | First iteration |
+| 2.2. Retention and cleanup | Bounded history growth while preserving decisions and duplicate protection | 2.1 for cleanup visibility |
+| 2.3. Relation explanations | Suggestion evidence and a Change/episode timeline | First iteration and evidence preservation contract from 2.2 |
+| 2.4. Correlation policy | Configurable window/horizon, Group inheritance and an exclusion editor | 2.3 to explain the applied policy |
+| 2.5. CI/CD onboarding | Supported sender templates and connection checks | Retry contracts from 2.2 and diagnostics from 2.1 |
+| 2.6. Quality assessment and workflow filters | Review statistics and discovery of Changes needing attention | 2.2–2.4 for data preservation and interpretation |
+
+### 15.1. Stage 2.1 — Integration and processing diagnostics
+
+Build the interface on the existing administrative job APIs, audit, queue and metrics.
+
+- Show recent accepted events and jobs within an integration, with state/type filters, last attempt, attempt count, next attempt and an actionable stop reason. Distinguish waiting for a Service, paused processing, lost authority and exhausted attempts.
+- Connect manual retry to the existing `expected_generation` and audit contract. After `409`, display current data and the action available to the user. Diagnostic reads enforce global administrator or integration-owner Group administrator authority.
+- Extend existing metrics and Grafana panels with accepted/duplicate/rejected counters, processing duration and lifecycle conflicts where these measurements are missing. Keep labels bounded. Record a safe rejection category while excluding request bodies and secrets.
+
+Test retries after grant withdrawal, concurrent retries, Group/permission changes during viewing, secret exclusion, API error recovery and pagination over a large queue.
+
+The stage is complete when an administrator can identify where a Change stopped, address the cause and retry authorized work through the UI.
+
+### 15.2. Stage 2.2 — Retention and cleanup
+
+Add separate system settings for event history, completed jobs and automatic results. Start with a preview of candidates, volume and retention reasons. Enable deletion explicitly after reviewing that estimate.
+
+- Initially, delete events only as part of a complete terminal, unprotected operation. Partial ChangeEvent deletion requires a separate projection recovery contract because current intake rebuilds the Change from its stored events. Under lock, check terminal state, absence of lifecycle conflict, pending references and unfinished work.
+- Manual confirmations/rejections, their evidence and Incident links, including removed links eligible for restoration, retain the corresponding history. Check publication and recomputation dependencies before deleting automatic rows.
+- Keep compact operation/event identities, digests and ordering mode for the agreed retry horizon. Define responses to exact retries, changed content and new events for a cleaned operation. Cleanup must prevent producer namespace reuse or recreation of the former Change.
+- Run bounded, resumable batches with candidate rechecks and consistent lock ordering. Completed-job cleanup must account for their role in establishing projection freshness.
+- Before deletion, define the review facts and timestamps needed by stage 2.6. Preserve them or explicitly restrict reporting to the period covered by retained history.
+
+Test races with ingestion, human review, Incident linking, requests for a new generation and worker publication. Repeat interrupted cleanup and old requests on PostgreSQL/SQLite. Verify retention boundaries and investigation evidence.
+
+The stage is complete when the policy bounds unprotected history, repeated cleanup is safe, and administrators can see retained/deleted volumes and reasons.
+
+### 15.3. Stage 2.3 — Suggestion explanations and timeline
+
+Reuse stored calculation evidence and the separate human-review snapshot.
+
+- Show a direct Service change, reported impact or dependency path, environment certainty, time gap and applied window. An explanation must match the specific suggestion version.
+- Add a shared timeline for the Change interval and selected episode. Represent unknown starts, unfinished operations and contradictory timestamps explicitly.
+- Check access to every disclosed Service and path edge. Use an authorized summary for hidden segments. Recheck both current projections and saved review evidence after permission changes.
+- Show recomputation state when a calculation becomes stale. Retain the grounds of a human decision as a historical snapshot with calculation/review times.
+
+Test consistent evidence on Change/AlertGroup/Incident pages, a hidden intermediate Service, withdrawn access, graph changes after review, timezones, unknown boundaries and narrow screens.
+
+The stage is complete when an operator can explain a suggestion from visible facts and distinguish the current calculation from the grounds of a saved decision.
+
+### 15.4. Stage 2.4 — Correlation policy and inheritance
+
+Move the correlation window and automatic discovery horizon from constants into database settings. Initial values match the first iteration at two hours and seven days.
+
+- Use the shared system settings model. The correlation window is selected as the first setting with a Group override under the [inheritance design](system-settings.md). Initially, the discovery horizon applies globally as a processing-volume bound.
+- Agreed on 7 November 2026 — the window comes from the Group of the selected alert episode's Service. If that Group has no override, use the system value. Each target Group controls cause searches for its alerts across Changes from any authorized Group.
+- Display the effective value and its source, and provide an explicit return to inheritance. Check edit permissions and record audit. Search work captures the revision/snapshot of the applied policy and checks it during publication alongside other inputs.
+- A window, horizon or inheritance change requests bounded recomputation of eligible history. Saved reviews retain their grounds. Evaluate the window for each target episode, including when one Change affects several Groups.
+- Replace the Service exclusion JSON field with a source/label editor. Preview rules against accessible alerts with explanations of matches. Preserve participation when the selected episode has at least one non-excluded child.
+
+Test a Change owned by a third Group against episodes in two target Groups with different windows, inheritance/reset, explicit values equal to system values, policy changes during calculation, withdrawn authority and editor equivalence with the existing matcher.
+
+The stage is complete when edits apply without restart, results explain the effective policy, and stale workers cannot publish calculations based on previous values.
+
+### 15.5. Stage 2.5 — Supported CI/CD senders
+
+Select the first system from the user's actual pipelines and deliver a maintained sender template using the existing `POST /api/change-events`. Agree on the initial supported systems before implementing this stage.
+
+- Define operation identity for deployment jobs, environments and run attempts. Network retries retain event_id and content. A new execution after rerunning a pipeline receives a new Change identity. Specify parallel/matrix jobs and rollback separately.
+- Support started, succeeded, failed, cancelled and rolled_back where the sender has a trustworthy event. A missing terminal event after forcibly stopping a job must be visible in diagnostics.
+- Respect `Retry-After`, bound retries and distinguish authorization/validation failures from transient failures. Agree before implementation whether IR unavailability affects pipeline status.
+- Generate an integration example using its Source, permitted references and a secret variable. A connection check sends an event through ordinary machine authorization into a dedicated test Source/Service. Operators and analytics must be able to identify test data, with the marker specified in the template contract.
+
+Test the generated example against real intake, retry after a lost response, credential rotation, duplicate delivery attempts, job cancellation and independent parallel deployment jobs.
+
+The stage is complete when the chosen CI/CD system follows a reproducible path from its template to a Change, event history and an authorized relation to a test episode.
+
+### 15.6. Stage 2.6 — Suggestion quality and workflow filters
+
+Use confirmations and rejections to assess correlation results.
+
+- Show reviewed suggestion counts, confirmed/rejected shares among reviewed suggestions, outstanding reviews and time to first review. State the denominator and observation period explicitly.
+- Separate automatic suggestions from independently created relations and distinguish cause/context/mitigation roles. Reports of current decisions count each Change/episode pair once, so repeated editing does not increase reviewed totals. Time to review requires a retained first-suggestion timestamp.
+- Apply current access checks before aggregation. Facts retained for analytics after cleanup follow the same RBAC. Show history coverage and excluded test-event volume.
+- Add Inbox filters for accessible Incident relations, pending/problematic Service references and processing state. Combined filters must agree across rows, counts and pagination.
+- Include engine/policy versions when comparing rules so that setting changes are visible alongside review outcomes.
+
+Test zero denominators, repeated/changed decisions, manual links, several episodes for one Change, reporting boundaries, history cleanup, filters involving private relations and permissions changing between requests.
+
+The stage is complete when operators can find Changes needing attention and administrators can assess suggestion quality using reproducible definitions.
+
+### 15.7. Decisions before implementation and overall acceptance
+
+| Decision | Agree before |
+|---|---|
+| Retention/retry horizons, new events for cleaned Changes, and requests beyond the retry horizon | 2.2 |
+| Allowed correlation-window and discovery-horizon ranges | 2.4 |
+| First CI/CD system, test-data marker and effect of IR failure on pipelines | 2.5 |
+
+Verify each stage through ordinary APIs and UI with current RBAC. Storage and concurrency changes require PostgreSQL/SQLite coverage, retries and failure rollback. Before accepting the iteration, exercise CI/CD → intake → explanation → review → analytics → cleanup → event retry. Check representative history volumes, batch bounds and query plans. The release checks in §12.10 apply to the second iteration's final artifact.
