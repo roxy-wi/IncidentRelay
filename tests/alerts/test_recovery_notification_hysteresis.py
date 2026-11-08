@@ -14,7 +14,6 @@ from app.services.orchestration.runtime import RuntimeResult
 from app.settings import Config
 from tests.factories import (
     create_channel, create_group, create_route, create_team,
-    create_user,
 )
 
 

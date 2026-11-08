@@ -4,7 +4,6 @@ from app.modules.db import alerts_repo, audit_repo
 from app.modules.db.models import Alert, AlertEvent, AlertGroup, AuditLog
 from app.services.alerts.actions import acknowledge_alert, resolve_alert
 from app.services.alerts.lifecycle import upsert_alert
-import app.services.alerts.lifecycle as lifecycle
 from tests.factories import create_group, create_route, create_team, create_user
 
 

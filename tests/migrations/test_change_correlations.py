@@ -13,7 +13,7 @@ from app.modules.db.models import (
     ChangeAlertGroupCorrelation,
     Service,
 )
-from tests.factories import create_group, create_service, create_team, unique
+from tests.factories import create_group, create_service, create_team
 from tests.integrations.test_change_correlation import (
     episode_for,
     intake,

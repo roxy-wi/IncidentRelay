@@ -1,5 +1,4 @@
 from peewee import DoesNotExist
-from app.db import database_proxy as db
 from flask import Blueprint, jsonify, request
 
 from app.api.schemas.alerts import (

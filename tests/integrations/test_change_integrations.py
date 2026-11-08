@@ -7,7 +7,6 @@ import pytest
 from app.api.schemas.change_integrations import (
     GrantCreate,
     GrantUpdate,
-    IntegrationUpdate,
     MachineTokenCreate,
     RevisionInput,
     SourceCreate,
@@ -24,7 +23,6 @@ from app.modules.db.models import (
     ChangeGrant,
     ChangeIntegration,
     ChangeJob,
-    ChangeSource,
     Service,
 )
 from app.services.api_token_scopes import required_scopes_for_path, token_has_scopes

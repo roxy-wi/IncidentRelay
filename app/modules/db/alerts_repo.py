@@ -5,7 +5,6 @@ import hashlib
 
 from peewee import Case, JOIN, fn
 
-from app.db import database_proxy as db
 from app.modules.db import alert_episodes_repo, incident_core_repo
 
 from app.modules.db.models import (

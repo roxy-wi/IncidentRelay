@@ -25,7 +25,6 @@ from app.modules.db.models import (
     ChangeService,
     ChangeServiceReference,
     Service,
-    Team,
 )
 from app.services.change_intelligence import (
     administration as admin,

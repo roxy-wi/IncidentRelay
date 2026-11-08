@@ -20,7 +20,6 @@ from app.modules.db.models import (
     AlertGroupEpisode,
     Change,
     ChangeAlertGroupCorrelation,
-    ChangeGraphState,
     ChangeImpact,
     ChangeIntegration,
     ChangeJob,

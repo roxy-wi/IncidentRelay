@@ -15,7 +15,6 @@ import json
 import os
 import re
 import ssl
-import sys
 import tempfile
 import time
 from collections import Counter, defaultdict

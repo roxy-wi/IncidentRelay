@@ -1,7 +1,6 @@
 import logging
 
 from app import Config
-from app.db import database_proxy as db
 from app.modules.common import utc_now
 from app.modules.db import alert_episodes_repo, alerts_repo, incident_core_repo
 from app.modules.db.models import Alert
