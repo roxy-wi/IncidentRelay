@@ -215,8 +215,8 @@ window.AlertIncidentManagement = (function () {
         section.data("incident-id", incidentId);
 
         renderPriority(section, incident);
-        renderResponders(section, incident);
-        renderStakeholders(section, incident);
+        // Operational responders are managed in the Incident workspace.
+        // Operational stakeholders are managed in the Incident workspace.
         bindSectionActions(section, incident);
     }
 
@@ -305,9 +305,7 @@ window.AlertIncidentManagement = (function () {
     function renderSectionGrid() {
         return $("<div>")
             .addClass("details-grid incident-management-grid")
-            .append(renderPriorityCard())
-            .append(renderRespondersCard())
-            .append(renderStakeholdersCard());
+            .append(renderPriorityCard());
     }
 
     function renderPriorityCard() {

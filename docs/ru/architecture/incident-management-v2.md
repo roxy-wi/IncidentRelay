@@ -199,8 +199,9 @@ Incident.assignee   = владелец операционного расслед
 Responders/stakeholders:
 
 - canonical ownership переходит в Incident;
-- legacy AlertGroup records сохраняются во время staged migration;
-- окончательное удаление legacy operational storage относится к 2.9;
+- в 2.5 legacy responders/stakeholders с однозначной связью переносятся в Incident;
+- unmapped и ambiguous записи намеренно пропускаются;
+- удаление прежних collaboration API и storage согласовано как breaking change 2.5;
 - technical comments AlertGroup cleanup не удаляет.
 
 ## 4. Терминология
@@ -755,6 +756,9 @@ incident_resolution_updated
 
 ### IncidentRelay 2.5: Incident collaboration
 
+Согласованный scope 2.5: удалить legacy AlertGroup responder/stakeholder API и storage в этом релизе. Записи без однозначного Incident можно пропускать. См. [breaking change и миграцию](../incidents/release-notes-2.5.md#решение-о-совместимости).
+
+
 - Incident Commander и responders;
 - Incident stakeholders и snapshot service-default stakeholders;
 - operational comments Incident и richer activity;
@@ -763,8 +767,8 @@ incident_resolution_updated
 - technical comments AlertGroup остаются отдельным target;
 - combined Incident activity может показывать comments linked AlertGroup с
   явным source attribution;
-- staged migration legacy AlertGroup responder/stakeholder data при наличии
-  однозначного Incident mapping;
+- перенос legacy AlertGroup responder/stakeholder data при однозначном Incident
+  mapping; сверка перенесённых, объединённых и намеренно пропущенных записей;
 - Incident не создаётся задним числом только ради migration collaboration data.
 
 ### IncidentRelay 2.6: Classification, relations и merge/split
@@ -805,8 +809,7 @@ incident_resolution_updated
 - #60 configurable Postmortems / Incident Reviews;
 - corrective actions с owner/due date и export/reporting;
 - final Incident v2 cleanup;
-- deprecated AlertGroup responder/stakeholder write flows удаляются только после
-  reconciliation;
+- удаление responder/stakeholder API и storage перенесено в 2.5;
 - technical comments AlertGroup и operational comments Incident сохраняются;
 - удаляются legacy Incident-as-AlertGroup terminology/helpers/adapters;
 - obsolete compatibility DB structures удаляются только explicit idempotent

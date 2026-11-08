@@ -1,5 +1,6 @@
 import json
 
+from app.modules.user_colors import user_color
 from app.services.serializers.common import serialize_utc_datetime
 
 
@@ -8,12 +9,13 @@ def serialize_incident_stakeholder(stakeholder):
 
     return {
         "id": stakeholder.id,
-        "alert_group_id": stakeholder.group_id,
+        "incident_id": stakeholder.incident_id,
         "user_id": stakeholder.user_id,
         "user": {
             "id": user.id,
             "username": user.username,
             "display_name": user.display_name,
+            "color": user_color(user),
             "email": user.email,
         } if user else None,
         "email": stakeholder.email,
@@ -55,6 +57,7 @@ def serialize_incident(incident, *, current_user=None, include_details=False):
             "id": assignee.id,
             "username": assignee.username,
             "display_name": assignee.display_name,
+            "color": user_color(assignee),
             "email": assignee.email,
         } if assignee else None),
         "workflow_status": incident.workflow_status,
@@ -103,9 +106,17 @@ def serialize_alert_group_incident_link(link, *, current_user=None):
     }
 
 
-def serialize_incident_link(link):
+def serialize_incident_link(link, *, current_user=None):
+    """Include the technical team's permission for removing this link."""
+    from app.services.rbac import can_respond_team, is_admin_user
+
     group = link.alert_group
+    can_unlink = bool(current_user and group and (
+        can_respond_team(current_user, group.team_id) if group.team_id
+        else is_admin_user(current_user)
+    ))
     return {
+        "permissions": {"can_unlink": can_unlink},
         "id": link.id,
         "incident_id": link.incident_id,
         "alert_group_id": link.alert_group_id,

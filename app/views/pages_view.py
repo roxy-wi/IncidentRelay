@@ -13,12 +13,17 @@ from flask import (
     send_from_directory,
 )
 
+from app.api.schemas.system_settings import settings_properties
 from app.i18n import get_current_locale, translate
 from app.login import normalize_auth_redirect_target
 from app.middleware import load_jwt_user
 from app.services.rbac import can_read_audit_logs
 from app.ui_preferences import get_current_theme
 
+
+ADVANCED_SETTINGS = {
+    name: field for name, field in settings_properties().items() if field["type"] == "integer"
+}
 
 pages_bp = Blueprint("pages", __name__)
 
@@ -88,6 +93,9 @@ def pwa_service_worker():
 @pages_bp.route("/incidents")
 @pages_bp.route("/incidents/")
 @pages_bp.route("/incidents/<int:incident_id>")
+@pages_bp.route("/changes")
+@pages_bp.route("/changes/")
+@pages_bp.route("/changes/<uuid:change_uid>")
 @pages_bp.route("/rotations")
 @pages_bp.route("/rotations/")
 @pages_bp.route("/calendar")
@@ -128,8 +136,12 @@ def pwa_service_worker():
 @pages_bp.route("/admin/audit-log/")
 @pages_bp.route("/admin/sso")
 @pages_bp.route("/admin/sso/")
+@pages_bp.route("/admin/system-settings")
+@pages_bp.route("/admin/system-settings/")
+@pages_bp.route("/admin/change-integrations")
+@pages_bp.route("/admin/change-integrations/")
 @pages_bp.route("/login")
-def app_page(alert_id=None, incident_id=None):
+def app_page(alert_id=None, incident_id=None, change_uid=None):
     """
     Render the frontend application for direct page URLs.
     """
@@ -147,14 +159,22 @@ def app_page(alert_id=None, incident_id=None):
 
     normalized_path = request.path.rstrip("/") or "/"
 
-    if normalized_path in ("/admin/users", "/groups", "/admin/sso") and not user.is_admin:
+    admin_paths = ("/admin/users", "/groups", "/admin/sso", "/admin/system-settings")
+    if normalized_path in admin_paths and not user.is_admin:
         abort(403)
+
+    if normalized_path == "/admin/change-integrations":
+        from app.services.change_intelligence.management import can_manage_integrations
+
+        if not can_manage_integrations(user):
+            abort(403)
 
     if normalized_path == "/admin/audit-log" and not can_read_audit_logs(user):
         abort(403)
 
     return render_template(
         "index.html",
+        advanced_settings=ADVANCED_SETTINGS if user.is_admin else {},
         initial_page=request.path,
         initial_alert_id=alert_id,
         current_theme=get_current_theme(),

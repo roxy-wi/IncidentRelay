@@ -216,7 +216,7 @@ function renderAuditLogTable(items) {
 
     items.forEach(function (item) {
         const actor = $("<div>").addClass("audit-log-actor");
-        actor.append($("<span>").text(auditLogActorLabel(item)));
+        actor.append(UserAppearance.label(item.actor, auditLogActorLabel(item)));
         if (item.actor && item.actor.username) {
             actor.append(
                 $("<span>").addClass("audit-log-secondary").text("@" + item.actor.username)
@@ -300,7 +300,8 @@ function openAuditLogDetails(auditId) {
     const summary = $("#audit-log-details-summary");
     summary.empty()
         .append(auditLogDetailsItem(i18n.t("audit.details.time"), formatDateTimeMinutes(item.created_at)))
-        .append(auditLogDetailsItem(i18n.t("audit.details.actor"), auditLogActorLabel(item)))
+        .append(auditLogDetailsItem(i18n.t("audit.details.actor"), "")
+            .find(".details-value").empty().append(UserAppearance.label(item.actor, auditLogActorLabel(item))).end())
         .append(auditLogDetailsItem(i18n.t("audit.details.action"), item.action))
         .append(auditLogDetailsItem(i18n.t("audit.details.object"), auditLogObjectLabel(item)))
         .append(auditLogDetailsItem(

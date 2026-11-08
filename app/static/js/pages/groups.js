@@ -400,7 +400,7 @@ function renderGroupMemberRow(member) {
     const row = $("<tr>").toggleClass("row-disabled", !member.active);
 
     row.append($("<td>").text(member.user_id));
-    row.append($("<td>").text(member.username || "-"));
+    row.append($("<td>").append(UserAppearance.label(member, member.username || "-")));
     row.append($("<td>").text(member.display_name || "-"));
 
     row.append(

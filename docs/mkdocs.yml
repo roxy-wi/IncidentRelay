@@ -72,6 +72,7 @@ nav:
           - New Relic: integrations/new-relic.md
           - OpenSearch Alerting: integrations/opensearch.md
           - Kibana Alerting: integrations/kibana.md
+          - Google Cloud Monitoring: integrations/google-cloud-monitoring.md
           - Azure Monitor: integrations/azure-monitor.md
           - Cloud.ru: integrations/cloud-ru.md
           - Nagios: integrations/nagios.md

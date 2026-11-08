@@ -226,5 +226,7 @@
   "profile.oncall.no_next_primary": "No upcoming primary shifts in the selected lookahead window.",
   "profile.oncall.next_backup": "Next escalation backup shifts",
   "profile.oncall.no_next_backup": "No upcoming escalation backup shifts in the selected lookahead window.",
-  "profile.push.device_placeholder": "My laptop, work phone..."
+  "profile.push.device_placeholder": "My laptop, work phone...",
+  "profile.fields.color": "User color",
+  "profile.fields.color_help": "Used for your avatar and on-call shifts throughout IncidentRelay."
 }

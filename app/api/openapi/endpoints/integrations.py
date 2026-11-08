@@ -2739,6 +2739,52 @@ def paths():
                 ),
             },
         },
+        "/api/integrations/google-cloud-monitoring": {
+            "post": {
+                "tags": ["integrations"],
+                "summary": "Receive Google Cloud Monitoring alerts",
+                "operationId": "receiveGoogleCloudMonitoringAlerts",
+                "description": (
+                    "Use HTTP Basic with username incidentrelay and the intake token "
+                    "of an enabled google_cloud_monitoring route as the password. "
+                    "A close is final for this route, scoping project and incident ID, "
+                    "even when it arrives before the open."
+                ),
+                "security": [{"basicRouteAuth": []}],
+                "requestBody": json_body(
+                    "Direct Cloud Monitoring webhook, version 1.2.",
+                    {
+                        "type": "object",
+                        "required": ["version", "incident"],
+                        "properties": {
+                            "version": {"type": "string", "enum": ["1.2"]},
+                            "incident": {
+                                "type": "object",
+                                "required": ["incident_id", "scoping_project_id", "state"],
+                                "properties": {
+                                    "incident_id": {"type": "string", "minLength": 1},
+                                    "scoping_project_id": {"type": "string", "minLength": 1},
+                                    "state": {"type": "string", "enum": ["open", "closed"]},
+                                    "policy_name": {"type": "string", "nullable": True},
+                                    "condition_name": {"type": "string", "nullable": True},
+                                    "severity": {"type": "string", "nullable": True},
+                                    "summary": {"type": "string", "nullable": True},
+                                    "resource": {"type": "object", "nullable": True},
+                                    "url": {"type": "string", "nullable": True},
+                                },
+                            },
+                        },
+                    },
+                ),
+                "responses": {
+                    **incoming_alert_responses("Google Cloud Monitoring alert processed."),
+                    "401": {
+                        "description": "Missing or invalid Basic route credential.",
+                        "headers": {"WWW-Authenticate": {"schema": {"type": "string"}}},
+                    },
+                },
+            },
+        },
         "/api/integrations/azure-monitor": {
             "post": {
                 "tags": ["integrations"],

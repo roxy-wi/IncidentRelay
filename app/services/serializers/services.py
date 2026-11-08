@@ -1,3 +1,4 @@
+from app.modules.user_colors import user_color
 from app.modules.db import services_repo, maintenance_repo
 from app.services.serializers.common import serialize_utc_datetime, attach_team_permissions, attach_group_permissions, \
     serialize_local_datetime
@@ -191,6 +192,8 @@ def serialize_service(service, current_user=None, readiness_state=None):
         "labels": service.labels or {},
         "tags": service.tags or [],
         "metadata": service.metadata or {},
+        "change_correlation_enabled": service.change_correlation_enabled,
+        "change_correlation_exclusions": service.change_correlation_exclusions or [],
 
         "enabled": service.enabled,
         "public": service.public,
@@ -357,6 +360,7 @@ def serialize_service_owner(owner, current_user=None):
         "team_id": service.team_id if service else None,
         "group_id": service.group_id if service else None,
         "user_id": user.id if user else None,
+        "color": user_color(user),
         "username": user.username if user else None,
         "user_email": user.email if user else None,
         "user_display_name": getattr(user, "display_name", None)

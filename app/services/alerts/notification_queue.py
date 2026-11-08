@@ -5,15 +5,9 @@ from app import Config
 from app.db import database_proxy as db
 from app.modules.db.models import AlertGroup, RecoveryNotificationDelivery
 from app.services.alerts.reopen import lock_grouping_identity
-from app.services.incidents.stakeholders import (
-    build_stakeholder_notification_email,
-    send_stakeholder_email,
-    send_stakeholder_push,
-    stakeholder_email,
-    stakeholder_user,
-)
-from app.modules.db import alerts_repo, incidents_repo, notifications_repo
+from app.modules.db import alerts_repo, notifications_repo
 from app.services.notifications.delivery import notify_alert
+from app.services.notifications.retries import delivery_attempt
 from app.services.alerts.shelving import is_alert_group_shelved
 from app.services.alerts.maintenance_state import (
     is_notification_lifecycle_suppressed,
@@ -122,14 +116,6 @@ def _snapshot_recovery_targets(group, *, now):
     if group.last_notification_at and group.assignee_id:
         targets.append(("user_rules", group.assignee_id))
 
-    for stakeholder in incidents_repo.list_incident_stakeholders(group.id):
-        if not stakeholder.active or not stakeholder.notify_on_resolved:
-            continue
-        if stakeholder_email(stakeholder):
-            targets.append(("stakeholder_email", stakeholder.id))
-        if stakeholder_user(stakeholder):
-            targets.append(("stakeholder_push", stakeholder.id))
-
     for kind, recipient_id in sorted(set(targets)):
         RecoveryNotificationDelivery.create(
             group=group.id,
@@ -168,44 +154,23 @@ def _deliver_recovery_target(group, delivery):
             return "skipped", 0
         return "sent", rules.enqueue_user_notifications(group, event_type="resolved")
 
-    stakeholder = incidents_repo.get_incident_stakeholder(delivery.target_id)
-    if (
-        not stakeholder or stakeholder.group_id != group.id
-        or not stakeholder.active or not stakeholder.notify_on_resolved
-    ):
-        return "skipped", 0
-
-    if kind == "stakeholder_email":
-        recipient = stakeholder_email(stakeholder)
-        if not recipient:
-            return "skipped", 0
-        subject, body = build_stakeholder_notification_email(
-            group, "resolved", old_value=group.previous_status,
-        )
-        send_stakeholder_email(recipient, subject, body)
-        return "sent", 1
-
-    if kind == "stakeholder_push":
-        if not stakeholder_user(stakeholder):
-            return "skipped", 0
-        sent = send_stakeholder_push(
-            stakeholder, group, event_type="incident_resolved",
-        )
-        return ("sent", int(sent)) if sent else ("skipped", 0)
-
     return "skipped", 0
+
 
 
 def _try_recovery_target(group, delivery, *, now):
     """Persist each target's result before processing the next target."""
-    delivery.attempts += 1
-    delivery.updated_at = now
-    try:
-        status, sent = _deliver_recovery_target(group, delivery)
-    except Exception as exc:
-        delivery.last_error = str(exc)[:2000]
-        if delivery.attempts >= RECOVERY_MAX_ATTEMPTS:
-            delivery.status = "failed"
+    values = delivery_attempt(
+        lambda: _deliver_recovery_target(group, delivery),
+        attempt=delivery.attempts + 1, now=now,
+        max_attempts=RECOVERY_MAX_ATTEMPTS,
+        base_seconds=RECOVERY_RETRY_BASE_SECONDS,
+        max_seconds=RECOVERY_RETRY_MAX_SECONDS,
+    )
+    for name, value in values.items():
+        setattr(delivery, name, value)
+    if delivery.last_error is not None:
+        if delivery.status == "failed":
             alerts_repo.create_alert_event(
                 group_id=group.id,
                 event_type="recovery_delivery_exhausted",
@@ -214,12 +179,6 @@ def _try_recovery_target(group, delivery, *, now):
                     f"exhausted {delivery.attempts} attempts"
                 ),
             )
-        else:
-            retry_seconds = min(
-                RECOVERY_RETRY_BASE_SECONDS * (2 ** (delivery.attempts - 1)),
-                RECOVERY_RETRY_MAX_SECONDS,
-            )
-            delivery.next_attempt_at = now + timedelta(seconds=retry_seconds)
         logger.warning(
             "recovery target delivery failed",
             extra={"extra": {
@@ -230,11 +189,6 @@ def _try_recovery_target(group, delivery, *, now):
                 "error": delivery.last_error,
             }},
         )
-    else:
-        delivery.status = status
-        delivery.delivered_count = max(int(sent or 0), 0)
-        delivery.delivered_at = now if status == "sent" else None
-        delivery.last_error = None
     delivery.save()
 
 
@@ -339,7 +293,7 @@ def schedule_group_notification(group, reason="notification", now=None):
         if group.next_escalation_at is not None:
             group.next_escalation_at = None
             group.updated_at = now
-            group.save()
+            group.save(only=[AlertGroup.next_escalation_at, AlertGroup.updated_at])
         return group
 
     if is_notification_lifecycle_suppressed(group, now=now):

@@ -148,8 +148,8 @@ function renderOncallStatusPanel(target, data) {
     header.append(
         $("<button>")
             .attr("type", "button")
-            .addClass("btn btn-small")
-            .text(i18n.t("profile.actions.refresh"))
+            .addClass("btn btn-small btn-reload")
+            .text(i18n.t("common.reload"))
             .on("click", function () {
                 loadOncallStatusPanel(root);
             })

@@ -63,6 +63,11 @@
     }
 
     function placeActionMenu(menu) {
+        // A queued animation frame may run after an action closes the menu.
+        if (!openedActionMenu || openedActionMenu[0] !== menu[0]) {
+            return;
+        }
+
         const toggle = menu.data("action-menu-toggle");
         const list = menu.data("action-menu-list");
 

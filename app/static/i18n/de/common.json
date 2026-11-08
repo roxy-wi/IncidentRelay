@@ -4,6 +4,8 @@
   "common.message": "Nachricht",
   "common.cancel": "Abbrechen",
   "common.ok": "OK",
+  "common.reload": "Reload",
+  "common.back": "Zurück",
   "common.close": "Schließen",
   "common.logout": "Abmelden",
   "common.install_app": "App installieren",

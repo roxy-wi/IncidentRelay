@@ -322,3 +322,43 @@
         width: 120px;
     }
 }
+
+/* Silence rules include their full context without a separate details panel. */
+body.md-theme .silences-table {
+    min-width: 1100px;
+}
+
+body.md-theme .silences-table th {
+    white-space: normal;
+}
+
+body.md-theme .silences-table td {
+    vertical-align: top;
+    overflow-wrap: anywhere;
+}
+
+body.md-theme .silences-table .silence-name-cell {
+    min-width: 130px;
+    max-width: 220px;
+}
+
+body.md-theme .silences-table .silence-team-cell {
+    min-width: 130px;
+    max-width: 180px;
+}
+
+body.md-theme .silences-table .silence-reason-cell {
+    min-width: 140px;
+    max-width: 260px;
+    white-space: pre-wrap;
+}
+
+body.md-theme .silences-table .silence-matching-cell {
+    min-width: 220px;
+    max-width: 320px;
+}
+
+body.md-theme .silences-table .details-code {
+    margin: 4px 0 0;
+    padding: 8px;
+}

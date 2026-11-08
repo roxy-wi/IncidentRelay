@@ -1,10 +1,9 @@
 import pytest
 
-from app.modules.db import alerts_repo
-from app.modules.db.models import Alert, AlertEvent, AlertGroup
+from app.modules.db import alerts_repo, audit_repo
+from app.modules.db.models import Alert, AlertEvent, AlertGroup, AuditLog
 from app.services.alerts.actions import acknowledge_alert, resolve_alert
 from app.services.alerts.lifecycle import upsert_alert
-import app.services.alerts.lifecycle as lifecycle
 from tests.factories import create_group, create_route, create_team, create_user
 
 
@@ -56,25 +55,18 @@ def _event_count(alert_group_id, event_type):
 def test_acknowledge_alert_is_idempotent(monkeypatch, db):
     """
     Repeating the same manual acknowledge must not create another timeline
-    event, update outbound messages again, or emit another stakeholder event.
+    event, update outbound messages again, or change technical ownership.
     """
     group, _team, _route, alert_group, _alert = _create_firing_group()
     user = create_user("release-ack-user", group)
 
     message_updates = []
-    stakeholder_updates = []
 
     monkeypatch.setattr(
         "app.services.alerts.actions.update_alert_messages",
         lambda current_group, event_type: message_updates.append(
             (current_group.id, event_type)
         ) or 1,
-    )
-    monkeypatch.setattr(
-        "app.services.alerts.actions.notify_stakeholders",
-        lambda current_group, event_type, **kwargs: stakeholder_updates.append(
-            (current_group.id, event_type, kwargs)
-        ),
     )
 
     first = acknowledge_alert(alert_group.id, user_id=user.id)
@@ -86,32 +78,23 @@ def test_acknowledge_alert_is_idempotent(monkeypatch, db):
 
     assert _event_count(alert_group.id, "acknowledged") == 1
     assert message_updates == [(alert_group.id, "acknowledged")]
-    assert len(stakeholder_updates) == 1
-    assert stakeholder_updates[0][1] == "status_changed"
 
 
 def test_resolve_alert_is_idempotent(monkeypatch, db):
     """
     Repeating manual resolve must preserve the first transition and must not
-    duplicate timeline, outbound-message, or stakeholder side effects.
+    duplicate timeline, outbound-message, side effects.
     """
     group, _team, _route, alert_group, _alert = _create_firing_group()
     user = create_user("release-resolve-user", group)
 
     message_updates = []
-    stakeholder_updates = []
 
     monkeypatch.setattr(
         "app.services.alerts.actions.update_alert_messages",
         lambda current_group, event_type: message_updates.append(
             (current_group.id, event_type)
         ) or 1,
-    )
-    monkeypatch.setattr(
-        "app.services.alerts.actions.notify_stakeholders",
-        lambda current_group, event_type, **kwargs: stakeholder_updates.append(
-            (current_group.id, event_type, kwargs)
-        ),
     )
 
     first = resolve_alert(alert_group.id, user_id=user.id)
@@ -125,8 +108,65 @@ def test_resolve_alert_is_idempotent(monkeypatch, db):
 
     assert _event_count(alert_group.id, "resolved") == 1
     assert message_updates == [(alert_group.id, "resolved")]
-    assert len(stakeholder_updates) == 1
-    assert stakeholder_updates[0][1] == "resolved"
+
+
+@pytest.mark.parametrize("failure", ["event", "audit"])
+def test_resolve_rolls_back_on_history_failure_and_can_retry(
+    monkeypatch, db, failure,
+):
+    """Failed resolve preserves the group, children and queued notification."""
+    scope, _team, _route, group, child = _create_firing_group()
+    user = create_user(group=scope)
+    group.notification_pending = True
+    group.notification_reason = "group_wait"
+    group.notification_due_at = group.created_at
+    group.save()
+    group_before = AlertGroup.get_by_id(group.id).__data__.copy()
+    child_before = Alert.get_by_id(child.id).__data__.copy()
+    events = AlertEvent.select().where(AlertEvent.group == group.id)
+    audits = AuditLog.select().where(
+        AuditLog.object_type == "alert_group", AuditLog.object_id == group.id,
+    )
+    event_count = events.count()
+    audit_count = audits.count()
+    message_updates = []
+    monkeypatch.setattr(
+        "app.services.alerts.actions.update_alert_messages",
+        lambda current, event_type: message_updates.append(
+            (current.id, event_type)
+        ),
+    )
+
+    def fail_history(**kwargs):
+        raise RuntimeError("resolve history failed")
+
+    with monkeypatch.context() as patch:
+        if failure == "event":
+            patch.setattr(alerts_repo, "create_alert_event", fail_history)
+        else:
+            patch.setattr(audit_repo, "create_audit_log", fail_history)
+        with pytest.raises(RuntimeError, match="resolve history failed"):
+            resolve_alert(group.id, user_id=user.id)
+
+    assert AlertGroup.get_by_id(group.id).__data__ == group_before
+    assert Alert.get_by_id(child.id).__data__ == child_before
+    assert events.count() == event_count
+    assert audits.count() == audit_count
+    assert message_updates == []
+
+    resolved = resolve_alert(group.id, user_id=user.id)
+    repeated = resolve_alert(group.id, user_id=user.id)
+    stored = AlertGroup.get_by_id(group.id)
+    assert resolved.status == repeated.status == stored.status == "resolved"
+    assert stored.resolved_by_id == user.id
+    assert repeated.resolved_at == resolved.resolved_at == stored.resolved_at
+    assert Alert.get_by_id(child.id).status == "resolved"
+    assert not stored.notification_pending
+    assert stored.notification_due_at is None
+    assert stored.notification_reason is None
+    assert events.count() == event_count + 1
+    assert audits.count() == audit_count + 1
+    assert message_updates == [(group.id, "resolved")]
 
 
 def test_same_alert_firing_after_payload_resolve_creates_new_group(db):
@@ -181,7 +221,6 @@ def test_resolve_alert_can_skip_message_updates(monkeypatch, db):
     user = create_user("release-resolve-no-update-user", group)
 
     message_updates = []
-    stakeholder_updates = []
 
     monkeypatch.setattr(
         "app.services.alerts.actions.update_alert_messages",
@@ -189,12 +228,6 @@ def test_resolve_alert_can_skip_message_updates(monkeypatch, db):
             (current_group.id, event_type)
         )
         or 1,
-    )
-    monkeypatch.setattr(
-        "app.services.alerts.actions.notify_stakeholders",
-        lambda current_group, event_type, **kwargs: stakeholder_updates.append(
-            (current_group.id, event_type, kwargs)
-        ),
     )
 
     resolved = resolve_alert(
@@ -205,7 +238,6 @@ def test_resolve_alert_can_skip_message_updates(monkeypatch, db):
 
     assert resolved.status == "resolved"
     assert message_updates == []
-    assert len(stakeholder_updates) == 1
     assert _event_count(alert_group.id, "resolved") == 1
 
 
@@ -259,14 +291,6 @@ def test_new_alert_persistence_rolls_back_group_when_child_insert_fails(
         group_by=["alertname"],
     )
 
-    stakeholder_calls = []
-
-    monkeypatch.setattr(
-        lifecycle,
-        "_add_service_stakeholders_for_new_group",
-        lambda current_group: stakeholder_calls.append(current_group.id),
-    )
-
     def fail_create_alert(**kwargs):
         raise RuntimeError("simulated child alert insert failure")
 
@@ -284,4 +308,3 @@ def test_new_alert_persistence_rolls_back_group_when_child_insert_fails(
 
     assert Alert.select().count() == 0
     assert AlertGroup.select().count() == 0
-    assert stakeholder_calls == []

@@ -1,4 +1,5 @@
 import logging
+from datetime import datetime, timedelta, timezone
 
 from apscheduler.schedulers.background import BackgroundScheduler
 from apscheduler.schedulers.base import SchedulerAlreadyRunningError, SchedulerNotRunningError
@@ -16,6 +17,7 @@ from app.services.notifications.shift_notifications import (
     send_due_oncall_shift_mattermost_notifications,
 )
 from app.services.notifications.rules import process_due_user_notifications
+from app.services.notifications.incidents import process_due_incident_notifications
 from app.services.incidents.responders import expire_due_incident_responders
 from app.services.alerts.explain_cleanup import cleanup_alert_explain_traces
 from app.services.alerts.retention import cleanup_alert_history
@@ -28,6 +30,7 @@ from app.services.orchestration.pending import (
     process_due_pending_events,
 )
 from app.services.orchestration.webhooks import process_due_webhooks
+from app.services.system_settings import get_settings
 
 logger = logging.getLogger("oncall.scheduler")
 _scheduler = None
@@ -184,6 +187,7 @@ def user_notification_rules_job():
         logger.info("user notification rules job started")
 
         count = process_due_user_notifications()
+        count += process_due_incident_notifications()
 
         logger.info(
             "user notification rules job finished",
@@ -694,6 +698,37 @@ def orchestration_webhook_job():
             db.close()
 
 
+def change_intelligence_job():
+    """Database leases, rather than the scheduler singleton, fence this work."""
+    from app.services.change_intelligence.worker import process_change_jobs
+
+    try:
+        if db.is_closed():
+            db.connect(reuse_if_open=True)
+        return process_change_jobs()
+    except Exception as error:
+        logger.error("Change Intelligence worker tick failed: %s", type(error).__name__)
+        return 0
+    finally:
+        if not db.is_closed():
+            db.close()
+
+
+def refresh_change_worker_schedule(scheduler):
+    """Apply the committed interval even while queue processing is paused."""
+    with db.connection_context():
+        seconds = get_settings().change_worker_interval_seconds
+    job_id = "change_intelligence_job"
+    job = scheduler.get_job(job_id)
+    if job is None:
+        scheduler.add_job(
+            change_intelligence_job, "interval", seconds=seconds, id=job_id,
+            max_instances=1, coalesce=True, next_run_time=datetime.now(timezone.utc),
+        )
+    elif job.trigger.interval != timedelta(seconds=seconds):
+        scheduler.reschedule_job(job_id, trigger="interval", seconds=seconds)
+
+
 def start_scheduler():
     """
     Start the background scheduler.
@@ -708,6 +743,17 @@ def start_scheduler():
         return _scheduler
 
     _scheduler = BackgroundScheduler()
+    _scheduler.add_job(
+        refresh_change_worker_schedule,
+        "interval",
+        seconds=5,
+        args=(_scheduler,),
+        max_instances=1,
+        coalesce=True,
+        next_run_time=datetime.now(timezone.utc),
+        id="refresh_change_worker_schedule",
+        replace_existing=True,
+    )
     _scheduler.add_job(
         reminder_job,
         "interval",

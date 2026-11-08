@@ -17,6 +17,7 @@ def test_registry_contains_all_supported_integration_normalizers():
         "azure_monitor",
         "cloud_ru",
         "datadog",
+        "google_cloud_monitoring",
         "grafana",
         "kibana",
         "opensearch",

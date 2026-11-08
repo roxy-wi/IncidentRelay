@@ -68,6 +68,7 @@ STANDARD_CHECK_SEVERITIES = ["info", "warning", "critical"]
 READINESS_STATUSES = ["ready", "warning", "not_ready", "not_applicable", "unknown"]
 CHECK_RESULT_STATUSES = ["passed", "failed", "skipped", "not_applicable"]
 TIMELINE_CATEGORIES = [
+    "change",
     "configuration",
     "routing",
     "readiness",
@@ -98,6 +99,7 @@ USER_SHORT_SCHEMA = {
     "type": "object",
     "nullable": True,
     "properties": {
+        "color": {"type": "string", "pattern": "^#[0-9a-f]{6}$", "readOnly": True},
         "id": {"type": "integer"},
         "username": {"type": "string", "nullable": True},
         "display_name": {"type": "string", "nullable": True},
@@ -333,6 +335,7 @@ SERVICE_READINESS_RESPONSE_SCHEMA = {
 TIMELINE_ACTOR_SCHEMA = {
     "type": "object",
     "properties": {
+        "color": {"type": "string", "pattern": "^#[0-9a-f]{6}$", "readOnly": True},
         "type": {"type": "string", "nullable": True, "example": "user"},
         "user_id": {"type": "integer", "nullable": True},
         "display_name": {"type": "string", "nullable": True},
@@ -343,6 +346,7 @@ TIMELINE_ACTOR_SCHEMA = {
 
 SERVICE_TIMELINE_EVENT_SCHEMA = {
     "type": "object",
+    "description": "Legacy events retain their original contract. Change Intelligence events always use source=change_intelligence, event_type=change.recorded and title=Related change. Their payload contains only change_uid (UUID), kind and relation_type (changed, reported_affected or inferred_impact); actor, original source identifiers, provider text and external URL are not copied. Current Service/Change visibility is checked before cursor pagination. Personal tokens also need changes:read to see these events. Responses containing timelines use Cache-Control: no-store.",
     "properties": {
         "id": {"type": "integer"},
         "uid": {"type": "string", "format": "uuid"},
@@ -585,27 +589,28 @@ SERVICE_SLO_INPUT_SCHEMA = {
         },
         "enabled": {"type": "boolean", "default": True},
     },
-    "examples": {
-        "ack_latency": {
-            "summary": "95% critical alerts acknowledged within 15 minutes",
-            "value": {
-                "sli_id": 10,
-                "name": "95% critical alerts acknowledged within 15 minutes",
-                "comparison": "percent_good_gte",
-                "target_percent_basis_points": 9500,
-                "threshold_seconds": 900,
-                "window_days": 30,
-            },
+}
+
+SERVICE_SLO_INPUT_EXAMPLES = {
+    "ack_latency": {
+        "summary": "95% critical alerts acknowledged within 15 minutes",
+        "value": {
+            "sli_id": 10,
+            "name": "95% critical ACKs within 15 minutes",
+            "comparison": "percent_good_gte",
+            "target_percent_basis_points": 9500,
+            "threshold_seconds": 900,
+            "window_days": 30,
         },
-        "incident_count": {
-            "summary": "No more than 3 critical incidents in 30 days",
-            "value": {
-                "sli_id": 11,
-                "name": "No more than 3 critical incidents in 30 days",
-                "comparison": "value_lte",
-                "threshold_count": 3,
-                "window_days": 30,
-            },
+    },
+    "incident_count": {
+        "summary": "No more than 3 critical incidents in 30 days",
+        "value": {
+            "sli_id": 11,
+            "name": "At most 3 critical incidents in 30 days",
+            "comparison": "value_lte",
+            "threshold_count": 3,
+            "window_days": 30,
         },
     },
 }
@@ -1001,7 +1006,8 @@ def paths():
                 "description": "Creates a Service Level Objective for an SLI on the same service and returns the first evaluation.",
                 "operationId": "createServiceSlo",
                 "parameters": [path_param("service_id", "Service id.")],
-                "requestBody": json_body("Service SLO properties.", SERVICE_SLO_INPUT_SCHEMA),
+                "requestBody": json_body("Service SLO properties.", SERVICE_SLO_INPUT_SCHEMA,
+                                         examples=SERVICE_SLO_INPUT_EXAMPLES),
                 "responses": {
                     "201": response("Service SLO created.", SERVICE_SLO_SCHEMA),
                     "400": response("Validation error or SLI/SLO shape mismatch.", ERROR_SCHEMA),
@@ -1017,7 +1023,8 @@ def paths():
                 "description": "Updates a Service Level Objective and returns the refreshed evaluation.",
                 "operationId": "updateServiceSlo",
                 "parameters": [path_param("slo_id", "Service SLO id.")],
-                "requestBody": json_body("Updated Service SLO properties.", SERVICE_SLO_INPUT_SCHEMA),
+                "requestBody": json_body("Updated Service SLO properties.", SERVICE_SLO_INPUT_SCHEMA,
+                                         examples=SERVICE_SLO_INPUT_EXAMPLES),
                 "responses": {
                     "200": response("Service SLO updated.", SERVICE_SLO_SCHEMA),
                     "400": response("Validation error or SLI/SLO shape mismatch.", ERROR_SCHEMA),

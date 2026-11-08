@@ -1,0 +1,41 @@
+.changes-page [hidden] {
+    display: none !important;
+}
+.changes-description,
+.changes-page pre {
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+.changes-page .form-grid-2 {
+    margin-top: 12px;
+}
+body.md-theme .changes-page .form-body {
+    padding: 12px 16px;
+    gap: 10px;
+}
+body.md-theme .changes-page .form-body > p {
+    margin: 0;
+}
+body.md-theme .changes-page .form-grid-2 > .form-group {
+    gap: 4px;
+}
+.changes-page #changes-metadata {
+    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+}
+.changes-page #changes-message:empty,
+.changes-page #changes-filter-message:empty {
+    display: none;
+}
+.changes-detail {
+    display: grid;
+    gap: 16px;
+    min-width: 0;
+}
+body.md-theme .changes-detail > .card {
+    margin: 0;
+    min-width: 0;
+}
+.changes-page .table-pagination > span {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}

@@ -160,3 +160,88 @@ def test_foreign_team_user_cannot_read_or_unlink_incident_links(client, db):
         incident.id,
         alert_group.id,
     ) is not None
+
+
+def test_incident_detail_and_link_list_hide_foreign_team_signals(client, db):
+    """A readable Incident does not imply visibility of its technical sources."""
+    from app.modules.db.models import IncidentAlertGroupLink
+
+    own_group = create_group()
+    own_team = create_team(own_group)
+    foreign_group = create_group()
+    foreign_team = create_team(foreign_group)
+    viewer = create_user(group=own_group, group_role="viewer")
+    add_user_to_team(own_team, viewer, role="responder")
+    headers = _headers(viewer)
+    incident = core.create_incident(team_id=own_team.id, title="Mixed-team incident")
+    own_signal = _alert_group(own_team)
+    private_signal = _alert_group(foreign_team)
+    private_signal.title = "Confidential foreign team's alert"
+    private_signal.save()
+    IncidentAlertGroupLink.create(incident=incident, alert_group=own_signal, relation_type="related")
+    IncidentAlertGroupLink.create(incident=incident, alert_group=private_signal, relation_type="related")
+
+    for endpoint in (f"/api/incidents/{incident.id}",
+                     f"/api/incidents/{incident.id}/alert-groups"):
+        response = client.get(endpoint, headers=headers)
+        assert response.status_code == 200, response.get_json()
+        payload = response.get_json()
+        links = payload["alert_groups"] if isinstance(payload, dict) else payload
+        assert [link["alert_group_id"] for link in links] == [own_signal.id]
+        assert "Confidential foreign team's alert" not in response.get_data(as_text=True)
+
+
+def test_incident_link_operations_reject_foreign_team_and_unscoped_signals(client, db):
+    from app.modules.db.models import IncidentAlertGroupLink
+
+    own_group = create_group()
+    own_team = create_team(own_group)
+    foreign_group = create_group()
+    foreign_team = create_team(foreign_group)
+    operator = create_user(group=own_group, group_role="viewer")
+    add_user_to_team(own_team, operator, role="responder")
+    headers = _headers(operator)
+    incident = core.create_incident(team_id=own_team.id, title="Cross-team restriction")
+    private_signal = _alert_group(foreign_team)
+    unscoped = _alert_group(own_team)
+    unscoped.team = None
+    unscoped.save()
+
+    for signal in (private_signal, unscoped):
+        link_response = client.post(
+            f"/api/incidents/{incident.id}/alert-groups",
+            json={"alert_group_id": signal.id, "relation_type": "related"},
+            headers=headers,
+        )
+        assert link_response.status_code in (403, 404), link_response.get_json()
+        IncidentAlertGroupLink.create(incident=incident, alert_group=signal, relation_type="related")
+        unlink_response = client.delete(
+            f"/api/incidents/{incident.id}/alert-groups/{signal.id}", headers=headers,
+        )
+        assert unlink_response.status_code in (403, 404), unlink_response.get_json()
+        assert IncidentAlertGroupLink.select().where(
+            IncidentAlertGroupLink.incident == incident.id,
+            IncidentAlertGroupLink.alert_group == signal.id,
+            IncidentAlertGroupLink.removed_at.is_null(True),
+        ).exists()
+
+
+def test_incident_activity_does_not_expose_foreign_team_comments(client, db):
+    from app.modules.db.models import AlertComment, IncidentAlertGroupLink
+
+    own_group = create_group()
+    own_team = create_team(own_group)
+    foreign_group = create_group()
+    foreign_team = create_team(foreign_group)
+    viewer = create_user(group=own_group, group_role="viewer")
+    add_user_to_team(own_team, viewer, role="responder")
+    incident = core.create_incident(team_id=own_team.id, title="Activity scope")
+    private_signal = _alert_group(foreign_team)
+    IncidentAlertGroupLink.create(incident=incident, alert_group=private_signal, relation_type="related")
+    AlertComment.create(group=private_signal, user=viewer, body="FOREIGN_CONFIDENTIAL_ACTIVITY")
+
+    response = client.get(f"/api/incidents/{incident.id}/activity", headers=_headers(viewer))
+    assert response.status_code == 200, response.get_json()
+    assert "FOREIGN_CONFIDENTIAL_ACTIVITY" not in response.get_data(as_text=True)
+    assert all(entry.get("source_id") != private_signal.id or
+               entry.get("source_type") != "AlertGroup" for entry in response.get_json())

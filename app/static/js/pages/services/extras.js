@@ -19,7 +19,7 @@ function normalizeServiceExternalUrl(value) {
 function renderServiceDetailsMaintenance(payload) {
     const windows = asArray(payload.maintenance_windows);
     const section = serviceDetailsSection(
-        "Maintenance windows",
+        "maintenance", "fa-tools", "Maintenance windows",
         "Active and upcoming maintenance that can affect this service."
     );
     const rows = windows.slice(0, 8).map(function (item) {
@@ -83,7 +83,7 @@ function serviceDetailsExternalLink(url, label, fallback) {
 function renderServiceDetailsRunbooks(payload) {
     const runbooks = asArray(payload.runbooks);
     const section = serviceDetailsSection(
-        "Runbooks",
+        "runbooks", "fa-book", "Runbooks",
         "Response instructions for this service."
     );
     const rows = runbooks.slice(0, 8).map(function (runbook) {
@@ -115,7 +115,7 @@ function renderServiceDetailsRunbooks(payload) {
 function renderServiceDetailsLinks(payload) {
     const links = asArray(payload.links);
     const section = serviceDetailsSection(
-        "Links",
+        "links", "fa-link", "Links",
         "Dashboards, logs, traces, repositories and documentation."
     );
     const rows = links.slice(0, 10).map(function (link) {
@@ -148,13 +148,13 @@ function renderServiceDetailsDependencies(payload) {
     const upstream = asArray(dependencies.upstream);
     const downstream = asArray(dependencies.downstream);
     const section = serviceDetailsSection(
-        "Dependencies",
+        "services", "fa-server", "Dependencies",
         "Upstream services this service needs and downstream services that depend on it."
     );
 
     section.append(
         $("<div>")
-            .addClass("grid-two")
+            .addClass("grid-two section-body")
             .append(renderServiceDependencyList("Depends on", upstream, true))
             .append(renderServiceDependencyList("Used by", downstream, false))
     );
@@ -201,7 +201,7 @@ function renderServiceDependencyList(title, rows, upstream) {
 
 function renderServiceDetailsAnalytics(analytics) {
     const section = serviceDetailsSection(
-        "Analytics",
+        "metrics", "fa-chart-line", "Analytics",
         "Service-level counters for the selected analytics window."
     );
     const widgets = analytics.widgets || {};
@@ -227,7 +227,7 @@ function renderServiceDetailsTimeline(payload) {
     const events = asArray(payload.timeline);
     const pageSize = 20;
     const section = serviceDetailsSection(
-        "Timeline",
+        "history", "fa-history", "Timeline",
         "Recent service, readiness and configuration events."
     );
     const table = $("<table>").addClass("data-table");
@@ -281,10 +281,17 @@ function renderServiceTimelineRow(event) {
         .append(serviceDetailsTableCell(formatServiceTimelineTime(event.occurred_at), false))
         .append(serviceDetailsTableCell(renderServiceTimelineEventCell(event), true))
         .append(serviceDetailsTableCell(renderServiceTimelineCategoryBadge(event.category), false))
-        .append(serviceDetailsTableCell(formatServiceTimelineActor(actor), false));
+        .append($("<td>").append(UserAppearance.label(actor.user_id ? actor : null, formatServiceTimelineActor(actor))));
 }
 
 function renderServiceTimelineEventCell(event) {
+    if (event.source === "change_intelligence" && event.payload?.change_uid) {
+        return $("<div>").append(
+            $("<div>").addClass("changes-row-heading").append(changesKindIcon(event.payload.kind),
+                $("<a>").attr("href", "/changes/" + event.payload.change_uid).text(changesText("related"))),
+            changesBadge(event.payload.relation_type),
+        );
+    }
     const wrapper = $("<div>");
     const title = $("<div>").append(
         $("<strong>").text(event.title || event.event_type || "Event")
@@ -427,6 +434,7 @@ function serviceTimelineCursorFromEvent(event) {
 }
 
 function loadMoreServiceTimelineEvents(serviceId, button) {
+    const generation = serviceDetailsGeneration;
     const before = button.data("before");
     const beforeId = button.data("before-id");
 
@@ -444,6 +452,7 @@ function loadMoreServiceTimelineEvents(serviceId, button) {
     }
 
     apiGet(url, function (payload) {
+        if (generation !== serviceDetailsGeneration || !isServiceDetailsModalOpen()) return;
         const items = asArray(payload.items);
         const tbody = $("#service-details-timeline-body");
 
@@ -466,6 +475,10 @@ function loadMoreServiceTimelineEvents(serviceId, button) {
         }
 
         button.closest(".form-actions").remove();
+    }, function (xhr) {
+        if (generation !== serviceDetailsGeneration || !isServiceDetailsModalOpen()) return;
+        closeServiceDetailsModal();
+        showApiError(xhr);
     });
 }
 
@@ -491,7 +504,6 @@ function openServiceAlerts(service, options) {
     window.location.href = "/alerts?" + params.toString();
 }
 function invalidateServiceDetailsCache() {
-    serviceDetailsCache = {};
 }
 
 
@@ -741,7 +753,7 @@ function serviceOwnerNotificationText(owner) {
 function renderServiceDetailsOwners(payload) {
     const service = payload.service || {};
     const owners = asArray(service.owners || payload.owners);
-    const section = serviceDetailsSection("Default stakeholders", null);
+    const section = serviceDetailsSection("stakeholders", "fa-users", "Default stakeholders", null);
     const actions = $("<div>").addClass("details-actions");
 
     appendIconActionIfAllowed(actions, service, {
@@ -753,7 +765,7 @@ function renderServiceDetailsOwners(payload) {
         },
     });
 
-    section.append(actions);
+    section.children(".card-header").append(actions);
 
     if (!owners.length) {
         section.append(
@@ -802,7 +814,7 @@ function renderServiceOwnerCompactRow(service, owner) {
             $("<td>")
                 .addClass("table-cell-truncate")
                 .attr("title", serviceOwnerDisplayName(owner))
-                .append($("<strong>").text(serviceOwnerDisplayName(owner)))
+                .append(UserAppearance.label(owner.user_id ? owner : null, serviceOwnerDisplayName(owner)))
                 .append($("<div>").addClass("row-subtitle").text(owner.user_email || owner.username || ""))
         )
         .append($("<td>").text(owner.role || "owner"))

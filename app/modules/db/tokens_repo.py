@@ -3,12 +3,30 @@ from app.modules.db.models import ApiToken
 from app.modules.common import utc_now
 
 
-def create_api_token(name, token_prefix, token_hash, scopes, team_id=None, group_id=None, user_id=None, expires_at=None):
+def create_api_token(
+    name,
+    token_prefix,
+    token_hash,
+    scopes,
+    team_id=None,
+    group_id=None,
+    user_id=None,
+    expires_at=None,
+    *,
+    change_integration_id=None,
+):
     """
     Create an API token.
     """
 
+    if change_integration_id is not None and (
+        scopes != ["changes:ingest"]
+        or any(value is not None for value in (team_id, group_id, user_id))
+    ):
+        raise ValueError("Integration credentials have only changes:ingest authority")
+
     return ApiToken.create(
+        change_integration=change_integration_id,
         team=team_id,
         group=group_id,
         user=user_id,
@@ -92,7 +110,7 @@ def mark_token_used(token):
     """
 
     token.last_used_at = utc_now()
-    token.save()
+    token.save(only=[ApiToken.last_used_at])
     return token
 
 

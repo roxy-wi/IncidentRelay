@@ -4,6 +4,8 @@
   "common.message": "Сообщение",
   "common.cancel": "Отмена",
   "common.ok": "ОК",
+  "common.reload": "Обновить",
+  "common.back": "Назад",
   "common.close": "Закрыть",
   "common.logout": "Выйти",
   "common.install_app": "Установить приложение",

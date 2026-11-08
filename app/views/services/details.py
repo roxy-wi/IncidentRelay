@@ -28,6 +28,17 @@ class ServiceDetailsImpactQuery:
     max_depth = 5
 
 
+@services_bp.after_request
+def prevent_timeline_caching(response):
+    """Current Change visibility must be rechecked when opening Service history."""
+    if request.endpoint in {
+        f"{services_bp.name}.get_service_details",
+        f"{services_bp.name}.get_service_timeline",
+    }:
+        response.headers["Cache-Control"] = "no-store"
+    return response
+
+
 def _service_open_statuses():
     return ("firing", "acknowledged")
 

@@ -322,6 +322,7 @@ function fillRouteSourceFilter(routes) {
         alertmanager: true,
         aws_sns: true,
         azure_monitor: true,
+        google_cloud_monitoring: true,
         datadog: true,
         new_relic: true,
         nagios: true,
@@ -1152,6 +1153,7 @@ function updateRouteSourceUi() {
     );
     $("#route-opensearch-help").toggleClass("is-hidden", !isOpenSearch);
     $("#route-kibana-help").toggleClass("is-hidden", !isKibana);
+    $("#route-google-cloud-monitoring-help").toggleClass("is-hidden", source !== "google_cloud_monitoring");
     $("#route-azure-monitor-help").toggleClass(
         "is-hidden",
         !isAzureMonitor
@@ -1220,6 +1222,8 @@ function updateRouteSourceUi() {
             $("#route-group-by").val(
                 '["new_relic_issue_id"]'
             );
+        } else if (source === "google_cloud_monitoring") {
+            $("#route-group-by").val('["gcp_project_id","gcp_incident_id"]');
         } else if (source === "azure_monitor") {
             $("#route-group-by").val(
                 '["azure_alert_id"]'
@@ -1646,6 +1650,10 @@ function getRouteIntakePath(route) {
         return "/api/integrations/new-relic";
     }
 
+    if (source === "google_cloud_monitoring") {
+        return "/api/integrations/google-cloud-monitoring";
+    }
+
     if (source === "azure_monitor") {
         return "/api/integrations/azure-monitor";
     }
@@ -1735,6 +1743,18 @@ function buildRouteIntakeCurl(route, token) {
             "  -H 'Content-Type: application/json' \\",
             `  -H 'Authorization: Bearer ${token || "<route-token>"}' \\`,
             "  -d '{\"issue_id\":\"issue-example-1\",\"title\":\"API latency is high\",\"state\":\"ACTIVATED\",\"status\":\"CREATED\",\"priority\":\"CRITICAL\",\"issue_url\":\"https://one.newrelic.com/redirects/issue/issue-example-1\",\"condition_name\":\"API latency\",\"policy_name\":\"Production API\",\"entity_name\":\"checkout-api\",\"labels\":{\"environment\":\"production\",\"team\":\"sre\"}}'"
+        ].join("\n");
+    }
+
+    if (source === "google_cloud_monitoring") {
+        const payload = {version: "1.2", incident: {
+            incident_id: "example-1", scoping_project_id: "example-project",
+            state: "open", policy_name: "High CPU"
+        }};
+        return [
+            `curl --user incidentrelay '${url}' \\`,
+            "  -H 'Content-Type: application/json' \\",
+            `  -d '${JSON.stringify(payload)}'`
         ].join("\n");
     }
 
@@ -1831,6 +1851,9 @@ function showRouteIntakeDetails(route) {
     } else if (source === "kibana") {
         subtitleKey = "routes.intake.kibana_subtitle";
         helpKey = "routes.intake.kibana_help";
+    } else if (source === "google_cloud_monitoring") {
+        subtitleKey = "routes.intake.google_cloud_monitoring_subtitle";
+        helpKey = "routes.intake.google_cloud_monitoring_help";
     } else if (isAzureMonitor) {
         subtitleKey = "routes.intake.azure_monitor_subtitle";
         helpKey = "routes.intake.azure_monitor_help";

@@ -1,6 +1,9 @@
 let currentUser = null;
 
 const routes = {
+    "/changes": {page: "changes", title: "Changes", subtitle: "", load: function () { loadChanges(); }},
+    "/admin/system-settings": {page: "system-settings", title: "System settings", subtitle: "", load: function () { loadSystemSettings(); }},
+    "/admin/change-integrations": {page: "change-integrations", title: "Change integrations", subtitle: "", load: function () { loadChangeIntegrations(); }},
     "/": { page: "dashboard", title: "Overview", subtitle: "Real-time summary of active incidents and affected teams", load: function () { loadDashboard(); } },
     "/alerts": { page: "alerts", title: "Alerts", subtitle: "Search, inspect, acknowledge and resolve routed alert groups", load: function () { loadAlerts(); } },
     "/incidents": { page: "incidents", title: "Incidents", subtitle: "Operational incidents and independent response workflow", load: function () { loadIncidents(); } },

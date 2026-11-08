@@ -82,7 +82,7 @@ Supported check types:
 
 | Type | Purpose | Common configuration |
 | --- | --- | --- |
-| `field_present` | Service field must be non-empty. | `{ "field": "metadata.owner" }` |
+| `field_present` | Service field must be non-empty. | `{ "field": "description" }` |
 | `field_equals` | Service field must match an expected value. | `{ "field": "environment", "value": "production" }` |
 | `owner_exists` | Service must have at least one active default stakeholder. | `{}` |
 | `active_rotation_exists` | Service must have a default rotation with active members. | `{}` |
@@ -96,6 +96,17 @@ Supported check types:
 | `dependency_exists` | Service must have at least one dependency. | `{ "direction": "upstream" }` |
 | `dependency_cycle_absent` | Service dependency graph must not contain a cycle. | `{}` |
 | `metadata_value` | Service metadata key must equal a value. | `{ "key": "pci", "value": true }` |
+
+In the check editor, `field_present` uses a service-field selector. For
+`field_equals`, select the field and enter the expected value; its type is
+suggested from the field and can be changed. Text, numbers, booleans and `null`
+do not require configuration JSON. Object and array values use a JSON value
+editor. Switching check types retains each draft until the form is closed.
+
+These checks read direct service attributes, such as `description`,
+`environment` or `metadata`. To check a key inside metadata, use `metadata_value`
+with `key` (for example, `owner` or `compliance.pci`); `metadata.owner` is not a
+service attribute.
 
 ### Readiness State
 

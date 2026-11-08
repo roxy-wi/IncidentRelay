@@ -231,9 +231,9 @@ Responder/stakeholder rules:
 
 - responders and stakeholders become canonical Incident collaboration data;
 - service default stakeholders are copied as Incident snapshots;
-- legacy AlertGroup responder/stakeholder records are preserved during staged
-  migration;
-- final removal of legacy operational AlertGroup storage belongs to 2.9;
+- 2.5 migrates uniquely mapped legacy responder/stakeholder records to Incident;
+- unmapped and ambiguous records are intentionally skipped;
+- removal of the old collaboration API and storage is an approved 2.5 breaking change;
 - AlertGroup technical comments are explicitly not removed by that cleanup.
 
 ## 4. Terminology
@@ -915,6 +915,9 @@ Tracked implementation: #96. Originating request: #95.
 
 ### IncidentRelay 2.5: Incident collaboration
 
+Approved 2.5 scope: remove the legacy AlertGroup responder/stakeholder API and storage in this release. Unmapped and ambiguous records may be skipped. See the [breaking change and migration notes](../incidents/release-notes-2.5.md#compatibility-decision).
+
+
 - Incident Commander and responders;
 - Incident stakeholders and service-default stakeholder snapshots;
 - Incident operational comments and richer activity;
@@ -923,8 +926,8 @@ Tracked implementation: #96. Originating request: #95.
 - preserve AlertGroup technical comments as a separate target;
 - combined Incident activity may show linked AlertGroup comments with explicit
   source attribution;
-- staged migration of legacy AlertGroup responder/stakeholder data when an
-  unambiguous Incident mapping exists;
+- migrate legacy AlertGroup responder/stakeholder data when an unambiguous
+  Incident mapping exists; reconcile migrated, merged and intentionally skipped records;
 - never backfill an Incident solely to move legacy collaboration data.
 
 ### IncidentRelay 2.6: Classification, relations and merge/split
@@ -965,8 +968,7 @@ Tracked implementation: #96. Originating request: #95.
 - #60 configurable Postmortems / Incident Reviews;
 - corrective actions with owner/due date and export/reporting;
 - final Incident v2 cleanup;
-- remove deprecated AlertGroup responder/stakeholder write flows only after
-  reconciliation;
+- responder/stakeholder API and storage removal was brought forward to 2.5;
 - preserve AlertGroup technical comments and Incident operational comments;
 - remove legacy Incident-as-AlertGroup terminology/helpers/adapters;
 - remove obsolete compatibility DB structures only through explicit,

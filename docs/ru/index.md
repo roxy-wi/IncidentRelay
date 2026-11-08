@@ -124,6 +124,7 @@ Team roles:  viewer, responder, manager
 
 | Источник            | Эндпоинт                                   | Документация                                              |
 |---------------------|--------------------------------------------|-----------------------------------------------------------|
+| Google Cloud Monitoring | `POST /api/integrations/google-cloud-monitoring` | [Google Cloud Monitoring](integrations/google-cloud-monitoring.md) |
 | Alertmanager        | `POST /api/integrations/alertmanager`      | [Alertmanager](integrations/alertmanager.md)              |
 | AWS SNS/Cloud watch | `POST /api/integrations/aws-sns`           | [AWS SNS/Cloud watch](integrations/aws-sns-cloudwatch.md) |
 | Grafana             | `POST /api/integrations/grafana`           | [Grafana](integrations/grafana.md)                        |
@@ -162,6 +163,10 @@ ICS-фиды календаря используют секретные URL по
 
 
 ## Управление инцидентами
+
+- [Рабочая область Incident](incidents/index.md)
+- [Релиз 2.5 и выпускные проверки](incidents/release-notes-2.5.md)
+- [Обновление 2.4 → 2.5](incidents/collaboration-migration-2.5.md)
 
 - [Алерты и группы алертов](usage/alerts.md)
 - [Приоритеты инцидентов](incidents/priorities.md)

@@ -57,6 +57,7 @@ GROUP_MEMBERSHIP_SCHEMA = {
 PROFILE_SCHEMA = {
     "type": "object",
     "properties": {
+        "color": {"type": "string", "pattern": "^#[0-9a-f]{6}$", "example": "#3b82f6"},
         "id": {
             "type": "integer",
             "readOnly": True,
@@ -179,6 +180,17 @@ PROFILE_SCHEMA = {
 PROFILE_UPDATE_SCHEMA = {
     "type": "object",
     "properties": {
+        "color": {
+            "type": "string",
+            "nullable": True,
+            "minLength": 7,
+            "maxLength": 7,
+            "pattern": "^#[0-9a-fA-F]{6}$",
+            "description": (
+                "Personal RGB color. Null restores the automatic color; "
+                "manual choices may match other users."
+            ),
+        },
         "display_name": {
             "type": "string",
             "nullable": True,

@@ -14,6 +14,9 @@ from app.services.integrations.normalizers.aws_sns import normalize_aws_sns
 from app.services.integrations.normalizers.azure_monitor import normalize_azure_monitor
 from app.services.integrations.normalizers.cloud_ru import normalize_cloud_ru
 from app.services.integrations.normalizers.datadog import normalize_datadog
+from app.services.integrations.normalizers.google_cloud_monitoring import (
+    normalize_google_cloud_monitoring,
+)
 from app.services.integrations.normalizers.grafana import normalize_grafana
 from app.services.integrations.normalizers.kibana import normalize_kibana
 from app.services.integrations.normalizers.opensearch import normalize_opensearch
@@ -62,7 +65,7 @@ def _normalize_sentry(
 
 
 
-def _normalize_search_payload(normalizer):
+def _route_scoped(normalizer):
     def wrapped(payload, headers, route_config):
         del headers
         return normalizer(payload, route_id=route_config.get("route_id"))
@@ -76,9 +79,10 @@ _NORMALIZERS: Dict[str, Normalizer] = {
     "azure_monitor": _payload_only(normalize_azure_monitor),
     "cloud_ru": _payload_only(normalize_cloud_ru),
     "datadog": _payload_only(normalize_datadog),
+    "google_cloud_monitoring": _route_scoped(normalize_google_cloud_monitoring),
     "grafana": _payload_only(normalize_grafana),
-    "kibana": _normalize_search_payload(normalize_kibana),
-    "opensearch": _normalize_search_payload(normalize_opensearch),
+    "kibana": _route_scoped(normalize_kibana),
+    "opensearch": _route_scoped(normalize_opensearch),
     "librenms": _payload_only(normalize_librenms),
     "new_relic": _payload_only(normalize_new_relic),
     "nagios": _payload_only(normalize_nagios),

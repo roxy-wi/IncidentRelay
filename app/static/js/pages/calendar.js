@@ -36,21 +36,6 @@ function formatCalendarDateForTitle(date, options) {
 }
 
 
-const calendarUserColors = [
-    "#1f77b4",
-    "#6f42c1",
-    "#198754",
-    "#fd7e14",
-    "#dc3545",
-    "#0dcaf0",
-    "#795548",
-    "#20c997",
-    "#6610f2",
-    "#6c757d",
-    "#b35c00",
-    "#005f73"
-];
-
 function getCalendarDisplayTimezone() {
     if (window.AppTimezones) {
         return AppTimezones.getDisplayTimezone(currentUser);
@@ -419,17 +404,6 @@ function getCalendarEventRotationId(event) {
     }
 
     return Number(event.rotation_id || event.rotationId || 0);
-}
-
-
-function getCalendarUserColor(userId) {
-    /*
-     * Return a stable color for user id.
-     */
-
-    const id = Number(userId || 0);
-
-    return calendarUserColors[Math.abs(id) % calendarUserColors.length];
 }
 
 
@@ -1262,7 +1236,7 @@ function renderCalendarTimelineAssignment(event, dayStart, dayEnd, monthMode) {
 
     const position = getCalendarTimelinePosition(clippedStart, clippedEnd, dayStart, dayEnd);
     const label = getCalendarUserLabel(event);
-    const color = getCalendarUserColor(event.user_id);
+    const color = UserAppearance.color(event);
     const layerLabel = event.type === "override"
         ? i18n.t("calendar.labels.override_lower")
         : (event.layer_name || i18n.t("calendar.labels.final"));
@@ -1270,12 +1244,14 @@ function renderCalendarTimelineAssignment(event, dayStart, dayEnd, monthMode) {
     const item = $("<button>")
         .attr("type", "button")
         .addClass("calendar-assignment calendar-assignment-timeline")
+        .attr("data-user-id", event.user_id)
         .toggleClass("calendar-assignment-timeline-month", !!monthMode)
         .toggleClass("calendar-assignment-override", event.type === "override")
         .attr(
             "style",
             "--calendar-user-color: " + color + "; " +
-            "--calendar-user-bg: " + hexToCalendarSoftColor(color, 0.14) + "; " +
+            "--calendar-user-bg: " + color + "; " +
+            "background-color: " + color + "; color: " + UserAppearance.textColor(color) + "; " +
             "left: " + position.left + "%; " +
             "width: " + position.width + "%;"
         )
@@ -1381,25 +1357,6 @@ function openCalendarTeam(teamId, rotationId) {
     refreshCalendar();
 }
 
-function hexToCalendarSoftColor(hex, alpha) {
-    /*
-     * Convert hex color to rgba background for soft calendar cards.
-     */
-
-    const value = String(hex || "").replace("#", "");
-
-    if (value.length !== 6) {
-        return "rgba(11, 108, 255, " + alpha + ")";
-    }
-
-    const r = parseInt(value.substring(0, 2), 16);
-    const g = parseInt(value.substring(2, 4), 16);
-    const b = parseInt(value.substring(4, 6), 16);
-
-    return "rgba(" + r + ", " + g + ", " + b + ", " + alpha + ")";
-}
-
-
 function getCalendarEventSearchText(event) {
     /*
      * Build searchable event text.
@@ -1472,22 +1429,6 @@ function renderCalendarSummaryCards() {
 }
 
 
-function calendarInitials(name) {
-    /*
-     * Return initials for details avatar.
-     */
-
-    return String(name || "?")
-        .trim()
-        .split(/\s+/)
-        .slice(0, 2)
-        .map(function (part) {
-            return part.substring(0, 1).toUpperCase();
-        })
-        .join("") || "?";
-}
-
-
 function calendarDetailsItem(label, value) {
     /*
      * Render one details item.
@@ -1525,9 +1466,7 @@ function renderCalendarDetails(event, clippedStart, clippedEnd) {
         $("<div>")
             .addClass("details-user")
             .append(
-                $("<div>")
-                    .addClass("details-avatar")
-                    .text(calendarInitials(userLabel))
+                UserAppearance.avatar(event, "details-avatar", userLabel)
             )
             .append(
                 $("<div>")

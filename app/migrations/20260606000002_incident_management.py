@@ -12,8 +12,6 @@ from app.migrations.introspection import (
 )
 from app.modules.db.models import (
     IncidentPriority,
-    IncidentResponder,
-    IncidentStakeholder,
     MaintenanceWindowScope,
 )
 from app.modules.common import utc_now
@@ -22,8 +20,6 @@ from app.modules.common import utc_now
 INCIDENT_TABLE_MODELS = [
     IncidentPriority,
     MaintenanceWindowScope,
-    IncidentResponder,
-    IncidentStakeholder,
 ]
 
 
@@ -523,9 +519,7 @@ def downgrade():
 
     db.drop_tables(
         [
-            IncidentStakeholder,
-            IncidentResponder,
-            MaintenanceWindowScope,
+                            MaintenanceWindowScope,
             IncidentPriority,
         ],
         safe=True,

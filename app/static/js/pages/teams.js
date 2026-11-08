@@ -564,7 +564,7 @@ function renderTeamMemberRow(member) {
     const selectedTeam = getSelectedTeamForMembers();
 
     row.append($("<td>").text(member.user_id));
-    row.append($("<td>").text(member.username));
+    row.append($("<td>").append(UserAppearance.label(member, member.username)));
     row.append($("<td>").text(member.display_name || "-"));
     row.append(
         $("<td>").append(

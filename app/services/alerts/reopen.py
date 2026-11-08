@@ -12,7 +12,12 @@ import hashlib
 
 from app.db import database_proxy as db
 from app.modules.common import utc_now
-from app.modules.db import alerts_repo, audit_repo, incident_core_repo
+from app.modules.db import (
+    alert_episodes_repo,
+    alerts_repo,
+    audit_repo,
+    incident_core_repo,
+)
 from app.modules.db.models import AlertGroup, AlertRoute, RecoveryNotificationDelivery
 from app.services.notifications.rules import cancel_pending_group_deliveries
 
@@ -141,6 +146,7 @@ def restart_resolved_group(
     group.notification_reason = None
     group.updated_at = now
     group.save()
+    alert_episodes_repo.open_episode(group, started_at=now)
 
     if recovery_pending:
         (
@@ -205,11 +211,13 @@ def _resume_linked_incident(group, alert, *, now):
 def record_reopened_occurrence(group, alert):
     """Call in the same transaction, after the new child was persisted."""
     now = utc_now()
-    alerts_repo.create_alert_event(
-        group_id=group.id, alert_id=alert.id,
+    event = alerts_repo.create_alert_event(
+        group_id=group.id,
+        alert_id=alert.id,
         event_type="reopened",
         message=f"Resolved AlertGroup reopened by new Alert #{alert.id}",
     )
+    alert_episodes_repo.open_episode(group, event=event)
     audit_repo.create_audit_log(
         action="alert_group.reopen", object_type="alert_group",
         object_id=group.id,

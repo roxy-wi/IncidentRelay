@@ -1,0 +1,262 @@
+"use strict";
+
+const assert = require("node:assert/strict");
+const path = require("node:path");
+const {chromium} = require("playwright");
+const fixture = JSON.parse(process.env.CHANGE_INTEGRATIONS_FIXTURE);
+
+async function main() {
+    const browser = await chromium.launch({headless: true, channel: process.env.PLAYWRIGHT_CHANNEL || undefined});
+    const context = await browser.newContext({baseURL: fixture.baseUrl, viewport: {width: 1440, height: 1080}, serviceWorkers: "block"});
+    await context.addCookies([
+        {name: "incidentrelay_jwt", value: fixture.token, url: fixture.baseUrl},
+        {name: "incidentrelay_locale", value: "en", url: fixture.baseUrl},
+    ]);
+    const page = await context.newPage();
+    page.setDefaultTimeout(10000);
+    const errors = [];
+    page.on("pageerror", error => errors.push(error.message));
+    await page.route("**/*", route => new URL(route.request().url()).origin === fixture.baseUrl ? route.continue() : route.abort());
+    const base = "/api/admin/change-integrations";
+    async function submit(form, suffix, method) {
+        const response = page.waitForResponse(r => new URL(r.url()).pathname.endsWith(suffix) && r.request().method() === method);
+        await page.locator(form + " button[type=submit]").click();
+        const result = await response;
+        assert.ok(result.ok(), await result.text());
+        return result.json();
+    }
+    async function action(row, label) {
+        await row.locator(".app-action-menu-toggle").click();
+        const item = page.getByRole("menuitem", {name: label, exact: true});
+        assert.equal(await item.locator("i.app-action-menu-icon").count(), 1);
+        await item.click();
+    }
+    try {
+        await page.goto("/admin/change-integrations");
+        assert.equal(await page.locator("#ci-modal").isVisible(), false);
+        await page.waitForFunction(() => document.querySelector("#ci-list-status").textContent.includes("No integrations"));
+        assert.equal(await page.locator("#view-change-integrations [role=switch]").count(), 0);
+        const link = page.locator('.menu-link[href="/admin/system-settings"]');
+        const settings = page.locator("#system-settings");
+        const settingsApi = "/api/admin/system-settings";
+        if (fixture.groupAdmin) {
+            assert.equal(await link.isVisible(), false);
+            assert.equal((await page.request.get("/admin/system-settings")).status(), 403);
+        } else {
+            const adminMenu = page.locator("#administration-menu-toggle");
+            if (await adminMenu.getAttribute("aria-expanded") === "false") {
+                await adminMenu.click();
+            }
+            await link.click();
+            const intake = settings.getByRole("switch", {name: "Accept Change Events"});
+            await page.waitForFunction(() => !document.querySelector('#system-settings-controls input').disabled);
+            const queue = settings.getByRole("switch", {name: "Background change processing"});
+            assert.equal(await queue.isChecked(), true);
+            assert.equal(await queue.isEnabled(), true);
+            assert.equal(await intake.isChecked(), false);
+            await settings.locator("summary").click();
+            const advanced = settings.locator("#system-settings-advanced");
+            assert.equal(await advanced.getByRole("spinbutton").count(), 12);
+            const interval = advanced.getByLabel("Worker interval (seconds)");
+            await interval.fill("0");
+            assert.equal(await interval.evaluate(input => input.validity.rangeUnderflow), true);
+            await interval.fill("13");
+            const saved = page.waitForResponse(r => r.url().endsWith(settingsApi) && r.request().method() === "PATCH");
+            await intake.check();
+            assert.equal((await (await saved).json()).change_intake_enabled, true);
+            assert.equal(await interval.inputValue(), "13");
+            const baseDelay = advanced.getByLabel("Base retry delay (seconds)");
+            await baseDelay.fill("301");
+            await advanced.getByRole("button", {name: "Save"}).click();
+            assert.equal(await baseDelay.evaluate(input => input.validity.customError), true);
+            await baseDelay.fill("5");
+            const edit = page.waitForResponse(r => r.url().endsWith(settingsApi) && r.request().method() === "PATCH");
+            await advanced.getByRole("button", {name: "Save"}).click();
+            const result = await edit;
+            assert.deepEqual(result.request().postDataJSON(), {change_worker_interval_seconds: 13});
+            assert.equal((await result.json()).change_worker_interval_seconds, 13);
+            const paused = page.waitForResponse(r => r.url().endsWith(settingsApi) && r.request().method() === "PATCH");
+            await queue.uncheck();
+            assert.equal((await (await paused).json()).change_worker_enabled, false);
+            await page.reload();
+            await page.waitForFunction(() => document.querySelector('#system-settings-controls input').checked);
+            assert.equal(await queue.isChecked(), false);
+            assert.equal(await interval.inputValue(), "13");
+            await page.locator('.menu-link[href="/admin/change-integrations"]').click();
+            await page.waitForFunction(() => document.querySelector("#ci-list-status").textContent.includes("No integrations"));
+        }
+        await page.locator("#ci-new").click();
+        await page.locator("#ci-new-group").selectOption(String(fixture.groupId));
+        await page.locator("#ci-new-owner").selectOption(String(fixture.teamId));
+        assert.equal(await page.locator('#ci-new-group option[value="central"]').count(), fixture.groupAdmin ? 0 : 1);
+        await page.locator("#ci-new-name").fill("Build <pipeline>");
+        const created = await submit("#ci-create", base, "POST");
+        await page.locator("#ci-detail").waitFor({state: "visible"});
+        assert.equal(await page.locator("#ci-more").isVisible(), false);
+        assert.equal(await page.locator("#ci-identity").isVisible(), false);
+        assert.equal(created.sources.length, 1);
+        assert.equal(created.source_count, 1);
+        assert.equal(created.permission_count, 0);
+        const sourceId = created.sources[0].id;
+        await action(page.locator('#ci-sources tr[data-source-id="' + sourceId + '"]'), "Edit source");
+        await page.locator("#ci-owner").selectOption(String(fixture.teamId));
+        await page.locator("#ci-source-name").fill("deploy");
+        const sourced = await submit("#ci-add-source", "/sources/" + sourceId, "PATCH");
+        assert.equal(sourced.sources.length, 1);
+        const sourceCells = page.locator("#ci-sources tr[data-source-id] td");
+        assert.equal(await sourceCells.nth(1).innerText(), fixture.teamLabel);
+        assert.equal(await page.locator("#ci-owner option:checked").textContent(), fixture.teamLabel);
+        assert.equal(await sourceCells.nth(1).locator("platform").count(), 0);
+        await page.locator('[data-ci-panel="grants"]').click();
+        assert.match(await page.locator("#ci-grants").innerText(), /No permissions configured/);
+        await page.locator("#ci-grant-form-toggle").click();
+        await page.locator("#ci-team").selectOption(String(fixture.teamId));
+        await page.locator("#ci-service").selectOption(String(fixture.serviceId));
+        await page.locator("#ci-capability").selectOption("changed");
+        const granted = await submit("#ci-add-grant", "/grants", "POST");
+        assert.equal(granted.sources[0].grants[0].capability, "changed");
+        const grantCells = page.locator("#ci-grants tr[data-grant-id] td");
+        assert.equal(await grantCells.nth(1).innerText(), await page.locator('#ci-capability option[value="changed"]').textContent());
+        assert.equal(await grantCells.nth(2).innerText(), fixture.teamLabel);
+        assert.equal(await grantCells.nth(3).innerText(), fixture.serviceLabel);
+        await page.locator('#ci-service option[value="' + fixture.serviceId + '"]').waitFor({state: "attached"});
+        assert.equal(await page.locator('#ci-service option[value="' + fixture.serviceId + '"]').textContent(), fixture.serviceLabel);
+        const permissionId = granted.sources[0].grants[0].id;
+        await action(page.locator('#ci-grants tr[data-grant-id="' + permissionId + '"]'), "Edit permission");
+        await page.locator("#ci-capability").selectOption("reference");
+        await page.locator("#ci-service").selectOption("");
+        const edited = await submit("#ci-add-grant", "/grants/" + permissionId, "PATCH");
+        assert.equal(edited.permission_count, 1);
+        assert.equal(edited.sources[0].grants[0].id, permissionId);
+        assert.equal(edited.sources[0].grants[0].target_service_id, null);
+        assert.match(await grantCells.nth(1).innerText(), /Reference only/);
+        assert.match(await grantCells.nth(3).innerText(), /All current and future Services/);
+        const serviceLookup = "**/targets?integration_id=*&team_id=*";
+        await page.route(serviceLookup, route => route.fulfill({status: 500, contentType: "application/json", body: '{"error":"Temporary failure"}'}), {times: 1});
+        const failedLookup = page.waitForResponse(r => r.url().includes("&team_id=") && r.status() === 500);
+        await action(page.locator('#ci-grants tr[data-grant-id="' + permissionId + '"]'), "Edit permission");
+        await failedLookup;
+        assert.equal(await page.locator("#ci-add-grant button[type=submit]").isDisabled(), true);
+        await page.locator("#app-dialog-confirm").click();
+        await page.locator("#ci-grant-cancel").click();
+        await action(page.locator('#ci-grants tr[data-grant-id="' + permissionId + '"]'), "Edit permission");
+        await page.waitForFunction(() => !document.querySelector("#ci-add-grant button[type=submit]").disabled);
+        assert.equal(await page.locator("#ci-service").inputValue(), "");
+        await page.locator("#ci-grant-cancel").click();
+        await page.locator('[data-ci-panel="tokens"]').click();
+        assert.match(await page.locator("#ci-tokens").innerText(), /No credentials issued/);
+        await page.locator("#ci-token-form-toggle").click();
+        await page.locator("#ci-token-name").fill("CI credential");
+        await submit("#ci-issue", "/tokens", "POST");
+        await page.locator("#ci-secret-box").waitFor({state: "visible"});
+        const secret = await page.locator("#ci-secret").inputValue();
+        assert.ok(secret.length >= 48);
+        await page.waitForFunction(() => document.querySelector("#ci-rotate").options.length === 2);
+        const tokenId = await page.locator("#ci-rotate option").nth(1).getAttribute("value");
+        await page.locator("#ci-token-form-toggle").click();
+        await action(page.locator('#ci-tokens tr[data-token-id="' + tokenId + '"]'), "Rotate credential");
+        assert.equal(await page.locator("#ci-rotate").inputValue(), tokenId);
+        const rotated = await submit("#ci-issue", "/rotate", "POST");
+        assert.notEqual(rotated.token, secret);
+        await page.locator("#ci-tokens tr[data-token-id]").nth(1).waitFor();
+        assert.match(await page.locator("#ci-tokens").innerText(), /Revoked/);
+        assert.match(await page.locator("#ci-tokens").innerText(), /Never used/);
+        assert.equal((await page.locator("#ci-tokens").innerText()).includes(rotated.token), false);
+        const denied = await context.request.post("/api/change-events", {headers: {Authorization: "Bearer " + secret}, data: {}});
+        assert.equal(denied.status(), 401);
+        await page.keyboard.press("Escape");
+        assert.equal(await page.locator("#ci-modal").isVisible(), false);
+        assert.equal(await page.locator("#ci-secret").inputValue(), "");
+        const row = page.locator('#ci-table tr[data-integration-id="' + created.id + '"]');
+        assert.equal(await row.locator("td").nth(2).innerText(), "1");
+        assert.equal(await row.locator("td").nth(3).innerText(), "1");
+        await row.locator(".app-action-menu-toggle").click();
+        await page.getByRole("menuitem", {name: "Edit integration", exact: true}).click();
+        await page.locator("#ci-name").fill("Retain on failure");
+        await page.route("**/api/admin/change-integrations/" + created.id, route => {
+            if (route.request().method() === "PATCH") return route.fulfill({status: 500, contentType: "application/json", body: JSON.stringify({error: "Temporary failure"})});
+            return route.continue();
+        });
+        const failure = page.waitForResponse(r => r.request().method() === "PATCH");
+        await page.locator("#ci-edit button[type=submit]").click();
+        assert.equal((await failure).status(), 500);
+        await page.waitForFunction(() => !document.querySelector("#ci-name").disabled);
+        assert.equal(await page.locator("#ci-name").inputValue(), "Retain on failure");
+        await page.unroute("**/api/admin/change-integrations/" + created.id);
+        const ok = page.locator("#app-dialog-confirm");
+        if (await ok.isVisible()) await ok.click();
+        await submit("#ci-edit", "/" + created.id, "PATCH");
+        await page.locator('[data-ci-panel="grants"]').click();
+        const headerHeight = await page.evaluate(() => {
+            const form = document.querySelector("#ci-edit").getBoundingClientRect();
+            const tabs = document.querySelector("#ci-modal .page-tabs").getBoundingClientRect();
+            return tabs.y - form.y;
+        });
+        assert.ok(headerHeight < 220, "Editor header should leave room for the list: " + headerHeight);
+        assert.deepEqual(await page.locator("#ci-panel-grants th").allTextContents(), ["Source", "Permission", "Target Team", "Target Service", "Status", "Actions"]);
+        await page.screenshot({path: path.join(fixture.screenshotDir, "change-integrations-desktop.png"), fullPage: true});
+        for (const width of [390, 320]) {
+            await page.setViewportSize({width, height: 844});
+            assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1));
+        }
+        await page.screenshot({path: path.join(fixture.screenshotDir, "change-integrations-mobile.png"), fullPage: true});
+        await page.locator("#ci-close-footer").click();
+        assert.equal(await row.locator("td").first().textContent(), "Retain on failure");
+        await page.setViewportSize({width: 1440, height: 1080});
+        await page.screenshot({path: path.join(fixture.screenshotDir, "change-integrations-list.png"), fullPage: true});
+        // Closing a loading editor must invalidate an in-flight detail response.
+        let releaseDetail;
+        const detailGate = new Promise(resolve => { releaseDetail = resolve; });
+        let detailStarted;
+        const detailRequest = new Promise(resolve => { detailStarted = resolve; });
+        await page.route("**/api/admin/change-integrations/" + created.id, async route => {
+            detailStarted();
+            await detailGate;
+            await route.continue();
+        });
+        await row.locator(".app-action-menu-toggle").click();
+        await page.getByRole("menuitem", {name: "Edit integration", exact: true}).click();
+        await detailRequest;
+        await page.locator("#ci-close").click();
+        const lateResponse = page.waitForResponse(r => new URL(r.url()).pathname === base + "/" + created.id);
+        releaseDetail();
+        await (await lateResponse).finished();
+        assert.equal(await page.locator("#ci-modal").isVisible(), false);
+        assert.equal(await page.locator("#ci-secret").inputValue(), "");
+        await page.unroute("**/api/admin/change-integrations/" + created.id);
+        assert.deepEqual(errors, []);
+        const detail = await (await context.request.get(base + "/" + created.id)).json();
+        assert.equal(detail.tokens.length, 2);
+        assert.equal(detail.tokens.filter(token => token.active).length, 1);
+        assert.ok(!JSON.stringify(detail).includes(rotated.token));
+        // Old records can have no expiry; an active flag alone does not mean valid.
+        const expired = detail.tokens.find(token => token.active);
+        expired.expired = true;
+        expired.expires_at = "2020-01-01T00:00:00Z";
+        detail.tokens.find(token => !token.active).expires_at = null;
+        detail.sources[0].identity_editable = false;
+        await page.route("**/api/admin/change-integrations/" + created.id, route => route.fulfill({json: detail}));
+        await row.locator(".app-action-menu-toggle").click();
+        await page.getByRole("menuitem", {name: "Edit integration", exact: true}).click();
+        await page.locator('[data-ci-panel="tokens"]').click();
+        assert.match(await page.locator("#ci-tokens").innerText(), /Expired/);
+        assert.match(await page.locator("#ci-tokens").innerText(), /No expiry/);
+        assert.deepEqual(await page.locator("#ci-panel-tokens th").allTextContents(), ["Name", "Token prefix", "Status", "Expires", "Last used", "Actions"]);
+        await page.screenshot({path: path.join(fixture.screenshotDir, "change-integrations-credentials.png"), fullPage: true});
+        await page.locator("#ci-technical-details summary").click();
+        assert.equal(await page.locator("#ci-identity").innerText(), detail.uid);
+        assert.match(await page.locator("#ci-technical-details").innerText(), /Permanent identifier/);
+        await page.locator('[data-ci-panel="sources"]').click();
+        await action(page.locator('#ci-sources tr[data-source-id="' + sourceId + '"]'), "Edit source");
+        assert.equal(await page.locator("#ci-source-name").isDisabled(), true);
+        assert.equal(await page.locator("#ci-owner").isDisabled(), true);
+        assert.equal(await page.locator("#ci-ordering").isEnabled(), true);
+        assert.match(await page.locator("#ci-source-lock-hint").innerText(), /already has Changes/);
+        await page.screenshot({path: path.join(fixture.screenshotDir, "change-integrations-history-lock.png"), fullPage: true});
+        await page.locator("#ci-close").click();
+    } finally {
+        await browser.close();
+    }
+}
+
+main().catch(error => {console.error(error); process.exitCode = 1;});

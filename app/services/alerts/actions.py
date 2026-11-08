@@ -1,10 +1,9 @@
 from app.db import database_proxy as db
-from app.modules.db import alerts_repo, audit_repo
+from app.modules.db import alerts_repo, audit_repo, incident_core_repo
 from app.modules.redaction import redact_secrets
 from app.modules.db.models import AlertGroup
 from app.services.alerts.correlation import refresh_alert_group_correlations_safely
 from app.services.alerts.shelving import clear_shelve_on_resolve
-from app.services.incidents.stakeholders import notify_stakeholders
 from app.services.notifications.delivery import update_alert_messages
 from app.services.notifications.rules import cancel_pending_group_deliveries
 from app.services.business_services.impact import refresh_business_impacts_safely_for_group
@@ -58,7 +57,7 @@ def _lock_group_for_lifecycle(group_id):
 
 def acknowledge_alert(alert_id, user_id=None, *, source="system", api_token_id=None):
     """Acknowledge an alert group."""
-    with db.atomic():
+    with incident_core_repo.write_transaction():
         group_before = _lock_group_for_lifecycle(alert_id)
         old_status = group_before.status
 
@@ -96,11 +95,7 @@ def acknowledge_alert(alert_id, user_id=None, *, source="system", api_token_id=N
     update_alert_messages(group, event_type="acknowledged")
 
     if old_status != group.status:
-        notify_stakeholders(
-            group,
-            "status_changed",
-            old_value=old_status,
-        )
+        pass  # Incident collaboration is independent of AlertGroup.
 
     return group
 
@@ -115,24 +110,36 @@ def resolve_alert(
     api_token_id: int | None = None,
 ) -> AlertGroup:
     """Resolve an alert group."""
-    with db.atomic():
+    group_before = AlertGroup.get_by_id(alert_id)
+    # A completed cycle needs no write or row lock. Waiting for a concurrent
+    # reopen could turn this repeated resolve into a write to the new cycle.
+    if (
+        group_before.status in {"resolved", "merged"}
+        or group_before.merged_into_id
+    ):
+        return group_before
+
+    observed_episode_id = group_before.current_episode_id
+    with incident_core_repo.write_transaction():
         group_before = _lock_group_for_lifecycle(alert_id)
+        if group_before.current_episode_id != observed_episode_id:
+            return group_before
         old_status = group_before.status
 
-        # Repeated resolve is a no-op, even across concurrent workers.
+        # Recheck: another worker may have resolved or merged the group.
         if old_status in {"resolved", "merged"} or group_before.merged_into_id:
             return group_before
 
-        group = alerts_repo.resolve_alert_group(alert_id, user_id=user_id)
-        # A manual resolve must not leave a stale firing group_wait job behind.
-        alerts_repo.clear_alert_group_notification(group)
-        clear_shelve_on_resolve(group.id, user_id=user_id, api_token_id=api_token_id)
-        alerts_repo.create_alert_event(
-            group_id=group.id,
+        event = alerts_repo.create_alert_event(
+            group_id=group_before.id,
             event_type="resolved",
             message="Alert group resolved",
             user_id=user_id,
         )
+        group = alerts_repo.resolve_alert_group(alert_id, user_id=user_id, event=event)
+        # A manual resolve must not leave a stale firing group_wait job behind.
+        alerts_repo.clear_alert_group_notification(group)
+        clear_shelve_on_resolve(group.id, user_id=user_id, api_token_id=api_token_id)
         _audit_lifecycle_change(
             group, "resolve", user_id=user_id, source=source,
             api_token_id=api_token_id,
@@ -152,10 +159,6 @@ def resolve_alert(
         update_alert_messages(group, event_type="resolved")
 
     if old_status != group.status and not defer_stakeholder_notification:
-        notify_stakeholders(
-            group,
-            "resolved",
-            old_value=old_status,
-        )
+        pass  # Incident collaboration is independent of AlertGroup.
 
     return group

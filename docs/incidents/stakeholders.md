@@ -1,54 +1,70 @@
 ---
 title: Incident Stakeholders
-description: Incident stakeholder snapshots, lifecycle notifications and service default stakeholders.
+description: Operational subscriptions, owner snapshots and durable notification delivery in 2.5.
 ---
 
-# Incident Stakeholders
+# Incident stakeholders
 
-> **2.3 boundary:** stakeholder records on this page are still attached to technical AlertGroups. Canonical first-class Incident stakeholders are planned for the 2.5 collaboration stage.
+Stakeholders follow an operational Incident; they do not become responders or
+gain permission to access it. A stakeholder is an active internal user or an
+external email recipient. Creation of an Incident with a primary service copies
+the service's active default stakeholders into an independent snapshot.
 
+## API
 
-Incident stakeholders are people who should stay informed about an incident without necessarily being the active responder or assignee.
+```http
+POST /api/incidents/17/stakeholders
+Content-Type: application/json
 
-Stakeholders are useful for:
+{"email":"support@example.com","display_name":"Support","role":"observer"}
+```
 
-- service owners;
-- business owners;
-- support contacts;
-- customer success contacts;
-- executives or other observers.
+Supply exactly one non-null `user_id` or non-empty `email`. Email is trimmed and
+lowercased. Email and display name are at most 255 characters. Manual roles are
+`stakeholder` (default), `communications` and `observer`; inherited owner/legacy
+roles remain visible in responses. Internal users must belong to the Incident's group.
 
-## Stakeholder snapshots
+- `GET /api/incidents/17/stakeholders` lists active stakeholders.
+- POST returns `201` for creation or reactivation; an already active recipient
+  returns `200` unchanged. Repeating POST is not an update of its role/name/flags.
+- `DELETE /api/incidents/17/stakeholders/<id>` deactivates the subscription (`204`)
+  and keeps its history. A repeated deletion returns `404`.
 
-When an incident is created for a service, IncidentRelay can copy service default stakeholders into the incident stakeholder list.
+Reads require team read access; writes require Incident response access and an
+authenticated actor. The public Incident API does not accept notification flags
+or offer a stakeholder update endpoint. Service defaults carry their flags into
+the snapshot. See [service default stakeholders](../services/default-stakeholders.md).
 
-This is a snapshot:
+## Delivery and retries
 
-- new service default stakeholders affect only new incidents;
-- existing incidents keep their own stakeholder list;
-- incident stakeholders can be edited directly without changing the service defaults.
+Events can notify on creation, priority change, workflow status change, resolution
+and operational comments, according to the snapshot flags. The actor is excluded
+from their own stakeholder notification. Technical ACK/resolve and technical
+comments do not stand in for these operational events.
 
-Read more: [Service default stakeholders](../services/default-stakeholders.md).
+Eligible recipients and payloads are persisted with the Incident event in one
+transaction. Email and browser push have independent delivery records. External
+email stakeholders receive email only. Browser push requires an active user and
+usable subscriptions; stakeholder pushes are informational, without technical
+ACK/resolve action buttons.
 
-## Notification events
+Immediate delivery is attempted after commit. The existing notification scheduler
+also processes pending Incident deliveries. Failed attempts use the shared retry
+policy: at most five total attempts, with 30, 60, 120 and 240 seconds before the
+remaining attempts (actual execution depends on scheduler polling). A processing
+claim expires after 300 seconds so another worker can recover abandoned work.
 
-Stakeholders can receive notifications for lifecycle events:
+The unique event/channel/recipient key prevents duplicate queue entries. Completed
+channels and successful push subscriptions are retained across retries, so a
+failure elsewhere does not normally resend them. Obsolete requests or inactive
+subscriptions can be skipped. Exhausted deliveries are recorded as failed.
 
-| Event | Description |
-|---|---|
-| Created | A new incident was created for a service. |
-| Priority changed | A responder changed the incident priority manually. |
-| Status changed | The incident was acknowledged or changed status. |
-| Resolved | The incident was resolved. |
+Delivery is **at least once**, not exactly once: a process crash after provider
+acceptance but before saving success can still cause a duplicate. HTTP success
+does not guarantee delivery. Keep the scheduler running and inspect failed
+`incident_notification_delivery` rows/logs when troubleshooting; do not log
+provider credentials or push endpoints.
 
-## Notification channels
-
-Stakeholder notifications are informational.
-
-They can be delivered through:
-
-- email, when the stakeholder has an email address;
-- browser push, when the stakeholder is an active IncidentRelay user with browser push enabled.
-
-Stakeholder browser push notifications do not include ACK, Resolve, Shelve or Unshelve action buttons.
-
+The current code has removed the old AlertGroup stakeholder routes. See the
+[compatibility decision](release-notes-2.5.md#compatibility-decision) and
+[migration procedure](collaboration-migration-2.5.md).

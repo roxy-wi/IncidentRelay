@@ -33,6 +33,11 @@ html[data-color-scheme="dark"] {
     --md-placeholder: #64748b;
     --md-on-accent: #ffffff;
 
+    --md-reload-bg: #064e3b;
+    --md-reload-hover: #065f46;
+    --md-reload-text: #a7f3d0;
+    --md-reload-border: #047857;
+
     --md-primary: #60a5fa;
     --md-primary-hover: #93c5fd;
     --md-primary-soft: rgba(59, 130, 246, 0.2);

@@ -4,6 +4,7 @@ from datetime import timedelta
 
 from app.services.rbac import current_user
 from app.services.serializers.common import attach_team_permissions
+from app.services.serializers.users import serialize_user_identity
 from app.modules.db import escalation_policies_repo
 from app.modules.db.models import EscalationPolicyRule
 from app.services.oncall import get_current_oncall_user
@@ -149,6 +150,7 @@ def serialize_rule(rule):
         "target_type": rule.target_type,
         "target_id": target_id,
         "target_name": target_name,
+        "target_user": serialize_user_identity(rule.target_user) if rule.target_type == "user" else None,
         "enabled": rule.enabled,
         "created_at": rule.created_at.isoformat() if rule.created_at else None,
         "updated_at": rule.updated_at.isoformat() if rule.updated_at else None,

@@ -22,7 +22,8 @@ class RouteBaseSchema(ApiModel):
     name: str = Field(min_length=2, max_length=120)
     source: str = Field(
         pattern=(
-            r"^(alertmanager|aws_sns|azure_monitor|cloud_ru|datadog|grafana|kibana|opensearch|"
+            r"^(alertmanager|aws_sns|azure_monitor|google_cloud_monitoring|"
+            r"cloud_ru|datadog|grafana|kibana|opensearch|"
             r"zabbix|webhook|sentry|librenms|new_relic|nagios|"
             r"rmon|uptime_kuma|heartbeat)$"
         )

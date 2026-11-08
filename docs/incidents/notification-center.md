@@ -1,79 +1,33 @@
 ---
 title: Notification Center
-description: Pending responder requests and user-facing incident notifications.
+description: Pending operational Incident responder requests.
 ---
 
 # Notification Center
 
-The notification center shows pending user actions related to incidents.
+`GET /api/notification-center?limit=20` returns `items` and `unread_count` for the
+current user. `limit` is 1–100. Items are pending Incident responder requests on
+which the user is eligible to act; `unread_count` is the number returned, not a
+separate read/unread receipt or a count of the notification delivery queue.
 
-The current notification center includes pending incident responder requests. A responder request appears for users who are allowed to act as the target responder.
-
-## Endpoint
+Each item includes its ID (`responder-request-<id>`), type `responder_request`,
+title, body, timestamps, `incident_id`, the serialized `responder`, and action
+descriptors. There is no embedded `incident` summary in the 2.5 response.
+`url` opens `/incidents/<incident_id>`. Accept and decline actions use:
 
 ```http
-GET /api/notification-center
+PUT /api/incidents/17/responders/8
+Content-Type: application/json
+
+{"status":"accepted"}
 ```
 
-Example response:
+Use `declined` to decline. Once the request leaves `requested` it disappears from
+the list. Eligibility and state are checked again when the action is submitted;
+another response or expiry can result in `409`. Reload the list after acting.
 
-```json
-{
-  "unread_count": 1,
-  "items": [
-    {
-      "id": "responder-request-15",
-      "type": "responder_request",
-      "title": "Responder requested",
-      "body": "Admin: Please help with database checks",
-      "created_at": "2026-06-17T10:00:00Z",
-      "expires_at": "2026-06-17T10:30:00Z",
-      "url": "/alerts/14784",
-      "incident_id": 14784,
-      "incident": {
-        "id": 14784,
-        "incident_id": 14784,
-        "title": "DiskFull",
-        "status": "firing",
-        "priority": {
-          "slug": "p1"
-        },
-        "team_name": "Platform Team",
-        "service_name": "PostgreSQL"
-      },
-      "responder": {
-        "id": 15,
-        "target": {
-          "type": "user",
-          "id": 42,
-          "label": "Alice Smith"
-        },
-        "status": "requested"
-      },
-      "actions": [
-        {
-          "id": "accept",
-          "label": "Accept",
-          "status": "accepted",
-          "method": "PUT",
-          "url": "/api/alert-groups/14784/responders/15"
-        },
-        {
-          "id": "decline",
-          "label": "Decline",
-          "status": "declined",
-          "method": "PUT",
-          "url": "/api/alert-groups/14784/responders/15"
-        }
-      ]
-    }
-  ]
-}
-```
+The item's top-level timestamps are currently UTC values without a guaranteed
+timezone suffix; the nested responder timestamps use explicit UTC. Consumers
+must not assume the top-level values are browser-local time.
 
-## Responder request lifecycle
-
-When a responder request is accepted, declined, resolved, or expired, it disappears from the notification center.
-
-Read more: [Incident Responders](responders.md).
-
+See [responders](responders.md) for request and assignment rules.

@@ -159,6 +159,8 @@ function fillUserSelect(selector, callback, url, options) {
             select.append(
                 $("<option>")
                     .val(String(userId))
+                    .attr("data-color", UserAppearance.color(user))
+                    .attr("data-display_name", UserAppearance.name(user))
                     .text(getUserOptionText(user))
             );
         });
@@ -285,6 +287,12 @@ function initUserTomSelectIfNeeded(selectElement, options) {
         },
         plugins: isMultiple ? ["remove_button"] : ["clear_button"],
         render: {
+            option: function (data) {
+                return UserAppearance.option(data);
+            },
+            item: function (data) {
+                return UserAppearance.option(data);
+            },
             no_results: function () {
                 return '<div class="no-results">' + i18n.t("shared.select.no_users") + '</div>';
             }

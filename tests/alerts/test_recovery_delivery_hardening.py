@@ -12,7 +12,7 @@ from app.services.alerts.lifecycle import upsert_alert
 from app.services.orchestration.runtime import RuntimeResult
 from app.settings import Config
 from tests.factories import (
-    create_channel, create_group, create_incident_stakeholder,
+    create_channel, create_group,
     create_route, create_team, create_user,
 )
 
@@ -27,7 +27,7 @@ def signal(route, status="firing"):
     }
 
 
-def setup_recovery(db, monkeypatch, *, channels=2, with_stakeholder=False):
+def setup_recovery(db, monkeypatch, *, channels=2):
     monkeypatch.setattr(Config, "RECOVERY_NOTIFICATION_DELAY_SECONDS", 60)
     group = create_group()
     team = create_team(group)
@@ -49,9 +49,6 @@ def setup_recovery(db, monkeypatch, *, channels=2, with_stakeholder=False):
             external_message_id=f"initial-{i}", provider_status="sent",
         )
         channel_rows.append(channel)
-    if with_stakeholder:
-        user = create_user(group=group, email="stakeholder@example.com")
-        create_incident_stakeholder(alert_group, user)
     upsert_alert(signal(route, "resolved"))
     return route, alert_group, channel_rows
 
@@ -121,31 +118,16 @@ def test_failed_channel_retried_without_resending_success(db, monkeypatch):
     assert notification_queue.process_due_alert_group_notifications()["processed"] == 0
 
 
-def test_stakeholder_push_failure_does_not_resend_email(db, monkeypatch):
-    route, group, _ = setup_recovery(db, monkeypatch, channels=0, with_stakeholder=True)
-    sent_email = []
-    sent_push = []
-    monkeypatch.setattr(
-        notification_queue, "send_stakeholder_email",
-        lambda *args: sent_email.append(args),
-    )
-
-    def push(*args, **kwargs):
-        sent_push.append(args)
-        if len(sent_push) == 1:
-            raise RuntimeError("push timeout")
-        return 1
-
-    monkeypatch.setattr(notification_queue, "send_stakeholder_push", push)
+def test_recovery_delivery_does_not_fan_out_to_incident_stakeholders(db, monkeypatch):
+    """Technical recovery retries must not invoke Incident stakeholder transports."""
+    _route, group, _channels = setup_recovery(db, monkeypatch, channels=0)
     force_due(group)
-    assert notification_queue.process_due_alert_group_notifications()["failed"] == 1
-    assert len(sent_email) == 1
-    assert len(sent_push) == 1
-    force_due(group)
-    assert notification_queue.process_due_alert_group_notifications()["sent"] == 1
-    assert len(sent_email) == 1
-    assert len(sent_push) == 2
-    assert not AlertGroup.get_by_id(group.id).notification_pending
+    result = notification_queue.process_due_alert_group_notifications()
+    assert result["processed"] == 1
+    assert result["sent"] == 0
+    assert result["skipped"] == 1
+    assert events(group, "recovery_notification_skipped") == 1
+    assert attempts(group) == []
 
 
 def test_all_failed_channels_stop_after_bounded_retries(db, monkeypatch):

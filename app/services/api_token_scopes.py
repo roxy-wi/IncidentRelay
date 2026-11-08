@@ -4,6 +4,8 @@ Keep this module dependency-free: it is imported by middleware, profile token
 creation, integration authentication, tests, and documentation helpers.
 """
 
+import re
+
 READ_METHODS = frozenset({"GET", "HEAD"})
 WRITE_METHODS = frozenset({"POST", "PUT", "PATCH", "DELETE"})
 
@@ -23,6 +25,7 @@ PUBLIC_API_PREFIXES = (
 # Stable, user-facing granular scopes. Keep the order intentional because the
 # profile API returns this sequence to the UI.
 READ_WRITE_SCOPE_DOMAINS = (
+    "changes",
     "alerts",
     "incidents",
     "services",
@@ -162,6 +165,33 @@ def required_scopes_for_path(path, method):
     therefore be denied for API-token principals (fail closed).
     """
     method = str(method or "").upper()
+    if path == "/api/change-events":
+        return ["changes:ingest"] if method == "POST" else None
+    if re.fullmatch(r"/api/alert-groups/\d+/(episodes|related-changes)", path):
+        return ["changes:read", "alerts:read"] if method in READ_METHODS else None
+    if re.fullmatch(r"/api/incidents/\d+/changes(?:/\d+)?", path):
+        item = bool(re.fullmatch(r"/api/incidents/\d+/changes/\d+", path))
+        if method in READ_METHODS and not item:
+            return ["changes:read", "incidents:read"]
+        if (method == "POST" and not item) or (item and method in {"PATCH", "DELETE"}):
+            return ["changes:write", "incidents:write"]
+        return None
+    if re.match(r"/api/incidents/\d+/changes(?:/|$)", path):
+        return None
+    if path_matches_prefix(path, "/api/changes"):
+        change_path = r"/api/changes/[0-9a-fA-F-]{36}"
+        if re.fullmatch(change_path + r"/(correlations|correlation-targets)", path) and method in READ_METHODS:
+            return ["changes:read", "alerts:read"]
+        if re.fullmatch(change_path + r"/correlations(?:/\d+/review)?", path) and method == "POST":
+            return ["changes:write", "alerts:write"]
+        if re.fullmatch(change_path + r"/incidents", path) and method in READ_METHODS:
+            return ["changes:read", "incidents:read"]
+        known_read = path in ("/api/changes", "/api/changes/sources") or re.fullmatch(
+            r"/api/changes/[0-9a-fA-F-]{36}(?:/events|/services)?", path
+        )
+        return ["changes:read"] if known_read and method in READ_METHODS else None
+    if re.fullmatch(r"/api/services/\d+/changes", path):
+        return ["changes:read", "services:read"] if method in READ_METHODS else None
     action = None
     if method in READ_METHODS:
         action = "read"
@@ -218,6 +248,8 @@ def token_has_scopes(token_scopes, required_scopes):
         return True
 
     raw = set(token_scopes or [])
+    if "changes:ingest" in required_scopes and "changes:ingest" not in raw:
+        return False
     if "*" in raw:
         # Wildcard keeps its historical meaning for explicitly declared view
         # scopes. Unmapped API routes are rejected before this check.
@@ -225,6 +257,14 @@ def token_has_scopes(token_scopes, required_scopes):
 
     effective = expand_token_scopes(raw)
     return all(scope in effective for scope in required_scopes)
+
+
+def is_jwt_only_api_path(path):
+    """Administration has no API-token scopes, including personal wildcard."""
+    return any(
+        path_matches_prefix(path, prefix)
+        for prefix in ("/api/admin/change-integrations", "/api/admin/system-settings")
+    )
 
 
 def token_can_grant_scopes(current_scopes, requested_scopes):

@@ -2,7 +2,6 @@
 
 from datetime import timedelta
 
-import pytest
 
 from app.modules.common import utc_now
 from app.modules.db import silences_repo, tokens_repo

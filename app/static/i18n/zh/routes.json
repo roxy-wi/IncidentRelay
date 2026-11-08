@@ -202,6 +202,8 @@
   "routes.intake.new_relic_example_comment": "New Relic Alerts Workflows Webhook 载荷示例",
   "routes.intake.new_relic_subtitle": "在 New Relic Alerts Workflow 的 Webhook 目标中使用此端点，并将路由 Token 添加为 Authorization: Bearer 请求头。",
   "routes.intake.new_relic_help": "将 issueId 用作 issue_id，使开启、更新和关闭通知能够更新同一条 IncidentRelay 告警。推荐模板还会发送优先级、Issue URL、策略、条件、实体和标签。",
+  "routes.intake.google_cloud_monitoring_subtitle": "在 Cloud Monitoring 中，将此 HTTPS 地址用于 Webhook 通知渠道。",
+  "routes.intake.google_cloud_monitoring_help": "选择 HTTP Basic，用户名填写 incidentrelay，密码填写此路由的接收令牌。",
   "routes.form.azure_monitor_help": "Azure Monitor 操作组 Webhook 要求启用通用警报架构。请使用生成的 Webhook URI，其中包含此路由的 HTTP Basic 认证凭据。",
   "routes.intake.azure_monitor_example_comment": "Azure Monitor 通用警报架构 Webhook 载荷示例",
   "routes.intake.azure_monitor_subtitle": "在 Azure Monitor 操作组 Webhook 中使用此 URI，并启用通用警报架构。",

@@ -5,6 +5,10 @@ from app.api.openapi.endpoints import (
     business_services,
     calendar,
     channels,
+    change_integrations,
+    change_events,
+    change_reviews,
+    changes,
     escalation_policies,
     groups,
     heartbeats,
@@ -22,6 +26,7 @@ from app.api.openapi.endpoints import (
     service_catalog,
     silences,
     sso,
+    system_settings,
     teams,
     users,
     version,
@@ -32,6 +37,10 @@ from app.version import get_service_version
 
 
 ENDPOINT_MODULES = [
+    change_reviews,
+    changes,
+    change_events,
+    change_integrations,
     version,
     auth,
     teams,
@@ -56,6 +65,7 @@ ENDPOINT_MODULES = [
     orchestrations,
     groups,
     sso,
+    system_settings,
     services,
     business_services,
     service_catalog,
@@ -105,7 +115,7 @@ def build_openapi_spec():
                     "type": "http",
                     "scheme": "basic",
                     "description": (
-                        "Provider-specific route authentication. Azure Monitor "
+                        "Provider-specific route authentication. Azure Monitor and Google Cloud Monitoring "
                         "webhooks use username incidentrelay and the route intake "
                         "token as the HTTP Basic password."
                     ),

@@ -1,0 +1,121 @@
+<div class="page-stack changes-page">
+  <p id="changes-message" role="status" aria-live="polite"></p>
+  <p id="changes-filter-message" role="status" aria-live="polite"></p>
+  <div id="changes-error-actions" class="card-header-actions" hidden><button class="btn changes-reload btn-reload" type="button">{{ _('common.reload') }}</button></div>
+  <section id="changes-list" class="card">
+    <form id="changes-filters">
+      <div class="page-toolbar is-flush-top">
+        <div class="page-toolbar-search"><span class="page-toolbar-search-icon" aria-hidden="true">⌕</span><input id="changes-search" class="input" type="search" maxlength="200" placeholder="{{ _('changes.search') }}" aria-label="{{ _('changes.search') }}"></div>
+        <select id="changes-status" class="input page-toolbar-filter" aria-label="{{ _('changes.status') }}">
+          <option value="">{{ _('changes.all_statuses') }}</option>
+          {% for status in ['unknown', 'running', 'succeeded', 'failed', 'rolled_back', 'cancelled'] %}<option value="{{ status }}">{{ _('changes.' ~ status) }}</option>{% endfor %}
+        </select>
+        <select id="changes-kind" class="input page-toolbar-filter" aria-label="{{ _('changes.kind') }}">
+          <option value="">{{ _('changes.all_kinds') }}</option>
+          {% for kind in ['deployment', 'configuration', 'infrastructure', 'database', 'feature_flag', 'other'] %}<option value="{{ kind }}">{{ _('changes.' ~ kind) }}</option>{% endfor %}
+        </select>
+        <button class="btn btn-primary" type="submit">{{ _('changes.apply') }}</button>
+        <button id="changes-reset" class="btn" type="button">{{ _('changes.reset') }}</button>
+        <button class="btn changes-reload btn-reload" type="button">{{ _('common.reload') }}</button>
+      </div>
+      <details class="form-body">
+        <summary>{{ _('changes.more_filters') }}</summary>
+        <div class="form-grid-2">
+          <div class="form-group"><label for="changes-service">{{ _('changes.service') }}</label><select id="changes-service" class="input" disabled><option value="">{{ _('changes.all_services') }}</option></select></div>
+          <div class="form-group"><label for="changes-source">{{ _('changes.source') }}</label><select id="changes-source" class="input" disabled><option value="">{{ _('changes.all_sources') }}</option></select></div>
+          <div class="form-group"><label for="changes-environment">{{ _('changes.environment') }}</label><input id="changes-environment" class="input" maxlength="255"></div>
+          <div class="form-group"><label for="changes-from">{{ _('changes.from') }}</label><input id="changes-from" class="input" type="datetime-local"></div>
+          <div class="form-group"><label for="changes-to">{{ _('changes.to') }}</label><input id="changes-to" class="input" type="datetime-local"></div>
+        </div>
+      </details>
+    </form>
+    <div class="table-wrapper has-table-pagination"><table class="data-table">
+      <thead><tr><th>{{ _('changes.change') }}</th><th>{{ _('changes.status') }}</th><th>{{ _('changes.owner') }}</th><th>{{ _('changes.source') }}</th><th>{{ _('changes.mapping') }}</th><th>{{ _('changes.occurred') }}</th></tr></thead>
+      <tbody id="changes-rows"></tbody>
+    </table></div>
+    <div class="table-pagination table-pagination-attached">
+      <div class="table-pagination-left"><label>{{ _('changes.page_size') }} <select id="changes-page-size" class="input input-sm table-page-size"><option>10</option><option selected>25</option><option>50</option><option>100</option></select></label></div>
+      <div id="changes-pagination" class="table-pagination-center"></div>
+      <div class="table-pagination-actions"><button id="changes-prev" class="btn btn-small" type="button">{{ _('changes.previous') }}</button><button id="changes-next" class="btn btn-small" type="button">{{ _('changes.next') }}</button></div>
+    </div>
+  </section>
+  <section id="changes-detail" class="changes-detail" hidden>
+    <section class="card">
+      <div class="card-header"><h2 id="changes-detail-title"></h2><button class="btn btn-small changes-reload btn-reload" type="button">{{ _('common.reload') }}</button></div>
+      <div class="form-body">
+        <p id="changes-limited" class="alert alert-info" hidden>{{ _('changes.limited') }}</p>
+        <p id="changes-conflict" class="alert alert-warning" hidden>{{ _('changes.conflict') }}</p>
+        <p id="changes-processing" role="status"></p>
+        <div id="changes-metadata" class="form-grid-2"></div>
+        <p id="changes-description" class="changes-description"></p>
+        <a id="changes-external" target="_blank" rel="noopener noreferrer" hidden>{{ _('changes.external') }}</a>
+      </div>
+    </section>
+    <section id="changes-services-panel" class="card workspace-section" data-section="services" aria-labelledby="changes-services-title">
+      <div class="card-header">
+        <div class="section-heading"><span class="section-icon" aria-hidden="true"><i class="fas fa-server"></i></span><h3 id="changes-services-title">{{ _('changes.services') }}</h3></div>
+      </div>
+      <div class="table-wrapper has-table-pagination"><table class="data-table change-relations-table change-relations-table-readonly">
+        <colgroup><col><col class="relation-type-column"><col class="relation-state-column"></colgroup>
+        <thead><tr><th>{{ _('changes.service') }}</th><th>{{ _('changes.relation') }}</th><th>{{ _('changes.verification') }}</th></tr></thead><tbody id="changes-services"></tbody>
+      </table></div>
+      <div class="table-pagination table-pagination-attached"><span id="changes-services-pagination"></span><div class="table-pagination-actions">
+        <button id="changes-services-prev" class="btn btn-small" type="button">{{ _('changes.previous') }}</button>
+        <button id="changes-services-next" class="btn btn-small" type="button">{{ _('changes.next') }}</button>
+      </div></div>
+    </section>
+    <section id="changes-references-panel" class="card workspace-section" data-section="references" aria-labelledby="changes-references-title" hidden>
+      <div class="card-header">
+        <div class="section-heading"><span class="section-icon" aria-hidden="true"><i class="fas fa-file-import"></i></span><h3 id="changes-references-title">{{ _('changes.references') }}</h3></div>
+      </div>
+      <div class="table-wrapper has-table-pagination"><table class="data-table change-relations-table change-relations-table-readonly">
+        <colgroup><col><col class="relation-type-column"><col class="relation-state-column"></colgroup>
+        <thead><tr><th>{{ _('changes.service') }}</th><th>{{ _('changes.relation') }}</th><th>{{ _('changes.status') }}</th></tr></thead><tbody id="changes-references"></tbody>
+      </table></div>
+      <div class="table-pagination table-pagination-attached"><span id="changes-references-pagination"></span><div class="table-pagination-actions">
+        <button id="changes-references-prev" class="btn btn-small" type="button">{{ _('changes.previous') }}</button>
+        <button id="changes-references-next" class="btn btn-small" type="button">{{ _('changes.next') }}</button>
+      </div></div>
+    </section>
+    <section id="changes-correlations-panel" class="card workspace-section" data-section="alerts" aria-labelledby="changes-correlations-title">
+      <div class="card-header">
+        <div class="section-heading"><span class="section-icon" aria-hidden="true"><i class="fas fa-bell"></i></span><h3 id="changes-correlations-title">{{ _('changes.episode_relations') }}</h3></div>
+        <button id="changes-add-episode" class="btn btn-primary btn-small" type="button"><i class="fas fa-link" aria-hidden="true"></i> {{ _('changes.add_episode') }}</button>
+      </div>
+      <div class="table-wrapper has-table-pagination"><table class="data-table change-relations-table">
+        <colgroup><col><col class="relation-type-column"><col class="relation-state-column"><col class="relation-actions-column"></colgroup>
+        <thead><tr><th>{{ _('changes.episode') }}</th><th>{{ _('changes.relation') }}</th><th>{{ _('changes.status') }}</th><th class="actions-th">{{ _('changes.actions') }}</th></tr></thead><tbody id="changes-correlations"></tbody>
+      </table></div>
+      <div class="table-pagination table-pagination-attached"><span id="changes-correlations-pagination"></span><div class="table-pagination-actions">
+        <button id="changes-correlations-prev" data-change-relations-page="correlations" class="btn btn-small" type="button">{{ _('changes.previous') }}</button>
+        <button id="changes-correlations-next" data-change-relations-page="correlations" class="btn btn-small" type="button">{{ _('changes.next') }}</button>
+      </div></div>
+    </section>
+    <section id="changes-incident-links-panel" class="card workspace-section" data-section="incidents" aria-labelledby="changes-incident-links-title">
+      <div class="card-header">
+        <div class="section-heading"><span class="section-icon" aria-hidden="true"><i class="fas fa-fire-extinguisher"></i></span><h3 id="changes-incident-links-title">{{ _('changes.incident_relations') }}</h3></div>
+        <button id="changes-add-incident" class="btn btn-primary btn-small" type="button"><i class="fas fa-link" aria-hidden="true"></i> {{ _('changes.add_incident') }}</button>
+      </div>
+      <div class="table-wrapper has-table-pagination"><table class="data-table change-relations-table">
+        <colgroup><col><col class="relation-type-column"><col class="relation-state-column"><col class="relation-actions-column"></colgroup>
+        <thead><tr><th>{{ _('changes.incident') }}</th><th>{{ _('changes.relation') }}</th><th>{{ _('changes.status') }}</th><th class="actions-th">{{ _('changes.actions') }}</th></tr></thead><tbody id="changes-incident-links"></tbody>
+      </table></div>
+      <div class="table-pagination table-pagination-attached"><span id="changes-incident-links-pagination"></span><div class="table-pagination-actions">
+        <button id="changes-incident-links-prev" data-change-relations-page="incidents" class="btn btn-small" type="button">{{ _('changes.previous') }}</button>
+        <button id="changes-incident-links-next" data-change-relations-page="incidents" class="btn btn-small" type="button">{{ _('changes.next') }}</button>
+      </div></div>
+    </section>
+    <section id="changes-events-panel" class="card workspace-section" data-section="history" aria-labelledby="changes-events-title" hidden>
+      <div class="card-header">
+        <div class="section-heading"><span class="section-icon" aria-hidden="true"><i class="fas fa-history"></i></span><h3 id="changes-events-title">{{ _('changes.events') }}</h3></div>
+      </div>
+      <div class="table-wrapper has-table-pagination"><table class="data-table">
+        <thead><tr><th>{{ _('changes.event') }}</th><th>{{ _('changes.occurred') }}</th><th>{{ _('changes.actor') }}</th><th>{{ _('changes.details') }}</th></tr></thead><tbody id="changes-events"></tbody>
+      </table></div>
+      <div class="table-pagination table-pagination-attached"><span id="changes-events-pagination"></span><div class="table-pagination-actions">
+        <button id="changes-events-prev" class="btn btn-small" type="button">{{ _('changes.previous') }}</button>
+        <button id="changes-events-next" class="btn btn-small" type="button">{{ _('changes.next') }}</button>
+      </div></div>
+    </section>
+  </section>
+</div>

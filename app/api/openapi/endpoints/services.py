@@ -272,6 +272,32 @@ SERVICE_SCHEMA = {
             "additionalProperties": True,
             "default": {},
         },
+        "change_correlation_enabled": {
+            "type": "boolean", "default": False,
+            "description": "Opt this Service's alert episodes into automatic Change suggestions.",
+        },
+        "change_correlation_exclusions": {
+            "type": "array", "default": [], "maxItems": 50,
+            "description": (
+                "A child is excluded when all clauses of any rule match exactly. "
+                "The episode participates if any child remains. Omitted settings "
+                "are preserved on update; send [] to clear exclusions."
+            ),
+            "items": {
+                "type": "object", "additionalProperties": False,
+                "properties": {
+                    "source": {"type": "string", "minLength": 1, "maxLength": 255, "nullable": True},
+                    "labels": {
+                        "type": "object", "maxProperties": 50,
+                        "additionalProperties": {"type": "string", "maxLength": 1024},
+                    },
+                },
+                "anyOf": [
+                    {"required": ["source"], "properties": {"source": {"type": "string", "nullable": False}}},
+                    {"required": ["labels"], "properties": {"labels": {"minProperties": 1}}},
+                ],
+            },
+        },
         "enabled": {"type": "boolean", "default": True},
         "public": {
             "type": "boolean",
@@ -976,6 +1002,7 @@ SERVICE_DETAILS_QUERY_PARAMS = [
 SERVICE_OWNER_SCHEMA = {
     "type": "object",
     "properties": {
+        "color": {"type": "string", "nullable": True, "pattern": "^#[0-9a-f]{6}$", "readOnly": True},
         "id": {"type": "integer"},
         "service_id": {"type": "integer"},
         "user_id": {"type": "integer", "nullable": True},

@@ -2,6 +2,7 @@ import logging
 from datetime import datetime
 
 from app.modules.db import alerts_repo
+from app.modules.db.models import AlertGroup
 from app.services import escalation_policies as escalation_policy_service
 from app.services.notifications.delivery import has_matching_notification_channel, notify_alert
 from app.services.alerts.maintenance_state import (
@@ -147,7 +148,15 @@ def maybe_escalate_alert(group):
     group.reminder_count = 0
     group.last_escalated_at = now
     group.updated_at = now
-    group.save()
+    group.save(
+        only=[
+            AlertGroup.assignee,
+            AlertGroup.escalation_level,
+            AlertGroup.reminder_count,
+            AlertGroup.last_escalated_at,
+            AlertGroup.updated_at,
+        ]
+    )
 
     alerts_repo.create_alert_event(
         group_id=group.id,
@@ -191,7 +200,7 @@ def maybe_escalate_alert_by_policy(group):
     if not next_rule:
         group.next_escalation_at = None
         group.updated_at = now
-        group.save()
+        group.save(only=[AlertGroup.next_escalation_at, AlertGroup.updated_at])
 
         alerts_repo.create_alert_event(
             group_id=group.id,
@@ -219,7 +228,19 @@ def maybe_escalate_alert_by_policy(group):
         now,
     )
     group.updated_at = now
-    group.save()
+    group.save(
+        only=[
+            AlertGroup.rotation,
+            AlertGroup.assignee,
+            AlertGroup.escalation_rule,
+            AlertGroup.escalation_level,
+            AlertGroup.escalation_repeat_count,
+            AlertGroup.reminder_count,
+            AlertGroup.last_escalated_at,
+            AlertGroup.next_escalation_at,
+            AlertGroup.updated_at,
+        ]
+    )
 
     target = next_user.username if next_user else "no assignee"
 

@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 from app.modules.db import alerts_repo, users_repo
-from app.services.incidents.stakeholders import notify_stakeholders
 
 MAX_COMMENT_LENGTH = 5000
 
@@ -52,12 +51,7 @@ def _notify_stakeholders_about_comment(
         context["alert_id"] = child_alert.id
         context["alert_title"] = getattr(child_alert, "title", None)
 
-    notify_stakeholders(
-        group,
-        "comment_added",
-        old_value=context,
-        skip_user_id=user_id,
-    )
+    pass  # Incident collaboration is independent of AlertGroup.
 
 
 def normalize_comment_body(body: str | None) -> str:

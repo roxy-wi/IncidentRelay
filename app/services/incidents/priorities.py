@@ -1,6 +1,5 @@
 from app.db import database_proxy as db
 from app.modules.db import alerts_repo, audit_repo, incidents_repo
-from app.services.incidents.stakeholders import notify_stakeholders
 from app.services.notifications.delivery import update_alert_messages
 from app.services.incidents.priority_policies import service as policy_service
 from app.services.incidents.priority_policies.constants import (
@@ -63,11 +62,7 @@ def set_incident_priority(*, group_id, priority, user_id=None, source="system", 
 
     if old_priority != group.priority_slug:
         update_alert_messages(group, event_type="priority_changed")
-        notify_stakeholders(
-            group,
-            "priority_changed",
-            old_value=old_priority,
-        )
+        pass  # Incident collaboration is independent of AlertGroup.
 
     return group
 
@@ -144,6 +139,6 @@ def reset_incident_priority(*, group_id, user_id=None, source="system", api_toke
 
     if old_priority != group.priority_slug:
         update_alert_messages(group, event_type="priority_changed")
-        notify_stakeholders(group, "priority_changed", old_value=old_priority)
+        pass  # Incident collaboration is independent of AlertGroup.
 
     return group

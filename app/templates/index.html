@@ -79,17 +79,22 @@
     <script src="{{ url_for('static', filename='js/core/theme.js') }}"></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/vendor/fontawesome/all.min.css') }}">
     <link rel="stylesheet" href="/static/css/oncall.css">
-    <link rel="stylesheet" href="/static/css/material.css">
+    <link rel="stylesheet" href="/static/css/material.css?v=c50eab6cb50b">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/workspace_sections.css', v='5095e31a315b') }}">
     <link rel="stylesheet" href="/static/css/loading.css">
-    <link rel="stylesheet" href="/static/css/table_pages.css">
-    <link rel="stylesheet" href="/static/css/incidents.css">
+    <link rel="stylesheet" href="/static/css/table_pages.css?v=460f18264e50">
+    <link rel="stylesheet" href="/static/css/incidents.css?v=59ff81b5e92e">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/changes.css', v='ce3ddb5625aa') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/change_relations.css', v='b5dfbd9a45be') }}">
     <link rel="stylesheet" href="/static/css/orchestrations.css">
     <link rel="stylesheet" href="/static/css/audit_log.css">
+    <link rel="stylesheet" href="/static/css/change_integrations.css?v=3a4824f00c4b">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/vendor/tom-select/tom-select.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/table_filters.css') }}">
     <link rel="stylesheet" href="/static/css/vendor/select2/select2.min.css">
     <link rel="stylesheet" href="/static/css/vendor/select2/override-select2.css">
-    <link rel="stylesheet" href="/static/css/theme_dark.css">
+    <link rel="stylesheet" href="/static/css/theme_dark.css?v=425497c16706">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/services.css', v='a8a41bb6652c') }}">
 
  <script>
  window.__INCIDENTRELAY_I18N__ = {
@@ -98,13 +103,14 @@
   messages: {{ i18n_messages | tojson }}
  };
  </script>
- <script src="{{ url_for('static', filename='js/core/i18n.js') }}"></script>
+ <script src="{{ url_for('static', filename='js/core/i18n.js', v='b91b059d9f49') }}"></script>
     <script src="/static/js/vendor/jquery-3.7.1.min.js"></script>
     <script src="/static/js/vendor/select2.min.js"></script>
     <script src="{{ url_for('static', filename='js/vendor/tom-select.complete.min.js') }}"></script>
     <script src="{{ url_for('static', filename='js/vendor/chart.min.js') }}"></script>
     <script>window.AppTheme && window.AppTheme.applyChartDefaults();</script>
     <script src="{{ url_for('static', filename='js/vendor/cytoscape.min.js') }}"></script>
+    <link rel="stylesheet" href="/static/css/user_appearance.css">
 </head>
 <body class="md-theme{% if initial_alert_id %} modal-open{% endif %}">
 <div id="pwa-navigation-mask" aria-hidden="true">
@@ -140,6 +146,10 @@
                         <svg class="menu-icon"><use href="#icon-alerts"></use></svg>
                         <span class="menu-text">{{ _('nav.alerts') }}</span>
                     </a>
+            <a href="/changes" data-page="changes" class="menu-link" title="{{ _('changes.title') }}">
+                <svg class="menu-icon"><use href="#icon-routes"></use></svg>
+                <span class="menu-text">{{ _('changes.title') }}</span>
+            </a>
             <a href="/incidents" data-page="incidents" class="menu-link" title="{{ _('nav.incidents') }}">
                         <svg class="menu-icon"><use href="#icon-incidents"></use></svg>
                         <span class="menu-text">{{ _('nav.incidents') }}</span>
@@ -276,6 +286,12 @@
                             <svg class="menu-icon"><use href="#icon-audit-log"></use></svg>
                             <span class="menu-text">{{ _('nav.audit_log') }}</span>
                         </a>
+            <a href="/admin/system-settings" data-page="system-settings" class="menu-link menu-link-global-admin is-hidden" title="{{ _('pages.system-settings.title') }}">
+              <i class="fa-solid fa-sliders menu-icon" aria-hidden="true"></i><span class="menu-text">{{ _('pages.system-settings.title') }}</span>
+            </a>
+            <a href="/admin/change-integrations" data-page="change-integrations" class="menu-link menu-link-change-integrations is-hidden" title="{{ _('ci.title') }}">
+              <svg class="menu-icon"><use href="#icon-routes"></use></svg><span class="menu-text">{{ _('ci.title') }}</span>
+            </a>
             <a href="/admin/sso" data-page="sso" class="menu-link menu-link-global-admin is-hidden" title="{{ _('nav.sso') }}">
                             <svg class="menu-icon"><use href="#icon-sso"></use></svg>
                             <span class="menu-text">{{ _('nav.sso') }}</span>
@@ -344,6 +360,7 @@
             <div id="view-dashboard" class="view{% if initial_page == '/' %} view-visible{% endif %}">{% include "pages/dashboard.html" %}</div>
             <div id="view-alerts" class="view{% if initial_alert_page %} view-visible{% endif %}">{% include "pages/alerts.html" %}</div>
             <div id="view-incidents" class="view{% if initial_incident_page %} view-visible{% endif %}">{% include "pages/incidents.html" %}</div>
+            <div id="view-changes" class="view{% if initial_page.startswith('/changes') %} view-visible{% endif %}">{% include "pages/changes.html" %}</div>
             <div id="view-rotations" class="view">{% include "pages/rotations.html" %}</div>
             <div id="view-calendar" class="view">{% include "pages/calendar.html" %}</div>
             <div id="view-routes" class="view">{% include "pages/routes.html" %}</div>
@@ -362,12 +379,15 @@
             <div id="view-admin-users" class="view">{% include "pages/admin_users.html" %}</div>
             <div id="view-audit-log" class="view">{% include "pages/audit_log.html" %}</div>
             <div id="view-sso" class="view">{% include "pages/sso.html" %}</div>
+            <div id="view-system-settings" class="view">{% include "pages/system_settings.html" %}</div>
+            <div id="view-change-integrations" class="view">{% include "pages/change_integrations.html" %}</div>
             <div id="view-groups" class="view">{% include "pages/groups.html" %}</div>
             <div id="view-profile" class="view">{% include "pages/profile.html" %}</div>
         </section>
         {% include 'pages/include/alerts_modal.html' %}
         {% include 'pages/include/rotation_overrides_modal.html' %}
         {% include "pages/include//oncall_health_modal.html" %}
+        {% include "pages/include/change_review.html" %}
         <div id="app-dialog-modal" class="app-modal is-hidden" role="dialog" aria-modal="true">
             <div class="app-modal-dialog app-modal-dialog-small">
             <div class="app-modal-header">
@@ -407,7 +427,8 @@
 </section>
 <script src="{{ url_for('static', filename='js/components/matcher_editor.js', v='20260625') }}"></script>
 <script src="/static/js/core/rbac_roles.js"></script>
-<script src="/static/js/core/state.js"></script>
+<script src="/static/js/core/state.js?v=1d0efc471f21"></script>
+<script src="/static/js/core/user_appearance.js"></script>
 <script src="/static/js/core/dialogs.js"></script>
 <script src="/static/js/core/api.js"></script>
 <script src="/static/js/core/auth.js"></script>
@@ -423,14 +444,14 @@
 <script src="/static/js/core/sortable_table.js"></script>
 <script src="/static/js/core/pwa.js"></script>
 <script src="/static/js/core/browser_push.js"></script>
-<script src="/static/js/core/router.js"></script>
+<script src="/static/js/core/router.js?v=ff115628149a"></script>
 <script src="/static/js/core/forms.js"></script>
 <script src="{{ url_for('static', filename='js/core/timezones.js') }}"></script>
 <script src="/static/js/sidebar.js"></script>
 <script src="/static/js/sidebar_section_restore.js"></script>
 <script src="{{ url_for('static', filename='js/components/alerts/alerts_summary_grid.js') }}"></script>
 <script src="/static/js/components/buttons.js"></script>
-<script src="/static/js/components/oncall_status_panel.js"></script>
+<script src="/static/js/components/oncall_status_panel.js?v=910ec2ea843b"></script>
 <script src="{{ url_for('static', filename='js/components/action_menu.js') }}"></script>
 <script src="{{ url_for('static', filename='js/components/alerts/alerts_comment.js') }}"></script>
 <script src="{{ url_for('static', filename='js/components/alerts/alert_incident_management.js') }}"></script>
@@ -438,21 +459,24 @@
 <script src="{{ url_for('static', filename='js/components/notification_center.js') }}"></script>
 <script src="{{ url_for('static', filename='js/components/dependency_graph.js') }}"></script>
 <script src="{{ url_for('static', filename='js/common/slug.js') }}"></script>
-<script src="{{ url_for('static', filename='js/pages/alerts.js') }}"></script>
+<script src="{{ url_for('static', filename='js/pages/alerts.js', v='6fa094403ce2') }}"></script>
 <script src="{{ url_for('static', filename='js/pages/alert_analytics.js') }}"></script>
-<script src="{{ url_for('static', filename='js/pages/incidents.js') }}"></script>
+<script src="{{ url_for('static', filename='js/pages/incidents.js', v='c015af96aaf4') }}"></script>
+<script src="{{ url_for('static', filename='js/pages/changes.js', v='a45ecf42677f') }}"></script>
+<script src="{{ url_for('static', filename='js/pages/changes_review.js', v='4e0f502e498f') }}"></script>
+<script src="{{ url_for('static', filename='js/pages/related_changes.js', v='b6abb1391c12') }}"></script>
 <script src="/static/js/pages/rotations.js"></script>
 <script src="{{ url_for('static', filename='js/pages/oncall_health.js') }}"></script>
 <script src="/static/js/pages/calendar.js"></script>
 <script src="/static/js/pages/routes.js"></script>
-<script src="{{ url_for('static', filename='js/pages/services/i18n_runtime.js') }}"></script>
-<script src="{{ url_for('static', filename='js/pages/services/core.js') }}"></script>
-<script src="{{ url_for('static', filename='js/pages/services/details.js') }}"></script>
-<script src="{{ url_for('static', filename='js/pages/services/context.js') }}"></script>
+<script src="{{ url_for('static', filename='js/pages/services/i18n_runtime.js', v='b8bf7ede656d') }}"></script>
+<script src="{{ url_for('static', filename='js/pages/services/core.js', v='4f132e1c00e4') }}"></script>
+<script src="{{ url_for('static', filename='js/pages/services/details.js', v='5024bcaf83f9') }}"></script>
+<script src="{{ url_for('static', filename='js/pages/services/context.js') }}?v=62cdc5d6083b"></script>
 <script src="{{ url_for('static', filename='js/pages/services/analytics.js') }}"></script>
 <script src="{{ url_for('static', filename='js/pages/services/impact.js') }}"></script>
-<script src="{{ url_for('static', filename='js/pages/services/extras.js') }}"></script>
-<script src="{{ url_for('static', filename='js/pages/business_services.js') }}"></script>
+<script src="{{ url_for('static', filename='js/pages/services/extras.js', v='9b81eb2c371c') }}"></script>
+<script src="{{ url_for('static', filename='js/pages/business_services.js', v='8f2bde6b8979') }}"></script>
 <script src="{{ url_for('static', filename='js/pages/heartbeats.js') }}"></script>
 <script src="{{ url_for('static', filename='js/pages/maintenance_windows.js') }}"></script>
 <script src="{{ url_for('static', filename='js/pages/orchestrations.js') }}"></script>
@@ -462,13 +486,15 @@
 <script src="{{ url_for('static', filename='js/pages/priority_policies.js') }}"></script>
 <script src="{{ url_for('static', filename='js/pages/matcher_presets.js') }}"></script>
 <script src="/static/js/pages/channels.js"></script>
-<script src="/static/js/pages/silences.js"></script>
+<script src="/static/js/pages/silences.js?v=0bc1dfb77062"></script>
 <script src="/static/js/pages/teams.js"></script>
 <script src="/static/js/pages/admin_users.js"></script>
 <script src="/static/js/pages/audit_log.js"></script>
 <script src="/static/js/pages/groups.js"></script>
 <script src="/static/js/pages/profile.js"></script>
 <script src="/static/js/pages/sso.js"></script>
+<script src="/static/js/pages/system_settings.js?v=7c93f59c849d"></script>
+<script src="/static/js/pages/change_integrations.js?v=8c42f9f7fefe"></script>
 <script src="/static/js/pages/services_standards.js"></script>
 <script src="{{ url_for('static', filename='js/core/list_url_state_registry.js') }}"></script>
 </body>

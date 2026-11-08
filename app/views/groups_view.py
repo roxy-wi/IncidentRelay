@@ -1,6 +1,7 @@
 from flask import Blueprint, jsonify, request
 from peewee import DoesNotExist, IntegrityError
 
+from app.modules.user_colors import user_color
 from app.modules.db.common import integrity_conflict, unique_field_conflict
 from app.api.schemas.groups import (
     GroupCreateSchema,
@@ -129,6 +130,7 @@ def list_group_users(group_id):
             "user_id": membership.user.id,
             "username": membership.user.username,
             "display_name": membership.user.display_name,
+            "color": user_color(membership.user),
             "role": membership.role,
             "active": membership.active,
         })
@@ -270,6 +272,7 @@ def update_group_user(membership_id):
         "user_id": membership.user.id,
         "username": membership.user.username,
         "display_name": membership.user.display_name,
+        "color": user_color(membership.user),
         "role": membership.role,
         "active": membership.active,
     })

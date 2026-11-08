@@ -1,0 +1,30 @@
+<section id="{{ related_kind }}-related-changes" class="card workspace-section related-changes" data-section="changes">
+  <div class="card-header">
+    <div class="section-heading"><span class="section-icon" aria-hidden="true"><i class="fas fa-code-branch"></i></span><div>
+      <h3>{{ _('changes.related_changes') }}</h3>
+      <div class="card-subtitle">{{ _('changes.related_' ~ related_kind ~ '_help') }}</div>
+    </div></div>
+    <div class="card-actions">
+      <button type="button" class="btn btn-small btn-reload" data-related-reload>{{ _('common.reload') }}</button>
+      <button type="button" class="btn btn-primary btn-small" data-related-add hidden><i class="fas fa-link" aria-hidden="true"></i> {{ _('changes.link_change') }}</button>
+    </div>
+  </div>
+  {% if related_kind == 'alert' %}
+  <div class="form-body">
+    <div class="form-group" data-related-episode-selector hidden>
+      <label for="alert-change-episode">{{ _('changes.episode') }}</label>
+      <select id="alert-change-episode" data-related-episodes aria-describedby="alert-change-eligibility"></select>
+    </div>
+    <p id="alert-change-eligibility" class="muted" data-related-eligibility></p>
+  </div>
+  {% endif %}
+  <p class="alert alert-danger" role="alert" data-related-error></p>
+  <div class="table-wrapper has-table-pagination"><table class="data-table">
+    <thead><tr><th>{{ _('changes.change') }}</th><th>{{ _('changes.relation') }}</th><th>{{ _('changes.status') }}</th><th class="actions-th">{{ _('changes.actions') }}</th></tr></thead>
+    <tbody></tbody>
+  </table></div>
+  <div class="table-pagination table-pagination-attached"><span data-related-count></span><div class="table-pagination-actions" data-related-paging hidden>
+    <button type="button" class="btn btn-small" data-related-prev>{{ _('changes.previous') }}</button>
+    <button type="button" class="btn btn-small" data-related-next>{{ _('changes.next') }}</button>
+  </div></div>
+</section>

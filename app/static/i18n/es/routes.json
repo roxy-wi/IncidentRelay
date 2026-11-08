@@ -213,6 +213,8 @@
   "routes.intake.uptime_kuma_example_comment": "Ejemplo de payload Webhook estándar de Uptime Kuma",
   "routes.intake.uptime_kuma_subtitle": "Usa este endpoint y el token de la ruta en una notificación Webhook de Uptime Kuma.",
   "routes.intake.uptime_kuma_help": "En Uptime Kuma, crea una notificación Webhook con POST, application/json, la URL de entrada de la ruta y un header Authorization adicional. Mantén el cuerpo de solicitud predeterminado.",
+  "routes.intake.google_cloud_monitoring_subtitle": "Utiliza esta URL HTTPS para un canal de notificación Webhook en Cloud Monitoring.",
+  "routes.intake.google_cloud_monitoring_help": "Selecciona HTTP Basic. Introduce incidentrelay como usuario y el token de la ruta como contraseña.",
   "routes.form.azure_monitor_help": "Azure Monitor Action Group Webhook requiere Common Alert Schema. Usa la URI de webhook generada, que incluye credenciales HTTP Basic para esta ruta.",
   "routes.intake.azure_monitor_example_comment": "Ejemplo de webhook Azure Monitor Common Alert Schema",
   "routes.intake.azure_monitor_subtitle": "Usa esta URI en un Webhook de Azure Monitor Action Group y habilita Common Alert Schema.",

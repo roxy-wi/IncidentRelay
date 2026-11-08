@@ -13,7 +13,7 @@ IncidentRelay — это self-hosted сервис для планировани�
 - команды и ротации;
 - каталог сервисов с затронутыми системами, ссылками, runbook’ами, зависимостями и аналитикой влияния;
 - токены приёма алертов на основе маршрутов;
-- приём из Alertmanager, Zabbix и обобщённых вебхуков;
+- приём из Alertmanager, Zabbix, [Google Cloud Monitoring](integrations/google-cloud-monitoring.md) и обобщённых вебхуков;
 - каналы уведомлений Mattermost, Telegram, email, на основе вебхуков и голосовых вызовов;
 - рабочие процессы ACK, Resolve и Alert Shelving;
 - временный Shelve отдельных AlertGroup с автоматическим expiry и resume;

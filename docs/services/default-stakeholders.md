@@ -11,7 +11,7 @@ When a new incident is created for a service, IncidentRelay copies active servic
 
 ## When default stakeholders are used
 
-Default stakeholders are copied when a new alert group / incident is created and matched to a service.
+Default stakeholders are copied only when an operational Incident is created with a primary service. Creating an AlertGroup, linking an existing Incident to a group, changing its primary service, or adding an affected service does not create a new owner snapshot.
 
 They are useful for:
 
@@ -34,7 +34,7 @@ This means:
 - new service default stakeholders affect only new incidents
 - disabled service default stakeholders are not copied to new incidents
 - existing incidents are not changed when service defaults are edited
-- incident stakeholders can still be edited directly on the incident
+- stakeholders can be added or deactivated on an existing Incident; its public API does not edit notification flags
 
 ## Supported roles
 
@@ -62,8 +62,9 @@ Each default stakeholder has notification flags.
 |---|---|
 | `notify_on_created` | New incident created |
 | `notify_on_priority_change` | Incident priority changed |
-| `notify_on_status_change` | Incident acknowledged or status changed |
-| `notify_on_resolved` | Incident resolved |
+| `notify_on_status_change` | Operational Incident workflow status changed |
+| `notify_on_resolved` | Operational Incident resolved |
+| `notify_on_comment` | Operational Incident comment added |
 
 These flags are copied to the incident stakeholder snapshot together with the user and role.
 
@@ -80,37 +81,21 @@ External stakeholders without an IncidentRelay user account can receive email no
 
 ## Incident lifecycle events
 
-Default stakeholders can receive notifications for the following lifecycle events.
+The snapshot flags control creation, priority changes, workflow changes,
+resolution and operational comments. Technical AlertGroup ACK/resolve and
+technical comments do not trigger equivalent Incident events. Resolving a linked
+AlertGroup does not automatically resolve the Incident.
 
-### New incident created
-
-When a new alert group is created for a service, IncidentRelay copies active service owners to incident stakeholders.
-
-If `notify_on_created` is enabled, the stakeholder receives an email and, when available, a browser push notification.
-
-### Priority changed
-
-When incident priority is changed manually, stakeholders with `notify_on_priority_change` enabled are notified.
-
-The notification includes the old and new priority.
-
-### Status changed
-
-When an incident is acknowledged or its status changes, stakeholders with `notify_on_status_change` enabled are notified.
-
-Manual acknowledge sends a status change notification.
-
-### Incident resolved
-
-When an incident is resolved manually or by an incoming resolved payload from an integration, stakeholders with `notify_on_resolved` enabled are notified.
-
-Repeated resolved payloads do not send duplicate stakeholder notifications if the incident was already resolved.
+Notifications contain the Incident title, priority, workflow status and workspace
+URL. The actor is skipped for their own stakeholder notifications. Delivery is
+persisted with the event and retried by the existing notification scheduler.
+Email and push retry independently; see [delivery guarantees](../incidents/stakeholders.md#delivery-and-retries).
 
 ## Existing incidents
 
 Default stakeholder changes affect only new incidents.
 
-Existing incidents keep their own stakeholder snapshot. To change stakeholders for an existing incident, edit the incident stakeholder list directly.
+Existing incidents keep their own stakeholder snapshot. To change stakeholders for an existing incident, add or deactivate recipients in the Incident stakeholder list.
 
 ## API
 
@@ -138,7 +123,8 @@ Example request:
   "notify_on_created": true,
   "notify_on_priority_change": true,
   "notify_on_status_change": false,
-  "notify_on_resolved": true
+  "notify_on_resolved": true,
+  "notify_on_comment": true
 }
 ```
 
@@ -158,7 +144,8 @@ Example request:
   "notify_on_created": true,
   "notify_on_priority_change": false,
   "notify_on_status_change": true,
-  "notify_on_resolved": true
+  "notify_on_resolved": true,
+  "notify_on_comment": true
 }
 ```
 

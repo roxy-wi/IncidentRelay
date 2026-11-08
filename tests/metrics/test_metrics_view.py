@@ -5,7 +5,7 @@ from prometheus_client import CONTENT_TYPE_LATEST
 import app.services.readiness as metrics_readiness
 from app.settings import Config
 from app.version import get_service_version
-from tests.metrics.exposition import parse_exposition
+from tests.metrics.exposition import parse_exposition, sample_value
 
 
 def _enabled(monkeypatch, token=""):
@@ -136,23 +136,21 @@ def test_metrics_reports_healthy_database(client, monkeypatch):
 
 
 def test_metrics_http_counter_counts_requests(client, monkeypatch):
-    """HTTP requests must show up in the request counter while enabled."""
+    """Each scrape exposes the count of previously completed requests."""
     _enabled(monkeypatch)
 
-    client.get("/metrics")
-    client.get("/metrics")
-
     response = client.get("/metrics")
-    families = parse_exposition(response.get_data())
+    assert response.status_code == 200
+    counter_name = "incidentrelay_http_requests_total"
+    labels = {"method": "GET", "status": "200"}
+    initial_count = sample_value(response.get_data(), counter_name, labels) or 0
 
-    get_200 = [
-        sample.value
-        for sample in families["incidentrelay_http_requests"].samples
-        if sample.labels == {"method": "GET", "status": "200"}
-        and sample.name.endswith("_total")
-    ]
-    assert get_200
-    assert max(get_200) >= 3
+    # The current scrape is counted by after_request, after rendering its body.
+    for completed_requests in range(1, 4):
+        response = client.get("/metrics")
+        assert response.status_code == 200
+        count = sample_value(response.get_data(), counter_name, labels)
+        assert count == initial_count + completed_requests
 
 
 def test_metrics_latency_histogram_observes_requests(client, monkeypatch):

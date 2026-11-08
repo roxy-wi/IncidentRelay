@@ -1,7 +1,16 @@
 from flask import Blueprint, jsonify, request
+from peewee import IntegrityError
+from urllib.parse import urlsplit
 
+from app.modules.user_colors import user_color
 from app.api.schemas.incidents import (
     IncidentAssignmentSchema,
+    IncidentParticipantCreateSchema,
+    IncidentResponderCreateSchema,
+    IncidentResponderUpdateSchema,
+    IncidentStakeholderCreateSchema,
+    IncidentCommentCreateSchema,
+    IncidentAffectedServiceSchema,
     IncidentCreateSchema,
     IncidentLinkSchema,
     IncidentTransitionSchema,
@@ -9,7 +18,14 @@ from app.api.schemas.incidents import (
 )
 from app.modules.db import incident_core_repo, incidents_repo
 from app.services.audit import current_api_token_id
-from app.modules.db.models import AlertGroup
+from app.services.incidents.core import _audit
+from app.db import database_proxy as db
+from app.modules.common import as_utc_aware, utc_now
+from app.modules.db.models import (
+    AlertComment, AlertEvent, AlertGroup, IncidentComment, IncidentEvent,
+    IncidentResponder, IncidentService, IncidentStakeholder, Service,
+    ServiceDependency, ServiceLink, ServiceRunbook, User,
+)
 from app.services.incidents.core import (
     IncidentConflictError,
     IncidentValidationError,
@@ -28,14 +44,21 @@ from app.services.rbac import (
     require_team_read,
     require_team_respond,
 )
-from app.services.serializers.alerts import serialize_incident_priority
+from app.services.serializers.alerts import serialize_incident_priority, serialize_incident_responder
+from app.services.serializers.common import serialize_utc_datetime
+from app.services.service_catalog.impact import build_service_effective_impact_map
 from app.services.serializers.incidents import (
     serialize_incident,
     serialize_incident_event,
     serialize_incident_link,
 )
-from app.services.validation import make_error_response, validate_body
+from app.services.validation import make_error_response, safe_exception_response, validate_body
 
+
+from app.services.incidents.responders import (
+    create_incident_responder as request_incident_responder,
+    set_incident_responder_status,
+)
 
 incidents_bp = Blueprint("incidents_api", __name__)
 
@@ -149,13 +172,34 @@ def list_incident_priorities():
     ])
 
 
+def _visible_alert_group_links(incident):
+    """Apply technical-team visibility on every Incident-to-AlertGroup read.
+
+    Owning an Incident never grants access to its linked technical signals.
+    Filtering here also protects the nested link list in the Incident detail.
+    """
+    visible = []
+    for link in incident_core_repo.list_active_links(incident.id):
+        group = link.alert_group
+        if group.team_id:
+            if require_team_read(group.team_id):
+                continue
+        elif not is_admin_user(_request_user()):
+            continue
+        visible.append(link)
+    return visible
+
+
 @incidents_bp.route("/<int:incident_id>", methods=["GET"])
 def get_incident(incident_id):
     incident, error = _get_incident_or_error(incident_id)
     if error:
         return error
     payload = serialize_incident(incident, current_user=_request_user(), include_details=True)
-    payload["alert_groups"] = [serialize_incident_link(link) for link in incident_core_repo.list_active_links(incident.id)]
+    payload["alert_groups"] = [
+        serialize_incident_link(link, current_user=_request_user())
+        for link in _visible_alert_group_links(incident)
+    ]
     payload["events"] = [serialize_incident_event(event) for event in incident_core_repo.list_events(incident.id)]
     return jsonify(payload)
 
@@ -179,6 +223,8 @@ def update_incident_view(incident_id):
             description=payload.description,
             service_id=payload.service_id,
             priority_slug=payload.priority,
+            root_cause=payload.root_cause,
+            resolution_summary=payload.resolution_summary,
         )
     except (IncidentValidationError, IncidentConflictError) as exc:
         return _service_error(exc)
@@ -299,7 +345,10 @@ def list_incident_alert_groups(incident_id):
     incident, error = _get_incident_or_error(incident_id)
     if error:
         return error
-    return jsonify([serialize_incident_link(link) for link in incident_core_repo.list_active_links(incident.id)])
+    return jsonify([
+        serialize_incident_link(link, current_user=_request_user())
+        for link in _visible_alert_group_links(incident)
+    ])
 
 
 @incidents_bp.route("/<int:incident_id>/alert-groups", methods=["POST"])
@@ -318,6 +367,8 @@ def link_incident_alert_group(incident_id):
         error = require_team_respond(alert_group.team_id)
         if error:
             return error
+    elif not is_admin_user(_request_user()):
+        return make_error_response("forbidden", "Alert group has no team scope", 403)
 
     try:
         link = link_alert_group(
@@ -330,7 +381,7 @@ def link_incident_alert_group(incident_id):
         )
     except (IncidentValidationError, IncidentConflictError) as exc:
         return _service_error(exc)
-    return jsonify(serialize_incident_link(link)), 201
+    return jsonify(serialize_incident_link(link, current_user=_request_user())), 201
 
 
 @incidents_bp.route("/<int:incident_id>/alert-groups/<int:group_id>", methods=["DELETE"])
@@ -338,6 +389,18 @@ def unlink_incident_alert_group(incident_id, group_id):
     incident, error = _get_incident_or_error(incident_id, respond=True)
     if error:
         return error
+    # Do not allow Incident operators to mutate an unrelated team's signal.
+    link = next((item for item in incident_core_repo.list_active_links(incident.id)
+                 if item.alert_group_id == group_id), None)
+    if link is None:
+        return make_error_response("not_found", "Active Incident/AlertGroup link not found", 404)
+    group = link.alert_group
+    if group.team_id:
+        error = require_team_respond(group.team_id)
+        if error:
+            return error
+    elif not is_admin_user(_request_user()):
+        return make_error_response("forbidden", "Alert group has no team scope", 403)
     try:
         link = unlink_alert_group(
             incident.id, group_id, user_id=_request_user_id(),
@@ -347,7 +410,7 @@ def unlink_incident_alert_group(incident_id, group_id):
         return _service_error(exc)
     if not link:
         return make_error_response("not_found", "Active Incident/AlertGroup link not found", 404)
-    return jsonify({"unlinked": True, "link": serialize_incident_link(link)})
+    return jsonify({"unlinked": True, "link": serialize_incident_link(link, current_user=_request_user())})
 
 
 @incidents_bp.route("/<int:incident_id>/events", methods=["GET"])
@@ -356,3 +419,626 @@ def list_incident_events(incident_id):
     if error:
         return error
     return jsonify([serialize_incident_event(event) for event in incident_core_repo.list_events(incident.id)])
+
+
+# Collaboration data belongs to the operational Incident, never to AlertGroup.
+def _serialize_comment(comment):
+    return {
+        "id": comment.id,
+        "incident_id": comment.incident_id,
+        "author_id": comment.author_id,
+        "author": ({
+            "id": comment.author.id,
+            "display_name": comment.author.display_name,
+            "username": comment.author.username,
+            "color": user_color(comment.author),
+        } if comment.author_id else None),
+        "body": comment.body,
+        "created_at": serialize_utc_datetime(comment.created_at),
+        "updated_at": serialize_utc_datetime(comment.updated_at),
+    }
+
+
+def _safe_service_url(value):
+    """Expose only browser-safe web links stored in service metadata."""
+    if not value or not isinstance(value, str):
+        return None
+    candidate = value.strip()
+    # Reject embedded whitespace/control characters and credential-bearing URLs.
+    # URL parsers normalize some control characters instead of rejecting them.
+    if any(character.isspace() or ord(character) < 32 or ord(character) == 127
+           for character in candidate):
+        return None
+    try:
+        parsed = urlsplit(candidate)
+        if (parsed.scheme.lower() not in ("http", "https") or not parsed.hostname
+                or parsed.username is not None or parsed.password is not None):
+            return None
+        # Accessing .port validates malformed port values.
+        _ = parsed.port
+    except ValueError:
+        return None
+    return candidate
+
+
+def _visible_service_dependencies(service):
+    """Never expose dependency names belonging to inaccessible teams."""
+    result = []
+    links = (ServiceDependency.select(ServiceDependency, Service)
+             .join(Service, on=(ServiceDependency.depends_on_service == Service.id))
+             .where(ServiceDependency.service == service.id,
+                    ServiceDependency.enabled == True,  # noqa: E712
+                    ServiceDependency.deleted == False,  # noqa: E712
+                    Service.enabled == True,  # noqa: E712
+                    Service.deleted == False))  # noqa: E712
+    for dependency in links:
+        target = dependency.depends_on_service
+        if not target.team_id or require_team_read(target.team_id):
+            continue
+        result.append({"service_id": target.id, "name": target.name,
+                       "criticality": dependency.criticality,
+                       "dependency_type": dependency.dependency_type})
+    return result
+
+
+def _serialize_service(link, *, impact=None):
+    """Return service resources and aggregate impact within the caller's scope."""
+    service = link.service
+    runbooks = (ServiceRunbook.select()
+                .where(ServiceRunbook.service == service.id,
+                       ServiceRunbook.enabled == True,  # noqa: E712
+                       ServiceRunbook.deleted == False)  # noqa: E712
+                .order_by(ServiceRunbook.priority, ServiceRunbook.id))
+    external_links = (ServiceLink.select()
+                      .where(ServiceLink.service == service.id,
+                             ServiceLink.enabled == True,  # noqa: E712
+                             ServiceLink.deleted == False)  # noqa: E712
+                      .order_by(ServiceLink.priority, ServiceLink.id))
+    return {
+        "id": link.id, "incident_id": link.incident_id, "service_id": service.id,
+        "service_name": service.name, "service_slug": service.slug,
+        "status": service.status, "criticality": service.criticality,
+        "tier": service.tier, "environment": service.environment,
+        "team_id": service.team_id,
+        "runbooks": [{"title": item.title, "url": url}
+                     for item in runbooks if (url := _safe_service_url(item.url))],
+        "links": [{"label": item.label, "type": item.link_type, "url": url}
+                  for item in external_links if (url := _safe_service_url(item.url))],
+        "dependencies": _visible_service_dependencies(service),
+        "permissions": {"can_remove": can_respond_team(_request_user(), service.team_id)
+                        if service.team_id else is_admin_user(_request_user())},
+        # The shared calculation includes upstream dependencies. Return only
+        # aggregate status/score; private root causes and paths stay private.
+        "impact": ({key: impact[key] for key in (
+            "own_status", "effective_status", "effective_impact_score",
+        )} if impact else None),
+        "added_at": serialize_utc_datetime(link.added_at),
+    }
+
+
+@incidents_bp.route("/<int:incident_id>/comments", methods=["GET"])
+def list_incident_comments(incident_id):
+    incident, error = _get_incident_or_error(incident_id)
+    if error:
+        return error
+    comments = (IncidentComment.select().where(IncidentComment.incident == incident.id)
+                .order_by(IncidentComment.created_at, IncidentComment.id))
+    return jsonify([_serialize_comment(comment) for comment in comments])
+
+
+@incidents_bp.route("/<int:incident_id>/comments", methods=["POST"])
+def add_incident_comment(incident_id):
+    incident, error = _get_incident_or_error(incident_id, respond=True)
+    if error:
+        return error
+    if _request_user_id() is None:
+        return make_error_response("forbidden", "Authenticated user is required", 403)
+    payload, error = validate_body(IncidentCommentCreateSchema)
+    if error:
+        return error
+    with db.atomic():
+        comment = IncidentComment.create(incident=incident, author=_request_user_id(), body=payload.body)
+        event = incident_core_repo.create_event(incident.id, "incident_comment_added", user_id=_request_user_id(),
+                                                data={"comment_id": comment.id})
+        _audit("incident.comment_add", incident, user_id=_request_user_id(),
+               api_token_id=current_api_token_id(), source="api", data={"comment_id": comment.id})
+        from app.services.notifications.incidents import enqueue_stakeholders
+        enqueue_stakeholders(
+            incident, event, "comment_added", skip_user_id=_request_user_id(),
+            context={"message": comment.body},
+        )
+    from app.services.incidents.stakeholders import notify_stakeholders
+    notify_stakeholders(incident, "comment_added", skip_user_id=_request_user_id(), event_id=event.id)
+    return jsonify(_serialize_comment(comment)), 201
+
+
+@incidents_bp.route("/<int:incident_id>/affected-services", methods=["GET"])
+def list_incident_affected_services(incident_id):
+    incident, error = _get_incident_or_error(incident_id)
+    if error:
+        return error
+    # Each service has an independent team scope. Never leak cross-team relations.
+    links = IncidentService.select().where(IncidentService.incident == incident.id).order_by(IncidentService.id)
+    visible = []
+    for link in links:
+        service = link.service
+        if service.deleted:
+            continue
+        if service.team_id:
+            if require_team_read(service.team_id):
+                continue
+        elif not is_admin_user(_request_user()):
+            continue
+        visible.append(link)
+    impacts = build_service_effective_impact_map([link.service_id for link in visible])
+    return jsonify([_serialize_service(link, impact=impacts.get(link.service_id)) for link in visible])
+
+
+@incidents_bp.route("/<int:incident_id>/affected-services", methods=["POST"])
+def add_incident_affected_service(incident_id):
+    incident, error = _get_incident_or_error(incident_id, respond=True)
+    if error:
+        return error
+    payload, error = validate_body(IncidentAffectedServiceSchema)
+    if error:
+        return error
+    service = Service.get_or_none(Service.id == payload.service_id,
+                                  Service.enabled == True, Service.deleted == False)  # noqa: E712
+    if service is None:
+        return make_error_response("not_found", "Service not found", 404)
+    if service.team_id:
+        error = require_team_respond(service.team_id)
+        if error:
+            return error
+    elif not is_admin_user(_request_user()):
+        return make_error_response("forbidden", "Service has no team scope", 403)
+    with incident_core_repo.incident_transaction(incident.id):
+        existing = IncidentService.get_or_none(IncidentService.incident == incident.id,
+                                               IncidentService.service == service.id)
+        if existing:
+            return jsonify(_serialize_service(existing)), 200
+        try:
+            with db.atomic():
+                link = IncidentService.create(incident=incident, service=service, added_at=utc_now())
+        except IntegrityError:
+            existing = IncidentService.get_or_none(
+                IncidentService.incident == incident.id, IncidentService.service == service.id,
+            )
+            if existing is not None:
+                return jsonify(_serialize_service(existing)), 200
+            raise
+        incident_core_repo.create_event(incident.id, "incident_service_added", user_id=_request_user_id(),
+                                        data={"service_id": service.id})
+        _audit("incident.service_add", incident, user_id=_request_user_id(),
+               api_token_id=current_api_token_id(), source="api", data={"service_id": service.id})
+    return jsonify(_serialize_service(link)), 201
+
+
+@incidents_bp.route("/<int:incident_id>/affected-services/<int:service_id>", methods=["DELETE"])
+def remove_incident_affected_service(incident_id, service_id):
+    incident, error = _get_incident_or_error(incident_id, respond=True)
+    if error:
+        return error
+    with incident_core_repo.incident_transaction(incident.id):
+        link = IncidentService.get_or_none(IncidentService.incident == incident.id,
+                                           IncidentService.service == service_id)
+        if link is None:
+            return make_error_response("not_found", "Affected service not found", 404)
+        if link.service.team_id:
+            error = require_team_respond(link.service.team_id)
+            if error:
+                return error
+        elif not is_admin_user(_request_user()):
+            return make_error_response("forbidden", "Service has no team scope", 403)
+        link.delete_instance()
+        incident_core_repo.create_event(incident.id, "incident_service_removed", user_id=_request_user_id(),
+                                        data={"service_id": service_id})
+        _audit("incident.service_remove", incident, user_id=_request_user_id(),
+               api_token_id=current_api_token_id(), source="api", data={"service_id": service_id})
+    return jsonify({"removed": True})
+
+
+# 2.5 canonical, concrete-user Incident participants. On-call schedule changes
+# cannot silently reassign these persisted operational roles.
+def _participant_json(row):
+    user = row.target_user if row.target_user_id else None
+    return {
+        "id": row.id,
+        "incident_id": row.incident_id,
+        "user_id": row.target_user_id,
+        "user": ({
+            "id": user.id,
+            "display_name": user.display_name,
+            "username": user.username,
+            "email": user.email,
+            "color": user_color(user),
+        } if user else None),
+        "role": row.role,
+        "assigned_by_id": row.requested_by_id,
+        "created_at": serialize_utc_datetime(row.created_at),
+    }
+
+
+@incidents_bp.route("/<int:incident_id>/participants", methods=["GET"])
+def list_incident_participants(incident_id):
+    incident, error = _get_incident_or_error(incident_id)
+    if error:
+        return error
+    rows = (IncidentResponder.select()
+            .where(IncidentResponder.incident == incident.id,
+                   IncidentResponder.status == "accepted")
+            .order_by(IncidentResponder.id))
+    return jsonify([_participant_json(row) for row in rows])
+
+
+@incidents_bp.route("/<int:incident_id>/participants", methods=["POST"])
+def add_incident_participant(incident_id):
+    incident, error = _get_incident_or_error(incident_id, respond=True)
+    if error:
+        return error
+    actor_id = _request_user_id()
+    if actor_id is None:
+        return make_error_response("forbidden", "Authenticated user required", 403)
+    payload, error = validate_body(IncidentParticipantCreateSchema)
+    if error:
+        return error
+    user = User.get_or_none(User.id == payload.user_id, User.active == True, User.deleted == False)  # noqa: E712
+    if user is None:
+        return make_error_response("not_found", "User not found", 404)
+    # Assignment requires membership in the Incident's owning group, not
+    # membership in the actor's team. An Incident can span multiple teams.
+    if incident.team_id:
+        from app.modules.db.models import UserGroup
+        in_group = UserGroup.select().where(
+            UserGroup.user == user.id,
+            UserGroup.group == incident.team.group_id,
+            UserGroup.active == True,  # noqa: E712
+        ).exists()
+        if not in_group:
+            return make_error_response("validation_error", "User is outside Incident group", 400)
+    with incident_core_repo.incident_transaction(incident.id):
+        if incidents_repo.has_participant_conflict(incident.id, user.id, payload.role):
+            return make_error_response("conflict", "Participant role already assigned", 409)
+        try:
+            with db.atomic():
+                row = IncidentResponder.create(
+                    incident=incident, target_user=user, target_type="user",
+                    role=payload.role, status="accepted", requested_by=actor_id,
+                    accepted_by=actor_id, responded_at=utc_now(),
+                )
+        except IntegrityError:
+            if incidents_repo.has_participant_conflict(incident.id, user.id, payload.role):
+                return make_error_response("conflict", "Participant role already assigned", 409)
+            raise
+        incident_core_repo.create_event(incident.id, "participant_added", user_id=actor_id,
+                                        data={"participant_id": row.id, "user_id": user.id, "role": payload.role})
+        _audit("incident.participant_add", incident, user_id=actor_id,
+               api_token_id=current_api_token_id(), source="api",
+               data={"participant_id": row.id, "user_id": user.id, "role": payload.role})
+    return jsonify(_participant_json(row)), 201
+
+
+@incidents_bp.route("/<int:incident_id>/participants/<int:participant_id>", methods=["DELETE"])
+def remove_incident_participant(incident_id, participant_id):
+    incident, error = _get_incident_or_error(incident_id, respond=True)
+    if error:
+        return error
+    actor_id = _request_user_id()
+    if actor_id is None:
+        return make_error_response("forbidden", "Authenticated user required", 403)
+    with incident_core_repo.incident_transaction(incident.id):
+        row = IncidentResponder.get_or_none(IncidentResponder.id == participant_id,
+                                              IncidentResponder.incident == incident.id,
+                                              IncidentResponder.status == "accepted")
+        if row is None:
+            return make_error_response("not_found", "Participant not found", 404)
+        detail = {"participant_id": row.id, "user_id": row.target_user_id, "role": row.role}
+        row.status = "resolved"
+        row.updated_at = utc_now()
+        row.save(only=[IncidentResponder.status, IncidentResponder.updated_at])
+        incident_core_repo.create_event(incident.id, "participant_removed", user_id=actor_id, data=detail)
+        _audit("incident.participant_remove", incident, user_id=actor_id,
+               api_token_id=current_api_token_id(), source="api", data=detail)
+    return "", 204
+
+
+# Operational stakeholders are independent from legacy AlertGroup subscriptions.
+def _operational_stakeholder_json(row):
+    return {
+        "id": row.id,
+        "incident_id": row.incident_id,
+        "user_id": row.user_id,
+        "email": row.email,
+        "display_name": row.display_name,
+        "user": ({
+            "id": row.user.id,
+            "display_name": row.user.display_name,
+            "username": row.user.username,
+            "email": row.user.email,
+            "color": user_color(row.user),
+        } if row.user_id else None),
+        "role": row.role,
+        "source": row.source,
+        "created_at": serialize_utc_datetime(row.created_at),
+    }
+
+
+@incidents_bp.route("/<int:incident_id>/stakeholders", methods=["GET"])
+def list_operational_stakeholders(incident_id):
+    incident, error = _get_incident_or_error(incident_id)
+    if error:
+        return error
+    rows = (IncidentStakeholder.select()
+            .where(IncidentStakeholder.incident == incident.id,
+                   IncidentStakeholder.active == True)  # noqa: E712
+            .order_by(IncidentStakeholder.id))
+    return jsonify([_operational_stakeholder_json(row) for row in rows])
+
+
+@incidents_bp.route("/<int:incident_id>/stakeholders", methods=["POST"])
+def add_operational_stakeholder(incident_id):
+    incident, error = _get_incident_or_error(incident_id, respond=True)
+    if error:
+        return error
+    actor = _request_user_id()
+    if actor is None:
+        return make_error_response("forbidden", "Authenticated user required", 403)
+    payload, error = validate_body(IncidentStakeholderCreateSchema)
+    if error:
+        return error
+    if payload.user_id:
+        user = User.get_or_none(User.id == payload.user_id,
+                                User.active == True, User.deleted == False)  # noqa: E712
+        if user is None:
+            return make_error_response("not_found", "Stakeholder user not found", 404)
+        if incident.team_id and incident.team.group_id:
+            from app.modules.db.models import UserGroup
+            if not UserGroup.select().where(
+                UserGroup.user == user.id,
+                UserGroup.group == incident.team.group_id,
+                UserGroup.active == True,  # noqa: E712
+            ).exists():
+                return make_error_response("forbidden", "User outside incident group", 403)
+    else:
+        user = None
+    with incident_core_repo.incident_transaction(incident.id):
+        # Include inactive rows so re-subscription never duplicates a stakeholder.
+        lookup = ((IncidentStakeholder.user == user.id) if user else
+                  (IncidentStakeholder.email == payload.email))
+        row = (IncidentStakeholder.select().where(
+            IncidentStakeholder.incident == incident.id, lookup).first())
+        if row is not None and row.active:
+            return jsonify(_operational_stakeholder_json(row)), 200
+        if row is None:
+            row = IncidentStakeholder.create(
+                incident=incident, user=user, email=payload.email,
+                display_name=payload.display_name, role=payload.role,
+                created_by=actor, source="manual")
+        else:
+            row.active = True
+            row.role = payload.role
+            row.updated_at = utc_now()
+            row.save(only=[IncidentStakeholder.active,
+                           IncidentStakeholder.role,
+                           IncidentStakeholder.updated_at])
+        detail = {"stakeholder_id": row.id, "user_id": row.user_id, "role": row.role}
+        incident_core_repo.create_event(incident.id, "stakeholder_added", user_id=actor, data=detail)
+        _audit("incident.stakeholder_add", incident, user_id=actor,
+               api_token_id=current_api_token_id(), source="api", data=detail)
+    return jsonify(_operational_stakeholder_json(row)), 201
+
+
+@incidents_bp.route("/<int:incident_id>/stakeholders/<int:stakeholder_id>", methods=["DELETE"])
+def remove_operational_stakeholder(incident_id, stakeholder_id):
+    incident, error = _get_incident_or_error(incident_id, respond=True)
+    if error:
+        return error
+    actor = _request_user_id()
+    if actor is None:
+        return make_error_response("forbidden", "Authenticated user required", 403)
+    with incident_core_repo.incident_transaction(incident.id):
+        row = IncidentStakeholder.get_or_none(
+            IncidentStakeholder.id == stakeholder_id,
+            IncidentStakeholder.incident == incident.id,
+            IncidentStakeholder.active == True)  # noqa: E712
+        if row is None:
+            return make_error_response("not_found", "Stakeholder not found", 404)
+        row.active = False
+        row.updated_at = utc_now()
+        row.save(only=[IncidentStakeholder.active,
+                       IncidentStakeholder.updated_at])
+        detail = {"stakeholder_id": row.id, "user_id": row.user_id}
+        incident_core_repo.create_event(incident.id, "stakeholder_removed", user_id=actor, data=detail)
+        _audit("incident.stakeholder_remove", incident, user_id=actor,
+               api_token_id=current_api_token_id(), source="api", data=detail)
+    return "", 204
+
+
+@incidents_bp.route("/<int:incident_id>/responders", methods=["GET"])
+def get_incident_responders(incident_id):
+    incident, error = _get_incident_or_error(incident_id)
+    if error:
+        return error
+    return jsonify([serialize_incident_responder(row) for row in
+        incidents_repo.list_incident_responders(incident.id)])
+
+
+@incidents_bp.route("/<int:incident_id>/responders", methods=["POST"])
+def request_incident_responder_view(incident_id):
+    incident, error = _get_incident_or_error(incident_id, respond=True)
+    if error:
+        return error
+    payload, error = validate_body(IncidentResponderCreateSchema)
+    if error:
+        return error
+    actor = _request_user_id()
+    if actor is None:
+        return make_error_response("forbidden", "Authenticated user required", 403)
+    try:
+        row = request_incident_responder(
+            incident_id=incident.id, payload=payload.model_dump(), user_id=actor,
+            api_token_id=current_api_token_id(), source="api")
+    except incident_core_repo.IncidentConflictError:
+        return make_error_response("conflict", "Responder request already exists", 409)
+    except (ValueError, KeyError) as exc:
+        return safe_exception_response(exc, error="validation_error",
+                                       message="Invalid responder request", status_code=400)
+    except LookupError:
+        return make_error_response("not_found", "Incident not found", 404)
+    return jsonify(serialize_incident_responder(row)), 201
+
+
+@incidents_bp.route("/<int:incident_id>/responders/<int:responder_id>", methods=["PUT"])
+def update_incident_responder_view(incident_id, responder_id):
+    incident, error = _get_incident_or_error(incident_id)
+    if error:
+        return error
+    payload, error = validate_body(IncidentResponderUpdateSchema)
+    if error:
+        return error
+    user = _request_user()
+    if user is None:
+        return make_error_response("forbidden", "Authenticated user required", 403)
+    try:
+        row = set_incident_responder_status(
+            incident_id=incident.id, responder_id=responder_id,
+            status=payload.status, response_message=payload.response_message,
+            user_id=user.id, user=user,
+            api_token_id=current_api_token_id(), source="api")
+    except incident_core_repo.IncidentConflictError:
+        return make_error_response(
+            "conflict", "Responder request changed, expired or participant already assigned", 409,
+        )
+    except PermissionError:
+        return make_error_response("forbidden", "Responder action forbidden", 403)
+    except LookupError:
+        return make_error_response("not_found", "Responder not found", 404)
+    except ValueError as exc:
+        return safe_exception_response(exc, error="validation_error",
+                                       message="Invalid responder transition", status_code=400)
+    return jsonify(serialize_incident_responder(row))
+
+# 2.5: canonical Incident collaboration endpoints above.
+
+
+# Activity is a read model, not a migration or a duplication of technical comments.
+# Unlinked and unauthorized AlertGroups must never contribute technical data.
+def _activity_event_data(event, visible_groups):
+    """Expose presentation fields, checking referenced objects independently."""
+    raw = getattr(event, "data", None)
+    raw = raw if isinstance(raw, dict) else {}
+    # Do not serialize arbitrary integration payloads, nested metadata or secrets.
+    keys = ("from", "to", "status", "role", "relation_type", "source",
+            "from_user_id", "to_user_id", "user_id", "responder_id",
+            "participant_id", "stakeholder_id", "comment_id")
+    data = {key: raw[key] for key in keys
+            if key in raw and isinstance(raw[key], (str, int, bool, type(None)))}
+    if isinstance(raw.get("fields"), list):
+        data["fields"] = [field for field in raw["fields"] if isinstance(field, str) and field in {
+            "title", "description", "priority", "service", "root_cause",
+            "resolution_summary", "summary",
+        }]
+    restricted = False
+    if "alert_group_id" in raw:
+        group_id = raw["alert_group_id"]
+        if isinstance(group_id, int) and group_id in visible_groups:
+            data["alert_group_id"] = group_id
+        else:
+            restricted = True
+    if "service_id" in raw:
+        service_id = raw["service_id"]
+        service = Service.get_or_none(Service.id == service_id) if isinstance(service_id, int) else None
+        if service and not service.deleted and (
+            (service.team_id and not require_team_read(service.team_id))
+            or (not service.team_id and is_admin_user(_request_user()))
+        ):
+            data["service_id"] = service.id
+        else:
+            restricted = True
+    return data, restricted
+
+
+def _incident_activity_rows(incident, *, limit=200):
+    """Merge bounded, attributed streams without copying technical comments."""
+    visible_groups = {link.alert_group_id for link in _visible_alert_group_links(incident)}
+    entries = []
+
+    def append_record(record, source_type, source_id, record_type, actor_id):
+        if record_type == "event":
+            data, restricted = _activity_event_data(record, visible_groups)
+            event_type = record.event_type
+            message = None if restricted else record.message
+        else:
+            data = {}
+            event_type = "comment"
+            message = record.body
+        entries.append({
+            "source_type": source_type, "source_id": source_id,
+            "target_type": source_type, "target_id": source_id,
+            "record_type": record_type, "record_id": record.id,
+            "event_type": event_type,
+            "actor_id": actor_id,
+            "message": message,
+            "data": data,
+            "created_at": serialize_utc_datetime(record.created_at),
+            "_sort_at": as_utc_aware(record.created_at),
+        })
+
+    # A comment has one visible entry. Its audit marker must not consume the
+    # stream limit or appear as a second, empty comment in the UI.
+    events = (IncidentEvent.select()
+              .where(IncidentEvent.incident == incident.id,
+                     IncidentEvent.event_type != "incident_comment_added")
+              .order_by(IncidentEvent.created_at.desc(), IncidentEvent.id.desc())
+              .limit(limit))
+    for event in events:
+        append_record(event, "Incident", incident.id, "event", event.user_id)
+    comments = (IncidentComment.select()
+                .where(IncidentComment.incident == incident.id)
+                .order_by(IncidentComment.created_at.desc(), IncidentComment.id.desc())
+                .limit(limit))
+    for comment in comments:
+        append_record(comment, "Incident", incident.id, "comment", comment.author_id)
+
+    if visible_groups:
+        events = (AlertEvent.select()
+                  .where(AlertEvent.group.in_(visible_groups))
+                  .order_by(AlertEvent.created_at.desc(), AlertEvent.id.desc())
+                  .limit(limit))
+        for event in events:
+            append_record(event, "AlertGroup", event.group_id, "event", event.user_id)
+        comments = (AlertComment.select()
+                    .where(AlertComment.group.in_(visible_groups),
+                           AlertComment.alert.is_null(True),
+                           AlertComment.deleted == False)  # noqa: E712
+                    .order_by(AlertComment.created_at.desc(), AlertComment.id.desc())
+                    .limit(limit))
+        for comment in comments:
+            append_record(comment, "AlertGroup", comment.group_id, "comment", comment.user_id)
+
+    entries.sort(key=lambda item: (item["_sort_at"], item["source_type"],
+                                   item["record_type"], item["record_id"]), reverse=True)
+    entries = entries[:limit]
+    actor_ids = {item["actor_id"] for item in entries if item["actor_id"]}
+    actors = {user.id: {"id": user.id, "username": user.username,
+                       "display_name": user.display_name, "color": user_color(user)}
+              for user in User.select().where(User.id.in_(actor_ids))} if actor_ids else {}
+    for entry in entries:
+        del entry["_sort_at"]
+        entry["actor"] = actors.get(entry["actor_id"])
+    return entries
+
+
+@incidents_bp.route("/<int:incident_id>/activity", methods=["GET"])
+def list_incident_activity(incident_id):
+    incident, error = _get_incident_or_error(incident_id)
+    if error:
+        return error
+    raw_limit = request.args.get("limit", "200")
+    try:
+        limit = int(raw_limit)
+    except (TypeError, ValueError):
+        return make_error_response("validation_error", "limit must be an integer", 400)
+    if not 1 <= limit <= 500:
+        return make_error_response("validation_error", "limit must be between 1 and 500", 400)
+    return jsonify(_incident_activity_rows(incident, limit=limit))

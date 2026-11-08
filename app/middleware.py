@@ -11,6 +11,7 @@ from app.services.api_token_scopes import (
     is_public_calendar_feed_path as is_public_calendar_feed_request,
     required_scopes_for_path,
     token_has_scopes,
+    is_jwt_only_api_path,
 )
 
 
@@ -143,6 +144,33 @@ def enforce_api_authentication():
     - personal/API Bearer token.
     """
 
+    if not request.path.startswith("/api/"):
+        # Health/metrics probes must retain their database-independent behavior.
+        return None
+
+    # Check this before public/auth-optional paths and JWT cookie fallback.
+    # A machine secret is never a personal token, including after revocation.
+    from app.services.change_intelligence.authorization import (
+        find_machine_token,
+        valid_machine_token,
+    )
+    from app.services.integrations.auth import get_bearer_token
+
+    machine = find_machine_token(get_bearer_token())
+    if request.path == "/api/change-events" and request.method == "POST":
+        if not machine or not valid_machine_token(machine, machine.change_integration):
+            return jsonify({
+                "error": "Active Change integration credential is required",
+            }), 401
+        request.current_api_token = machine
+        request.current_auth_type = "change_integration"
+        request.current_user = None
+        return None
+    if machine is not None:
+        return jsonify({
+            "error": "Integration credentials may only ingest Change Events",
+        }), 403
+
     if request.method == "OPTIONS":
         return None
 
@@ -153,6 +181,9 @@ def enforce_api_authentication():
 
     if user:
         return None
+
+    if is_jwt_only_api_path(request.path):
+        return jsonify({"error": "Valid administrator JWT is required"}), 401
 
     api_token_or_response = load_api_token_principal()
 

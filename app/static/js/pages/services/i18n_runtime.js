@@ -328,7 +328,7 @@
     "Recent alerts": "services_full.recent_alerts",
     "Recent service, readiness and configuration events.": "services_full.recent_service_readiness_and_configuration_events",
     "Reliability": "services_full.reliability",
-    "Reload": "services_full.reload",
+    "Reload": "common.reload",
     "Repository": "services_full.repository",
     "Required": "services_full.required",
     "Reset": "services_full.reset",

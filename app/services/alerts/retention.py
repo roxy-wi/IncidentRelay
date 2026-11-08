@@ -8,7 +8,15 @@ from peewee import fn
 
 from app.db import database_proxy
 from app.modules.common import utc_now
-from app.modules.db.models import Alert, AlertGroup
+from app.modules.db import incident_core_repo
+from app.modules.db.models import (
+    Alert,
+    AlertGroup,
+    AlertGroupEpisode,
+    ChangeAlertGroupCorrelation,
+    ChangeJob,
+)
+from app.services.change_intelligence.authorization import lock_row
 
 
 DEFAULT_ALERT_RETENTION_DAYS = 0
@@ -29,36 +37,39 @@ def _normalize_batch_size(value) -> int:
     return batch_size
 
 
-def _resolved_group_batch(cutoff, batch_size: int) -> list[int]:
-    """Return terminal groups that are safe to remove.
-
-    A resolved group is retained if it still contains any non-resolved alert.
-    That defensive check prevents retention cleanup from deleting an inconsistent or
-    reactivated incident merely because an old ``resolved_at`` value survived.
-    """
-    non_terminal_alert = (
-        Alert
-        .select(Alert.id)
+def _resolved_group_query(cutoff):
+    """Retain active children and manually reviewed Change evidence."""
+    non_terminal_alert = Alert.select(Alert.id).where(
+        Alert.group == AlertGroup.id, Alert.status != "resolved"
+    )
+    retained_review = (
+        ChangeAlertGroupCorrelation.select(ChangeAlertGroupCorrelation.id)
+        .join(AlertGroupEpisode)
         .where(
-            (Alert.group == AlertGroup.id)
-            & (Alert.status != "resolved")
+            AlertGroupEpisode.alert_group == AlertGroup.id,
+            (ChangeAlertGroupCorrelation.review_status != "suggested")
+            | (ChangeAlertGroupCorrelation.relation_type != "potential_cause")
+            | ChangeAlertGroupCorrelation.review_evidence.is_null(False)
+            | ChangeAlertGroupCorrelation.reviewed_at.is_null(False)
+            | ChangeAlertGroupCorrelation.reviewed_by.is_null(False),
         )
     )
+    return AlertGroup.select(AlertGroup.id).where(
+        AlertGroup.status == "resolved",
+        AlertGroup.resolved_at.is_null(False),
+        AlertGroup.resolved_at < cutoff,
+        ~fn.EXISTS(non_terminal_alert),
+        ~fn.EXISTS(retained_review),
+    )
 
+
+def _resolved_group_batch(cutoff, batch_size: int) -> list[int]:
+    """Return the next bounded batch, excluding retained investigation history."""
     return [
         row.id
-        for row in (
-            AlertGroup
-            .select(AlertGroup.id)
-            .where(
-                (AlertGroup.status == "resolved")
-                & AlertGroup.resolved_at.is_null(False)
-                & (AlertGroup.resolved_at < cutoff)
-                & ~fn.EXISTS(non_terminal_alert)
-            )
-            .order_by(AlertGroup.resolved_at.asc(), AlertGroup.id.asc())
-            .limit(batch_size)
-        )
+        for row in _resolved_group_query(cutoff)
+        .order_by(AlertGroup.resolved_at, AlertGroup.id)
+        .limit(batch_size)
     ]
 
 
@@ -67,8 +78,7 @@ def _standalone_alert_batch(cutoff, batch_size: int) -> list[int]:
     return [
         row.id
         for row in (
-            Alert
-            .select(Alert.id)
+            Alert.select(Alert.id)
             .where(
                 Alert.group.is_null(True)
                 & (Alert.status == "resolved")
@@ -94,7 +104,8 @@ def cleanup_alert_history(
     removed only when the group is resolved and every attached alert is also
     resolved. Foreign-key cascades remove comments, lifecycle events,
     notifications, responder/stakeholder state, correlations and other
-    group-owned history.
+    group-owned history. Manual Change reviews pin their episode and group;
+    unreviewed derived suggestions are removed before the parent rows.
     """
     retention_days = _normalize_retention_days(retention_days)
     batch_size = _normalize_batch_size(batch_size)
@@ -122,19 +133,41 @@ def cleanup_alert_history(
         if not group_ids:
             break
 
-        with database_proxy.atomic():
-            alerts_deleted += (
-                Alert
-                .delete()
-                .where(Alert.group.in_(group_ids))
-                .execute()
+        with incident_core_repo.write_transaction():
+            for group_id in sorted(group_ids):
+                incident_core_repo.lock_alert_group(group_id)
+            episodes = list(
+                AlertGroupEpisode.select()
+                .where(AlertGroupEpisode.alert_group.in_(group_ids))
+                .order_by(AlertGroupEpisode.id)
             )
-            deleted = (
-                AlertGroup
-                .delete()
-                .where(AlertGroup.id.in_(group_ids))
-                .execute()
-            )
+            for episode in episodes:
+                lock_row(
+                    AlertGroupEpisode.select().where(AlertGroupEpisode.id == episode.id)
+                )
+            # Reopen and future review writers serialize on these same rows.
+            group_ids = [
+                row.id
+                for row in _resolved_group_query(cutoff).where(
+                    AlertGroup.id.in_(group_ids)
+                )
+            ]
+            if not group_ids:
+                continue
+            episode_ids = [
+                episode.id
+                for episode in episodes
+                if episode.alert_group_id in group_ids
+            ]
+            ChangeAlertGroupCorrelation.delete().where(
+                ChangeAlertGroupCorrelation.episode.in_(episode_ids)
+            ).execute()
+            ChangeJob.delete().where(
+                ChangeJob.job_type == "discover_episode",
+                ChangeJob.entity_id.in_(episode_ids),
+            ).execute()
+            alerts_deleted += Alert.delete().where(Alert.group.in_(group_ids)).execute()
+            deleted = AlertGroup.delete().where(AlertGroup.id.in_(group_ids)).execute()
 
         groups_deleted += deleted
         batches += 1
@@ -148,12 +181,7 @@ def cleanup_alert_history(
             break
 
         with database_proxy.atomic():
-            deleted = (
-                Alert
-                .delete()
-                .where(Alert.id.in_(alert_ids))
-                .execute()
-            )
+            deleted = Alert.delete().where(Alert.id.in_(alert_ids)).execute()
 
         standalone_alerts_deleted += deleted
         alerts_deleted += deleted

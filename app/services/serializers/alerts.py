@@ -1,4 +1,5 @@
-from app.modules.db import incidents_repo, maintenance_repo, business_services_repo, notification_policies_repo
+from app.modules.user_colors import user_color
+from app.modules.db import maintenance_repo, business_services_repo, notification_policies_repo
 from app.services.incidents.responder_display import responder_target_label
 from app.services.serializers.business_services import serialize_business_service_incident_impact, \
     serialize_alert_group_business_impact_summary
@@ -61,6 +62,7 @@ def serialize_alert_activity_event(event, group, user=None):
             "id": user.id,
             "username": user.username,
             "display_name": user.display_name,
+            "color": user_color(user),
         }
 
     return {
@@ -428,11 +430,11 @@ def serialize_incident_responder_target(responder):
 
 
 def serialize_incident_responder(responder):
-    """Serialize legacy AlertGroup responder request."""
+    """Serialize an operational Incident responder request."""
     return {
         "id": responder.id,
-        "alert_group_id": responder.group_id,
-        "group_id": responder.group_id,
+        "incident_id": responder.incident_id,
+        "role": responder.role,
 
         "target_type": responder.target_type,
         "target_user_id": responder.target_user_id,
@@ -714,13 +716,6 @@ def serialize_alert_group(
             serialize_alert_notification(notification)
             for notification in notifications or []
         ]
-        if responders is None:
-            responders = incidents_repo.list_incident_responders(group.id)
-
-        data["responders"] = [
-            serialize_incident_responder(item)
-            for item in responders
-        ]
         data["correlations"] = serialize_alert_group_correlations(group)
         data["business_impacts"] = [
             serialize_business_service_incident_impact(impact)
@@ -748,6 +743,7 @@ def serialize_alert_comment(comment):
             "username": getattr(user, "username", None),
             "email": getattr(user, "email", None),
             "display_name": getattr(user, "display_name", None),
+            "color": user_color(user),
         } if user else None,
         "body": comment.body,
         "created_at": created_at,

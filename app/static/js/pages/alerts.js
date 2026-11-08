@@ -1272,7 +1272,7 @@ function renderAlertPageRow(alert) {
             )
     );
 
-    row.append($("<td>").text(alert.assignee || "-"));
+    row.append($("<td>").append(UserAppearance.label(alert.assignee_details, alert.assignee || "-")));
     row.append($("<td>").text(formatDateTimeMinutes(alertCreatedValue(alert))));
     row.append($("<td>").text(formatDateTimeMinutes(alert.last_seen_at)));
     row.append($("<td>").append(renderEscalationCell(alert)));
@@ -1696,6 +1696,7 @@ function loadAlertExplainForCurrentDetails() {
 }
 
 function showAlertDetails(alertId) {
+    RelatedChanges.clear("alert");
     const isDifferentAlert = currentDetailsAlertId !== alertId;
     currentDetailsAlertId = alertId;
 
@@ -1761,9 +1762,11 @@ function showAlertDetails(alertId) {
 
         currentDetailsAlertId = alert.id;
         currentDetailsAlertCanRespond = canRespondObject(alert);
+        RelatedChanges.mount("alert", alert.id, {
+            isCurrent: () => currentDetailsAlertId === alert.id && alertDetailsModal().hasClass("is-open"),
+        });
         renderAlertDetailsActionBar(alert, modal);
         currentDetailsAlertShelved = Boolean(alert.shelved || (alert.shelve && alert.shelve.active));
-        resetAlertDetailsTabs(alert.id);
 
         modal.find("#alert-details-title").text(alert.title || i18n.t("alert_details.entity.alert_number", {id: alert.id}));
         modal.find("#alert-details-subtitle").text(buildAlertDetailsSubtitle(alert));
@@ -2690,8 +2693,8 @@ function renderAlertCorrelation(alert, modal) {
 
 function renderAlertDetailsActionBar(alert, modal) {
     modal.find("#alert-details-context-status").text(statusLabel(alert.status) || "-");
-    modal.find("#alert-details-context-assignee").text(alert.assignee || "-");
-    modal.find("#alert-details-context-acknowledged").text(alert.acknowledged_by || "-");
+    modal.find("#alert-details-context-assignee").empty().append(UserAppearance.label(alert.assignee_details, alert.assignee || "-"));
+    modal.find("#alert-details-context-acknowledged").empty().append(UserAppearance.label(alert.acknowledged_by_details, alert.acknowledged_by || "-"));
     modal.find("#alert-details-context-escalation")
         .text(alert.next_escalation_at ? formatDateTimeMinutes(alert.next_escalation_at) : "-");
     modal.find("#alert-details-action-bar").removeClass("is-hidden");
@@ -2745,7 +2748,9 @@ function renderAlertDetailsSummary(alert, modal) {
     ));
     summary.append(detailItem(i18n.t("alert_details.detail.policy_rule"), alertPolicyRuleLabel(alert)));
     summary.append(detailItem(i18n.t("alert_details.target.rotation"), alert.rotation_name));
-    summary.append(detailItem(i18n.t("alert_details.detail.assignee"), alert.assignee));
+    const assigneeCard = detailItem(i18n.t("alert_details.detail.assignee"), "");
+    assigneeCard.find(".detail-value").empty().append(UserAppearance.label(alert.assignee_details, alert.assignee || "-"));
+    summary.append(assigneeCard);
     summary.append(detailItem(i18n.t("alert_details.detail.next_escalation"), formatDateTimeMinutes(alert.next_escalation_at)));
     summary.append(detailItem(i18n.t("alert_details.detail.last_escalated"), formatDateTimeMinutes(alert.last_escalated_at)));
     summary.append(detailItem(i18n.t("alert_details.detail.escalation_level"), alert.escalation_level || 0));
@@ -2964,6 +2969,8 @@ function renderEvents(events, modal, pagination, append) {
                     .text(formatDateTimeMinutes(event.created_at) + " " + (event.message || ""))
             );
 
+        if (event.user) { row.prepend(UserAppearance.label(event.user)); }
+
         if (event.event_type === "reopened" && event.alert_id) {
             row.append(
                 $("<button>")
@@ -3048,6 +3055,7 @@ function openAlertDetailsModal() {
 }
 
 function closeAlertDetailsModal(options) {
+    RelatedChanges.clear("alert");
     options = options || {};
 
     closeAppModal("#alert-details-modal");

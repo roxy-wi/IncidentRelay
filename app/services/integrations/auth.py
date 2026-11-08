@@ -41,7 +41,7 @@ def get_bearer_token():
 
 
 def get_basic_route_token():
-    """Return a route token from HTTP Basic auth used by Azure webhooks."""
+    """Return a route token from HTTP Basic auth used by monitoring webhooks."""
 
     authorization = request.authorization
     if not authorization:
@@ -88,6 +88,11 @@ def authenticate_api_token(raw_token=None):
     api_token = tokens_repo.get_active_token_by_hash(hash_token(raw_token))
 
     if not api_token:
+        request.current_api_token = None
+        return None
+
+    # Machine credentials have their own authentication and exact route allowlist.
+    if api_token.change_integration_id is not None:
         request.current_api_token = None
         return None
 

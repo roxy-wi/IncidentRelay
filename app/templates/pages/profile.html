@@ -69,6 +69,10 @@
                                 autocomplete="name"
                             >
 
+                            <label for="profile-color">{{ _('profile.fields.color') }}</label>
+                            <input id="profile-color" class="input profile-color-picker" type="color" aria-describedby="profile-color-help">
+                            <span id="profile-color-help" class="field-hint">{{ _('profile.fields.color_help') }}</span>
+
                             <label for="profile-email">{{ _('profile.fields.email') }}</label>
                             <input
                                 id="profile-email"
@@ -343,9 +347,7 @@
                     <button type="button" class="btn" id="send-test-push-btn">
                         {{ _('profile.push.test') }}
                     </button>
-                    <button type="button" class="btn" id="reload-push-devices-btn">
-                        {{ _('profile.push.reload') }}
-                    </button>
+                    <button type="button" class="btn btn-reload" id="reload-push-devices-btn">{{ _('common.reload') }}</button>
                     <span id="push-status" class="inline-status"></span>
                 </div>
             </div>
@@ -384,9 +386,7 @@
                     <button type="button" class="btn btn-primary" id="open-notification-rule-modal">
                         {{ _('profile.rules.new') }}
                     </button>
-                    <button type="button" class="btn" id="reload-notification-rules-btn">
-                        {{ _('profile.actions.reload') }}
-                    </button>
+                    <button type="button" class="btn btn-reload" id="reload-notification-rules-btn">{{ _('common.reload') }}</button>
                 </div>
             </div>
 

@@ -22,6 +22,20 @@ from app.login import create_access_token  # noqa: E402
 from tests.factories import create_user  # noqa: E402
 from app.modules.db.migrations import migrate  # noqa: E402
 from app.modules.db.models import (  # noqa: E402
+    AlertGroupEpisode,
+    ClosedGoogleMonitoringIncident,
+    SystemSettings,
+    ChangeImpact,
+    ChangeAlertGroupCorrelation,
+    ChangeIncidentLink,
+    ChangeIntegration,
+    ChangeSource,
+    ChangeGrant,
+    Change,
+    ChangeEvent,
+    ChangeServiceReference,
+    ChangeService,
+    ChangeJob,
     Alert,
     AlertEvent,
     AlertNotification,
@@ -77,6 +91,7 @@ from app.modules.db.models import (  # noqa: E402
     Incident,
     IncidentAlertGroupLink,
     IncidentEvent,
+    IncidentNotificationDelivery,
     IncidentResponder,
     IncidentStakeholder,
     MaintenanceWindowScope,
@@ -111,6 +126,19 @@ from app.modules.db.models import (  # noqa: E402
 
 
 CLEANUP_MODELS = [
+    ServiceEvent,
+    ChangeIncidentLink,
+    ChangeAlertGroupCorrelation,
+    ClosedGoogleMonitoringIncident,
+    ChangeImpact,
+    ChangeJob,
+    ChangeService,
+    ChangeServiceReference,
+    ChangeEvent,
+    Change,
+    ChangeGrant,
+    ChangeSource,
+    AlertGroupEpisode,
     AutomationExecution,
     OrchestrationWebhookAction,
     PendingOrchestratedEvent,
@@ -131,6 +159,7 @@ CLEANUP_MODELS = [
     UserNotificationDelivery,
     RecoveryNotificationDelivery,
     UserNotificationRule,
+    IncidentNotificationDelivery,
     IncidentEvent,
     IncidentAlertGroupLink,
     IncidentResponder,
@@ -151,8 +180,6 @@ CLEANUP_MODELS = [
     ServiceReadinessState,
     ServiceStandardCheck,
     ServiceStandard,
-    ServiceEvent,
-    ServiceEvent,
     ServiceMatchRule,
     ServiceChannel,
     ServiceDependency,
@@ -186,6 +213,7 @@ CLEANUP_MODELS = [
     UserRole,
     AuditLog,
     ApiToken,
+    ChangeIntegration,
     LoginThrottle,
     AppLock,
     Role,
@@ -229,6 +257,9 @@ def clean_database(migrated_database):
         if db.table_exists(model._meta.table_name):
             model.delete().execute()
 
+    SystemSettings.update({
+        field: field.default for field in SystemSettings._meta.sorted_fields if not field.primary_key
+    }).execute()
     yield
 
     if db.is_closed():

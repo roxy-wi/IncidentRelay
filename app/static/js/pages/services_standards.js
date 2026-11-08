@@ -32,6 +32,7 @@
     const KIND_OPTIONS = [
         ["technical", i18n.t("service_standards.kind.technical")],
         ["business", i18n.t("service_standards.kind.business")],
+        ["component", i18n.t("service_standards.kind.component")],
     ];
 
     const LIFECYCLE_OPTIONS = [
@@ -77,6 +78,43 @@
         ["infrastructure", i18n.t("service_standards.service_type.infrastructure")],
         ["external", i18n.t("service_standards.service_type.external")],
         ["other", i18n.t("service_standards.service_type.other")],
+    ];
+
+    // Service attributes read by the field_present / field_equals evaluators.
+    const CHECK_SERVICE_FIELDS = [
+        ["description", "string", "service_standards.form.description"],
+        ["name", "string", "service_standards.form.name"],
+        ["slug", "string", "service_standards.form.slug"],
+        ["kind", "string", "service_standards.form.kinds", KIND_OPTIONS],
+        ["lifecycle", "string", "service_standards.form.lifecycles", LIFECYCLE_OPTIONS],
+        ["environment", "string", "services.table.environment", ENVIRONMENT_OPTIONS],
+        ["service_type", "string", "service_standards.form.service_types", SERVICE_TYPE_OPTIONS],
+        ["criticality", "string", "services.table.criticality", CRITICALITY_OPTIONS],
+        ["tier", "string", "service_standards.form.tiers", TIER_OPTIONS],
+        ["status", "string", "services.table.status", ["operational", "degraded", "partial_outage", "major_outage", "maintenance", "unknown"]
+            .map(value => [value, i18n.t("services.status." + value)])],
+        ["status_message", "string"],
+        ["status_source", "string"],
+        ["enabled", "boolean", "service_standards.form.enabled"],
+        ["public", "boolean"],
+        ["public_name", "string"],
+        ["public_description", "string"],
+        ["public_order", "number"],
+        ["team_id", "number", "services.table.team"],
+        ["group_id", "number"],
+        ["default_rotation_id", "number"],
+        ["default_escalation_policy_id", "number"],
+        ["notification_policy_id", "number"],
+        ["priority_policy_id", "number"],
+        ["labels", "json"],
+        ["tags", "json"],
+        ["metadata", "json", "services.form.metadata"],
+        ["id", "number"],
+        ["uid", "string"],
+        ["created_at", "string"],
+        ["updated_at", "string"],
+        ["status_updated_at", "string"],
+        ["status_updated_by_id", "number"],
     ];
 
     function standardsApi(method, url, data) {
@@ -168,6 +206,7 @@
                 maxItems: null,
                 closeAfterSelect: false,
                 hideSelected: true,
+                hidePlaceholder: true,
                 placeholder: $(this).data("placeholder") || i18n.t("service_standards.form.select_values"),
             };
 
@@ -185,6 +224,9 @@
     }
 
     function getErrorMessage(xhr, fallback) {
+        if (typeof window.getApiErrorMessage === "function") {
+            return window.getApiErrorMessage(xhr, fallback);
+        }
         const payload = xhr && xhr.responseJSON ? xhr.responseJSON : null;
 
         if (payload && payload.error) {
@@ -348,13 +390,22 @@
             });
     }
 
+    function closeStandardsActionMenu() {
+        if (typeof window.closeOpenedActionMenu === "function" &&
+            $("#service-standards-list .app-action-menu.is-open, #service-standard-checks-list .app-action-menu.is-open").length) {
+            window.closeOpenedActionMenu();
+        }
+    }
+
     function renderStandardsLoading(message) {
+        closeStandardsActionMenu();
         $("#service-standards-list").html(
             $("<tr>").append($("<td>").attr("colspan", 5).addClass("empty-cell").text(message))
         );
     }
 
     function renderStandardsEmpty(message) {
+        closeStandardsActionMenu();
         $("#services-standards-count").text("0");
 
         $("#service-standards-list").html(
@@ -363,12 +414,14 @@
     }
 
     function renderChecksLoading(message) {
+        closeStandardsActionMenu();
         $("#service-standard-checks-list").html(
             $("<tr>").append($("<td>").attr("colspan", 6).addClass("empty-cell").text(message))
         );
     }
 
     function renderChecksEmpty(message) {
+        closeStandardsActionMenu();
         $("#new-service-standard-check-btn").prop("disabled", !getSelectedStandard());
         $("#service-standard-checks-list").html(
             $("<tr>").append($("<td>").attr("colspan", 6).addClass("empty-cell").text(message))
@@ -376,6 +429,7 @@
     }
 
     function renderStandardsTable() {
+        closeStandardsActionMenu();
         const tbody = $("#service-standards-list");
         tbody.empty();
 
@@ -416,6 +470,7 @@
     }
 
     function renderChecksTable() {
+        closeStandardsActionMenu();
         const tbody = $("#service-standard-checks-list");
         const standard = getSelectedStandard();
 
@@ -839,11 +894,14 @@
             return;
         }
 
+        destroyServiceStandardTomSelects();
         $("#service-standard-modal").remove();
         $("body").append(renderStandardModal(standard, groupId));
         openAppModal("#service-standard-modal");
+        initializeServiceStandardTomSelects();
 
         bindStandardSlugAutofill(!standard);
+        $("#service-standard-name").trigger("focus");
     }
 
     function openCheckModal(check) {
@@ -857,194 +915,336 @@
         $("body").append(renderCheckModal(standard, check));
         openAppModal("#service-standard-check-modal");
         if (window.AppSlug) {
-            window.AppSlug.bind("#service-standard-name", "#service-standard-slug", {
+            window.AppSlug.bind("#service-standard-check-name", "#service-standard-check-slug", {
                 manualWhenHasValue: true,
-                initialUpdate: !standard,
+                initialUpdate: !check,
             });
         }
+        $("#service-standard-check-name").trigger("focus");
+    }
+
+    function editorField(id, labelKey, input, fullWidth) {
+        return $("<div>").addClass("service-editor-field")
+            .toggleClass("service-editor-full", !!fullWidth)
+            .append(formLabel(id, i18n.t("service_standards.form." + labelKey)))
+            .append(input);
+    }
+
+    function editorSection(id, icon, titleKey, hintKey, content) {
+        return $("<section>").addClass("service-editor-section").attr("aria-labelledby", id)
+            .append($("<div>").addClass("service-editor-heading")
+                .append($("<span>").addClass("service-editor-icon").attr("aria-hidden", "true")
+                    .append($("<i>").addClass("fas " + icon)))
+                .append($("<div>")
+                    .append($("<h3>").attr("id", id).text(i18n.t("service_standards.form." + titleKey)))
+                    .append($("<p>").text(i18n.t("service_standards.form." + hintKey)))))
+            .append(content);
+    }
+
+    function editorModal(id, title, subtitle, content, saveId, saveLabel, onSave) {
+        const close = function () {
+            if (!$("#" + id).data("saving")) {
+                closeServiceStandardModal("#" + id);
+            }
+        };
+        return $("<div>").attr({id: id, role: "dialog", "aria-modal": "true", "aria-labelledby": id + "-title"})
+            .addClass("app-modal standard-editor-modal").hide()
+            .append($("<div>").addClass("app-modal-dialog service-editor-dialog")
+                .append($("<div>").addClass("app-modal-header")
+                    .append($("<div>")
+                        .append($("<h2>").attr("id", id + "-title").text(title))
+                        .append($("<div>").addClass("card-subtitle").text(subtitle)))
+                    .append(makeButton({className: "app-modal-close", label: "×",
+                        ariaLabel: i18n.t("common.close"), onClick: close})))
+                .append($("<div>").addClass("app-modal-body service-editor-body").append(content))
+                .append($("<div>").addClass("app-modal-footer service-editor-footer")
+                    .append($("<p>").addClass("service-editor-error standard-editor-error")
+                        .attr("role", "alert").prop("hidden", true))
+                    .append(makeButton({className: "btn", label: i18n.t("service_standards.actions.cancel"),
+                        onClick: close}).attr("data-editor-cancel", "1"))
+                    .append(makeButton({className: "btn btn-primary", label: saveLabel,
+                        onClick: onSave}).attr("id", saveId))));
     }
 
     function renderStandardModal(standard, groupId) {
         standard = standard || {
-            group_id: groupId,
-            slug: "",
-            name: "",
-            description: "",
-            applies_to: {
-                kinds: ["technical"],
-                lifecycles: ["production"],
-            },
-            enabled: true,
+            group_id: groupId, slug: "", name: "", description: "",
+            applies_to: {kinds: ["technical"], lifecycles: ["production"]}, enabled: true,
         };
-
         const appliesTo = standard.applies_to || {};
-
-        return $("<div>")
-            .attr("id", "service-standard-modal")
-            .addClass("app-modal")
-            .hide()
-            .append(
-                $("<div>")
-                    .addClass("app-modal-dialog app-modal-dialog-wide")
-                    .append(
-                        $("<div>")
-                            .addClass("app-modal-header")
-                            .append(
-                                $("<div>")
-                                    .append($("<h2>").text(standard.id ? i18n.t("service_standards.form.edit_standard") : i18n.t("service_standards.form.new_standard")))
-                                    .append($("<div>").addClass("card-subtitle").text(i18n.t("service_standards.form.standard_subtitle")))
-                            )
-                            .append(
-                                $("<button>")
-                                    .attr("type", "button")
-                                    .addClass("app-modal-close")
-                                    .attr("aria-label", i18n.t("common.close", {}, "Close"))
-                                    .text("×")
-                                    .on("click", function () {
-                                        closeServiceStandardModal("#service-standard-modal");
-                                    })
-                            )
-                    )
-                    .append(
-                        $("<div>")
-                            .addClass("app-modal-body")
-                            .append(
-                                $("<div>")
-                                    .addClass("form-body")
-                                    .append(hiddenInput("standard-id", standard.id || ""))
-                                    .append(hiddenInput("standard-group-id", standard.group_id || groupId))
-                                    .append(formLabel("service-standard-name", i18n.t("service_standards.form.name")))
-                                    .append(textInput("service-standard-name", standard.name || "", i18n.t("service_standards.form.standard_name_placeholder")))
-                                    .append(formLabel("service-standard-slug", i18n.t("service_standards.form.slug")))
-                                    .append(textInput("service-standard-slug", standard.slug || "", "basic-operational-readiness"))
-                                    .append(formLabel("service-standard-description", i18n.t("service_standards.form.description")))
-                                    .append(textArea("service-standard-description", standard.description || ""))
-                                    .append(formLabel("service-standard-kind", i18n.t("service_standards.form.kinds")))
-                                    .append(multiSelectInput("service-standard-kind", KIND_OPTIONS, appliesTo.kinds || [], i18n.t("service_standards.form.select_kinds")))
-                                    .append(formLabel("service-standard-lifecycle", i18n.t("service_standards.form.lifecycles")))
-                                    .append(multiSelectInput("service-standard-lifecycle", LIFECYCLE_OPTIONS, appliesTo.lifecycles || [], i18n.t("service_standards.form.select_lifecycles")))
-                                    .append(formLabel("service-standard-tier", i18n.t("service_standards.form.tiers")))
-                                    .append(multiSelectInput("service-standard-tier", TIER_OPTIONS, appliesTo.tiers || [], i18n.t("service_standards.form.select_tiers")))
-                                    .append(formLabel("service-standard-criticality", i18n.t("service_standards.form.criticalities")))
-                                    .append(multiSelectInput("service-standard-criticality", CRITICALITY_OPTIONS, appliesTo.criticalities || [], i18n.t("service_standards.form.select_criticalities")))
-                                    .append(formLabel("service-standard-environment", i18n.t("service_standards.form.environments")))
-                                    .append(multiSelectInput("service-standard-environment", ENVIRONMENT_OPTIONS, appliesTo.environments || [], i18n.t("service_standards.form.select_environments")))
-                                    .append(formLabel("service-standard-service-type", i18n.t("service_standards.form.service_types")))
-                                    .append(multiSelectInput("service-standard-service-type", SERVICE_TYPE_OPTIONS, appliesTo.service_types || [], i18n.t("service_standards.form.select_service_types")))
-                                    .append(checkboxLine("service-standard-enabled", i18n.t("service_standards.form.enabled"), standard.enabled !== false))
-                                    .append(
-                                        $("<div>")
-                                            .addClass("form-actions")
-                                            .append(
-                                                $("<button>")
-                                                    .attr("type", "button")
-                                                    .addClass("btn")
-                                                    .text(i18n.t("service_standards.actions.cancel"))
-                                                    .on("click", function () {
-                                                        closeServiceStandardModal("#service-standard-modal");
-                                                    })
-                                            )
-                                            .append(
-                                                $("<button>")
-                                                    .attr("type", "button")
-                                                    .addClass("btn btn-primary")
-                                                    .text(i18n.t("service_standards.actions.save_standard"))
-                                                    .on("click", saveStandard)
-                                            )
-                                    )
-                            )
-                    )
-            );
+        const identity = $("<div>").addClass("service-editor-fields")
+            .append(hiddenInput("standard-id", standard.id || ""))
+            .append(hiddenInput("standard-group-id", standard.group_id || groupId))
+            .append(editorField("service-standard-name", "name",
+                textInput("service-standard-name", standard.name, i18n.t("service_standards.form.standard_name_placeholder")), true))
+            .append(editorField("service-standard-slug", "slug",
+                textInput("service-standard-slug", standard.slug, "basic-operational-readiness"), true))
+            .append(editorField("service-standard-description", "description",
+                textArea("service-standard-description", standard.description), true))
+            .append($("<div>").addClass("service-editor-options service-editor-full")
+                .append(checkboxLine("service-standard-enabled", i18n.t("service_standards.form.enabled"), standard.enabled !== false))
+                .append($("<p>").addClass("help-text").text(i18n.t("service_standards.form.enabled_hint"))));
+        const scope = $("<div>").addClass("service-editor-fields");
+        const filters = [
+            ["kind", "kinds", KIND_OPTIONS],
+            ["lifecycle", "lifecycles", LIFECYCLE_OPTIONS],
+            ["environment", "environments", ENVIRONMENT_OPTIONS],
+            ["tier", "tiers", TIER_OPTIONS],
+            ["criticality", "criticalities", CRITICALITY_OPTIONS],
+            ["service-type", "service_types", SERVICE_TYPE_OPTIONS],
+        ];
+        filters.forEach(function ([field, key, options]) {
+            const id = "service-standard-" + field;
+            scope.append(editorField(id, key, multiSelectInput(
+                id, options, appliesTo[key] || [], i18n.t("service_standards.form.any_value")
+            )));
+        });
+        scope.append($("<p>").addClass("standard-editor-note service-editor-full")
+            .text(i18n.t("service_standards.form.scope_note")));
+        if (appliesTo.labels && Object.keys(appliesTo.labels).length) {
+            scope.append($("<div>").addClass("service-editor-field service-editor-full")
+                .append($("<span>").addClass("service-editor-label").text(i18n.t("service_standards.form.label_filters")))
+                .append($("<pre>").addClass("standard-editor-labels").text(JSON.stringify(appliesTo.labels, null, 2))));
+        }
+        const grid = $("<div>").addClass("service-editor-grid")
+            .append(editorSection("standard-identity-heading", "fa-clipboard-check", "identity", "identity_hint", identity))
+            .append(editorSection("standard-scope-heading", "fa-filter", "scope", "scope_hint", scope));
+        return editorModal("service-standard-modal",
+            i18n.t(standard.id ? "service_standards.form.edit_standard" : "service_standards.form.new_standard"),
+            i18n.t("service_standards.form.standard_subtitle"), grid,
+            "save-service-standard", i18n.t("service_standards.actions.save_standard"), saveStandard
+        ).data("applies-to", appliesTo);
     }
 
     function renderCheckModal(standard, check) {
         check = check || {
-            slug: "",
-            name: "",
-            description: "",
-            check_type: "owner_exists",
-            configuration: {},
-            weight: 10,
-            severity: "critical",
-            required: true,
-            enabled: true,
-            position: nextCheckPosition(),
+            slug: "", name: "", description: "", check_type: "owner_exists", configuration: {},
+            weight: 10, severity: "critical", required: true, enabled: true, position: nextCheckPosition(),
         };
+        const identity = $("<div>").addClass("service-editor-fields")
+            .append(hiddenInput("service-standard-check-id", check.id || ""))
+            .append(editorField("service-standard-check-name", "name",
+                textInput("service-standard-check-name", check.name, i18n.t("service_standards.form.check_name_placeholder")), true))
+            .append(editorField("service-standard-check-slug", "slug",
+                textInput("service-standard-check-slug", check.slug, "owner"), true))
+            .append(editorField("service-standard-check-description", "description",
+                textArea("service-standard-check-description", check.description), true));
+        const scoring = $("<div>").addClass("service-editor-fields")
+            .append(editorField("service-standard-check-weight", "weight",
+                numberInput("service-standard-check-weight", check.weight, 1, 100)))
+            .append(editorField("service-standard-check-position", "position",
+                numberInput("service-standard-check-position", check.position, 0)))
+            .append(editorField("service-standard-check-severity", "severity",
+                selectInput("service-standard-check-severity", SEVERITIES, check.severity), true))
+            .append($("<div>").addClass("service-editor-options service-editor-full")
+                .append(checkboxLine("service-standard-check-required", i18n.t("service_standards.form.required"), !!check.required))
+                .append(checkboxLine("service-standard-check-enabled", i18n.t("service_standards.form.enabled"), check.enabled !== false)));
+        const checkType = selectInput("service-standard-check-type", CHECK_TYPES, check.check_type);
+        const configuration = $("<div>").addClass("service-editor-fields")
+            .append(editorField("service-standard-check-type", "check_type",
+                checkType, true))
+            .append(createCheckConfigurationEditor(checkType, check));
+        const grid = $("<div>").addClass("service-editor-grid")
+            .append($("<div>").addClass("standard-editor-stack")
+                .append(editorSection("check-identity-heading", "fa-clipboard-check", "check_identity", "check_identity_hint", identity))
+                .append(editorSection("check-scoring-heading", "fa-sliders-h", "scoring", "scoring_hint", scoring)))
+            .append(editorSection("check-condition-heading", "fa-code", "condition", "condition_hint", configuration));
+        return editorModal("service-standard-check-modal",
+            i18n.t(check.id ? "service_standards.form.edit_check" : "service_standards.form.new_check"),
+            standardDisplayName(standard), grid,
+            "save-service-standard-check", i18n.t("service_standards.actions.save_check"), saveCheck);
+    }
 
-        return $("<div>")
-            .attr("id", "service-standard-check-modal")
-            .addClass("app-modal")
-            .hide()
-            .append(
-                $("<div>")
-                    .addClass("app-modal-dialog app-modal-dialog-wide")
-                    .append(
-                        $("<div>")
-                            .addClass("app-modal-header")
-                            .append(
-                                $("<div>")
-                                    .append($("<h2>").text(check.id ? i18n.t("service_standards.form.edit_check") : i18n.t("service_standards.form.new_check")))
-                                    .append($("<div>").addClass("card-subtitle").text(standardDisplayName(standard)))
-                            )
-                            .append(
-                                $("<button>")
-                                    .attr("type", "button")
-                                    .addClass("app-modal-close")
-                                    .attr("aria-label", i18n.t("common.close", {}, "Close"))
-                                    .text("×")
-                                    .on("click", function () {
-                                        closeAppModal("#service-standard-check-modal");
-                                    })
-                            )
-                    )
-                    .append(
-                        $("<div>")
-                            .addClass("app-modal-body")
-                            .append(
-                                $("<div>")
-                                    .addClass("form-body")
-                                    .append(hiddenInput("service-standard-check-id", check.id || ""))
-                                    .append(formLabel("service-standard-check-name", i18n.t("service_standards.form.name")))
-                                    .append(textInput("service-standard-check-name", check.name || "", i18n.t("service_standards.form.check_name_placeholder")))
-                                    .append(formLabel("service-standard-check-slug", i18n.t("service_standards.form.slug")))
-                                    .append(textInput("service-standard-check-slug", check.slug || "", "owner"))
-                                    .append(formLabel("service-standard-check-description", i18n.t("service_standards.form.description")))
-                                    .append(textArea("service-standard-check-description", check.description || ""))
-                                    .append(formLabel("service-standard-check-type", i18n.t("service_standards.form.check_type")))
-                                    .append(selectInput("service-standard-check-type", CHECK_TYPES, check.check_type || "owner_exists"))
-                                    .append(formLabel("service-standard-check-configuration", i18n.t("service_standards.form.configuration")))
-                                    .append(textArea("service-standard-check-configuration", JSON.stringify(check.configuration || {}, null, 2)))
-                                    .append(formLabel("service-standard-check-weight", i18n.t("service_standards.form.weight")))
-                                    .append(numberInput("service-standard-check-weight", check.weight || 0, 0, 100))
-                                    .append(formLabel("service-standard-check-position", i18n.t("service_standards.form.position")))
-                                    .append(numberInput("service-standard-check-position", check.position || 0, 0, 10000))
-                                    .append(formLabel("service-standard-check-severity", i18n.t("service_standards.form.severity")))
-                                    .append(selectInput("service-standard-check-severity", SEVERITIES, check.severity || "warning"))
-                                    .append(checkboxLine("service-standard-check-required", i18n.t("service_standards.form.required"), !!check.required))
-                                    .append(checkboxLine("service-standard-check-enabled", i18n.t("service_standards.form.enabled"), check.enabled !== false))
-                                    .append(
-                                        $("<div>")
-                                            .addClass("form-actions")
-                                            .append(
-                                                $("<button>")
-                                                    .attr("type", "button")
-                                                    .addClass("btn")
-                                                    .text(i18n.t("service_standards.actions.cancel"))
-                                                    .on("click", function () {
-                                                        closeAppModal("#service-standard-check-modal");
-                                                    })
-                                            )
-                                            .append(
-                                                $("<button>")
-                                                    .attr("type", "button")
-                                                    .addClass("btn btn-primary")
-                                                    .text(i18n.t("service_standards.actions.save_check"))
-                                                    .on("click", saveCheck)
-                                            )
-                                    )
-                            )
-                    )
-            );
+    function isFieldCheck(type) {
+        return type === "field_present" || type === "field_equals";
+    }
+
+    function fieldConfigurationDraft(configuration) {
+        const field = CHECK_SERVICE_FIELDS.find(option => option[0] === configuration.field);
+        const hasValue = Object.prototype.hasOwnProperty.call(configuration, "value");
+        const value = configuration.value;
+        const valueType = !hasValue ? (field ? field[1] : "string")
+            : value === null ? "null" : typeof value === "object" ? "json" : typeof value;
+        return {
+            original: configuration,
+            field: configuration.field || "",
+            valueType: valueType,
+            rawValue: !hasValue ? "" : valueType === "string" ? value : JSON.stringify(value, null, 2),
+        };
+    }
+
+    function createCheckConfigurationEditor(typeSelect, check) {
+        const editor = $("<div>").attr("id", "standard-check-configuration-editor").addClass("service-editor-full");
+        const drafts = new Map();
+        let activeType = check.check_type;
+        drafts.set(activeType, isFieldCheck(activeType) ? fieldConfigurationDraft(check.configuration || {})
+            : {raw: JSON.stringify(check.configuration || {}, null, 2)});
+
+        function render() {
+            editor.empty().removeData("read");
+            const draft = drafts.get(activeType);
+            if (isFieldCheck(activeType)) {
+                renderFieldCheckConfiguration(editor, activeType, draft);
+            } else {
+                editor.append(renderJsonCheckConfiguration(draft.raw));
+                editor.data("capture", () => ({raw: editor.find("textarea").val()}));
+            }
+        }
+
+        typeSelect.on("change", function () {
+            const previousDraft = editor.data("capture")();
+            drafts.set(activeType, previousDraft);
+            const nextType = typeSelect.val();
+            if (!drafts.has(nextType)) {
+                drafts.set(nextType, isFieldCheck(nextType)
+                    ? fieldConfigurationDraft(isFieldCheck(activeType) ? {field: previousDraft.field} : {})
+                    : {raw: "{}"});
+            }
+            activeType = nextType;
+            render();
+        });
+        render();
+        return editor;
+    }
+
+    function renderFieldCheckConfiguration(editor, checkType, draft) {
+        const options = [["", i18n.t("service_standards.form.choose_field")]].concat(CHECK_SERVICE_FIELDS.map(function (field) {
+            return [field[0], field[2] ? i18n.t(field[2]) + " · " + field[0] : field[0]];
+        }));
+        // Keep older/custom attributes selectable instead of silently replacing them.
+        if (draft.field && !options.some(option => option[0] === draft.field)) {
+            options.push([draft.field, draft.field]);
+        }
+        const field = selectInput("service-standard-check-field", options, draft.field);
+        const error = $("<p>").attr({id: "standard-check-field-error", role: "alert"})
+            .addClass("service-editor-error service-editor-full").prop("hidden", true);
+        const fields = $("<div>").addClass("service-editor-fields")
+            .append(editorField("service-standard-check-field", "service_field", field, true))
+            .append($("<p>").addClass("help-text service-editor-full")
+                .text(i18n.t("service_standards.form." + checkType + "_hint")));
+        const valueTypes = ["string", "number", "boolean", "null", "json"].map(type => [
+            type, i18n.t("service_standards.value_type." + type),
+        ]);
+        const valueType = selectInput("service-standard-check-value-type", valueTypes, draft.valueType);
+        const valueContainer = $("<div>").addClass("service-editor-full");
+        let valueInput = $();
+
+        function clearError() {
+            error.text("").prop("hidden", true);
+            fields.find("[aria-invalid]").removeAttr("aria-invalid");
+        }
+
+        function renderValue(rawValue) {
+            const type = valueType.val();
+            const id = "service-standard-check-value";
+            valueContainer.empty();
+            valueInput = $();
+            if (type === "null") {
+                valueContainer.append($("<p>").addClass("standard-editor-note")
+                    .text(i18n.t("service_standards.form.null_value_hint")));
+                return;
+            }
+            if (type === "boolean") {
+                valueInput = selectInput(id, [["true", i18n.t("service_standards.value.true")],
+                    ["false", i18n.t("service_standards.value.false")]], rawValue === "false" ? "false" : "true");
+            } else if (type === "json") {
+                valueInput = textArea(id, rawValue || "{}").addClass("standard-editor-json").attr("spellcheck", "false");
+            } else {
+                valueInput = textInput(id, rawValue).attr("autocomplete", "off");
+                if (type === "number") {
+                    valueInput.attr({type: "number", step: "any", required: true});
+                }
+            }
+            valueInput.attr("aria-describedby", "standard-check-field-error").on("input change", clearError);
+            valueContainer.append(editorField(id, "expected_value", valueInput, true));
+            const definition = CHECK_SERVICE_FIELDS.find(option => option[0] === field.val());
+            if (type === "string" && definition && definition[3]) {
+                const suggestions = $("<datalist>").attr("id", "standard-check-value-options");
+                definition[3].forEach(option => suggestions.append($("<option>").val(option[0]).text(option[1])));
+                valueInput.attr("list", "standard-check-value-options");
+                valueContainer.append(suggestions);
+            }
+        }
+
+        field.attr("aria-describedby", "standard-check-field-error").on("change", function () {
+            clearError();
+            const definition = CHECK_SERVICE_FIELDS.find(option => option[0] === field.val());
+            const nextType = definition ? definition[1] : "string";
+            const previousValue = nextType === valueType.val() ? valueInput.val() : "";
+            valueType.val(nextType);
+            renderValue(previousValue || "");
+        });
+        valueType.on("change", function () {
+            clearError();
+            renderValue("");
+        });
+        if (checkType === "field_equals") {
+            fields.append(editorField("service-standard-check-value-type", "value_type", valueType, true))
+                .append(valueContainer);
+            renderValue(draft.rawValue);
+        }
+        editor.append(fields.append(error));
+        editor.data("capture", () => ({original: draft.original, field: field.val(),
+            valueType: valueType.val(), rawValue: valueInput.val() || ""}));
+        editor.data("read", function () {
+            clearError();
+            function invalid(input, message) {
+                error.text(i18n.t("service_standards.validation." + message)).prop("hidden", false);
+                input.attr("aria-invalid", "true").trigger("focus");
+                return null;
+            }
+            if (!field.val()) {
+                return invalid(field, "field_required");
+            }
+            const configuration = Object.assign({}, draft.original, {field: field.val()});
+            if (checkType === "field_present") {
+                delete configuration.value;
+                return configuration;
+            }
+            const raw = valueInput.val();
+            switch (valueType.val()) {
+                case "number":
+                    if (!raw || !valueInput[0].checkValidity() || !Number.isFinite(Number(raw))) {
+                        return invalid(valueInput, "number_value");
+                    }
+                    configuration.value = Number(raw);
+                    break;
+                case "boolean": configuration.value = raw === "true"; break;
+                case "null": configuration.value = null; break;
+                case "json":
+                    try {
+                        configuration.value = JSON.parse(raw);
+                    } catch (error) {
+                        if (!(error instanceof SyntaxError)) {
+                            throw error;
+                        }
+                        return invalid(valueInput, "config_json");
+                    }
+                    break;
+                default: configuration.value = raw;
+            }
+            return configuration;
+        });
+    }
+
+    function renderJsonCheckConfiguration(raw) {
+        return $("<div>").addClass("service-editor-field")
+            .append($("<div>").addClass("service-metadata-toolbar")
+                .append(formLabel("service-standard-check-configuration", i18n.t("service_standards.form.configuration")))
+                .append(makeButton({className: "btn btn-sm", label: i18n.t("service_standards.form.format_json"),
+                    onClick: function () {
+                        formatJsonTextarea("#service-standard-check-configuration", {}, "", checkConfigurationOptions());
+                    }}).attr("id", "format-standard-check-json")))
+            .append(textArea("service-standard-check-configuration", raw)
+                .attr({rows: 12, spellcheck: "false", "aria-describedby": "standard-check-config-hint standard-check-config-error"})
+                .addClass("standard-editor-json")
+                .on("input", function () {
+                    clearJsonInputError(this, "#standard-check-config-error");
+                }))
+            .append($("<p>").attr("id", "standard-check-config-hint").addClass("help-text")
+                .text(i18n.t("service_standards.form.configuration_hint")))
+            .append($("<p>").attr({id: "standard-check-config-error", role: "alert"})
+                .addClass("service-editor-error").prop("hidden", true));
     }
 
     function formLabel(forId, text) {
@@ -1089,7 +1289,7 @@
     }
 
     function selectInput(id, options, selected) {
-        const select = $("<select>").attr("id", id);
+        const select = $("<select>").attr("id", id).addClass("input");
 
         options.forEach(function (option) {
             select.append(
@@ -1155,15 +1355,22 @@
     }
 
     function saveStandard() {
+        const modal = $("#service-standard-modal");
+        if (modal.data("saving")) {
+            return;
+        }
+        modal.find(".standard-editor-error").text("").prop("hidden", true);
         const standardId = $("#standard-id").val();
         const payload = {
-            group_id: Number($("#standard-group-id").val()),
             name: $("#service-standard-name").val().trim(),
             slug: $("#service-standard-slug").val().trim(),
             description: $("#service-standard-description").val().trim(),
             applies_to: buildAppliesToPayload(),
             enabled: $("#service-standard-enabled").is(":checked"),
         };
+        if (!standardId) {
+            payload.group_id = Number($("#standard-group-id").val());
+        }
 
         if (!payload.name || !payload.slug) {
             notifyError(i18n.t("service_standards.validation.name_slug"));
@@ -1175,27 +1382,56 @@
             ? "/api/services/standards/" + encodeURIComponent(standardId)
             : "/api/services/standards";
 
+        setAppModalSaving(modal, true);
         standardsApi(method, url, payload)
             .then(function (standard) {
+                setAppModalSaving(modal, false);
                 closeServiceStandardModal("#service-standard-modal");
                 standardsState.selectedStandardId = standard.id || standardsState.selectedStandardId;
                 refreshAfterStandardsChange();
                 loadServiceStandards();
             })
             .catch(function (xhr) {
-                notifyError(getErrorMessage(xhr, i18n.t("service_standards.errors.save_standard")));
+                setAppModalSaving(modal, false);
+                modal.find(".standard-editor-error")
+                    .text(getErrorMessage(xhr, i18n.t("service_standards.errors.save_standard")))
+                    .prop("hidden", false);
             });
     }
 
+    function checkConfigurationOptions() {
+        return {
+            objectOnly: true,
+            errorTarget: "#standard-check-config-error",
+            invalidMessage: i18n.t("service_standards.validation.config_json"),
+            objectMessage: i18n.t("service_standards.validation.config_object"),
+        };
+    }
+
+    function readCheckConfiguration() {
+        const readFieldConfiguration = $("#standard-check-configuration-editor").data("read");
+        return readFieldConfiguration ? readFieldConfiguration()
+            : readJsonObjectInput("#service-standard-check-configuration", checkConfigurationOptions());
+    }
+
     function saveCheck() {
+        const modal = $("#service-standard-check-modal");
+        if (modal.data("saving")) {
+            return;
+        }
+        modal.find(".standard-editor-error").text("").prop("hidden", true);
         const standard = getSelectedStandard();
         const checkId = $("#service-standard-check-id").val();
-        let configuration = {};
-
-        try {
-            configuration = JSON.parse($("#service-standard-check-configuration").val() || "{}");
-        } catch (error) {
-            notifyError(i18n.t("service_standards.validation.config_json"));
+        const configuration = readCheckConfiguration();
+        if (configuration === null) {
+            return;
+        }
+        const invalidNumber = modal.find("input[type=number]").toArray().find(function (input) {
+            return !input.checkValidity() || input.value === "";
+        });
+        if (invalidNumber) {
+            invalidNumber.required = true;
+            invalidNumber.reportValidity();
             return;
         }
 
@@ -1222,21 +1458,25 @@
             ? "/api/services/standards/" + encodeURIComponent(standard.id) + "/checks/" + encodeURIComponent(checkId)
             : "/api/services/standards/" + encodeURIComponent(standard.id) + "/checks";
 
+        setAppModalSaving(modal, true);
         standardsApi(method, url, payload)
             .then(function () {
+                setAppModalSaving(modal, false);
                 closeAppModal("#service-standard-check-modal");
                 refreshAfterStandardsChange();
                 loadStandardChecks(standard.id);
                 loadServiceStandards();
             })
             .catch(function (xhr) {
-                notifyError(getErrorMessage(xhr, i18n.t("service_standards.errors.save_check")));
+                setAppModalSaving(modal, false);
+                modal.find(".standard-editor-error")
+                    .text(getErrorMessage(xhr, i18n.t("service_standards.errors.save_check")))
+                    .prop("hidden", false);
             });
     }
 
     function buildStandardPayload(standard) {
         return {
-            group_id: standard.group_id,
             slug: standard.slug,
             name: standard.name,
             description: standard.description || "",
@@ -1261,7 +1501,10 @@
     }
 
     function buildAppliesToPayload() {
-        const appliesTo = {};
+        const appliesTo = Object.assign({}, $("#service-standard-modal").data("applies-to") || {});
+        ["kinds", "lifecycles", "tiers", "criticalities", "environments", "service_types"].forEach(function (key) {
+            delete appliesTo[key];
+        });
         const kinds = selectedValues("service-standard-kind");
         const lifecycles = selectedValues("service-standard-lifecycle");
         const tiers = selectedValues("service-standard-tier");

@@ -1,7 +1,7 @@
-
 from peewee import DoesNotExist
 from flask import Blueprint, jsonify, request
 
+from app.modules.user_colors import user_color
 from app.api.schemas.rotations import (
     RotationCreateSchema,
     RotationMemberAddSchema,
@@ -455,6 +455,7 @@ def list_rotation_members(rotation_id):
             "user_id": member.user.id,
             "username": member.user.username,
             "display_name": member.user.display_name,
+            "color": user_color(member.user),
             "position": member.position,
             "active": member.active,
         }
@@ -518,6 +519,7 @@ def list_rotation_eligible_users(rotation_id):
             "user_id": membership.user.id,
             "username": membership.user.username,
             "display_name": membership.user.display_name,
+            "color": user_color(membership.user),
             "team_member_id": membership.id,
             "role": membership.role,
             "active": membership.active,
@@ -556,6 +558,7 @@ def update_rotation_member(member_id):
         "user_id": member.user.id,
         "username": member.user.username,
         "display_name": member.user.display_name,
+        "color": user_color(member.user),
         "position": member.position,
         "active": member.active,
     })
@@ -602,6 +605,7 @@ def list_rotation_overrides(rotation_id):
             "user_id": override.user.id,
             "username": override.user.username,
             "display_name": override.user.display_name,
+            "color": user_color(override.user),
             "starts_at": _utc_naive_to_rotation_local(
                 override.starts_at,
                 rotation,

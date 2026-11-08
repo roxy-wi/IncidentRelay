@@ -1,0 +1,112 @@
+/* Shared section appearance for Changes, Incidents and service workspaces.
+ * Layout and form controls stay in their page stylesheets.
+ */
+body.md-theme .card.workspace-section {
+  --section-accent: var(--md-info);
+  padding: 0;
+  overflow: visible;
+  /* Keep the accent when the base card's hover border changes. */
+  border-top: 2px solid color-mix(in srgb, var(--section-accent) 55%, var(--md-border));
+}
+
+body.md-theme .workspace-section[data-section="services"],
+body.md-theme .workspace-section[data-section="resolution"],
+body.md-theme .workspace-section[data-section="readiness"],
+body.md-theme .workspace-section[data-section="runbooks"] {
+  --section-accent: var(--md-success);
+}
+
+body.md-theme .workspace-section[data-section="alerts"],
+body.md-theme .workspace-section[data-section="operations"] {
+  --section-accent: var(--md-warning);
+}
+
+body.md-theme .workspace-section[data-section="incidents"],
+body.md-theme .workspace-section[data-section="impact"] {
+  --section-accent: var(--md-danger);
+}
+
+body.md-theme .workspace-section[data-section="history"],
+body.md-theme .workspace-section[data-section="stakeholders"],
+body.md-theme .workspace-section[data-section="maintenance"],
+body.md-theme .workspace-section[data-section="metadata"] {
+  --section-accent: var(--md-maintenance);
+}
+
+body.md-theme .workspace-section[data-section="people"],
+body.md-theme .workspace-section[data-section="metrics"] {
+  --section-accent: var(--md-primary);
+}
+
+body.md-theme .workspace-section > .card-header {
+  flex-wrap: wrap;
+  gap: 10px;
+  /* Round the header itself so dropdowns can extend beyond the card. */
+  border-radius: calc(var(--md-radius-lg) - 1px) calc(var(--md-radius-lg) - 1px) 0 0;
+}
+
+body.md-theme .workspace-section > :last-child {
+  border-bottom-left-radius: calc(var(--md-radius-lg) - 1px);
+  border-bottom-right-radius: calc(var(--md-radius-lg) - 1px);
+}
+
+body.md-theme .workspace-section .section-heading {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  min-width: 0;
+}
+
+body.md-theme .workspace-section .section-heading > div {
+  min-width: 0;
+}
+
+body.md-theme .workspace-section .section-heading h3 {
+  margin: 0;
+  padding: 0;
+  color: var(--md-text);
+  font-size: 16px;
+  font-weight: 700;
+  line-height: 1.35;
+  overflow-wrap: anywhere;
+}
+
+body.md-theme .workspace-section .card-subtitle {
+  margin: 4px 0 0;
+  line-height: 1.4;
+}
+
+body.md-theme .workspace-section .section-icon {
+  display: grid;
+  place-items: center;
+  width: 30px;
+  height: 30px;
+  flex: 0 0 30px;
+  border-radius: 8px;
+  background: color-mix(in srgb, var(--section-accent) 12%, transparent);
+  color: var(--section-accent);
+  font-size: 14px;
+}
+
+/* Shared modal density and content layout; section colors are defined above. */
+body.md-theme .workspace-modal .app-modal-header {
+  align-items: center;
+  padding: 10px 16px;
+  flex-shrink: 0;
+}
+body.md-theme .workspace-modal .app-modal-header h2 { font-size: 18px; }
+body.md-theme .workspace-modal .app-modal-body { padding: 14px 16px; }
+body.md-theme .workspace-modal .app-modal-footer { padding: 12px 16px; }
+.workspace-stack {
+  display: grid;
+  gap: 16px;
+  align-content: start;
+  min-width: 0;
+}
+body.md-theme .workspace-stack > .card { margin: 0; min-width: 0; }
+body.md-theme .workspace-section .section-body { padding: 12px 16px; margin: 0; }
+body.md-theme .workspace-section > .card-header .details-actions,
+body.md-theme .workspace-section > .card-header .card-header-actions {
+  flex-wrap: wrap;
+  margin: 0;
+}

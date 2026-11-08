@@ -3,17 +3,26 @@ function asArray(value) {
     return Array.isArray(value) ? value : [];
 }
 
-function parseJsonInput(selector, fallback) {
+function parseJsonInput(selector, fallback, options) {
     /* Parse JSON from an input field. */
-    const raw = $(selector).val();
+    options = options || {};
+    const raw = options.trim ? String($(selector).val() || "").trim() : $(selector).val();
 
-    if (!raw) {
+    if (!raw && options.allowEmpty !== false) {
         return fallback;
     }
 
     try {
-        return JSON.parse(raw);
+        const value = JSON.parse(raw);
+        if (options.objectOnly && (value === null || typeof value !== "object" || Array.isArray(value))) {
+            throw new TypeError(options.objectMessage);
+        }
+        return value;
     } catch (error) {
+        if (typeof options.onError === "function") {
+            options.onError(error);
+            throw error;
+        }
         const message = i18n.t("shared.json.invalid_selector", {selector: selector, error: error});
         if (typeof showAppError === "function") {
             showAppError(message);
@@ -21,6 +30,37 @@ function parseJsonInput(selector, fallback) {
             alert(message);
         }
         throw error;
+    }
+}
+
+function clearJsonInputError(selector, errorTarget) {
+    $(selector).removeAttr("aria-invalid");
+    $(errorTarget).text("").prop("hidden", true);
+}
+
+function readJsonObjectInput(selector, options) {
+    /* Return a JSON object, or null after displaying an inline validation error. */
+    try {
+        const value = parseJsonInput(selector, undefined, {
+            allowEmpty: false,
+            objectOnly: true,
+            objectMessage: options.objectMessage,
+            onError: function (error) {
+                if (!(error instanceof SyntaxError) && !(error instanceof TypeError)) {
+                    throw error;
+                }
+                $(options.errorTarget).text(error instanceof SyntaxError ? options.invalidMessage : options.objectMessage)
+                    .prop("hidden", false);
+                $(selector).attr("aria-invalid", "true").trigger("focus");
+            },
+        });
+        clearJsonInputError(selector, options.errorTarget);
+        return value;
+    } catch (error) {
+        if (!(error instanceof SyntaxError) && !(error instanceof TypeError)) {
+            throw error;
+        }
+        return null;
     }
 }
 

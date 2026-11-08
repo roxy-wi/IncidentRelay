@@ -15,6 +15,9 @@ function normalizeAppRoutePath(pathname) {
     if (/^\/incidents\/\d+$/.test(normalizedPath)) {
         return "/incidents";
     }
+    if (/^\/changes\/[0-9a-f-]{36}$/i.test(normalizedPath)) {
+        return "/changes";
+    }
     return normalizedPath || "/";
 }
 
@@ -105,7 +108,15 @@ function navigate(path, pushState) {
     let appPath = splitAppPath(path);
     let routePath = appPath.routePath;
 
-    if (routePath === "/admin/sso" && (!currentUser || !currentUser.is_admin)) {
+    if (routePath !== "/changes" && typeof leaveChanges === "function") leaveChanges();
+    if (routePath !== "/services" && typeof closeServiceDetailsModal === "function") closeServiceDetailsModal();
+
+    if (routePath !== "/admin/change-integrations" && typeof closeChangeIntegrationModal === "function") closeChangeIntegrationModal();
+    if (routePath === "/admin/change-integrations" && !hasGroupUserAdminAccess()) {
+        showAppError(i18n.t("errors.group_admin_role_required"));
+        path = "/";
+    }
+    if (["/admin/sso", "/admin/system-settings"].includes(routePath) && (!currentUser || !currentUser.is_admin)) {
         showAppError(i18n.t("errors.admin_role_required"));
         path = "/";
     }
@@ -134,12 +145,16 @@ function navigate(path, pushState) {
         && typeof syncAlertDetailsFromUrl === "function"
     ) {
         syncAlertDetailsFromUrl();
+    } else if (typeof closeAlertDetailsModal === "function") {
+        closeAlertDetailsModal({updateUrl: false});
     }
     if (
         normalizedPath.routePath === "/incidents"
         && typeof syncIncidentDetailsFromUrl === "function"
     ) {
         syncIncidentDetailsFromUrl();
+    } else if (typeof closeIncidentDetails === "function") {
+        closeIncidentDetails({updateUrl: false});
     }
 
     if (window.PageUrlState && typeof window.PageUrlState.restorePath === "function") {
@@ -180,7 +195,7 @@ function updateAuthUi() {
     adminSection.addClass("is-hidden");
     $(".menu-link-users").addClass("is-hidden");
     $(".menu-link-groups").addClass("is-hidden");
-    $(".menu-link-global-admin").addClass("is-hidden");
+    $(".menu-link-global-admin, .menu-link-change-integrations").addClass("is-hidden");
     $(".menu-link-audit").addClass("is-hidden");
 
     if (canViewAuditLog) {
@@ -189,6 +204,7 @@ function updateAuthUi() {
     }
 
     if (canManageUsers) {
+        $(".menu-link-change-integrations").removeClass("is-hidden");
         adminSection.removeClass("is-hidden");
         $(".menu-link-users").removeClass("is-hidden");
         $(".menu-link-groups").removeClass("is-hidden");
@@ -204,6 +220,7 @@ function updateAuthUi() {
 
     if (currentUser) {
         $("#topbar-username").text(currentUser.display_name || currentUser.username);
+        $(".topbar-user-avatar").replaceWith(UserAppearance.avatar(currentUser, "topbar-user-avatar"));
         fillActiveGroupSelect();
     }
 
@@ -214,6 +231,7 @@ const TEAM_SCOPED_ROUTE_PATHS = {
     "/": true,
     "/alerts": true,
     "/incidents": true,
+    "/changes": true,
     "/rotations": true,
     "/calendar": true,
     "/routes": true,

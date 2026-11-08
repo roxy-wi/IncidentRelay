@@ -29,6 +29,7 @@ const NOTIFICATION_POLICY_SOURCE_OPTIONS = [
     "alertmanager",
     "aws_sns",
     "azure_monitor",
+    "google_cloud_monitoring",
     "cloud_ru",
     "datadog",
     "grafana",

@@ -3,7 +3,12 @@ from peewee import IntegrityError, DoesNotExist
 
 from app.views.services.blueprint import services_bp
 from app.api.schemas.services import ServiceCreateSchema, ServiceUpdateSchema
-from app.modules.db import services_repo, rotations_repo, escalation_policies_repo
+from app.modules.db import (
+    incident_core_repo,
+    services_repo,
+    rotations_repo,
+    escalation_policies_repo,
+)
 from app.modules.db.common import unique_field_conflict, integrity_conflict
 from app.services.audit import write_audit
 from app.services.incidents.priority_policies import service as priority_policy_service
@@ -42,6 +47,8 @@ SERVICE_TIMELINE_CONFIGURATION_FIELDS = (
     "public_name",
     "public_description",
     "public_order",
+    "change_correlation_enabled",
+    "change_correlation_exclusions",
 )
 
 
@@ -160,6 +167,10 @@ def _service_data_from_payload(payload):
         "labels": payload.labels,
         "tags": payload.tags,
         "metadata": payload.metadata,
+        **payload.model_dump(
+            include={"change_correlation_enabled", "change_correlation_exclusions"},
+            exclude_unset=True,
+        ),
         "enabled": payload.enabled,
         "public": payload.public,
         "public_name": payload.public_name,
@@ -238,7 +249,20 @@ def create_service():
         return validation_error
 
     try:
-        service = services_repo.create_service(_service_data_from_payload(payload))
+        with incident_core_repo.write_transaction():
+            service = services_repo.create_service(_service_data_from_payload(payload))
+            write_audit(
+                "service.create",
+                object_type="service",
+                object_id=service.id,
+                group_id=service.group_id,
+                team_id=service.team_id,
+                data={
+                    **payload.model_dump(),
+                    "change_correlation_enabled": service.change_correlation_enabled,
+                    "change_correlation_exclusions": service.change_correlation_exclusions,
+                },
+            )
     except IntegrityError as exc:
         error_text = str(exc).lower()
         if "slug" in error_text:
@@ -250,15 +274,6 @@ def create_service():
         return integrity_conflict(
             "Service could not be saved because it conflicts with existing data"
         )
-
-    write_audit(
-        "service.create",
-        object_type="service",
-        object_id=service.id,
-        group_id=service.group_id,
-        team_id=service.team_id,
-        data=payload.model_dump(),
-    )
 
     event_result = emit_service_catalog_event(
         service,
@@ -307,10 +322,23 @@ def update_service(service_id):
         return validation_error
 
     try:
-        service = services_repo.update_service(
-            service_id,
-            _service_data_from_payload(payload),
-        )
+        with incident_core_repo.write_transaction():
+            service = services_repo.update_service(
+                service_id,
+                _service_data_from_payload(payload),
+            )
+            write_audit(
+                "service.update",
+                object_type="service",
+                object_id=service.id,
+                group_id=service.group_id,
+                team_id=service.team_id,
+                data={
+                    **payload.model_dump(),
+                    "change_correlation_enabled": service.change_correlation_enabled,
+                    "change_correlation_exclusions": service.change_correlation_exclusions,
+                },
+            )
     except IntegrityError as exc:
         error_text = str(exc).lower()
         if "slug" in error_text:
@@ -322,15 +350,6 @@ def update_service(service_id):
         return integrity_conflict(
             "Service could not be saved because it conflicts with existing data"
         )
-
-    write_audit(
-        "service.update",
-        object_type="service",
-        object_id=service.id,
-        group_id=service.group_id,
-        team_id=service.team_id,
-        data=payload.model_dump(),
-    )
 
     readiness_result = _emit_service_update_events(
         service,

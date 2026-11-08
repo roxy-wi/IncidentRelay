@@ -17,6 +17,15 @@ ESCALATION_POLICY_RULE_SCHEMA = {
     "type": "object",
     "required": ["position", "delay_seconds", "target_type", "target_id"],
     "properties": {
+        "target_user": {
+            "type": "object", "nullable": True, "readOnly": True,
+            "properties": {
+                "id": {"type": "integer"},
+                "username": {"type": "string"},
+                "display_name": {"type": "string", "nullable": True},
+                "color": {"type": "string", "pattern": "^#[0-9a-f]{6}$"},
+            },
+        },
         "id": {"type": "integer", "readOnly": True},
         "policy_id": {"type": "integer", "readOnly": True},
         "position": {

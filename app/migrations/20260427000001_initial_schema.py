@@ -1,4 +1,4 @@
-from peewee import ForeignKeyField
+from peewee import ForeignKeyField, sort_models
 
 from app.db import init_database
 from app.modules.db.models import (
@@ -94,7 +94,9 @@ def _expand_model_dependencies(models):
     for model in models:
         visit(model)
 
-    return ordered
+    # Deferred foreign keys complete cycles in later migrations. Preserve
+    # dependency coverage while using the same creation order as Peewee.
+    return sort_models(ordered)
 
 
 BOOTSTRAP_MODELS = _expand_model_dependencies(MODELS)

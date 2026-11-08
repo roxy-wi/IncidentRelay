@@ -12,7 +12,6 @@ let allServiceGraphDependenciesCache = [];
 let businessServiceComponentsCache = [];
 let serviceAnalyticsCache = [];
 let serviceImpactCache = [];
-let serviceDetailsCache = {};
 let serviceImpactPayload = null;
 let serviceImpactHistoryPayload = null;
 let serviceImpactHistoryCache = [];
@@ -135,7 +134,7 @@ function translateServicesWorkspace() {
 
     setServicesStaticText("#services-tab-services h2", "services.section.services");
     setServicesStaticText("#open-service-create-modal", "services.actions.new_service");
-    setServicesStaticText("#reload-services", "services.actions.reload");
+    setServicesStaticText("#reload-services", "common.reload");
     setServicesStaticPlaceholder("#services-search", "services.search.services");
 
     setServicesStaticText("#services-status-filter option[value='']", "services.filters.all_statuses");
@@ -222,7 +221,7 @@ function translateServicesWorkspace() {
     setServicesStaticText("#services-tab-dependencies h2", "services.section.dependencies");
     setServicesStaticText("#services-tab-dependencies .card-header .card-subtitle", "services.section.dependencies_subtitle");
     setServicesStaticText("#open-service-dependency-create-modal", "services.actions.new_dependency");
-    setServicesStaticText('[id="reload-service-context"]', "services.actions.reload");
+    setServicesStaticText('[id="reload-service-context"]', "common.reload");
     setServicesStaticPlaceholder("#service-dependencies-search", "services.search.dependencies");
     setServicesStaticPlaceholder("#service-dependency-graph-search", "services.search.graph");
 
@@ -425,7 +424,6 @@ function refreshServices() {
     const generation = ++servicesLoadGeneration;
     let delayedIndicator = null;
 
-    serviceDetailsCache = {};
 
     if (window.AppLoading) {
         if (!servicesHasLoaded) {
@@ -470,6 +468,14 @@ function refreshServices() {
 
         renderServicesSummary();
         renderServicesTable();
+        // Open service details from an Incident deep link, only for services
+        // already present within the API-scoped catalog.
+        const linkedServiceId = Number(new URLSearchParams(window.location.search).get("service_id"));
+        if (linkedServiceId > 0 && servicesCache.some(function (service) {
+            return Number(service.id) === linkedServiceId;
+        })) {
+            openServiceDetailsModal(linkedServiceId);
+        }
 
         if (typeof window.loadServiceStandards === "function") {
             window.loadServiceStandards();

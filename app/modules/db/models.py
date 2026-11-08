@@ -3,13 +3,16 @@ import uuid
 
 from peewee import (
     AutoField,
+    BigIntegerField,
     BooleanField,
     CharField,
+    Check,
     DateTimeField,
     ForeignKeyField,
     IntegerField,
     Model,
     TextField,
+    SQL,
     DeferredForeignKey,
     UUIDField,
 )
@@ -132,6 +135,7 @@ class User(SoftDeleteModel):
     id = AutoField()
     username = CharField(unique=True)
     display_name = CharField(null=True)
+    color = CharField(null=True, max_length=7)
     email = CharField(null=True)
     phone = CharField(null=True)
     timezone = CharField(null=True)
@@ -495,6 +499,8 @@ class Service(SoftDeleteModel):
     public_name = CharField(null=True)
     public_description = TextField(null=True)
     public_order = IntegerField(default=100)
+    change_correlation_enabled = BooleanField(default=False)
+    change_correlation_exclusions = JSONTextField(default=list)
 
     created_at = DateTimeField(default=utc_now)
     updated_at = DateTimeField(default=utc_now)
@@ -782,6 +788,20 @@ class ServiceEvent(BaseModel):
     recorded_at = DateTimeField(default=utc_now)
     schema_version = IntegerField(default=1)
     payload = JSONTextField(default=dict)
+    change_event = DeferredForeignKey(
+        "ChangeEvent",
+        null=True,
+        backref="service_events",
+        on_delete="RESTRICT",
+        index=True,
+    )
+    change_relation_type = CharField(
+        max_length=32,
+        null=True,
+        constraints=[Check(
+            "change_relation_type IN ('changed', 'reported_affected', 'inferred_impact')"
+        )],
+    )
 
     class Meta:
         table_name = "service_event"
@@ -793,6 +813,7 @@ class ServiceEvent(BaseModel):
             (("service", "event_type", "occurred_at"), False),
             (("source", "source_ref"), False),
             (("service", "source", "dedup_key"), True),
+            (("service", "change_event", "change_relation_type"), True),
         )
 
 
@@ -1803,6 +1824,34 @@ class Incident(BaseModel):
         )
 
 
+class IncidentComment(BaseModel):
+    """Operational comment attached to a first-class Incident."""
+
+    id = AutoField()
+    incident = ForeignKeyField(Incident, backref="comments", on_delete="CASCADE")
+    author = ForeignKeyField(User, null=True, backref="incident_comments", on_delete="SET NULL")
+    body = TextField()
+    created_at = DateTimeField(default=utc_now, index=True)
+    updated_at = DateTimeField(default=utc_now)
+
+    class Meta:
+        table_name = "incident_comment"
+        indexes = ((('incident', 'created_at'), False),)
+
+
+class IncidentService(BaseModel):
+    """Affected service associated with an Incident independent of its owning team."""
+
+    id = AutoField()
+    incident = ForeignKeyField(Incident, backref="affected_services", on_delete="CASCADE")
+    service = ForeignKeyField(Service, backref="affected_incidents", on_delete="CASCADE")
+    added_at = DateTimeField(default=utc_now)
+
+    class Meta:
+        table_name = "incident_service"
+        indexes = ((('incident', 'service'), True),)
+
+
 class IncidentEvent(BaseModel):
     """Immutable operational timeline event for a first-class Incident."""
 
@@ -1826,6 +1875,11 @@ class AlertGroup(BaseModel):
     """Logical incident/group containing one or more concrete alerts."""
 
     id = AutoField()
+
+    current_episode = DeferredForeignKey(
+        "AlertGroupEpisode", null=True, backref="current_for_groups",
+        on_delete="SET NULL",
+    )
 
     team = ForeignKeyField(Team, null=True, backref="alert_groups", on_delete="SET NULL")
     route = ForeignKeyField(AlertRoute, null=True, backref="alert_groups", on_delete="SET NULL")
@@ -2134,6 +2188,16 @@ class Alert(BaseModel):
         )
 
 
+class ClosedGoogleMonitoringIncident(BaseModel):
+    """A provider close is final, even if its opening webhook has not arrived."""
+
+    dedup_key = CharField(primary_key=True, max_length=64)
+    route = ForeignKeyField(AlertRoute, on_delete="CASCADE")
+
+    class Meta:
+        table_name = "closed_google_monitoring_incident"
+
+
 class AlertComment(BaseModel):
     """Human comment attached to an alert group or concrete alert."""
 
@@ -2177,15 +2241,12 @@ class AlertComment(BaseModel):
 
 
 class IncidentResponder(BaseModel):
-    """Responder request attached to an incident / alert group."""
+    """Canonical operational responder request and assignment for Incident."""
 
     id = AutoField()
 
-    group = ForeignKeyField(
-        AlertGroup,
-        backref="incident_responders",
-        on_delete="CASCADE",
-    )
+    incident = ForeignKeyField(Incident, backref="responders", on_delete="CASCADE")
+    role = CharField(default="responder", index=True)
 
     target_type = CharField(index=True)
 
@@ -2253,7 +2314,7 @@ class IncidentResponder(BaseModel):
     class Meta:
         table_name = "incident_responder"
         indexes = (
-            (("group", "status"), False),
+            (("incident", "status"), False),
             (("target_user", "status"), False),
             (("target_team", "status"), False),
             (("target_rotation", "status"), False),
@@ -2266,11 +2327,7 @@ class IncidentStakeholder(BaseModel):
 
     id = AutoField()
 
-    group = ForeignKeyField(
-        AlertGroup,
-        backref="incident_stakeholders",
-        on_delete="CASCADE",
-    )
+    incident = ForeignKeyField(Incident, backref="stakeholders", on_delete="CASCADE")
 
     user = ForeignKeyField(
         User,
@@ -2306,10 +2363,48 @@ class IncidentStakeholder(BaseModel):
     class Meta:
         table_name = "incident_stakeholder"
         indexes = (
-            (("group", "user"), False),
-            (("group", "email"), False),
-            (("group", "role"), False),
-            (("group", "active"), False),
+            (("incident", "user"), False),
+            (("incident", "email"), False),
+            (("incident", "role"), False),
+            (("incident", "active"), False),
+        )
+
+
+class IncidentNotificationDelivery(BaseModel):
+    """One event/recipient/transport, with durable per-device push progress.
+
+    Successful targets are not retried. A provider success followed by a
+    process crash before persistence can still cause an at-least-once retry.
+    """
+
+    id = AutoField()
+    incident = ForeignKeyField(Incident, on_delete="CASCADE")
+    event = ForeignKeyField(IncidentEvent, on_delete="CASCADE")
+    # Request identity is historical metadata; Incident owns the lifecycle.
+    responder_id = IntegerField(null=True, index=True)
+    user = ForeignKeyField(User, null=True, on_delete="SET NULL")
+    method = CharField(max_length=32)
+    target_key = CharField(max_length=255)
+    recipient = TextField(null=True)
+    payload = JSONTextField()
+    subscription_ids = JSONTextField(null=True)
+    sent_subscription_ids = JSONTextField(default=list)
+    status = CharField(max_length=16, default="pending", index=True)
+    attempts = IntegerField(default=0)
+    next_attempt_at = DateTimeField(default=utc_now, index=True)
+    claim_token = CharField(null=True)
+    claim_expires_at = DateTimeField(null=True)
+    delivered_count = IntegerField(default=0)
+    delivered_at = DateTimeField(null=True)
+    last_error = TextField(null=True)
+    created_at = DateTimeField(default=utc_now)
+    updated_at = DateTimeField(default=utc_now)
+
+    class Meta:
+        table_name = "incident_notification_delivery"
+        indexes = (
+            (("event", "method", "target_key"), True),
+            (("status", "next_attempt_at"), False),
         )
 
 
@@ -2608,6 +2703,72 @@ class SilenceAlertApplication(BaseModel):
         )
 
 
+class SystemSettings(BaseModel):
+    """Installation-wide operational settings."""
+
+    id = IntegerField(primary_key=True, default=1, constraints=[Check("id = 1")])
+    change_intake_enabled = BooleanField(default=False)
+    change_worker_enabled = BooleanField(default=True)
+    change_max_future_seconds = IntegerField(
+        default=300, constraints=[Check("change_max_future_seconds BETWEEN 0 AND 2147483647")]
+    )
+    change_events_per_minute = IntegerField(
+        default=600, constraints=[Check("change_events_per_minute BETWEEN 1 AND 2147483647")]
+    )
+    change_events_per_change = IntegerField(
+        default=1000, constraints=[Check("change_events_per_change BETWEEN 1 AND 10000")]
+    )
+    change_worker_interval_seconds = IntegerField(
+        default=5, constraints=[Check("change_worker_interval_seconds BETWEEN 1 AND 2147483647")]
+    )
+    change_worker_jobs_per_tick = IntegerField(
+        default=20, constraints=[Check("change_worker_jobs_per_tick BETWEEN 1 AND 100")]
+    )
+    change_worker_batch_size = IntegerField(
+        default=100, constraints=[Check("change_worker_batch_size BETWEEN 1 AND 1000")]
+    )
+    change_worker_lease_seconds = IntegerField(
+        default=60, constraints=[Check("change_worker_lease_seconds BETWEEN 10 AND 2147483647")]
+    )
+    change_worker_max_attempts = IntegerField(
+        default=8, constraints=[Check("change_worker_max_attempts BETWEEN 1 AND 2147483647")]
+    )
+    change_worker_retry_base_seconds = IntegerField(
+        default=5, constraints=[Check("change_worker_retry_base_seconds BETWEEN 1 AND 2147483647")]
+    )
+    change_worker_retry_max_seconds = IntegerField(
+        default=300, constraints=[Check("change_worker_retry_max_seconds BETWEEN 1 AND 2147483647")]
+    )
+    change_pending_ttl_seconds = IntegerField(
+        default=604800, constraints=[Check("change_pending_ttl_seconds BETWEEN 60 AND 2147483647")]
+    )
+    change_pending_poll_seconds = IntegerField(
+        default=60, constraints=[Check("change_pending_poll_seconds BETWEEN 5 AND 2147483647")]
+    )
+
+    class Meta:
+        table_name = "system_settings"
+        constraints = [Check("change_worker_retry_base_seconds <= change_worker_retry_max_seconds")]
+
+
+class ChangeIntegration(BaseModel):
+    """Stable machine identity, independent of its rotating credentials."""
+
+    id = AutoField()
+    owner_group = ForeignKeyField(
+        Group, null=True, backref="change_integrations", on_delete="RESTRICT"
+    )
+    uid = UUIDField(default=uuid.uuid4, unique=True)
+    name = CharField(max_length=255)
+    active = BooleanField(default=True)
+    auth_revision = BigIntegerField(default=1, constraints=[Check("auth_revision > 0")])
+    created_at = DateTimeField(default=utc_now)
+    updated_at = DateTimeField(default=utc_now)
+
+    class Meta:
+        table_name = "change_integration"
+
+
 class ApiToken(SoftDeleteModel):
     """Hashed API token."""
 
@@ -2615,6 +2776,18 @@ class ApiToken(SoftDeleteModel):
     user = ForeignKeyField(User, null=True, backref="api_tokens", on_delete="CASCADE")
     group = ForeignKeyField(Group, null=True, backref="api_tokens", on_delete="CASCADE")
     team = ForeignKeyField(Team, null=True, backref="api_tokens", on_delete="CASCADE")
+    change_integration = ForeignKeyField(
+        ChangeIntegration,
+        null=True,
+        backref="tokens",
+        on_delete="RESTRICT",
+        constraints=[
+            Check(
+                "change_integration_id IS NULL OR "
+                "(user_id IS NULL AND group_id IS NULL AND team_id IS NULL)"
+            )
+        ],
+    )
     name = CharField()
     token_prefix = CharField(index=True)
     token_hash = CharField(unique=True)
@@ -3524,3 +3697,527 @@ class AutomationExecution(BaseModel):
         return super().save(*args, **kwargs)
 
 # END EVENT ORCHESTRATION V1 MODELS
+
+class ChangeSource(BaseModel):
+    """Reserve an owner/source namespace for one integration."""
+
+    id = AutoField()
+    integration = ForeignKeyField(
+        ChangeIntegration, backref="sources", on_delete="RESTRICT"
+    )
+    owner_team = ForeignKeyField(Team, backref="change_sources", on_delete="RESTRICT")
+    source = CharField(max_length=255)
+    active = BooleanField(default=True)
+    ordering_mode = CharField(
+        default="timestamp",
+        constraints=[Check("ordering_mode IN ('timestamp', 'sequence')")],
+    )
+    created_at = DateTimeField(default=utc_now)
+    updated_at = DateTimeField(default=utc_now)
+
+    class Meta:
+        table_name = "change_source"
+        indexes = (
+            (("owner_team", "source"), True),
+            (("id", "integration", "owner_team"), True),
+        )
+
+
+class ChangeGrant(BaseModel):
+    """Explicit claim permission scoped to a pinned Team or Service."""
+
+    id = AutoField()
+    source = ForeignKeyField(ChangeSource, backref="grants", on_delete="RESTRICT")
+    capability = CharField(
+        constraints=[
+            Check("capability IN ('reference', 'changed', 'reported_affected')")
+        ]
+    )
+    target_team = ForeignKeyField(Team, backref="change_grants", on_delete="RESTRICT")
+    target_service = ForeignKeyField(
+        Service,
+        null=True,
+        backref="change_grants",
+        on_delete="RESTRICT",
+    )
+    target_key = CharField(max_length=64)
+    active = BooleanField(default=True)
+    created_at = DateTimeField(default=utc_now)
+    updated_at = DateTimeField(default=utc_now)
+
+    class Meta:
+        table_name = "change_grant"
+        indexes = ((("source", "capability", "target_key"), True),)
+        constraints = [
+            Check(
+                "target_key = CASE WHEN target_service_id IS NULL "
+                "THEN 'team:' || CAST(target_team_id AS TEXT) "
+                "ELSE 'service:' || CAST(target_service_id AS TEXT) END"
+            )
+        ]
+
+
+class Change(BaseModel):
+    """Rebuildable operation projection; source carries the sender's name."""
+
+    id = AutoField()
+    uid = UUIDField(default=uuid.uuid4, unique=True)
+    source = ForeignKeyField(ChangeSource, backref="changes", on_delete="RESTRICT")
+    integration = ForeignKeyField(
+        ChangeIntegration, backref="changes", on_delete="RESTRICT"
+    )
+    owner_team = ForeignKeyField(Team, backref="changes", on_delete="RESTRICT")
+    external_change_id = CharField(max_length=255)
+    kind = CharField(
+        constraints=[
+            Check(
+                "kind IN ('deployment', 'configuration', 'infrastructure', "
+                "'database', 'feature_flag', 'other')"
+            )
+        ]
+    )
+    environment = CharField(max_length=255, null=True)
+    title = CharField(max_length=500)
+    description = TextField(null=True)
+    external_url = CharField(max_length=2048, null=True)
+    status = CharField(
+        default="unknown",
+        constraints=[
+            Check(
+                "status IN ('unknown', 'running', 'succeeded', 'failed', 'rolled_back', 'cancelled')"
+            )
+        ],
+    )
+    lifecycle_conflict = BooleanField(default=False)
+    diagnostics = JSONTextField(default=list)
+    mapping_status = CharField(
+        default="unmapped",
+        constraints=[
+            Check(
+                "mapping_status IN ('mapped', 'partially_mapped', 'unmapped', 'mapping_failed')"
+            )
+        ],
+    )
+    ordering_mode = CharField(
+        default="timestamp",
+        constraints=[Check("ordering_mode IN ('timestamp', 'sequence')")],
+    )
+    started_at = DateTimeField(null=True)
+    completed_at = DateTimeField(null=True)
+    first_occurred_at = DateTimeField(null=True)
+    last_occurred_at = DateTimeField(null=True)
+    revision = BigIntegerField(default=1, constraints=[Check("revision > 0")])
+    created_at = DateTimeField(default=utc_now)
+    updated_at = DateTimeField(default=utc_now)
+
+    class Meta:
+        table_name = "change_record"
+        indexes = (
+            (("source", "external_change_id"), True),
+            (("owner_team", "last_occurred_at"), False),
+            (("id", "source", "integration"), True),
+        )
+        constraints = [
+            Check("NOT lifecycle_conflict OR status = 'unknown'"),
+            SQL(
+                "FOREIGN KEY (source_id, integration_id, owner_team_id) "
+                "REFERENCES change_source (id, integration_id, owner_team_id) "
+                "ON DELETE RESTRICT"
+            ),
+        ]
+
+
+class ChangeEvent(BaseModel):
+    """Accepted event identity and evidence, retained independently of tokens."""
+
+    id = AutoField()
+    uid = UUIDField(default=uuid.uuid4, unique=True)
+    change = ForeignKeyField(Change, backref="events", on_delete="RESTRICT")
+    source = ForeignKeyField(ChangeSource, backref="events", on_delete="RESTRICT")
+    integration = ForeignKeyField(
+        ChangeIntegration, backref="events", on_delete="RESTRICT"
+    )
+    external_event_id = CharField(max_length=255)
+    event_type = CharField(
+        constraints=[
+            Check(
+                "event_type IN ('change.started', 'change.updated', 'change.succeeded', "
+                "'change.failed', 'change.rolled_back', 'change.cancelled')"
+            )
+        ]
+    )
+    occurred_at = DateTimeField()
+    received_at = DateTimeField(default=utc_now)
+    source_sequence = BigIntegerField(
+        null=True, constraints=[Check("source_sequence >= 0")]
+    )
+    actor_type = CharField(max_length=64, null=True)
+    actor_label = CharField(max_length=255, null=True)
+    details = JSONTextField(default=dict)
+    projection_fields = JSONTextField(default=dict)
+    submitted_references = JSONTextField(default=list)
+    request_snapshot = JSONTextField(default=dict)
+    request_digest = CharField(
+        max_length=64, constraints=[Check("length(request_digest) = 64")]
+    )
+    ingest_token = ForeignKeyField(
+        ApiToken, null=True, backref="change_events", on_delete="SET NULL"
+    )
+    schema_version = IntegerField(default=1, constraints=[Check("schema_version = 1")])
+
+    class Meta:
+        table_name = "change_event"
+        indexes = (
+            (("source", "external_event_id"), True),
+            (("change", "source_sequence"), True),
+            (("change", "occurred_at"), False),
+            (("id", "change"), True),
+        )
+        constraints = [
+            SQL(
+                "FOREIGN KEY (change_id, source_id, integration_id) "
+                "REFERENCES change_record (id, source_id, integration_id) ON DELETE RESTRICT"
+            )
+        ]
+
+
+class ChangeServiceReference(BaseModel):
+    """Submitted identity with an immutable numeric Team namespace."""
+
+    id = AutoField()
+    change = ForeignKeyField(Change, backref="service_references", on_delete="RESTRICT")
+    first_event = ForeignKeyField(
+        ChangeEvent, backref="service_references", on_delete="RESTRICT"
+    )
+    relation_type = CharField(
+        constraints=[Check("relation_type IN ('changed', 'reported_affected')")]
+    )
+    ref_type = CharField(constraints=[Check("ref_type IN ('id', 'slug')")])
+    requested_service_id = IntegerField(null=True)
+    requested_service_slug = CharField(max_length=255, null=True)
+    requested_team_id = IntegerField(null=True)
+    requested_team_slug = CharField(max_length=255, null=True)
+    namespace_team = ForeignKeyField(
+        Team, backref="change_references", on_delete="RESTRICT"
+    )
+    normalized_ref_key = CharField(max_length=320)
+    resolved_service = ForeignKeyField(
+        Service, null=True, backref="change_references", on_delete="RESTRICT"
+    )
+    resolution_status = CharField(
+        default="pending_resolution",
+        constraints=[
+            Check(
+                "resolution_status IN ('resolved', 'pending_resolution', 'denied', 'invalid', 'expired')"
+            )
+        ],
+    )
+    verification_state = CharField(
+        default="unverified",
+        constraints=[
+            Check("verification_state IN ('trusted', 'unverified', 'rejected')")
+        ],
+    )
+    verification_evidence = JSONTextField(default=dict)
+    verification_version = BigIntegerField(
+        default=0, constraints=[Check("verification_version >= 0")]
+    )
+    resolved_at = DateTimeField(null=True)
+    last_attempt_at = DateTimeField(null=True)
+    attempts = IntegerField(default=0, constraints=[Check("attempts >= 0")])
+    expires_at = DateTimeField(null=True)
+    last_error_code = CharField(max_length=128, null=True)
+    created_at = DateTimeField(default=utc_now)
+
+    class Meta:
+        table_name = "change_service_reference"
+        indexes = (
+            (("change", "relation_type", "normalized_ref_key"), True),
+            (("resolution_status", "namespace_team", "requested_service_slug"), False),
+            (("id", "change", "relation_type", "resolved_service"), True),
+        )
+        constraints = [
+            Check(
+                "(ref_type = 'id' AND requested_service_id > 0 "
+                "AND requested_service_id IS NOT NULL AND requested_service_slug IS NULL) OR "
+                "(ref_type = 'slug' AND requested_service_id IS NULL "
+                "AND requested_service_slug IS NOT NULL AND length(requested_service_slug) > 0)"
+            ),
+            Check("requested_team_id IS NULL OR requested_team_slug IS NULL"),
+            Check("resolution_status <> 'resolved' OR resolved_service_id IS NOT NULL"),
+            Check(
+                "resolution_status <> 'pending_resolution' OR "
+                "(ref_type = 'slug' AND resolved_service_id IS NULL)"
+            ),
+            Check(
+                "normalized_ref_key = CASE WHEN ref_type = 'id' "
+                "THEN 'id:' || CAST(requested_service_id AS TEXT) ELSE "
+                "'slug:team-id:' || CAST(namespace_team_id AS TEXT) || '/' || requested_service_slug END"
+            ),
+            SQL(
+                "FOREIGN KEY (first_event_id, change_id) "
+                "REFERENCES change_event (id, change_id) ON DELETE RESTRICT"
+            ),
+        ]
+
+
+class ChangeService(BaseModel):
+    """Canonical Service relation; several submitted aliases may support it."""
+
+    id = AutoField()
+    change = ForeignKeyField(Change, backref="services", on_delete="RESTRICT")
+    service = ForeignKeyField(Service, backref="changes", on_delete="RESTRICT")
+    relation_type = CharField(
+        constraints=[Check("relation_type IN ('changed', 'reported_affected')")]
+    )
+    first_reference = ForeignKeyField(
+        ChangeServiceReference, backref="canonical_links", on_delete="RESTRICT"
+    )
+    verification_state = CharField(
+        default="unverified",
+        constraints=[
+            Check("verification_state IN ('trusted', 'unverified', 'rejected')")
+        ],
+    )
+    verification_evidence = JSONTextField(default=dict)
+    input_stamp = JSONTextField(default=dict)
+    identity_snapshot = JSONTextField(default=dict)
+    created_at = DateTimeField(default=utc_now)
+    updated_at = DateTimeField(default=utc_now)
+
+    class Meta:
+        table_name = "change_service"
+        indexes = (
+            (("change", "service", "relation_type"), True),
+            (("service", "change"), False),
+        )
+        constraints = [
+            SQL(
+                "FOREIGN KEY (first_reference_id, change_id, relation_type, service_id) "
+                "REFERENCES change_service_reference "
+                "(id, change_id, relation_type, resolved_service_id) ON DELETE RESTRICT"
+            )
+        ]
+
+
+class ChangeGraphState(BaseModel):
+    """Singleton revision of the graph used for Change calculations."""
+
+    id = IntegerField(primary_key=True, default=1, constraints=[Check("id = 1")])
+    revision = BigIntegerField(default=1, constraints=[Check("revision > 0")])
+    updated_at = DateTimeField(default=utc_now)
+
+    class Meta:
+        table_name = "change_graph_state"
+
+
+class ChangeJob(BaseModel):
+    """Durable coalesced request; processing is implemented in stage 5."""
+
+    id = AutoField()
+    job_type = CharField(
+        max_length=64,
+        constraints=[
+            Check(
+                "job_type IN ('resolve_references', 'refresh_impacts', 'refresh_correlations', "
+                "'sync_service_timeline', 'discover_episode', 'discover_graph', 'discover_auth')"
+            )
+        ],
+    )
+    entity_id = IntegerField(constraints=[Check("entity_id > 0")])
+    state = CharField(
+        default="pending",
+        constraints=[Check("state IN ('pending', 'running', 'done', 'dead')")],
+    )
+    requested_generation = BigIntegerField(default=1)
+    claimed_generation = BigIntegerField(default=0)
+    completed_generation = BigIntegerField(default=0)
+    target_revision = BigIntegerField(
+        default=0, constraints=[Check("target_revision >= 0")]
+    )
+    graph_revision = BigIntegerField(
+        default=0, constraints=[Check("graph_revision >= 0")]
+    )
+    auth_revision = BigIntegerField(
+        default=0, constraints=[Check("auth_revision >= 0")]
+    )
+    engine_version = CharField(max_length=64, null=True)
+    lease_owner = CharField(max_length=255, null=True)
+    lease_token = UUIDField(null=True, unique=True)
+    lease_expires_at = DateTimeField(null=True)
+    attempts = IntegerField(default=0, constraints=[Check("attempts >= 0")])
+    next_attempt_at = DateTimeField(default=utc_now)
+    last_error_class = CharField(max_length=128, null=True)
+    cursor = JSONTextField(null=True)
+    created_at = DateTimeField(default=utc_now)
+    updated_at = DateTimeField(default=utc_now)
+
+    class Meta:
+        table_name = "change_job"
+        indexes = (
+            (("job_type", "entity_id"), True),
+            (("state", "next_attempt_at"), False),
+        )
+        constraints = [
+            Check(
+                "requested_generation > 0 AND completed_generation >= 0 "
+                "AND completed_generation <= claimed_generation "
+                "AND claimed_generation <= requested_generation"
+            ),
+            Check(
+                "state <> 'running' OR (lease_owner IS NOT NULL AND lease_token IS NOT NULL "
+                "AND lease_expires_at IS NOT NULL AND claimed_generation > 0)"
+            ),
+        ]
+
+
+class AlertGroupEpisode(BaseModel):
+    """A technical firing cycle with an explicit quality of its start boundary."""
+
+    id = AutoField()
+    uid = UUIDField(default=uuid.uuid4, unique=True)
+    alert_group = ForeignKeyField(AlertGroup, backref="episodes", on_delete="CASCADE")
+    ordinal = IntegerField(constraints=[Check("ordinal > 0")])
+    started_at = DateTimeField(null=True)
+    ended_at = DateTimeField(null=True)
+    state = CharField(
+        default="open", constraints=[Check("state IN ('open', 'resolved', 'merged')")]
+    )
+    start_quality = CharField(
+        default="unknown", constraints=[Check("start_quality IN ('exact', 'unknown')")]
+    )
+    start_event = ForeignKeyField(
+        AlertEvent, null=True, backref="started_episodes", on_delete="SET NULL"
+    )
+    end_event = ForeignKeyField(
+        AlertEvent, null=True, backref="ended_episodes", on_delete="SET NULL"
+    )
+    correlation_context = JSONTextField(null=True)
+    correlation_service_id = IntegerField(null=True)
+    context_revision = BigIntegerField(
+        default=1, constraints=[Check("context_revision > 0")]
+    )
+    created_at = DateTimeField(default=utc_now)
+
+    class Meta:
+        table_name = "alert_group_episode"
+        indexes = (
+            (("alert_group", "ordinal"), True),
+            SQL(
+                "CREATE INDEX IF NOT EXISTS episode_correlation_service_start "
+                "ON alert_group_episode (correlation_service_id, started_at, id)"
+            ),
+            SQL(
+                "CREATE INDEX IF NOT EXISTS episode_correlation_start "
+                "ON alert_group_episode (started_at, id)"
+            ),
+            SQL(
+                "CREATE UNIQUE INDEX IF NOT EXISTS alert_group_episode_one_open "
+                "ON alert_group_episode (alert_group_id) WHERE state = 'open'"
+            ),
+        )
+        constraints = [
+            Check(
+                "(start_quality = 'unknown' AND started_at IS NULL) OR "
+                "(start_quality = 'exact' AND started_at IS NOT NULL)"
+            ),
+            Check("state <> 'open' OR ended_at IS NULL"),
+            Check("started_at IS NULL OR ended_at IS NULL OR ended_at >= started_at"),
+        ]
+
+
+class ChangeImpact(BaseModel):
+    """Rebuildable dependency evidence rooted in an authorized changed Service."""
+
+    id = AutoField()
+    change = ForeignKeyField(Change, backref="impacts", on_delete="RESTRICT")
+    service = ForeignKeyField(Service, backref="change_impacts", on_delete="RESTRICT")
+    origin_service = ForeignKeyField(
+        Service, backref="origin_change_impacts", on_delete="RESTRICT"
+    )
+    dependency_path_snapshot = JSONTextField(default=list)
+    depth = IntegerField(constraints=[Check("depth >= 0 AND depth <= 5")])
+    reason = CharField(max_length=64)
+    input_stamp = JSONTextField(default=dict)
+    engine_version = CharField(max_length=64)
+    computed_at = DateTimeField(default=utc_now)
+    active = BooleanField(default=True)
+
+    class Meta:
+        table_name = "change_impact"
+        indexes = (
+            (("change", "origin_service", "service"), True),
+            (("service", "active", "change"), False),
+        )
+
+
+class ChangeAlertGroupCorrelation(BaseModel):
+    """Computed suggestion with separately retained human review and evidence."""
+
+    id = AutoField()
+    change = ForeignKeyField(Change, backref="correlations", on_delete="RESTRICT")
+    episode = ForeignKeyField(
+        AlertGroupEpisode, backref="change_correlations", on_delete="RESTRICT"
+    )
+    score = IntegerField(null=True, constraints=[Check("score >= 0 AND score <= 100")])
+    reason = CharField(max_length=64)
+    evidence = JSONTextField(default=dict)
+    input_stamp = JSONTextField(default=dict)
+    engine_version = CharField(max_length=64)
+    computed_at = DateTimeField(default=utc_now)
+    active = BooleanField(default=True)
+    review_status = CharField(
+        default="suggested",
+        constraints=[Check("review_status IN ('suggested', 'confirmed', 'rejected')")],
+    )
+    relation_type = CharField(
+        default="potential_cause",
+        constraints=[
+            Check(
+                "relation_type IN ('potential_cause', 'confirmed_cause', 'mitigation', 'context')"
+            )
+        ],
+    )
+    reviewed_by = ForeignKeyField(
+        User, null=True, backref="change_reviews", on_delete="SET NULL"
+    )
+    reviewed_at = DateTimeField(null=True)
+    review_evidence = JSONTextField(null=True)
+    row_version = BigIntegerField(default=1, constraints=[Check("row_version > 0")])
+    updated_at = DateTimeField(default=utc_now)
+
+    class Meta:
+        table_name = "change_alert_group_correlation"
+        indexes = (
+            (("change", "episode"), True),
+            (("episode", "active", "score"), False),
+        )
+
+
+class ChangeIncidentLink(BaseModel):
+    """A versioned manual link retained even after removal from an Incident."""
+
+    id = AutoField()
+    change = ForeignKeyField(Change, backref="incident_links", on_delete="RESTRICT")
+    incident = ForeignKeyField(Incident, backref="change_links", on_delete="RESTRICT")
+    relation_type = CharField(
+        constraints=[Check(
+            "relation_type IN ('context', 'potential_cause', 'confirmed_cause', 'mitigation')"
+        )]
+    )
+    linked_by = ForeignKeyField(
+        User, null=True, backref="linked_incident_changes", on_delete="SET NULL"
+    )
+    linked_at = DateTimeField(default=utc_now)
+    removed_by = ForeignKeyField(
+        User, null=True, backref="removed_incident_changes", on_delete="SET NULL"
+    )
+    removed_at = DateTimeField(null=True)
+    row_version = BigIntegerField(default=1, constraints=[Check("row_version > 0")])
+
+    class Meta:
+        table_name = "change_incident_link"
+        indexes = (
+            (("change", "incident"), True),
+            (("incident", "removed_at"), False),
+        )
