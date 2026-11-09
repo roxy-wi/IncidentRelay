@@ -3,7 +3,7 @@
 Each stage was measured against a fresh PostgreSQL database using the same commands.
 Web: 4 workers × 4 threads, 2 CPU limit. PostgreSQL: 2 CPU limit. Full explain tracing.
 Existing containers were left running, including an old Telegram worker consuming a CPU.
-Intake excludes the Telegram worker, so changes in its row's intake numbers are run variance.
+Intake excludes Telegram and scheduler workers; intake differences after their fixes are run variance.
 Short local runs and tmpfs storage do not establish production capacity.
 
 | Cumulative stage | Idle Telegram SQL/sec | SQL/new alert | Saturated new alerts/sec | p95 at 40 offered/sec | Client arrivals not dispatched | Delivery/sec, 100 ms provider | Delivery/sec, 500 ms provider |
@@ -12,6 +12,7 @@ Short local runs and tmpfs storage do not establish production capacity.
 | 01-telegram | 1.00 | 81 | 38.69 | 3703 ms | 3 / 1200 | 8.64 | 1.92 |
 | 02-sql | 1.00 | 59 | 41.58 | 2890 ms | 64 / 1200 | 8.51 | 1.93 |
 | 03-pool | 1.00 | 59 | 63.82 | 30 ms | 0 / 1200 | 8.59 | 1.93 |
+| 04-delivery | 1.00 | 59 | 67.31 | 58 ms | 0 / 1200 | 54.54 | 12.20 |
 
 The saturation test lasts 20 seconds with 16 concurrent clients. The fixed-rate test offers
 40 events/sec for 30 seconds with at most 64 in flight. Client capacity rejections are not
@@ -21,3 +22,12 @@ batch execution, not the periodic scheduler's cadence. Idle-worker probes last 3
 SQL counts include transaction statements routed through Peewee's execute_sql.
 Raw JSON, SQL profiles, source commits and diffs are stored under results/improvements/.
 See README.md for reproduction; measure_stage.py runs and archives one cumulative stage.
+
+PostgreSQL physical backends used by each 20-request profile: 02-sql: 20; 03-pool: 1; 04-delivery: 1.
+
+## Earlier 50/sec check with Telegram still running
+
+The final code was offered 3000 unique events over 60 seconds.
+It persisted 2998, with 0 HTTP/client transport errors and 2 arrivals not dispatched at the 64-request client limit.
+Throughput including drain was 49.96/sec; p95 was 971 ms and p99 1446 ms.
+This was the earlier environment's edge. Later probes remove the client cap and stop the unused Telegram worker; see CEILING.md.

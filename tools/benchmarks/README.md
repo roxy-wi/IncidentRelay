@@ -83,8 +83,11 @@ docker compose -p ir-capacity-bench -f tools/benchmarks/compose.yml run --rm loa
 Run delivery **last**: it attaches a local-only channel to the unique route,
 clears benchmark pending flags, and schedules the 100 newest unique groups for
 each probe. It invokes one batch directly, so its result measures batch service
-time. The deployed scheduler's 10-second cadence and batch size of 100 impose a
-separate upper bound of 10 groups/sec even when batch execution is faster.
+time. Current PostgreSQL defaults use eight delivery workers and a one-second
+tick with batches of 100. SQLite stays serial. The original baseline used one
+delivery loop and a ten-second tick; see the historical results and the
+[cumulative comparison](IMPROVEMENTS.md). Batch rates do not include waiting for
+the next periodic tick or the configured initial group wait.
 
 Cleanup only the benchmark resources:
 
@@ -99,3 +102,20 @@ correctness. Use real PostgreSQL for these measurements, not pgsqlite.
 The idle-worker probe calls the real Telegram poller repeatedly with no Telegram
 channels, matching the worker's successful-loop behavior. It refuses to run if
 any Telegram channel is configured, so it cannot contact Telegram.
+
+## Comparing fixes
+
+```sh
+python3 tools/benchmarks/measure_stage.py my-unique-stage-label
+python3 tools/benchmarks/render_comparison.py
+```
+
+Each stage resets only the benchmark Compose project and initializes a fresh
+database, then measures intake, SQL count, idle polling, and delayed delivery.
+Use a unique label to preserve previous evidence. The script records the checked
+out commit and diff; its label does not switch code versions. To reproduce an
+older row, use its recorded source commit in a separate checkout.
+
+Raw stage evidence is copied to `results/improvements/`. PostgreSQL backend IDs
+in `profile.json` show physical session reuse across 20 requests. The final
+50/sec minute-long probe is stored separately in `results/final-validation/`.

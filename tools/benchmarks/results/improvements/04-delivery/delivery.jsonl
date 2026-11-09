@@ -1,0 +1,2 @@
+{"processed": 100, "sent": 100, "skipped": 0, "failed": 0, "action": "delivery", "sink_delay_seconds": 0.1, "elapsed_seconds": 1.834, "observed_http_deliveries": 100, "deliveries_per_second": 54.54}
+{"processed": 20, "sent": 20, "skipped": 0, "failed": 0, "action": "delivery", "sink_delay_seconds": 0.5, "elapsed_seconds": 1.639, "observed_http_deliveries": 20, "deliveries_per_second": 12.2}

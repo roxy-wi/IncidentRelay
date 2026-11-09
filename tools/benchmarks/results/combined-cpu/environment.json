@@ -1,0 +1,9 @@
+{
+  "docker_vm_cpus": 4,
+  "web_cpu_limit": 3,
+  "postgres_cpu_limit": 2,
+  "telegram_worker": "stopped",
+  "cpu_measurement": "web + PostgreSQL cgroup v2 usage_usec deltas; load-generator CPU excluded",
+  "source_commit": "62ffd3ce1013811053f36601b2fb884722216709",
+  "storage": "tmpfs, fsync enabled; later maintenance not accounted"
+}

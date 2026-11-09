@@ -4,6 +4,7 @@ Run only with tools/benchmarks/compose.yml: setup refuses other database names.
 No external notification channels are configured by setup.
 """
 import argparse
+import asyncio
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor
 import cProfile
@@ -54,10 +55,10 @@ def payload(run_id, index, mode):
                        "external_id": key, "labels": {"environment": "benchmark", "host": key}}).encode()
 
 
-def request(run_id, index, mode, scheduled=None):
+def request(run_id, index, mode, scheduled=None, timeout=20):
     started = time.monotonic()
     scheduled = started if scheduled is None else scheduled
-    connection = http.client.HTTPConnection("web", 8080, timeout=20)
+    connection = http.client.HTTPConnection("web", 8080, timeout=timeout)
     try:
         connection.request("POST", "/api/integrations/webhook", body=payload(run_id, index, mode),
                            headers={"Authorization": "Bearer " + TOKEN + mode, "Content-Type": "application/json", "Connection": "close"})
@@ -82,10 +83,7 @@ def percentile(values, fraction):
     return round(values[min(len(values)-1, int((len(values)-1)*fraction))] * 1000, 2)
 
 
-def run(args):
-    run_id = uuid.uuid4().hex[:12]
-    started = time.monotonic()
-    stop = started + args.seconds
+def threaded_load(args, run_id, started, stop):
     results = []
     rejected = 0
     offered = 0
@@ -95,7 +93,7 @@ def run(args):
         values = []
         index = worker
         while time.monotonic() < stop:
-            values.append(request(run_id, index, args.mode))
+            values.append(request(run_id, index, args.mode, timeout=args.request_timeout))
             index += args.concurrency
         return values
 
@@ -117,7 +115,7 @@ def run(args):
                 if delay > 0:
                     time.sleep(delay)
                 if slots.acquire(blocking=False):
-                    pool.submit(request, run_id, offered, args.mode, scheduled).add_done_callback(done)
+                    pool.submit(request, run_id, offered, args.mode, scheduled, args.request_timeout).add_done_callback(done)
                 else:
                     rejected += 1
                 offered += 1
@@ -126,10 +124,116 @@ def run(args):
             for future in futures:
                 results.extend(future.result())
             offered = len(results)
+    return results, offered, rejected
+
+
+async def async_request(run_id, index, mode, scheduled, timeout):
+    started = time.monotonic()
+
+    async def exchange():
+        reader, writer = await asyncio.open_connection("web", 8080)
+        try:
+            body = payload(run_id, index, mode)
+            headers = ("POST /api/integrations/webhook HTTP/1.1\r\nHost: web\r\n"
+                       f"Authorization: Bearer {TOKEN}{mode}\r\nContent-Type: application/json\r\n"
+                       f"Content-Length: {len(body)}\r\nConnection: close\r\n\r\n")
+            writer.write(headers.encode() + body)
+            await writer.drain()
+            status = int((await reader.readline()).split()[1])
+            response_headers = {}
+            while True:
+                line = await reader.readline()
+                if line in (b"\r\n", b"\n", b""):
+                    break
+                name, _, value = line.decode().partition(":")
+                response_headers[name.lower()] = value.strip()
+            if response_headers.get("transfer-encoding", "").lower() == "chunked":
+                chunks = []
+                while True:
+                    size = int((await reader.readline()).split(b";", 1)[0].strip(), 16)
+                    if not size:
+                        while (await reader.readline()) not in (b"\r\n", b"\n", b""):
+                            pass
+                        break
+                    chunks.append(await reader.readexactly(size))
+                    await reader.readexactly(2)
+                raw = b"".join(chunks)
+            elif "content-length" in response_headers:
+                raw = await reader.readexactly(int(response_headers["content-length"]))
+            else:
+                raw = await reader.read()
+            return status, raw
+        finally:
+            writer.close()
+            try:
+                await writer.wait_closed()
+            except (ConnectionError, OSError):
+                pass
+
+    try:
+        status, raw = await asyncio.wait_for(exchange(), timeout=timeout)
+        result = json.loads(raw)
+        ok = status == 200 and isinstance(result, list) and len(result) == 1 and bool(result[0].get("group_id")) and result[0].get("processing_status") == "completed"
+        detail = "ok" if ok else f"HTTP {status}: {raw[:350].decode(errors='replace')}"
+    except Exception as exc:
+        ok = False
+        detail = f"{type(exc).__name__}: {exc}"
+    ended = time.monotonic()
+    return ok, ended-started, ended-scheduled, started-scheduled, detail, ended
+
+
+async def async_load(args, run_id, started, stop):
+    results = []
+    pending = set()
+    offered = rejected = peak = 0
+
+    def done(task):
+        pending.discard(task)
+        results.append(task.result())
+
+    if args.rate:
+        while True:
+            scheduled = started + offered / args.rate
+            if scheduled >= stop:
+                break
+            await asyncio.sleep(max(0, scheduled-time.monotonic()))
+            if len(pending) >= args.concurrency:
+                rejected += 1
+            else:
+                task = asyncio.create_task(async_request(run_id, offered, args.mode, scheduled, args.request_timeout))
+                pending.add(task)
+                peak = max(peak, len(pending))
+                task.add_done_callback(done)
+            offered += 1
+        if pending:
+            await asyncio.gather(*list(pending))
+        await asyncio.sleep(max(0, stop-time.monotonic()))
+    else:
+        async def closed(worker):
+            index = worker
+            while time.monotonic() < stop:
+                results.append(await async_request(run_id, index, args.mode, time.monotonic(), args.request_timeout))
+                index += args.concurrency
+        await asyncio.gather(*(closed(worker) for worker in range(args.concurrency)))
+        offered = len(results)
+        peak = args.concurrency
+    return results, offered, rejected, peak
+
+
+def run(args):
+    run_id = uuid.uuid4().hex[:12]
+    started = time.monotonic()
+    stop = started + args.seconds
+    peak = None
+    if args.async_client:
+        results, offered, rejected, peak = asyncio.run(async_load(args, run_id, started, stop))
+    else:
+        results, offered, rejected = threaded_load(args, run_id, started, stop)
     elapsed = time.monotonic() - started
     good = [r for r in results if r[0]]
     record = {"run_id": run_id, "label": args.label, "mode": args.mode, "seconds": args.seconds,
               "transport": "connection-close",
+              "client": "asyncio" if args.async_client else "threads",
               "concurrency": args.concurrency, "offered_rate": args.rate,
               "elapsed_seconds": round(elapsed, 3), "offered": offered, "completed": len(results),
               "success": len(good), "errors": len(results)-len(good), "client_rejected": rejected,
@@ -140,6 +244,17 @@ def run(args):
               "scheduled_p95_ms": percentile([r[2] for r in results], .95),
               "dispatch_p95_ms": percentile([r[3] for r in results], .95),
               "failures": dict(Counter(r[4] for r in results if not r[0]))}
+    if args.async_client:
+        completed_during_offer = sum(r[5] <= stop for r in results)
+        success_during_offer = sum(r[0] and r[5] <= stop for r in results)
+        record.update({"peak_in_flight": peak,
+                       "completion_rate_during_offer": round(success_during_offer/args.seconds, 2),
+                       "backlog_at_offer_end": offered-rejected-completed_during_offer,
+                       "drain_seconds": round(max(0, elapsed-args.seconds), 3),
+                       "request_timeout_seconds": args.request_timeout})
+        warmup = min(5, args.seconds / 2)
+        steady_success = sum(r[0] and started+warmup <= r[5] <= stop for r in results)
+        record["completion_rate_after_warmup"] = round(steady_success/(args.seconds-warmup), 2)
     db = database()
     if args.mode == "unique":
         # Independently confirm reported successes were actually persisted.
@@ -297,8 +412,10 @@ if __name__ == "__main__":
     parser.add_argument("--label", default="")
     parser.add_argument("--sink-delay", type=float, default=0)
     parser.add_argument("--batch-size", type=int, default=100)
+    parser.add_argument("--async-client", action="store_true")
+    parser.add_argument("--request-timeout", type=float, default=20)
     args = parser.parse_args()
-    if args.seconds <= 0 or args.concurrency < 1 or args.rate < 0:
+    if args.seconds <= 0 or args.concurrency < 1 or args.rate < 0 or args.request_timeout <= 0:
         parser.error("seconds and concurrency must be positive; rate must be nonnegative")
     {"setup": setup, "run": lambda: run(args), "profile": profile,
      "delivery": lambda: delivery(args), "idle-worker": lambda: idle_worker(args)}[args.action]()

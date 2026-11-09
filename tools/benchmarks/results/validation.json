@@ -1,0 +1,29 @@
+{
+  "full_suites": {
+    "sqlite": {
+      "tests": 2961,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 18,
+      "passed": 2943,
+      "seconds": 569.792
+    },
+    "postgresql": {
+      "tests": 3026,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 19,
+      "passed": 3007,
+      "seconds": 927.588
+    }
+  },
+  "python": "3.12.13 macOS arm64",
+  "postgresql": "16.15 Linux container; dedicated regression DB; fsync/synchronous_commit/full_page_writes disabled for disposable functional tests",
+  "checks": [
+    "Ruff 0.16.0 full app/tests/benchmarks passed",
+    "Bandit 1.9.4 medium severity/confidence policy passed",
+    "dependency consistency passed",
+    "duplicate test detection passed"
+  ],
+  "application_commit": "62ffd3c"
+}

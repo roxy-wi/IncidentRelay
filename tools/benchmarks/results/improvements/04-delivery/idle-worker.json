@@ -1,0 +1,8 @@
+{
+  "action": "idle_worker",
+  "elapsed_seconds": 3.009,
+  "iterations": 3,
+  "sql_statements": 3,
+  "sql_per_second": 1.0,
+  "python_cpu_seconds": 0.003
+}

@@ -11,7 +11,7 @@ def main():
         "Each stage was measured against a fresh PostgreSQL database using the same commands.",
         "Web: 4 workers × 4 threads, 2 CPU limit. PostgreSQL: 2 CPU limit. Full explain tracing.",
         "Existing containers were left running, including an old Telegram worker consuming a CPU.",
-        "Intake excludes the Telegram worker, so changes in its row's intake numbers are run variance.",
+        "Intake excludes Telegram and scheduler workers; intake differences after their fixes are run variance.",
         "Short local runs and tmpfs storage do not establish production capacity.", "",
         "| Cumulative stage | Idle Telegram SQL/sec | SQL/new alert | Saturated new alerts/sec | p95 at 40 offered/sec | Client arrivals not dispatched | Delivery/sec, 100 ms provider | Delivery/sec, 500 ms provider |",
         "|---|---:|---:|---:|---:|---:|---:|---:|",
@@ -41,6 +41,25 @@ def main():
         "Raw JSON, SQL profiles, source commits and diffs are stored under results/improvements/.",
         "See README.md for reproduction; measure_stage.py runs and archives one cumulative stage.", "",
     ])
+    connection_counts = []
+    for stage in ["02-sql", "03-pool", "04-delivery"]:
+        path = stages / stage / "profile.json"
+        if path.exists():
+            profile = json.loads(path.read_text())
+            connection_counts.append(f"{stage}: {profile.get('postgres_backends_used', 'not recorded')}")
+    if connection_counts:
+        lines.extend(["PostgreSQL physical backends used by each 20-request profile: " + "; ".join(connection_counts) + ".", ""])
+    validation_path = root / "results/final-validation/runs.jsonl"
+    if validation_path.exists():
+        validation = json.loads(validation_path.read_text().splitlines()[-1])
+        assert validation["success"] == validation["persisted_unique_alerts"] == validation["persisted_unique_groups"]
+        lines.extend([
+            "## Earlier 50/sec check with Telegram still running", "",
+            f"The final code was offered {validation['offered']} unique events over {validation['seconds']:g} seconds.",
+            f"It persisted {validation['success']}, with {validation['errors']} HTTP/client transport errors and {validation['client_rejected']} arrivals not dispatched at the 64-request client limit.",
+            f"Throughput including drain was {validation['success_per_second']:.2f}/sec; p95 was {validation['http_p95_ms']:.0f} ms and p99 {validation['http_p99_ms']:.0f} ms.",
+            "This was the earlier environment's edge. Later probes remove the client cap and stop the unused Telegram worker; see CEILING.md.", "",
+        ])
     path = root / "IMPROVEMENTS.md"
     path.write_text("\n".join(lines))
     print(path.read_text())

@@ -1,0 +1,8 @@
+{
+  "docker_vm_cpus": 4,
+  "web_cpu_limit": 2,
+  "postgres_cpu_limit": 2,
+  "telegram_worker": "stopped; optional profile in local override",
+  "request_timeout_seconds": 180,
+  "offered_rate_max_in_flight": 8192
+}

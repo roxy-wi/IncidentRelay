@@ -1,0 +1,9 @@
+{
+  "docker_vm_cpus": 4,
+  "web_cpu_limit": 2,
+  "postgres_cpu_limit": 2,
+  "telegram_worker": "running near one CPU during these measurements",
+  "request_timeout_seconds": 180,
+  "offered_rate_max_in_flight": 8192,
+  "client_fd_limit": 20480
+}

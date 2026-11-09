@@ -2,6 +2,7 @@
 import argparse
 import json
 import os
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -15,7 +16,12 @@ def main():
     parser.add_argument("stage")
     parser.add_argument("--output", default="/tmp/ir-perf-comparison")
     args = parser.parse_args()
+    if not re.fullmatch(r"[A-Za-z0-9][A-Za-z0-9._-]*", args.stage):
+        parser.error("stage must be a plain label without path separators")
     output = Path(args.output).resolve() / args.stage
+    destination = Path("tools/benchmarks/results/improvements") / args.stage
+    if (output / "runs.jsonl").exists() or destination.exists():
+        parser.error("stage already has measurements; choose a new label")
     output.mkdir(parents=True, exist_ok=True)
     env = dict(os.environ, BENCH_RESULTS_DIR=str(output), BENCH_WORKERS="4")
 
@@ -42,7 +48,6 @@ def main():
         "diff": subprocess.check_output(["git", "diff"], text=True),
         "stage": args.stage,
     }, indent=2))
-    destination = Path("tools/benchmarks/results/improvements") / args.stage
     destination.mkdir(parents=True, exist_ok=True)
     for name in ["runs.jsonl", "delivery.jsonl", "idle-worker.json", "profile.txt", "profile.json", "source.json"]:
         shutil.copyfile(output / name, destination / name)
