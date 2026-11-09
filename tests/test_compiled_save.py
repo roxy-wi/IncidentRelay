@@ -2,7 +2,7 @@ from datetime import datetime
 from itertools import count
 
 import pytest
-from peewee import AutoField, BooleanField, DateTimeField, IntegrityError, IntegerField, Model, SQL, TextField
+from peewee import AutoField, BooleanField, DateTimeField, ForeignKeyField, IntegrityError, IntegerField, Model, SQL, TextField
 
 from app.modules.db.compiled_save import _save_template
 from app.modules.db.models import BaseModel, JSONTextField
@@ -192,3 +192,44 @@ def test_standard_and_compiled_saves_produce_same_rows(db, record):
         data.pop("id")
         data.pop("name")
     assert left == right
+
+
+def test_foreign_key_instances_and_reassignment_preserve_identity(db, record):
+    class Child(BaseModel):
+        _compiled_write_sql = True
+        id = AutoField()
+        parent = ForeignKeyField(record)
+
+        class Meta:
+            database = db
+            table_name = "compiled_save_child"
+
+    try:
+        Child.create_table()
+        first = record.create(name="first")
+        second = record.create(name="second")
+        child = Child.create(parent=first)
+        assert child.parent is first
+        assert Child.get_by_id(child.id).parent_id == first.id
+        child.parent = second
+        assert child.save(only=[Child.parent]) == 1
+        assert child.parent is second
+        assert Child.get_by_id(child.id).parent_id == second.id
+    finally:
+        Child.drop_table(safe=True)
+
+
+def test_changed_table_layout_does_not_reuse_cached_write_sql(db, record):
+    original = record._meta.table_name
+    first = record.create(name="first-table")
+    try:
+        record._meta.set_table_name("compiled_save_other_table")
+        record.create_table()
+        second = record.create(name="other-table")
+        second.name = "updated-other"
+        second.save(only=[record.name])
+        assert record.get_by_id(second.id).name == "updated-other"
+    finally:
+        record.drop_table(safe=True)
+        record._meta.set_table_name(original)
+    assert record.get_by_id(first.id).name == "first-table"

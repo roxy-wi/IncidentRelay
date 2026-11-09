@@ -315,17 +315,15 @@ def _create_group(
     orchestration_suppress_reason=None,
 ):
     return alerts_repo.create_alert_group(
-        team=team.id if team else None,
-        route=route.id if route else None,
-        service=service.id if service else None,
-        rotation=rotation.id if rotation else None,
-        escalation_policy=policy.id if policy else None,
-        escalation_rule=policy_rule.id if policy_rule else None,
-        notification_policy=(
-            notification_policy.id if notification_policy else None
-        ),
+        team=team,
+        route=route,
+        service=service,
+        rotation=rotation,
+        escalation_policy=policy,
+        escalation_rule=policy_rule,
+        notification_policy=notification_policy,
         next_escalation_at=next_escalation_at,
-        assignee=assignee.id if assignee else None,
+        assignee=assignee,
         source=alert_data["source"],
         group_key=group_key,
         title=alert_data["title"],
@@ -1223,20 +1221,20 @@ def _upsert_alert(alert_data, trace, runtime=None):
             maybe_apply_maintenance_to_group(group, maintenance_decision)
 
             alert = alerts_repo.create_alert(
-                group=group.id,
-                team=team.id if team else None,
-                route=route.id if route else None,
-                service=service.id if service else None,
-                rotation=rotation.id if rotation else None,
-                escalation_policy=policy.id if policy else None,
-                escalation_rule=policy_rule.id if policy_rule else None,
+                group=group,
+                team=team,
+                route=route,
+                service=service,
+                rotation=rotation,
+                escalation_policy=policy,
+                escalation_rule=policy_rule,
                 notification_policy=(
                     runtime.notification_policy.id
                     if runtime and runtime.notification_policy
                     else getattr(group, "notification_policy_id", None)
                 ),
                 next_escalation_at=next_escalation_at,
-                assignee=assignee.id if assignee else None,
+                assignee=assignee,
                 source=alert_data["source"],
                 external_id=alert_data.get("external_id"),
                 dedup_key=alert_data["dedup_key"],
