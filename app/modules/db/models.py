@@ -24,6 +24,7 @@ from peewee import (
 from app.db import database_proxy
 from app.modules.common import utc_now
 from app.modules.db.compiled_lookup import get_by_primary_key
+from app.modules.db import compiled_save
 
 
 class JSONTextField(TextField):
@@ -47,6 +48,14 @@ class JSONTextField(TextField):
 
 class BaseModel(Model):
     """Base model for all tables."""
+    _compiled_write_sql = False
+
+    def save(self, force_insert=False, only=None):
+        if self._compiled_write_sql and type(self).save is BaseModel.save:
+            result = compiled_save.save(self, force_insert=force_insert, only=only)
+            if result is not compiled_save.NOT_SUPPORTED:
+                return result
+        return super().save(force_insert=force_insert, only=only)
 
     @classmethod
     def get(cls, *query, **filters):
@@ -1900,6 +1909,7 @@ class IncidentEvent(BaseModel):
 
 class AlertGroup(BaseModel):
     """Logical incident/group containing one or more concrete alerts."""
+    _compiled_write_sql = True
 
     id = AutoField()
 
@@ -2130,6 +2140,7 @@ class AlertGroupShelve(BaseModel):
 
 class Alert(BaseModel):
     """Alert stored after normalization and routing."""
+    _compiled_write_sql = True
 
     id = AutoField()
     team = ForeignKeyField(Team, null=True, backref="alerts", on_delete="SET NULL")
@@ -2437,6 +2448,7 @@ class IncidentNotificationDelivery(BaseModel):
 
 class AlertEvent(BaseModel):
     """Alert/group history event."""
+    _compiled_write_sql = True
 
     id = AutoField()
     group = ForeignKeyField(AlertGroup, null=True, backref="events", on_delete="CASCADE")
@@ -2449,6 +2461,7 @@ class AlertEvent(BaseModel):
 
 class AlertExplainTrace(BaseModel):
     """One alert routing/execution explain trace."""
+    _compiled_write_sql = True
 
     id = AutoField()
     trace_id = CharField(unique=True, index=True)
@@ -4100,6 +4113,7 @@ class ChangeJob(BaseModel):
 
 class AlertGroupEpisode(BaseModel):
     """A technical firing cycle with an explicit quality of its start boundary."""
+    _compiled_write_sql = True
 
     id = AutoField()
     uid = UUIDField(default=uuid.uuid4, unique=True)

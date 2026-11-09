@@ -33,6 +33,7 @@ services:
       INCIDENTRELAY_CONFIG_FILE: /opt/incidentrelay/tools/benchmarks/benchmark.conf
       INCIDENTRELAY__ALERTS__EXPLAIN_TRACE_LEVEL: ${BENCH_TRACE_LEVEL:-full}
       BENCH_DISABLE_COMPILED_LOOKUPS: ${BENCH_DISABLE_COMPILED_LOOKUPS:-0}
+      BENCH_DISABLE_COMPILED_WRITES: ${BENCH_DISABLE_COMPILED_WRITES:-0}
     entrypoint: []
     command: [gunicorn, --bind, "0.0.0.0:8080", --workers, "${BENCH_WORKERS:-1}", --threads, "4", --timeout, "60", "tools.benchmarks.app_factory:create_app()"]
     depends_on:
