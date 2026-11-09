@@ -341,6 +341,21 @@ def _create_group(
     )
 
 
+def _sync_orchestration_group_fields(group, *, runtime, suppressed, reason):
+    values = {"orchestration_suppressed": suppressed, "orchestration_suppress_reason": reason}
+    if suppressed:
+        values["next_escalation_at"] = None
+    if runtime is not None and runtime.notification_policy is not None:
+        values["notification_policy"] = runtime.notification_policy.id
+    fields = []
+    for name, value in values.items():
+        if group.__data__.get(name) != value or name in group._dirty:
+            setattr(group, name, value)
+            fields.append(group._meta.fields[name])
+    if fields:
+        group.save(only=fields)
+
+
 def _set_alert_routing_fields(
     alert,
     *,
@@ -1191,19 +1206,10 @@ def _upsert_alert(alert_data, trace, runtime=None):
             else:
                 trace.group_reused(group)
 
-            group.orchestration_suppressed = orchestration_suppressed
-            group.orchestration_suppress_reason = orchestration_suppress_reason
-            group_fields = [
-                group.__class__.orchestration_suppressed,
-                group.__class__.orchestration_suppress_reason,
-            ]
-            if orchestration_suppressed:
-                group.next_escalation_at = None
-                group_fields.append(group.__class__.next_escalation_at)
-            if runtime is not None and runtime.notification_policy is not None:
-                group.notification_policy = runtime.notification_policy.id
-                group_fields.append(group.__class__.notification_policy)
-            group.save(only=group_fields)
+            _sync_orchestration_group_fields(
+                group, runtime=runtime, suppressed=orchestration_suppressed,
+                reason=orchestration_suppress_reason,
+            )
 
             priority_state_before_recalculate = group_priority_state(group)
 

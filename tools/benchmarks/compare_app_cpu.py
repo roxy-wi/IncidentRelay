@@ -33,6 +33,7 @@ def main():
     create_group, create_alert = alerts_repo.create_alert_group, alerts_repo.create_alert
     compiled_first = compiled_select.first
     refresh_impacts = lifecycle.refresh_business_impacts_safely_for_group
+    sync_state = lifecycle._sync_orchestration_group_fields
     rows = []
 
     def scalar_arguments(function):
@@ -46,14 +47,27 @@ def main():
         lifecycle.refresh_alert_group_correlations_safely(group, reason="benchmark_duplicate")
         return result
 
+    def legacy_sync(group, *, runtime, suppressed, reason):
+        group.orchestration_suppressed = suppressed
+        group.orchestration_suppress_reason = reason
+        fields = [type(group).orchestration_suppressed, type(group).orchestration_suppress_reason]
+        if suppressed:
+            group.next_escalation_at = None
+            fields.append(type(group).next_escalation_at)
+        if runtime is not None and runtime.notification_policy is not None:
+            group.notification_policy = runtime.notification_policy.id
+            fields.append(type(group).notification_policy)
+        group.save(only=fields)
+
     def select(variant):
         BaseModel.get = classmethod(Model.get.__func__) if variant == "ordinary" else optimized_get
         BaseModel.save = Model.save if variant in {"ordinary", "lookup"} else optimized_save
         reuse_relations = variant not in {"ordinary", "lookup", "lookup-and-writes"}
         alerts_repo.create_alert_group = create_group if reuse_relations else scalar_arguments(create_group)
         alerts_repo.create_alert = create_alert if reuse_relations else scalar_arguments(create_alert)
-        compiled_select.first = compiled_first if variant in {"selectors", "deduplicate"} else compiled_select.ordinary_first
-        lifecycle.refresh_business_impacts_safely_for_group = refresh_impacts if variant == "deduplicate" else legacy_impacts
+        compiled_select.first = compiled_select.ordinary_first if variant in {"ordinary", "lookup", "lookup-and-writes", "relations"} else compiled_first
+        lifecycle.refresh_business_impacts_safely_for_group = refresh_impacts if variant in {"deduplicate", "state-writes"} else legacy_impacts
+        lifecycle._sync_orchestration_group_fields = sync_state if variant == "state-writes" else legacy_sync
 
     def send(run_id, index):
         response = client.post("/api/integrations/webhook", data=payload(run_id, index, "unique"),
@@ -64,7 +78,7 @@ def main():
 
     try:
         for round_number in range(args.rounds):
-            variants = ["ordinary", "lookup", "lookup-and-writes", "relations", "selectors", "deduplicate"]
+            variants = ["ordinary", "lookup", "lookup-and-writes", "relations", "selectors", "deduplicate", "state-writes"]
             if round_number % 2:
                 variants.reverse()
             ids = {variant: uuid.uuid4().hex for variant in variants}
@@ -105,6 +119,7 @@ def main():
         alerts_repo.create_alert_group, alerts_repo.create_alert = create_group, create_alert
         compiled_select.first = compiled_first
         lifecycle.refresh_business_impacts_safely_for_group = refresh_impacts
+        lifecycle._sync_orchestration_group_fields = sync_state
     result = {"scope": "app process incl Flask test client; excludes PG CPU, server and network", "rows": rows,
               "median_app_cpu_ms_per_event": {
                   variant: round(statistics.median(row["app_cpu_ms_per_event"] for row in rows if row["variant"] == variant), 3)
