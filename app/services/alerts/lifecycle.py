@@ -65,7 +65,7 @@ from app.services.routing.service_resolution import (
     resolve_alert_service,
 )
 from app.services.silences import find_active_silences, record_new_alert_silences
-from app.services.alerts.correlation import refresh_alert_group_correlations, refresh_alert_group_correlations_safely
+from app.services.alerts.correlation import refresh_alert_group_correlations_safely
 from app.services.business_services.impact import refresh_business_impacts_safely_for_group
 from app.services.business_services.status import refresh_business_services_safely_for_technical_service
 
@@ -1384,19 +1384,6 @@ def _upsert_alert(alert_data, trace, runtime=None):
                     "project_slug": labels.get("project_slug") or "",
                     "organization_slug": labels.get("organization_slug") or "",
                     "label_keys": sorted(labels.keys()),
-                }
-            },
-        )
-
-    try:
-        refresh_alert_group_correlations(group)
-    except Exception:
-        logger.exception(
-            "alert group correlation refresh failed",
-            extra={
-                "extra": {
-                    "alert_group_id": getattr(group, "id", None),
-                    "service_id": getattr(group, "service_id", None),
                 }
             },
         )

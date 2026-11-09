@@ -1,7 +1,8 @@
 import pytest
+from peewee import AutoField, BooleanField, TextField
 
 from app.modules.db import alerts_repo, compiled_select
-from app.modules.db.models import Alert, AlertGroup
+from app.modules.db.models import Alert, AlertGroup, BaseModel
 from tests.factories import create_group, create_route, create_team
 
 
@@ -64,3 +65,32 @@ def test_cached_group_lookup_binds_each_identity_and_excludes_terminal_groups(db
 def test_null_selector_inputs_retain_original_expression_semantics(db):
     assert alerts_repo.find_existing_alert(None, None) is None
     assert alerts_repo.find_open_alert_group(None, None) is None
+
+
+def test_custom_select_security_filter_is_not_bypassed(db):
+    class Record(BaseModel):
+        id = AutoField()
+        name = TextField()
+        visible = BooleanField(default=False)
+
+        @classmethod
+        def select(cls, *fields):
+            return super().select(*fields).where(cls.visible == True)  # noqa: E712
+
+        class Meta:
+            database = db
+            table_name = "compiled_selector_filtered"
+
+    def query(parameters):
+        return Record.select().where(Record.name == parameters["name"])
+
+    try:
+        Record.create_table()
+        row = Record.create(name="hidden")
+        bindings = {"name": (Record.name, "hidden")}
+        assert compiled_select.first(Record, query, bindings) is None
+        row.visible = True
+        row.save()
+        assert compiled_select.first(Record, query, bindings).id == row.id
+    finally:
+        Record.drop_table(safe=True)

@@ -15,6 +15,7 @@ from peewee import Model
 from app import create_app
 from app.modules.db import alerts_repo, compiled_select
 from app.modules.db.models import Alert, AlertExplainTrace, BaseModel
+from app.services.alerts import lifecycle
 from tools.benchmarks.capacity import TOKEN, database, payload
 
 
@@ -31,6 +32,7 @@ def main():
     optimized_save = BaseModel.save
     create_group, create_alert = alerts_repo.create_alert_group, alerts_repo.create_alert
     compiled_first = compiled_select.first
+    refresh_impacts = lifecycle.refresh_business_impacts_safely_for_group
     rows = []
 
     def scalar_arguments(function):
@@ -39,12 +41,19 @@ def main():
                                for name, value in kwargs.items()})
         return create
 
+    def legacy_impacts(group, *args, **kwargs):
+        result = refresh_impacts(group, *args, **kwargs)
+        lifecycle.refresh_alert_group_correlations_safely(group, reason="benchmark_duplicate")
+        return result
+
     def select(variant):
         BaseModel.get = classmethod(Model.get.__func__) if variant == "ordinary" else optimized_get
-        BaseModel.save = optimized_save if variant in {"lookup-and-writes", "relations", "selectors"} else Model.save
-        alerts_repo.create_alert_group = create_group if variant in {"relations", "selectors"} else scalar_arguments(create_group)
-        alerts_repo.create_alert = create_alert if variant in {"relations", "selectors"} else scalar_arguments(create_alert)
-        compiled_select.first = compiled_first if variant == "selectors" else compiled_select.ordinary_first
+        BaseModel.save = Model.save if variant in {"ordinary", "lookup"} else optimized_save
+        reuse_relations = variant not in {"ordinary", "lookup", "lookup-and-writes"}
+        alerts_repo.create_alert_group = create_group if reuse_relations else scalar_arguments(create_group)
+        alerts_repo.create_alert = create_alert if reuse_relations else scalar_arguments(create_alert)
+        compiled_select.first = compiled_first if variant in {"selectors", "deduplicate"} else compiled_select.ordinary_first
+        lifecycle.refresh_business_impacts_safely_for_group = refresh_impacts if variant == "deduplicate" else legacy_impacts
 
     def send(run_id, index):
         response = client.post("/api/integrations/webhook", data=payload(run_id, index, "unique"),
@@ -55,7 +64,7 @@ def main():
 
     try:
         for round_number in range(args.rounds):
-            variants = ["ordinary", "lookup", "lookup-and-writes", "relations", "selectors"]
+            variants = ["ordinary", "lookup", "lookup-and-writes", "relations", "selectors", "deduplicate"]
             if round_number % 2:
                 variants.reverse()
             ids = {variant: uuid.uuid4().hex for variant in variants}
@@ -95,6 +104,7 @@ def main():
         BaseModel.save = optimized_save
         alerts_repo.create_alert_group, alerts_repo.create_alert = create_group, create_alert
         compiled_select.first = compiled_first
+        lifecycle.refresh_business_impacts_safely_for_group = refresh_impacts
     result = {"scope": "app process incl Flask test client; excludes PG CPU, server and network", "rows": rows,
               "median_app_cpu_ms_per_event": {
                   variant: round(statistics.median(row["app_cpu_ms_per_event"] for row in rows if row["variant"] == variant), 3)
