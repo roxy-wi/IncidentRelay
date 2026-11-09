@@ -1,0 +1,8 @@
+{
+  "commit": "e72ab50e525dbc1ccedf56be6bc6643bbe8abe9b",
+  "web_cpu_limit": 3,
+  "postgres_cpu_limit": 2,
+  "telegram_worker": "stopped",
+  "target_requests_per_second": 500,
+  "notes": "Shared four-CPU Docker VM; tmpfs PG; no concurrent regression runs. Target is aggregate completed HTTP requests/sec, not 500 per core."
+}

@@ -68,6 +68,48 @@ exclusion, isolate correlation refresh failures, persist preexisting dirty state
 and leave unrelated escalation fields untouched during recalculation. Focused
 regression tests cover those behaviors on PostgreSQL and SQLite.
 
+## Final complete-processing HTTP measurements
+
+The final code was tested with full traces, four Gunicorn processes with four
+threads each, a three-CPU web allowance, a two-CPU PostgreSQL allowance, and the
+same shared four-CPU Docker VM. These are allowances, not dedicated cores. The
+unused Telegram worker remains off. PostgreSQL data/WAL use tmpfs, so these are
+short local synthetic measurements, not durable-disk production guarantees.
+
+| Load | Completed/sec during 20-second offer | Completed/sec including drain | HTTP p95 | Backlog at offer end |
+|---|---:|---:|---:|---:|
+| Saturation, 128 clients | 262.25 | 261.23 | 1055 ms | 128 |
+| 75/sec | 75.00 | 75.00 | 13 ms | 0 |
+| 100/sec | 100.00 | 99.98 | 13 ms | 0 |
+| 150/sec | 149.95 | 149.92 | 23 ms | 1 |
+| 500/sec | 238.90 | 208.92 | 25897 ms | 5222 |
+
+Every dispatched event succeeded and was independently matched to a persisted
+Alert and distinct AlertGroup. Arrival-rate probes allow 16,384 in-flight requests
+and a 300-second timeout; none were rejected by the client. The 500/sec probe
+persisted all 10,000 events, but required another 27.865 seconds to drain after
+the offer ended. **500 requests/sec sustained was not achieved.**
+
+The original measured saturation ceiling was 32.91/sec. After the earlier fixes
+and environment changes it was 102.58/sec. The first three Python changes in this
+pass measured 244.47/sec; the complete pass measured 261.23/sec. These runs span
+host/resource changes and pronounced shared-machine variability, so the overall
+7.9x rise from the original ceiling must not be attributed solely to Python code.
+The controlled app-process table above isolates the Python changes more directly.
+
+The overload result is also retained even though it is worse than the earlier
+three-change run's 225.24/sec including drain. At 500 offered/sec, both app and PG
+CPU/event rose substantially. Peak saturation rate and overloaded drain rate are
+separate measurements; quoting 261/sec as a sustained 500/sec result would be
+incorrect. Raw final evidence is in `results/15-python-complete-capacity/`.
+
+Full final Linux/Python 3.12.16 suites passed: PostgreSQL 2,991 passed/66 skipped,
+SQLite 2,927 passed/65 skipped. The image lacks Helm; all 47 skipped Helm contracts
+passed separately on the macOS host. Remaining skips require browser/Node/promtool
+or the other database backend. Ruff, Bandit medium/high checks, dependency
+consistency, duplicate-test detection, schema and templates passed. See
+`results/python-final-validation.json` for exact counts and source metadata.
+
 ## Container A/B results retained
 
 The earlier end-to-end measurements use four Gunicorn workers, four threads each,

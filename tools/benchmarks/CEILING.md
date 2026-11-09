@@ -1,5 +1,10 @@
 # Processing ceiling and local CPU constraints
 
+This records the earlier checkpoint. See [the completed Python pass](PYTHON-CPU.md)
+for the latest measured 261/sec saturation result and the 500/sec overload probe.
+The current target is 500 completed requests/sec total; the per-core target below
+is historical.
+
 The observed processing plateau rose from roughly 50–60 events/sec with the old Telegram worker
 running to roughly 100–105/sec with it stopped and the benchmark web CPU limit raised to three.
 All cases use the same processing code, complete full traces, unique alerts/groups, four Gunicorn
