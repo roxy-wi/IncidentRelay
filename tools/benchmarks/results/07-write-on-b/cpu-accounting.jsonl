@@ -1,0 +1,1 @@
+{"label": "w4-unique-r40.0-pg2-web3-s20-async", "run_id": "1df62711e7b4", "events": 800, "web_cpu_seconds": 30.248564, "postgres_cpu_seconds": 20.454669, "combined_cpu_seconds": 50.703233, "web_cpu_ms_per_event": 37.811, "postgres_cpu_ms_per_event": 25.568, "combined_cpu_ms_per_event": 63.379, "events_per_combined_cpu_second": 15.78, "target_events_per_combined_cpu_second": 500}

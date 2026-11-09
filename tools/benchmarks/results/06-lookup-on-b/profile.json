@@ -1,0 +1,497 @@
+{
+  "requests": 20,
+  "counts": {
+    "SELECT": 760,
+    "INSERT": 140,
+    "SAVEPOINT": 40,
+    "UPDATE": 200,
+    "RELEASE": 40
+  },
+  "postgres_backends_used": 1,
+  "queries": [
+    {
+      "sql": "SELECT \"t1\".\"id\", \"t1\".\"deleted\", \"t1\".\"deleted_at\", \"t1\".\"group_id\", \"t1\".\"slug\", \"t1\".\"name\", \"t1\".\"description\", \"t1\".\"escalation_enabled\", \"t1\".\"escalation_after_reminders\", \"t1\".\"active\", \"t1\".\"created_at\" FROM \"team\" AS \"t1\" WHERE (\"t1\".\"id\" = %s) LIMIT %s OFFSET %s",
+      "calls": 100
+    },
+    {
+      "sql": "SELECT \"t1\".\"id\", \"t1\".\"deleted\", \"t1\".\"deleted_at\", \"t1\".\"team_id\", \"t1\".\"name\", \"t1\".\"source\", \"t1\".\"rotation_id\", \"t1\".\"escalation_policy_id\", \"t1\".\"matcher_preset_id\", \"t1\".\"matchers\", \"t1\".\"group_by\", \"t1\".\"integration_config\", \"t1\".\"notification_channel_mode\", \"t1\".\"intake_token_prefix\", \"t1\".\"intake_token_hash\", \"t1\".\"enabled\", \"t1\".\"created_at\", \"t1\".\"service_id\" FROM \"alertroute\" AS \"t1\" WHERE (\"t1\".\"id\" = %s) LIMIT %s OFFSET %s",
+      "calls": 60
+    },
+    {
+      "sql": "SELECT DISTINCT \"t1\".\"id\", \"t1\".\"deleted\", \"t1\".\"deleted_at\", \"t1\".\"group_id\", \"t1\".\"team_id\", \"t1\".\"name\", \"t1\".\"description\", \"t1\".\"starts_at\", \"t1\".\"ends_at\", \"t1\".\"timezone\", \"t1\".\"rrule\", \"t1\".\"behavior\", \"t1\".\"status\", \"t1\".\"enabled\", \"t1\".\"apply_to_existing\", \"t1\".\"reactivate_on_end\", \"t1\".\"reconciled_at\", \"t1\".\"created_by_id\", \"t1\".\"cancelled_by_id\", \"t1\".\"cancelled_at\", \"t1\".\"cancel_reason\", \"t1\".\"created_at\", \"t1\".\"updated_at\" FROM \"maintenance_window\" AS \"t1\" INNER JOIN \"maintenance_window_scope\" AS \"t2\" ON (\"t2\".\"maintenance_window_id\" = \"t1\".\"id\") WHERE ((((\"t1\".\"deleted\" = %s) AND (\"t1\".\"enabled\" = %s)) AND (\"t1\".\"status\" IN (%s, %s))) AND ((((\"t2\".\"scope_type\" = %s) AND (\"t2\".\"group_id\" = %s)) OR ((\"t2\".\"scope_type\" = %s) AND (\"t2\".\"team_id\" = %s))) OR ((\"t2\".\"scope_type\" = %s) AND (\"t2\".\"route_id\" = %s)))) ORDER BY \"t1\".\"starts_at\" DESC, \"t1\".\"id\" DESC",
+      "calls": 60
+    },
+    {
+      "sql": "SELECT \"t1\".\"id\", \"t1\".\"uid\", \"t1\".\"alert_group_id\", \"t1\".\"ordinal\", \"t1\".\"started_at\", \"t1\".\"ended_at\", \"t1\".\"state\", \"t1\".\"start_quality\", \"t1\".\"start_event_id\", \"t1\".\"end_event_id\", \"t1\".\"correlation_context\", \"t1\".\"correlation_service_id\", \"t1\".\"context_revision\", \"t1\".\"created_at\" FROM \"alert_group_episode\" AS \"t1\" WHERE (\"t1\".\"id\" = %s) LIMIT %s OFFSET %s",
+      "calls": 60
+    },
+    {
+      "sql": "SELECT \"t1\".\"id\", \"t1\".\"deleted\", \"t1\".\"deleted_at\", \"t1\".\"slug\", \"t1\".\"name\", \"t1\".\"description\", \"t1\".\"active\", \"t1\".\"created_at\" FROM \"oncall_group\" AS \"t1\" WHERE (\"t1\".\"id\" = %s) LIMIT %s OFFSET %s",
+      "calls": 40
+    },
+    {
+      "sql": "UPDATE \"alert_group_episode\" SET \"correlation_context\" = %s, \"correlation_service_id\" = %s, \"context_revision\" = %s WHERE (\"alert_group_episode\".\"id\" = %s)",
+      "calls": 40
+    },
+    {
+      "sql": "INSERT INTO \"alertevent\" (\"group_id\", \"alert_id\", \"event_type\", \"message\", \"user_id\", \"created_at\") VALUES (%s, %s, %s, %s, %s, %s) RETURNING \"alertevent\".\"id\"",
+      "calls": 40
+    },
+    {
+      "sql": "SELECT \"t1\".\"id\", \"t1\".\"team_id\", \"t1\".\"root_service_id\", \"t1\".\"related_service_id\", \"t1\".\"dependency_id\", \"t1\".\"relation_type\", \"t1\".\"direction\", \"t1\".\"score\", \"t1\".\"depth\", \"t1\".\"dependency_type\", \"t1\".\"criticality\", \"t1\".\"reason\", \"t1\".\"active\", \"t1\".\"first_seen_at\", \"t1\".\"last_seen_at\", \"t1\".\"updated_at\", \"t1\".\"created_at\", \"t1\".\"context\", \"t1\".\"root_group_id\", \"t1\".\"related_group_id\" FROM \"alert_group_correlation\" AS \"t1\" WHERE (((\"t1\".\"root_group_id\" = %s) OR (\"t1\".\"related_group_id\" = %s)) AND (\"t1\".\"active\" = %s))",
+      "calls": 40
+    },
+    {
+      "sql": "SELECT \"t1\".\"id\", \"t1\".\"deleted\", \"t1\".\"deleted_at\", \"t1\".\"user_id\", \"t1\".\"group_id\", \"t1\".\"team_id\", \"t1\".\"change_integration_id\", \"t1\".\"name\", \"t1\".\"token_prefix\", \"t1\".\"token_hash\", \"t1\".\"scopes\", \"t1\".\"expires_at\", \"t1\".\"active\", \"t1\".\"created_at\", \"t1\".\"last_used_at\" FROM \"apitoken\" AS \"t1\" WHERE ((\"t1\".\"token_hash\" = %s) AND (\"t1\".\"change_integration_id\" IS NOT NULL)) LIMIT %s OFFSET %s",
+      "calls": 20
+    },
+    {
+      "sql": "SELECT \"t1\".\"id\", \"t1\".\"deleted\", \"t1\".\"deleted_at\", \"t1\".\"user_id\", \"t1\".\"group_id\", \"t1\".\"team_id\", \"t1\".\"change_integration_id\", \"t1\".\"name\", \"t1\".\"token_prefix\", \"t1\".\"token_hash\", \"t1\".\"scopes\", \"t1\".\"expires_at\", \"t1\".\"active\", \"t1\".\"created_at\", \"t1\".\"last_used_at\" FROM \"apitoken\" AS \"t1\" WHERE (((\"t1\".\"token_hash\" = %s) AND (\"t1\".\"active\" = %s)) AND (\"t1\".\"deleted\" = %s)) LIMIT %s OFFSET %s",
+      "calls": 20
+    },
+    {
+      "sql": "SELECT \"t1\".\"id\", \"t1\".\"deleted\", \"t1\".\"deleted_at\", \"t1\".\"team_id\", \"t1\".\"name\", \"t1\".\"source\", \"t1\".\"rotation_id\", \"t1\".\"escalation_policy_id\", \"t1\".\"matcher_preset_id\", \"t1\".\"matchers\", \"t1\".\"group_by\", \"t1\".\"integration_config\", \"t1\".\"notification_channel_mode\", \"t1\".\"intake_token_prefix\", \"t1\".\"intake_token_hash\", \"t1\".\"enabled\", \"t1\".\"created_at\", \"t1\".\"service_id\", \"t2\".\"id\", \"t2\".\"deleted\", \"t2\".\"deleted_at\", \"t2\".\"group_id\", \"t2\".\"slug\", \"t2\".\"name\", \"t2\".\"description\", \"t2\".\"escalation_enabled\", \"t2\".\"escalation_after_reminders\", \"t2\".\"active\", \"t2\".\"created_at\", \"t3\".\"id\", \"t3\".\"deleted\", \"t3\".\"deleted_at\", \"t3\".\"slug\", \"t3\".\"name\", \"t3\".\"description\", \"t3\".\"active\", \"t3\".\"created_at\" FROM \"alertroute\" AS \"t1\" INNER JOIN \"team\" AS \"t2\" ON (\"t1\".\"team_id\" = \"t2\".\"id\") INNER JOIN \"oncall_group\" AS \"t3\" ON (\"t2\".\"group_id\" = \"t3\".\"id\") WHERE (((((((\"t1\".\"intake_token_hash\" = %s) AND (\"t1\".\"enabled\" = %s)) AND (\"t1\".\"deleted\" = %s)) AND (\"t2\".\"active\" = %s)) AND (\"t2\".\"deleted\" = %s)) AND (\"t3\".\"active\" = %s)) AND (\"t3\".\"deleted\" = %s)) LIMIT %s",
+      "calls": 20
+    },
+    {
+      "sql": "SELECT \"t1\".\"id\", \"t1\".\"deleted\", \"t1\".\"deleted_at\", \"t1\".\"uid\", \"t1\".\"group_id\", \"t1\".\"name\", \"t1\".\"description\", \"t1\".\"scope\", \"t1\".\"service_id\", \"t1\".\"enabled\", \"t1\".\"mode\", \"t1\".\"compatibility_mode\", \"t1\".\"active_version_id\", \"t1\".\"created_by_id\", \"t1\".\"created_at\", \"t1\".\"updated_at\" FROM \"event_orchestration\" AS \"t1\" WHERE (((((((\"t1\".\"group_id\" = %s) AND (\"t1\".\"scope\" = %s)) AND (\"t1\".\"enabled\" = %s)) AND (\"t1\".\"mode\" IN (%s, %s))) AND (\"t1\".\"active_version_id\" IS NOT NULL)) AND (\"t1\".\"deleted\" = %s)) AND (\"t1\".\"deleted_at\" IS NULL)) ORDER BY \"t1\".\"id\" ASC",
+      "calls": 20
+    },
+    {
+      "sql": "INSERT INTO \"alertexplaintrace\" (\"trace_id\", \"mode\", \"trace_level\", \"source\", \"dedup_key\", \"status\", \"input_summary\", \"started_at\") VALUES (%s, %s, %s, %s, %s, %s, %s, %s) RETURNING \"alertexplaintrace\".\"id\"",
+      "calls": 20
+    },
+    {
+      "sql": "SELECT \"t1\".\"id\", \"t1\".\"deleted\", \"t1\".\"deleted_at\", \"t1\".\"team_id\", \"t1\".\"name\", \"t1\".\"source\", \"t1\".\"rotation_id\", \"t1\".\"escalation_policy_id\", \"t1\".\"matcher_preset_id\", \"t1\".\"matchers\", \"t1\".\"group_by\", \"t1\".\"integration_config\", \"t1\".\"notification_channel_mode\", \"t1\".\"intake_token_prefix\", \"t1\".\"intake_token_hash\", \"t1\".\"enabled\", \"t1\".\"created_at\", \"t1\".\"service_id\" FROM \"alertroute\" AS \"t1\" WHERE ((\"t1\".\"id\" = %s) AND (\"t1\".\"deleted\" = %s)) LIMIT %s OFFSET %s",
+      "calls": 20
+    },
+    {
+      "sql": "SELECT \"t1\".\"id\", \"t1\".\"deleted\", \"t1\".\"deleted_at\", \"t1\".\"team_id\", \"t1\".\"route_id\", \"t1\".\"service_id\", \"t1\".\"position\", \"t1\".\"name\", \"t1\".\"description\", \"t1\".\"matcher_preset_id\", \"t1\".\"matchers\", \"t1\".\"enabled\", \"t1\".\"created_at\", \"t1\".\"updated_at\", \"t2\".\"id\", \"t2\".\"deleted\", \"t2\".\"deleted_at\", \"t2\".\"uid\", \"t2\".\"kind\", \"t2\".\"lifecycle\", \"t2\".\"group_id\", \"t2\".\"team_id\", \"t2\".\"slug\", \"t2\".\"name\", \"t2\".\"description\", \"t2\".\"service_type\", \"t2\".\"environment\", \"t2\".\"criticality\", \"t2\".\"tier\", \"t2\".\"status\", \"t2\".\"status_source\", \"t2\".\"status_message\", \"t2\".\"status_updated_at\", \"t2\".\"status_updated_by_id\", \"t2\".\"default_rotation_id\", \"t2\".\"default_escalation_policy_id\", \"t2\".\"notification_policy_id\", \"t2\".\"labels\", \"t2\".\"tags\", \"t2\".\"metadata\", \"t2\".\"enabled\", \"t2\".\"public\", \"t2\".\"public_name\", \"t2\".\"public_description\", \"t2\".\"public_order\", \"t2\".\"change_correlation_enabled\", \"t2\".\"change_correlation_exclusions\", \"t2\".\"created_at\", \"t2\".\"updated_at\", \"t2\".\"priority_policy_id\" FROM \"service_match_rule\" AS \"t1\" INNER JOIN \"service\" AS \"t2\" ON (\"t1\".\"service_id\" = \"t2\".\"id\") WHERE (((((((\"t1\".\"team_id\" = %s) AND (\"t1\".\"route_id\" = %s)) AND (\"t1\".\"enabled\" = %s)) AND (\"t1\".\"deleted\" = %s)) AND (\"t2\".\"enabled\" = %s)) AND (\"t2\".\"deleted\" = %s)) AND (\"t2\".\"team_id\" = %s)) ORDER BY \"t1\".\"position\" ASC, \"t1\".\"id\" ASC",
+      "calls": 20
+    },
+    {
+      "sql": "SELECT \"t1\".\"id\", \"t1\".\"deleted\", \"t1\".\"deleted_at\", \"t1\".\"team_id\", \"t1\".\"route_id\", \"t1\".\"service_id\", \"t1\".\"position\", \"t1\".\"name\", \"t1\".\"description\", \"t1\".\"matcher_preset_id\", \"t1\".\"matchers\", \"t1\".\"enabled\", \"t1\".\"created_at\", \"t1\".\"updated_at\", \"t2\".\"id\", \"t2\".\"deleted\", \"t2\".\"deleted_at\", \"t2\".\"uid\", \"t2\".\"kind\", \"t2\".\"lifecycle\", \"t2\".\"group_id\", \"t2\".\"team_id\", \"t2\".\"slug\", \"t2\".\"name\", \"t2\".\"description\", \"t2\".\"service_type\", \"t2\".\"environment\", \"t2\".\"criticality\", \"t2\".\"tier\", \"t2\".\"status\", \"t2\".\"status_source\", \"t2\".\"status_message\", \"t2\".\"status_updated_at\", \"t2\".\"status_updated_by_id\", \"t2\".\"default_rotation_id\", \"t2\".\"default_escalation_policy_id\", \"t2\".\"notification_policy_id\", \"t2\".\"labels\", \"t2\".\"tags\", \"t2\".\"metadata\", \"t2\".\"enabled\", \"t2\".\"public\", \"t2\".\"public_name\", \"t2\".\"public_description\", \"t2\".\"public_order\", \"t2\".\"change_correlation_enabled\", \"t2\".\"change_correlation_exclusions\", \"t2\".\"created_at\", \"t2\".\"updated_at\", \"t2\".\"priority_policy_id\" FROM \"service_match_rule\" AS \"t1\" INNER JOIN \"service\" AS \"t2\" ON (\"t1\".\"service_id\" = \"t2\".\"id\") WHERE (((((((\"t1\".\"team_id\" = %s) AND (\"t1\".\"route_id\" IS NULL)) AND (\"t1\".\"enabled\" = %s)) AND (\"t1\".\"deleted\" = %s)) AND (\"t2\".\"enabled\" = %s)) AND (\"t2\".\"deleted\" = %s)) AND (\"t2\".\"team_id\" = %s)) ORDER BY \"t1\".\"position\" ASC, \"t1\".\"id\" ASC",
+      "calls": 20
+    },
+    {
+      "sql": "SELECT \"t1\".\"id\", \"t1\".\"deleted\", \"t1\".\"deleted_at\", \"t1\".\"team_id\", \"t1\".\"name\", \"t1\".\"description\", \"t1\".\"enabled\", \"t1\".\"default_for_team\", \"t1\".\"update_mode\", \"t1\".\"source_priority_mode\", \"t1\".\"fallback_mode\", \"t1\".\"fallback_priority_id\", \"t1\".\"created_at\", \"t1\".\"updated_at\" FROM \"priority_policy\" AS \"t1\" WHERE ((((\"t1\".\"team_id\" = %s) AND (\"t1\".\"default_for_team\" = %s)) AND (\"t1\".\"deleted\" = %s)) AND (\"t1\".\"enabled\" = %s)) ORDER BY \"t1\".\"id\" ASC LIMIT %s",
+      "calls": 20
+    },
+    {
+      "sql": "SELECT \"t1\".\"slug\" FROM \"incident_priority\" AS \"t1\" WHERE (\"t1\".\"slug\" IN (%s, %s, %s, %s, %s))",
+      "calls": 20
+    },
+    {
+      "sql": "SELECT \"t1\".\"id\", \"t1\".\"slug\", \"t1\".\"name\", \"t1\".\"description\", \"t1\".\"level\", \"t1\".\"color\", \"t1\".\"enabled\", \"t1\".\"default\", \"t1\".\"created_at\", \"t1\".\"updated_at\" FROM \"incident_priority\" AS \"t1\" WHERE ((\"t1\".\"slug\" = %s) AND (\"t1\".\"enabled\" = %s)) LIMIT %s OFFSET %s",
+      "calls": 20
+    },
+    {
+      "sql": "SELECT \"t1\".\"id\", \"t1\".\"team_id\", \"t1\".\"route_id\", \"t1\".\"rotation_id\", \"t1\".\"escalation_policy_id\", \"t1\".\"escalation_rule_id\", \"t1\".\"notification_policy_id\", \"t1\".\"next_escalation_at\", \"t1\".\"last_escalated_at\", \"t1\".\"escalation_repeat_count\", \"t1\".\"assignee_id\", \"t1\".\"source\", \"t1\".\"external_id\", \"t1\".\"dedup_key\", \"t1\".\"group_key\", \"t1\".\"title\", \"t1\".\"message\", \"t1\".\"severity\", \"t1\".\"priority_id\", \"t1\".\"priority_slug\", \"t1\".\"priority_order\", \"t1\".\"maintenance_window_id\", \"t1\".\"maintenance_behavior\", \"t1\".\"maintenance_suppressed\", \"t1\".\"orchestration_suppressed\", \"t1\".\"orchestration_suppress_reason\", \"t1\".\"labels\", \"t1\".\"payload\", \"t1\".\"status\", \"t1\".\"previous_status\", \"t1\".\"acknowledged_by_id\", \"t1\".\"acknowledged_at\", \"t1\".\"first_seen_at\", \"t1\".\"last_seen_at\", \"t1\".\"last_notification_at\", \"t1\".\"reminder_count\", \"t1\".\"escalation_level\", \"t1\".\"silenced\", \"t1\".\"resolved_at\", \"t1\".\"service_id\", \"t1\".\"group_id\" FROM \"alert\" AS \"t1\" WHERE (((\"t1\".\"source\" = %s) AND (\"t1\".\"dedup_key\" = %s)) AND (\"t1\".\"status\" != %s)) ORDER BY \"t1\".\"id\" DESC LIMIT %s",
+      "calls": 20
+    },
+    {
+      "sql": "SELECT \"t1\".\"id\", \"t1\".\"team_id\", \"t1\".\"route_id\", \"t1\".\"service_id\", \"t1\".\"rotation_id\", \"t1\".\"escalation_policy_id\", \"t1\".\"escalation_rule_id\", \"t1\".\"notification_policy_id\", \"t1\".\"next_escalation_at\", \"t1\".\"last_escalated_at\", \"t1\".\"escalation_repeat_count\", \"t1\".\"escalation_level\", \"t1\".\"assignee_id\", \"t1\".\"source\", \"t1\".\"group_key_hash\", \"t1\".\"group_key\", \"t1\".\"title\", \"t1\".\"message\", \"t1\".\"severity\", \"t1\".\"common_labels\", \"t1\".\"label_values\", \"t1\".\"payload_summary\", \"t1\".\"status\", \"t1\".\"previous_status\", \"t1\".\"acknowledged_by_id\", \"t1\".\"acknowledged_at\", \"t1\".\"resolved_by_id\", \"t1\".\"resolved_at\", \"t1\".\"first_seen_at\", \"t1\".\"last_seen_at\", \"t1\".\"last_notification_at\", \"t1\".\"notification_due_at\", \"t1\".\"notification_pending\", \"t1\".\"notification_reason\", \"t1\".\"alert_count\", \"t1\".\"firing_count\", \"t1\".\"acknowledged_count\", \"t1\".\"resolved_count\", \"t1\".\"silenced_count\", \"t1\".\"reminder_count\", \"t1\".\"silenced\", \"t1\".\"merged_into_id\", \"t1\".\"merged_by_id\", \"t1\".\"merged_at\", \"t1\".\"merge_reason\", \"t1\".\"created_at\", \"t1\".\"updated_at\", \"t1\".\"priority_id\", \"t1\".\"priority_slug\", \"t1\".\"priority_order\", \"t1\".\"priority_set_manually\", \"t1\".\"priority_set_by_id\", \"t1\".\"priority_set_at\", \"t1\".\"maintenance_window_id\", \"t1\".\"maintenance_behavior\", \"t1\".\"maintenance_suppressed\", \"t1\".\"orchestration_suppressed\", \"t1\".\"orchestration_suppress_reason\", \"t1\".\"current_episode_id\" FROM \"alert_group\" AS \"t1\" WHERE ((((((\"t1\".\"source\" = %s) AND (\"t1\".\"group_key_hash\" = %s)) AND (\"t1\".\"status\" NOT IN (%s, %s))) AND (\"t1\".\"merged_into_id\" IS NULL)) AND (\"t1\".\"team_id\" = %s)) AND (\"t1\".\"route_id\" = %s)) ORDER BY \"t1\".\"id\" DESC LIMIT %s",
+      "calls": 20
+    },
+    {
+      "sql": "SELECT \"t1\".\"id\", \"t1\".\"deleted\", \"t1\".\"deleted_at\", \"t1\".\"team_id\", \"t1\".\"name\", \"t1\".\"reason\", \"t1\".\"matcher_preset_id\", \"t1\".\"matchers\", \"t1\".\"starts_at\", \"t1\".\"ends_at\", \"t1\".\"apply_to_existing\", \"t1\".\"reactivate_on_end\", \"t1\".\"reconciled_at\", \"t1\".\"created_by_id\", \"t1\".\"created_at\", \"t1\".\"updated_at\", \"t1\".\"enabled\" FROM \"silence\" AS \"t1\" WHERE (((((\"t1\".\"team_id\" = %s) AND (\"t1\".\"enabled\" = %s)) AND (\"t1\".\"deleted\" = %s)) AND (\"t1\".\"starts_at\" <= %s)) AND (\"t1\".\"ends_at\" > %s)) ORDER BY \"t1\".\"id\" DESC",
+      "calls": 20
+    },
+    {
+      "sql": "INSERT INTO \"alert_group\" (\"team_id\", \"route_id\", \"service_id\", \"rotation_id\", \"escalation_policy_id\", \"escalation_rule_id\", \"notification_policy_id\", \"next_escalation_at\", \"escalation_repeat_count\", \"escalation_level\", \"assignee_id\", \"source\", \"group_key_hash\", \"group_key\", \"title\", \"message\", \"severity\", \"status\", \"first_seen_at\", \"last_seen_at\", \"notification_pending\", \"alert_count\", \"firing_count\", \"acknowledged_count\", \"resolved_count\", \"silenced_count\", \"reminder_count\", \"silenced\", \"created_at\", \"updated_at\", \"priority_id\", \"priority_slug\", \"priority_order\", \"priority_set_manually\", \"maintenance_suppressed\", \"orchestration_suppressed\", \"orchestration_suppress_reason\") VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING \"alert_group\".\"id\"",
+      "calls": 20
+    },
+    {
+      "sql": "SELECT MAX(\"t1\".\"ordinal\") FROM \"alert_group_episode\" AS \"t1\" WHERE (\"t1\".\"alert_group_id\" = %s)",
+      "calls": 20
+    },
+    {
+      "sql": "INSERT INTO \"alert_group_episode\" (\"uid\", \"alert_group_id\", \"ordinal\", \"started_at\", \"state\", \"start_quality\", \"start_event_id\", \"correlation_context\", \"context_revision\", \"created_at\") VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING \"alert_group_episode\".\"id\"",
+      "calls": 20
+    },
+    {
+      "sql": "UPDATE \"alert_group\" SET \"current_episode_id\" = %s WHERE (\"alert_group\".\"id\" = %s)",
+      "calls": 20
+    },
+    {
+      "sql": "SELECT \"t1\".\"id\", \"t1\".\"team_id\", \"t1\".\"route_id\", \"t1\".\"rotation_id\", \"t1\".\"escalation_policy_id\", \"t1\".\"escalation_rule_id\", \"t1\".\"notification_policy_id\", \"t1\".\"next_escalation_at\", \"t1\".\"last_escalated_at\", \"t1\".\"escalation_repeat_count\", \"t1\".\"assignee_id\", \"t1\".\"source\", \"t1\".\"external_id\", \"t1\".\"dedup_key\", \"t1\".\"group_key\", \"t1\".\"title\", \"t1\".\"message\", \"t1\".\"severity\", \"t1\".\"priority_id\", \"t1\".\"priority_slug\", \"t1\".\"priority_order\", \"t1\".\"maintenance_window_id\", \"t1\".\"maintenance_behavior\", \"t1\".\"maintenance_suppressed\", \"t1\".\"orchestration_suppressed\", \"t1\".\"orchestration_suppress_reason\", \"t1\".\"labels\", \"t1\".\"payload\", \"t1\".\"status\", \"t1\".\"previous_status\", \"t1\".\"acknowledged_by_id\", \"t1\".\"acknowledged_at\", \"t1\".\"first_seen_at\", \"t1\".\"last_seen_at\", \"t1\".\"last_notification_at\", \"t1\".\"reminder_count\", \"t1\".\"escalation_level\", \"t1\".\"silenced\", \"t1\".\"resolved_at\", \"t1\".\"service_id\", \"t1\".\"group_id\" FROM \"alert\" AS \"t1\" WHERE (\"t1\".\"group_id\" = %s) ORDER BY \"t1\".\"id\"",
+      "calls": 20
+    },
+    {
+      "sql": "UPDATE \"alertexplaintrace\" SET \"group_id\" = %s WHERE (\"alertexplaintrace\".\"id\" = %s)",
+      "calls": 20
+    },
+    {
+      "sql": "UPDATE \"alert_group_episode\" SET \"start_event_id\" = %s WHERE (\"alert_group_episode\".\"id\" = %s)",
+      "calls": 20
+    },
+    {
+      "sql": "UPDATE \"alert_group\" SET \"orchestration_suppressed\" = %s, \"orchestration_suppress_reason\" = %s WHERE (\"alert_group\".\"id\" = %s)",
+      "calls": 20
+    },
+    {
+      "sql": "INSERT INTO \"alert\" (\"team_id\", \"route_id\", \"rotation_id\", \"escalation_policy_id\", \"escalation_rule_id\", \"notification_policy_id\", \"next_escalation_at\", \"escalation_repeat_count\", \"assignee_id\", \"source\", \"external_id\", \"dedup_key\", \"group_key\", \"title\", \"message\", \"severity\", \"priority_id\", \"priority_slug\", \"priority_order\", \"maintenance_suppressed\", \"orchestration_suppressed\", \"orchestration_suppress_reason\", \"labels\", \"payload\", \"status\", \"first_seen_at\", \"last_seen_at\", \"reminder_count\", \"escalation_level\", \"silenced\", \"service_id\", \"group_id\") VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING \"alert\".\"id\"",
+      "calls": 20
+    },
+    {
+      "sql": "UPDATE \"alertexplaintrace\" SET \"group_id\" = %s, \"alert_id\" = %s WHERE (\"alertexplaintrace\".\"id\" = %s)",
+      "calls": 20
+    },
+    {
+      "sql": "SELECT \"t1\".\"id\", \"t1\".\"team_id\", \"t1\".\"route_id\", \"t1\".\"service_id\", \"t1\".\"rotation_id\", \"t1\".\"escalation_policy_id\", \"t1\".\"escalation_rule_id\", \"t1\".\"notification_policy_id\", \"t1\".\"next_escalation_at\", \"t1\".\"last_escalated_at\", \"t1\".\"escalation_repeat_count\", \"t1\".\"escalation_level\", \"t1\".\"assignee_id\", \"t1\".\"source\", \"t1\".\"group_key_hash\", \"t1\".\"group_key\", \"t1\".\"title\", \"t1\".\"message\", \"t1\".\"severity\", \"t1\".\"common_labels\", \"t1\".\"label_values\", \"t1\".\"payload_summary\", \"t1\".\"status\", \"t1\".\"previous_status\", \"t1\".\"acknowledged_by_id\", \"t1\".\"acknowledged_at\", \"t1\".\"resolved_by_id\", \"t1\".\"resolved_at\", \"t1\".\"first_seen_at\", \"t1\".\"last_seen_at\", \"t1\".\"last_notification_at\", \"t1\".\"notification_due_at\", \"t1\".\"notification_pending\", \"t1\".\"notification_reason\", \"t1\".\"alert_count\", \"t1\".\"firing_count\", \"t1\".\"acknowledged_count\", \"t1\".\"resolved_count\", \"t1\".\"silenced_count\", \"t1\".\"reminder_count\", \"t1\".\"silenced\", \"t1\".\"merged_into_id\", \"t1\".\"merged_by_id\", \"t1\".\"merged_at\", \"t1\".\"merge_reason\", \"t1\".\"created_at\", \"t1\".\"updated_at\", \"t1\".\"priority_id\", \"t1\".\"priority_slug\", \"t1\".\"priority_order\", \"t1\".\"priority_set_manually\", \"t1\".\"priority_set_by_id\", \"t1\".\"priority_set_at\", \"t1\".\"maintenance_window_id\", \"t1\".\"maintenance_behavior\", \"t1\".\"maintenance_suppressed\", \"t1\".\"orchestration_suppressed\", \"t1\".\"orchestration_suppress_reason\", \"t1\".\"current_episode_id\" FROM \"alert_group\" AS \"t1\" WHERE (\"t1\".\"id\" = %s) LIMIT %s FOR UPDATE",
+      "calls": 20
+    },
+    {
+      "sql": "SELECT \"t1\".\"id\", \"t1\".\"team_id\", \"t1\".\"route_id\", \"t1\".\"rotation_id\", \"t1\".\"escalation_policy_id\", \"t1\".\"escalation_rule_id\", \"t1\".\"notification_policy_id\", \"t1\".\"next_escalation_at\", \"t1\".\"last_escalated_at\", \"t1\".\"escalation_repeat_count\", \"t1\".\"assignee_id\", \"t1\".\"source\", \"t1\".\"external_id\", \"t1\".\"dedup_key\", \"t1\".\"group_key\", \"t1\".\"title\", \"t1\".\"message\", \"t1\".\"severity\", \"t1\".\"priority_id\", \"t1\".\"priority_slug\", \"t1\".\"priority_order\", \"t1\".\"maintenance_window_id\", \"t1\".\"maintenance_behavior\", \"t1\".\"maintenance_suppressed\", \"t1\".\"orchestration_suppressed\", \"t1\".\"orchestration_suppress_reason\", \"t1\".\"labels\", \"t1\".\"payload\", \"t1\".\"status\", \"t1\".\"previous_status\", \"t1\".\"acknowledged_by_id\", \"t1\".\"acknowledged_at\", \"t1\".\"first_seen_at\", \"t1\".\"last_seen_at\", \"t1\".\"last_notification_at\", \"t1\".\"reminder_count\", \"t1\".\"escalation_level\", \"t1\".\"silenced\", \"t1\".\"resolved_at\", \"t1\".\"service_id\", \"t1\".\"group_id\" FROM \"alert\" AS \"t1\" WHERE (\"t1\".\"group_id\" = %s) ORDER BY \"t1\".\"last_seen_at\" DESC, \"t1\".\"id\" DESC",
+      "calls": 20
+    },
+    {
+      "sql": "UPDATE \"alert_group\" SET \"team_id\" = %s, \"route_id\" = %s, \"service_id\" = %s, \"rotation_id\" = %s, \"escalation_policy_id\" = %s, \"escalation_rule_id\" = %s, \"notification_policy_id\" = %s, \"next_escalation_at\" = %s, \"last_escalated_at\" = %s, \"escalation_repeat_count\" = %s, \"escalation_level\" = %s, \"assignee_id\" = %s, \"source\" = %s, \"group_key_hash\" = %s, \"group_key\" = %s, \"title\" = %s, \"message\" = %s, \"severity\" = %s, \"common_labels\" = %s, \"label_values\" = %s, \"payload_summary\" = %s, \"status\" = %s, \"previous_status\" = %s, \"acknowledged_by_id\" = %s, \"acknowledged_at\" = %s, \"resolved_by_id\" = %s, \"resolved_at\" = %s, \"first_seen_at\" = %s, \"last_seen_at\" = %s, \"last_notification_at\" = %s, \"notification_due_at\" = %s, \"notification_pending\" = %s, \"notification_reason\" = %s, \"alert_count\" = %s, \"firing_count\" = %s, \"acknowledged_count\" = %s, \"resolved_count\" = %s, \"silenced_count\" = %s, \"reminder_count\" = %s, \"silenced\" = %s, \"merged_into_id\" = %s, \"merged_by_id\" = %s, \"merged_at\" = %s, \"merge_reason\" = %s, \"created_at\" = %s, \"updated_at\" = %s, \"priority_id\" = %s, \"priority_slug\" = %s, \"priority_order\" = %s, \"priority_set_manually\" = %s, \"priority_set_by_id\" = %s, \"priority_set_at\" = %s, \"maintenance_window_id\" = %s, \"maintenance_behavior\" = %s, \"maintenance_suppressed\" = %s, \"orchestration_suppressed\" = %s, \"orchestration_suppress_reason\" = %s, \"current_episode_id\" = %s WHERE (\"alert_group\".\"id\" = %s)",
+      "calls": 20
+    },
+    {
+      "sql": "SELECT \"t1\".\"id\", \"t1\".\"business_service_id\", \"t1\".\"service_id\", \"t1\".\"impact_status\", \"t1\".\"impact_score\", \"t1\".\"relation\", \"t1\".\"reason\", \"t1\".\"active\", \"t1\".\"component_snapshot\", \"t1\".\"first_seen_at\", \"t1\".\"last_seen_at\", \"t1\".\"updated_at\", \"t1\".\"group_id\" FROM \"business_service_incident_impact\" AS \"t1\" WHERE ((\"t1\".\"group_id\" = %s) AND (\"t1\".\"active\" = %s)) ORDER BY \"t1\".\"impact_score\" DESC",
+      "calls": 20
+    },
+    {
+      "sql": "SELECT \"t1\".\"id\", \"t1\".\"alert_group_id\", \"t1\".\"shelved_by_id\", \"t1\".\"reason\", \"t1\".\"source\", \"t1\".\"shelved_at\", \"t1\".\"ends_at\", \"t1\".\"active\", \"t1\".\"unshelved_at\", \"t1\".\"unshelved_by_id\", \"t1\".\"unshelve_reason\", \"t1\".\"created_at\", \"t1\".\"updated_at\" FROM \"alert_group_shelve\" AS \"t1\" WHERE (((\"t1\".\"alert_group_id\" = %s) AND (\"t1\".\"active\" = %s)) AND ((\"t1\".\"ends_at\" IS NULL) OR (\"t1\".\"ends_at\" > %s))) ORDER BY \"t1\".\"shelved_at\" DESC, \"t1\".\"id\" DESC LIMIT %s",
+      "calls": 20
+    },
+    {
+      "sql": "SELECT \"t1\".\"id\", \"t1\".\"maintenance_window_id\", \"t1\".\"behavior\", \"t1\".\"application_source\", \"t1\".\"previous_status\", \"t1\".\"occurrence_started_at\", \"t1\".\"active\", \"t1\".\"applied_at\", \"t1\".\"retained_at\", \"t1\".\"released_at\", \"t1\".\"release_reason\", \"t1\".\"alert_group_id\" FROM \"maintenance_window_alert_application\" AS \"t1\" WHERE ((\"t1\".\"alert_group_id\" = %s) AND (\"t1\".\"active\" = %s)) ORDER BY \"t1\".\"applied_at\" DESC",
+      "calls": 20
+    },
+    {
+      "sql": "UPDATE \"alert_group\" SET \"notification_due_at\" = %s, \"notification_pending\" = %s, \"notification_reason\" = %s, \"updated_at\" = %s WHERE (\"alert_group\".\"id\" = %s)",
+      "calls": 20
+    },
+    {
+      "sql": "INSERT INTO \"alertexplainstep\" (\"trace_id\", \"position\", \"stage\", \"code\", \"status\", \"title\", \"message\", \"data\", \"created_at\") VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s), (%s, %s, %s, %s, %s, %s, %s, %s, %s), (%s, %s, %s, %s, %s, %s, %s, %s, %s), (%s, %s, %s, %s, %s, %s, %s, %s, %s), (%s, %s, %s, %s, %s, %s, %s, %s, %s), (%s, %s, %s, %s, %s, %s, %s, %s, %s), (%s, %s, %s, %s, %s, %s, %s, %s, %s), (%s, %s, %s, %s, %s, %s, %s, %s, %s), (%s, %s, %s, %s, %s, %s, %s, %s, %s), (%s, %s, %s, %s, %s, %s, %s, %s, %s), (%s, %s, %s, %s, %s, %s, %s, %s, %s), (%s, %s, %s, %s, %s, %s, %s, %s, %s), (%s, %s, %s, %s, %s, %s, %s, %s, %s), (%s, %s, %s, %s, %s, %s, %s, %s, %s), (%s, %s, %s, %s, %s, %s, %s, %s, %s), (%s, %s, %s, %s, %s, %s, %s, %s, %s), (%s, %s, %s, %s, %s, %s, %s, %s, %s), (%s, %s, %s, %s, %s, %s, %s, %s, %s) RETURNING \"alertexplainstep\".\"id\"",
+      "calls": 20
+    },
+    {
+      "sql": "UPDATE \"alertexplaintrace\" SET \"status\" = %s, \"outcome\" = %s, \"reason\" = %s, \"result\" = %s, \"finished_at\" = %s WHERE (\"alertexplaintrace\".\"id\" = %s)",
+      "calls": 20
+    },
+    {
+      "sql": "SAVEPOINT \"s494c6a6f67e8444481342e6f59479c43\";",
+      "calls": 1
+    },
+    {
+      "sql": "RELEASE SAVEPOINT \"s494c6a6f67e8444481342e6f59479c43\";",
+      "calls": 1
+    },
+    {
+      "sql": "SAVEPOINT \"sd3654fae9ea645118f889532d6362893\";",
+      "calls": 1
+    },
+    {
+      "sql": "RELEASE SAVEPOINT \"sd3654fae9ea645118f889532d6362893\";",
+      "calls": 1
+    },
+    {
+      "sql": "SAVEPOINT \"sd3361872cc3944949e57340e487ec99c\";",
+      "calls": 1
+    },
+    {
+      "sql": "RELEASE SAVEPOINT \"sd3361872cc3944949e57340e487ec99c\";",
+      "calls": 1
+    },
+    {
+      "sql": "SAVEPOINT \"sa4571ca750b94ea5a5f5a0ea8fbf81bb\";",
+      "calls": 1
+    },
+    {
+      "sql": "RELEASE SAVEPOINT \"sa4571ca750b94ea5a5f5a0ea8fbf81bb\";",
+      "calls": 1
+    },
+    {
+      "sql": "SAVEPOINT \"s4d06452f50a44b938e028fe5ad9978e0\";",
+      "calls": 1
+    },
+    {
+      "sql": "RELEASE SAVEPOINT \"s4d06452f50a44b938e028fe5ad9978e0\";",
+      "calls": 1
+    },
+    {
+      "sql": "SAVEPOINT \"sc0255eeef6e3489e8f834974dc4e57ba\";",
+      "calls": 1
+    },
+    {
+      "sql": "RELEASE SAVEPOINT \"sc0255eeef6e3489e8f834974dc4e57ba\";",
+      "calls": 1
+    },
+    {
+      "sql": "SAVEPOINT \"sf630f063484d4e23ac48f10a049733e9\";",
+      "calls": 1
+    },
+    {
+      "sql": "RELEASE SAVEPOINT \"sf630f063484d4e23ac48f10a049733e9\";",
+      "calls": 1
+    },
+    {
+      "sql": "SAVEPOINT \"sc71595fbf0104bd8a472842ab1480b90\";",
+      "calls": 1
+    },
+    {
+      "sql": "RELEASE SAVEPOINT \"sc71595fbf0104bd8a472842ab1480b90\";",
+      "calls": 1
+    },
+    {
+      "sql": "SAVEPOINT \"s63f55e525bd6440e8f34b5cf5d103a21\";",
+      "calls": 1
+    },
+    {
+      "sql": "RELEASE SAVEPOINT \"s63f55e525bd6440e8f34b5cf5d103a21\";",
+      "calls": 1
+    },
+    {
+      "sql": "SAVEPOINT \"saf53a2dd955b4e3ba9316d4405b36218\";",
+      "calls": 1
+    },
+    {
+      "sql": "RELEASE SAVEPOINT \"saf53a2dd955b4e3ba9316d4405b36218\";",
+      "calls": 1
+    },
+    {
+      "sql": "SAVEPOINT \"saf792f625f8e4ed6b7489543ffccd1af\";",
+      "calls": 1
+    },
+    {
+      "sql": "RELEASE SAVEPOINT \"saf792f625f8e4ed6b7489543ffccd1af\";",
+      "calls": 1
+    },
+    {
+      "sql": "SAVEPOINT \"sa750275810694cc1a54a8c0d3e713e31\";",
+      "calls": 1
+    },
+    {
+      "sql": "RELEASE SAVEPOINT \"sa750275810694cc1a54a8c0d3e713e31\";",
+      "calls": 1
+    },
+    {
+      "sql": "SAVEPOINT \"scd1f0811cd76486cb1dfc484cf4b0cd5\";",
+      "calls": 1
+    },
+    {
+      "sql": "RELEASE SAVEPOINT \"scd1f0811cd76486cb1dfc484cf4b0cd5\";",
+      "calls": 1
+    },
+    {
+      "sql": "SAVEPOINT \"s926ad0dfa54345aa827fea0247efb134\";",
+      "calls": 1
+    },
+    {
+      "sql": "RELEASE SAVEPOINT \"s926ad0dfa54345aa827fea0247efb134\";",
+      "calls": 1
+    },
+    {
+      "sql": "SAVEPOINT \"s8c212cdef0374d8185a3dbd8012beee1\";",
+      "calls": 1
+    },
+    {
+      "sql": "RELEASE SAVEPOINT \"s8c212cdef0374d8185a3dbd8012beee1\";",
+      "calls": 1
+    },
+    {
+      "sql": "SAVEPOINT \"s251996d1b5de4034b363498797b58127\";",
+      "calls": 1
+    },
+    {
+      "sql": "RELEASE SAVEPOINT \"s251996d1b5de4034b363498797b58127\";",
+      "calls": 1
+    },
+    {
+      "sql": "SAVEPOINT \"sfbdfb2dd744d4b5c84fed3ddb4a7e5c5\";",
+      "calls": 1
+    },
+    {
+      "sql": "RELEASE SAVEPOINT \"sfbdfb2dd744d4b5c84fed3ddb4a7e5c5\";",
+      "calls": 1
+    },
+    {
+      "sql": "SAVEPOINT \"s2e01ed365f524bcc8b1062afdd1fdd92\";",
+      "calls": 1
+    },
+    {
+      "sql": "RELEASE SAVEPOINT \"s2e01ed365f524bcc8b1062afdd1fdd92\";",
+      "calls": 1
+    },
+    {
+      "sql": "SAVEPOINT \"s4a930dcb0e6e435393acbde32ee9cc32\";",
+      "calls": 1
+    },
+    {
+      "sql": "RELEASE SAVEPOINT \"s4a930dcb0e6e435393acbde32ee9cc32\";",
+      "calls": 1
+    },
+    {
+      "sql": "SAVEPOINT \"s18f3f114752b4f8cafa475bf8077ab04\";",
+      "calls": 1
+    },
+    {
+      "sql": "RELEASE SAVEPOINT \"s18f3f114752b4f8cafa475bf8077ab04\";",
+      "calls": 1
+    },
+    {
+      "sql": "SAVEPOINT \"s6db7cf46abe04861af22a32f3cf88224\";",
+      "calls": 1
+    },
+    {
+      "sql": "RELEASE SAVEPOINT \"s6db7cf46abe04861af22a32f3cf88224\";",
+      "calls": 1
+    },
+    {
+      "sql": "SAVEPOINT \"s10c9db5d85c4472d895f2588be54cc36\";",
+      "calls": 1
+    },
+    {
+      "sql": "RELEASE SAVEPOINT \"s10c9db5d85c4472d895f2588be54cc36\";",
+      "calls": 1
+    },
+    {
+      "sql": "SAVEPOINT \"sa5990f1431f641aaac3c54b453d13cfc\";",
+      "calls": 1
+    },
+    {
+      "sql": "RELEASE SAVEPOINT \"sa5990f1431f641aaac3c54b453d13cfc\";",
+      "calls": 1
+    },
+    {
+      "sql": "SAVEPOINT \"sb9b4f4c66f0044ba9aaef0f02ff85b95\";",
+      "calls": 1
+    },
+    {
+      "sql": "RELEASE SAVEPOINT \"sb9b4f4c66f0044ba9aaef0f02ff85b95\";",
+      "calls": 1
+    },
+    {
+      "sql": "SAVEPOINT \"sd06875e970e84dcea643a70bd0fdfe8b\";",
+      "calls": 1
+    },
+    {
+      "sql": "RELEASE SAVEPOINT \"sd06875e970e84dcea643a70bd0fdfe8b\";",
+      "calls": 1
+    },
+    {
+      "sql": "SAVEPOINT \"s6e73df2561114d26945d24bda3015295\";",
+      "calls": 1
+    },
+    {
+      "sql": "RELEASE SAVEPOINT \"s6e73df2561114d26945d24bda3015295\";",
+      "calls": 1
+    },
+    {
+      "sql": "SAVEPOINT \"s60f3658def1c40ec94e0b96084721783\";",
+      "calls": 1
+    },
+    {
+      "sql": "RELEASE SAVEPOINT \"s60f3658def1c40ec94e0b96084721783\";",
+      "calls": 1
+    },
+    {
+      "sql": "SAVEPOINT \"s19adfa0c6cec4edd9fa40f2738f87893\";",
+      "calls": 1
+    },
+    {
+      "sql": "RELEASE SAVEPOINT \"s19adfa0c6cec4edd9fa40f2738f87893\";",
+      "calls": 1
+    },
+    {
+      "sql": "SAVEPOINT \"s82afdd7034524b55a6b6ad157dd32e3f\";",
+      "calls": 1
+    },
+    {
+      "sql": "RELEASE SAVEPOINT \"s82afdd7034524b55a6b6ad157dd32e3f\";",
+      "calls": 1
+    },
+    {
+      "sql": "SAVEPOINT \"sb57810cd8d9e49518c8c278d46a83a68\";",
+      "calls": 1
+    },
+    {
+      "sql": "RELEASE SAVEPOINT \"sb57810cd8d9e49518c8c278d46a83a68\";",
+      "calls": 1
+    },
+    {
+      "sql": "SAVEPOINT \"s5506d82951244744bc1d1eb9ba3eba0e\";",
+      "calls": 1
+    },
+    {
+      "sql": "RELEASE SAVEPOINT \"s5506d82951244744bc1d1eb9ba3eba0e\";",
+      "calls": 1
+    },
+    {
+      "sql": "SAVEPOINT \"s9d905043d6864f609be6a3db49b5aa89\";",
+      "calls": 1
+    },
+    {
+      "sql": "RELEASE SAVEPOINT \"s9d905043d6864f609be6a3db49b5aa89\";",
+      "calls": 1
+    },
+    {
+      "sql": "SAVEPOINT \"s59d61c81710f474faf64204ce14bb5d9\";",
+      "calls": 1
+    },
+    {
+      "sql": "RELEASE SAVEPOINT \"s59d61c81710f474faf64204ce14bb5d9\";",
+      "calls": 1
+    },
+    {
+      "sql": "SAVEPOINT \"sef0466c1dc7149fb98e4bbb7f670ce4a\";",
+      "calls": 1
+    },
+    {
+      "sql": "RELEASE SAVEPOINT \"sef0466c1dc7149fb98e4bbb7f670ce4a\";",
+      "calls": 1
+    },
+    {
+      "sql": "SAVEPOINT \"s69ff4b15522e438eae4f8d6cb90636d2\";",
+      "calls": 1
+    },
+    {
+      "sql": "RELEASE SAVEPOINT \"s69ff4b15522e438eae4f8d6cb90636d2\";",
+      "calls": 1
+    },
+    {
+      "sql": "SAVEPOINT \"s7624b31a2e344149bf6762af34ed0be9\";",
+      "calls": 1
+    },
+    {
+      "sql": "RELEASE SAVEPOINT \"s7624b31a2e344149bf6762af34ed0be9\";",
+      "calls": 1
+    },
+    {
+      "sql": "SAVEPOINT \"s0b54b48fa6e741fcbf93e7c9d93922ea\";",
+      "calls": 1
+    },
+    {
+      "sql": "RELEASE SAVEPOINT \"s0b54b48fa6e741fcbf93e7c9d93922ea\";",
+      "calls": 1
+    },
+    {
+      "sql": "SAVEPOINT \"s59148d13e1464008843ece65ada5d064\";",
+      "calls": 1
+    },
+    {
+      "sql": "RELEASE SAVEPOINT \"s59148d13e1464008843ece65ada5d064\";",
+      "calls": 1
+    },
+    {
+      "sql": "SAVEPOINT \"s861dff0b6e2f49d5a064120b00fd3692\";",
+      "calls": 1
+    },
+    {
+      "sql": "RELEASE SAVEPOINT \"s861dff0b6e2f49d5a064120b00fd3692\";",
+      "calls": 1
+    },
+    {
+      "sql": "SAVEPOINT \"s67dc24a8ced14d169da0d077e0e23b45\";",
+      "calls": 1
+    },
+    {
+      "sql": "RELEASE SAVEPOINT \"s67dc24a8ced14d169da0d077e0e23b45\";",
+      "calls": 1
+    }
+  ]
+}

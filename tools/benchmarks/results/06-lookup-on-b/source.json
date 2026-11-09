@@ -1,0 +1,7 @@
+{
+  "commit": "49f961a5031e324fa4ab2819e66f483283d3bbe9",
+  "compiled_lookups": true,
+  "web_cpu_limit": 3,
+  "postgres_cpu_limit": 2,
+  "telegram_worker": "stopped"
+}

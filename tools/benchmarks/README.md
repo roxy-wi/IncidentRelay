@@ -105,6 +105,9 @@ any Telegram channel is configured, so it cannot contact Telegram.
 
 ## Comparing fixes
 
+See [Python application CPU work](PYTHON-CPU.md) for the subsequent interleaved
+comparison of SQL-template reuse and loaded-relationship reuse, with full traces.
+
 ```sh
 python3 tools/benchmarks/measure_stage.py my-unique-stage-label
 python3 tools/benchmarks/render_comparison.py

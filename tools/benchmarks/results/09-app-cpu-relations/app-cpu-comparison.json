@@ -1,0 +1,155 @@
+{
+  "scope": "app process incl Flask test client; excludes PG CPU, server and network",
+  "rows": [
+    {
+      "round": 0,
+      "variant": "ordinary",
+      "events": 50,
+      "app_cpu_ms_per_event": 18.513,
+      "wall_ms_per_event": 28.128,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 0,
+      "variant": "lookup",
+      "events": 50,
+      "app_cpu_ms_per_event": 16.728,
+      "wall_ms_per_event": 25.821,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 0,
+      "variant": "lookup-and-writes",
+      "events": 50,
+      "app_cpu_ms_per_event": 14.573,
+      "wall_ms_per_event": 23.297,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 0,
+      "variant": "relations",
+      "events": 50,
+      "app_cpu_ms_per_event": 14.75,
+      "wall_ms_per_event": 23.343,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 1,
+      "variant": "relations",
+      "events": 50,
+      "app_cpu_ms_per_event": 13.457,
+      "wall_ms_per_event": 21.361,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 1,
+      "variant": "lookup-and-writes",
+      "events": 50,
+      "app_cpu_ms_per_event": 13.417,
+      "wall_ms_per_event": 21.21,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 1,
+      "variant": "lookup",
+      "events": 50,
+      "app_cpu_ms_per_event": 15.242,
+      "wall_ms_per_event": 23.264,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 1,
+      "variant": "ordinary",
+      "events": 50,
+      "app_cpu_ms_per_event": 16.978,
+      "wall_ms_per_event": 25.313,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 2,
+      "variant": "ordinary",
+      "events": 50,
+      "app_cpu_ms_per_event": 30.381,
+      "wall_ms_per_event": 47.244,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 2,
+      "variant": "lookup",
+      "events": 50,
+      "app_cpu_ms_per_event": 28.275,
+      "wall_ms_per_event": 45.524,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 2,
+      "variant": "lookup-and-writes",
+      "events": 50,
+      "app_cpu_ms_per_event": 25.864,
+      "wall_ms_per_event": 41.632,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 2,
+      "variant": "relations",
+      "events": 50,
+      "app_cpu_ms_per_event": 23.022,
+      "wall_ms_per_event": 37.936,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 3,
+      "variant": "relations",
+      "events": 50,
+      "app_cpu_ms_per_event": 19.38,
+      "wall_ms_per_event": 31.275,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 3,
+      "variant": "lookup-and-writes",
+      "events": 50,
+      "app_cpu_ms_per_event": 20.378,
+      "wall_ms_per_event": 34.074,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 3,
+      "variant": "lookup",
+      "events": 50,
+      "app_cpu_ms_per_event": 23.602,
+      "wall_ms_per_event": 36.852,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 3,
+      "variant": "ordinary",
+      "events": 50,
+      "app_cpu_ms_per_event": 24.978,
+      "wall_ms_per_event": 38.118,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    }
+  ],
+  "median_app_cpu_ms_per_event": {
+    "relations": 17.065,
+    "lookup-and-writes": 17.476,
+    "lookup": 20.165,
+    "ordinary": 21.745
+  }
+}

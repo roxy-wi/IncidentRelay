@@ -1,0 +1,47 @@
+ Container ir-capacity-bench-postgres-1 Running 
+ Container ir-capacity-bench-postgres-1 Waiting 
+ Container ir-capacity-bench-postgres-1 Healthy 
+ Container ir-capacity-bench-load-run-f17a5a23d9b3 Creating 
+ Container ir-capacity-bench-load-run-f17a5a23d9b3 Created 
+/opt/incidentrelay/app/views/sso_auth_view.py:8: AuthlibDeprecationWarning: authlib.jose module is deprecated, please use joserfc instead.
+It will be compatible before version 2.0.0.
+  from authlib.jose import JsonWebKey, JsonWebToken
+SQL statements / 20 requests: {'SELECT': 740, 'INSERT': 140, 'SAVEPOINT': 40, 'UPDATE': 200, 'RELEASE': 40} HTTP statuses: {200: 20}
+         2044245 function calls (1936302 primitive calls) in 1.247 seconds
+
+   Ordered by: cumulative time
+   List reduced from 874 to 30 due to restriction <30>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+       20    0.000    0.000    1.253    0.063 test.py:1168(post)
+       20    0.000    0.000    1.253    0.063 testing.py:204(open)
+       20    0.000    0.000    1.248    0.062 test.py:1062(open)
+       20    0.000    0.000    1.248    0.062 test.py:984(run_wsgi_app)
+       20    0.000    0.000    1.245    0.062 test.py:1230(run_wsgi_app)
+       20    0.000    0.000    1.244    0.062 app.py:1491(__call__)
+       20    0.000    0.000    1.244    0.062 app.py:1441(wsgi_app)
+       20    0.000    0.000    1.236    0.062 app.py:867(full_dispatch_request)
+       20    0.000    0.000    1.193    0.060 app.py:842(dispatch_request)
+       20    0.000    0.000    1.193    0.060 auth.py:210(wrapper)
+       20    0.000    0.000    1.096    0.055 integrations_view.py:632(generic_webhook)
+       20    0.000    0.000    1.091    0.055 integrations_view.py:755(process_incoming_alerts)
+       20    0.000    0.000    1.082    0.054 lifecycle.py:184(upsert_alert)
+       20    0.003    0.000    0.996    0.050 lifecycle.py:650(_upsert_alert)
+ 1040/760    0.001    0.000    0.883    0.001 peewee.py:2030(inner)
+      760    0.001    0.000    0.866    0.001 peewee.py:2105(execute)
+      760    0.002    0.000    0.855    0.001 peewee.py:3325(execute)
+      500    0.003    0.000    0.755    0.002 peewee.py:2278(_execute)
+100661/818    0.058    0.000    0.635    0.001 peewee.py:662(sql)
+      544    0.007    0.000    0.584    0.001 peewee.py:2526(__sql__)
+2174/1712    0.012    0.000    0.442    0.000 peewee.py:1894(__sql__)
+      280    0.000    0.000    0.442    0.002 peewee.py:7273(__iter__)
+    16519    0.010    0.000    0.416    0.000 peewee.py:4855(__sql__)
+    16519    0.038    0.000    0.378    0.000 peewee.py:1342(__sql__)
+      544    0.001    0.000    0.367    0.001 peewee.py:7641(__sql_selection__)
+     1160    0.004    0.000    0.359    0.000 capacity.py:294(execute)
+     1320    0.347    0.000    0.355    0.000 {method 'execute' of 'psycopg2.extensions.cursor' objects}
+     1160    0.004    0.000    0.352    0.000 peewee.py:3316(execute_sql)
+      140    0.000    0.000    0.253    0.002 peewee.py:2284(peek)
+      120    0.000    0.000    0.243    0.002 peewee.py:2290(first)
+
+

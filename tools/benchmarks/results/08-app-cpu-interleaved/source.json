@@ -1,0 +1,7 @@
+{
+  "commit": "db1a902",
+  "note": "Three variants before relationship reuse; benchmark script was uncommitted.",
+  "full_traces": true,
+  "events_per_variant": 200,
+  "postgres_cpu_excluded": true
+}

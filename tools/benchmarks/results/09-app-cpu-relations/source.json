@@ -1,0 +1,7 @@
+{
+  "commit": "4e96886",
+  "note": "Production code matches this commit; four variants interleaved per request.",
+  "full_traces": true,
+  "events_per_variant": 200,
+  "postgres_cpu_excluded": true
+}
