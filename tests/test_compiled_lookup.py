@@ -37,6 +37,23 @@ def test_missing_primary_key_preserves_model_exception(db):
         Group.get_by_id(2_000_000_000)
 
 
+def test_container_key_keeps_peewee_expression_semantics(db):
+    class Record(BaseModel):
+        id = TextField(primary_key=True)
+
+        class Meta:
+            database = db
+            table_name = "compiled_text_key"
+
+    try:
+        Record.create_table()
+        Record.create(id="abc")
+        assert Record.get_by_id("abc").id == "abc"
+        assert Record.get_by_id(["abc"]).id == "abc"
+    finally:
+        Record.drop_table(safe=True)
+
+
 def test_compound_filters_are_not_bypassed_by_cached_primary_key(db):
     group = create_group()
     Group.get_by_id(group.id)

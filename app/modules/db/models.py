@@ -53,14 +53,15 @@ class BaseModel(Model):
         # This includes Peewee's lazy FK lookups. Only optimize the standard
         # scalar primary-key case: custom SELECTs and compound/security filters
         # continue through Peewee unchanged. Every lookup still queries the DB.
-        if not filters and len(query) == 1 and isinstance(cls._meta.primary_key, Field):
+        if (not filters and len(query) == 1 and isinstance(cls._meta.primary_key, Field)
+            and type(cls._meta.primary_key).__module__ == "peewee"):
             predicate = query[0]
             value = None
             if isinstance(predicate, int):
                 value = predicate
             elif (isinstance(predicate, Expression) and predicate.op == OP.EQ
                   and predicate.lhs is cls._meta.primary_key
-                  and not isinstance(predicate.rhs, Node)):
+                  and not isinstance(predicate.rhs, (Node, list, tuple, dict, set, frozenset, range))):
                 value = predicate.rhs
             database = getattr(cls._meta.database, "obj", cls._meta.database)
             if (value is not None and database is not None

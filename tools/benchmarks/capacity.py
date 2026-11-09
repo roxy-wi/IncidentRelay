@@ -273,7 +273,7 @@ def run(args):
 
 
 def profile():
-    from app import create_app
+    from tools.benchmarks.app_factory import create_app
     db = database()
     client = create_app().test_client()
     counts = Counter()
