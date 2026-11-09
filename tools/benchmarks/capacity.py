@@ -162,10 +162,12 @@ def profile():
     db = database()
     client = create_app().test_client()
     counts = Counter()
+    queries = Counter()
     original = db.execute_sql
 
     def execute(sql, params=None, *a, **kw):
         counts[sql.split()[0].upper()] += 1
+        queries[sql] += 1
         return original(sql, params, *a, **kw)
 
     db.execute_sql = execute
@@ -178,6 +180,10 @@ def profile():
         statuses.append(response.status_code)
     profiler.disable()
     print("SQL statements / 20 requests:", dict(counts), "HTTP statuses:", dict(Counter(statuses)))
+    Path("/results/profile.json").write_text(json.dumps({
+        "requests": len(statuses), "counts": dict(counts),
+        "queries": [{"sql": sql, "calls": count} for sql, count in queries.most_common()],
+    }, indent=2))
     pstats.Stats(profiler).strip_dirs().sort_stats("cumulative").print_stats(30)
 
 
@@ -252,8 +258,13 @@ def idle_worker(args):
     started = time.monotonic()
     cpu_started = time.process_time()
     iterations = 0
+    from app import telegram_worker
+    shutdown = threading.Event()
     while time.monotonic() - started < args.seconds:
-        poll_telegram_channels_once(timeout=20)
+        if hasattr(telegram_worker, "run_poll_cycle"):
+            telegram_worker.run_poll_cycle(shutdown)
+        else:
+            poll_telegram_channels_once(timeout=20)
         iterations += 1
     elapsed = time.monotonic() - started
     record = {"action": "idle_worker", "elapsed_seconds": round(elapsed, 3), "iterations": iterations,
