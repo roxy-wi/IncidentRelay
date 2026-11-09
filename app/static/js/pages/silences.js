@@ -89,7 +89,7 @@ function loadSilences() {
             Number($("#silence-team").val()) || null,
             null
         );
-    });
+    }, "can_write_resources");
 
     refreshSilences();
 }

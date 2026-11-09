@@ -1344,7 +1344,7 @@ function escapeHtml(value) {
 }
 
 function loadRotations() {
-    fillTeamSelect("#rotation-team", false);
+    fillTeamSelect("#rotation-team", false, null, "can_write");
     fillUserSelect("#member-user");
     fillUserSelect("#override-user");
     updateRotationCadenceFields();

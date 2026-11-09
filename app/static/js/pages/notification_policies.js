@@ -58,7 +58,7 @@ function isSameNotificationPolicyRuleId(left, right) {
 function loadNotificationPolicies() {
     fillTeamSelect("#notification-policy-team", false, function () {
         resetNotificationPolicyForm();
-    });
+    }, "can_write");
     refreshNotificationPolicies();
     updateNotificationPolicyCreateButtonState();
 }
@@ -1763,11 +1763,7 @@ function resetNotificationPolicyForm() {
     $("#notification-policy-enabled").prop("checked", true);
     $("#notification-policy-team").prop("disabled", false);
 
-    const selectedTeam = $("#global-team-filter").val();
-
-    if (selectedTeam) {
-        $("#notification-policy-team").val(selectedTeam);
-    }
+    selectPreferredTeam("#notification-policy-team");
 }
 
 function openCreateNotificationPolicyModal() {

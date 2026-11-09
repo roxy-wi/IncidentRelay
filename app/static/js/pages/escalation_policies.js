@@ -80,7 +80,7 @@ function createUnsavedEscalationRule() {
 function loadEscalationPolicies() {
     fillTeamSelect("#escalation-policy-team", false, function () {
         resetEscalationPolicyForm();
-    });
+    }, "can_write");
 
     refreshEscalationPolicies();
     updateEscalationPolicyCreateButtonState();
@@ -536,10 +536,7 @@ function resetEscalationPolicyForm() {
     $("#escalation-policy-enabled").prop("checked", true);
     $("#escalation-policy-team").prop("disabled", false);
 
-    const selectedTeam = $("#global-team-filter").val();
-    if (selectedTeam) {
-        $("#escalation-policy-team").val(selectedTeam);
-    }
+    selectPreferredTeam("#escalation-policy-team");
 }
 
 function openCreateEscalationPolicyModal() {
