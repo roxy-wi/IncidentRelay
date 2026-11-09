@@ -9,8 +9,12 @@ from peewee import (
     Check,
     DateTimeField,
     ForeignKeyField,
+    Expression,
+    Field,
     IntegerField,
     Model,
+    Node,
+    OP,
     TextField,
     SQL,
     DeferredForeignKey,
@@ -19,6 +23,7 @@ from peewee import (
 
 from app.db import database_proxy
 from app.modules.common import utc_now
+from app.modules.db.compiled_lookup import get_by_primary_key
 
 
 class JSONTextField(TextField):
@@ -42,6 +47,27 @@ class JSONTextField(TextField):
 
 class BaseModel(Model):
     """Base model for all tables."""
+
+    @classmethod
+    def get(cls, *query, **filters):
+        # This includes Peewee's lazy FK lookups. Only optimize the standard
+        # scalar primary-key case: custom SELECTs and compound/security filters
+        # continue through Peewee unchanged. Every lookup still queries the DB.
+        if not filters and len(query) == 1 and isinstance(cls._meta.primary_key, Field):
+            predicate = query[0]
+            value = None
+            if isinstance(predicate, int):
+                value = predicate
+            elif (isinstance(predicate, Expression) and predicate.op == OP.EQ
+                  and predicate.lhs is cls._meta.primary_key
+                  and not isinstance(predicate.rhs, Node)):
+                value = predicate.rhs
+            database = getattr(cls._meta.database, "obj", cls._meta.database)
+            if (value is not None and database is not None
+                and getattr(cls.select, "__func__", None) is Model.select.__func__
+                and (cls._meta.schema is None or isinstance(cls._meta.schema, str))):
+                return get_by_primary_key(cls, value, database)
+        return super().get(*query, **filters)
 
     class Meta:
         database = database_proxy
