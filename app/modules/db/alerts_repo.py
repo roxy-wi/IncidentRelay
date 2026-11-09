@@ -5,7 +5,7 @@ import hashlib
 
 from peewee import Case, JOIN, fn
 
-from app.modules.db import alert_episodes_repo, incident_core_repo
+from app.modules.db import alert_episodes_repo, compiled_select, incident_core_repo
 
 from app.modules.db.models import (
     Alert,
@@ -472,28 +472,29 @@ def hash_group_key(group_key):
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
-def find_open_alert_group(source, group_key, team_id=None, route_id=None, service_id=None):
-    """Return open alert group by routing/grouping key."""
-
-    group_key_hash = hash_group_key(group_key)
-
+def _open_group_query(parameters):
     query = AlertGroup.select().where(
-        (AlertGroup.source == source)
-        & (AlertGroup.group_key_hash == group_key_hash)
+        (AlertGroup.source == parameters["source"])
+        & (AlertGroup.group_key_hash == parameters["group_key_hash"])
         & (AlertGroup.status.not_in(("resolved", "merged")))
         & (AlertGroup.merged_into.is_null(True))
     )
+    for name in ("team", "route", "service"):
+        if name in parameters:
+            query = query.where(AlertGroup._meta.fields[name] == parameters[name])
+    return query.order_by(AlertGroup.id.desc())
 
-    if team_id:
-        query = query.where(AlertGroup.team == team_id)
 
-    if route_id:
-        query = query.where(AlertGroup.route == route_id)
-
-    if service_id:
-        query = query.where(AlertGroup.service == service_id)
-
-    return query.order_by(AlertGroup.id.desc()).first()
+def find_open_alert_group(source, group_key, team_id=None, route_id=None, service_id=None):
+    """Return open alert group by routing/grouping key, using fresh row data."""
+    bindings = {
+        "source": (AlertGroup.source, source),
+        "group_key_hash": (AlertGroup.group_key_hash, hash_group_key(group_key)),
+    }
+    for name, value in (("team", team_id), ("route", route_id), ("service", service_id)):
+        if value:
+            bindings[name] = (AlertGroup._meta.fields[name], value)
+    return compiled_select.first(AlertGroup, _open_group_query, bindings)
 
 
 def create_alert_group(**kwargs):
@@ -1064,16 +1065,21 @@ def find_existing_alert(
     This prevents a PagerDuty-compatible routing key from acknowledging or
     resolving an alert owned by another webhook route that reused a dedup key.
     """
+    bindings = {"source": (Alert.source, source), "dedup_key": (Alert.dedup_key, dedup_key)}
+    if route_id is not None:
+        bindings["route"] = (Alert.route, route_id)
+    return compiled_select.first(Alert, _existing_alert_query, bindings)
+
+
+def _existing_alert_query(parameters):
     query = Alert.select().where(
-        (Alert.source == source)
-        & (Alert.dedup_key == dedup_key)
+        (Alert.source == parameters["source"])
+        & (Alert.dedup_key == parameters["dedup_key"])
         & (Alert.status != "resolved")
     )
-
-    if route_id is not None:
-        query = query.where(Alert.route == route_id)
-
-    return query.order_by(Alert.id.desc()).first()
+    if "route" in parameters:
+        query = query.where(Alert.route == parameters["route"])
+    return query.order_by(Alert.id.desc())
 
 
 def create_alert(**kwargs):
