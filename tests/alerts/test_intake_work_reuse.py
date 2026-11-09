@@ -64,7 +64,7 @@ def test_recalculation_updates_derived_fields_without_rewriting_unrelated_state(
     execute = db.execute_sql
 
     def capture(sql, params=None, *args, **kwargs):
-        if sql.startswith('UPDATE "alertgroup"'):
+        if sql.startswith(f'UPDATE "{AlertGroup._meta.table_name}"'):
             updates.append(sql)
         return execute(sql, params, *args, **kwargs)
 
