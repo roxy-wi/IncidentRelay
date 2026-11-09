@@ -154,6 +154,23 @@ password = change-me
 
 Use PostgreSQL for larger installations, higher alert volume, multiple web workers, or long-term production deployments.
 
+PostgreSQL connections are pooled per process. Closing a request returns its
+connection to the pool; dirty transactions are rolled back before reuse.
+
+```ini
+[database]
+pool_enabled = true
+pool_max_connections = 32
+pool_stale_seconds = 300
+pool_wait_seconds = 5
+```
+
+All three limits must be positive. The pool opens connections on demand, up to
+`pool_max_connections` per process, and waits at most `pool_wait_seconds` when
+full. Set `pool_enabled = false` to close physical connections after use.
+Budget PostgreSQL's connection limit across all web processes, scheduler
+delivery threads, and other workers. Pool limits are not shared between processes.
+
 ## Outbound HTTP network policy
 
 IncidentRelay protects administrator-configured outbound HTTP requests against

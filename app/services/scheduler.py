@@ -214,7 +214,7 @@ def user_notification_rules_job():
 
 
 def alert_group_notification_job():
-    """Send due alert group notifications under a database lock."""
+    """Deliver a bounded batch; PostgreSQL workers claim individual groups."""
 
     if db.is_closed():
         db.connect(reuse_if_open=True)
@@ -222,11 +222,11 @@ def alert_group_notification_job():
     owner = None
 
     try:
-        owner = acquire_db_lock("alert_group_notification_job")
-
-        if not owner:
-            logger.debug("alert group notification job skipped because lock is busy")
-            return {"processed": 0, "sent": 0, "skipped": 0, "failed": 0}
+        if "postgres" not in db.obj.__class__.__name__.lower():
+            owner = acquire_db_lock("alert_group_notification_job")
+            if not owner:
+                logger.debug("alert group notification job skipped because lock is busy")
+                return {"processed": 0, "sent": 0, "skipped": 0, "failed": 0}
 
         logger.info("alert group notification job started")
 
@@ -820,7 +820,7 @@ def start_scheduler():
     _scheduler.add_job(
         alert_group_notification_job,
         "interval",
-        seconds=int(getattr(Config, "ALERT_GROUP_NOTIFICATION_CHECK_INTERVAL_SECONDS", 10)),
+        seconds=int(getattr(Config, "ALERT_GROUP_NOTIFICATION_CHECK_INTERVAL_SECONDS", 1)),
         max_instances=1,
         coalesce=True,
         next_run_time=utc_now(),

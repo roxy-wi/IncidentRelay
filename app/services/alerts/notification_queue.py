@@ -1,11 +1,17 @@
 import logging
+from collections import Counter
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import nullcontext
 from datetime import timedelta
+
+from flask import current_app, has_app_context
 
 from app import Config
 from app.db import database_proxy as db
 from app.modules.db.models import AlertGroup, RecoveryNotificationDelivery
 from app.services.alerts.reopen import lock_grouping_identity
 from app.modules.db import alerts_repo, notifications_repo
+from app.modules.db.transactions import write_transaction
 from app.services.notifications.delivery import notify_alert
 from app.services.notifications.retries import delivery_attempt
 from app.services.alerts.shelving import is_alert_group_shelved
@@ -323,121 +329,115 @@ def schedule_group_notification(group, reason="notification", now=None):
     )
 
 
-def process_due_alert_group_notifications(limit=100):
-    """Send due alert group notifications."""
+def _process_due_firing_group(selected_group, *, now):
+    """Claim one group until its delivery state is committed.
 
-    now = utc_now()
-    sent = 0
-    skipped = 0
-    failed = 0
+    PostgreSQL workers skip already claimed rows. ACK/resolve use the same row
+    fence, so a stale selection cannot send after a committed lifecycle change.
+    On process death PostgreSQL releases the lock and rolls back, leaving the
+    persisted pending work retryable. Provider sends remain at-least-once across
+    a crash between external delivery and database commit.
+    """
+    backend = db.obj.__class__.__name__.lower()
+    # Preserve SQLite's serial compatibility path without holding its single
+    # writer across a network call. Its scheduler keeps the job-wide lock.
+    transaction = nullcontext() if "sqlite" in backend else write_transaction()
+    with transaction:
+        query = AlertGroup.select().where(AlertGroup.id == selected_group.id)
+        if "postgres" in backend:
+            query = query.for_update("FOR UPDATE SKIP LOCKED")
+        elif "sqlite" not in backend:
+            query = query.for_update()
+        group = query.first()
+        if group is None:
+            return "skipped"
 
-    groups = alerts_repo.list_due_alert_group_notifications(
-        now=now,
-        limit=limit,
-    )
+        if (
+            not group.notification_pending
+            or group.status != "firing"
+            or group.notification_due_at is None
+            or group.notification_due_at > now
+            or group.notification_due_at != selected_group.notification_due_at
+            or group.notification_reason != selected_group.notification_reason
+        ):
+            if (
+                group.notification_pending
+                and group.status != "firing"
+                and group.notification_reason == selected_group.notification_reason
+                and group.notification_reason != RECOVERY_NOTIFICATION_REASON
+            ):
+                alerts_repo.clear_alert_group_notification(group)
+            return "skipped"
 
-    for selected_group in groups:
-        group = selected_group
+        group = alerts_repo.recalculate_alert_group(group)
+        if is_alert_group_shelved(group, now=now):
+            alerts_repo.clear_alert_group_notification(group)
+            return "skipped"
+        if is_notification_lifecycle_suppressed(group, now=now):
+            pause_notification_lifecycle(group)
+            return "skipped"
+        resume_notification_lifecycle(group, now=now)
+        if group.status != "firing":
+            alerts_repo.clear_alert_group_notification(group)
+            return "skipped"
 
-        try:
+        event_type = "notification" if not group.last_notification_at else "update"
+        sent_count = notify_alert(group, event_type=event_type)
+        if not sent_count:
+            alerts_repo.clear_alert_group_notification(group)
+            alerts_repo.create_alert_event(
+                group_id=group.id, event_type=f"{event_type}_skipped",
+                message="Due alert group notification skipped: no delivery target",
+            )
+            return "skipped"
+
+        alerts_repo.mark_alert_group_notification_sent(group, now=now)
+        alerts_repo.create_alert_event(
+            group_id=group.id, event_type=f"{event_type}_sent",
+            message="Due alert group notification sent",
+        )
+        return "sent"
+
+
+def _process_due_group(selected_group, now, *, threaded=False, app=None):
+    try:
+        connection_scope = db.connection_context() if threaded else nullcontext()
+        app_scope = app.app_context() if app is not None else nullcontext()
+        with connection_scope, app_scope:
             if selected_group.notification_reason == RECOVERY_NOTIFICATION_REASON:
                 outcome = _process_due_recovery(selected_group, now=now)
-                if outcome == "sent":
-                    sent += 1
-                elif outcome in {"retrying", "failed", "partial"}:
-                    failed += 1
-                else:
-                    skipped += 1
-                continue
+                return outcome if outcome in {"sent", "skipped"} else "failed"
+            return _process_due_firing_group(selected_group, now=now)
+    except Exception as exc:
+        logger.exception("failed to send due alert group notification", extra={
+            "extra": {"alert_group_id": selected_group.id, "error": str(exc)},
+        })
+        return "failed"
 
-            # The due-list query can race with an ACK handled by another
-            # worker. Reload before recalculation so a stale firing object does
-            # not overwrite the persisted acknowledged state.
-            group = alerts_repo.get_alert_group(selected_group.id)
 
-            if (
-                not group.notification_pending
-                or group.status != "firing"
-                or group.notification_due_at is None
-                or group.notification_due_at > now
-                or group.notification_due_at != selected_group.notification_due_at
-                or group.notification_reason != selected_group.notification_reason
-            ):
-                if (
-                    group.notification_pending
-                    and group.status != "firing"
-                    and group.notification_reason == selected_group.notification_reason
-                    and group.notification_reason != RECOVERY_NOTIFICATION_REASON
-                ):
-                    alerts_repo.clear_alert_group_notification(group)
-                skipped += 1
-                continue
+def process_due_alert_group_notifications(limit=100):
+    """Deliver a bounded batch; parallelize independent PostgreSQL groups."""
+    now = utc_now()
+    groups = list(alerts_repo.list_due_alert_group_notifications(now=now, limit=limit))
+    workers = max(1, min(32, int(getattr(Config, "ALERT_GROUP_NOTIFICATION_WORKERS", 8))))
+    pool_limit = getattr(db.obj, "_max_connections", None)
+    if pool_limit:
+        # The coordinator retains its own connection while workers run.
+        workers = min(workers, max(1, pool_limit - 1))
+    # SQLite has one writer and may use a thread-local in-memory database.
+    # Never move an existing caller transaction onto another connection.
+    if "postgres" not in db.obj.__class__.__name__.lower() or db.in_transaction():
+        workers = 1
+    workers = min(workers, len(groups))
+    if workers > 1:
+        app = current_app._get_current_object() if has_app_context() else None
 
-            group = alerts_repo.recalculate_alert_group(group)
+        def deliver(group):
+            return _process_due_group(group, now, threaded=True, app=app)
 
-            if is_alert_group_shelved(group, now=now):
-                alerts_repo.clear_alert_group_notification(group)
-                skipped += 1
-                continue
-
-            if is_notification_lifecycle_suppressed(group, now=now):
-                pause_notification_lifecycle(group)
-                skipped += 1
-                continue
-
-            resume_notification_lifecycle(group, now=now)
-
-            if group.status != "firing":
-                alerts_repo.clear_alert_group_notification(group)
-                skipped += 1
-                continue
-
-            event_type = (
-                "notification"
-                if not group.last_notification_at
-                else "update"
-            )
-
-            sent_count = notify_alert(group, event_type=event_type)
-
-            if not sent_count:
-                alerts_repo.clear_alert_group_notification(group)
-
-                alerts_repo.create_alert_event(
-                    group_id=group.id,
-                    event_type=f"{event_type}_skipped",
-                    message="Due alert group notification skipped: no delivery target",
-                )
-
-                skipped += 1
-                continue
-
-            alerts_repo.mark_alert_group_notification_sent(group, now=now)
-
-            alerts_repo.create_alert_event(
-                group_id=group.id,
-                event_type=f"{event_type}_sent",
-                message="Due alert group notification sent",
-            )
-
-            sent += 1
-
-        except Exception as exc:
-            failed += 1
-
-            logger.exception(
-                "failed to send due alert group notification",
-                extra={
-                    "extra": {
-                        "alert_group_id": getattr(group, "id", None),
-                        "error": str(exc),
-                    }
-                },
-            )
-
-    return {
-        "processed": len(groups),
-        "sent": sent,
-        "skipped": skipped,
-        "failed": failed,
-    }
+        with ThreadPoolExecutor(max_workers=workers, thread_name_prefix="alert-delivery") as pool:
+            outcomes = Counter(pool.map(deliver, groups))
+    else:
+        outcomes = Counter(_process_due_group(group, now) for group in groups)
+    return {"processed": len(groups), "sent": outcomes["sent"],
+            "skipped": outcomes["skipped"], "failed": outcomes["failed"]}

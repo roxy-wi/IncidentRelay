@@ -170,6 +170,10 @@ class Config:
     DB_PASSWORD = settings.get("database", "password", "")
     DB_HOST = settings.get("database", "host", "127.0.0.1")
     DB_PORT = settings.get_int("database", "port", 0)
+    DB_POOL_ENABLED = settings.get_bool("database", "pool_enabled", True)
+    DB_POOL_MAX_CONNECTIONS = settings.get_int("database", "pool_max_connections", 32)
+    DB_POOL_STALE_SECONDS = settings.get_int("database", "pool_stale_seconds", 300)
+    DB_POOL_WAIT_SECONDS = settings.get_int("database", "pool_wait_seconds", 5)
 
     LOG_FILE = settings.get("logging", "file", "./logs/incidentrelay.log")
     LOG_APP_FILE = settings.get(
@@ -430,13 +434,16 @@ class Config:
     ALERT_GROUP_NOTIFICATION_CHECK_INTERVAL_SECONDS = settings.get_int(
         "alerts",
         "alert_group_notification_check_interval_seconds",
-        10,
+        1,
     )
 
     ALERT_GROUP_NOTIFICATION_BATCH_SIZE = settings.get_int(
         "alerts",
         "alert_group_notification_batch_size",
         100,
+    )
+    ALERT_GROUP_NOTIFICATION_WORKERS = settings.get_int(
+        "alerts", "alert_group_notification_workers", 8,
     )
 
     # Separate from Event Orchestration reopen_window_seconds. Off by default.
