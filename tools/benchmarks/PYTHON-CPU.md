@@ -66,11 +66,12 @@ app-process diagnostic above. Raw results are retained in `results/07-write-*/`.
 Earlier lookup-only A/B results and the exploratory unpaired measurement are also
 retained; the exploratory result is not used to claim a speedup.
 
-The target of 500 fully processed events/sec per combined app + PG CPU core is
-**not achieved**. It permits 2 combined CPU ms/event; even the isolated app cost
-above exceeds that budget. The earlier [observed ceiling](CEILING.md) applies to
-the earlier code/environment and must not be relabeled as a measurement of these
-changes.
+The user clarified the current target as **500 completed requests/sec total**.
+The earlier CPU-normalized target in [CEILING.md](CEILING.md) is historical.
+App CPU cost alone does not establish aggregate HTTP throughput: that requires
+the complete server/database capacity probe. The earlier observed ceiling of
+about 103/sec applies to the earlier code/environment and must not be relabeled
+as a measurement of these changes.
 
 ## Reproduce the controlled app diagnostic
 

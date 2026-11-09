@@ -96,7 +96,7 @@ def main():
                         "postgres_cpu_ms_per_event": round(pg_seconds*1000/events, 3) if events else None,
                         "combined_cpu_ms_per_event": round(total*1000/events, 3) if events else None,
                         "events_per_combined_cpu_second": round(events/total, 2) if total else None,
-                        "target_events_per_combined_cpu_second": 500,
+                        "offered_requests_per_second": row.get("offered_rate"),
                     }
                     (results / f"{artifact}-cpu.json").write_text(json.dumps(accounting, indent=2)+"\n")
                     with (results / "cpu-accounting.jsonl").open("a") as output:
