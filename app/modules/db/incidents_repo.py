@@ -71,7 +71,14 @@ def ensure_default_priorities():
     This only restores missing built-in rows, which also keeps tests stable
     after the database cleanup fixture deletes IncidentPriority rows.
     """
+    existing = {
+        row.slug for row in IncidentPriority.select(IncidentPriority.slug).where(
+            IncidentPriority.slug.in_([data["slug"] for data in DEFAULT_INCIDENT_PRIORITIES])
+        )
+    }
     for data in DEFAULT_INCIDENT_PRIORITIES:
+        if data["slug"] in existing:
+            continue
         IncidentPriority.get_or_create(
             slug=data["slug"],
             defaults=data,

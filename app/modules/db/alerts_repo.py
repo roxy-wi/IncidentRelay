@@ -1373,7 +1373,22 @@ def create_alert_explain_step(
     }
     if created_at is not None:
         values["created_at"] = created_at
-    return AlertExplainStep.create(**values)
+    with AlertExplainStep._meta.database.atomic():
+        return AlertExplainStep.create(**values)
+
+
+def create_alert_explain_steps(trace, steps):
+    """Persist ordered trace steps in bounded batches, including on SQLite.
+
+    A savepoint protects the caller's transaction if a diagnostic row fails.
+    The caller can then fall back to individual rows without an aborted PG
+    transaction. Fifty rows stay below older SQLite parameter limits.
+    """
+    database = AlertExplainStep._meta.database
+    with database.atomic():
+        for offset in range(0, len(steps), 50):
+            rows = [dict(item, trace=trace.id) for item in steps[offset:offset + 50]]
+            AlertExplainStep.insert_many(rows).execute()
 
 
 def attach_alert_explain_trace(trace, *, group=None, alert=None):

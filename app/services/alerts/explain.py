@@ -110,6 +110,7 @@ class AlertExplainTrace:
         self._input_summary = input_summary or {}
         self._started_at = utc_now()
         self._buffered = bool(buffered)
+        self._batch_steps = bool(buffered)
         self._applied = False
         self._disabled = False
         self._pending_steps = []
@@ -198,31 +199,8 @@ class AlertExplainTrace:
             started_at=self._started_at,
         )
 
-        for item in self._pending_steps:
-            try:
-                alerts_repo.create_alert_explain_step(
-                    trace=self.row,
-                    position=item["position"],
-                    stage=item["stage"],
-                    code=item["code"],
-                    status=item["status"],
-                    title=item["title"],
-                    message=item["message"],
-                    data=self._stored_data(item["data"]),
-                    created_at=item["created_at"],
-                )
-            except Exception:
-                logger.exception(
-                    "failed to create buffered alert explain step",
-                    extra={
-                        "extra": {
-                            "trace_id": self.trace_id,
-                            "stage": item["stage"],
-                            "code": item["code"],
-                        }
-                    },
-                )
-        self._pending_steps.clear()
+        if not self._batch_steps or self._pending_finish is not None:
+            self._flush_steps()
 
         if self._pending_group is not None or self._pending_alert is not None:
             try:
@@ -268,6 +246,26 @@ class AlertExplainTrace:
 
         return self
 
+    def _flush_steps(self):
+        if not self._pending_steps or self.row is None:
+            return
+        steps = [dict(item, data=self._stored_data(item["data"])) for item in self._pending_steps]
+        self._pending_steps.clear()
+        try:
+            alerts_repo.create_alert_explain_steps(self.row, steps)
+            return
+        except Exception:
+            logger.exception("failed to batch alert explain steps; retrying individually")
+        # Preserve the old best-effort diagnostics behavior: one invalid step
+        # must not discard all other steps or abort the alert transaction.
+        for item in steps:
+            try:
+                alerts_repo.create_alert_explain_step(trace=self.row, **item)
+            except Exception:
+                logger.exception("failed to create alert explain step", extra={
+                    "extra": {"trace_id": self.trace_id, "code": item["code"]},
+                })
+
     def step(
         self,
         stage,
@@ -283,7 +281,7 @@ class AlertExplainTrace:
         self.position += 1
         created_at = utc_now()
 
-        if self.row is None:
+        if self.row is None or self._batch_steps:
             self._pending_steps.append(
                 {
                     "position": self.position,
@@ -379,6 +377,7 @@ class AlertExplainTrace:
             self._pending_finish = finish
             return self
 
+        self._flush_steps()
         try:
             self.row = alerts_repo.finish_alert_explain_trace(
                 self.row,

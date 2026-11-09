@@ -1,0 +1,50 @@
+"""Render the cumulative measurements without treating run variance as causation."""
+import json
+from pathlib import Path
+
+
+def main():
+    root = Path(__file__).resolve().parent
+    stages = root / "results/improvements"
+    lines = [
+        "# Cumulative performance fixes", "",
+        "Each stage was measured against a fresh PostgreSQL database using the same commands.",
+        "Web: 4 workers × 4 threads, 2 CPU limit. PostgreSQL: 2 CPU limit. Full explain tracing.",
+        "Existing containers were left running, including an old Telegram worker consuming a CPU.",
+        "Intake excludes the Telegram worker, so changes in its row's intake numbers are run variance.",
+        "Short local runs and tmpfs storage do not establish production capacity.", "",
+        "| Cumulative stage | Idle Telegram SQL/sec | SQL/new alert | Saturated new alerts/sec | p95 at 40 offered/sec | Client arrivals not dispatched | Delivery/sec, 100 ms provider | Delivery/sec, 500 ms provider |",
+        "|---|---:|---:|---:|---:|---:|---:|---:|",
+    ]
+    for directory in sorted([path for path in stages.iterdir() if path.is_dir()], key=lambda p: (p.name != "baseline", p.name)):
+        rows = [json.loads(line) for line in (directory / "runs.jsonl").read_text().splitlines()]
+        saturated = next(row for row in rows if not row["offered_rate"])
+        fixed = next(row for row in rows if row["offered_rate"])
+        for row in rows:
+            assert row["success"] == row["persisted_unique_alerts"] == row["persisted_unique_groups"]
+            assert row["errors"] == 0
+        profile = json.loads((directory / "profile.json").read_text())
+        idle = json.loads((directory / "idle-worker.json").read_text())
+        deliveries = [json.loads(line) for line in (directory / "delivery.jsonl").read_text().splitlines()]
+        fast = next(row for row in deliveries if row["sink_delay_seconds"] == 0.1)
+        slow = next(row for row in deliveries if row["sink_delay_seconds"] == 0.5)
+        assert all(row["sent"] == row["processed"] == row["observed_http_deliveries"] and not row["failed"] for row in deliveries)
+        sql = sum(profile["counts"].values()) / profile["requests"]
+        lines.append(f"| {directory.name} | {idle['sql_per_second']:.2f} | {sql:g} | {saturated['success_per_second']:.2f} | {fixed['http_p95_ms']:.0f} ms | {fixed['client_rejected']} / {fixed['offered']} | {fast['deliveries_per_second']:.2f} | {slow['deliveries_per_second']:.2f} |")
+    lines.extend([
+        "", "The saturation test lasts 20 seconds with 16 concurrent clients. The fixed-rate test offers",
+        "40 events/sec for 30 seconds with at most 64 in flight. Client capacity rejections are not",
+        "HTTP errors. Every dispatched event was independently checked in PostgreSQL.",
+        "Delivery probes use 100 groups at 100 ms delay and 20 groups at 500 ms delay; rates measure",
+        "batch execution, not the periodic scheduler's cadence. Idle-worker probes last 3 seconds.",
+        "SQL counts include transaction statements routed through Peewee's execute_sql.",
+        "Raw JSON, SQL profiles, source commits and diffs are stored under results/improvements/.",
+        "See README.md for reproduction; measure_stage.py runs and archives one cumulative stage.", "",
+    ])
+    path = root / "IMPROVEMENTS.md"
+    path.write_text("\n".join(lines))
+    print(path.read_text())
+
+
+if __name__ == "__main__":
+    main()

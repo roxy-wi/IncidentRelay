@@ -164,6 +164,17 @@ def profile():
     counts = Counter()
     queries = Counter()
     original = db.execute_sql
+    original_connect = db._connect
+    backend_ids = set()
+    connection = db.connection()
+    if hasattr(connection, "get_backend_pid"):
+        backend_ids.add(connection.get_backend_pid())
+
+    def connect(*args, **kwargs):
+        connection = original_connect(*args, **kwargs)
+        if hasattr(connection, "get_backend_pid"):
+            backend_ids.add(connection.get_backend_pid())
+        return connection
 
     def execute(sql, params=None, *a, **kw):
         counts[sql.split()[0].upper()] += 1
@@ -171,6 +182,7 @@ def profile():
         return original(sql, params, *a, **kw)
 
     db.execute_sql = execute
+    db._connect = connect
     profiler = cProfile.Profile()
     profiler.enable()
     statuses = []
@@ -182,6 +194,7 @@ def profile():
     print("SQL statements / 20 requests:", dict(counts), "HTTP statuses:", dict(Counter(statuses)))
     Path("/results/profile.json").write_text(json.dumps({
         "requests": len(statuses), "counts": dict(counts),
+        "postgres_backends_used": len(backend_ids),
         "queries": [{"sql": sql, "calls": count} for sql, count in queries.most_common()],
     }, indent=2))
     pstats.Stats(profiler).strip_dirs().sort_stats("cumulative").print_stats(30)
