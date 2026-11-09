@@ -52,3 +52,27 @@ def test_orchestration_state_skips_unchanged_writes_and_persists_dirty_values(db
     _sync_orchestration_group_fields(fetched, runtime=None, suppressed=True, reason="changed-before-sync")
     assert len(calls) == 1
     assert AlertGroup.get_by_id(group.id).orchestration_suppress_reason == "changed-before-sync"
+
+
+def test_recalculation_updates_derived_fields_without_rewriting_unrelated_state(db, monkeypatch):
+    group = alerts_repo.create_alert_group(source="test", group_key="derived", title="Original")
+    group.escalation_repeat_count = 17
+    group.save(only=[AlertGroup.escalation_repeat_count])
+    Alert.create(group=group, source="test", dedup_key="derived", group_key="derived",
+                 title="Updated child", labels={"host": "server"}, payload={"value": 1})
+    updates = []
+    execute = db.execute_sql
+
+    def capture(sql, params=None, *args, **kwargs):
+        if sql.startswith('UPDATE "alertgroup"'):
+            updates.append(sql)
+        return execute(sql, params, *args, **kwargs)
+
+    monkeypatch.setattr(db, "execute_sql", capture)
+    alerts_repo.recalculate_alert_group(group)
+    assert len(updates) == 1
+    assert '"escalation_repeat_count"' not in updates[0]
+    fetched = AlertGroup.get_by_id(group.id)
+    assert (fetched.title, fetched.alert_count, fetched.escalation_repeat_count) == ("Updated child", 1, 17)
+    assert fetched.common_labels == {"host": "server"}
+    assert fetched.payload_summary["latest_payload"] == {"value": 1}

@@ -659,7 +659,7 @@ def _recalculate_alert_group(group, *, event=None):
         group.previous_status = previous_status
 
     group.updated_at = now
-    group.save()
+    group.save(only=group.dirty_fields)
     alert_episodes_repo.refresh_context(group, alerts=alerts)
     if group.status == "resolved":
         alert_episodes_repo.close_episode(

@@ -34,6 +34,7 @@ def main():
     compiled_first = compiled_select.first
     refresh_impacts = lifecycle.refresh_business_impacts_safely_for_group
     sync_state = lifecycle._sync_orchestration_group_fields
+    recalculate = alerts_repo._recalculate_alert_group
     rows = []
 
     def scalar_arguments(function):
@@ -59,6 +60,20 @@ def main():
             fields.append(type(group).notification_policy)
         group.save(only=fields)
 
+    def legacy_recalculate(group, *args, **kwargs):
+        # Reproduce the old full-row save only in this isolated diagnostic.
+        save = group.save
+
+        def full_save(*args, **kwargs):
+            kwargs.pop("only", None)
+            return save(*args, **kwargs)
+
+        group.save = full_save
+        try:
+            return recalculate(group, *args, **kwargs)
+        finally:
+            del group.save
+
     def select(variant):
         BaseModel.get = classmethod(Model.get.__func__) if variant == "ordinary" else optimized_get
         BaseModel.save = Model.save if variant in {"ordinary", "lookup"} else optimized_save
@@ -66,8 +81,9 @@ def main():
         alerts_repo.create_alert_group = create_group if reuse_relations else scalar_arguments(create_group)
         alerts_repo.create_alert = create_alert if reuse_relations else scalar_arguments(create_alert)
         compiled_select.first = compiled_select.ordinary_first if variant in {"ordinary", "lookup", "lookup-and-writes", "relations"} else compiled_first
-        lifecycle.refresh_business_impacts_safely_for_group = refresh_impacts if variant in {"deduplicate", "state-writes"} else legacy_impacts
-        lifecycle._sync_orchestration_group_fields = sync_state if variant == "state-writes" else legacy_sync
+        lifecycle.refresh_business_impacts_safely_for_group = refresh_impacts if variant in {"deduplicate", "state-writes", "derived-writes"} else legacy_impacts
+        lifecycle._sync_orchestration_group_fields = sync_state if variant in {"state-writes", "derived-writes"} else legacy_sync
+        alerts_repo._recalculate_alert_group = recalculate if variant == "derived-writes" else legacy_recalculate
 
     def send(run_id, index):
         response = client.post("/api/integrations/webhook", data=payload(run_id, index, "unique"),
@@ -78,7 +94,7 @@ def main():
 
     try:
         for round_number in range(args.rounds):
-            variants = ["ordinary", "lookup", "lookup-and-writes", "relations", "selectors", "deduplicate", "state-writes"]
+            variants = ["ordinary", "lookup", "lookup-and-writes", "relations", "selectors", "deduplicate", "state-writes", "derived-writes"]
             if round_number % 2:
                 variants.reverse()
             ids = {variant: uuid.uuid4().hex for variant in variants}
@@ -120,6 +136,7 @@ def main():
         compiled_select.first = compiled_first
         lifecycle.refresh_business_impacts_safely_for_group = refresh_impacts
         lifecycle._sync_orchestration_group_fields = sync_state
+        alerts_repo._recalculate_alert_group = recalculate
     result = {"scope": "app process incl Flask test client; excludes PG CPU, server and network", "rows": rows,
               "median_app_cpu_ms_per_event": {
                   variant: round(statistics.median(row["app_cpu_ms_per_event"] for row in rows if row["variant"] == variant), 3)
