@@ -1,14 +1,4 @@
 {
-  "__inputs": [
-    {
-      "name": "DS_PROMETHEUS",
-      "label": "Prometheus",
-      "description": "Prometheus that scrapes IncidentRelay",
-      "type": "datasource",
-      "pluginId": "prometheus",
-      "pluginName": "Prometheus"
-    }
-  ],
   "id": null,
   "uid": "incidentrelay-operations",
   "title": "IncidentRelay · Operations",
@@ -19,7 +9,7 @@
     "prometheus"
   ],
   "schemaVersion": 39,
-  "version": 1,
+  "version": 2,
   "editable": true,
   "timezone": "browser",
   "refresh": "30s",
@@ -29,6 +19,20 @@
   },
   "templating": {
     "list": [
+      {
+        "name": "DS_PROMETHEUS",
+        "label": "Prometheus",
+        "description": "Prometheus data source that scrapes this IncidentRelay deployment",
+        "type": "datasource",
+        "query": "prometheus",
+        "regex": "",
+        "multi": false,
+        "includeAll": false,
+        "hide": 0,
+        "current": {},
+        "refresh": 1,
+        "options": []
+      },
       {
         "name": "job",
         "label": "IR scrape job",

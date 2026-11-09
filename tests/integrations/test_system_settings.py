@@ -196,7 +196,7 @@ def test_group_scope_cannot_modify_global_settings(client, admin_headers):
 
 
 @pytest.mark.parametrize("auth_required", [False, True])
-def test_settings_reject_machine_and_admin_personal_tokens(
+def test_settings_accept_admin_personal_token_and_reject_machine_token(
     client, setup_identity, admin_user, monkeypatch, auth_required
 ):
     monkeypatch.setattr(Config, "API_AUTH_REQUIRED", auth_required)
@@ -204,7 +204,7 @@ def test_settings_reject_machine_and_admin_personal_tokens(
     tokens_repo.create_api_token(
         "personal", "personal", hash_token("personal"), ["*"], user_id=admin_user.id
     )
-    for token, status in ((raw, 403), ("personal", 401)):
+    for token, status in ((raw, 403), ("personal", 200)):
         auth = {"Authorization": f"Bearer {token}"}
         assert client.get(URL, headers=auth).status_code == status
         assert client.patch(URL, headers=auth, json={"change_intake_enabled": True}).status_code == status

@@ -11,6 +11,7 @@ from app.modules.db.models import (
     ChangeServiceReference,
 )
 from app.services.audit import record_audit
+from app.services.rbac import current_api_token
 from app.services.change_intelligence.administration import ChangeConflict, lock_catalog
 from app.services.change_intelligence.authorization import lock_row
 from app.services.change_intelligence.management import require_manager
@@ -110,6 +111,7 @@ def retry_job(job_id, expected_generation, *, actor_id, integration_id=None):
             object_id=job.id,
             group_id=principal.owner_group_id if principal else None,
             user_id=actor_id,
+            api_token_id=getattr(current_api_token(), "id", None),
             data={
                 "integration_id": principal_id,
                 "previous_generation": current.requested_generation,

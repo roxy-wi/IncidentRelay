@@ -11,7 +11,6 @@ from app.services.api_token_scopes import (
     is_public_calendar_feed_path as is_public_calendar_feed_request,
     required_scopes_for_path,
     token_has_scopes,
-    is_jwt_only_api_path,
 )
 
 
@@ -181,9 +180,6 @@ def enforce_api_authentication():
 
     if user:
         return None
-
-    if is_jwt_only_api_path(request.path):
-        return jsonify({"error": "Valid administrator JWT is required"}), 401
 
     api_token_or_response = load_api_token_principal()
 

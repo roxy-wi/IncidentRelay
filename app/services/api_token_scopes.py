@@ -26,6 +26,8 @@ PUBLIC_API_PREFIXES = (
 # profile API returns this sequence to the UI.
 READ_WRITE_SCOPE_DOMAINS = (
     "changes",
+    "change-integrations",
+    "system-settings",
     "alerts",
     "incidents",
     "services",
@@ -65,7 +67,8 @@ PROFILE_TOKEN_SCOPE_OPTIONS = (
 ALLOWED_PROFILE_TOKEN_SCOPES = frozenset(PROFILE_TOKEN_SCOPE_OPTIONS)
 
 # resources:* predates granular entity scopes. Preserve it as an aggregate for
-# every non-alert, non-profile resource domain so existing tokens keep working.
+# the explicitly listed resource domains so existing tokens keep working.
+# Changes and administrative settings/integrations require dedicated scopes.
 # alerts:* and profile:* remain separate exactly as they were before.
 LEGACY_RESOURCE_DOMAINS = frozenset({
     "incidents",
@@ -93,6 +96,8 @@ API_SCOPE_RULES = (
     # OpenAPI specification follows the authenticated documentation boundary.
     # Reuse profile:read rather than adding a one-off docs scope.
     ("/api/openapi.json", "profile"),
+    ("/api/admin/change-integrations", "change-integrations"),
+    ("/api/admin/system-settings", "system-settings"),
     ("/api/admin/audit-logs", "audit"),
     ("/api/admin/sso", "sso"),
     ("/api/admin/users", "users"),
@@ -257,14 +262,6 @@ def token_has_scopes(token_scopes, required_scopes):
 
     effective = expand_token_scopes(raw)
     return all(scope in effective for scope in required_scopes)
-
-
-def is_jwt_only_api_path(path):
-    """Administration has no API-token scopes, including personal wildcard."""
-    return any(
-        path_matches_prefix(path, prefix)
-        for prefix in ("/api/admin/change-integrations", "/api/admin/system-settings")
-    )
 
 
 def token_can_grant_scopes(current_scopes, requested_scopes):

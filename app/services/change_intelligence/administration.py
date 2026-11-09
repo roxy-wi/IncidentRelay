@@ -16,6 +16,7 @@ from app.modules.db.models import (
     Service,
 )
 from app.services.audit import record_audit
+from app.services.rbac import current_api_token
 from app.services.change_intelligence.authorization import (
     active_integration_group,
     lock_row,
@@ -50,7 +51,10 @@ def advance_revision(integration):
 
 
 @contextmanager
-def admin_transaction(integration_id, expected_revision=None, *, actor_id=None):
+def admin_transaction(
+    integration_id, expected_revision=None, *, actor_id=None,
+    token_scope="change-integrations:write",
+):
     """Reject stale edits after locking graph state, then the machine principal."""
     with incident_core_repo.write_transaction():
         lock_catalog()
@@ -61,7 +65,7 @@ def admin_transaction(integration_id, expected_revision=None, *, actor_id=None):
             raise ChangeIntegration.DoesNotExist()
         if actor_id is not None:
             try:
-                require_manager(actor_id, integration.owner_group_id)
+                require_manager(actor_id, integration.owner_group_id, token_scope=token_scope)
             except PermissionError as error:
                 raise ChangeIntegration.DoesNotExist() from error
         if (
@@ -80,6 +84,7 @@ def audit(actor_id, action, obj, integration_id, data=None):
         object_id=obj.id,
         group_id=ChangeIntegration.get_by_id(integration_id).owner_group_id,
         user_id=actor_id,
+        api_token_id=getattr(current_api_token(), "id", None),
         data={"integration_id": integration_id, **(data or {})},
     )
 

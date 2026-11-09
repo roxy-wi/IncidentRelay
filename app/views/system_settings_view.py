@@ -3,8 +3,8 @@
 from flask import Blueprint, jsonify, request
 
 from app.api.schemas.system_settings import SystemSettingsUpdate
-from app.middleware import load_jwt_user
 from app.services import system_settings
+from app.services.rbac import current_api_token
 from app.services.validation import make_error_response, validate_body
 
 system_settings_bp = Blueprint("system_settings_api", __name__)
@@ -18,12 +18,19 @@ def prevent_caching(response):
 
 @system_settings_bp.route("", methods=["GET", "PATCH"])
 def manage_system_settings():
-    """Read or update the system singleton using a global administrator JWT."""
-    user = load_jwt_user()
-    if user is None:
-        return make_error_response("jwt_required", "Valid JWT token is required", 401)
+    """Read or update the singleton as an authenticated global administrator."""
+    user = getattr(request, "current_user", None)
+    if not user or not user.active or user.deleted:
+        return make_error_response(
+            "authentication_required", "Authentication is required", 401
+        )
     if not user.is_admin:
         return make_error_response("access_denied", "Global administrator required", 403)
+    token = current_api_token()
+    if token and (token.group_id is not None or token.team_id is not None):
+        return make_error_response(
+            "access_denied", "An unrestricted administrator token is required", 403
+        )
     if request.args:
         return make_error_response("invalid_query", "No query parameters are supported", 400)
     if request.method == "PATCH":

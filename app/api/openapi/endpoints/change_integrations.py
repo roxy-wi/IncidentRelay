@@ -1,4 +1,4 @@
-"""JWT administration of Change Intelligence integrations."""
+"""JWT and personal API-token administration of Change integrations."""
 
 from app.api.openapi.common import json_body, path_param, response
 
@@ -13,7 +13,7 @@ def tags():
     return [
         {
             "name": "Change integrations",
-            "description": "Global or Group user_admin JWT required; personal and machine API tokens are rejected.",
+            "description": "Global or Group user_admin authentication by JWT or personal API token. Machine ingest credentials are rejected.",
         }
     ]
 
@@ -31,17 +31,26 @@ def body(properties, required):
 
 
 def operation(summary, *, properties=None, required=None, created=False):
+    scope = "change-integrations:write" if properties is not None else "change-integrations:read"
     result = {
         "tags": ["Change integrations"],
         "summary": summary,
         "security": [{"bearerAuth": []}],
-        "description": "Requires a current global administrator or Group user_admin JWT, even with global API auth disabled. Group administrators manage only identities owned by their active Groups. Central identities remain global-only. owner_group_id is immutable; null means central. Sources and grants of Group-owned identities must stay within that Group. Mutations are audited. Permission edits require the current auth_revision as expected_revision; stale edits return 409. Responses are not cached.",
+        "description": (
+            f"Requires a current global administrator or Group user_admin with JWT or a personal API token with {scope} (or *), "
+            "even with global API auth disabled. Legacy resources:* and changes:* scopes do not grant administration. "
+            "Group-bound tokens manage only identities owned by that Group; Team-bound tokens are rejected. "
+            "Central identities and root job operations require an unrestricted global administrator. "
+            "owner_group_id is immutable; null means central. Sources and grants of Group-owned identities must stay within that Group. "
+            "Mutations audit both user and API-token identity. Permission edits require the current auth_revision as expected_revision; "
+            "stale edits return 409. Responses are not cached."
+        ),
         "responses": {
             "201" if created else "200": response(
                 "Created" if created else "Configuration returned"
             ),
             "400": response("Invalid body"),
-            "401": response("Administrator JWT required"),
+            "401": response("Authenticated administrator required"),
             "403": response("Access denied"),
             "404": response("Configuration not found"),
             "409": response(
@@ -192,8 +201,8 @@ def paths():
             result[prefix + "/jobs"]["get"],
             result[prefix + "/jobs/{job_id}/retry"]["post"],
         ):
-            method["description"] = (
-                "JWT only, even when API authentication is optional. Global administrators manage all jobs; "
+            method["description"] += (
+                " Global administrators manage all jobs; "
                 "Group user_admin members use the integration-scoped route for their own Group. "
                 "Listing returns up to 50 queue metadata records, without event payloads, Services or lease credentials. "
                 "Retry requires expected_generation; a stale generation returns 409. It renews the pending window "

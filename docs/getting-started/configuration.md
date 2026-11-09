@@ -450,7 +450,7 @@ The user-notification queue gauges describe current backlog, not history. `state
 
 ### Grafana dashboard
 
-After Prometheus has successfully scraped the IR web service, import the [tools/grafana/incidentrelay-overview.json](https://github.com/roxy-wi/IncidentRelay/blob/release/2.5.0/tools/grafana/incidentrelay-overview.json) via **Dashboards → New → Import** in Grafana. Select the Prometheus data source at import, then choose **IR scrape job** and **Web target** on the dashboard. Set the data source's scrape interval to the actual Prometheus interval so the rate panels use the right window.
+After Prometheus has successfully scraped the IR web service, import the [tools/grafana/incidentrelay-overview.json](https://github.com/roxy-wi/IncidentRelay/blob/2.5.1/tools/grafana/incidentrelay-overview.json) via **Dashboards → New → Import** in Grafana. Choose **Prometheus**, **IR scrape job** and **Web target** at the top of the dashboard. Changing the **Prometheus** data source refreshes the job and target choices and applies to every panel; no re-import is needed. Set the data source's scrape interval to the actual Prometheus interval so the rate panels use the right window.
 
 Use one job per IR deployment sharing a database. Scrape each web replica as a separate target: the dashboard adds request and event rates, but counts a shared database queue only once. Notification outcomes are rolling **24-hour** counts regardless of the dashboard time range. Missing data is not zero: for example, a database outage can hide the migration count, and an optional worker has no heartbeat line until it first reports. In Docker and Kubernetes, web scrapes may not include counters from separate scheduler or worker containers; their database-backed queue gauges are still available.
 
@@ -588,7 +588,10 @@ may still carry an earlier Change revision.
 
 Global administrators can inspect `GET /api/admin/change-integrations/jobs`;
 Group administrators use `GET /api/admin/change-integrations/{integration_id}/jobs`
-for their owned integrations. These endpoints require JWT, return only queue
+for their owned integrations. These endpoints accept JWT or personal API tokens
+with `change-integrations:read` for listing and `change-integrations:write` for
+retry (`*` also works). Group-bound tokens use the integration-scoped routes;
+Team-bound tokens are rejected. The endpoints return only queue
 metadata, support `state` and `after`, and paginate at 50 records. Retry with
 `POST` to the corresponding `/jobs/{job_id}/retry`, supplying
 `{"expected_generation": <requested_generation>}`. A stale request returns `409`.
