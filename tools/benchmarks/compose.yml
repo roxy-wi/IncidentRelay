@@ -1,0 +1,55 @@
+# Isolated capacity test. Never uses the normal Compose deployment or its data.
+services:
+  postgres:
+    image: postgres:16-alpine
+    cpus: 1.0
+    mem_limit: 1g
+    environment:
+      POSTGRES_DB: ir_capacity_bench
+      POSTGRES_USER: ir_capacity_bench
+      POSTGRES_PASSWORD: benchmark-only
+    command: [postgres, -c, shared_preload_libraries=pg_stat_statements]
+    tmpfs:
+      - /var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U ir_capacity_bench"]
+      interval: 2s
+      timeout: 2s
+      retries: 30
+
+  web:
+    image: ghcr.io/roxy-wi/incidentrelay:2.5
+    cpus: 2.0
+    mem_limit: 1536m
+    working_dir: /opt/incidentrelay
+    volumes:
+      - ../..:/opt/incidentrelay:ro
+      - ${BENCH_RESULTS_DIR:-/tmp/ir-capacity-results}:/results
+    tmpfs:
+      - /bench-logs
+    environment: &environment
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONPATH: /opt/incidentrelay
+      INCIDENTRELAY_CONFIG_FILE: /opt/incidentrelay/tools/benchmarks/benchmark.conf
+      INCIDENTRELAY__ALERTS__EXPLAIN_TRACE_LEVEL: ${BENCH_TRACE_LEVEL:-full}
+    entrypoint: []
+    command: [gunicorn, --bind, "0.0.0.0:8080", --workers, "${BENCH_WORKERS:-1}", --threads, "4", --timeout, "60", "app:create_app()"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+  load:
+    image: ghcr.io/roxy-wi/incidentrelay:2.5
+    profiles: [tools]
+    working_dir: /opt/incidentrelay
+    volumes:
+      - ../..:/opt/incidentrelay:ro
+      - ${BENCH_RESULTS_DIR:-/tmp/ir-capacity-results}:/results
+    tmpfs:
+      - /bench-logs
+    environment: *environment
+    entrypoint: [python, tools/benchmarks/capacity.py]
+    command: [--help]
+    depends_on:
+      postgres:
+        condition: service_healthy

@@ -1,0 +1,32 @@
+{
+  "source_commit": "29e7f82de1a3a97ef812615b0c3dfd822da81154",
+  "host_cpu": "Apple M5",
+  "host_cores": 10,
+  "host_memory_bytes": 25769803776,
+  "docker_vm": {
+    "cpus": 4,
+    "memory_bytes": 6283915264
+  },
+  "app_image": "sha256:cd390f181e484893113bc5b68a052c0bd4bbd991dce064f601b5fc06f765a98c",
+  "postgres_image": "sha256:35726244c51a57338a5a5a5ad8a7e2b18f4ecb8dccd51224cab33ac2ea6a5df0",
+  "python": "Python 3.12.16",
+  "postgres": "PostgreSQL 16.15 on aarch64-unknown-linux-musl, compiled by gcc (Alpine 15.2.0) 15.2.0, 64-bit",
+  "limits": {
+    "web_cpus": 2,
+    "web_memory_bytes": 1610612736,
+    "postgres_memory_bytes": 1073741824,
+    "postgres_cpus_tested": [
+      1,
+      2
+    ],
+    "gunicorn_threads": 4,
+    "gunicorn_workers_tested": [
+      1,
+      4
+    ]
+  },
+  "storage": "PostgreSQL data and WAL on tmpfs; fsync remains on. No durable-disk benchmark.",
+  "background_workload": "Existing incidentrelay-telegram repeatedly observed near 100% of one CPU. Existing deployment was not stopped or changed.",
+  "fixture": "one generic webhook event/request, route-token auth, per-host groups, no rotations, service dependency graph, or orchestration rules; no scheduler during intake",
+  "final_transport": "connection-close; earlier rows without transport are exploratory keep-alive runs; one long exploratory run had stale-socket client errors"
+}

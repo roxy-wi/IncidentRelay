@@ -1,0 +1,47 @@
+SQL statements / 20 requests: {'SELECT': 860, 'INSERT': 480, 'SAVEPOINT': 40, 'UPDATE': 200, 'RELEASE': 40} HTTP statuses: {200: 20}
+         3035106 function calls (2865883 primitive calls) in 4.188 seconds
+
+   Ordered by: cumulative time
+   List reduced from 845 to 30 due to restriction <30>
+
+   ncalls  tottime  percall  cumtime  percall filename:lineno(function)
+       20    0.000    0.000    4.201    0.210 test.py:1168(post)
+       20    0.000    0.000    4.201    0.210 testing.py:204(open)
+       20    0.000    0.000    4.192    0.210 test.py:1062(open)
+       20    0.000    0.000    4.192    0.210 test.py:984(run_wsgi_app)
+       20    0.000    0.000    4.187    0.209 test.py:1230(run_wsgi_app)
+       20    0.000    0.000    4.186    0.209 app.py:1491(__call__)
+       20    0.000    0.000    4.186    0.209 app.py:1441(wsgi_app)
+       20    0.000    0.000    4.166    0.208 app.py:867(full_dispatch_request)
+       20    0.000    0.000    3.822    0.191 app.py:842(dispatch_request)
+       20    0.000    0.000    3.821    0.191 auth.py:210(wrapper)
+       20    0.001    0.000    3.580    0.179 integrations_view.py:632(generic_webhook)
+       20    0.002    0.000    3.571    0.179 integrations_view.py:755(process_incoming_alerts)
+       20    0.001    0.000    3.514    0.176 lifecycle.py:184(upsert_alert)
+1820/1540    0.003    0.000    3.463    0.002 peewee.py:2030(inner)
+     1540    0.003    0.000    3.438    0.002 peewee.py:2105(execute)
+     1540    0.007    0.000    3.365    0.002 peewee.py:3325(execute)
+       20    0.010    0.001    2.936    0.147 lifecycle.py:650(_upsert_alert)
+      860    0.009    0.000    2.328    0.003 peewee.py:2278(_execute)
+     1620    0.009    0.000    1.898    0.001 capacity.py:167(execute)
+     1620    0.009    0.000    1.882    0.001 peewee.py:3316(execute_sql)
+     1740    1.854    0.001    1.870    0.001 {method 'execute' of 'psycopg2.extensions.cursor' objects}
+160920/1580    0.135    0.000    1.490    0.001 peewee.py:662(sql)
+      680    0.012    0.000    1.161    0.002 peewee.py:6920(save)
+      680    0.003    0.000    1.107    0.002 peewee.py:2621(_execute)
+      900    0.020    0.000    1.104    0.001 peewee.py:2526(__sql__)
+6040/3940    0.038    0.000    0.991    0.000 peewee.py:1894(__sql__)
+      260    0.002    0.000    0.962    0.004 peewee.py:7273(__iter__)
+      460    0.007    0.000    0.952    0.002 peewee.py:7281(get)
+      480    0.003    0.000    0.871    0.002 peewee.py:6738(create)
+    28100    0.024    0.000    0.856    0.000 peewee.py:4855(__sql__)
+
+
+ Container ir-capacity-bench-postgres-1 Running 
+ Container ir-capacity-bench-postgres-1 Waiting 
+ Container ir-capacity-bench-postgres-1 Healthy 
+ Container ir-capacity-bench-load-run-e79006efc854 Creating 
+ Container ir-capacity-bench-load-run-e79006efc854 Created 
+/opt/incidentrelay/app/views/sso_auth_view.py:8: AuthlibDeprecationWarning: authlib.jose module is deprecated, please use joserfc instead.
+It will be compatible before version 2.0.0.
+  from authlib.jose import JsonWebKey, JsonWebToken
