@@ -170,6 +170,10 @@ class Config:
     DB_PASSWORD = settings.get("database", "password", "")
     DB_HOST = settings.get("database", "host", "127.0.0.1")
     DB_PORT = settings.get_int("database", "port", 0)
+    DB_POOL_ENABLED = settings.get_bool("database", "pool_enabled", True)
+    DB_POOL_MAX_CONNECTIONS = settings.get_int("database", "pool_max_connections", 32)
+    DB_POOL_STALE_SECONDS = settings.get_int("database", "pool_stale_seconds", 300)
+    DB_POOL_WAIT_SECONDS = settings.get_int("database", "pool_wait_seconds", 5)
 
     LOG_FILE = settings.get("logging", "file", "./logs/incidentrelay.log")
     LOG_APP_FILE = settings.get(
