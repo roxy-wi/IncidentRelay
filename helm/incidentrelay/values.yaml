@@ -98,8 +98,9 @@ config:
     alert_group_window_seconds: 3600
     alert_group_wait_seconds: 30
     alert_group_interval_seconds: 300
-    alert_group_notification_check_interval_seconds: 10
+    alert_group_notification_check_interval_seconds: 1
     alert_group_notification_batch_size: 100
+    alert_group_notification_workers: 8
     # Opt-in delayed recovery notifications; independent of reopen_window_seconds.
     recovery_notification_delay_seconds: 0
     silence_lifecycle_check_interval_seconds: 30

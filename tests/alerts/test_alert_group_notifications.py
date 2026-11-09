@@ -119,3 +119,24 @@ def test_group_resolved_before_group_wait_does_not_send_notification(db, monkeyp
 
     assert result["sent"] == 0
     assert sent == []
+
+
+def test_sqlite_delivery_stays_on_caller_thread_without_holding_writer(db, monkeypatch):
+    import threading
+    import pytest
+    if "sqlite" not in db.__class__.__name__.lower():
+        pytest.skip("SQLite compatibility path")
+    route = _route()
+    group = upsert_alert(_alert(route, "DiskFull", "sqlite-host")).group
+    AlertGroup.update(notification_pending=True, notification_due_at=utc_now() - timedelta(seconds=1),
+                      notification_reason="notification").where(AlertGroup.id == group.id).execute()
+    caller = threading.get_ident()
+    monkeypatch.setattr(Config, "ALERT_GROUP_NOTIFICATION_WORKERS", 8)
+
+    def provider(group, event_type="notification"):
+        assert threading.get_ident() == caller
+        assert not db.in_transaction()
+        return 1
+
+    monkeypatch.setattr(notification_queue, "notify_alert", provider)
+    assert notification_queue.process_due_alert_group_notifications()["sent"] == 1

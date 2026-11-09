@@ -434,13 +434,16 @@ class Config:
     ALERT_GROUP_NOTIFICATION_CHECK_INTERVAL_SECONDS = settings.get_int(
         "alerts",
         "alert_group_notification_check_interval_seconds",
-        10,
+        1,
     )
 
     ALERT_GROUP_NOTIFICATION_BATCH_SIZE = settings.get_int(
         "alerts",
         "alert_group_notification_batch_size",
         100,
+    )
+    ALERT_GROUP_NOTIFICATION_WORKERS = settings.get_int(
+        "alerts", "alert_group_notification_workers", 8,
     )
 
     # Separate from Event Orchestration reopen_window_seconds. Off by default.

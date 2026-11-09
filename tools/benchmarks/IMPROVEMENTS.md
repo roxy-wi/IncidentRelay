@@ -11,6 +11,7 @@ Short local runs and tmpfs storage do not establish production capacity.
 | baseline | 2299.28 | 81 | 32.91 | 889 ms | 0 / 1200 | 8.58 | 1.92 |
 | 01-telegram | 1.00 | 81 | 38.69 | 3703 ms | 3 / 1200 | 8.64 | 1.92 |
 | 02-sql | 1.00 | 59 | 41.58 | 2890 ms | 64 / 1200 | 8.51 | 1.93 |
+| 03-pool | 1.00 | 59 | 63.82 | 30 ms | 0 / 1200 | 8.59 | 1.93 |
 
 The saturation test lasts 20 seconds with 16 concurrent clients. The fixed-rate test offers
 40 events/sec for 30 seconds with at most 64 in flight. Client capacity rejections are not
