@@ -10,6 +10,10 @@ Python remains the implementation language. These changes follow the original
    retain their normal behavior. Unsupported inputs use Peewee's normal save.
 3. Pass already loaded models into new Alert/AlertGroup foreign keys. Peewee can
    reuse those objects during the request instead of fetching them again.
+4. Reuse SQL templates for the route-scoped deduplication and open-group selectors.
+5. Refresh dependency correlations once per new alert instead of twice.
+6. Skip orchestration state writes when those fields are already persisted.
+7. Save only fields modified by group recalculation, preserving unrelated state.
 
 Both template caches are bounded to 256 entries and include database/table layout
 in their keys. Neither caches row data. Tests cover fresh values, custom hooks,
@@ -18,32 +22,51 @@ changes, in addition to the lifecycle/concurrency regression suites.
 
 ## Comparison per change
 
-The controlled diagnostic runs all four variants in one process, interleaved
-request by request, reversing their order. Each variant processes 50 unique events
-per round, four rounds, after warming each variant. All 800 measured Alerts and
-800 completed full traces were independently counted in PostgreSQL.
+The final controlled diagnostic runs eight cumulative variants in one process,
+interleaved request by request, reversing their order. Each variant processes
+50 unique events per round for four rounds, after warming each variant. All
+1,600 measured Alerts and 1,600 completed full traces were counted in PostgreSQL.
 
 | Cumulative Python change | Median app CPU ms/event | Less app CPU vs previous | SQL/event |
 |---|---:|---:|---:|
-| Ordinary Peewee, after original fixes | 21.745 | — | 59 |
-| Reuse primary-key SELECT templates | 20.165 | 7.3% | 59 |
-| Also reuse alert INSERT/UPDATE templates | 17.476 | 13.3% | 59 |
-| Also retain loaded intake relationships | 17.065 | 2.4% | 58 |
+| Ordinary Peewee, after original fixes | 8.012 | — | 59 |
+| Reuse primary-key SELECT templates | 7.274 | 9.2% | 59 |
+| Also reuse alert INSERT/UPDATE templates | 6.466 | 11.1% | 59 |
+| Also retain loaded intake relationships | 6.428 | 0.6% | 58 |
+| Also reuse dedup/open-group SELECT templates | 5.976 | 7.0% | 58 |
+| Also remove duplicate correlation refresh | 5.868 | 1.8% | 57 |
+| Also skip unchanged orchestration state writes | 5.826 | 0.7% | 56 |
+| Also save only recalculated group fields | 5.801 | 0.4% | 56 |
 
-The overall reduction in this run is **21.5%**. The relationship change was small:
-two rounds were slightly slower, two faster; its deterministic improvement is one
-fewer SELECT/event. Before that change, a separate three-variant interleaved run
-measured 16.711 → 15.332 → 13.476 app CPU ms/event, a 19.4% overall reduction.
+The overall app CPU reduction in this run is **27.6%**. Small timing differences
+are less reliable than the deterministic reductions: one fewer relationship
+SELECT, one fewer correlation SELECT in this fixture, one fewer unchanged UPDATE,
+and 18 rather than 59 bound values in the group-recalculation UPDATE. Removing the
+duplicate correlation refresh also avoids a second dependency traversal for
+service-backed alerts; the small fixture has no service graph.
 
 These are `time.process_time_ns()` measurements around complete processing through
 Flask's test client. They include test-client overhead and exclude Gunicorn,
 network transport and **PostgreSQL CPU**. They diagnose app work; they do not
-establish a production throughput ceiling or the combined CPU target.
+establish an HTTP throughput ceiling. Benchmark-only wrappers reproduce former
+code paths, including the duplicate refresh and full-row save, and add a small
+amount of overhead to those comparison variants.
 
-Absolute CPU timings vary sharply on this shared development machine. Compare
+Absolute timings vary sharply on this shared development machine. Compare
 interleaved variants within a run, not absolute numbers from different runs.
-Raw results, per-round values and source metadata are in
-`results/08-app-cpu-interleaved/` and `results/09-app-cpu-relations/`.
+For example, the earlier four-variant run measured 21.745 → 17.065 ms/event,
+a 21.5% reduction through relationship reuse. That is not an additional speedup
+attributable to the later changes. The quieter final run above is the comparison
+of all eight variants together.
+
+Raw results and source metadata are retained under `results/08-app-cpu-interleaved/`,
+`09-app-cpu-relations/`, `11-select-templates/`, `12-single-correlation-refresh/`,
+`13-skip-unchanged-state/`, and `14-derived-fields-only/`.
+
+The subsequent fixes preserve route-scoped deduplication and terminal-state
+exclusion, isolate correlation refresh failures, persist preexisting dirty state,
+and leave unrelated escalation fields untouched during recalculation. Focused
+regression tests cover those behaviors on PostgreSQL and SQLite.
 
 ## Container A/B results retained
 
@@ -90,5 +113,5 @@ docker compose -p ir-capacity-bench -f tools/benchmarks/compose.yml down
 
 The diagnostic's `ordinary`, `lookup`, and `lookup-and-writes` variants convert
 creation arguments back to scalar IDs to emulate the earlier intake behavior.
-`relations` retains the loaded objects. Those benchmark switches are confined to
-the diagnostic process. The real application uses all three changes.
+`relations` and subsequent variants retain the loaded objects. Those benchmark switches are confined to
+the diagnostic process. The real application uses all seven changes. Earlier variants also reproduce the old duplicate refresh, orchestration write and full-row recalculation save; the final `derived-writes` variant uses the complete Python pass.

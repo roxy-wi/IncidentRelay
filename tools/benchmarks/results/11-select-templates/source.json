@@ -1,0 +1,4 @@
+{
+  "commit": "2688bda",
+  "note": "Five interleaved variants, 200 unique events and full traces per variant; SELECTs cache enabled only for selectors variant."
+}

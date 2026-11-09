@@ -1,0 +1,192 @@
+{
+  "scope": "app process incl Flask test client; excludes PG CPU, server and network",
+  "rows": [
+    {
+      "round": 0,
+      "variant": "ordinary",
+      "events": 50,
+      "app_cpu_ms_per_event": 8.218,
+      "wall_ms_per_event": 12.034,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 0,
+      "variant": "lookup",
+      "events": 50,
+      "app_cpu_ms_per_event": 7.505,
+      "wall_ms_per_event": 11.341,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 0,
+      "variant": "lookup-and-writes",
+      "events": 50,
+      "app_cpu_ms_per_event": 6.586,
+      "wall_ms_per_event": 10.285,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 0,
+      "variant": "relations",
+      "events": 50,
+      "app_cpu_ms_per_event": 6.47,
+      "wall_ms_per_event": 10.089,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 0,
+      "variant": "selectors",
+      "events": 50,
+      "app_cpu_ms_per_event": 6.128,
+      "wall_ms_per_event": 9.864,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 1,
+      "variant": "selectors",
+      "events": 50,
+      "app_cpu_ms_per_event": 6.122,
+      "wall_ms_per_event": 9.899,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 1,
+      "variant": "relations",
+      "events": 50,
+      "app_cpu_ms_per_event": 6.47,
+      "wall_ms_per_event": 10.273,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 1,
+      "variant": "lookup-and-writes",
+      "events": 50,
+      "app_cpu_ms_per_event": 6.499,
+      "wall_ms_per_event": 10.243,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 1,
+      "variant": "lookup",
+      "events": 50,
+      "app_cpu_ms_per_event": 7.379,
+      "wall_ms_per_event": 11.142,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 1,
+      "variant": "ordinary",
+      "events": 50,
+      "app_cpu_ms_per_event": 8.121,
+      "wall_ms_per_event": 11.925,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 2,
+      "variant": "ordinary",
+      "events": 50,
+      "app_cpu_ms_per_event": 8.156,
+      "wall_ms_per_event": 12.064,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 2,
+      "variant": "lookup",
+      "events": 50,
+      "app_cpu_ms_per_event": 7.375,
+      "wall_ms_per_event": 11.228,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 2,
+      "variant": "lookup-and-writes",
+      "events": 50,
+      "app_cpu_ms_per_event": 6.837,
+      "wall_ms_per_event": 10.634,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 2,
+      "variant": "relations",
+      "events": 50,
+      "app_cpu_ms_per_event": 6.467,
+      "wall_ms_per_event": 10.253,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 2,
+      "variant": "selectors",
+      "events": 50,
+      "app_cpu_ms_per_event": 6.038,
+      "wall_ms_per_event": 9.811,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 3,
+      "variant": "selectors",
+      "events": 50,
+      "app_cpu_ms_per_event": 6.363,
+      "wall_ms_per_event": 10.496,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 3,
+      "variant": "relations",
+      "events": 50,
+      "app_cpu_ms_per_event": 8.3,
+      "wall_ms_per_event": 12.985,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 3,
+      "variant": "lookup-and-writes",
+      "events": 50,
+      "app_cpu_ms_per_event": 9.494,
+      "wall_ms_per_event": 14.992,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 3,
+      "variant": "lookup",
+      "events": 50,
+      "app_cpu_ms_per_event": 9.208,
+      "wall_ms_per_event": 13.977,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 3,
+      "variant": "ordinary",
+      "events": 50,
+      "app_cpu_ms_per_event": 9.674,
+      "wall_ms_per_event": 14.641,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    }
+  ],
+  "median_app_cpu_ms_per_event": {
+    "selectors": 6.125,
+    "relations": 6.47,
+    "lookup-and-writes": 6.712,
+    "lookup": 7.442,
+    "ordinary": 8.187
+  }
+}

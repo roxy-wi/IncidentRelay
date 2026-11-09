@@ -1,0 +1,303 @@
+{
+  "scope": "app process incl Flask test client; excludes PG CPU, server and network",
+  "rows": [
+    {
+      "round": 0,
+      "variant": "ordinary",
+      "events": 50,
+      "app_cpu_ms_per_event": 7.916,
+      "wall_ms_per_event": 11.547,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 0,
+      "variant": "lookup",
+      "events": 50,
+      "app_cpu_ms_per_event": 7.213,
+      "wall_ms_per_event": 10.849,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 0,
+      "variant": "lookup-and-writes",
+      "events": 50,
+      "app_cpu_ms_per_event": 6.39,
+      "wall_ms_per_event": 10.032,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 0,
+      "variant": "relations",
+      "events": 50,
+      "app_cpu_ms_per_event": 6.312,
+      "wall_ms_per_event": 9.945,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 0,
+      "variant": "selectors",
+      "events": 50,
+      "app_cpu_ms_per_event": 5.912,
+      "wall_ms_per_event": 9.465,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 0,
+      "variant": "deduplicate",
+      "events": 50,
+      "app_cpu_ms_per_event": 5.779,
+      "wall_ms_per_event": 9.27,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 0,
+      "variant": "state-writes",
+      "events": 50,
+      "app_cpu_ms_per_event": 5.743,
+      "wall_ms_per_event": 9.158,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 0,
+      "variant": "derived-writes",
+      "events": 50,
+      "app_cpu_ms_per_event": 5.709,
+      "wall_ms_per_event": 9.088,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 1,
+      "variant": "derived-writes",
+      "events": 50,
+      "app_cpu_ms_per_event": 5.773,
+      "wall_ms_per_event": 9.183,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 1,
+      "variant": "state-writes",
+      "events": 50,
+      "app_cpu_ms_per_event": 5.807,
+      "wall_ms_per_event": 9.253,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 1,
+      "variant": "deduplicate",
+      "events": 50,
+      "app_cpu_ms_per_event": 5.884,
+      "wall_ms_per_event": 9.503,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 1,
+      "variant": "selectors",
+      "events": 50,
+      "app_cpu_ms_per_event": 5.986,
+      "wall_ms_per_event": 9.606,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 1,
+      "variant": "relations",
+      "events": 50,
+      "app_cpu_ms_per_event": 6.452,
+      "wall_ms_per_event": 10.152,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 1,
+      "variant": "lookup-and-writes",
+      "events": 50,
+      "app_cpu_ms_per_event": 6.496,
+      "wall_ms_per_event": 10.18,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 1,
+      "variant": "lookup",
+      "events": 50,
+      "app_cpu_ms_per_event": 7.277,
+      "wall_ms_per_event": 10.922,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 1,
+      "variant": "ordinary",
+      "events": 50,
+      "app_cpu_ms_per_event": 8.015,
+      "wall_ms_per_event": 11.703,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 2,
+      "variant": "ordinary",
+      "events": 50,
+      "app_cpu_ms_per_event": 8.01,
+      "wall_ms_per_event": 11.702,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 2,
+      "variant": "lookup",
+      "events": 50,
+      "app_cpu_ms_per_event": 7.271,
+      "wall_ms_per_event": 10.924,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 2,
+      "variant": "lookup-and-writes",
+      "events": 50,
+      "app_cpu_ms_per_event": 6.436,
+      "wall_ms_per_event": 10.078,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 2,
+      "variant": "relations",
+      "events": 50,
+      "app_cpu_ms_per_event": 6.403,
+      "wall_ms_per_event": 10.015,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 2,
+      "variant": "selectors",
+      "events": 50,
+      "app_cpu_ms_per_event": 5.966,
+      "wall_ms_per_event": 9.559,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 2,
+      "variant": "deduplicate",
+      "events": 50,
+      "app_cpu_ms_per_event": 5.852,
+      "wall_ms_per_event": 9.458,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 2,
+      "variant": "state-writes",
+      "events": 50,
+      "app_cpu_ms_per_event": 5.845,
+      "wall_ms_per_event": 9.305,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 2,
+      "variant": "derived-writes",
+      "events": 50,
+      "app_cpu_ms_per_event": 5.83,
+      "wall_ms_per_event": 9.299,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 3,
+      "variant": "derived-writes",
+      "events": 50,
+      "app_cpu_ms_per_event": 6.346,
+      "wall_ms_per_event": 10.636,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 3,
+      "variant": "state-writes",
+      "events": 50,
+      "app_cpu_ms_per_event": 6.395,
+      "wall_ms_per_event": 10.753,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 3,
+      "variant": "deduplicate",
+      "events": 50,
+      "app_cpu_ms_per_event": 6.373,
+      "wall_ms_per_event": 10.715,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 3,
+      "variant": "selectors",
+      "events": 50,
+      "app_cpu_ms_per_event": 6.557,
+      "wall_ms_per_event": 11.245,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 3,
+      "variant": "relations",
+      "events": 50,
+      "app_cpu_ms_per_event": 7.049,
+      "wall_ms_per_event": 11.838,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 3,
+      "variant": "lookup-and-writes",
+      "events": 50,
+      "app_cpu_ms_per_event": 7.132,
+      "wall_ms_per_event": 12.232,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 3,
+      "variant": "lookup",
+      "events": 50,
+      "app_cpu_ms_per_event": 7.995,
+      "wall_ms_per_event": 12.823,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    },
+    {
+      "round": 3,
+      "variant": "ordinary",
+      "events": 50,
+      "app_cpu_ms_per_event": 8.688,
+      "wall_ms_per_event": 13.161,
+      "persisted_alerts": 50,
+      "persisted_traces": 50
+    }
+  ],
+  "median_app_cpu_ms_per_event": {
+    "derived-writes": 5.801,
+    "state-writes": 5.826,
+    "deduplicate": 5.868,
+    "selectors": 5.976,
+    "relations": 6.428,
+    "lookup-and-writes": 6.466,
+    "lookup": 7.274,
+    "ordinary": 8.012
+  }
+}
