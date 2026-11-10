@@ -1,0 +1,51 @@
+{
+  "runtime": {
+    "python": "3.12.16",
+    "peewee": "3.17.6",
+    "pytest": "8.4.2",
+    "platform": "Linux ARM64"
+  },
+  "suites": {
+    "postgresql": {
+      "tests": 3057,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 66,
+      "passed": 2991,
+      "seconds": 361.588
+    },
+    "sqlite": {
+      "tests": 2992,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 65,
+      "passed": 2927,
+      "seconds": 259.971
+    },
+    "native_helm": {
+      "tests": 47,
+      "failures": 0,
+      "errors": 0,
+      "skipped": 0,
+      "passed": 47,
+      "seconds": 3.582
+    }
+  },
+  "notes": [
+    "47 Helm cases skipped in both Linux runs passed separately on the macOS host.",
+    "Remaining skips cover browser/Node/promtool dependencies and backend-specific assertions.",
+    "Disposable functional PostgreSQL test database uses relaxed durability; capacity tests use the separate benchmark database."
+  ],
+  "checks": {
+    "ruff": "passed",
+    "bandit_medium_high": "passed",
+    "dependency_consistency": "passed",
+    "duplicate_tests": "passed",
+    "schema": "passed",
+    "templates": "passed"
+  },
+  "source_trees": {
+    "app": "957847f1567dab68f970d02f00f6518ae65541a4",
+    "tests": "4243e6184e78836e2027b441404f804395319318"
+  }
+}
