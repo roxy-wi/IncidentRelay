@@ -34,6 +34,30 @@ incidentrelay-scheduler   # one scheduler process
 
 ## Scheduler interval and reminder interval
 
+### Alert-group delivery
+
+PostgreSQL delivers independent alert groups with a bounded thread pool. Firing
+groups are claimed with transaction row locks; competing workers skip claimed
+rows and lifecycle changes serialize with the in-flight delivery of that group.
+Delayed recovery retains its existing grouping and row-lock fence.
+Pending work remains in PostgreSQL if a worker fails. A crash after a provider
+accepts a send but before database commit can still cause a retry of that send.
+
+```ini
+[alerts]
+alert_group_notification_check_interval_seconds = 1
+alert_group_notification_batch_size = 100
+alert_group_notification_workers = 8
+```
+
+Concurrency is bounded to 1–32 workers and reduced to fit the PostgreSQL pool,
+reserving its coordinator connection. Include delivery threads and other
+scheduler jobs when sizing `database.pool_max_connections`. SQLite stays serial
+under the scheduler job lock. Ordinary firing delivery keeps provider calls
+outside its writer transaction; delayed recovery retains its transaction fence.
+The initial `alert_group_wait_seconds` default remains 30 seconds. The new
+one-second polling default does not override an explicitly configured interval.
+
 There are two different intervals:
 
 | Setting | Meaning |

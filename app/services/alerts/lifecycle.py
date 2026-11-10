@@ -65,7 +65,7 @@ from app.services.routing.service_resolution import (
     resolve_alert_service,
 )
 from app.services.silences import find_active_silences, record_new_alert_silences
-from app.services.alerts.correlation import refresh_alert_group_correlations, refresh_alert_group_correlations_safely
+from app.services.alerts.correlation import refresh_alert_group_correlations_safely
 from app.services.business_services.impact import refresh_business_impacts_safely_for_group
 from app.services.business_services.status import refresh_business_services_safely_for_technical_service
 
@@ -315,17 +315,15 @@ def _create_group(
     orchestration_suppress_reason=None,
 ):
     return alerts_repo.create_alert_group(
-        team=team.id if team else None,
-        route=route.id if route else None,
-        service=service.id if service else None,
-        rotation=rotation.id if rotation else None,
-        escalation_policy=policy.id if policy else None,
-        escalation_rule=policy_rule.id if policy_rule else None,
-        notification_policy=(
-            notification_policy.id if notification_policy else None
-        ),
+        team=team,
+        route=route,
+        service=service,
+        rotation=rotation,
+        escalation_policy=policy,
+        escalation_rule=policy_rule,
+        notification_policy=notification_policy,
         next_escalation_at=next_escalation_at,
-        assignee=assignee.id if assignee else None,
+        assignee=assignee,
         source=alert_data["source"],
         group_key=group_key,
         title=alert_data["title"],
@@ -341,6 +339,21 @@ def _create_group(
         **priority_kwargs,
         **maintenance_kwargs,
     )
+
+
+def _sync_orchestration_group_fields(group, *, runtime, suppressed, reason):
+    values = {"orchestration_suppressed": suppressed, "orchestration_suppress_reason": reason}
+    if suppressed:
+        values["next_escalation_at"] = None
+    if runtime is not None and runtime.notification_policy is not None:
+        values["notification_policy"] = runtime.notification_policy.id
+    fields = []
+    for name, value in values.items():
+        if group.__data__.get(name) != value or name in group._dirty:
+            setattr(group, name, value)
+            fields.append(group._meta.fields[name])
+    if fields:
+        group.save(only=fields)
 
 
 def _set_alert_routing_fields(
@@ -1193,19 +1206,10 @@ def _upsert_alert(alert_data, trace, runtime=None):
             else:
                 trace.group_reused(group)
 
-            group.orchestration_suppressed = orchestration_suppressed
-            group.orchestration_suppress_reason = orchestration_suppress_reason
-            group_fields = [
-                group.__class__.orchestration_suppressed,
-                group.__class__.orchestration_suppress_reason,
-            ]
-            if orchestration_suppressed:
-                group.next_escalation_at = None
-                group_fields.append(group.__class__.next_escalation_at)
-            if runtime is not None and runtime.notification_policy is not None:
-                group.notification_policy = runtime.notification_policy.id
-                group_fields.append(group.__class__.notification_policy)
-            group.save(only=group_fields)
+            _sync_orchestration_group_fields(
+                group, runtime=runtime, suppressed=orchestration_suppressed,
+                reason=orchestration_suppress_reason,
+            )
 
             priority_state_before_recalculate = group_priority_state(group)
 
@@ -1223,20 +1227,20 @@ def _upsert_alert(alert_data, trace, runtime=None):
             maybe_apply_maintenance_to_group(group, maintenance_decision)
 
             alert = alerts_repo.create_alert(
-                group=group.id,
-                team=team.id if team else None,
-                route=route.id if route else None,
-                service=service.id if service else None,
-                rotation=rotation.id if rotation else None,
-                escalation_policy=policy.id if policy else None,
-                escalation_rule=policy_rule.id if policy_rule else None,
+                group=group,
+                team=team,
+                route=route,
+                service=service,
+                rotation=rotation,
+                escalation_policy=policy,
+                escalation_rule=policy_rule,
                 notification_policy=(
                     runtime.notification_policy.id
                     if runtime and runtime.notification_policy
                     else getattr(group, "notification_policy_id", None)
                 ),
                 next_escalation_at=next_escalation_at,
-                assignee=assignee.id if assignee else None,
+                assignee=assignee,
                 source=alert_data["source"],
                 external_id=alert_data.get("external_id"),
                 dedup_key=alert_data["dedup_key"],
@@ -1386,19 +1390,6 @@ def _upsert_alert(alert_data, trace, runtime=None):
                     "project_slug": labels.get("project_slug") or "",
                     "organization_slug": labels.get("organization_slug") or "",
                     "label_keys": sorted(labels.keys()),
-                }
-            },
-        )
-
-    try:
-        refresh_alert_group_correlations(group)
-    except Exception:
-        logger.exception(
-            "alert group correlation refresh failed",
-            extra={
-                "extra": {
-                    "alert_group_id": getattr(group, "id", None),
-                    "service_id": getattr(group, "service_id", None),
                 }
             },
         )
