@@ -1,0 +1,43 @@
+{
+  "baseline": "29e7f82de1a3a97ef812615b0c3dfd822da81154",
+  "current": "c9cb20cf8b2e040540b65277bc89d6a23e720b8c",
+  "runtime_image": "sha256:cd390f181e484893113bc5b68a052c0bd4bbd991dce064f601b5fc06f765a98c",
+  "postgres_image": "sha256:35726244c51a57338a5a5a5ad8a7e2b18f4ecb8dccd51224cab33ac2ea6a5df0",
+  "image_repo_digests": {
+    "sha256:cd390f181e484893113bc5b68a052c0bd4bbd991dce064f601b5fc06f765a98c": [
+      "ghcr.io/roxy-wi/incidentrelay@sha256:0aa4dbba71cf43ad5cdf0a1c23ee43936f40d8bfc9fa402266acfbca35042c0e"
+    ],
+    "sha256:35726244c51a57338a5a5a5ad8a7e2b18f4ecb8dccd51224cab33ac2ea6a5df0": [
+      "postgres@sha256:aa6cb33cf4c19c765cefcf48d96176258800870a9a1e930ad126200f9d825139"
+    ]
+  },
+  "docker_info": {
+    "NCPU": 4,
+    "MemTotal": 6283915264,
+    "ServerVersion": "29.8.2",
+    "Architecture": "aarch64",
+    "KernelVersion": "7.2.12-orbstack-00394-gbecdd6130068"
+  },
+  "host_load_generator_nofile": [
+    65536,
+    9223372036854775807
+  ],
+  "telegram": "disabled",
+  "workers": 4,
+  "threads_per_worker": 4,
+  "cpu_limits": {
+    "web": 3,
+    "postgres": 2
+  },
+  "storage": "PostgreSQL data/WAL on tmpfs",
+  "warmup": {
+    "seconds": 5,
+    "rate": 25
+  },
+  "offer_seconds": 20,
+  "steady_rate": 100,
+  "overload_rate": 400,
+  "saturation_clients": 128,
+  "events_before_saturation": 10125,
+  "harness_sha256": "12bc3e0cdaa18f95e41399667c24244afa5508af2c317e8825a768e35760cb05"
+}

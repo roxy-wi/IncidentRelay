@@ -1,0 +1,54 @@
+# Identical runtime/limits for immutable baseline and current source snapshots.
+services:
+  postgres:
+    image: ${POSTGRES_IMAGE:?}
+    cpus: 2
+    mem_limit: 1g
+    ports: ["127.0.0.1:55435:5432"]
+    environment:
+      POSTGRES_DB: ir_capacity_bench
+      POSTGRES_USER: ir_capacity_bench
+      POSTGRES_PASSWORD: benchmark-only
+    command: [postgres, -c, shared_preload_libraries=pg_stat_statements]
+    tmpfs: [/var/lib/postgresql/data]
+    healthcheck:
+      test: [CMD-SHELL, "pg_isready -U ir_capacity_bench"]
+      interval: 1s
+      timeout: 2s
+      retries: 60
+  web:
+    image: ${RUNTIME_IMAGE:?}
+    cpus: 3
+    mem_limit: 1536m
+    working_dir: /code
+    ports: ["127.0.0.1:18380:8080"]
+    volumes:
+      - ${SOURCE_DIR:?}:/code:ro
+      - ${HARNESS_DIR:?}:/harness:ro
+    tmpfs: [/bench-logs]
+    environment: &environment
+      PYTHONDONTWRITEBYTECODE: "1"
+      PYTHONPATH: /code
+      INCIDENTRELAY_CONFIG_FILE: /harness/tools/benchmarks/benchmark.conf
+      PGAPPNAME: matrix-web
+    entrypoint: []
+    command: [gunicorn, --bind, "0.0.0.0:8080", --workers, "4", --threads, "4", --timeout, "120", "app:create_app()"]
+    depends_on:
+      postgres: {condition: service_healthy}
+  telegram:
+    image: ${RUNTIME_IMAGE:?}
+    cpus: 1
+    mem_limit: 256m
+    working_dir: /code
+    profiles: [telegram]
+    volumes:
+      - ${SOURCE_DIR:?}:/code:ro
+      - ${HARNESS_DIR:?}:/harness:ro
+    tmpfs: [/bench-logs]
+    environment:
+      <<: *environment
+      PGAPPNAME: matrix-telegram
+    entrypoint: []
+    command: [python, -m, app.telegram_worker]
+    depends_on:
+      postgres: {condition: service_healthy}
