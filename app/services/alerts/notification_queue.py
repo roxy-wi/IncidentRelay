@@ -13,6 +13,7 @@ from app.services.alerts.reopen import lock_grouping_identity
 from app.modules.db import alerts_repo, notifications_repo
 from app.modules.db.transactions import write_transaction
 from app.services.notifications.delivery import notify_alert
+from app.services.notifications import rules
 from app.services.notifications.retries import delivery_attempt
 from app.services.alerts.shelving import is_alert_group_shelved
 from app.services.alerts.maintenance_state import (
@@ -333,15 +334,17 @@ def _process_due_firing_group(selected_group, *, now):
     """Claim one group until its delivery state is committed.
 
     PostgreSQL workers skip already claimed rows. ACK/resolve use the same row
-    fence, so a stale selection cannot send after a committed lifecycle change.
-    On process death PostgreSQL releases the lock and rolls back, leaving the
-    persisted pending work retryable. Provider sends remain at-least-once across
-    a crash between external delivery and database commit.
+    fence for synchronous delivery and enqueueing deferred calls.
+    Immediate voice calls are queued under the fence and sent after commit so
+    provider callbacks can read their delivery and acknowledge/resolve the group.
+    The user notification worker can pick up committed pending calls after a
+    crash; its conditional claim also prevents concurrent duplicate sends.
     """
     backend = db.obj.__class__.__name__.lower()
     # Preserve SQLite's serial compatibility path without holding its single
     # writer across a network call. Its scheduler keeps the job-wide lock.
     transaction = nullcontext() if "sqlite" in backend else write_transaction()
+    deferred_voice_deliveries = []
     with transaction:
         query = AlertGroup.select().where(AlertGroup.id == selected_group.id)
         if "postgres" in backend:
@@ -382,8 +385,11 @@ def _process_due_firing_group(selected_group, *, now):
             return "skipped"
 
         event_type = "notification" if not group.last_notification_at else "update"
-        sent_count = notify_alert(group, event_type=event_type)
-        if not sent_count:
+        sent_count = notify_alert(
+            group, event_type=event_type,
+            deferred_voice_deliveries=deferred_voice_deliveries,
+        )
+        if not sent_count and not deferred_voice_deliveries:
             alerts_repo.clear_alert_group_notification(group)
             alerts_repo.create_alert_event(
                 group_id=group.id, event_type=f"{event_type}_skipped",
@@ -391,12 +397,33 @@ def _process_due_firing_group(selected_group, *, now):
             )
             return "skipped"
 
-        alerts_repo.mark_alert_group_notification_sent(group, now=now)
+        if sent_count:
+            alerts_repo.mark_alert_group_notification_sent(group, now=now)
+        else:
+            alerts_repo.clear_alert_group_notification(group)
+        if not deferred_voice_deliveries:
+            alerts_repo.create_alert_event(
+                group_id=group.id, event_type=f"{event_type}_sent",
+                message="Due alert group notification sent",
+            )
+            return "sent"
+
+        alerts_repo.create_alert_event(
+            group_id=group.id, event_type=f"{event_type}_voice_queued",
+            message=f"Voice notifications queued: {len(deferred_voice_deliveries)}",
+        )
+
+    # No group/delivery row lock may span a voice provider call. In particular,
+    # a synchronous callback can finish before the provider returns its response.
+    sent_count += rules.process_due_user_notifications(
+        limit=len(deferred_voice_deliveries), delivery_ids=deferred_voice_deliveries,
+    )
+    if sent_count:
         alerts_repo.create_alert_event(
             group_id=group.id, event_type=f"{event_type}_sent",
             message="Due alert group notification sent",
         )
-        return "sent"
+    return "sent" if sent_count else "skipped"
 
 
 def _process_due_group(selected_group, now, *, threaded=False, app=None):

@@ -73,7 +73,7 @@
   "escalations.form.repeat_count": "重复次数",
   "escalations.form.description": "说明",
   "escalations.form.description_placeholder": "主值班轮班、后备轮班、团队负责人",
-  "escalations.form.rules_help": "策略保存后，可在策略详情中配置规则。",
+  "escalations.form.rules_help": "保存策略后，通过表格中的“规则”操作配置规则。",
   "escalations.rules.title": "策略规则",
   "escalations.rules.title_named": "策略规则：{name}",
   "escalations.rules.select_policy": "请先选择策略。",

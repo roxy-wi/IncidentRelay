@@ -33,6 +33,7 @@ from app.views.version_view import version_bp
 from app.views.sso_admin_view import sso_admin_bp
 from app.views.sso_auth_view import sso_auth_bp
 from app.services.db_errors import handle_integrity_error, handle_not_found_error
+from app.services.encryption_keys import verify_encryption_key
 from app.views.services_view import services_bp
 from app.views.push_view import push_bp
 from app.views.notification_rules_view import notification_rules_bp
@@ -64,6 +65,8 @@ def create_app(log_role=None):
     """
     Create and configure the Flask application.
     """
+
+    verify_encryption_key()
 
     flask_app = Flask(__name__)
     flask_app.config.from_object(Config)

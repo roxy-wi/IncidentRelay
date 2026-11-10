@@ -73,7 +73,7 @@
   "escalations.form.repeat_count": "Repeat count",
   "escalations.form.description": "Description",
   "escalations.form.description_placeholder": "Primary rotation, backup rotation, team lead",
-  "escalations.form.rules_help": "Rules are configured from policy details after the policy is saved.",
+  "escalations.form.rules_help": "After saving the policy, configure its rules using the Rules action in the table.",
   "escalations.rules.title": "Policy rules",
   "escalations.rules.title_named": "Policy rules: {name}",
   "escalations.rules.select_policy": "Select a policy first.",

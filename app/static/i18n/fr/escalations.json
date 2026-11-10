@@ -73,7 +73,7 @@
   "escalations.form.repeat_count": "Nombre de répétitions",
   "escalations.form.description": "Description",
   "escalations.form.description_placeholder": "Rotation principale, rotation de secours, responsable d’équipe",
-  "escalations.form.rules_help": "Les règles se configurent depuis les détails de la politique après son enregistrement.",
+  "escalations.form.rules_help": "Après avoir enregistré la politique, configurez ses règles via l’action « Règles » dans le tableau.",
   "escalations.rules.title": "Règles de la politique",
   "escalations.rules.title_named": "Règles de la politique : {name}",
   "escalations.rules.select_policy": "Sélectionnez d’abord une politique.",

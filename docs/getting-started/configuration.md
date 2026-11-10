@@ -64,10 +64,30 @@ Docker entrypoint.
 must not change once IncidentRelay has used it, whether it comes from the config
 file, an environment variable or a `__FILE`. When it is empty, IncidentRelay
 encrypts with `main.secret_key` instead, and the same applies to that key. If
-the encryption key changes, the Docker entrypoint refuses to start: restore the
-previous key. Changing the key directly is not supported. The entrypoint
-compares the key with a salted hash it keeps in `/var/lib/incidentrelay`, so the
-check only works when that directory persists between restarts.
+the encryption key changes, every web, scheduler, Telegram and Slack process
+refuses to start: restore the previous key. A salted PBKDF2-SHA256 verifier is
+stored in the database, never the plaintext key. Verification works with an
+ephemeral `/var/lib/incidentrelay` and replicas without a shared runtime directory.
+The Docker entrypoint's runtime-file verifier remains an additional compatible check.
+
+On the first startup after migration, IncidentRelay authenticates all existing
+encrypted orchestration headers, queued request headers/bodies and SSO secrets,
+including disabled/deleted configuration and completed execution history. SSO
+records use the effective `sso.secret_encryption_key` when configured separately;
+the persisted verifier protects the main encryption key. If any ciphertext cannot
+be decrypted, initialization fails without recording the new key. If there are
+no encrypted values, the first key is registered. Subsequent starts compare it
+with the stored verifier even if all encrypted records have since been deleted.
+
+Before the first upgrade, back up the database and original keys and stop all
+old web and worker processes. Keep the keys unchanged, run `python manage.py migrate`,
+then `python -m app.check_encryption_key` with the same configuration and environment
+as the services. Start the services only after the check succeeds. Concurrent
+starts of the new version serialize initialization in the database; mixing old
+writers into the initial bootstrap is not supported. See the
+[Kubernetes upgrade procedure](kubernetes.md#encryption-key-verification-in-251).
+Do not delete/reset the verification record to bypass a failure. Restore the
+original key or investigate damaged data using a backup; this is not key rotation.
 
 In `[voice_provider]`, whose options depend on the provider, a variable only
 overrides an option that is present in the file, and the option keeps its

@@ -86,7 +86,7 @@ def test_due_group_notification_without_delivery_target_is_skipped(db, monkeypat
     monkeypatch.setattr(
         notification_queue,
         "notify_alert",
-        lambda group, event_type="notification": calls.append(
+        lambda group, event_type="notification", **kwargs: calls.append(
             (group.id, event_type)
         )
         or 0,
@@ -141,7 +141,7 @@ def test_due_group_update_without_delivery_target_does_not_change_last_notificat
     monkeypatch.setattr(
         notification_queue,
         "notify_alert",
-        lambda group, event_type="update": calls.append((group.id, event_type)) or 0,
+        lambda group, event_type="update", **kwargs: calls.append((group.id, event_type)) or 0,
     )
 
     result = notification_queue.process_due_alert_group_notifications()

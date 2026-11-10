@@ -39,6 +39,12 @@ incidentrelay-scheduler   # one scheduler process
 PostgreSQL delivers independent alert groups with a bounded thread pool. Firing
 groups are claimed with transaction row locks; competing workers skip claimed
 rows and lifecycle changes serialize with the in-flight delivery of that group.
+Immediate user voice calls are saved to the existing user-notification queue
+under that lock and dispatched immediately after commit. Their callbacks can
+read the delivery and ACK/resolve the group while the provider request is still
+running. A conditional delivery claim prevents duplicate calls by the group
+and user-notification workers. If the group worker exits before dispatch, the
+regular user-notification worker picks up the committed pending delivery.
 Delayed recovery retains its existing grouping and row-lock fence.
 Pending work remains in PostgreSQL if a worker fails. A crash after a provider
 accepts a send but before database commit can still cause a retry of that send.

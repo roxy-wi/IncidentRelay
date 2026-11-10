@@ -459,6 +459,38 @@ extraVolumeMounts:
 
 ## Upgrade and uninstall
 
+### Encryption key verification in 2.5.1
+
+The database now persists a salted verifier of the effective encryption key.
+It survives pod recreation with PostgreSQL and `persistence.enabled: false`.
+Every component verifies the key before starting. An empty
+`main.secret_encryption_key` inherits the effective `main.secret_key`, including
+`configFrom`, environment and `__FILE` overrides. Keep a stable shared key in
+your Kubernetes Secret; an `emptyDir` cannot preserve a generated key.
+
+For the first upgrade from a version without the database verifier:
+
+1. Back up the database and original key material. Confirm all components use
+   the same main encryption key. Preserve any separate SSO encryption key.
+2. Stop old web, scheduler, Telegram and Slack pods and any other database
+   writers. Disable automatic scaling/reconciliation that would restart them
+   during bootstrap. Use a maintenance window for this first upgrade.
+3. Run a one-off migration pod/Job using the new image and exactly the same
+   configuration, Secret mounts, environment and database as the deployment.
+   Run `python manage.py migrate`, then `python -m app.check_encryption_key`.
+   The migration only creates an empty verification record. The check verifies
+   the legacy runtime-file hash when present and authenticates all existing
+   encrypted SSO/orchestration values before registering the key.
+4. Start the new deployment only after the check succeeds. Multiple new pods
+   can verify concurrently. Complete this bootstrap before scaling replicas.
+
+A mismatch or unreadable ciphertext stops startup without overwriting the
+verifier. Restore the original Secret and recreate affected pods. Do not delete
+the verification row or rotate the Secret to work around an error. When the
+old key is unavailable or data is damaged, investigate/recover from backup;
+automatic re-encryption and key rotation are outside this feature.
+After successful bootstrap, regular pod restarts need no initialization command.
+
 ### Upgrading from 1.2 to 2.1 or later
 
 !!! warning

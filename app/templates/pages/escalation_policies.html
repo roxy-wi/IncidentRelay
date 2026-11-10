@@ -37,8 +37,8 @@
         </div>
     </div>
 
-    <div class="page-layout-grid">
-        <section class="card page-layout-main">
+    <div class="page-layout-grid is-full-width">
+        <section class="card table-card page-layout-main">
             <div class="card-header">
                 <div>
                     <h2>{{ _("escalations.list.title") }}</h2>
@@ -75,7 +75,7 @@
             </div>
 
             <div class="table-wrapper">
-                <table id="escalation-policies-table-view" class="data-table">
+                <table id="escalation-policies-table-view" class="data-table escalation-policies-table">
                     <thead>
                     <tr>
                         <th>{{ _("escalations.table.policy") }}</th>
@@ -95,21 +95,6 @@
             </div>
         </section>
 
-        <aside class="card page-details-card">
-            <div class="card-header">
-                <div>
-                    <h2>{{ _("escalations.details.title") }}</h2>
-                    <div id="escalation-policy-details-subtitle" class="card-subtitle">
-                        {{ _("escalations.details.select") }}
-                    </div>
-                </div>
-            </div>
-            <div id="escalation-policy-details-body" class="details-body">
-                <div class="details-empty">
-                    {{ _("escalations.details.hint") }}
-                </div>
-            </div>
-        </aside>
     </div>
 
     <div id="escalation-policy-form-modal" class="app-modal" style="display: none;">

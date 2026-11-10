@@ -79,7 +79,7 @@ def test_due_group_notification_is_sent(db, monkeypatch):
     monkeypatch.setattr(
         notification_queue,
         "notify_alert",
-        lambda group, event_type="notification": calls.append((group.id, event_type)) or 1,
+        lambda group, event_type="notification", **kwargs: calls.append((group.id, event_type)) or 1,
     )
 
     result = notification_queue.process_due_alert_group_notifications()
@@ -133,7 +133,7 @@ def test_sqlite_delivery_stays_on_caller_thread_without_holding_writer(db, monke
     caller = threading.get_ident()
     monkeypatch.setattr(Config, "ALERT_GROUP_NOTIFICATION_WORKERS", 8)
 
-    def provider(group, event_type="notification"):
+    def provider(group, event_type="notification", **kwargs):
         assert threading.get_ident() == caller
         assert not db.in_transaction()
         return 1

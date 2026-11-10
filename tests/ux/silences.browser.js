@@ -42,7 +42,8 @@ async function main() {
         assert.equal(await row.locator("script").count(), 0);
         assert.equal(await page.evaluate(() => window.silenceInjected), undefined);
         assert.equal(await row.locator(".silence-reason-cell").textContent(), fixture.reason);
-        assert.deepEqual(JSON.parse(await row.locator("code").textContent()), fixture.matchers);
+        assert.equal(await row.locator("code, pre").count(), 0);
+        assert.equal(await page.locator("#view-silences .app-modal").count(), 1);
         const content = await row.innerText();
         for (const value of [
             "Production Operations", "production-ops", "Host maintenance",
@@ -52,13 +53,14 @@ async function main() {
         for (const value of ["No preset", "New alerts only", "Reactivate affected alerts", "Disabled"]) {
             assert((await other.innerText()).includes(value), value);
         }
-        assert.equal(await other.locator("code").textContent(), "{}");
+        assert.equal(await other.locator("code, pre").count(), 0);
 
         // Existing actions still edit the rule and refresh the displayed behavior.
         await row.locator(".app-action-menu-toggle").click();
         await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
         await page.locator("#silence-form-modal").waitFor({ state: "visible" });
         assert.equal(await page.locator("#silence-reason").inputValue(), fixture.reason);
+        assert.deepEqual(JSON.parse(await page.locator("#silence-matchers").inputValue()), fixture.matchers);
         await page.locator("#silence-apply-to-existing").uncheck();
         await page.locator("#silence-reactivate-on-end").check();
         const saved = page.waitForResponse(response =>
@@ -89,6 +91,15 @@ async function main() {
         await page.screenshot({
             path: path.join(fixture.screenshots, "silences-mobile.png"), fullPage: true,
         });
+        await other.locator(".app-action-menu-toggle").click();
+        await page.getByRole("menuitem", { name: "Edit", exact: true }).click();
+        await page.locator("#silence-form-modal").waitFor({ state: "visible" });
+        assert.deepEqual(JSON.parse(await page.locator("#silence-matchers").inputValue()), {});
+        await page.screenshot({
+            path: path.join(fixture.screenshots, "silences-edit-mobile.png"), fullPage: true,
+        });
+        await page.keyboard.press("Escape");
+        await page.locator("#silence-form-modal").waitFor({ state: "hidden" });
         await page.locator("#silences-search").fill("no matching silence");
         const emptyCell = page.locator("#silences-table tr td");
         await emptyCell.getByText("No silences", { exact: true }).waitFor();

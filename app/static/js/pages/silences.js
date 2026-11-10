@@ -252,8 +252,6 @@ function renderSilenceRow(silence) {
                     })
                     : i18n.t("silences.form.no_preset"),
             ),
-        $("<div>").addClass("row-subtitle").text(i18n.t("silences.details.additional_matchers")),
-        $("<code>").addClass("details-code").text(JSON.stringify(silence.matchers || {}, null, 2)),
     );
 
     row.append(matchingCell);

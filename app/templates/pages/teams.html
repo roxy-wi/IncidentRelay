@@ -37,8 +37,8 @@
     </div>
   </div>
 
-  <div class="page-layout-grid">
-    <section class="card">
+  <div class="page-layout-grid is-full-width">
+    <section class="card table-card page-layout-main">
       <div class="card-header">
         <div>
           <h2>{{ _('teams.list.title') }}</h2>
@@ -82,11 +82,16 @@
 
       <div class="table-wrapper">
         <table class="data-table teams-table">
+          <caption class="table-caption help-text">
+            <strong>{{ _('teams.form.simple_escalation') }}:</strong>
+            {{ _('teams.form.escalation_help') }}
+          </caption>
           <thead>
             <tr>
               <th>{{ _('teams.table.team') }}</th>
               <th>{{ _('teams.table.group') }}</th>
               <th>{{ _('teams.table.slug') }}</th>
+              <th>{{ _('teams.form.description') }}</th>
               <th>{{ _('teams.table.escalation') }}</th>
               <th>{{ _('teams.table.health') }}</th>
               <th>{{ _('teams.table.status') }}</th>
@@ -99,22 +104,6 @@
       </div>
     </section>
 
-    <aside class="card page-details-card">
-  <div class="card-header details-header">
-    <div>
-      <h2>{{ _('teams.details.title') }}</h2>
-      <div id="team-details-subtitle" class="card-subtitle">
-        {{ _('teams.details.select') }}
-      </div>
-    </div>
-  </div>
-
-  <div id="team-details-body" class="details-body">
-    <div class="details-empty">
-      {{ _('teams.details.select_help') }}
-    </div>
-  </div>
-</aside>
   </div>
 
   <div id="team-form-modal" class="app-modal is-hidden">

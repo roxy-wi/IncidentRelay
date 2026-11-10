@@ -1,7 +1,6 @@
 let teamsCache = [];
 let selectedTeamForMembers = null;
 let selectedTeamNameForMembers = "";
-let selectedTeamDetailsId = null;
 
 function loadTeams() {
     /*
@@ -54,7 +53,7 @@ function updateTeamCreateButtonState(groups) {
 
 function refreshTeams() {
     /*
-     * Refresh teams table and details.
+     * Refresh teams table.
      */
     apiGet("/api/teams?include_inactive=1", function (teams) {
         teamsCache = asArray(teams);
@@ -62,7 +61,6 @@ function refreshTeams() {
         renderTeamsSummary(scopedTeams);
         fillTeamsGroupFilter(scopedTeams);
         renderTeamsTable();
-        restoreTeamDetails(scopedTeams);
 
         if ($("#team-members-modal").hasClass("is-open") && selectedTeamForMembers) {
             loadTeamMembers(selectedTeamForMembers, selectedTeamNameForMembers);
@@ -207,7 +205,7 @@ function renderTeamsTable() {
         tbody.append(
             $("<tr>").append(
                 $("<td>")
-                    .attr("colspan", "7")
+                    .attr("colspan", "8")
                     .addClass("empty-cell")
                     .text(i18n.t("teams.empty.teams"))
             )
@@ -231,14 +229,10 @@ function renderTeamRow(team) {
 
     row.append(
         $("<td>")
+            .addClass("team-name")
             .append(
-                $("<button>")
-                    .attr("type", "button")
-                    .addClass("name-button")
+                $("<strong>")
                     .text(team.name || "-")
-                    .on("click", function () {
-                        renderTeamDetails(team);
-                    })
             )
             .append(
                 $("<div>")
@@ -247,21 +241,28 @@ function renderTeamRow(team) {
             )
     );
     row.append(
-        $("<td>").append(
+        $("<td>").addClass("team-group").append(
             $("<span>")
                 .addClass("pill")
                 .text(team.group_name || "-")
+        ).append(
+            $("<div>").addClass("row-subtitle").text(team.group_slug || "-")
         )
     );
-    row.append($("<td>").text(team.slug || "-"));
+    row.append($("<td>").addClass("team-slug").text(team.slug || "-"));
+    row.append($("<td>").addClass("team-description").text(team.description || "-"));
     row.append(
         $("<td>").append(
             $("<span>")
                 .addClass("status-pill")
                 .addClass(team.escalation_enabled ? "status-enabled" : "status-disabled")
                 .text(team.escalation_enabled
-                    ? i18n.t("teams.row.escalation_simple", {count: team.escalation_after_reminders || 0})
+                    ? i18n.t("teams.status.enabled")
                     : i18n.t("teams.status.disabled"))
+        ).append(
+            $("<div>")
+                .addClass("row-subtitle")
+                .text(i18n.t("teams.row.escalation_simple", {count: team.escalation_after_reminders || 0}))
         )
     );
     row.append(
@@ -326,106 +327,6 @@ function renderTeamActions(team) {
             }
         ]
     });
-}
-
-function teamDetailsItem(label, value) {
-    /*
-     * Render one team details item.
-     */
-    return $("<div>")
-        .addClass("details-item")
-        .append($("<div>").addClass("details-label").text(label))
-        .append($("<div>").addClass("details-value").text(value || "-"));
-}
-
-function renderTeamDetails(team) {
-    /*
-     * Render selected team details.
-     */
-    selectedTeamDetailsId = team.id;
-
-    $("#team-details-subtitle").text((team.group_slug || "-") + " / " + (team.active ? i18n.t("teams.status.active") : i18n.t("teams.status.inactive")));
-
-    const body = $("#team-details-body").empty();
-    body.append(
-        $("<div>")
-            .addClass("details-list")
-            .append(teamDetailsItem(i18n.t("teams.details.name"), team.name))
-            .append(teamDetailsItem(i18n.t("teams.details.slug"), team.slug))
-            .append(teamDetailsItem(i18n.t("teams.details.group"), team.group_slug))
-            .append(teamDetailsItem(i18n.t("teams.details.description"), team.description))
-            .append(teamDetailsItem(
-                i18n.t("teams.details.simple_escalation"),
-                team.escalation_enabled ? i18n.t("teams.status.enabled") : i18n.t("teams.status.disabled")
-            ))
-            .append(teamDetailsItem(
-                i18n.t("teams.details.after_reminders"),
-                team.escalation_after_reminders || 0
-            ))
-            .append(teamDetailsItem(
-                i18n.t("teams.details.policy_mode"),
-                i18n.t("teams.details.policy_mode_help")
-            ))
-            .append(teamDetailsItem(i18n.t("teams.details.status"), team.active ? i18n.t("teams.status.active") : i18n.t("teams.status.inactive")))
-    );
-
-    const actions = $("<div>").addClass("details-actions");
-    appendIconActionIfAllowed(actions, team, {
-        required: "write",
-        icon: "fas fa-edit",
-        label: i18n.t("teams.actions.edit_team"),
-        onClick: function () {
-            editTeam(team.id);
-        },
-    });
-    appendIconActionIfAllowed(actions, team, {
-        required: "manage_users",
-        icon: "fas fa-users",
-        label: i18n.t("teams.actions.members"),
-        onClick: function () {
-            openTeamMembers(team.id, team.name);
-        },
-    });
-    if (actions.children().length) {
-        body.append(actions);
-    }
-}
-
-function restoreTeamDetails(teams) {
-    /*
-     * Restore details panel after reload.
-     */
-    teams = asArray(
-        teams === undefined
-            ? getGlobalTeamScopedTeams()
-            : teams
-    );
-
-    if (!teams.length) {
-        renderTeamDetailsEmpty();
-        return;
-    }
-
-    if (selectedTeamDetailsId) {
-        const selected = teams.find(function (team) {
-            return Number(team.id) === Number(selectedTeamDetailsId);
-        });
-        if (selected) {
-            renderTeamDetails(selected);
-            return;
-        }
-    }
-
-    renderTeamDetails(teams[0]);
-}
-
-function renderTeamDetailsEmpty() {
-    /*
-     * Render empty details state.
-     */
-    selectedTeamDetailsId = null;
-    $("#team-details-subtitle").text(i18n.t("teams.details.select"));
-    $("#team-details-body").empty().append($("<div>").addClass("details-empty").text(i18n.t("teams.details.select_help")));
 }
 
 function getSelectedTeamForMembers() {
@@ -1020,9 +921,6 @@ function removeTeam(team) {
         confirmClass: "btn-danger",
     }).done(function () {
         apiDelete("/api/teams/" + team.id, function () {
-            if (Number(selectedTeamDetailsId) === Number(team.id)) {
-                selectedTeamDetailsId = null;
-            }
             refreshTeams();
             if (typeof refreshRotations === "function") {
                 refreshRotations();

@@ -1,5 +1,4 @@
 let escalationPoliciesCache = [];
-let selectedEscalationPolicyDetailsId = null;
 let selectedEscalationPolicyRulesId = null;
 let selectedEscalationPolicyRulesName = "";
 let escalationPolicyRulesCache = [];
@@ -103,7 +102,6 @@ function refreshEscalationPolicies() {
         escalationPoliciesCache = asArray(policies);
         renderEscalationPoliciesSummary(escalationPoliciesCache);
         renderEscalationPoliciesTable();
-        restoreEscalationPolicyDetails();
         updateEscalationPolicyCreateButtonState();
     });
 }
@@ -169,7 +167,6 @@ function getFilteredEscalationPolicies() {
 
 function applyEscalationPolicyFilters() {
     renderEscalationPoliciesTable();
-    restoreEscalationPolicyDetails();
 }
 
 function renderEscalationPoliciesCounter(filteredPolicies, allPolicies) {
@@ -206,22 +203,17 @@ function renderEscalationPoliciesTable() {
 
 function renderEscalationPolicyRow(policy) {
     const row = $("<tr>").toggleClass("row-disabled", !policy.enabled);
-    const rules = asArray(policy.rules);
 
     row.append(
         $("<td>")
+            .addClass("escalation-policy-name-cell")
             .append(
-                $("<button>")
-                    .attr("type", "button")
-                    .addClass("name-button")
+                $("<strong>")
                     .text(policy.name || "-")
-                    .on("click", function () {
-                        renderEscalationPolicyDetails(policy, { scroll: true });
-                    })
             )
             .append(
                 $("<div>")
-                    .addClass("row-subtitle")
+                    .addClass("row-subtitle escalation-policy-description")
                     .text(policy.description || i18n.t("escalations.policy.number", {id: policy.id}))
             )
     );
@@ -233,7 +225,9 @@ function renderEscalationPolicyRow(policy) {
                 .text(policy.team_slug || policy.team_name || "-")
         )
     );
-    row.append($("<td>").text(rules.length));
+    row.append(
+        $("<td>").addClass("escalation-policy-rules-cell").append(renderEscalationPolicyRules(policy))
+    );
     row.append($("<td>").text(policy.repeat_count || 0));
     row.append($("<td>").append(renderStatusBadge(policy.enabled, i18n.t("escalations.status.enabled"), i18n.t("escalations.status.disabled"))));
     row.append($("<td>").addClass("actions-cell").append(renderEscalationPolicyActions(policy)));
@@ -287,13 +281,6 @@ function renderEscalationPolicyActions(policy) {
     });
 }
 
-function escalationPolicyDetailsItem(label, value) {
-    return $("<div>")
-        .addClass("details-item")
-        .append($("<div>").addClass("details-label").text(label))
-        .append($("<div>").addClass("details-value").text(value || "-"));
-}
-
 function formatEscalationPolicyRule(rule) {
     const target = i18n.t("escalations.rules.target_summary", {
         type: escalationRuleTargetTypeLabel(rule.target_type),
@@ -311,162 +298,25 @@ function formatEscalationPolicyRule(rule) {
 }
 
 function renderEscalationPolicyRules(policy) {
-    const wrapper = $("<div>").addClass("details-list");
+    const wrapper = $("<div>").addClass("compact-list");
     const rules = asArray(policy.rules).slice().sort(function (left, right) {
         return Number(left.position || 0) - Number(right.position || 0);
     });
 
-    const header = $("<div>").addClass("details-item");
-    const actions = $("<div>").addClass("table-actions");
-
-    header.append($("<div>").addClass("details-label").text(i18n.t("escalations.details.rules")));
-    header.append(
+    wrapper.append(
         $("<div>")
-            .addClass("details-value")
+            .addClass("row-subtitle")
             .text(rules.length ? i18n.t("escalations.details.configured", {count: rules.length}) : i18n.t("escalations.details.no_rules"))
     );
-
-    appendActionIfAllowed(actions, policy, {
-        required: "write",
-        text: i18n.t("escalations.actions.manage_rules"),
-        className: "btn btn-small",
-        onClick: function () {
-            openEscalationRulesModal(policy.id);
-        },
-    });
-
-    if (actions.children().length) {
-        header.append(actions);
-    }
-
-    wrapper.append(header);
-
-    if (!rules.length) {
-        wrapper.append(
-            $("<div>")
-                .addClass("details-item")
-                .append($("<div>").addClass("details-label").text(i18n.t("escalations.details.first_rule")))
-                .append(
-                    $("<div>")
-                        .addClass("details-value")
-                        .text(i18n.t("escalations.details.first_rule_hint"))
-                )
-        );
-        return wrapper;
-    }
 
     rules.forEach(function (rule) {
         wrapper.append(
             $("<div>")
-                .addClass("details-item")
-                .append($("<div>").addClass("details-label").text(i18n.t("escalations.details.rule", {position: rule.position})))
-                .append($("<div>").addClass("details-value").append(UserAppearance.label(rule.target_user, formatEscalationPolicyRule(rule))))
+                .append(UserAppearance.label(rule.target_user, formatEscalationPolicyRule(rule)))
         );
     });
 
     return wrapper;
-}
-
-function renderEscalationPolicyDetails(policy, options) {
-    selectedEscalationPolicyDetailsId = policy.id;
-
-    $("#escalation-policy-details-subtitle").text(
-        (policy.team_slug || policy.team_name || "-") + " / " + escalationPolicyStatusLabel(policy.enabled)
-    );
-
-    const body = $("#escalation-policy-details-body");
-    body.empty();
-
-    body.append(
-        $("<div>")
-            .addClass("details-list")
-            .append(escalationPolicyDetailsItem(i18n.t("escalations.details.name"), policy.name))
-            .append(escalationPolicyDetailsItem(i18n.t("escalations.details.team"), policy.team_slug || policy.team_name))
-            .append(escalationPolicyDetailsItem(i18n.t("escalations.details.description"), policy.description))
-            .append(escalationPolicyDetailsItem(i18n.t("escalations.details.repeat_count"), policy.repeat_count || 0))
-            .append(escalationPolicyDetailsItem(i18n.t("escalations.details.status"), escalationPolicyStatusLabel(policy.enabled)))
-    );
-
-    body.append(renderEscalationPolicyRules(policy));
-
-    const actions = $("<div>").addClass("details-actions");
-
-    appendIconActionIfAllowed(actions, policy, {
-        required: "write",
-        icon: "fas fa-edit",
-        label: i18n.t("escalations.actions.edit_policy"),
-        onClick: function () {
-            editEscalationPolicy(policy.id);
-        },
-    });
-
-    appendIconActionIfAllowed(actions, policy, {
-        required: "write",
-        icon: "fas fa-layer-group",
-        label: i18n.t("escalations.actions.manage_rules"),
-        onClick: function () {
-            openEscalationRulesModal(policy.id);
-        },
-    });
-
-    appendIconActionIfAllowed(actions, policy, {
-        required: "write",
-        icon: policy.enabled ? "fas fa-pause" : "fas fa-play",
-        label: policy.enabled ? i18n.t("escalations.actions.disable_policy") : i18n.t("escalations.actions.enable_policy"),
-        className: policy.enabled ? "btn-warning" : "btn-success",
-        onClick: function () {
-            setEscalationPolicyEnabled(policy, !policy.enabled);
-        },
-    });
-
-    appendIconActionIfAllowed(actions, policy, {
-        required: "delete",
-        icon: "fas fa-trash-alt",
-        label: i18n.t("escalations.actions.remove_policy"),
-        className: "btn-danger",
-        onClick: function () {
-            removeEscalationPolicy(policy);
-        },
-    });
-
-    if (actions.children().length) {
-        body.append(actions);
-    }
-
-    if (options && options.scroll && typeof scrollToAndHighlight === "function") {
-        scrollToAndHighlight("#escalation-policy-details-body", {
-            highlight: "#escalation-policy-details-body",
-            block: "nearest",
-        });
-    }
-}
-
-function renderEscalationPolicyDetailsEmpty() {
-    selectedEscalationPolicyDetailsId = null;
-    $("#escalation-policy-details-subtitle").text(i18n.t("escalations.details.select"));
-    $("#escalation-policy-details-body").text(i18n.t("escalations.details.hint"));
-}
-
-function restoreEscalationPolicyDetails() {
-    const policies = getFilteredEscalationPolicies();
-
-    if (!policies.length) {
-        renderEscalationPolicyDetailsEmpty();
-        return;
-    }
-
-    if (selectedEscalationPolicyDetailsId) {
-        const selected = policies.find(function (policy) {
-            return Number(policy.id) === Number(selectedEscalationPolicyDetailsId);
-        });
-
-        if (selected) {
-            renderEscalationPolicyDetails(selected);
-            return;
-        }
-    }
-
-    renderEscalationPolicyDetails(policies[0]);
 }
 
 function getEscalationPolicyById(id) {
@@ -720,7 +570,6 @@ function loadEscalationRuleCards(policyId, callback) {
         renderEscalationRuleCards();
         renderEscalationPoliciesSummary(escalationPoliciesCache);
         renderEscalationPoliciesTable();
-        restoreEscalationPolicyDetails();
 
         if (typeof callback === "function") {
             callback(policy);

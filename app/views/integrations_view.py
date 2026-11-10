@@ -999,7 +999,11 @@ def _process_voice_rule_callback_event(delivery, event):
     delivery.provider_status = event.status
     delivery.provider_payload = event.raw
     delivery.updated_at = utc_now()
-    delivery.save()
+    delivery.save(only=[
+        UserNotificationDelivery.provider_status,
+        UserNotificationDelivery.provider_payload,
+        UserNotificationDelivery.updated_at,
+    ])
 
     # UserNotificationDelivery owns an AlertGroup, not a child Alert.
     group = delivery.group

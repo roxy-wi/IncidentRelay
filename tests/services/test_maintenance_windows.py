@@ -1798,7 +1798,7 @@ def test_due_group_notification_is_cancelled_during_maintenance(
     monkeypatch.setattr(
         notification_queue,
         "notify_alert",
-        lambda group, event_type: sent.append((group.id, event_type)) or 1,
+        lambda group, event_type, **kwargs: sent.append((group.id, event_type)) or 1,
     )
 
     result = notification_queue.process_due_alert_group_notifications()

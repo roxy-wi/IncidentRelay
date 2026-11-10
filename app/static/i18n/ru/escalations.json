@@ -73,7 +73,7 @@
   "escalations.form.repeat_count": "Количество повторов",
   "escalations.form.description": "Описание",
   "escalations.form.description_placeholder": "Основная ротация, резервная ротация, руководитель команды",
-  "escalations.form.rules_help": "Правила настраиваются в деталях политики после её сохранения.",
+  "escalations.form.rules_help": "После сохранения политики настройте правила через действие «Правила» в таблице.",
   "escalations.rules.title": "Правила политики",
   "escalations.rules.title_named": "Правила политики: {name}",
   "escalations.rules.select_policy": "Сначала выберите политику.",

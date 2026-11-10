@@ -426,7 +426,7 @@ def test_due_group_notification_is_sent(db, monkeypatch):
     monkeypatch.setattr(
         notification_queue,
         "notify_alert",
-        lambda group, event_type="notification": calls.append((group.id, event_type)) or 1,
+        lambda group, event_type="notification", **kwargs: calls.append((group.id, event_type)) or 1,
     )
 
     result = notification_queue.process_due_alert_group_notifications()
@@ -531,7 +531,7 @@ def test_new_child_after_notification_schedules_group_interval_update(db, monkey
     monkeypatch.setattr(
         notification_queue,
         "notify_alert",
-        lambda group, event_type="notification": calls.append((group.id, event_type)) or 1,
+        lambda group, event_type="notification", **kwargs: calls.append((group.id, event_type)) or 1,
     )
 
     result = notification_queue.process_due_alert_group_notifications()

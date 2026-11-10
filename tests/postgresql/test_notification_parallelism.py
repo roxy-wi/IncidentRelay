@@ -50,7 +50,7 @@ def test_distinct_groups_deliver_in_parallel_with_app_context(app, due, monkeypa
     lock = Lock()
     monkeypatch.setattr(Config, "ALERT_GROUP_NOTIFICATION_WORKERS", 4)
 
-    def provider(group, event_type="notification"):
+    def provider(group, event_type="notification", **kwargs):
         assert has_app_context()
         barrier.wait(timeout=10)
         with lock:
@@ -76,7 +76,7 @@ def test_two_schedulers_do_not_deliver_the_same_group(due, monkeypatch):
     calls = []
     monkeypatch.setattr(notification_queue.alerts_repo, "list_due_alert_group_notifications", lambda **kw: [selected])
 
-    def provider(group, event_type="notification"):
+    def provider(group, event_type="notification", **kwargs):
         calls.append(group.id)
         inside.set()
         assert finish.wait(timeout=10)
@@ -115,7 +115,7 @@ def test_ack_serializes_with_a_claimed_delivery(due, monkeypatch):
     ack_started = Event()
     ack_done = Event()
 
-    def provider(group, event_type="notification"):
+    def provider(group, event_type="notification", **kwargs):
         inside.set()
         assert finish.wait(timeout=10)
         return 1
@@ -168,7 +168,7 @@ def test_one_connection_pool_uses_the_coordinator_instead_of_deadlocking(db, due
     monkeypatch.setattr(db, "_max_connections", 1)
     monkeypatch.setattr(Config, "ALERT_GROUP_NOTIFICATION_WORKERS", 8)
 
-    def provider(group, event_type="notification"):
+    def provider(group, event_type="notification", **kwargs):
         assert threading.get_ident() == caller
         return 1
 

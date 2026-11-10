@@ -14,6 +14,12 @@
     padding: 16px 18px;
 }
 
+.table-caption {
+    caption-side: bottom;
+    padding: 12px;
+    text-align: left;
+}
+
 .table-toolbar {
     display: flex;
     align-items: center;
@@ -323,7 +329,43 @@
     }
 }
 
-/* Silence rules include their full context without a separate details panel. */
+/* Team descriptions remain fully readable in the main table. */
+.teams-table .team-description {
+    min-width: 180px;
+    max-width: 360px;
+    white-space: pre-wrap;
+    overflow-wrap: anywhere;
+}
+
+.teams-table .team-name,
+.teams-table .team-group,
+.teams-table .team-slug {
+    min-width: 120px;
+    max-width: 240px;
+    overflow-wrap: anywhere;
+}
+
+/* Escalation chains remain readable alongside the policy settings. */
+body.md-theme .escalation-policies-table td {
+    vertical-align: top;
+    overflow-wrap: anywhere;
+}
+
+.escalation-policies-table .escalation-policy-name-cell {
+    min-width: 180px;
+    max-width: 340px;
+}
+
+.escalation-policies-table .escalation-policy-description {
+    white-space: pre-wrap;
+}
+
+.escalation-policies-table .escalation-policy-rules-cell {
+    min-width: 280px;
+    max-width: 560px;
+}
+
+/* Silence metadata stays in the table; matching rules open separately. */
 body.md-theme .silences-table {
     min-width: 1100px;
 }
@@ -354,11 +396,6 @@ body.md-theme .silences-table .silence-reason-cell {
 }
 
 body.md-theme .silences-table .silence-matching-cell {
-    min-width: 220px;
-    max-width: 320px;
-}
-
-body.md-theme .silences-table .details-code {
-    margin: 4px 0 0;
-    padding: 8px;
+    min-width: 140px;
+    max-width: 220px;
 }

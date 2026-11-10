@@ -108,6 +108,17 @@ class MigrationState(BaseModel):
     applied_at = DateTimeField(default=utc_now)
 
 
+class EncryptionKeyVerification(BaseModel):
+    """Installation-wide verifier; never stores the plaintext encryption key."""
+
+    id = IntegerField(primary_key=True, constraints=[Check("id = 1")])
+    key_check = TextField(null=True)
+    initialized_at = DateTimeField(null=True)
+
+    class Meta:
+        table_name = "encryption_key_verification"
+
+
 class Group(SoftDeleteModel):
     """Access boundary for all resources."""
 

@@ -15,7 +15,7 @@ def _delivery(*, authorized=True):
         provider_status=None,
         provider_payload=None,
         updated_at=None,
-        save=lambda: None,
+        save=lambda **kwargs: None,
     )
     return delivery
 
