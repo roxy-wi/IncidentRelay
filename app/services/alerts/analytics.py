@@ -1,7 +1,8 @@
 from __future__ import annotations
 
-from collections import defaultdict
-from datetime import datetime, timedelta
+from collections import Counter, defaultdict
+from datetime import datetime, timedelta, timezone
+from zoneinfo import ZoneInfo
 
 from app.modules.common import utc_now
 from app.modules.db.models import Alert, AlertGroup, Service, Team
@@ -27,23 +28,35 @@ def build_alert_analytics_v1(query, *, team_ids=None):
 
     until = utc_now()
     since = until - timedelta(days=days)
+    previous_since = since - timedelta(days=days)
+    timezone_name = getattr(query, "timezone", "UTC")
 
     scoped_team_ids = [requested_team_id] if requested_team_id else team_ids
     if scoped_team_ids is not None:
         scoped_team_ids = sorted({int(team_id) for team_id in scoped_team_ids if team_id})
         if not scoped_team_ids:
-            return _empty_payload(days=days, limit=limit, since=since, until=until, team_id=requested_team_id)
+            return _empty_payload(
+                days=days,
+                limit=limit,
+                since=since,
+                until=until,
+                team_id=requested_team_id,
+                timezone_name=timezone_name,
+            )
 
     groups = _load_relevant_groups(
         team_ids=scoped_team_ids,
-        since=since,
+        since=previous_since,
         until=until,
     )
     raw_alerts = _load_raw_alerts(
         team_ids=scoped_team_ids,
-        since=since,
+        since=previous_since,
         until=until,
     )
+
+    previous_raw_alerts = [alert for alert in raw_alerts if alert.first_seen_at < since]
+    raw_alerts = [alert for alert in raw_alerts if alert.first_seen_at >= since]
 
     groups_by_id = {group.id: group for group in groups}
     missing_group_ids = {
@@ -67,11 +80,6 @@ def build_alert_analytics_v1(query, *, team_ids=None):
         for group in groups_by_id.values()
         if _is_current_open(group)
     ]
-    actionable_created_groups = [
-        group
-        for group in created_groups
-        if not _is_suppressed(group)
-    ]
     actionable_open_groups = [
         group
         for group in current_open_groups
@@ -91,33 +99,18 @@ def build_alert_analytics_v1(query, *, team_ids=None):
         if group.acknowledged_at is None
     ]
 
-    mtta_values = []
-    mttr_values = []
-    acknowledged_created = 0
-
-    for group in actionable_created_groups:
-        if group.acknowledged_at and group.first_seen_at:
-            acknowledged_created += 1
-            mtta_values.append(_duration_seconds(group.first_seen_at, group.acknowledged_at))
-
-        if group.resolved_at and group.first_seen_at:
-            mttr_values.append(_duration_seconds(group.first_seen_at, group.resolved_at))
-
+    current_metrics = _period_metrics(groups_by_id.values(), raw_alerts, since, until)
+    previous_metrics = _period_metrics(
+        groups_by_id.values(), previous_raw_alerts, previous_since, since
+    )
     summary = {
-        "alert_groups": len(created_groups),
-        "occurrences": len(raw_alerts),
+        **current_metrics,
         "open_now": len(current_open_groups),
         "unacknowledged": sum(
             1
             for group in actionable_open_groups
             if group.status == "firing" and group.acknowledged_at is None
         ),
-        "ack_rate": _ratio(acknowledged_created, len(actionable_created_groups)),
-        "resolved_without_ack": len(resolved_without_ack_groups),
-        "mtta_seconds_p50": _percentile_or_none(mtta_values, 50),
-        "mtta_seconds_p95": _percentile_or_none(mtta_values, 95),
-        "mttr_seconds_p50": _percentile_or_none(mttr_values, 50),
-        "mttr_seconds_p95": _percentile_or_none(mttr_values, 95),
     }
 
     oldest_unresolved = sorted(
@@ -153,10 +146,12 @@ def build_alert_analytics_v1(query, *, team_ids=None):
             "until": serialize_utc_datetime(until),
         },
         "summary": summary,
+        "comparison": _comparison(current_metrics, previous_metrics, previous_since, since),
+        "heatmap": _build_heatmap(created_groups, timezone_name),
+        "noise_growth": _build_noise_growth(raw_alerts, previous_raw_alerts, limit=limit),
         "top_noisy": _build_top_noisy(raw_alerts, groups_by_id, limit=limit),
         "oldest_unresolved": [
-            _serialize_group_row(group, until, metadata)
-            for group in oldest_unresolved
+            _serialize_group_row(group, until, metadata) for group in oldest_unresolved
         ],
         "attention": {
             "unacknowledged": [
@@ -187,7 +182,7 @@ def build_alert_analytics_v1(query, *, team_ids=None):
     }
 
 
-def _empty_payload(*, days, limit, since, until, team_id):
+def _empty_payload(*, days, limit, since, until, team_id, timezone_name):
     return {
         "version": 1,
         "window": {
@@ -207,6 +202,14 @@ def _empty_payload(*, days, limit, since, until, team_id):
             "mttr_seconds_p50": None,
             "mttr_seconds_p95": None,
         },
+        "comparison": _comparison(
+            _period_metrics([], [], since, until),
+            _period_metrics([], [], since, until),
+            since - timedelta(days=days),
+            since,
+        ),
+        "heatmap": _build_heatmap([], timezone_name),
+        "noise_growth": [],
         "top_noisy": [],
         "oldest_unresolved": [],
         "attention": {
@@ -223,7 +226,175 @@ def _empty_payload(*, days, limit, since, until, team_id):
     }
 
 
-def _load_relevant_groups(*, team_ids, since, until):
+def _metric_groups(groups, metric, since, until):
+    """Use the same cohort and cutoff for summaries and record selection."""
+    groups = [group for group in groups if not _is_merged(group)]
+    if metric == "resolved_without_ack":
+        return [
+            group
+            for group in groups
+            if not _is_suppressed(group)
+            and _in_window(group.resolved_at, since, until)
+            and (group.acknowledged_at is None or group.acknowledged_at >= until)
+        ]
+    created = [group for group in groups if _in_window(group.first_seen_at, since, until)]
+    if metric == "alert_groups":
+        return created
+    actionable = [group for group in created if not _is_suppressed(group)]
+    if metric == "ack_rate":
+        return actionable
+    field = "acknowledged_at" if metric == "mtta" else "resolved_at"
+    return [
+        group
+        for group in actionable
+        if _in_window(getattr(group, field), group.first_seen_at, until)
+    ]
+
+
+def _period_metrics(groups, raw_alerts, since, until):
+    """Measure cohorts at their window end, excluding later responses."""
+    groups = list(groups)
+    actionable = _metric_groups(groups, "ack_rate", since, until)
+    acknowledged = _metric_groups(groups, "mtta", since, until)
+    resolved = _metric_groups(groups, "mttr", since, until)
+    mtta = [_duration_seconds(group.first_seen_at, group.acknowledged_at) for group in acknowledged]
+    mttr = [_duration_seconds(group.first_seen_at, group.resolved_at) for group in resolved]
+    return {
+        "alert_groups": len(_metric_groups(groups, "alert_groups", since, until)),
+        "occurrences": len(raw_alerts),
+        "ack_rate": _ratio(len(acknowledged), len(actionable)),
+        "ack_eligible": len(actionable),
+        "mtta_samples": len(mtta),
+        "mttr_samples": len(mttr),
+        "resolved_without_ack": len(_metric_groups(groups, "resolved_without_ack", since, until)),
+        "mtta_seconds_p50": _percentile_or_none(mtta, 50),
+        "mtta_seconds_p95": _percentile_or_none(mtta, 95),
+        "mttr_seconds_p50": _percentile_or_none(mttr, 50),
+        "mttr_seconds_p95": _percentile_or_none(mttr, 95),
+    }
+
+
+def _comparison(current, previous, since, until):
+    deltas = {}
+    for key in (
+        "alert_groups",
+        "occurrences",
+        "ack_rate",
+        "resolved_without_ack",
+        "mtta_seconds_p50",
+        "mtta_seconds_p95",
+        "mttr_seconds_p50",
+        "mttr_seconds_p95",
+    ):
+        value, baseline = current[key], previous[key]
+        delta = None if value is None or baseline is None else round(value - baseline, 4)
+        deltas[key] = {
+            "absolute": delta,
+            "percent": round(delta / baseline * 100, 1) if delta is not None and baseline else None,
+        }
+    return {
+        "previous_window": {
+            "since": serialize_utc_datetime(since),
+            "until": serialize_utc_datetime(until),
+        },
+        "current": current,
+        "previous": previous,
+        "deltas": deltas,
+    }
+
+
+def _build_heatmap(groups, timezone_name):
+    zone = ZoneInfo(timezone_name)
+    counts = Counter()
+    for group in groups:
+        local = group.first_seen_at.replace(tzinfo=timezone.utc).astimezone(zone)
+        counts[(local.weekday(), local.hour)] += 1
+    return {
+        "timezone": timezone_name,
+        "cells": [
+            {"weekday": weekday, "hour": hour, "count": counts[(weekday, hour)]}
+            for weekday in range(7)
+            for hour in range(24)
+        ],
+    }
+
+
+def _build_noise_growth(current, previous, *, limit):
+    current_counts = Counter(_alert_name(alert) for alert in current)
+    previous_counts = Counter(_alert_name(alert) for alert in previous)
+    rows = []
+    for name, count in current_counts.items():
+        baseline = previous_counts[name]
+        if name and count > baseline:
+            rows.append(
+                {
+                    "alertname": name,
+                    "current": count,
+                    "previous": baseline,
+                    "increase": count - baseline,
+                    "percent": round((count - baseline) / baseline * 100, 1) if baseline else None,
+                }
+            )
+    return sorted(rows, key=lambda row: (-row["increase"], -row["current"], row["alertname"]))[
+        :limit
+    ]
+
+
+def select_analytics_groups(query, *, team_ids=None):
+    """Return a bounded page behind one metric, with the same access scope."""
+    scoped = [query.team_id] if query.team_id else team_ids
+    if query.metric == "occurrences":
+        raw = _load_raw_alerts(team_ids=scoped, since=query.since, until=query.until)
+        if query.alertname is not None:
+            raw = [alert for alert in raw if _alert_name(alert) == query.alertname]
+        counts = Counter(alert.group_id for alert in raw)
+        groups = _load_groups_by_ids((key for key in counts if key), team_ids=scoped)
+        accessible_ids = {group.id for group in groups}
+        unlinked = sum(count for key, count in counts.items() if key not in accessible_ids)
+    else:
+        groups = _load_relevant_groups(
+            team_ids=scoped, since=query.since, until=query.until, include_open=False
+        )
+        groups = _metric_groups(groups, query.metric, query.since, query.until)
+        counts, unlinked = {}, 0
+    if query.weekday is not None:
+        zone = ZoneInfo(query.timezone)
+        groups = [
+            group
+            for group in groups
+            if (
+                local := group.first_seen_at.replace(tzinfo=timezone.utc).astimezone(zone)
+            ).weekday()
+            == query.weekday
+            and local.hour == query.hour
+        ]
+    groups.sort(key=lambda group: (group.first_seen_at, group.id), reverse=True)
+    total = len(groups)
+    pages = max(1, (total + query.page_size - 1) // query.page_size)
+    page = min(query.page, pages)
+    groups = groups[(page - 1) * query.page_size : page * query.page_size]
+    metadata = _load_group_metadata(groups)
+    return {
+        "items": [
+            {
+                **_serialize_group_row(group, query.until, metadata),
+                "occurrences": counts.get(group.id),
+            }
+            for group in groups
+        ],
+        "unlinked_occurrences": unlinked,
+        "pagination": {
+            "page": page,
+            "page_size": query.page_size,
+            "total_items": total,
+            "total_pages": pages,
+            "has_prev": page > 1,
+            "has_next": page < pages,
+        },
+    }
+
+
+def _load_relevant_groups(*, team_ids, since, until, include_open=True):
     query = AlertGroup.select().where(
         (AlertGroup.merged_into.is_null(True))
         & (AlertGroup.status != "merged")
@@ -231,7 +402,7 @@ def _load_relevant_groups(*, team_ids, since, until):
             _window_condition(AlertGroup.first_seen_at, since, until)
             | _window_condition(AlertGroup.acknowledged_at, since, until)
             | _window_condition(AlertGroup.resolved_at, since, until)
-            | AlertGroup.status.in_(tuple(OPEN_ALERT_GROUP_STATUSES))
+            | (AlertGroup.status.in_(tuple(OPEN_ALERT_GROUP_STATUSES)) if include_open else False)
         )
     )
 
@@ -247,18 +418,20 @@ def _load_groups_by_ids(group_ids, *, team_ids):
     if not group_ids:
         return []
 
-    query = AlertGroup.select().where(AlertGroup.id.in_(group_ids))
-    query = _apply_team_scope(query, AlertGroup.team, team_ids)
-    if query is None:
-        return []
-
-    return list(query)
+    groups = []
+    for offset in range(0, len(group_ids), 500):
+        query = AlertGroup.select().where(AlertGroup.id.in_(group_ids[offset : offset + 500]))
+        query = _apply_team_scope(query, AlertGroup.team, team_ids)
+        if query is None:
+            return []
+        groups.extend(query)
+    return groups
 
 
 def _load_raw_alerts(*, team_ids, since, until):
-    query = Alert.select().where(
-        _window_condition(Alert.first_seen_at, since, until)
-    )
+    query = Alert.select(
+        Alert.id, Alert.group, Alert.first_seen_at, Alert.labels, Alert.title
+    ).where(_window_condition(Alert.first_seen_at, since, until))
     query = _apply_team_scope(query, Alert.team, team_ids)
     if query is None:
         return []
@@ -488,11 +661,11 @@ def _is_suppressed(group):
 
 
 def _window_condition(field, since, until):
-    return (field >= since) & (field <= until)
+    return (field >= since) & (field < until)
 
 
 def _in_window(value, since, until):
-    return bool(value and since <= value <= until)
+    return bool(value and since <= value < until)
 
 
 def _duration_seconds(start, end):

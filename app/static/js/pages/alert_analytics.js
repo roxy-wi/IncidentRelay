@@ -1,6 +1,8 @@
 let alertAnalyticsChart = null;
 let alertAnalyticsLoaded = false;
 let alertAnalyticsLoadGeneration = 0;
+let alertAnalyticsSelection = null;
+let alertAnalyticsSelectionGeneration = 0;
 const ALERTS_PAGE_TAB_STORAGE_KEY = "incidentrelay.alerts.active_tab";
 
 
@@ -15,6 +17,7 @@ function buildAlertAnalyticsApiUrl() {
 
     params.set("days", String(days));
     params.set("limit", "10");
+    params.set("timezone", $("#alert-analytics-timezone").val() || "UTC");
 
     if (typeof selectedTeamId === "function" && selectedTeamId()) {
         params.set("team_id", String(selectedTeamId()));
@@ -30,6 +33,8 @@ function loadAlertAnalytics() {
     }
 
     const generation = ++alertAnalyticsLoadGeneration;
+    closeAlertAnalyticsSelection();
+    $(".alert-analytics-interactive").attr("inert", "");
     $("#alert-analytics-loading").removeClass("is-hidden");
     $("#refresh-alert-analytics").prop("disabled", true);
 
@@ -42,6 +47,7 @@ function loadAlertAnalytics() {
 
             alertAnalyticsLoaded = true;
             renderAlertAnalytics(payload || {});
+            $(".alert-analytics-interactive").removeAttr("inert");
             $("#alert-analytics-loading").addClass("is-hidden");
             $("#refresh-alert-analytics").prop("disabled", false);
         },
@@ -76,10 +82,163 @@ function renderAlertAnalytics(payload) {
         formatAlertAnalyticsDurationPair(summary.mttr_seconds_p50, summary.mttr_seconds_p95)
     );
 
+    renderAlertAnalyticsComparison(payload);
+    renderAlertAnalyticsHeatmap(payload);
+    renderAlertAnalyticsGrowth(payload);
     renderAlertAnalyticsNoisy(payload.top_noisy || []);
     renderAlertAnalyticsOldest(payload.oldest_unresolved || []);
     renderAlertAnalyticsAcknowledgementHealth(payload.attention || {});
     renderAlertAnalyticsLifecycle((payload.series || {}).lifecycle_by_day || []);
+}
+
+
+function alertAnalyticsSelectionButton(text, payload, window, filters, enabled = true) {
+    return $("<button>", {type: "button", class: "alerts-analytics-alert-link", text, disabled: !enabled})
+        .on("click", function () {
+            alertAnalyticsSelection = {
+                ...filters, since: window.since, until: window.until,
+                timezone: payload.heatmap?.timezone || "UTC", page: 1, page_size: 25,
+            };
+            if (payload.filters?.team_id) alertAnalyticsSelection.team_id = payload.filters.team_id;
+            $("#alert-analytics-selection-title").text(i18n.t("alerts.analytics.selection.title"));
+            const description = [
+                i18n.t("alerts.analytics.summary." + ({mtta: "mtta", mttr: "mttr"}[filters.metric] || filters.metric)),
+                filters.alertname,
+                formatAlertAnalyticsTimestamp(window.since) + " — " + formatAlertAnalyticsTimestamp(window.until),
+            ];
+            if (filters.weekday !== undefined) {
+                description.push(alertAnalyticsWeekday(filters.weekday) + " " + String(filters.hour).padStart(2, "0") + ":00, " + alertAnalyticsSelection.timezone);
+            }
+            $("#alert-analytics-selection-description").text(description.filter(Boolean).join(" · "));
+            $("#alert-analytics-selection").removeClass("is-hidden")[0].scrollIntoView({block: "start"});
+            $("#alert-analytics-selection-title").trigger("focus");
+            loadAlertAnalyticsSelection();
+        });
+}
+
+
+function closeAlertAnalyticsSelection() {
+    alertAnalyticsSelectionGeneration += 1;
+    alertAnalyticsSelection = null;
+    $("#alert-analytics-selection").addClass("is-hidden");
+}
+
+
+function loadAlertAnalyticsSelection() {
+    const generation = ++alertAnalyticsSelectionGeneration;
+    $("#alert-analytics-selection-table").empty();
+    $("#alert-analytics-selection-status").text(i18n.t("alerts.analytics.loading"));
+    $("#alert-analytics-selection-prev, #alert-analytics-selection-next").prop("disabled", true);
+    apiGet("/api/alert-groups/analytics/selection?" + new URLSearchParams(alertAnalyticsSelection), function (data) {
+        if (generation !== alertAnalyticsSelectionGeneration) return;
+        const body = $("#alert-analytics-selection-table").empty();
+        data.items.forEach(row => body.append($("<tr>")
+            .append($("<td>").append(alertAnalyticsGroupButton(row)))
+            .append($("<td>").text(alertAnalyticsServiceLabel(row)))
+            .append($("<td>").text(alertAnalyticsStatusLabel(row.status)))
+            .append($("<td>").text(formatAlertAnalyticsTimestamp(row.first_seen_at)))
+            .append($("<td>").text(row.occurrences === null ? "—" : row.occurrences))));
+        if (!data.items.length) appendAlertAnalyticsEmptyRow(body, 5);
+        $("#alert-analytics-selection-status").text(data.unlinked_occurrences
+            ? i18n.t("alerts.analytics.selection.unlinked", {count: data.unlinked_occurrences}) : "");
+        const paging = data.pagination;
+        alertAnalyticsSelection.page = paging.page;
+        $("#alert-analytics-selection-page").text(i18n.t("alerts.analytics.selection.page", {
+            page: paging.page, pages: paging.total_pages, count: paging.total_items,
+        }));
+        $("#alert-analytics-selection-prev").prop("disabled", !paging.has_prev);
+        $("#alert-analytics-selection-next").prop("disabled", !paging.has_next);
+    }, function (xhr) {
+        if (generation !== alertAnalyticsSelectionGeneration) return;
+        $("#alert-analytics-selection-status").text(i18n.t("alerts.analytics.load_failed"));
+        showApiError(xhr);
+    });
+}
+
+
+function renderAlertAnalyticsComparison(payload) {
+    const comparison = payload.comparison;
+    const body = $("#alert-analytics-comparison-table").empty();
+    if (!comparison) return;
+    $("#alert-analytics-comparison-window").text(
+        i18n.t("alerts.analytics.comparison.previous") + ": " + formatAlertAnalyticsTimestamp(comparison.previous_window.since) + " — " + formatAlertAnalyticsTimestamp(comparison.previous_window.until)
+        + " · " + i18n.t("alerts.analytics.comparison.current") + ": " + formatAlertAnalyticsTimestamp(payload.window.since) + " — " + formatAlertAnalyticsTimestamp(payload.window.until));
+    const metrics = [
+        ["alert_groups", "alert_groups"], ["occurrences", "occurrences"], ["ack_rate", "ack_rate"],
+        ["resolved_without_ack", "resolved_without_ack"], ["mtta_seconds_p50", "mtta"], ["mttr_seconds_p50", "mttr"],
+    ];
+    metrics.forEach(([key, metric]) => {
+        const label = i18n.t("alerts.analytics.summary." + metric) + (key.endsWith("p50") ? " p50" : "");
+        const row = $("<tr>").append($("<td>").text(label));
+        ["previous", "current"].forEach(period => {
+            const values = comparison[period];
+            const value = values[key];
+            const text = key.endsWith("p50") ? formatAlertAnalyticsDuration(value)
+                : key === "ack_rate" ? formatAlertAnalyticsPercent(value) : formatAlertAnalyticsNumber(value);
+            const window = period === "previous" ? comparison.previous_window : payload.window;
+            const samplesKey = key.endsWith("p50") ? metric + "_samples" : key === "ack_rate" ? "ack_eligible" : null;
+            const enabled = samplesKey ? values[samplesKey] > 0 : value !== null && value > 0;
+            const cell = $("<td>").append(alertAnalyticsSelectionButton(text, payload, window, {metric}, enabled));
+            if (samplesKey) cell.append($("<small>", {class: "alerts-analytics-sample-size", text: i18n.t("alerts.analytics.comparison.samples", {count: values[samplesKey] || 0})}));
+            row.append(cell);
+        });
+        const delta = comparison.deltas[key];
+        let change = "—";
+        if (delta.absolute !== null) {
+            if (key === "ack_rate") change = (delta.absolute > 0 ? "+" : "") + (delta.absolute * 100).toFixed(1) + " " + i18n.t("alerts.analytics.comparison.pp");
+            else if (key.endsWith("p50")) change = (delta.absolute > 0 ? "+" : delta.absolute < 0 ? "−" : "") + formatAlertAnalyticsDuration(Math.abs(delta.absolute));
+            else change = (delta.absolute > 0 ? "+" : "") + formatAlertAnalyticsNumber(delta.absolute);
+            if (delta.percent !== null && key !== "ack_rate") change += " (" + (delta.percent > 0 ? "+" : "") + delta.percent + "%)";
+            else if (delta.absolute > 0 && comparison.previous[key] === 0) change += " · " + i18n.t("alerts.analytics.comparison.no_baseline");
+        }
+        body.append(row.append($("<td>").text(change)));
+    });
+}
+
+
+function alertAnalyticsWeekday(day) {
+    return new Intl.DateTimeFormat(i18n.locale || "en", {weekday: "short", timeZone: "UTC"})
+        .format(new Date(Date.UTC(2024, 0, 1 + day)));
+}
+
+
+function renderAlertAnalyticsHeatmap(payload) {
+    const table = $("#alert-analytics-heatmap").empty();
+    const cells = payload.heatmap?.cells || [];
+    const maximum = Math.max(1, ...cells.map(cell => cell.count));
+    const headings = $("<tr>").append($("<th>", {scope: "col", text: i18n.t("alerts.analytics.heatmap.day")}));
+    for (let hour = 0; hour < 24; hour++) headings.append($("<th>", {scope: "col", text: String(hour).padStart(2, "0")}));
+    table.append($("<thead>").append(headings));
+    const body = $("<tbody>").appendTo(table);
+    for (let weekday = 0; weekday < 7; weekday++) {
+        const row = $("<tr>").append($("<th>", {scope: "row", text: alertAnalyticsWeekday(weekday)}));
+        cells.filter(cell => cell.weekday === weekday).forEach(cell => {
+            const label = i18n.t("alerts.analytics.heatmap.cell", {day: alertAnalyticsWeekday(weekday), hour: String(cell.hour).padStart(2, "0"), count: cell.count, timezone: payload.heatmap.timezone});
+            const button = alertAnalyticsSelectionButton(String(cell.count), payload, payload.window,
+                {metric: "alert_groups", weekday, hour: cell.hour}, cell.count > 0)
+                .attr({title: label, "aria-label": label, "data-level": cell.count ? Math.ceil(cell.count / maximum * 4) : 0})
+                .addClass("alerts-analytics-heat-cell");
+            row.append($("<td>").append(button));
+        });
+        body.append(row);
+    }
+}
+
+
+function renderAlertAnalyticsGrowth(payload) {
+    const body = $("#alert-analytics-growth-table").empty();
+    const rows = payload.noise_growth || [];
+    if (!rows.length) return appendAlertAnalyticsEmptyRow(body, 4);
+    rows.forEach(row => {
+        const filters = {metric: "occurrences", alertname: row.alertname};
+        const change = "+" + row.increase + (row.percent === null
+            ? " · " + i18n.t("alerts.analytics.comparison.no_baseline") : " (+" + row.percent + "%)");
+        body.append($("<tr>")
+            .append($("<td>").append(alertAnalyticsSelectionButton(row.alertname, payload, payload.window, filters)))
+            .append($("<td>").append(alertAnalyticsSelectionButton(String(row.previous), payload, payload.comparison.previous_window, filters, row.previous > 0)))
+            .append($("<td>").append(alertAnalyticsSelectionButton(String(row.current), payload, payload.window, filters)))
+            .append($("<td>").text(change)));
+    });
 }
 
 
@@ -495,6 +654,14 @@ function restoreAlertsPageTab() {
 
 
 $(document).ready(function () {
+    AppTimezones.fillSelect("#alert-analytics-timezone", AppTimezones.getDisplayTimezone());
+    $(document).on("change", "#alert-analytics-timezone", loadAlertAnalytics);
+    $(document).on("click", "#alert-analytics-selection-close", closeAlertAnalyticsSelection);
+    $(document).on("click", "#alert-analytics-selection-prev, #alert-analytics-selection-next", function () {
+        if (!alertAnalyticsSelection) return;
+        alertAnalyticsSelection.page += this.id.endsWith("prev") ? -1 : 1;
+        loadAlertAnalyticsSelection();
+    });
     $(document).on("click", "[data-alerts-page-tab]", function () {
         setAlertsPageTab($(this).attr("data-alerts-page-tab"));
     });

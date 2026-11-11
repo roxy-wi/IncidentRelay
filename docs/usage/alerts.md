@@ -308,6 +308,22 @@ curl -X POST https://incidentrelay.example.com/api/alert-groups/101/resolve \
   -d '{}'
 ```
 
+## Alert analytics
+
+Open **Alerts → Alert analytics** and select a team and a 7, 30 or 90 day period.
+
+- **Compared with the previous period** compares adjacent windows of equal length. Selecting 7 days compares the last 7 days with the 7 days immediately before them. Values show absolute and percentage changes. ACK rate changes are percentage points. When the previous value is zero, there is no percentage baseline.
+- **When alert groups start** shows new groups by weekday and hour. Choose a timezone using the selector. Values are totals over the period. DST is respected: both occurrences of a repeated local hour contribute to the same cell.
+- **Largest increases in alert noise** compares saved child-alert occurrences by exact name, ranked by absolute increase. Repeated webhook updates to an existing child alert are not separate occurrences. Zero in the previous window does not necessarily mean a new alert rule.
+
+Click a period value, a non-empty heatmap cell, an alert name or an occurrence count. **Matching alert groups** opens on the same page with the exact period, team, name and local-hour selection, and pagination. Click a group title to open its detail page. Several occurrences can belong to one group; the occurrence column counts only matches within the selected period. A message explains occurrences with no accessible parent group.
+
+MTTA/MTTR use eligible groups created in the window with ACK/resolution before its end. The sample size is shown. Currently maintenance- or orchestration-suppressed groups are excluded from response metrics. Open-now counters are not compared with a historical value.
+
+Windows include their start and exclude their end: `[since, until)`. Calculations use retained records and their currently saved lifecycle timestamps, not historical snapshots. Reopening, merging and retention cleanup can change past results. A short history or small sample limits comparisons. Selection is a fresh read: records may change after a chart was loaded.
+
+`GET /api/alert-groups/analytics?days=7&timezone=Europe%2FMoscow` adds `comparison`, `heatmap` and `noise_growth` to the existing response. `GET /api/alert-groups/analytics/selection` takes the returned `since`/`until`, `metric`, optional `team_id`, exact `alertname` for occurrences, or `weekday` (Monday = 0), `hour` and `timezone` for new groups. It supports `page` and `page_size` (1–100), with a maximum window of 365 days and the same access checks.
+
 ## Troubleshooting
 
 ### Alerts are not grouped

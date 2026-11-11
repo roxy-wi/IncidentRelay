@@ -4,6 +4,7 @@ from flask import Blueprint, jsonify, request
 from app.api.schemas.alerts import (
     AlertActivityQuerySchema,
     AlertAnalyticsQuerySchema,
+    AlertAnalyticsSelectionQuerySchema,
     AlertDetailQuerySchema,
     AlertEventListQuerySchema,
     AlertGroupCreateSchema,
@@ -12,7 +13,7 @@ from app.api.schemas.alerts import (
 )
 from app.modules.db import alerts_repo, incident_core_repo, incidents_repo, notifications_repo
 from app.services.alerts.actions import acknowledge_alert, resolve_alert
-from app.services.alerts.analytics import build_alert_analytics_v1
+from app.services.alerts.analytics import build_alert_analytics_v1, select_analytics_groups
 from app.services.alerts.assignment import set_alert_group_assignee
 from app.services.alerts.shelving import shelve_alert_group, unshelve_alert_group
 from app.services.audit import current_api_token_id, write_audit
@@ -229,6 +230,22 @@ def get_alert_analytics():
         team_ids = get_allowed_team_ids()
 
     return jsonify(build_alert_analytics_v1(payload, team_ids=team_ids))
+
+
+@alerts_bp.route("/analytics/selection", methods=["GET"])
+def get_alert_analytics_selection():
+    """List the readable groups contributing to an analytics value."""
+    payload, error = validate_query(AlertAnalyticsSelectionQuerySchema)
+    if error:
+        return error
+    if payload.team_id:
+        error = require_team_read(payload.team_id)
+        if error:
+            return error
+        team_ids = [payload.team_id]
+    else:
+        team_ids = get_allowed_team_ids()
+    return jsonify(select_analytics_groups(payload, team_ids=team_ids))
 
 
 @alerts_bp.route("", methods=["POST"])

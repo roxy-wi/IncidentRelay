@@ -1,6 +1,8 @@
-from typing import Any
+from datetime import timedelta, timezone
+from typing import Annotated, Any, Literal
+from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 
-from pydantic import Field, field_validator
+from pydantic import AwareDatetime, Field, StringConstraints, field_validator, model_validator
 
 from app.api.schemas.base import ApiModel
 
@@ -12,12 +14,67 @@ class AlertActivityQuerySchema(ApiModel):
     limit: int = Field(default=6, ge=1, le=25)
 
 
-class AlertAnalyticsQuerySchema(ApiModel):
+class AnalyticsTimezoneQuery(ApiModel):
+    """Validate the timezone used for analytics and its drill-down."""
+
+    timezone: str = Field(default="UTC", min_length=1, max_length=64)
+
+    @field_validator("timezone")
+    @classmethod
+    def valid_timezone(cls, value):
+        try:
+            ZoneInfo(value)
+        except (ZoneInfoNotFoundError, ValueError) as error:
+            raise ValueError("Unknown IANA timezone") from error
+        return value
+
+
+class AlertAnalyticsQuerySchema(AnalyticsTimezoneQuery):
     """Validate Alert Analytics v1 query parameters."""
 
     team_id: int | None = Field(default=None, ge=1)
     days: int = Field(default=30, ge=1, le=365)
     limit: int = Field(default=10, ge=1, le=50)
+
+
+class AlertAnalyticsSelectionQuerySchema(AnalyticsTimezoneQuery):
+    """Select the exact records behind a period metric or heatmap cell."""
+
+    team_id: int | None = Field(default=None, ge=1)
+    since: AwareDatetime
+    until: AwareDatetime
+    metric: Literal[
+        "alert_groups", "occurrences", "ack_rate", "mtta", "mttr", "resolved_without_ack"
+    ]
+    alertname: (
+        Annotated[str, StringConstraints(strip_whitespace=False, min_length=1, max_length=5000)]
+        | None
+    ) = None
+    weekday: int | None = Field(default=None, ge=0, le=6)
+    hour: int | None = Field(default=None, ge=0, le=23)
+    page: int = Field(default=1, ge=1, le=1000000)
+    page_size: int = Field(default=25, ge=1, le=100)
+
+    @field_validator("since", "until", mode="before")
+    @classmethod
+    def iso_timestamp(cls, value):
+        if not isinstance(value, str) or "T" not in value:
+            raise ValueError("Use an ISO timestamp with a timezone")
+        return value
+
+    @model_validator(mode="after")
+    def valid_selection(self):
+        if not timedelta(0) < self.until - self.since <= timedelta(days=365):
+            raise ValueError("Select a positive window of at most 365 days")
+        if (self.weekday is None) != (self.hour is None):
+            raise ValueError("Supply both weekday and hour")
+        if self.weekday is not None and self.metric != "alert_groups":
+            raise ValueError("Heatmap cells select newly created alert groups")
+        if self.alertname is not None and self.metric != "occurrences":
+            raise ValueError("Alert names select saved occurrences")
+        self.since = self.since.astimezone(timezone.utc).replace(tzinfo=None)
+        self.until = self.until.astimezone(timezone.utc).replace(tzinfo=None)
+        return self
 
 
 class AlertEventListQuerySchema(ApiModel):

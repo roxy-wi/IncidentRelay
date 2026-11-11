@@ -736,7 +736,7 @@ def alert_analytics_schema():
     }
     group_row = alert_analytics_group_row_schema()
 
-    return {
+    schema = {
         "type": "object",
         "properties": {
             "version": {"type": "integer", "enum": [1]},
@@ -844,6 +844,86 @@ def alert_analytics_schema():
             },
         },
     }
+
+    metric_properties = {
+        key: value
+        for key, value in schema["properties"]["summary"]["properties"].items()
+        if key not in {"open_now", "unacknowledged"}
+    }
+    metric_properties.update(
+        {
+            key: {"type": "integer", "minimum": 0}
+            for key in ("ack_eligible", "mtta_samples", "mttr_samples")
+        }
+    )
+    metrics = {"type": "object", "properties": metric_properties}
+    window = {
+        "type": "object",
+        "properties": {
+            "since": date_time_property("Inclusive start in UTC."),
+            "until": date_time_property("Exclusive end in UTC."),
+        },
+    }
+    schema["properties"].update(
+        {
+            "comparison": {
+                "type": "object",
+                "properties": {
+                    "previous_window": window,
+                    "current": metrics,
+                    "previous": metrics,
+                    "deltas": {
+                        "type": "object",
+                        "additionalProperties": {
+                            "type": "object",
+                            "properties": {
+                                "absolute": {"type": "number", "nullable": True},
+                                "percent": {"type": "number", "nullable": True},
+                            },
+                        },
+                    },
+                },
+            },
+            "heatmap": {
+                "type": "object",
+                "properties": {
+                    "timezone": {"type": "string"},
+                    "cells": {
+                        "type": "array",
+                        "minItems": 168,
+                        "maxItems": 168,
+                        "items": {
+                            "type": "object",
+                            "properties": {
+                                "weekday": {
+                                    "type": "integer",
+                                    "minimum": 0,
+                                    "maximum": 6,
+                                    "description": "Monday = 0.",
+                                },
+                                "hour": {"type": "integer", "minimum": 0, "maximum": 23},
+                                "count": {"type": "integer", "minimum": 0},
+                            },
+                        },
+                    },
+                },
+            },
+            "noise_growth": {
+                "type": "array",
+                "items": {
+                    "type": "object",
+                    "properties": {
+                        "alertname": {"type": "string"},
+                        "current": {"type": "integer", "minimum": 0},
+                        "previous": {"type": "integer", "minimum": 0},
+                        "increase": {"type": "integer", "minimum": 1},
+                        "percent": {"type": "number", "nullable": True},
+                    },
+                },
+            },
+        }
+    )
+    return schema
 
 
 def alert_group_merge_request_schema():
@@ -1212,11 +1292,18 @@ def paths():
                     "Occurrences are persisted child Alert lifecycle rows; repeated updates "
                     "to the same still-open child alert are not counted as separate occurrences. "
                     "Response-quality metrics exclude currently maintenance- or orchestration-suppressed "
-                    "groups. Oldest unresolved rows are current-state and may predate the selected window."
+                    "groups. Oldest unresolved rows are current-state and may predate the selected window. "
+                    "Periods are adjacent half-open windows [since, until). Response samples use timestamps before each "
+                    "window end. Comparison uses retained records and current saved lifecycle timestamps, not historical snapshots."
                 ),
                 "operationId": "getAlertAnalytics",
                 "security": bearer_security(),
                 "parameters": [
+                    query_param(
+                        "timezone",
+                        "IANA timezone for weekday/hour buckets.",
+                        {"type": "string", "default": "UTC"},
+                    ),
                     query_param(
                         "team_id",
                         "Restrict analytics to one readable team.",
@@ -1253,6 +1340,124 @@ def paths():
                     "403": response("Access denied."),
                 },
             }
+        },
+        "/api/alert-groups/analytics/selection": {
+            "get": {
+                "tags": ["alerts"],
+                "summary": "Inspect groups behind an analytics metric",
+                "operationId": "getAlertAnalyticsSelection",
+                "security": bearer_security(),
+                "description": "Returns exact contributing groups with the same team access checks. Occurrences are grouped by parent group; alert names match exactly. Windows are limited to 365 days. Record changes and retention cleanup can change the selection after analytics was loaded.",
+                "parameters": [
+                    query_param("team_id", "Readable team.", {"type": "integer", "minimum": 1}),
+                    query_param(
+                        "since",
+                        "Inclusive UTC/offset timestamp.",
+                        {"type": "string", "format": "date-time"},
+                        required=True,
+                    ),
+                    query_param(
+                        "until",
+                        "Exclusive UTC/offset timestamp.",
+                        {"type": "string", "format": "date-time"},
+                        required=True,
+                    ),
+                    query_param(
+                        "metric",
+                        "ACK rate selects its eligible cohort; MTTA/MTTR select completed samples.",
+                        {
+                            "type": "string",
+                            "enum": [
+                                "alert_groups",
+                                "occurrences",
+                                "ack_rate",
+                                "mtta",
+                                "mttr",
+                                "resolved_without_ack",
+                            ],
+                        },
+                        required=True,
+                    ),
+                    query_param(
+                        "alertname",
+                        "Exact occurrence name; only valid with metric=occurrences.",
+                        {"type": "string", "maxLength": 5000},
+                    ),
+                    query_param(
+                        "timezone",
+                        "IANA timezone for heatmap selection.",
+                        {"type": "string", "default": "UTC"},
+                    ),
+                    query_param(
+                        "weekday",
+                        "Monday=0; requires hour and metric=alert_groups.",
+                        {"type": "integer", "minimum": 0, "maximum": 6},
+                    ),
+                    query_param(
+                        "hour",
+                        "Local hour; requires weekday.",
+                        {"type": "integer", "minimum": 0, "maximum": 23},
+                    ),
+                    query_param(
+                        "page",
+                        "Page number.",
+                        {"type": "integer", "minimum": 1, "maximum": 1000000},
+                    ),
+                    query_param(
+                        "page_size",
+                        "Page size.",
+                        {"type": "integer", "minimum": 1, "maximum": 100, "default": 25},
+                    ),
+                ],
+                "responses": {
+                    "200": response(
+                        "Matching groups.",
+                        {
+                            "type": "object",
+                            "properties": {
+                                "items": {
+                                    "type": "array",
+                                    "items": {
+                                        "allOf": [
+                                            alert_analytics_group_row_schema(),
+                                            {
+                                                "type": "object",
+                                                "properties": {
+                                                    "occurrences": {
+                                                        "type": "integer",
+                                                        "nullable": True,
+                                                        "minimum": 0,
+                                                    }
+                                                },
+                                            },
+                                        ]
+                                    },
+                                },
+                                "unlinked_occurrences": {"type": "integer", "minimum": 0},
+                                "pagination": {
+                                    "type": "object",
+                                    "properties": {
+                                        **{
+                                            key: {"type": "integer"}
+                                            for key in (
+                                                "page",
+                                                "page_size",
+                                                "total_items",
+                                                "total_pages",
+                                            )
+                                        },
+                                        "has_prev": {"type": "boolean"},
+                                        "has_next": {"type": "boolean"},
+                                    },
+                                },
+                            },
+                        },
+                    ),
+                    "400": response("Validation error."),
+                    "401": response("Authentication required."),
+                    "403": response("Access denied."),
+                },
+            },
         },
         "/api/alert-groups/{alert_id}": {
             "get": {

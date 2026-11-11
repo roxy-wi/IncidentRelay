@@ -1,0 +1,83 @@
+"use strict";
+const assert = require("node:assert/strict");
+const path = require("node:path");
+const {chromium} = require("playwright");
+const fixture = JSON.parse(process.env.ALERT_ANALYTICS_FIXTURE);
+
+(async () => {
+    const browser = await chromium.launch({headless: true, channel: process.env.PLAYWRIGHT_CHANNEL || undefined});
+    const context = await browser.newContext({baseURL: fixture.baseUrl, viewport: {width: 1440, height: 1080}, serviceWorkers: "block"});
+    await context.addCookies([{name: "incidentrelay_jwt", value: fixture.token, url: fixture.baseUrl},
+        {name: "incidentrelay_locale", value: "en", url: fixture.baseUrl}]);
+    const page = await context.newPage();
+    page.setDefaultTimeout(20000);
+    const errors = [];
+    page.on("pageerror", error => errors.push(error.message));
+    await page.route("**/*", route => new URL(route.request().url()).origin === fixture.baseUrl ? route.continue() : route.abort());
+    async function selectedAfter(click) {
+        const response = page.waitForResponse(r => r.url().includes("/analytics/selection?"));
+        await click();
+        const result = await response;
+        assert.equal(result.status(), 200, await result.text());
+        await page.waitForFunction(() => document.querySelector("#alert-analytics-selection-status").textContent === "");
+        return result.json();
+    }
+    try {
+        await page.goto("/alerts?team=" + fixture.teamId);
+        await page.locator("#alerts-tab-analytics").click();
+        await page.waitForFunction(() => alertAnalyticsLoaded);
+        let refresh = page.waitForResponse(r => r.url().includes("/analytics?") && new URL(r.url()).searchParams.get("days") === "7");
+        await page.locator("#alert-analytics-days").selectOption("7");
+        assert.equal((await refresh).status(), 200);
+        await page.waitForFunction(() => !document.querySelector("#refresh-alert-analytics").disabled);
+        refresh = page.waitForResponse(r => r.url().includes("/analytics?") && new URL(r.url()).searchParams.get("timezone") === "Europe/Moscow");
+        await page.locator("#alert-analytics-timezone").selectOption("Europe/Moscow");
+        const payload = await (await refresh).json();
+        await page.waitForFunction(() => !document.querySelector("#refresh-alert-analytics").disabled);
+        assert.equal(await page.locator("#alert-analytics-comparison-table tr").count(), 6);
+        assert.equal(await page.locator("#alert-analytics-heatmap button").count(), 168);
+        await page.screenshot({path: path.join(fixture.screenshots, "desktop.png"), fullPage: true});
+        const growth = page.locator("#alert-analytics-growth-table tr").filter({has: page.getByRole("button", {name: "Disk <prod>", exact: true})});
+        let selected = await selectedAfter(() => growth.getByRole("button", {name: "Disk <prod>", exact: true}).click());
+        assert.deepEqual(selected.items.map(row => row.id), [fixture.currentId]);
+        assert.equal(selected.items[0].occurrences, 5);
+        await page.locator("#alert-analytics-selection-table button").click();
+        await page.waitForURL("**/alerts/" + fixture.currentId + "*");
+        await page.goBack();
+        await page.locator("#alerts-tab-analytics").click();
+        await page.locator("#alert-analytics-selection-close").click();
+        selected = await selectedAfter(() => growth.locator("td").nth(1).getByRole("button").click());
+        assert.deepEqual(selected.items.map(row => row.id), [fixture.previousId]);
+        await page.locator("#alert-analytics-selection-close").click();
+        const cell = payload.heatmap.cells.find(cell => cell.count > 25);
+        assert.ok(cell);
+        selected = await selectedAfter(() => page.locator("#alert-analytics-heatmap button").nth(cell.weekday * 24 + cell.hour).click());
+        assert.equal(selected.pagination.total_items, cell.count);
+        assert.equal(selected.items.length, 25);
+        const firstPageIds = selected.items.map(row => row.id);
+        selected = await selectedAfter(() => page.locator("#alert-analytics-selection-next").click());
+        assert.equal(selected.pagination.page, 2);
+        assert.ok(selected.items.every(row => !firstPageIds.includes(row.id)));
+        await page.locator("#alert-analytics-selection-close").click();
+        selected = await selectedAfter(() => page.locator("#alert-analytics-comparison-table tr").first().locator("td").nth(1).getByRole("button").click());
+        assert.deepEqual(selected.items.map(row => row.id), [fixture.previousId]);
+        await page.locator("#alert-analytics-days").selectOption("30");
+        await page.waitForFunction(() => !document.querySelector("#refresh-alert-analytics").disabled);
+        assert.equal(await page.locator("#alert-analytics-selection").isVisible(), false);
+        let releaseSelection;
+        const gate = new Promise(resolve => { releaseSelection = resolve; });
+        await page.route("**/analytics/selection?*", async route => { await gate; await route.continue(); });
+        const lateResponse = page.waitForResponse(r => r.url().includes("/analytics/selection?"));
+        await growth.getByRole("button", {name: "Disk <prod>", exact: true}).click();
+        await page.locator("#alert-analytics-selection-close").click();
+        releaseSelection();
+        await lateResponse;
+        await page.unroute("**/analytics/selection?*");
+        assert.equal(await page.locator("#alert-analytics-selection").isVisible(), false);
+        await page.setViewportSize({width: 390, height: 844});
+        await page.locator("#alert-analytics-heatmap").scrollIntoViewIfNeeded();
+        await page.screenshot({path: path.join(fixture.screenshots, "mobile.png")});
+        assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 2), "page must not overflow horizontally");
+        assert.deepEqual(errors, []);
+    } finally { await browser.close(); }
+})().catch(error => { console.error(error); process.exitCode = 1; });
