@@ -1,6 +1,7 @@
 let currentUser = null;
 
 const routes = {
+    "/admin/directory-sync": {page: "directory-sync", title: "Directory synchronization", subtitle: "", load: function () { loadDirectorySync(); }},
     "/changes": {page: "changes", title: "Changes", subtitle: "", load: function () { loadChanges(); }},
     "/admin/system-settings": {page: "system-settings", title: "System settings", subtitle: "", load: function () { loadSystemSettings(); }},
     "/admin/change-integrations": {page: "change-integrations", title: "Change integrations", subtitle: "", load: function () { loadChangeIntegrations(); }},

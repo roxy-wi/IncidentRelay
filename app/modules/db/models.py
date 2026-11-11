@@ -321,6 +321,96 @@ class RotationOverride(BaseModel):
     created_at = DateTimeField(default=utc_now)
 
 
+class DirectorySyncSource(BaseModel):
+    """Group-owned API configuration and fenced synchronization state."""
+
+    id = AutoField()
+    group = ForeignKeyField(Group, backref="directory_sources", on_delete="CASCADE")
+    name = CharField()
+    config = JSONTextField(default=dict)
+    headers_encrypted = TextField(null=True)
+    revision = IntegerField(default=1)
+    approved_revision = IntegerField(null=True)
+    enabled = BooleanField(default=False)
+    lease = CharField(null=True)
+    lease_until = DateTimeField(null=True)
+    current_lease = CharField(null=True)
+    current_lease_until = DateTimeField(null=True)
+    next_run_at = DateTimeField(default=utc_now)
+    next_current_at = DateTimeField(default=utc_now)
+    last_success_at = DateTimeField(null=True)
+    last_current_at = DateTimeField(null=True)
+    last_error = TextField(null=True)
+    current_error = TextField(null=True)
+    last_result = JSONTextField(default=dict)
+    preview_encrypted = TextField(null=True)
+    preview_token = CharField(null=True)
+    preview_until = DateTimeField(null=True)
+    preview_result = JSONTextField(null=True)
+    pending_mode = CharField(null=True)
+    pending_preview_token = CharField(null=True)
+    created_by = ForeignKeyField(User, null=True, on_delete="SET NULL")
+    created_at = DateTimeField(default=utc_now)
+
+    class Meta:
+        table_name = "directory_sync_source"
+
+
+class DirectorySyncBinding(BaseModel):
+    """Stable external identities; only owned bindings may change local objects."""
+
+    id = AutoField()
+    source = ForeignKeyField(DirectorySyncSource, backref="bindings", on_delete="CASCADE")
+    kind = CharField()
+    external_id = CharField(max_length=255)
+    local_id = IntegerField(index=True)
+    owned = BooleanField(default=True)
+    created = BooleanField(default=False)
+    present = BooleanField(default=True)
+
+    class Meta:
+        table_name = "directory_sync_binding"
+        indexes = ((("source", "kind", "external_id"), True),)
+
+
+class DirectorySyncShift(BaseModel):
+    """Concrete imported intervals; recurrence is never recalculated locally."""
+
+    id = AutoField()
+    source = ForeignKeyField(DirectorySyncSource, backref="shifts", on_delete="CASCADE")
+    rotation = ForeignKeyField(Rotation, backref="imported_shifts", on_delete="CASCADE")
+    external_id = CharField(max_length=255)
+    user = ForeignKeyField(User, null=True, on_delete="SET NULL")
+    starts_at = DateTimeField(index=True)
+    ends_at = DateTimeField(index=True)
+    unavailable = BooleanField(default=False)
+    local_override = BooleanField(default=False)
+    local_from = DateTimeField(null=True)
+    local_until = DateTimeField(null=True)
+    deleted = BooleanField(default=False)
+    replacements = JSONTextField(default=list)
+    title = CharField(default="")
+
+    class Meta:
+        table_name = "directory_sync_shift"
+        indexes = ((("source", "external_id"), True),)
+
+
+class DirectorySyncCurrent(BaseModel):
+    """Bounded current-duty cache, independent from the calendar refresh interval."""
+
+    id = AutoField()
+    source = ForeignKeyField(DirectorySyncSource, backref="current_duties", on_delete="CASCADE")
+    rotation = ForeignKeyField(Rotation, unique=True, on_delete="CASCADE")
+    user = ForeignKeyField(User, null=True, on_delete="SET NULL")
+    status = CharField()
+    observed_at = DateTimeField()
+    valid_until = DateTimeField()
+
+    class Meta:
+        table_name = "directory_sync_current"
+
+
 class NotificationChannel(SoftDeleteModel):
     """Notification target."""
 

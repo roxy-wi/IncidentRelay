@@ -21,7 +21,7 @@ services:
       - "8080:8080"
     volumes: *incidentrelay_common_volumes
     healthcheck:
-      test: ["CMD-SHELL", "curl -fsS http://127.0.0.1:8080/api/health || curl -fsS http://127.0.0.1:8080/login >/dev/null"]
+      test: ["CMD", "curl", "--fail", "--silent", "--show-error", "--max-time", "4", "http://127.0.0.1:8080/readyz"]
       interval: 30s
       timeout: 5s
       retries: 5

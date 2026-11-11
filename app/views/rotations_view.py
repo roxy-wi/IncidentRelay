@@ -40,6 +40,73 @@ from app.modules.common import (
 rotations_bp = Blueprint("rotations_api", __name__)
 
 
+@rotations_bp.route("/<int:rotation_id>/imported-shifts", methods=["GET", "POST"])
+def imported_rotation_shifts(rotation_id):
+    """Read or edit concrete imported intervals using the rotation's access boundary."""
+    from app.modules.db.models import DirectorySyncBinding, DirectorySyncShift, User
+    from app.modules.db.transactions import write_transaction
+    from app.services.directory_sync.config import SyncError
+    from app.services.directory_sync.runtime import source_for
+    from app.services.directory_sync.shift_editor import ShiftInput, edit_shift, serialize_shift
+    rotation, error = (_require_rotation_read(rotation_id) if request.method == "GET"
+                       else _require_rotation_write(rotation_id))
+    if error:
+        return error
+    source = source_for("rotation", rotation_id)
+    if not source:
+        return _not_found("Imported schedule")
+    if request.method == "GET":
+        after = max(0, request.args.get("after", 0, type=int))
+        rows = list(DirectorySyncShift.select().where(DirectorySyncShift.rotation == rotation_id,
+                                                      DirectorySyncShift.deleted == False,
+                                                      DirectorySyncShift.id > after).order_by(DirectorySyncShift.id).limit(101))
+        ids = DirectorySyncBinding.select(DirectorySyncBinding.local_id).where(
+            DirectorySyncBinding.source == source.id, DirectorySyncBinding.kind == "user")
+        return jsonify(items=[serialize_shift(row) for row in rows[:100]],
+                       next_cursor=rows[99].id if len(rows) > 100 else None,
+                       users=[{"id": user.id, "name": user.display_name or user.username} for user in User.select().where(User.id.in_(ids), User.deleted == False)])
+    payload, error = validate_body(ShiftInput)
+    if error:
+        return error
+    try:
+        with write_transaction():
+            shift = edit_shift(rotation, payload)
+            write_audit("rotation.imported_shift.create", object_type="rotation", object_id=rotation.id, team_id=rotation.team_id)
+        return jsonify(serialize_shift(shift)), 201
+    except SyncError as error:
+        return make_error_response("sync_conflict", str(error), 409)
+
+
+@rotations_bp.route("/imported-shifts/<int:shift_id>", methods=["PUT", "DELETE"])
+def edit_imported_rotation_shift(shift_id):
+    """Apply a local edit or tombstone within the existing rotation boundary."""
+    from app.modules.db.models import DirectorySyncShift
+    from app.modules.db.transactions import write_transaction
+    from app.services.directory_sync.config import SyncError
+    from app.services.directory_sync.shift_editor import ShiftInput, edit_shift, serialize_shift
+    shift = DirectorySyncShift.get_or_none(DirectorySyncShift.id == shift_id)
+    if shift is None:
+        return _not_found("Imported shift")
+    rotation, error = _require_rotation_write(shift.rotation_id)
+    if error:
+        return error
+    if request.method == "DELETE":
+        with write_transaction():
+            DirectorySyncShift.update(deleted=True, local_override=True).where(DirectorySyncShift.id == shift.id).execute()
+            write_audit("rotation.imported_shift.delete", object_type="rotation", object_id=rotation.id, team_id=rotation.team_id)
+        return jsonify(deleted=True)
+    payload, error = validate_body(ShiftInput)
+    if error:
+        return error
+    try:
+        with write_transaction():
+            shift = edit_shift(rotation, payload, shift)
+            write_audit("rotation.imported_shift.update", object_type="rotation", object_id=rotation.id, team_id=rotation.team_id)
+        return jsonify(serialize_shift(shift))
+    except SyncError as error:
+        return make_error_response("sync_conflict", str(error), 409)
+
+
 def _not_found(resource):
     return make_error_response(
         error="not_found",

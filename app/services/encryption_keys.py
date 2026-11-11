@@ -14,6 +14,7 @@ from app.modules.crypto import decrypt_secret
 from app.modules.db.models import (
     AutomationExecution,
     EncryptionKeyVerification,
+    DirectorySyncSource,
     OrchestrationWebhookAction,
     SsoProvider,
 )
@@ -67,6 +68,8 @@ def _verify_existing_secrets(key, sso_key):
     No ciphertext or decrypted value is included in failures.
     """
     fields = (
+        (DirectorySyncSource.headers_encrypted, key),
+        (DirectorySyncSource.preview_encrypted, key),
         (OrchestrationWebhookAction.headers_encrypted, key),
         (AutomationExecution.request_headers_encrypted, key),
         (AutomationExecution.request_body_encrypted, key),

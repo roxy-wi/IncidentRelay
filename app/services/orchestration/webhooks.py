@@ -462,6 +462,7 @@ def _request_once(
     body: bytes,
     timeout_seconds: int,
     private_network_policy: str,
+    max_response_bytes: int | None = None,
 ) -> Tuple[int, Mapping[str, str], bytes]:
     parsed, target_ip, port = resolve_webhook_target(
         url,
@@ -503,7 +504,7 @@ def _request_once(
             retries=False,
             preload_content=False,
         )
-        limit = int(getattr(Config, "ORCHESTRATION_WEBHOOK_MAX_RESPONSE_BYTES", 65536))
+        limit = int(max_response_bytes or getattr(Config, "ORCHESTRATION_WEBHOOK_MAX_RESPONSE_BYTES", 65536))
         payload = response.read(amt=limit + 1, decode_content=True)
         if len(payload) > limit:
             raise WebhookDeliveryError(

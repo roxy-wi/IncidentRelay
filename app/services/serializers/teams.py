@@ -35,6 +35,9 @@ def serialize_team(team, current_user=None):
         "active": team.active,
     }
 
+    from app.services.directory_sync.runtime import import_metadata
+    data["sync"] = import_metadata("team", team.id)
+
     return attach_team_permissions(data, team.id, current_user)
 
 

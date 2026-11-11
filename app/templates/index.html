@@ -292,6 +292,9 @@
             <a href="/admin/change-integrations" data-page="change-integrations" class="menu-link menu-link-change-integrations is-hidden" title="{{ _('ci.title') }}">
               <svg class="menu-icon"><use href="#icon-routes"></use></svg><span class="menu-text">{{ _('ci.title') }}</span>
             </a>
+            <a href="/admin/directory-sync" data-page="directory-sync" class="menu-link menu-link-directory-sync is-hidden" title="{{ _('ds.title') }}">
+              <svg class="menu-icon"><use href="#icon-teams"></use></svg><span class="menu-text">{{ _('ds.title') }}</span>
+            </a>
             <a href="/admin/sso" data-page="sso" class="menu-link menu-link-global-admin is-hidden" title="{{ _('nav.sso') }}">
                             <svg class="menu-icon"><use href="#icon-sso"></use></svg>
                             <span class="menu-text">{{ _('nav.sso') }}</span>
@@ -381,6 +384,7 @@
             <div id="view-sso" class="view">{% include "pages/sso.html" %}</div>
             <div id="view-system-settings" class="view">{% include "pages/system_settings.html" %}</div>
             <div id="view-change-integrations" class="view">{% include "pages/change_integrations.html" %}</div>
+            <div id="view-directory-sync" class="view">{% include "pages/directory_sync.html" %}</div>
             <div id="view-groups" class="view">{% include "pages/groups.html" %}</div>
             <div id="view-profile" class="view">{% include "pages/profile.html" %}</div>
         </section>
@@ -495,6 +499,8 @@
 <script src="/static/js/pages/sso.js"></script>
 <script src="/static/js/pages/system_settings.js?v=7c93f59c849d"></script>
 <script src="/static/js/pages/change_integrations.js?v=8c42f9f7fefe"></script>
+<script src="/static/js/pages/directory_sync.js"></script>
+<script src="/static/js/pages/imported_shifts.js"></script>
 <script src="/static/js/pages/services_standards.js"></script>
 <script src="{{ url_for('static', filename='js/core/list_url_state_registry.js') }}"></script>
 </body>

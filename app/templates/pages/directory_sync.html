@@ -1,0 +1,62 @@
+<section class="card table-card">
+  <div class="card-header">
+    <div><h2>{{ _('ds.title') }}</h2><div class="card-subtitle">{{ _('ds.intro') }}</div></div>
+    <div class="card-header-actions"><button id="ds-new" class="btn btn-primary" type="button">{{ _('ds.new') }}</button><button id="ds-reload" class="btn btn-reload" type="button">{{ _('common.reload') }}</button></div>
+  </div>
+  <div class="table-wrapper"><table class="data-table"><thead><tr><th>{{ _('ds.name') }}</th><th>{{ _('ds.group') }}</th><th>{{ _('ds.status') }}</th><th>{{ _('ds.last_success') }}</th><th>{{ _('ds.actions') }}</th></tr></thead><tbody id="ds-list"></tbody></table></div>
+</section>
+<div id="ds-editor" class="app-modal is-hidden" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="ds-editor-title">
+  <div class="app-modal-dialog app-modal-dialog-wide">
+    <div class="app-modal-header">
+      <h2 id="ds-editor-title">{{ _('ds.configure') }}</h2>
+      <button id="ds-close" type="button" class="app-modal-close" aria-label="{{ _('ds.close') }}"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
+    </div>
+    <div class="app-modal-body">
+      <p id="ds-status" role="status" aria-live="polite"></p>
+      <form id="ds-form" class="form-stack">
+        <fieldset class="form-stack"><legend>{{ _('ds.connection') }}</legend>
+          <div class="form-grid-2">
+            <div class="form-group"><label for="ds-name">{{ _('ds.name') }}</label><input id="ds-name" class="input" required maxlength="255"></div>
+            <div class="form-group"><label for="ds-group">{{ _('ds.group') }}</label><select id="ds-group" class="input" required></select></div>
+            <div class="form-group"><label for="ds-url">{{ _('ds.url') }}</label><input id="ds-url" class="input" type="url" required></div>
+            <div class="form-group"><label for="ds-network">{{ _('ds.network') }}</label><select id="ds-network" class="input"><option value="deny">{{ _('ds.public') }}</option><option value="allowlist">{{ _('ds.allowlist') }}</option></select></div>
+          </div>
+          <div class="form-group"><label for="ds-headers">{{ _('ds.headers') }}</label><input id="ds-headers" type="text" class="input code-textarea" spellcheck="false" autocomplete="off" aria-describedby="ds-headers-hint" placeholder='{"Authorization": "PAT …"}'><small id="ds-headers-hint" class="muted">{{ _('ds.headers_hint') }}</small></div>
+          <div class="form-group"><label for="ds-operations">{{ _('ds.operations') }}</label><textarea id="ds-operations" class="code-textarea" rows="12" spellcheck="false" required></textarea><small class="muted">{{ _('ds.operations_hint') }}</small></div>
+        </fieldset>
+        <fieldset class="form-stack"><legend>{{ _('ds.mapping') }}</legend>
+          <p class="muted">{{ _('ds.mapping_hint') }}</p>
+          <div class="form-actions-inline">
+            <button id="ds-sample" class="btn btn-info" type="button"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i> {{ _('ds.sample') }}</button>
+          </div>
+          <pre id="ds-sample-output" class="table-wrapper" hidden></pre>
+          <div class="form-group"><label for="ds-mapping">{{ _('ds.fields') }}</label><textarea id="ds-mapping" class="code-textarea" rows="14" spellcheck="false" required></textarea></div>
+          <div id="ds-team-matches" class="form-grid-2"></div>
+        </fieldset>
+        <fieldset class="form-stack"><legend>{{ _('ds.behavior') }}</legend>
+          <div class="form-grid-2">
+            <div class="form-group"><label for="ds-interval">{{ _('ds.interval') }}</label><input id="ds-interval" type="number" min="60" max="604800" class="input" required></div>
+            <div class="form-group"><label for="ds-current-interval">{{ _('ds.current_interval') }}</label><input id="ds-current-interval" type="number" min="10" max="3600" class="input" required></div>
+            <div class="form-group"><label for="ds-horizon">{{ _('ds.horizon') }}</label><input id="ds-horizon" type="number" min="1" max="11" class="input" required></div>
+            <div class="form-group"><label for="ds-authority">{{ _('ds.authority') }}</label><select id="ds-authority" class="input"><option value="sync">{{ _('ds.api_authority') }}</option><option value="oidc">OIDC</option></select></div>
+          </div>
+          <div class="form-actions-inline">
+            <label class="checkbox-label"><input id="ds-editable" type="checkbox"><span>{{ _('ds.editable') }}</span></label>
+            <label class="checkbox-label"><input id="ds-overwrite" type="checkbox"><span>{{ _('ds.overwrite') }}</span></label>
+            <label class="checkbox-label"><input id="ds-delete" type="checkbox"><span>{{ _('ds.delete') }}</span></label>
+            <label id="ds-enabled-label" class="checkbox-label"><input id="ds-enabled" type="checkbox" aria-describedby="ds-enabled-hint"><span>{{ _('ds.enabled') }}</span></label>
+          </div>
+          <small id="ds-enabled-hint" class="muted" aria-live="polite" hidden></small>
+          <p class="muted">{{ _('ds.behavior_hint') }}</p>
+        </fieldset>
+        <div class="form-actions-inline"><button id="ds-preview" type="button" class="btn">{{ _('ds.preview') }}</button><button id="ds-apply" type="button" class="btn btn-success" disabled>{{ _('ds.apply') }}</button><button id="ds-run" type="button" class="btn btn-success">{{ _('ds.run') }}</button></div>
+      </form>
+      <p class="muted">{{ _('ds.worker_hint') }}</p>
+      <div class="table-wrapper"><table class="data-table"><thead><tr><th>{{ _('ds.entity') }}</th><th>{{ _('ds.external_id') }}</th><th>{{ _('ds.action') }}</th><th>{{ _('ds.changes') }}</th></tr></thead><tbody id="ds-preview-table"></tbody></table></div>
+    </div>
+    <div class="app-modal-footer">
+      <button id="ds-save" class="btn btn-primary" type="submit" form="ds-form">{{ _('ds.save') }}</button>
+      <button id="ds-close-footer" class="btn" type="button">{{ _('ds.close') }}</button>
+    </div>
+  </div>
+</div>

@@ -11,6 +11,7 @@ Administration topics:
 - [Data Retention](data-retention.md)
 - [Logging](logging.md)
 - [SSO](sso.md)
+- [Directory synchronization](directory-sync.md)
 - [Demo Data](demo-data.md)
 - [Schema Check](schema-check.md)
 - [Troubleshooting](troubleshooting.md)

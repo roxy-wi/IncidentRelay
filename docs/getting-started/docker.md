@@ -93,6 +93,16 @@ of the SQLite database before changing volume permissions.
 
 ## Quick start with SQLite
 
+Compose checks the web service through `/readyz`. It becomes healthy only when
+the database is reachable and all migrations are applied; background services
+wait for that state before starting. The check runs every 30 seconds, with a
+4-second HTTP timeout. It does not fall back to the login page.
+
+The image builds Python dependencies in a separate stage and copies the virtual
+environment to `/opt/venv` in the runtime image. Compilers and PostgreSQL development
+headers are not included in the final image. Gunicorn and the PostgreSQL driver
+are installed from `requirements.txt`; the driver's binary wheel bundles `libpq`.
+
 ```bash
 docker compose up -d
 ```

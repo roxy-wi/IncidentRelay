@@ -102,6 +102,7 @@
             "audit-log": "nav.audit_log",
             "sso": "nav.sso",
             "change-integrations": "ci.title",
+            "directory-sync": "ds.title",
             "system-settings": "pages.system-settings.title",
             "changes": "changes.title",
         };

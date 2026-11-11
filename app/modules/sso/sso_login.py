@@ -2,7 +2,7 @@ import json
 import re
 
 from flask import make_response, redirect
-from peewee import IntegrityError
+from peewee import IntegrityError, fn
 
 from app.db import database_proxy as db
 from app.login import create_access_token, normalize_auth_redirect_target
@@ -197,7 +197,7 @@ def _find_user_by_email(email):
         User
         .select()
         .where(
-            (User.email == email)
+            (fn.LOWER(fn.TRIM(User.email)) == email.strip().lower())
             & (User.deleted == False)
         )
         .limit(2)
@@ -421,6 +421,10 @@ def _sync_team_membership_from_mapping(user, mapping):
     if not team_id:
         return
 
+    from app.services.directory_sync.runtime import sync_managed_team_member
+    if sync_managed_team_member(user.id, team_id):
+        return
+
     team = teams_repo.get_team(team_id)
     if not team.active:
         return
@@ -490,9 +494,13 @@ def _sync_group_memberships(user, provider, claims):
 
     provider_group_ids = []
     matched_group_ids = []
+    from app.services.directory_sync.runtime import sync_managed_groups
+    api_managed_groups = sync_managed_groups(user.id)
 
     for mapping in mappings:
         group_id = mapping.incidentrelay_group_id
+        if group_id in api_managed_groups:
+            continue
         provider_group_ids.append(group_id)
 
         if normalize_sso_group_name(mapping.external_group) not in external_groups:

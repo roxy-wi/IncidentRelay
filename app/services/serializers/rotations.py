@@ -65,6 +65,8 @@ def serialize_rotation(rotation, current_user=None, request_user=None):
         "current_oncall_user": serialize_user_identity(current_user),
     }
 
+    from app.services.directory_sync.runtime import import_metadata
+    data["sync"] = import_metadata("rotation", rotation.id)
     return attach_team_permissions(data, rotation.team.id, request_user)
 
 

@@ -1,4 +1,5 @@
 Flask==3.0.3
+gunicorn==27.0.0
 peewee==3.17.6
 PyMySQL==1.1.1
 psycopg2-binary==2.9.12

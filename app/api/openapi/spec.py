@@ -6,6 +6,7 @@ from app.api.openapi.endpoints import (
     calendar,
     channels,
     change_integrations,
+    directory_sync,
     change_events,
     change_reviews,
     changes,
@@ -37,6 +38,7 @@ from app.version import get_service_version
 
 
 ENDPOINT_MODULES = [
+    directory_sync,
     change_reviews,
     changes,
     change_events,

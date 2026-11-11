@@ -120,9 +120,24 @@ function selectRotationLayers(rotationId) {
     expandedLayerId = null;
 
     $("#rotation-layers-title").text(
-        i18n.t("rotations.layers.title_named", {name: selectedRotationNameForLayers})
+        rotation.sync ? i18n.t("ds.imported_schedule") + " — " + selectedRotationNameForLayers
+            : i18n.t("rotations.layers.title_named", {name: selectedRotationNameForLayers})
     );
+    $("#rotation-layers-modal .app-modal-header .card-subtitle").text(i18n.t(
+        rotation.sync ? "ds.local_shift_hint" : "rotations.layers.subtitle"
+    ));
+    $("#rotation-layers-modal .card-header h2").text(i18n.t(
+        rotation.sync ? "ds.imported_schedule" : "rotations.layers.schedule_layers"
+    ));
+    $("#rotation-layers-modal .card-header .card-subtitle, #rotation-layers-modal .details-empty").toggle(!rotation.sync);
     openAppModal("#rotation-layers-modal");
+
+    if (rotation.sync) {
+        $("#add-layer-card").hide();
+        loadImportedRotationShifts(rotation);
+        return;
+    }
+    $("#add-layer-card").show().prop("disabled", false).text(i18n.t("rotations.layers.add"));
 
     loadEligibleUsersForLayerCards(rotation.id, function () {
         loadRotationLayerCards(rotation.id);
@@ -2029,9 +2044,9 @@ function renderRotationRow(rotation) {
                             }
                         },
                         {
-                            label: i18n.t("rotations.actions.layers"),
+                            label: i18n.t(rotation.sync ? "ds.imported_schedule" : "rotations.actions.layers"),
                             icon: "fas fa-layer-group",
-                            required: "write",
+                            required: rotation.sync ? "read" : "write",
                             denyMessage: i18n.t("rotations.permissions.layers"),
                             onClick: function () {
                                 selectRotationLayers(rotation.id);
@@ -2093,6 +2108,7 @@ function closeRotationOverridesModal() {
 }
 
 function getRotationCadence(rotation) {
+    if (rotation.sync) return i18n.t("ds.imported_schedule");
     if (rotation.rotation_type === "custom") {
         return i18n.t("rotations.cadence.every", {
             value: rotation.custom_days || rotation.interval_value || 1,
@@ -2133,6 +2149,12 @@ function renderRotationDetails(rotation) {
     const body = $("#rotation-details-body");
     body.empty();
 
+    if (rotation.sync) {
+        body.append($("<p>").addClass("muted").text(rotation.sync.source_name + " · " +
+            (rotation.sync.editable ? i18n.t("ds.editable") : i18n.t("ds.readonly")) +
+            (rotation.sync.current_status ? " · " + rotation.sync.current_status : "")));
+    }
+
     body.append(
         $("<div>")
             .addClass("details-list")
@@ -2160,9 +2182,9 @@ function renderRotationDetails(rotation) {
     });
 
     appendIconActionIfAllowed(actions, rotation, {
-        required: "write",
+        required: rotation.sync ? "read" : "write",
         icon: "fas fa-layer-group",
-        label: i18n.t("rotations.layers.title"),
+        label: i18n.t(rotation.sync ? "ds.imported_schedule" : "rotations.layers.title"),
         onClick: function () {
             closeAppModal("#rotation-details-modal");
             selectRotationLayers(rotation.id);
@@ -2304,7 +2326,11 @@ function initLayerTimezoneSelects() {
         }
     });
 }
-$(document).on("click", "#add-layer-card", addLayerCard);
+$(document).on("click", "#add-layer-card", function () {
+    const rotation = findSelectedLayerRotation();
+    if (rotation?.sync) addImportedRotationShift(rotation);
+    else addLayerCard();
+});
 $(document).on(
     "click",
     "#close-rotation-layers-modal, #close-rotation-layers-modal-footer",

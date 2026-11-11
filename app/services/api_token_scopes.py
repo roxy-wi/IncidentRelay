@@ -27,6 +27,7 @@ PUBLIC_API_PREFIXES = (
 READ_WRITE_SCOPE_DOMAINS = (
     "changes",
     "change-integrations",
+    "directory-sync",
     "system-settings",
     "alerts",
     "incidents",
@@ -97,6 +98,7 @@ API_SCOPE_RULES = (
     # Reuse profile:read rather than adding a one-off docs scope.
     ("/api/openapi.json", "profile"),
     ("/api/admin/change-integrations", "change-integrations"),
+    ("/api/admin/directory-sync", "directory-sync"),
     ("/api/admin/system-settings", "system-settings"),
     ("/api/admin/audit-logs", "audit"),
     ("/api/admin/sso", "sso"),
