@@ -52,28 +52,6 @@
         </div>
     </div>
 
-    <section id="alert-analytics-selection" class="alerts-analytics-chart-card is-hidden" aria-labelledby="alert-analytics-selection-title">
-        <div class="alerts-analytics-header">
-            <div>
-                <h4 id="alert-analytics-selection-title" tabindex="-1"></h4>
-                <p id="alert-analytics-selection-description" class="card-subtitle"></p>
-                <p id="alert-analytics-selection-status" role="status"></p>
-            </div>
-            <button id="alert-analytics-selection-close" type="button" class="btn btn-small">{{ _('common.close') }}</button>
-        </div>
-        <div class="table-wrapper">
-            <table class="data-table">
-                <thead><tr><th>{{ _('alerts.analytics.table.alert') }}</th><th>{{ _('alerts.analytics.table.service') }}</th><th>{{ _('alerts.analytics.table.status') }}</th><th>{{ _('alerts.analytics.selection.created') }}</th><th>{{ _('alerts.analytics.noisy.occurrences') }}</th></tr></thead>
-                <tbody id="alert-analytics-selection-table"></tbody>
-            </table>
-        </div>
-        <div class="form-actions-inline">
-            <button id="alert-analytics-selection-prev" type="button" class="btn btn-small">{{ _('alerts.analytics.selection.prev') }}</button>
-            <span id="alert-analytics-selection-page"></span>
-            <button id="alert-analytics-selection-next" type="button" class="btn btn-small">{{ _('alerts.analytics.selection.next') }}</button>
-        </div>
-    </section>
-
     <section class="alerts-analytics-chart-card alert-analytics-interactive">
         <div class="alerts-analytics-section-header">
             <h4>{{ _('alerts.analytics.comparison.title') }}</h4>
@@ -101,6 +79,28 @@
         </div>
         <div class="table-wrapper"><table id="alert-analytics-heatmap" class="alerts-analytics-heatmap" aria-label="{{ _('alerts.analytics.heatmap.title') }}"></table></div>
         <p class="card-subtitle">{{ _('alerts.analytics.heatmap.legend') }}</p>
+    </section>
+
+    <section id="alert-analytics-selection" class="alerts-analytics-chart-card is-hidden" aria-labelledby="alert-analytics-selection-title">
+        <div class="alerts-analytics-header">
+            <div>
+                <h4 id="alert-analytics-selection-title" tabindex="-1"></h4>
+                <p id="alert-analytics-selection-description" class="card-subtitle"></p>
+                <p id="alert-analytics-selection-status" role="status"></p>
+            </div>
+            <button id="alert-analytics-selection-close" type="button" class="btn btn-small">{{ _('common.close') }}</button>
+        </div>
+        <div class="table-wrapper">
+            <table class="data-table">
+                <thead><tr><th>{{ _('alerts.analytics.table.alert') }}</th><th>{{ _('alerts.analytics.table.service') }}</th><th>{{ _('alerts.analytics.table.status') }}</th><th>{{ _('alerts.analytics.selection.created') }}</th><th>{{ _('alerts.analytics.noisy.occurrences') }}</th></tr></thead>
+                <tbody id="alert-analytics-selection-table"></tbody>
+            </table>
+        </div>
+        <div class="form-actions-inline">
+            <button id="alert-analytics-selection-prev" type="button" class="btn btn-small">{{ _('alerts.analytics.selection.prev') }}</button>
+            <span id="alert-analytics-selection-page"></span>
+            <button id="alert-analytics-selection-next" type="button" class="btn btn-small">{{ _('alerts.analytics.selection.next') }}</button>
+        </div>
     </section>
 
     <section class="alerts-analytics-chart-card alert-analytics-interactive">

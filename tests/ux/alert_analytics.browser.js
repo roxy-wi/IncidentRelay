@@ -20,6 +20,15 @@ const fixture = JSON.parse(process.env.ALERT_ANALYTICS_FIXTURE);
         const result = await response;
         assert.equal(result.status(), 200, await result.text());
         await page.waitForFunction(() => document.querySelector("#alert-analytics-selection-status").textContent === "");
+        const selection = page.locator("#alert-analytics-selection");
+        assert.equal(await selection.count(), 1, "reuse one selection panel for every drill-down");
+        assert.equal(await selection.isVisible(), true);
+        assert.equal(await page.getByRole("heading", {name: "Matching alert groups", exact: true}).count(), 1);
+        assert.ok(await selection.evaluate(panel => {
+            const heatmap = document.querySelector("#alert-analytics-heatmap").closest("section");
+            return heatmap.nextElementSibling === panel
+                && panel.getBoundingClientRect().top >= heatmap.getBoundingClientRect().bottom;
+        }), "matching groups must appear directly below the heatmap");
         return result.json();
     }
     try {
@@ -54,6 +63,8 @@ const fixture = JSON.parse(process.env.ALERT_ANALYTICS_FIXTURE);
         selected = await selectedAfter(() => page.locator("#alert-analytics-heatmap button").nth(cell.weekday * 24 + cell.hour).click());
         assert.equal(selected.pagination.total_items, cell.count);
         assert.equal(selected.items.length, 25);
+        await page.locator("#alert-analytics-heatmap").scrollIntoViewIfNeeded();
+        await page.screenshot({path: path.join(fixture.screenshots, "heatmap-selection.png")});
         const firstPageIds = selected.items.map(row => row.id);
         selected = await selectedAfter(() => page.locator("#alert-analytics-selection-next").click());
         assert.equal(selected.pagination.page, 2);
@@ -75,6 +86,8 @@ const fixture = JSON.parse(process.env.ALERT_ANALYTICS_FIXTURE);
         await page.unroute("**/analytics/selection?*");
         assert.equal(await page.locator("#alert-analytics-selection").isVisible(), false);
         await page.setViewportSize({width: 390, height: 844});
+        await selectedAfter(() => growth.getByRole("button", {name: "Disk <prod>", exact: true}).click());
+        await selectedAfter(() => page.locator("#alert-analytics-heatmap button:enabled").first().click());
         await page.locator("#alert-analytics-heatmap").scrollIntoViewIfNeeded();
         await page.screenshot({path: path.join(fixture.screenshots, "mobile.png")});
         assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 2), "page must not overflow horizontally");

@@ -2,6 +2,8 @@ from pathlib import Path
 import json
 import re
 
+import pytest
+
 from app.i18n import SUPPORTED_LOCALES
 
 
@@ -23,6 +25,25 @@ def test_alert_catalogs_have_matching_keys():
 
     for locale in SUPPORTED_LOCALES:
         assert english_keys == set(load_catalog(locale)), locale
+
+
+@pytest.mark.parametrize("locale", SUPPORTED_LOCALES)
+def test_analytics_catalogs_have_matching_keys_and_placeholders(locale):
+    """Require complete analytics translations without relying on English fallback."""
+    catalog_root = ROOT / "app" / "static" / "i18n"
+    english = json.loads(
+        (catalog_root / "en" / "alert_analytics.json").read_text(encoding="utf-8")
+    )
+    translated = json.loads(
+        (catalog_root / locale / "alert_analytics.json").read_text(encoding="utf-8")
+    )
+
+    assert translated.keys() == english.keys()
+    for key, value in english.items():
+        assert isinstance(translated[key], str) and translated[key].strip(), key
+        assert sorted(re.findall(r"\{[A-Za-z0-9_]+\}", translated[key])) == sorted(
+            re.findall(r"\{[A-Za-z0-9_]+\}", value)
+        ), key
 
 
 def test_alert_templates_reference_existing_keys():
@@ -53,7 +74,8 @@ def test_alert_javascript_references_existing_keys():
         for path in paths
     )
 
-    keys = set(re.findall(r'i18n\.t\([""]([^""]+)[""]', content))
+    # Check complete literal keys, not prefixes of dynamically composed keys.
+    keys = set(re.findall(r"""i18n\.t\(\s*["']([^"']+)["']\s*(?=[,)])""", content))
     missing = sorted(
         key
         for key in keys
