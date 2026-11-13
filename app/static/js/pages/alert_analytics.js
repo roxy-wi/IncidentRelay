@@ -358,7 +358,7 @@ function openAlertAnalyticsInboxSearch(searchValue) {
         setTableFilterValues("#alerts-service-filter", []);
     }
 
-    $("#assigned-to-me-filter").prop("checked", false);
+    setSelectValue("#alerts-involvement-filter", "");
     $("#shelved-only-filter").prop("checked", false);
     $("#alerts-search").val(value);
 

@@ -77,5 +77,11 @@
   "overview.charts.distribution_subtitle": "Aufschlüsselung nach Schweregrad und Priorität",
   "overview.activity.system": "System",
   "overview.activity.none": "Keine kürzliche Aktivität",
-  "overview.activity.unavailable": "Aktivität ist vorübergehend nicht verfügbar"
+  "overview.activity.unavailable": "Aktivität ist vorübergehend nicht verfügbar",
+  "overview.filters.my_alerts": "Meine Alarme",
+  "overview.filters.all_alerts": "Alle Alarme",
+  "overview.filters.filters": "Filter",
+  "overview.filters.reset": "Zurücksetzen",
+  "overview.filters.empty": "Keine aktiven Alarme entsprechen diesen Filtern.",
+  "overview.filters.load_error": "Aktive Alarme konnten nicht geladen werden. Versuchen Sie es mit „Neu laden“ erneut."
 }

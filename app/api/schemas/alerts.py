@@ -105,6 +105,7 @@ class AlertListQuerySchema(ApiModel):
     service_criticality: str | None = Field(default=None, min_length=1, max_length=120)
     search: str | None = Field(default=None, max_length=300)
     assigned_to_me: bool = False
+    involvement: Literal["assigned", "responder", "stakeholder", "any"] | None = None
     shelved: bool = False
     page: int = Field(default=1, ge=1)
     page_size: int = Field(default=25, ge=1, le=100)

@@ -16,6 +16,9 @@ from app.modules.db.models import (
     AlertRoute,
     AlertComment,
     Group,
+    IncidentAlertGroupLink,
+    IncidentResponder,
+    IncidentStakeholder,
     Rotation,
     Service,
     Team,
@@ -112,6 +115,46 @@ def apply_alert_group_priority_filter(query, values):
     return query.where(reduce(or_, conditions))
 
 
+def alert_group_involvement_condition(involvement, user_id):
+    """Match personal involvement without duplicating groups linked to incidents.
+
+    Assignment belongs to the alert group. Responders and stakeholders belong
+    to Incidents; only links that have not been removed contribute membership.
+    Closed incidents remain searchable in the historical alert inbox.
+    """
+    assigned = AlertGroup.assignee == user_id
+    responder_incidents = IncidentResponder.select(IncidentResponder.incident).where(
+        (
+            (IncidentResponder.target_user == user_id)
+            | (IncidentResponder.accepted_by == user_id)
+        )
+        & IncidentResponder.status.in_(("requested", "accepted", "resolved"))
+    )
+    stakeholder_incidents = IncidentStakeholder.select(IncidentStakeholder.incident).where(
+        (IncidentStakeholder.user == user_id)
+        & (IncidentStakeholder.active == True)  # noqa: E712
+    )
+
+    def linked_groups(incidents):
+        return AlertGroup.id.in_(
+            IncidentAlertGroupLink.select(IncidentAlertGroupLink.alert_group).where(
+                IncidentAlertGroupLink.incident.in_(incidents),
+                IncidentAlertGroupLink.removed_at.is_null(True),
+            )
+        )
+
+    conditions = {
+        "assigned": assigned,
+        "responder": linked_groups(responder_incidents),
+        "stakeholder": linked_groups(stakeholder_incidents),
+    }
+    if involvement == "any":
+        return reduce(or_, conditions.values())
+    if involvement not in conditions:
+        raise ValueError(f"Unsupported involvement: {involvement}")
+    return conditions[involvement]
+
+
 def build_alert_groups_query(
     team_id=None,
     team_ids=None,
@@ -127,6 +170,8 @@ def build_alert_groups_query(
     assigned_to_user_id=None,
     shelved=False,
     include_merged=False,
+    involvement=None,
+    involvement_user_id=None,
 ):
     """Build the base alert groups query with filters."""
 
@@ -156,6 +201,11 @@ def build_alert_groups_query(
 
     if assigned_to_user_id:
         query = query.where(AlertGroup.assignee == assigned_to_user_id)
+
+    if involvement:
+        if not involvement_user_id:
+            return None
+        query = query.where(alert_group_involvement_condition(involvement, involvement_user_id))
 
     if shelved:
         now = utc_now()
@@ -390,6 +440,8 @@ def paginate_alert_groups(
     sort="activity",
     order="desc",
     include_merged=False,
+    involvement=None,
+    involvement_user_id=None,
 ):
     """Return alert groups with backend pagination, filtering and sorting."""
 
@@ -411,6 +463,8 @@ def paginate_alert_groups(
         service_criticality=service_criticality,
         search=search,
         assigned_to_user_id=assigned_to_user_id,
+        involvement=involvement,
+        involvement_user_id=involvement_user_id,
         shelved=shelved,
         include_merged=include_merged,
     )

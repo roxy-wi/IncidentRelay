@@ -1,5 +1,6 @@
 let dashboardHasLoaded = false;
 let dashboardLoadGeneration = 0;
+let dashboardActiveLoadGeneration = 0;
 let dashboardImpactHasLoaded = false;
 let dashboardImpactLoadGeneration = 0;
 let dashboardCharts = {};
@@ -55,14 +56,6 @@ function dashboardAsArray(value) {
 
 function dashboardDateValue(alert) {
     return alert.updated_at || alert.last_seen_at || alert.first_seen_at || alert.created_at || null;
-}
-
-function dashboardSortByActivity(alerts) {
-    return alerts.slice().sort(function (left, right) {
-        const leftDate = new Date(dashboardDateValue(left) || 0).getTime();
-        const rightDate = new Date(dashboardDateValue(right) || 0).getTime();
-        return rightDate - leftDate;
-    });
 }
 
 function dashboardGroupCount(alerts, fieldName, fallback) {
@@ -390,6 +383,10 @@ function renderDashboardActivityTrend(alerts) {
 }
 
 function loadDashboard() {
+    initTableMultiSelects("#dashboard-alert-filters");
+    const filters = AlertFilterState.resolve("dashboard");
+    setSelectValue("#dashboard-involvement-filter", filters.get("involvement") || "");
+    loadDashboardActiveAlerts(getTableFilterParamValues(filters, "service_id", ["service_ids"]));
     const params = [];
     const generation = ++dashboardLoadGeneration;
     let delayedIndicator = null;
@@ -403,9 +400,7 @@ function loadDashboard() {
     params.push("order=desc");
 
     if (window.AppLoading) {
-        if (!dashboardHasLoaded) {
-            AppLoading.showTableSkeleton("#dashboard-alerts", {columns: 9, rows: 6});
-        } else {
+        if (dashboardHasLoaded) {
             AppLoading.clear("#dashboard-loading-indicator");
             delayedIndicator = AppLoading.delayed(function () {
                 if (generation === dashboardLoadGeneration) {
@@ -423,7 +418,6 @@ function loadDashboard() {
             return;
         }
 
-        AppLoading.clearTableBusy("#dashboard-alerts");
         if (delayedIndicator) {
             delayedIndicator.finish(function () {
                 AppLoading.clear("#dashboard-loading-indicator");
@@ -440,14 +434,12 @@ function loadDashboard() {
 
         const alerts = dashboardAsArray(response);
         const activeAlerts = dashboardActiveAlerts(alerts);
-        const sortedActiveAlerts = dashboardSortByActivity(activeAlerts);
 
         dashboardHasLoaded = true;
         dashboardLastAlerts = alerts.slice();
         finishDashboardLoading();
         renderAlertsSummaryGrid("#overview-alerts-summary", alerts);
         renderDashboardActivityTrend(alerts);
-        renderDashboardAlertsTable(sortedActiveAlerts.slice(0, 8));
         renderDashboardSeveritySplit(alerts);
         renderDashboardPrioritySplit(alerts);
         renderDashboardTeamSummary(alerts);
@@ -458,15 +450,115 @@ function loadDashboard() {
         }
 
         finishDashboardLoading();
-        if (!dashboardHasLoaded) {
-            $("#dashboard-alerts").empty();
-        }
         showApiError(xhr);
     });
     loadDashboardServiceImpact();
     loadDashboardOncall();
     loadDashboardActivity(generation);
 }
+
+function dashboardActiveFilterParams(serviceValues) {
+    const params = new URLSearchParams();
+    const involvement = $("#dashboard-involvement-filter").val();
+    if (involvement) params.set("involvement", involvement);
+    appendTableFilterParams(params, "service_id",
+        serviceValues === undefined ? getTableFilterValues("#dashboard-service-filter") : serviceValues);
+    if (selectedTeamId()) params.set("team", selectedTeamId());
+    return params;
+}
+
+function updateDashboardActiveFilters(serviceValues) {
+    const params = dashboardActiveFilterParams(serviceValues);
+    const involvement = params.get("involvement");
+    $("#dashboard-my-alerts").toggleClass("btn-primary", !!involvement).attr("aria-pressed", String(!!involvement));
+    $("#dashboard-all-alerts").toggleClass("btn-primary", !involvement).attr("aria-pressed", String(!involvement));
+    const chips = [];
+    if (involvement) {
+        chips.push({label: i18n.t("alerts.filters.involvement"),
+            value: tableSelectOptionLabel("#dashboard-involvement-filter", involvement)});
+    }
+    const services = params.getAll("service_id");
+    if (services.length) {
+        chips.push({label: i18n.t("alerts.filters.service"),
+            value: services.map(id => tableSelectOptionLabel("#dashboard-service-filter", id)).join(", ")});
+    }
+    renderTableFilterChips("#dashboard-active-filters", chips);
+    if (window.location.pathname === "/") {
+        AlertFilterState.remember("dashboard", params);
+    }
+    params.append("status", "firing");
+    params.append("status", "acknowledged");
+    $("#dashboard-view-alerts").attr("href", "/alerts?" + params.toString());
+}
+
+function renderDashboardActiveMessage(key, isError) {
+    $("#dashboard-alerts").empty().append(
+        $("<tr>").append($("<td>").attr("colspan", 9)
+            .attr("role", isError ? "alert" : "status")
+            .addClass("empty-table-cell").text(i18n.t(key)))
+    );
+}
+
+function loadDashboardActiveAlerts(serviceValues) {
+    const generation = ++dashboardActiveLoadGeneration;
+    const scope = AlertFilterState.scope();
+    function isCurrent() {
+        return generation === dashboardActiveLoadGeneration && AlertFilterState.isActive("dashboard")
+            && scope === AlertFilterState.scope();
+    }
+    // Preserve a deep-linked selection even while its service options load.
+    if (serviceValues === undefined) {
+        serviceValues = getTableFilterParamValues(new URLSearchParams(window.location.search), "service_id");
+    }
+    // Clear old rows immediately: they belong to a different filter selection.
+    renderDashboardActiveMessage("common.loading");
+    updateDashboardActiveFilters(serviceValues);
+    loadTableServiceFilter("#dashboard-service-filter", serviceValues,
+        function (error) {
+            if (!isCurrent()) return;
+            if (error) {
+                renderDashboardActiveMessage("overview.filters.load_error", true);
+                showApiError(error);
+                return;
+            }
+            updateDashboardActiveFilters();
+            const params = dashboardActiveFilterParams();
+            params.delete("team");
+            if (selectedTeamId()) params.set("team_id", selectedTeamId());
+            params.append("status", "firing");
+            params.append("status", "acknowledged");
+            params.set("page_size", "8");
+            params.set("sort", "activity");
+            params.set("order", "desc");
+            apiGet("/api/alert-groups?" + params.toString(), function (response) {
+                if (!isCurrent()) return;
+                renderDashboardAlertsTable(dashboardAsArray(response));
+            }, function (xhr) {
+                if (!isCurrent()) return;
+                renderDashboardActiveMessage("overview.filters.load_error", true);
+                showApiError(xhr);
+            });
+        });
+}
+
+$(document).on("click", "#dashboard-my-alerts, #dashboard-all-alerts", function () {
+    setSelectValue("#dashboard-involvement-filter", this.id === "dashboard-my-alerts" ? "any" : "");
+    loadDashboardActiveAlerts();
+});
+$(document).on("change", "#dashboard-involvement-filter, #dashboard-service-filter", function () {
+    if (isTableFilterSilent(this)) return;
+    loadDashboardActiveAlerts(this.id === "dashboard-service-filter" ? getTableFilterValues(this) : undefined);
+});
+$(document).on("click", "#dashboard-toggle-filters", function () {
+    const expanded = $(this).attr("aria-expanded") !== "true";
+    $(this).attr("aria-expanded", String(expanded));
+    $("#dashboard-alert-filters").prop("hidden", !expanded);
+});
+$(document).on("click", "#dashboard-reset-filters", function () {
+    setSelectValue("#dashboard-involvement-filter", "");
+    setTableFilterValues("#dashboard-service-filter", []);
+    loadDashboardActiveAlerts([]);
+});
 
 function renderDashboardAlertsTable(alerts) {
     const tbody = $("#dashboard-alerts");
@@ -478,7 +570,10 @@ function renderDashboardAlertsTable(alerts) {
                 $("<td>")
                     .attr("colspan", "9")
                     .addClass("empty-table-cell")
-                    .text(i18n.t("overview.empty.no_active_incidents"))
+                    .text(i18n.t(
+                        $("#dashboard-involvement-filter").val() || getTableFilterValues("#dashboard-service-filter").length
+                            ? "overview.filters.empty" : "overview.empty.no_active_incidents"
+                    ))
             )
         );
         return;

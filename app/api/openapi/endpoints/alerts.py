@@ -1126,6 +1126,19 @@ def paths():
                     query_param("service_status", "Filter by service status."),
                     query_param("service_criticality", "Filter by service criticality."),
                     query_param(
+                        "involvement",
+                        "Current user's involvement: assigned to the alert group, responder "
+                        "(requested, accepted or resolved) or active stakeholder of a linked "
+                        "Incident, or any of these. Removed links do not count. Does not "
+                        "expand team permissions. Returns no groups without a user identity.",
+                        {"type": "string", "enum": ["assigned", "responder", "stakeholder", "any"]},
+                    ),
+                    query_param(
+                        "assigned_to_me",
+                        "Legacy assignment filter; combined with involvement using AND.",
+                        {"type": "boolean", "default": False},
+                    ),
+                    query_param(
                         "include_merged",
                         "Set to 1 to include groups marked as merged.",
                         {"type": "string", "enum": ["0", "1"], "default": "0"},

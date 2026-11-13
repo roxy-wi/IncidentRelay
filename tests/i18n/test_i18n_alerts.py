@@ -50,6 +50,8 @@ def test_alert_templates_reference_existing_keys():
     messages = load_catalog("en")
     paths = [
         ROOT / "app" / "templates" / "pages" / "alerts.html",
+        ROOT / "app" / "templates" / "pages" / "dashboard.html",
+        ROOT / "app" / "templates" / "pages" / "include" / "alert_involvement_options.html",
         ROOT / "app" / "templates" / "pages" / "include" / "alerts_summary_grid.html",
         ROOT / "app" / "templates" / "pages" / "include" / "alert_analytics_panel.html",
     ]
@@ -67,6 +69,7 @@ def test_alert_javascript_references_existing_keys():
     messages = load_catalog("en")
     paths = [
         ROOT / "app" / "static" / "js" / "pages" / "alerts.js",
+        ROOT / "app" / "static" / "js" / "pages" / "dashboard.js",
         ROOT / "app" / "static" / "js" / "pages" / "alert_analytics.js",
     ]
     content = "\n".join(
@@ -79,6 +82,6 @@ def test_alert_javascript_references_existing_keys():
     missing = sorted(
         key
         for key in keys
-        if key.startswith("alerts.") and key not in messages
+        if key.startswith(("alerts.", "overview.")) and key not in messages
     )
     assert missing == []

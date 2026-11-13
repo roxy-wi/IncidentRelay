@@ -103,5 +103,10 @@
   "alerts.summary.total": "Всего алертов",
   "alerts.summary.total_hint": "Текущая выборка",
   "alerts.status.shelved": "Отложен",
-  "alerts.filters.shelved_only": "Только отложенные"
+  "alerts.filters.shelved_only": "Только отложенные",
+  "alerts.filters.involvement": "Участие",
+  "alerts.filters.all_involvement": "Все алерты",
+  "alerts.filters.any_involvement": "С моим участием",
+  "alerts.filters.responder": "Участник реагирования",
+  "alerts.filters.stakeholder": "Подписчик"
 }

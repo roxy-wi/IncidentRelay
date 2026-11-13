@@ -192,6 +192,8 @@ def list_alerts():
         service_criticality=payload.service_criticality,
         search=payload.search,
         assigned_to_user_id=assigned_to_user_id,
+        involvement=payload.involvement or ("assigned" if payload.assigned_to_me else None),
+        involvement_user_id=getattr(current_user, "id", None),
         shelved=payload.shelved,
         page=payload.page,
         page_size=payload.page_size,

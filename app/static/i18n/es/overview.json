@@ -77,5 +77,11 @@
   "overview.charts.distribution_subtitle": "Desglose por gravedad y prioridad",
   "overview.activity.system": "Sistema",
   "overview.activity.none": "No hay actividad reciente",
-  "overview.activity.unavailable": "La actividad no está disponible temporalmente"
+  "overview.activity.unavailable": "La actividad no está disponible temporalmente",
+  "overview.filters.my_alerts": "Mis alertas",
+  "overview.filters.all_alerts": "Todas las alertas",
+  "overview.filters.filters": "Filtros",
+  "overview.filters.reset": "Restablecer",
+  "overview.filters.empty": "No hay alertas activas que coincidan con estos filtros.",
+  "overview.filters.load_error": "No se pudieron cargar las alertas activas. Pulse Recargar para reintentar."
 }

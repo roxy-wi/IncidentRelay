@@ -19,9 +19,6 @@ let alertsCurrentPage = 1;
 let alertsPageSize = 25;
 let alertsSortState = createTableSortState("activity", "desc");
 let alertsServiceFilterApplying = false;
-let alertsServiceFilterLoaded = false;
-let alertsServiceFilterTeamKey = null;
-const ALERTS_QUERY_STORAGE_KEY = "incidentrelay.alerts.query";
 let selectedAlertGroupIds = new Set();
 let manualIncidentTeams = [];
 let manualIncidentPermissionsLoaded = false;
@@ -442,57 +439,11 @@ function normalizeAlertsQueryString(queryString) {
 }
 
 function readStoredAlertsQueryString() {
-    try {
-        return normalizeAlertsQueryString(
-            sessionStorage.getItem(ALERTS_QUERY_STORAGE_KEY) || ""
-        );
-    } catch (error) {
-        return "";
-    }
-}
-
-function storeAlertsQueryString(queryString) {
-    queryString = normalizeAlertsQueryString(queryString);
-
-    try {
-        if (queryString) {
-            sessionStorage.setItem(ALERTS_QUERY_STORAGE_KEY, queryString);
-        } else {
-            sessionStorage.removeItem(ALERTS_QUERY_STORAGE_KEY);
-        }
-    } catch (error) {
-        // Ignore storage errors, for example private mode restrictions.
-    }
+    return normalizeAlertsQueryString(AlertFilterState.saved("alerts").toString());
 }
 
 function getAlertsQueryStringForApply() {
-    let queryString = normalizeAlertsQueryString(window.location.search || "");
-
-    if (queryString) {
-        return queryString;
-    }
-
-    if (getAlertIdFromPath(window.location.pathname)) {
-        return "";
-    }
-
-    queryString = readStoredAlertsQueryString();
-
-    if (
-        queryString &&
-        window.location.pathname === "/alerts"
-    ) {
-        history.replaceState(
-            Object.assign({}, history.state || {}, {
-                path: window.location.pathname + queryString,
-                alerts_state: true
-            }),
-            "",
-            window.location.pathname + queryString
-        );
-    }
-
-    return queryString;
+    return normalizeAlertsQueryString(AlertFilterState.resolve("alerts").toString());
 }
 
 function buildAlertsStateParams(options) {
@@ -510,8 +461,9 @@ function buildAlertsStateParams(options) {
         params.set("search", search);
     }
 
-    if ($("#assigned-to-me-filter").is(":checked")) {
-        params.set("assigned_to_me", "1");
+    const involvement = $("#alerts-involvement-filter").val();
+    if (involvement) {
+        params.set("involvement", involvement);
     }
 
     if ($("#shelved-only-filter").is(":checked")) {
@@ -552,26 +504,9 @@ function buildAlertsApiUrl() {
 
 
 function writeAlertsQueryParams() {
-    const queryString = buildAlertsQueryString();
-    const nextUrl = window.location.pathname + queryString;
-
-    history.replaceState(
-        Object.assign({}, history.state || {}, {
-            path: nextUrl,
-            alerts_state: true
-        }),
-        "",
-        nextUrl
-    );
-
+    if (!AlertFilterState.isActive("alerts")) return;
+    AlertFilterState.remember("alerts", buildAlertsStateParams({includeUrlTeam: true}));
     alertsLastAppliedQueryString = window.location.search || "";
-
-    if (
-        window.location.pathname === "/alerts" ||
-        getAlertIdFromPath(window.location.pathname)
-    ) {
-        storeAlertsQueryString(queryString);
-    }
 }
 
 function openAlertDetailsPage(alertId) {
@@ -934,10 +869,16 @@ function renderAlertBusinessImpactBadges(alert) {
 }
 
 function loadAlerts() {
+    if (!AlertFilterState.isActive("alerts")) return;
     applyAlertsQueryParams();
     initAlertsTableSorting();
 
     const generation = ++alertsLoadGeneration;
+    const scope = AlertFilterState.scope();
+    function isCurrent() {
+        return generation === alertsLoadGeneration && AlertFilterState.isActive("alerts")
+            && scope === AlertFilterState.scope();
+    }
     let delayedIndicator = null;
 
     if (window.AppLoading) {
@@ -946,7 +887,7 @@ function loadAlerts() {
         } else {
             AppLoading.clear("#alerts-loading-indicator");
             delayedIndicator = AppLoading.delayed(function () {
-                if (generation === alertsLoadGeneration) {
+                if (isCurrent()) {
                     AppLoading.showInline(
                         "#alerts-loading-indicator",
                         i18n.t("common.updating")
@@ -957,7 +898,7 @@ function loadAlerts() {
     }
 
     function finishAlertsLoading() {
-        if (generation !== alertsLoadGeneration || !window.AppLoading) {
+        if (!isCurrent() || !window.AppLoading) {
             return;
         }
 
@@ -972,13 +913,20 @@ function loadAlerts() {
         }
     }
 
-    loadAlertServiceFilter(function () {
-        if (generation !== alertsLoadGeneration) {
+    loadAlertServiceFilter(function (error) {
+        if (!isCurrent()) {
+            return;
+        }
+
+        if (error) {
+            finishAlertsLoading();
+            $("#alerts-table").empty();
+            showApiError(error);
             return;
         }
 
         apiGet(buildAlertsApiUrl(), function (response) {
-            if (generation !== alertsLoadGeneration) {
+            if (!isCurrent()) {
                 return;
             }
 
@@ -995,7 +943,7 @@ function loadAlerts() {
             writeAlertsQueryParams();
             updateSortableTableHeaders("#alerts-table-view", alertsSortState);
         }, function (xhr) {
-            if (generation !== alertsLoadGeneration) {
+            if (!isCurrent()) {
                 return;
             }
 
@@ -1050,7 +998,7 @@ function renderActiveAlertFilters() {
     const severities = getTableFilterValues("#severity-filter");
     const priorities = getTableFilterValues("#priority-filter");
     const serviceIds = getTableFilterValues("#alerts-service-filter");
-    const assignedToMe = $("#assigned-to-me-filter").is(":checked");
+    const involvement = $("#alerts-involvement-filter").val();
     const shelvedOnly = $("#shelved-only-filter").is(":checked");
 
     if (search) {
@@ -1100,10 +1048,10 @@ function renderActiveAlertFilters() {
                 .join(", ")
         });
     }
-    if (assignedToMe) {
+    if (involvement) {
         chips.push({
-            label: i18n.t("alerts.filters.assignee"),
-            value: i18n.t("alerts.filters.me")
+            label: i18n.t("alerts.filters.involvement"),
+            value: tableSelectOptionLabel("#alerts-involvement-filter", involvement)
         });
     }
 
@@ -3184,9 +3132,9 @@ function applyAlertsQueryParams() {
 
     $("#alerts-search").val(params.get("search") || "");
 
-    $("#assigned-to-me-filter").prop(
-        "checked",
-        isAlertBoolQueryParamEnabled(params, "assigned_to_me")
+    setSelectValue("#alerts-involvement-filter",
+        params.get("involvement")
+        || (isAlertBoolQueryParamEnabled(params, "assigned_to_me") ? "assigned" : "")
     );
 
     $("#shelved-only-filter").prop(
@@ -3209,11 +3157,11 @@ $(document).on("click", "#reload-alerts", function () {
 $(document)
     .off(
         "change.tableFilters",
-        "#status-filter, #severity-filter, #priority-filter, #alerts-service-filter, #assigned-to-me-filter, #shelved-only-filter"
+        "#status-filter, #severity-filter, #priority-filter, #alerts-service-filter, #alerts-involvement-filter, #shelved-only-filter"
     )
     .on(
         "change.tableFilters",
-        "#status-filter, #severity-filter, #priority-filter, #alerts-service-filter, #assigned-to-me-filter, #shelved-only-filter",
+        "#status-filter, #severity-filter, #priority-filter, #alerts-service-filter, #alerts-involvement-filter, #shelved-only-filter",
         function () {
             if (
                 typeof isTableFilterSilent === "function"
@@ -3508,82 +3456,16 @@ $(document).on("click", "#modal-alert-resolve", function () {
     });
 });
 function loadAlertServiceFilter(callback) {
-    const select = $("#alerts-service-filter");
-
-    if (!select.length) {
-        if (typeof callback === "function") {
-            callback();
-        }
-
-        return;
-    }
-
-    const teamKey = (
-        typeof selectedTeamId === "function" && selectedTeamId()
-            ? String(selectedTeamId())
-            : "all"
-    );
-
-    if (
-        alertsServiceFilterLoaded
-        && alertsServiceFilterTeamKey === teamKey
-    ) {
-        refreshTableMultiSelect(select);
-
-        if (typeof callback === "function") {
-            callback();
-        }
-
-        return;
-    }
-
     alertsServiceFilterApplying = true;
-
-    const params = new URLSearchParams(window.location.search || "");
-    const currentValues = getTableFilterValues(select).length
-        ? getTableFilterValues(select)
-        : getTableFilterParamValues(params, "service_id", ["service_ids"]);
-
-    apiGet("/api/services" + selectedTeamQuery(), function (response) {
-        const services = asArray(response && response.items ? response.items : response);
-
-        const serviceOptions = services
-            .filter(function (service) {
-                return service.enabled !== false;
-            })
-            .map(function (service) {
-                return {
-                    value: String(service.id),
-                    text: [
-                        service.team_name || service.team_slug || null,
-                        service.name || service.slug || service.id
-                    ].filter(Boolean).join(" / ")
-                };
-            });
-
-        replaceTableSelectOptions(
-            select,
-            serviceOptions,
-            currentValues
-        );
-
-        refreshTableMultiSelect(select);
-
-        alertsServiceFilterLoaded = true;
-        alertsServiceFilterTeamKey = teamKey;
-        alertsServiceFilterApplying = false;
-
-        if (typeof callback === "function") {
-            callback();
+    const params = new URLSearchParams(getAlertsQueryStringForApply());
+    loadTableServiceFilter(
+        "#alerts-service-filter",
+        getTableFilterParamValues(params, "service_id", ["service_ids"]),
+        function (error) {
+            alertsServiceFilterApplying = false;
+            callback(error);
         }
-    }, function (xhr) {
-        alertsServiceFilterApplying = false;
-        showApiError(xhr);
-
-        if (typeof callback === "function") {
-            callback();
-        }
-    });
+    );
 }
 window.addEventListener("popstate", function () {
     if (getAlertIdFromPath(window.location.pathname)) {

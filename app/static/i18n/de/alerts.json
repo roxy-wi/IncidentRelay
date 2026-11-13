@@ -103,5 +103,10 @@
   "alerts.summary.total": "Ausschreibungen insgesamt",
   "alerts.summary.total_hint": "Aktuelle Auswahl",
   "alerts.status.shelved": "Zurückgestellt",
-  "alerts.filters.shelved_only": "Nur zurückgestellte"
+  "alerts.filters.shelved_only": "Nur zurückgestellte",
+  "alerts.filters.involvement": "Beteiligung",
+  "alerts.filters.all_involvement": "Alle Alarme",
+  "alerts.filters.any_involvement": "Mit meiner Beteiligung",
+  "alerts.filters.responder": "Einsatzkraft",
+  "alerts.filters.stakeholder": "Abonnent"
 }

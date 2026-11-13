@@ -11,6 +11,23 @@ An alert group is the incident-level object. It is the object that users acknowl
 
 A child alert is the concrete signal inside the group. For example, three `DiskFull` alerts from three hosts can be shown as one alert group with three child alerts.
 
+## Personal filters on the dashboard
+
+The active alerts card has **My alerts / All alerts** buttons. **My alerts** shows alert groups assigned to you, or linked to an Incident where you are a responder or an active stakeholder. **Filters** opens the involvement selector and the existing service filter. Select several services to include any of them; service, involvement and the global Team selector are combined using AND.
+
+These personal filters affect only the active alerts table. Dashboard totals, charts, system status and service health keep the global team scope. **View all** opens Alerts with the same team, services, involvement and active statuses (`firing` and `acknowledged`). **Reset** clears personal filters without changing the global Team selector. Changing team or active group refreshes the service options and removes incompatible selections.
+
+Involvement and selected services are shared between Dashboard and Alerts, including navigation through the sidebar. They survive a reload and are stored in this browser separately for each user and active group. Alerts keeps its own status, severity, priority, search and pagination settings. Links containing explicit filters take precedence over saved preferences; Back/Forward restores the selection recorded in that history entry. Resetting Dashboard clears the shared filters on both pages.
+
+The Alerts page also exposes **Involvement**. The API accepts `GET /api/alert-groups?involvement=any` (choose one value):
+
+- `assigned`: the alert group's assignee is the current user.
+- `responder`: a linked Incident has a responder request targeting the user or accepted by them, with status `requested`, `accepted` or `resolved`. An unaccepted team request does not include every team member.
+- `stakeholder`: the user has an active stakeholder subscription to a linked Incident.
+- `any`: any of the above, without duplicate alert groups.
+
+Removed Incident links do not count. Closed Incidents can still provide membership when searching historical alert groups. Personal filters never expand team access; without a user identity they return no groups. Existing `assigned_to_me=true` requests still work; if both parameters are supplied, their conditions are combined using AND.
+
 ## Main terms
 
 | Term | Meaning |

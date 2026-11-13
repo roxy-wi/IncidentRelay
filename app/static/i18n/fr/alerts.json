@@ -103,5 +103,10 @@
   "alerts.summary.total": "Total des alertes",
   "alerts.summary.total_hint": "Sélection actuelle",
   "alerts.status.shelved": "En attente",
-  "alerts.filters.shelved_only": "En attente uniquement"
+  "alerts.filters.shelved_only": "En attente uniquement",
+  "alerts.filters.involvement": "Participation",
+  "alerts.filters.all_involvement": "Toutes les alertes",
+  "alerts.filters.any_involvement": "Avec ma participation",
+  "alerts.filters.responder": "Intervenant",
+  "alerts.filters.stakeholder": "Abonné"
 }

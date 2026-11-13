@@ -103,5 +103,10 @@
   "alerts.summary.total": "Total alerts",
   "alerts.summary.total_hint": "Current selection",
   "alerts.status.shelved": "Shelved",
-  "alerts.filters.shelved_only": "Shelved only"
+  "alerts.filters.shelved_only": "Shelved only",
+  "alerts.filters.involvement": "Involvement",
+  "alerts.filters.all_involvement": "All alerts",
+  "alerts.filters.any_involvement": "Any involvement",
+  "alerts.filters.responder": "Responder",
+  "alerts.filters.stakeholder": "Stakeholder"
 }
