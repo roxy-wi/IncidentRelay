@@ -14,6 +14,14 @@ class SyncBusy(SyncError):
     """Another worker owns the live lease; keep queued work intact."""
 
 
+class SyncApiError(SyncError):
+    """An upstream API failure, distinct from a local synchronization conflict."""
+
+    def __init__(self, message: str, *, status_code: int = 502):
+        super().__init__(message)
+        self.status_code = status_code
+
+
 class StrictModel(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
@@ -52,6 +60,10 @@ class Collection(StrictModel):
 class SyncConfig(StrictModel):
     base_url: str
     private_network_policy: Literal["deny", "allowlist"] = "deny"
+    verify_tls: bool = Field(
+        default=True, strict=True,
+        description="Verify the TLS certificate and hostname for this source's API requests.",
+    )
     interval_seconds: int = Field(default=3600, ge=60, le=604800)
     current_interval_seconds: int = Field(default=60, ge=10, le=3600)
     current_max_age_seconds: int = Field(default=120, ge=10, le=3600)

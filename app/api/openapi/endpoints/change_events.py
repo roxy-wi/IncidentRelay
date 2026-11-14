@@ -1,7 +1,8 @@
 """Experimental intake contract; this does not enable production ingestion."""
 
-from app.api.openapi.common import json_body, response
+from app.api.openapi.common import json_body, path_param, response
 from app.api.schemas.change_events import ChangeEventInput
+from app.api.schemas.gitlab_changes import GitLabDeployment
 
 
 def tags():
@@ -107,11 +108,17 @@ def components():
             "correlation_status": {"type": "string", "enum": ["queued", "not_enabled"]},
         },
     }
+    native = GitLabDeployment.model_json_schema()
+    schemas.update({
+        f"ChangeEvent{name}": _openapi_schema(schema)
+        for name, schema in native.get("$defs", {}).items()
+    })
+    schemas["GitLabDeployment"] = _openapi_schema(native)
     return schemas
 
 
 def paths():
-    return {
+    result = {
         "/api/change-events": {
             "post": {
                 "tags": ["Change Events"],
@@ -169,3 +176,37 @@ def paths():
             }
         }
     }
+    result["/api/change-events/gitlab/{source_id}"] = {
+        "post": {
+            "tags": ["Change Events"],
+            "summary": "Receive a native GitLab Deployment Hook",
+            "security": [{"gitlabChangeToken": []}, {"bearerAuth": []}],
+            "parameters": [
+                path_param("source_id", "Configured Change source ID"),
+                {"name": "X-Gitlab-Event", "in": "header", "required": True,
+                 "schema": {"type": "string", "enum": ["Deployment Hook"]}},
+            ],
+            "description": (
+                "Use the integration credential as GitLab's Secret token (X-Gitlab-Token). "
+                "Bearer is also accepted; conflicting credentials are rejected. "
+                "Requires enabled Change intake, active integration and source, and timestamp ordering. "
+                "Source gitlab_mappings match exact project.id/environment and supply Service IDs; "
+                "the owner Team comes from the source. Current changed grants are enforced. "
+                "No match returns 200 with status=ignored and reason=no_matching_mapping. "
+                "Status running/success/failed/canceled maps to started/succeeded/failed/cancelled; "
+                "blocked/approved/rejected adds an update, not a terminal result. "
+                "status_changed_at must be ISO 8601 with timezone. Vendor additions are ignored. "
+                "Deployment identity uses source, project and deployment ID. Event identity also uses "
+                "status and timestamp, independently of delivery UUIDs. Normalized sender content "
+                "determines retries: unchanged redelivery returns 200 even after mapping edits; "
+                "changed content for the same event returns 409. Shares standard intake limits and receipts. "
+                "Use a separate source for each GitLab instance."
+            ),
+            "requestBody": json_body("Native GitLab payload", {"$ref": "#/components/schemas/GitLabDeployment"}),
+            "responses": {
+                **result["/api/change-events"]["post"]["responses"],
+                "200": response("Exact redelivery or ignored unmatched project/environment"),
+            },
+        }
+    }
+    return result

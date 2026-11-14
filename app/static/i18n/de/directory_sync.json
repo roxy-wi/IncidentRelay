@@ -1,4 +1,6 @@
 {
+  "ds.skip_tls": "TLS-Zertifikat nicht prüfen",
+  "ds.skip_tls_hint": "Für APIs mit selbstsignierten Zertifikaten. Deaktiviert die Zertifikats- und Hostnamenprüfung für alle Anfragen nur dieser Quelle. Standardmäßig ausgeschaltet.",
   "ds.title": "Verzeichnissynchronisierung",
   "ds.intro": "Teams, Personen und Bereitschaftspläne über konfigurierbare APIs importieren.",
   "ds.new": "Quelle hinzufügen",

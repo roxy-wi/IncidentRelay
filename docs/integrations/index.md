@@ -5,6 +5,9 @@ description: Incoming alert sources and outgoing notification channels
 
 # Integrations
 
+For deployment tracking, use [GitLab deployments → Change Intelligence](gitlab-changes.md).
+This integration records Changes and their related Services; it does not create incoming alerts.
+
 IncidentRelay has two different integration layers. Keep them separate when configuring or troubleshooting the system.
 
 ```text

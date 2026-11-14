@@ -40,6 +40,16 @@ def get_bearer_token():
     return auth_header.split(" ", 1)[1].strip()
 
 
+def get_gitlab_change_token():
+    """Accept GitLab's Secret token header without ambiguous credential fallback."""
+    secret = request.headers.get("X-Gitlab-Token")
+    bearer = get_bearer_token()
+    if secret is not None and request.headers.get("Authorization"):
+        if not bearer or not secrets.compare_digest(secret.encode("utf-8"), bearer.encode("utf-8")):
+            return None
+    return secret if secret is not None else bearer
+
+
 def get_basic_route_token():
     """Return a route token from HTTP Basic auth used by monitoring webhooks."""
 

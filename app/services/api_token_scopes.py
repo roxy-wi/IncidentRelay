@@ -172,7 +172,7 @@ def required_scopes_for_path(path, method):
     therefore be denied for API-token principals (fail closed).
     """
     method = str(method or "").upper()
-    if path == "/api/change-events":
+    if path == "/api/change-events" or re.fullmatch(r"/api/change-events/gitlab/\d+", path):
         return ["changes:ingest"] if method == "POST" else None
     if re.fullmatch(r"/api/alert-groups/\d+/(episodes|related-changes)", path):
         return ["changes:read", "alerts:read"] if method in READ_METHODS else None

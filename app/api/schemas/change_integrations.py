@@ -5,6 +5,7 @@ from typing import Annotated, Literal
 from pydantic import Field, StrictBool, model_validator
 
 from app.api.schemas.base import ApiModel
+from app.api.schemas.gitlab_changes import GitLabProjectId
 
 PositiveId = Annotated[int, Field(strict=True, gt=0)]
 Name = Annotated[str, Field(min_length=1, max_length=255)]
@@ -44,7 +45,28 @@ class IntegrationUpdate(RevisionInput):
         return self
 
 
-class SourceCreate(RevisionInput):
+class GitLabMapping(ApiModel):
+    """Route one project's exact environment to explicitly selected Services."""
+
+    project_id: GitLabProjectId
+    environment: Name
+    service_ids: list[PositiveId] = Field(min_length=1, max_length=100)
+
+
+class SourceInput(RevisionInput):
+    """Bound routing configuration and reject ambiguous project/environment pairs."""
+
+    gitlab_mappings: list[GitLabMapping] = Field(default_factory=list, max_length=100)
+
+    @model_validator(mode="after")
+    def unique_gitlab_routes(self):
+        identities = [(row.project_id, row.environment) for row in self.gitlab_mappings]
+        if len(identities) != len(set(identities)):
+            raise ValueError("Duplicate GitLab project/environment mapping")
+        return self
+
+
+class SourceCreate(SourceInput):
     """Reserve a sender's source string in its owner's namespace."""
 
     owner_team_id: PositiveId
@@ -52,7 +74,7 @@ class SourceCreate(RevisionInput):
     ordering_mode: Literal["timestamp", "sequence"] = "timestamp"
 
 
-class SourceUpdate(RevisionInput):
+class SourceUpdate(SourceInput):
     """Source identity may change only before its first Change."""
 
     source: Name | None = None

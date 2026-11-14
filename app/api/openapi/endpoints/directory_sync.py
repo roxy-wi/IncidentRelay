@@ -57,7 +57,10 @@ def paths():
                                "get": {**common, "summary": "Read configuration, queue and preview status"},
                                "put": {**common, "summary": "Update using the last read revision", "requestBody": json_body("Source", config)}},
         ROOT + "/{source_id}/sample": {"parameters": [path_param("source_id", "Source ID")],
-                                       "post": {**common, "summary": "Inspect response field names and types"}},
+                                       "post": {**common, "summary": "Inspect response field names and types",
+                                                "responses": {**common["responses"],
+                                                              "502": response("External API failure (sync_api_error)"),
+                                                              "504": response("External API timeout (sync_api_error)")}}},
     }
     for action in ("preview", "apply", "run"):
         result[ROOT + "/{source_id}/" + action] = {

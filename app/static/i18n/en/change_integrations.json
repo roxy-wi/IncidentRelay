@@ -74,5 +74,15 @@
   "ci.auto_source_hint": "One source will be created automatically for this Team, using the integration name. No permissions are granted automatically.",
   "ci.no_owner_teams": "No available Teams. Create an active Team in this Group first.",
   "ci.source_locked_hint": "The name and owner Team cannot be changed because this source already has Changes. Create a new source for a different name or Team. Status and ordering for new Changes remain editable.",
-  "ci.count_hint": "All configured records, including disabled ones."
+  "ci.count_hint": "All configured records, including disabled ones.",
+  "ci.gitlab_title": "GitLab deployments",
+  "ci.gitlab_hint": "In GitLab Settings → Webhooks, use this URL and the integration token as Secret token. Enable Deployment events and keep the default payload. Rules match the exact project ID and environment; the source defines the owner team.",
+  "ci.gitlab_url": "Webhook URL",
+  "ci.gitlab_add": "Add mapping",
+  "ci.gitlab_permissions": "Select services with an active Changed permission on the Permissions tab. With no matching rule, new events are ignored.",
+  "ci.gitlab_project": "GitLab project ID",
+  "ci.gitlab_environment": "Environment",
+  "ci.gitlab_services": "Changed services",
+  "ci.gitlab_remove": "Remove mapping",
+  "ci.gitlab_add_short": "Add"
 }

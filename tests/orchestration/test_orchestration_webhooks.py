@@ -1,3 +1,5 @@
+import socket
+import ssl
 from datetime import timedelta
 
 import pytest
@@ -296,7 +298,29 @@ def test_resolver_allows_explicit_private_network_allowlist(monkeypatch):
     assert port == 443
 
 
-def test_https_request_pins_resolved_ip_and_preserves_tls_hostname(monkeypatch):
+@pytest.mark.parametrize("empty", [False, True])
+def test_resolver_preserves_safe_dns_failure_reason(monkeypatch, empty):
+    def resolve(*_args, **_kwargs):
+        if empty:
+            return []
+        raise socket.gaierror("private-host-secret")
+
+    monkeypatch.setattr(webhook_service.socket, "getaddrinfo", resolve)
+    with pytest.raises(WebhookDeliveryError) as failure:
+        resolve_webhook_target("https://example.test/hook")
+    assert failure.value.reason == "dns"
+    assert failure.value.retryable
+    assert "private-host-secret" not in str(failure.value)
+
+
+def test_wrapped_connection_refusal_is_not_a_timeout():
+    error = webhook_service.urllib3.exceptions.NewConnectionError(None, "private-host-secret")
+    error.__cause__ = ConnectionRefusedError("private-host-secret")
+    assert webhook_service._request_failure_reason(error) == "connection_refused"
+
+
+@pytest.mark.parametrize("verify_tls", [None, True, False])
+def test_https_request_pins_resolved_ip_and_preserves_tls_hostname(monkeypatch, verify_tls):
     captured = {}
 
     class FakeResponse:
@@ -323,7 +347,7 @@ def test_https_request_pins_resolved_ip_and_preserves_tls_hostname(monkeypatch):
         def close(self):
             captured["closed"] = True
 
-    parsed = webhook_service.urlsplit("https://hooks.example.test:8443/run?q=1")
+    parsed = webhook_service.urlsplit("https://example.com:8443/run?q=1")
     monkeypatch.setattr(
         webhook_service,
         "resolve_webhook_target",
@@ -332,20 +356,22 @@ def test_https_request_pins_resolved_ip_and_preserves_tls_hostname(monkeypatch):
     monkeypatch.setattr(webhook_service.urllib3, "HTTPSConnectionPool", FakePool)
 
     status, headers, payload = webhook_service._request_once(
-        "https://hooks.example.test:8443/run?q=1",
+        "https://example.com:8443/run?q=1",
         method="POST",
         headers={"X-Test": "yes"},
         body=b"{}",
         timeout_seconds=5,
         private_network_policy="deny",
+        **({} if verify_tls is None else {"verify_tls": verify_tls}),
     )
 
     assert status == 200
     assert payload == b"ok"
     assert captured["host"] == "198.51.100.25"
-    assert captured["pool_kwargs"]["server_hostname"] == "hooks.example.test"
-    assert captured["pool_kwargs"]["assert_hostname"] == "hooks.example.test"
-    assert captured["headers"]["Host"] == "hooks.example.test:8443"
+    assert captured["pool_kwargs"]["server_hostname"] == "example.com"
+    assert captured["pool_kwargs"]["assert_hostname"] == (False if verify_tls is False else "example.com")
+    assert captured["pool_kwargs"]["cert_reqs"] == (ssl.CERT_NONE if verify_tls is False else ssl.CERT_REQUIRED)
+    assert captured["headers"]["Host"] == "example.com:8443"
     assert captured["path"] == "/run?q=1"
     assert captured["released"] is True
     assert captured["closed"] is True

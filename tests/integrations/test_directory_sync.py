@@ -2,9 +2,18 @@
 
 import copy
 import json
-from datetime import timedelta
+import socket
+import ssl
+import threading
+from datetime import datetime, timedelta, timezone
+from http.server import BaseHTTPRequestHandler, HTTPServer
 
 import pytest
+import urllib3
+from cryptography import x509
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import ec
+from cryptography.x509.oid import NameOID
 
 from app.login import create_access_token
 from app.modules.common import utc_now
@@ -16,10 +25,11 @@ from app.modules.db.models import (
 )
 from app.services.directory_sync import client as client_module, service
 from app.services.directory_sync.client import ApiClient
-from app.services.directory_sync.config import SyncBusy, SyncConfig, SyncError, org_service_preset
+from app.services.directory_sync.config import SyncApiError, SyncBusy, SyncConfig, SyncError, org_service_preset
 from app.services.directory_sync.fetch import fetch_snapshot, iso, window
 from app.services.directory_sync.runtime import imported_candidates
 from app.services.oncall import get_current_oncall_user
+from app.services.orchestration import webhooks
 from tests.factories import create_group, create_team, create_user
 
 URL = "/api/admin/directory-sync"
@@ -257,6 +267,113 @@ def test_http_pagination_and_post_body_preserve_types(monkeypatch):
     assert "hidden" not in json.dumps(api.samples)
 
 
+def test_tls_setting_is_per_source_and_used_by_every_operation(monkeypatch):
+    calls = []
+
+    def transport(_url, **kwargs):
+        calls.append(kwargs["verify_tls"])
+        return 200, {}, b'{}'
+
+    monkeypatch.setattr(client_module, "_request_once", transport)
+    context = {"team_id": "team", "user_id": "person", "schedule_ids": ["slot"], **window(
+        SyncConfig.model_validate(org_service_preset()),
+    )}
+    for verify_tls in (True, False, True):
+        config = SyncConfig.model_validate({**org_service_preset(), "verify_tls": verify_tls})
+        api = ApiClient(config, {})
+        for operation in config.operations:
+            api.request(operation, context)
+        assert calls[-len(config.operations):] == [verify_tls] * len(config.operations)
+
+
+def test_tls_setting_preserves_legacy_defaults_and_requires_new_preview(client, admin_headers, source, fetched):
+    source.config.pop("verify_tls", None)
+    source.save()
+    service.run(source.id)
+    source = Source.get_by_id(source.id)
+    payload = {"name": source.name, "group_id": source.group_id, "config": source.config,
+               "revision": source.revision, "enabled": True}
+    response = client.put(f"{URL}/{source.id}", headers=admin_headers, json=payload)
+    assert response.status_code == 200
+    assert response.json["config"]["verify_tls"] is True
+    assert response.json["approved"] is True
+    payload.update(config={**source.config, "verify_tls": False}, revision=response.json["revision"])
+    assert client.put(f"{URL}/{source.id}", headers=admin_headers, json=payload).status_code == 409
+    payload["enabled"] = False
+    response = client.put(f"{URL}/{source.id}", headers=admin_headers, json=payload)
+    assert response.status_code == 200
+    assert response.json["approved"] is False
+    assert client.get(f"{URL}/{source.id}", headers=admin_headers).json["config"]["verify_tls"] is False
+
+
+@pytest.mark.parametrize("value", [None, "false", 0])
+def test_tls_verification_requires_an_explicit_boolean(client, admin_headers, source, value):
+    config = {**source.config, "verify_tls": value}
+    response = client.put(f"{URL}/{source.id}", headers=admin_headers, json={
+        "name": source.name, "group_id": source.group_id, "config": config, "revision": source.revision,
+    })
+    assert response.status_code == 400
+    assert Source.get_by_id(source.id).config["verify_tls"] is True
+
+
+@pytest.mark.filterwarnings("ignore:Unverified HTTPS request:urllib3.exceptions.InsecureRequestWarning")
+def test_self_signed_api_requires_explicit_tls_opt_out(monkeypatch, tmp_path):
+    key = ec.generate_private_key(ec.SECP256R1())
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, "example.com")])
+    now = datetime.now(timezone.utc)
+    cert = (x509.CertificateBuilder().subject_name(name).issuer_name(name).public_key(key.public_key())
+            .serial_number(x509.random_serial_number()).not_valid_before(now - timedelta(days=1))
+            .not_valid_after(now + timedelta(days=1))
+            .add_extension(x509.SubjectAlternativeName([x509.DNSName("example.com")]), critical=False)
+            .sign(key, hashes.SHA256()))
+    cert_path, key_path = tmp_path / "cert.pem", tmp_path / "key.pem"
+    cert_path.write_bytes(cert.public_bytes(serialization.Encoding.PEM))
+    key_path.write_bytes(key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+                                          serialization.NoEncryption()))
+
+    class Handler(BaseHTTPRequestHandler):
+        def do_GET(self):
+            body = b'{"teams": []}'
+            self.send_response(200)
+            self.send_header("Content-Type", "application/json")
+            self.send_header("Content-Length", str(len(body)))
+            self.end_headers()
+            self.wfile.write(body)
+
+        def log_message(self, *_args):
+            """Keep fixture HTTP traffic out of test output."""
+
+    server = HTTPServer(("127.0.0.1", 0), Handler)
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    context.load_cert_chain(cert_path, key_path)
+    server.socket = context.wrap_socket(server.socket, server_side=True)
+    thread = threading.Thread(target=server.serve_forever, daemon=True)
+    thread.start()
+    monkeypatch.setattr(webhooks.socket, "getaddrinfo", lambda *_args, **_kwargs: [
+        (socket.AF_INET, socket.SOCK_STREAM, socket.IPPROTO_TCP, "", ("127.0.0.1", server.server_port)),
+    ])
+    monkeypatch.setattr(webhooks.Config, "ORCHESTRATION_WEBHOOK_PRIVATE_NETWORK_ALLOWLIST", "127.0.0.1/32")
+    monkeypatch.setattr(client_module.time, "sleep", lambda _delay: None)
+    config = SyncConfig.model_validate({**org_service_preset(), "base_url": f"https://example.com:{server.server_port}",
+                                       "private_network_policy": "allowlist"})
+    try:
+        with pytest.raises(SyncApiError, match="TLS connection failed"):
+            ApiClient(config, {}).records("teams", {})
+        config.verify_tls = False
+        assert ApiClient(config, {}).records("teams", {}) == []
+        with pytest.raises(webhooks.WebhookDeliveryError) as failure:
+            webhooks.deliver_webhook(url=config.base_url, method="GET", headers={}, body=b"",
+                                     timeout_seconds=5, private_network_policy="allowlist")
+        assert failure.value.reason == "tls"
+        config.private_network_policy = "deny"
+        with pytest.raises(SyncError, match="API target blocked"):
+            ApiClient(config, {}).records("teams", {})
+    finally:
+        server.shutdown()
+        thread.join(timeout=5)
+        server.server_close()
+
+
 @pytest.mark.parametrize("body", [b'{"teams": null}', b'{"error": "bad"}', b'not json'])
 def test_invalid_api_shape_is_not_an_empty_snapshot(monkeypatch, body):
     monkeypatch.setattr(client_module, "_request_once", lambda *_args, **_kwargs: (200, {}, body))
@@ -273,6 +390,96 @@ def test_repeated_cursor_and_http_errors_do_not_expose_secrets(monkeypatch):
     with pytest.raises(SyncError, match="HTTP 403") as failure:
         ApiClient(config, {}).records("teams", {})
     assert "never-log-me" not in str(failure.value)
+
+
+@pytest.mark.parametrize(("error", "detail", "status"), [
+    (urllib3.exceptions.SSLError("secret-test"), "TLS connection failed", 502),
+    (ssl.SSLCertVerificationError("secret-test"), "TLS connection failed", 502),
+    (urllib3.exceptions.ConnectTimeoutError("secret-test"), "request timed out", 504),
+    (urllib3.exceptions.ReadTimeoutError(None, "/private?key=secret-test", "secret-test"), "request timed out", 504),
+    (urllib3.exceptions.NewConnectionError(None, "secret-test"), "connection failed", 502),
+    (ConnectionRefusedError("secret-test"), "connection refused", 502),
+    (urllib3.exceptions.ProtocolError("secret-test"), "connection interrupted", 502),
+    (ValueError("secret-test"), "connection failed", 502),
+])
+def test_sample_reports_safe_transport_reason(client, admin_headers, source, monkeypatch, error, detail, status):
+    closed = []
+
+    class FailedPool:
+        def __init__(self, *_args, **_kwargs):
+            pass
+
+        def urlopen(self, *_args, **_kwargs):
+            raise error
+
+        def close(self):
+            closed.append(True)
+
+    monkeypatch.setattr(webhooks, "resolve_webhook_target", lambda url, **_kwargs: (
+        webhooks.urlsplit(url), "198.51.100.25", 443,
+    ))
+    monkeypatch.setattr(webhooks.urllib3, "HTTPSConnectionPool", FailedPool)
+    monkeypatch.setattr(client_module.time, "sleep", lambda _delay: None)
+
+    response = client.post(f"{URL}/{source.id}/sample", headers=admin_headers)
+
+    assert response.status_code == status
+    assert response.json["error"] == "sync_api_error"
+    assert response.json["message"].startswith(f"teams: API {detail}")
+    assert "secret-test" not in response.get_data(as_text=True)
+    assert len(closed) == 3
+
+
+@pytest.mark.parametrize(("status", "body", "expected", "detail"), [
+    (401, b"secret-test", 502, "HTTP 401"),
+    (403, b"secret-test", 502, "HTTP 403"),
+    (503, b"secret-test", 502, "HTTP 503"),
+    (504, b"secret-test", 504, "HTTP 504"),
+    (200, b"secret-test", 502, "valid JSON"),
+    (200, b'"secret-test"', 502, "JSON object or array"),
+])
+def test_sample_upstream_errors_are_not_local_conflicts(
+    client, admin_headers, source, monkeypatch, status, body, expected, detail,
+):
+    monkeypatch.setattr(client_module, "_request_once", lambda *_args, **_kwargs: (status, {}, body))
+    monkeypatch.setattr(client_module.time, "sleep", lambda _delay: None)
+    response = client.post(f"{URL}/{source.id}/sample", headers=admin_headers)
+    assert response.status_code == expected
+    assert response.json["error"] == "sync_api_error"
+    assert detail in response.json["message"]
+    assert "secret-test" not in response.get_data(as_text=True)
+
+
+@pytest.mark.parametrize(("reason", "retryable", "detail", "attempts"), [
+    ("dns", True, "DNS resolution failed", 3),
+    ("response_too_large", False, "8 MiB limit", 1),
+])
+def test_background_transport_failure_keeps_data_and_safe_diagnostics(
+    source, fetched, monkeypatch, caplog, reason, retryable, detail, attempts,
+):
+    source.config["delete_missing"] = True
+    source.save()
+    service.run(source.id)
+    previous_success = Source.get_by_id(source.id).last_success_at
+    calls = []
+
+    def fail(*_args, **_kwargs):
+        calls.append(True)
+        raise webhooks.WebhookDeliveryError("secret-test", reason=reason, retryable=retryable)
+
+    monkeypatch.setattr(service, "fetch_snapshot", fetch_snapshot)
+    monkeypatch.setattr(client_module, "_request_once", fail)
+    monkeypatch.setattr(client_module.time, "sleep", lambda _delay: None)
+    with pytest.raises(SyncApiError, match=detail):
+        service.run(source.id)
+    updated = Source.get_by_id(source.id)
+    assert detail in updated.last_error
+    assert "secret-test" not in updated.last_error + caplog.text
+    assert updated.lease is None
+    assert updated.last_success_at == previous_success
+    assert Shift.select().count() == 1
+    assert not Team.get_by_id(binding(source, "team", "t1").local_id).deleted
+    assert len(calls) == attempts
 
 
 def test_full_org_contract_fetches_outside_roster_users(monkeypatch):
@@ -361,6 +568,7 @@ def test_changed_config_must_be_previewed_before_enabling(client, admin_headers,
     response = client.put(f"{URL}/{source.id}", headers=admin_headers,
                           json={"name": source.name, "group_id": source.group_id, "config": config, "revision": 2, "enabled": True})
     assert response.status_code == 409
+    assert response.json["error"] == "sync_conflict"
 
 
 def test_editable_imported_shifts_use_existing_rotation_access(client, admin_headers, source, fetched):

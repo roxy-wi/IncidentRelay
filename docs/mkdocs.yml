@@ -67,6 +67,7 @@ nav:
       - Rotation Overrides: usage/rotation-overrides.md
   - Integrations:
       - Overview: integrations/index.md
+      - GitLab deployments (Changes): integrations/gitlab-changes.md
       - Incoming alert sources:
           - Alertmanager: integrations/alertmanager.md
           - New Relic: integrations/new-relic.md

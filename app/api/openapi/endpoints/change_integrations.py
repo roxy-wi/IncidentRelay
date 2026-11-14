@@ -7,6 +7,18 @@ ID = {"type": "integer", "minimum": 1}
 NAME = {"type": "string", "minLength": 1, "maxLength": 255}
 ACTIVE = {"type": "boolean"}
 ORDER = {"type": "string", "enum": ["timestamp", "sequence"]}
+GITLAB_MAPPINGS = {
+    "type": "array", "maxItems": 100,
+    "description": "Exact project/environment routing; [] disables new native events. Requires timestamp ordering and current changed grants on target Services.",
+    "items": {
+        "type": "object", "additionalProperties": False,
+        "required": ["project_id", "environment", "service_ids"],
+        "properties": {
+            "project_id": {**ID, "maximum": 9007199254740991}, "environment": NAME,
+            "service_ids": {"type": "array", "minItems": 1, "maxItems": 100, "items": ID},
+        },
+    },
+}
 
 
 def tags():
@@ -109,6 +121,7 @@ def paths():
                     "owner_team_id": ID,
                     "source": NAME,
                     "ordering_mode": ORDER,
+                    "gitlab_mappings": GITLAB_MAPPINGS,
                 },
                 required=["expected_revision", "owner_team_id", "source"],
                 created=True,
@@ -121,6 +134,7 @@ def paths():
                     **revision,
                     "active": ACTIVE,
                     "ordering_mode": ORDER,
+                    "gitlab_mappings": GITLAB_MAPPINGS,
                     "source": NAME,
                     "owner_team_id": ID,
                 },
@@ -226,6 +240,8 @@ def paths():
         {"name": "after", "in": "query", "schema": {"type": "integer", "minimum": 0}}
     ]
     result[BASE + "/targets"]["get"]["parameters"] = [
+        {"name": "source_id", "in": "query", "schema": ID,
+         "description": "With integration_id, list Services covered by this source's active changed grants."},
         {"name": "team_id", "in": "query", "schema": ID},
         {"name": "integration_id", "in": "query", "schema": ID},
     ]

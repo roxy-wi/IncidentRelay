@@ -153,11 +153,14 @@ def create_source(integration_id, payload, *, actor_id):
             .exists()
         ):
             raise ChangeConflict("Source namespace is already reserved")
+        mappings = [row.model_dump() for row in payload.gitlab_mappings]
+        validate_gitlab_mappings(integration, payload.ordering_mode, mappings)
         source = ChangeSource.create(
             integration=integration,
             owner_team=payload.owner_team_id,
             source=payload.source,
             ordering_mode=payload.ordering_mode,
+            gitlab_mappings=mappings,
         )
         advance_revision(integration)
         audit(actor_id, "source_created", source, integration.id)
@@ -201,11 +204,17 @@ def update_source(integration_id, source_id, payload, *, actor_id):
             "owner_team_id": source.owner_team_id,
             "active": source.active,
             "ordering_mode": source.ordering_mode,
+            "gitlab_mappings": source.gitlab_mappings,
         }
+        mappings = values.get("gitlab_mappings", source.gitlab_mappings)
+        ordering = values.get("ordering_mode", source.ordering_mode)
+        if "gitlab_mappings" in values or "ordering_mode" in values:
+            validate_gitlab_mappings(integration, ordering, mappings)
         source.source = source_name
         source.owner_team = owner_team_id
         source.active = values.get("active", source.active)
-        source.ordering_mode = values.get("ordering_mode", source.ordering_mode)
+        source.ordering_mode = ordering
+        source.gitlab_mappings = mappings
         source.updated_at = utc_now()
         source.save()
         advance_revision(integration)
@@ -217,6 +226,20 @@ def update_source(integration_id, source_id, payload, *, actor_id):
             {"before": previous, "after": values},
         )
         return source
+
+
+def validate_gitlab_mappings(integration, ordering_mode, mappings):
+    """Configuration never grants authority; intake also checks current grants."""
+    if mappings and ordering_mode != "timestamp":
+        raise ChangeConflict("GitLab webhooks require timestamp ordering")
+    service_ids = {sid for row in mappings for sid in row["service_ids"]}
+    services = list(Service.select().where(Service.id.in_(service_ids)))
+    if len(services) != len(service_ids):
+        from app.services.change_intelligence.authorization import ChangeAccessDenied
+
+        raise ChangeAccessDenied("Change access denied")
+    for service in services:
+        validate_grant_target(integration, service.team_id, service.id)
 
 
 def validate_grant_target(integration, team_id, service_id):

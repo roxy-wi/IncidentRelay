@@ -74,5 +74,15 @@
   "ci.auto_source_hint": "Une source sera créée automatiquement pour cette équipe à partir du nom de l’intégration. Aucune autorisation n’est accordée automatiquement.",
   "ci.no_owner_teams": "Aucune équipe disponible. Créez d’abord une équipe active dans ce groupe.",
   "ci.source_locked_hint": "Le nom et l’équipe propriétaire sont verrouillés car cette source contient déjà des Changes. Créez une autre source pour les modifier. Le statut et l’ordre des nouveaux Changes restent modifiables.",
-  "ci.count_hint": "Toutes les entrées configurées, y compris celles désactivées."
+  "ci.count_hint": "Toutes les entrées configurées, y compris celles désactivées.",
+  "ci.gitlab_title": "Déploiements GitLab",
+  "ci.gitlab_hint": "Dans GitLab Settings → Webhooks, utilisez cette URL et le jeton de l’intégration comme Secret token. Activez Deployment events et conservez le contenu par défaut. Les règles comparent exactement l’ID du projet et l’environnement ; l’équipe responsable vient de la source.",
+  "ci.gitlab_url": "URL du webhook",
+  "ci.gitlab_add": "Ajouter une correspondance",
+  "ci.gitlab_permissions": "Sélectionnez les services disposant d’une autorisation active de modification dans l’onglet Autorisations. Sans règle correspondante, les nouveaux événements sont ignorés.",
+  "ci.gitlab_project": "ID du projet GitLab",
+  "ci.gitlab_environment": "Environnement",
+  "ci.gitlab_services": "Services modifiés",
+  "ci.gitlab_remove": "Supprimer la correspondance",
+  "ci.gitlab_add_short": "Ajouter"
 }

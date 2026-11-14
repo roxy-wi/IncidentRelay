@@ -74,5 +74,15 @@
   "ci.auto_source_hint": "将根据集成名称为此团队自动创建一个来源，不会自动授予权限。",
   "ci.no_owner_teams": "没有可用的团队，请先在此组中创建一个活跃团队。",
   "ci.source_locked_hint": "此来源已包含 Change，因此无法更改名称和所属团队。如需其他名称或团队，请创建新来源。仍可编辑状态和新 Change 的排序方式。",
-  "ci.count_hint": "所有已配置记录，包括已禁用的记录。"
+  "ci.count_hint": "所有已配置记录，包括已禁用的记录。",
+  "ci.gitlab_title": "GitLab 部署",
+  "ci.gitlab_hint": "在 GitLab Settings → Webhooks 中填写此 URL，并将集成令牌填入 Secret token。启用 Deployment events，保留默认请求内容。规则精确匹配项目 ID 和环境；所属团队由来源确定。",
+  "ci.gitlab_url": "Webhook URL",
+  "ci.gitlab_add": "添加映射",
+  "ci.gitlab_permissions": "请先在权限选项卡中授予服务有效的更改权限。没有匹配规则时，新事件将被忽略。",
+  "ci.gitlab_project": "GitLab 项目 ID",
+  "ci.gitlab_environment": "环境",
+  "ci.gitlab_services": "变更的服务",
+  "ci.gitlab_remove": "删除映射",
+  "ci.gitlab_add_short": "添加"
 }

@@ -77,6 +77,7 @@ function openDirectorySync(source) {
     if (source) groups.val(source.group_id);
     $("#ds-url").val(config.base_url);
     $("#ds-network").val(config.private_network_policy);
+    $("#ds-skip-tls").prop("checked", config.verify_tls === false);
     $("#ds-operations").val(JSON.stringify(config.operations, null, 2));
     const mapping = {};
     directorySyncMappingKeys.forEach(key => { mapping[key] = config[key]; });
@@ -224,6 +225,7 @@ $(document).on("submit", "#ds-form", function (event) {
         const config = {...(directorySyncSource?.config || directorySyncOptions.preset), ...JSON.parse($("#ds-mapping").val()),
             operations: JSON.parse($("#ds-operations").val()), base_url: $("#ds-url").val(),
             private_network_policy: $("#ds-network").val(), interval_seconds: Number($("#ds-interval").val()),
+            verify_tls: !$("#ds-skip-tls").prop("checked"),
             current_interval_seconds: Number($("#ds-current-interval").val()), horizon_months: Number($("#ds-horizon").val()),
             membership_authority: $("#ds-authority").val(), editable: $("#ds-editable").prop("checked"),
             overwrite_existing: $("#ds-overwrite").prop("checked"), delete_missing: $("#ds-delete").prop("checked")};

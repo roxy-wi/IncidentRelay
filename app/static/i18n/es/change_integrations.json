@@ -74,5 +74,15 @@
   "ci.auto_source_hint": "Se creará automáticamente una fuente para este equipo a partir del nombre de la integración. No se conceden permisos automáticamente.",
   "ci.no_owner_teams": "No hay equipos disponibles. Cree primero un equipo activo en este grupo.",
   "ci.source_locked_hint": "El nombre y el equipo propietario no se pueden cambiar porque la fuente ya contiene Changes. Cree otra fuente para un nombre o equipo diferente. El estado y el orden de nuevos Changes siguen siendo editables.",
-  "ci.count_hint": "Todas las entradas configuradas, incluidas las desactivadas."
+  "ci.count_hint": "Todas las entradas configuradas, incluidas las desactivadas.",
+  "ci.gitlab_title": "Despliegues de GitLab",
+  "ci.gitlab_hint": "En GitLab Settings → Webhooks, usa esta URL y el token de la integración como Secret token. Activa Deployment events y conserva el contenido predeterminado. Las reglas coinciden exactamente con el ID del proyecto y el entorno; el equipo responsable procede de la fuente.",
+  "ci.gitlab_url": "URL del webhook",
+  "ci.gitlab_add": "Añadir correspondencia",
+  "ci.gitlab_permissions": "Selecciona servicios con permiso activo de modificación en la pestaña Permisos. Sin una regla coincidente, los nuevos eventos se ignoran.",
+  "ci.gitlab_project": "ID del proyecto GitLab",
+  "ci.gitlab_environment": "Entorno",
+  "ci.gitlab_services": "Servicios modificados",
+  "ci.gitlab_remove": "Eliminar correspondencia",
+  "ci.gitlab_add_short": "Añadir"
 }

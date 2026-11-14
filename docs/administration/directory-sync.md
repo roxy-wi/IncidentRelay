@@ -39,6 +39,7 @@ The form already contains requests and mapping for org-service. Keep these defau
 | Destination group | The IR group where teams should appear. This cannot change after creating the source. |
 | API base URL | For example, `https://org-service.example.com`. The operations already contain the `/api/v1/...` paths. |
 | Network access | Use public networks for a public API. For an internal API, configure the server allowlist and select the server-allowed networks option. |
+| Skip TLS certificate verification | Off by default. Enable to connect to an API with a self-signed certificate without configuring CA trust. Disables certificate and hostname verification for this source only. |
 | Authentication headers | JSON headers expected by the external system. |
 
 For org-service:
@@ -296,9 +297,21 @@ The server calls the external API. A successful request from your laptop does no
 
 3. Restart IR processes to reload configuration.
 4. Select server-allowed networks in the source (`private_network_policy: allowlist`).
-5. For an internal CA, install trust in the IR processes' environment. TLS verification remains enabled.
+5. For an internal CA, install trust in the IR processes' environment. To connect without verifying the certificate, enable **Skip TLS certificate verification** in the source and save its settings.
+
+The API setting is `config.verify_tls`: `true` (the default) enables verification; `false` disables it. It applies to response samples, previews, imports and current-duty refreshes. After changing it, fetch and apply a new preview before re-enabling periodic synchronization. This setting does not bypass the server allowlist or affect other sources or outbound webhooks.
 
 Separate multiple subnets with commas. Plain HTTP also requires `webhook_allow_http = true` in that section. Selecting allowlist in the form does not add addresses to the server list: this uses IR's existing outbound network policy.
+
+Check DNS, TCP and TLS in a standard Docker deployment without sending a PAT:
+
+```bash
+docker exec incidentrelay curl --noproxy '*' -sS -o /dev/null -w 'HTTP %{http_code}\n' \
+  --connect-timeout 10 --max-time 20 \
+  'https://example.com/api/v1/support-team-catalog?pageSize=1'
+```
+
+Replace the URL with your API address and repeat for `incidentrelay-scheduler`: web fetches response samples, while scheduler runs imports. HTTP 401/403 is expected without a PAT and confirms an HTTP connection, but does not validate token permissions or the API path. `Could not resolve host` indicates a DNS failure; `Connection refused` indicates a rejected connection; a timeout means no response arrived within the limit. Certificate verification failures require configuring internal CA trust in both containers. `--noproxy '*'` checks a direct connection, matching synchronization's transport, which does not use `HTTP_PROXY`/`HTTPS_PROXY`. A successful curl request does not validate IR's server allowlist.
 
 ## Connecting a script to IR
 
@@ -336,7 +349,11 @@ Concrete shift endpoints reuse rotation permissions: `GET/POST /api/rotations/{r
 | Preview stays queued | Scheduler: `systemctl status incidentrelay-scheduler`; logs: `journalctl -u incidentrelay-scheduler -f`. Docker: `docker compose logs -f incidentrelay-scheduler`. |
 | `API target blocked` | HTTPS, server allowlist and the source network policy. |
 | External API returns 401/403 | PAT validity, permissions and header format. An IR token does not replace the external PAT. |
-| Connection failure | Access from IR, DNS, certificate trust, timeout and pagination. |
+| `API DNS resolution failed` | DNS inside both web and scheduler containers. |
+| `API TLS connection failed` | CA trust, certificate hostname and TLS settings in the IR environment. |
+| `API connection refused` or `API connection failed` | API address, port and direct network access from IR containers. |
+| `API request timed out` | Network access, API response time and `timeout_seconds`. |
+| `API response exceeded the 8 MiB limit` | Reduce the API page size. |
 | `items mapping must resolve to an array` | The operation's `items` path must select an array. |
 | No teams in the preview | Catalog data and `team_filter`; org-service needs nonempty `enrolledScopeUuid`. |
 | A team is marked `skip` | Its local match and whether managing matched teams is enabled. |
@@ -346,5 +363,7 @@ Concrete shift endpoints reuse rotation permissions: `GET/POST /api/rotations/{r
 | Calendar exists but no current assignee | `current_error`, current status/freshness, user activity and enabled periodic updates. |
 
 Transient failures receive up to three attempts. Limits are 8 MiB per response, 10,000 requests and 30 minutes per run, and 100,000 records per operation. Set the 1–60 second request timeout with `timeout_seconds`. Redirects are rejected; authentication failures are not retried. Headers and raw response bodies are excluded from errors and logs.
+
+Response sample requests report external API failures as `sync_api_error`: HTTP 502 for connection or response failures, and HTTP 504 for timeouts. HTTP 409 `sync_conflict` refers to synchronization state, such as a busy source or stale revision. Earlier versions also returned `teams: API connection failed` as `sync_conflict`; that code alone does not prove a team conflict or concurrent run. Background execution requests still return HTTP 202; read subsequent failure details from `last_error` or `current_error`.
 
 A full import is applied in one transaction after all data has loaded. A failed request prevents a partial result from being applied. A per-source lock limits concurrent runs, and queued work survives scheduler restarts.

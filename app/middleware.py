@@ -153,10 +153,15 @@ def enforce_api_authentication():
         find_machine_token,
         valid_machine_token,
     )
-    from app.services.integrations.auth import get_bearer_token
+    from app.services.integrations.auth import get_bearer_token, get_gitlab_change_token
 
-    machine = find_machine_token(get_bearer_token())
-    if request.path == "/api/change-events" and request.method == "POST":
+    gitlab_intake = request.endpoint == "change_events_api.receive_gitlab_event"
+    machine = find_machine_token(
+        get_gitlab_change_token() if gitlab_intake else get_bearer_token()
+    )
+    if request.method == "POST" and (
+        request.path == "/api/change-events" or gitlab_intake
+    ):
         if not machine or not valid_machine_token(machine, machine.change_integration):
             return jsonify({
                 "error": "Active Change integration credential is required",

@@ -105,6 +105,12 @@ def build_openapi_spec():
         "components": {
             "schemas": schemas,
             "securitySchemes": {
+                "gitlabChangeToken": {
+                    "type": "apiKey",
+                    "in": "header",
+                    "name": "X-Gitlab-Token",
+                    "description": "Change integration credential used as GitLab webhook Secret token.",
+                },
                 "bearerAuth": {
                     "type": "http",
                     "scheme": "bearer",

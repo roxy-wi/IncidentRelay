@@ -71,7 +71,7 @@
           </div>
           <p class="muted ci-hint">{{ _('ci.namespace_hint') }}</p>
           <details class="ci-add-form">
-            <summary id="ci-source-form-toggle" class="btn btn-secondary">{{ _('ci.add_source') }}</summary>
+            <summary id="ci-source-form-toggle" class="btn btn-secondary btn-small">{{ _('ci.add_source') }}</summary>
             <form id="ci-add-source" class="form-stack">
               <div class="form-grid-2">
                 <div class="form-group"><label for="ci-owner">{{ _('ci.owner') }}</label><select id="ci-owner" class="input" required aria-describedby="ci-source-lock-hint"></select></div>
@@ -79,9 +79,17 @@
                 <div class="form-group"><label for="ci-ordering">{{ _('ci.ordering') }}</label><select id="ci-ordering" class="input" required><option value="timestamp">{{ _('ci.order_timestamp') }}</option><option value="sequence">{{ _('ci.order_sequence') }}</option></select></div>
               </div>
               <p id="ci-source-lock-hint" class="muted" hidden>{{ _('ci.source_locked_hint') }}</p>
+              <fieldset id="ci-gitlab" class="form-stack" hidden>
+                <legend>{{ _('ci.gitlab_title') }}</legend>
+                <p class="muted">{{ _('ci.gitlab_hint') }}</p>
+                <div class="form-group"><label for="ci-gitlab-url">{{ _('ci.gitlab_url') }}</label><input id="ci-gitlab-url" class="input" readonly></div>
+                <p id="ci-gitlab-status" class="muted" role="status"></p>
+                <div id="ci-gitlab-mappings" class="form-stack"></div>
+                <div class="form-actions-inline"><button id="ci-gitlab-add" type="button" class="btn btn-secondary btn-small" title="{{ _('ci.gitlab_add') }}" aria-label="{{ _('ci.gitlab_add') }}">{{ _('ci.gitlab_add_short') }}</button></div>
+              </fieldset>
               <div class="form-actions-inline">
                 <label id="ci-source-edit-status" class="checkbox-label" hidden><input id="ci-source-active" type="checkbox"><span>{{ _('ci.active') }}</span></label>
-                <button class="btn btn-primary" type="submit">{{ _('ci.add_source') }}</button>
+                <button class="btn btn-primary btn-small" type="submit">{{ _('ci.add_source') }}</button>
                 <button id="ci-source-cancel" class="btn" type="button" hidden>{{ _('ci.cancel') }}</button>
               </div>
             </form>
@@ -96,7 +104,7 @@
           </div>
           <p class="muted ci-hint">{{ _('ci.grant_hint') }}</p>
           <details class="ci-add-form">
-            <summary id="ci-grant-form-toggle" class="btn btn-secondary">{{ _('ci.add_grant') }}</summary>
+            <summary id="ci-grant-form-toggle" class="btn btn-secondary btn-small">{{ _('ci.add_grant') }}</summary>
             <form id="ci-add-grant" class="form-stack">
               <div class="form-grid-2">
                 <div class="form-group"><label for="ci-grant-source">{{ _('ci.source') }}</label><select id="ci-grant-source" class="input" required></select></div>
@@ -106,7 +114,7 @@
               </div>
               <div class="form-actions-inline">
                 <label id="ci-grant-edit-status" class="checkbox-label" hidden><input id="ci-grant-active" type="checkbox"><span>{{ _('ci.active') }}</span></label>
-                <button class="btn btn-primary" type="submit">{{ _('ci.add_grant') }}</button>
+                <button class="btn btn-primary btn-small" type="submit">{{ _('ci.add_grant') }}</button>
                 <button id="ci-grant-cancel" class="btn" type="button" hidden>{{ _('ci.cancel') }}</button>
               </div>
             </form>
@@ -121,20 +129,20 @@
           </div>
           <p class="muted ci-hint">{{ _('ci.credentials_hint') }}</p>
           <details class="ci-add-form">
-            <summary id="ci-token-form-toggle" class="btn btn-secondary">{{ _('ci.issue') }}</summary>
+            <summary id="ci-token-form-toggle" class="btn btn-secondary btn-small">{{ _('ci.issue') }}</summary>
             <form id="ci-issue" class="form-stack">
               <div class="form-grid-2">
                 <div class="form-group"><label for="ci-token-name">{{ _('ci.name') }}</label><input id="ci-token-name" class="input" required maxlength="255"></div>
                 <div class="form-group"><label for="ci-days">{{ _('ci.days') }}</label><input id="ci-days" class="input" type="number" min="1" max="3650" value="90" required></div>
                 <div class="form-group"><label for="ci-rotate">{{ _('ci.replace') }}</label><select id="ci-rotate" class="input"></select></div>
               </div>
-              <div class="form-actions-inline"><button class="btn btn-primary" type="submit">{{ _('ci.issue') }}</button></div>
+              <div class="form-actions-inline"><button class="btn btn-primary btn-small" type="submit">{{ _('ci.issue') }}</button></div>
             </form>
           </details>
           <div id="ci-secret-box" class="form-stack" hidden role="status">
             <label for="ci-secret">{{ _('ci.secret_once') }}</label>
             <textarea id="ci-secret" class="input" readonly rows="3" autocomplete="off" spellcheck="false"></textarea>
-            <div class="form-actions-inline"><button id="ci-clear-secret" type="button" class="btn">{{ _('ci.hide') }}</button></div>
+            <div class="form-actions-inline"><button id="ci-clear-secret" type="button" class="btn btn-small">{{ _('ci.hide') }}</button></div>
           </div>
         </section>
       </div>

@@ -4,6 +4,7 @@
 #ci-modal .input {width: 100%; min-width: 0; box-sizing: border-box;}
 #ci-modal p {margin: 0;}
 #ci-modal .form-actions-inline {justify-content: flex-start;}
+#ci-modal .btn-small:not(.btn-icon) {min-height: 24px; height: 24px; padding: 0 8px; gap: 4px;}
 #ci-modal .ci-field-label {font-weight: 750;}
 #ci-modal .page-tabs {margin: 16px 0 12px;}
 #ci-modal .data-table {min-width: 760px;}

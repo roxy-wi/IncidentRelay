@@ -3853,6 +3853,7 @@ class ChangeSource(BaseModel):
         default="timestamp",
         constraints=[Check("ordering_mode IN ('timestamp', 'sequence')")],
     )
+    gitlab_mappings = JSONTextField(default=list, constraints=[SQL("DEFAULT '[]'")])
     created_at = DateTimeField(default=utc_now)
     updated_at = DateTimeField(default=utc_now)
 

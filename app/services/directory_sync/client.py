@@ -5,12 +5,21 @@ import re
 import time
 from urllib.parse import quote, urlencode
 
-from app.services.directory_sync.config import SyncError, path_value
+from app.services.directory_sync.config import SyncApiError, SyncError, path_value
 from app.services.orchestration.webhooks import (
     WebhookDeliveryError, WebhookSecurityError, WebhookValidationError, _request_once,
 )
 
 _VARIABLE = re.compile(r"\{([a-z_]+)\}")
+_CONNECTION_FAILURES = {
+    "dns": "DNS resolution failed; check DNS in the IR container or server",
+    "tls": "TLS connection failed; check certificate trust, hostname and TLS settings in the IR container or server",
+    "timeout": "request timed out; check network access and timeout_seconds",
+    "connection_refused": "connection refused; check the API port and whether the service is listening",
+    "connection": "connection failed; check the API address, port and network access from the IR container or server",
+    "protocol": "connection interrupted while reading the response; check the API server and network",
+    "response_too_large": "response exceeded the 8 MiB limit; reduce the API page size",
+}
 
 
 def render(value, context, *, url=False):
@@ -67,6 +76,7 @@ class ApiClient:
                     body=json.dumps(body).encode() if body is not None else b"",
                     timeout_seconds=self.config.timeout_seconds,
                     private_network_policy=self.config.private_network_policy,
+                    verify_tls=self.config.verify_tls,
                     max_response_bytes=8 * 1024 * 1024,
                 )
             except (WebhookSecurityError, WebhookValidationError) as error:
@@ -75,18 +85,22 @@ class ApiClient:
                 if attempt < 2 and error.retryable:
                     time.sleep(0.25 * (2 ** attempt))
                     continue
-                raise SyncError(f"{name}: API connection failed") from error
+                detail = _CONNECTION_FAILURES.get(error.reason, _CONNECTION_FAILURES["connection"])
+                raise SyncApiError(
+                    f"{name}: API {detail}",
+                    status_code=504 if error.reason == "timeout" else 502,
+                ) from error
             if status in {408, 429, 500, 502, 503, 504} and attempt < 2:
                 time.sleep(0.25 * (2 ** attempt))
                 continue
             if not 200 <= status < 300:
-                raise SyncError(f"{name}: API returned HTTP {status}")
+                raise SyncApiError(f"{name}: API returned HTTP {status}", status_code=504 if status == 504 else 502)
             try:
                 data = json.loads(payload)
             except (ValueError, UnicodeError) as error:
-                raise SyncError(f"{name}: API did not return valid JSON") from error
+                raise SyncApiError(f"{name}: API did not return valid JSON") from error
             if not isinstance(data, (dict, list)):
-                raise SyncError(f"{name}: expected a JSON object or array")
+                raise SyncApiError(f"{name}: expected a JSON object or array")
             # Show field names/types only: no raw profiles, tokens or response bodies.
             self.samples.setdefault(name, describe(data))
             return data

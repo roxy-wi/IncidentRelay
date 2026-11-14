@@ -1,4 +1,6 @@
 {
+  "ds.skip_tls": "Omitir la verificación del certificado TLS",
+  "ds.skip_tls_hint": "Para API con certificados autofirmados. Desactiva la verificación del certificado y del nombre del servidor en todas las solicitudes de esta fuente únicamente. Desactivado de forma predeterminada.",
   "ds.title": "Sincronización de directorios",
   "ds.intro": "Importa equipos, personas y calendarios de guardias mediante APIs configurables.",
   "ds.new": "Añadir origen",

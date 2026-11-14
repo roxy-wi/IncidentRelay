@@ -12,7 +12,7 @@ from app.services.admin_tokens import lock_admin_api_token
 from app.services.audit import write_audit
 from app.services.change_intelligence.management import managed_groups
 from app.services.directory_sync.client import ApiClient
-from app.services.directory_sync.config import StrictModel, SyncConfig, SyncError, org_service_preset
+from app.services.directory_sync.config import StrictModel, SyncApiError, SyncConfig, SyncError, org_service_preset
 from app.services.directory_sync.fetch import window
 from app.services.directory_sync.service import authorized_actor
 from app.services.orchestration.webhooks import _normalize_headers, WebhookValidationError
@@ -51,6 +51,11 @@ def no_cache(response):
 @directory_sync_bp.errorhandler(SyncError)
 def sync_error(error):
     return make_error_response("sync_conflict", str(error), 409)
+
+
+@directory_sync_bp.errorhandler(SyncApiError)
+def sync_api_error(error):
+    return make_error_response("sync_api_error", str(error), error.status_code)
 
 
 @directory_sync_bp.errorhandler(DoesNotExist)
@@ -135,7 +140,8 @@ def save_source(source_id=None):
                 raise SyncError("Destination group cannot change after creation")
             if payload.revision != source.revision:
                 raise SyncError("Configuration changed; reload it before saving")
-            config_changed = source.config != payload.config.model_dump() or headers is not None
+            previous_config = SyncConfig.model_validate(source.config).model_dump()
+            config_changed = previous_config != payload.config.model_dump() or headers is not None
             if payload.enabled and (source.approved_revision != source.revision or config_changed):
                 raise SyncError("Apply a preview of this configuration before enabling periodic sync")
             source.name = payload.name.strip()

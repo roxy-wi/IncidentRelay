@@ -2,7 +2,7 @@
 
 from contextlib import nullcontext
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, url_for
 from peewee import DoesNotExist, fn
 
 from app.api.schemas import change_integrations as schemas
@@ -104,6 +104,8 @@ def source_data(source, grants, teams, services, *, identity_editable):
         "source": source.source,
         "active": source.active,
         "ordering_mode": source.ordering_mode,
+        "gitlab_mappings": source.gitlab_mappings,
+        "gitlab_webhook_path": url_for("change_events_api.receive_gitlab_event", source_id=source.id),
         "identity_editable": identity_editable,
         "grants": [grant_data(grant, teams, services) for grant in grants],
     }
@@ -268,18 +270,38 @@ def list_targets():
         if integration is not None and integration.owner_group_id is not None:
             teams = teams.where(Team.group == integration.owner_group_id)
         team_id = request.args.get("team_id", type=int)
+        source_id = request.args.get("source_id", type=int)
+        if "source_id" in request.args and (not source_id or integration is None):
+            return make_error_response("invalid_id", "Source requires an integration ID", 400)
         services = (
             Service.select()
             .where(
-                Service.team == team_id,
                 Service.enabled == True,
                 Service.deleted == False,
                 Service.team.in_(teams.select(Team.id)),
             )
             .order_by(Service.name, Service.id)
-            if team_id
-            else []
         )
+        if source_id:
+            ChangeSource.get(
+                ChangeSource.id == source_id, ChangeSource.integration == integration.id
+            )
+            grants = ChangeGrant.select().where(
+                ChangeGrant.source == source_id,
+                ChangeGrant.active == True,
+                ChangeGrant.capability == "changed",
+            )
+            # Pin both service and team: a moved service must not inherit a grant.
+            authorized = grants.where(
+                ChangeGrant.target_team == Service.team,
+                (ChangeGrant.target_service.is_null(True))
+                | (ChangeGrant.target_service == Service.id),
+            )
+            services = services.where(fn.EXISTS(authorized.select(ChangeGrant.id)))
+        elif team_id:
+            services = services.where(Service.team == team_id)
+        else:
+            services = []
         return jsonify(
             {
                 "groups": [{"id": group.id, "name": group.name} for group in groups],
@@ -294,7 +316,8 @@ def list_targets():
                     for team in teams
                 ],
                 "services": [
-                    {"id": service.id, "name": service.name, "slug": service.slug}
+                    {"id": service.id, "name": service.name, "slug": service.slug,
+                     "team_id": service.team_id}
                     for service in services
                 ],
             }

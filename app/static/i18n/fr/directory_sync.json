@@ -1,4 +1,6 @@
 {
+  "ds.skip_tls": "Ignorer la vérification du certificat TLS",
+  "ds.skip_tls_hint": "Pour les API avec des certificats autosignés. Désactive la vérification du certificat et du nom du serveur pour toutes les requêtes de cette source uniquement. Désactivé par défaut.",
   "ds.title": "Synchronisation d'annuaires",
   "ds.intro": "Importez des équipes, des personnes et des plannings d'astreinte depuis des API configurables.",
   "ds.new": "Ajouter une source",

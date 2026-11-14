@@ -21,6 +21,10 @@
             <div class="form-group"><label for="ds-url">{{ _('ds.url') }}</label><input id="ds-url" class="input" type="url" required></div>
             <div class="form-group"><label for="ds-network">{{ _('ds.network') }}</label><select id="ds-network" class="input"><option value="deny">{{ _('ds.public') }}</option><option value="allowlist">{{ _('ds.allowlist') }}</option></select></div>
           </div>
+          <div class="form-group">
+            <label class="checkbox-label"><input id="ds-skip-tls" type="checkbox" aria-describedby="ds-skip-tls-hint"><span>{{ _('ds.skip_tls') }}</span></label>
+            <small id="ds-skip-tls-hint" class="muted">{{ _('ds.skip_tls_hint') }}</small>
+          </div>
           <div class="form-group"><label for="ds-headers">{{ _('ds.headers') }}</label><input id="ds-headers" type="text" class="input code-textarea" spellcheck="false" autocomplete="off" aria-describedby="ds-headers-hint" placeholder='{"Authorization": "PAT …"}'><small id="ds-headers-hint" class="muted">{{ _('ds.headers_hint') }}</small></div>
           <div class="form-group"><label for="ds-operations">{{ _('ds.operations') }}</label><textarea id="ds-operations" class="code-textarea" rows="12" spellcheck="false" required></textarea><small class="muted">{{ _('ds.operations_hint') }}</small></div>
         </fieldset>

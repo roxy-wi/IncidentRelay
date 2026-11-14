@@ -1,4 +1,6 @@
 {
+  "ds.skip_tls": "Skip TLS certificate verification",
+  "ds.skip_tls_hint": "For APIs with self-signed certificates. Disables certificate and hostname verification for all requests from this source only. Off by default.",
   "ds.title": "Directory synchronization",
   "ds.intro": "Import teams, people and on-call schedules from configurable APIs.",
   "ds.new": "Add source",
