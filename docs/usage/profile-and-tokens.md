@@ -59,6 +59,25 @@ A normal user sees groups where they have active membership. A global admin can 
 
 Personal tokens allow API access as the current user.
 
+Access is the intersection of the token's scopes, its Group/Team bounds and the
+owner's current permissions. A global administrator's token still respects its
+Group/Team bounds. These bounds also apply to resource lists, alert intake,
+maintenance windows and CalDAV; CalDAV additionally requires Team membership.
+Tokens belonging to inactive or deleted users are rejected.
+Orchestration administration is Group-scoped and requires a token without a
+Team bound, even for service orchestrations.
+
+When a personal token creates another token through `/api/profile/tokens`, the
+new token cannot gain additional scopes or switch to another Group. Omitted or
+`null` Group bounds inherit the parent's Group, and Team bounds are always
+inherited. The new token's expiry cannot exceed the parent's expiry. Tokens
+remain independently revocable; revoking the parent does not revoke its children.
+
+Legacy intake tokens without a user must have an explicit Group or Team bound.
+Route intake tokens remain limited to their route, including when orchestration
+selects a destination. Matching fingerprints in other routes do not update or
+resolve that route's alerts or pending events.
+
 Recommended practices:
 
 - use short-lived tokens where possible;

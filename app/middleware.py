@@ -6,11 +6,11 @@ from flask import jsonify, request
 from app.login import decode_access_token
 from app.modules.db import users_repo
 from app.settings import Config
+from app.services.authorization import bind_authorization, token_allows_operation
 from app.services.api_token_scopes import (
     is_public_api_request,
     is_public_calendar_feed_path as is_public_calendar_feed_request,
     required_scopes_for_path,
-    token_has_scopes,
 )
 
 
@@ -50,8 +50,7 @@ def load_jwt_user():
         request.current_user = None
         return None
 
-    request.current_user = user
-    request.current_auth_type = "jwt"
+    bind_authorization(kind="jwt", user=user)
     return user
 
 
@@ -97,7 +96,7 @@ def required_scopes_for_request():
 
 def api_token_has_scopes(api_token, required_scopes):
     """Return True when an API token has the required effective scopes."""
-    return token_has_scopes(api_token.scopes or [], required_scopes)
+    return token_allows_operation(api_token, required_scopes)
 
 def load_api_token_principal():
     """
@@ -166,9 +165,7 @@ def enforce_api_authentication():
             return jsonify({
                 "error": "Active Change integration credential is required",
             }), 401
-        request.current_api_token = machine
-        request.current_auth_type = "change_integration"
-        request.current_user = None
+        bind_authorization(kind="change_integration", token=machine)
         return None
     if machine is not None:
         return jsonify({
@@ -193,7 +190,7 @@ def enforce_api_authentication():
             return api_token_or_response
         return None
 
-    if Config.API_AUTH_REQUIRED:
+    if Config.API_AUTH_REQUIRED or get_bearer_token():
         return jsonify({"error": "JWT or API token authentication is required"}), 401
 
     return None

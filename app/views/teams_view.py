@@ -13,6 +13,7 @@ from app.api.schemas.teams import (
 from app.modules.db import groups_repo, teams_repo
 from app.services.audit import write_audit
 from app.services.rbac import (
+    is_admin_user,
     get_allowed_oncall_team_ids,
     require_group_write,
     require_team_user_admin,
@@ -36,7 +37,7 @@ def list_teams():
     )
     active_only = not include_inactive
 
-    if user and user.is_admin:
+    if is_admin_user(user):
         teams = teams_repo.list_teams(active_only=active_only)
     else:
         team_ids = set(

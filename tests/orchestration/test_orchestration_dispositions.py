@@ -349,6 +349,7 @@ def test_resolve_winning_after_claim_cancels_activation(db, monkeypatch):
         assert claimed is not None
         resolved = resolve_pending_event(
             group_id=group.id,
+            route_id=route.id,
             source="alertmanager",
             dedup_key="pause-claim-resolve-1",
             now=now,

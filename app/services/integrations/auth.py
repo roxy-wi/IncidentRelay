@@ -7,8 +7,6 @@ from flask import jsonify, request
 from app.middleware import load_jwt_user
 from app.modules.db import routes_repo, tokens_repo
 from app.settings import Config
-from app.modules.common import utc_now
-from app.services.api_token_scopes import token_has_scopes
 
 
 def create_raw_token():
@@ -95,28 +93,17 @@ def authenticate_api_token(raw_token=None):
         request.current_api_token = None
         return None
 
+    from app.services.authorization import bind_authorization, valid_personal_token
+
     api_token = tokens_repo.get_active_token_by_hash(hash_token(raw_token))
 
-    if not api_token:
-        request.current_api_token = None
-        return None
-
-    # Machine credentials have their own authentication and exact route allowlist.
-    if api_token.change_integration_id is not None:
-        request.current_api_token = None
-        return None
-
-    if api_token.expires_at and api_token.expires_at <= utc_now():
+    if not valid_personal_token(api_token):
         request.current_api_token = None
         return None
 
     tokens_repo.mark_token_used(api_token)
 
-    request.current_api_token = api_token
-    request.current_auth_type = "api_token"
-
-    if api_token.user and api_token.user.active:
-        request.current_user = api_token.user
+    bind_authorization(kind="api_token", user=api_token.user, token=api_token)
 
     return api_token
 
@@ -138,8 +125,9 @@ def authenticate_route_token(raw_token=None):
         request.current_intake_route = None
         return None
 
-    request.current_intake_route = route
-    request.current_auth_type = "route_token"
+    from app.services.authorization import bind_authorization
+
+    bind_authorization(kind="route_token", route=route)
 
     return route
 
@@ -167,7 +155,8 @@ def authenticate_request():
 
 def token_has_scope(api_token, required_scopes):
     """Return True when an API token has all required effective scopes."""
-    return token_has_scopes(api_token.scopes or [], required_scopes)
+    from app.services.authorization import token_allows_operation
+    return token_allows_operation(api_token, required_scopes)
 
 
 def require_api_token(scopes=None, required=None):

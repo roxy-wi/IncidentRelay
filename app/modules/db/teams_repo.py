@@ -140,6 +140,8 @@ def update_team(team_id, data):
     from app.services.change_intelligence.catalog import catalog_authorization_change
 
     with catalog_authorization_change(team_id=team_id):
+        from app.services.authorization import recheck_team_write
+        recheck_team_write(team_id, destination_group_id=data.get("group"))
         team = get_team(team_id)
         for field in ["group", "slug", "name", "description", "escalation_enabled", "escalation_after_reminders", "active"]:
             if field in data:

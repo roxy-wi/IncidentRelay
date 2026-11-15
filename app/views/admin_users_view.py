@@ -8,6 +8,7 @@ from app.login import hash_password
 from app.modules.db import groups_repo, users_repo
 from app.services.audit import write_audit
 from app.services.rbac import (
+    is_admin_user,
     get_allowed_group_ids,
     require_admin_user,
     require_user_management_access,
@@ -109,7 +110,7 @@ def admin_list_users():
 
     user = request.current_user
 
-    if user.is_admin:
+    if is_admin_user(user):
         query = users_repo.build_all_users_query()
     else:
         group_ids = get_allowed_group_ids(

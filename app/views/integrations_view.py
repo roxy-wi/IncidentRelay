@@ -29,6 +29,8 @@ from app.modules.db import channels_repo, users_repo, alerts_repo, routes_repo
 from app.services.alerts.actions import acknowledge_alert, resolve_alert
 from app.services.alerts.shelving import shelve_alert_group, unshelve_alert_group
 from app.services.alerts.lifecycle import upsert_alert
+from app.services.authorization import require_intake_route
+from app.services.routing.routing import find_route_for_alert
 from app.services.integrations.auth import (
     authenticate_route_token,
     get_basic_route_token,
@@ -252,10 +254,15 @@ def _process_nagios_lifecycle(alert_data):
     if action != "acknowledge":
         return process_incoming_alerts([alert_data])
 
+    if intake_route is None:
+        intake_route = find_route_for_alert(alert_data)
+    if intake_route is None:
+        return jsonify({"status": "ignored", "reason": "matching_alert_not_found"}), 200
+    require_intake_route(intake_route)
     existing_alert = alerts_repo.find_existing_alert(
         source="nagios",
         dedup_key=dedup_key,
-        route_id=intake_route.id if intake_route else None,
+        route_id=intake_route.id,
     )
 
     if not existing_alert or not existing_alert.group:
@@ -265,7 +272,9 @@ def _process_nagios_lifecycle(alert_data):
             "dedup_key": dedup_key,
         }), 200
 
-    group = acknowledge_alert(existing_alert.group.id, source="integration")
+    group = acknowledge_alert(
+        existing_alert.group.id, source="integration", intake_route=intake_route,
+    )
     return jsonify({
         "status": "acknowledged",
         "dedup_key": dedup_key,
@@ -602,9 +611,9 @@ def _process_pagerduty_events_v2(alert_data):
         group_id = existing_alert.group.id
 
         if action == "acknowledge":
-            acknowledge_alert(group_id, source="integration")
+            acknowledge_alert(group_id, source="integration", intake_route=intake_route)
         elif action == "resolve":
-            resolve_alert(group_id, source="integration")
+            resolve_alert(group_id, source="integration", intake_route=intake_route)
 
     logging.getLogger("oncall.alerts").info(
         "PagerDuty Events API v2 lifecycle event processed",

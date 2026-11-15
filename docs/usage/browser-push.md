@@ -28,6 +28,8 @@ Browser push requires:
 
 For local testing, browser push generally requires HTTPS, except for browser-specific localhost exceptions.
 
+The push service endpoint must use HTTPS and resolve only to public IP addresses. IncidentRelay checks the destination on every delivery, including existing subscriptions, and does not follow redirects. The outbound private-network allowlist for administrator-configured integrations does not apply to user push subscriptions. Disabling browser push also disables profile test notifications.
+
 ## Configuration
 
 Add the browser push section to the main IncidentRelay config:

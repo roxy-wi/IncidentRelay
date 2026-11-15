@@ -1,6 +1,7 @@
 from typing import Dict, FrozenSet
 
 from app.modules.db.models import UserGroup
+from app.services.authorization import token_allows_group
 
 
 VIEW = "orchestration.view"
@@ -38,6 +39,9 @@ GROUP_ROLE_PERMISSIONS: Dict[str, FrozenSet[str]] = {
 
 
 def has_orchestration_permission(user, group_id: int, permission: str) -> bool:
+    """Apply credential bounds to the existing Group-level orchestration roles."""
+    if user is None or not token_allows_group(group_id):
+        return False
     if permission not in ALL_PERMISSIONS:
         return False
     if bool(getattr(user, "is_admin", False)):

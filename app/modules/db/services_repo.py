@@ -164,6 +164,8 @@ def update_service(service_id, data):
 
     with catalog_authorization_change(service_id=service_id, team_id=data.get("team")):
         service = get_service(service_id)
+        from app.services.authorization import recheck_team_write
+        recheck_team_write(service.team_id, destination_team_id=data.get("team"))
 
         if "team" in data:
             team = Team.get_by_id(data["team"])

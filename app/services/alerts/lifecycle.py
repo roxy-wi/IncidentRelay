@@ -4,6 +4,9 @@ from app import Config
 from app.modules.common import utc_now
 from app.modules.db import alert_episodes_repo, alerts_repo, incident_core_repo
 from app.modules.db.models import Alert
+from app.services.authorization import (
+    refresh_authority, require_intake_route, require_intake_target,
+)
 from app.services.alerts.reopen import (
     lock_grouping_identity,
     find_exact_open_group,
@@ -399,10 +402,16 @@ def _handle_existing_alert(
     runtime=None,
 ):
     with incident_core_repo.write_transaction():
+        refresh_authority(lock=True)
+        require_intake_route(route, service=service, lock=True)
         group = existing_alert.group or existing_group
         if group is not None:
             group = incident_core_repo.lock_alert_group(group.id)
         existing_alert = Alert.get_by_id(existing_alert.id)
+        if existing_alert.route_id != route.id or existing_alert.team_id != team.id:
+            return None
+        if group is not None:
+            require_intake_target(group, route)
         if (
             existing_alert.status == "resolved"
             or (group is not None and existing_alert.group_id != group.id)
@@ -690,12 +699,14 @@ def _upsert_alert(alert_data, trace, runtime=None):
             },
         )
 
+    require_intake_route(route)
     team = route.team
     service = (
         runtime.service
         if runtime and runtime.service
         else resolve_alert_service(route, alert_data)
     )
+    require_intake_route(route, service=service)
 
     if runtime is not None and service is not None:
         runtime = run_service_orchestration(
@@ -737,6 +748,7 @@ def _upsert_alert(alert_data, trace, runtime=None):
             else resolve_alert_service(route, alert_data)
         )
 
+    require_intake_route(route, service=service)
     rotation = get_effective_route_rotation(route, service)
 
     trace.route_matched(route, team)
@@ -749,6 +761,7 @@ def _upsert_alert(alert_data, trace, runtime=None):
     if status == "resolved" and group_id is not None:
         pending = resolve_pending_event(
             group_id=group_id,
+            route_id=route.id,
             source=alert_data.get("source"),
             dedup_key=alert_data.get("dedup_key"),
             trace=trace,
@@ -855,7 +868,16 @@ def _upsert_alert(alert_data, trace, runtime=None):
         alert_data["source"],
         alert_data["dedup_key"],
         grouping_window_seconds,
+        route_id=route.id,
     )
+    if existing_alert is not None and (
+        existing_alert.team_id != team.id
+        or (existing_alert.group is not None and (
+            existing_alert.group.team_id != team.id
+            or existing_alert.group.route_id != route.id
+        ))
+    ):
+        existing_alert = None
     reopen_window_seconds = (
         runtime.grouping_reopen_window_seconds if runtime is not None else 0
     )
@@ -1033,6 +1055,8 @@ def _upsert_alert(alert_data, trace, runtime=None):
         # SQLite needs a writer reservation before SELECTs in the reopen path.
         # PostgreSQL uses a transaction-scoped advisory lock by grouping identity.
         with incident_core_repo.write_transaction():
+            refresh_authority(lock=True)
+            require_intake_route(route, service=service, lock=True)
             if reopen_enabled:
                 lock_grouping_identity(
                     source=alert_data["source"], group_key=group_key,
@@ -1099,6 +1123,8 @@ def _upsert_alert(alert_data, trace, runtime=None):
                         trace.group_reopened(group)
             if group is not None and not reopened_group:
                 group = incident_core_repo.lock_alert_group(group.id)
+                if group is not None:
+                    require_intake_target(group, route)
                 if group and (
                     group.status in alert_episodes_repo.TERMINAL_STATUSES
                     or group.merged_into_id

@@ -10,6 +10,7 @@ from app.db import database_proxy as db
 from app.modules.db import maintenance_repo
 from app.modules.db.models import AlertRoute, Group, MaintenanceWindow, Service, Team, User
 from app.services import rbac
+from app.services.authorization import refresh_authority, token_allows_owner
 from app.services.audit import record_audit
 from app.services.serializers.common import serialize_utc_datetime
 from app.modules.common import as_naive_datetime
@@ -228,13 +229,54 @@ def _can_manage_scope(current_user, scope):
     return False
 
 
+def _ensure_token_owner(group_id, team_id):
+    """Keep maintenance mutations inside the authenticated token's bounds."""
+    if not token_allows_owner(group_id, team_id):
+        raise PermissionError("access denied")
+
+
+def _ensure_token_scope(scope):
+    """Check each scope, including scopes beyond the window's primary owner."""
+    token = rbac.current_api_token()
+    if token is None or (token.group_id is None and token.team_id is None):
+        return
+    owner = _window_owner_from_scopes([scope])
+    _ensure_token_owner(
+        getattr(owner["group"], "id", None),
+        getattr(owner["team"], "id", None),
+    )
+
+
 def _ensure_can_manage_scopes(current_user, scopes):
+    if rbac.current_api_token() is not None:
+        current_user = rbac.current_user()
     for scope in scopes or []:
+        _ensure_token_scope(scope)
         if not _can_manage_scope(current_user, scope):
             raise PermissionError("access denied")
 
 
 def _ensure_can_manage_existing_window(current_user, window):
+    refresh_authority(lock=True)
+    if rbac.current_api_token() is not None:
+        current_user = rbac.current_user()
+    scopes = maintenance_repo.list_maintenance_window_scopes(window)
+    scope_payloads = [
+        {
+            "scope_type": scope.scope_type,
+            "group_id": scope.group_id,
+            "team_id": scope.team_id,
+            "service_id": scope.service_id,
+            "route_id": scope.route_id,
+        }
+        for scope in scopes
+    ]
+    # Legacy windows may have only scopes and no primary owner columns.
+    if window.group_id or window.team_id or not scope_payloads:
+        _ensure_token_owner(window.group_id, window.team_id)
+    for scope in scope_payloads:
+        _ensure_token_scope(scope)
+
     if getattr(current_user, "is_admin", False):
         return
 
@@ -244,17 +286,7 @@ def _ensure_can_manage_existing_window(current_user, window):
     if window.group_id and rbac.can_write_group(current_user, window.group_id):
         return
 
-    scopes = maintenance_repo.list_maintenance_window_scopes(window)
-
-    for scope in scopes:
-        scope_payload = {
-            "scope_type": scope.scope_type,
-            "group_id": scope.group_id,
-            "team_id": scope.team_id,
-            "service_id": scope.service_id,
-            "route_id": scope.route_id,
-        }
-
+    for scope_payload in scope_payloads:
         if _can_manage_scope(current_user, scope_payload):
             return
 
@@ -482,6 +514,8 @@ def create_maintenance_window(payload, *, user_id, api_token_id=None):
     data.update(_window_owner_from_scopes(scopes))
 
     with db.atomic():
+        refresh_authority(lock=True)
+        _ensure_can_manage_scopes(user, scopes)
         window = maintenance_repo.create_maintenance_window(**data)
         maintenance_repo.replace_maintenance_window_scopes(window, scopes)
         _record_maintenance_command(
@@ -500,14 +534,13 @@ def update_maintenance_window(window_id, payload, *, user_id, api_token_id=None)
         window = _lock_maintenance_window(window_id)
         if not window:
             raise LookupError("maintenance window was not found")
+        _ensure_can_manage_existing_window(user, window)
 
         data = normalize_window_payload(payload, existing_window=window, partial=True)
         scopes = data.pop("scopes", None)
         if scopes is not None:
             _ensure_can_manage_scopes(user, scopes)
             data.update(_window_owner_from_scopes(scopes))
-        else:
-            _ensure_can_manage_existing_window(user, window)
 
         # Invalidate the previous reconciliation marker before the config commit.
         data["reconciled_at"] = None

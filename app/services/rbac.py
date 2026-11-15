@@ -10,6 +10,7 @@ from app.api.schemas.roles import (
 )
 from app.modules.db import groups_repo, teams_repo
 from app.modules.db.models import Group, UserGroup
+from app.services import authorization
 
 GROUP_READ_ROLES = {GROUP_VIEWER_ROLE, GROUP_EDITOR_ROLE, GROUP_USER_ADMIN_ROLE}
 GROUP_WRITE_ROLES = {
@@ -33,31 +34,18 @@ def current_user():
 
 
 def current_api_token():
-    """Return the current request API token."""
-
-    if not has_request_context():
-        return None
-
-    return getattr(request, "current_api_token", None)
+    """Return the credential from the shared authorization context."""
+    return authorization.current_authorization().token
 
 
 def is_admin_user(user=None):
-    """Return True when the current principal is an administrator."""
-    user = user or current_user()
-    return bool(user and user.is_admin)
+    """Return whether the caller has unrestricted global administration."""
+    return authorization.unrestricted_admin(user or current_user())
 
 
 def token_group_filter(group_ids):
-    """Apply group restriction from the current API token."""
-    api_token = current_api_token()
-    if not api_token or not api_token.group_id:
-        return group_ids
-
-    return [
-        group_id
-        for group_id in group_ids
-        if group_id == api_token.group_id
-    ]
+    """Apply the shared credential bounds to visible Groups."""
+    return authorization.filter_group_ids(group_ids)
 
 
 def get_allowed_group_ids(user=None, write_required=False, manage_users_required=False, use_active_group=False):
@@ -70,7 +58,10 @@ def get_allowed_group_ids(user=None, write_required=False, manage_users_required
     if not user:
         api_token = current_api_token()
         if api_token and api_token.group_id:
-            return [api_token.group_id]
+            return token_group_filter([api_token.group_id])
+        if api_token and api_token.team_id:
+            team = teams_repo.get_team(api_token.team_id)
+            return token_group_filter([team.group_id]) if team else []
         return []
 
     if user.is_admin:
@@ -110,22 +101,22 @@ def get_allowed_team_ids(
         return []
 
     if not user:
-        return [
+        return authorization.filter_team_ids([
             team.id
             for team in teams_repo.list_teams(
                 active_only=active_only,
                 group_ids=group_ids,
             )
-        ]
+        ])
 
     if user.is_admin:
-        return [
+        return authorization.filter_team_ids([
             team.id
             for team in teams_repo.list_teams(
                 active_only=active_only,
                 group_ids=group_ids,
             )
-        ]
+        ])
 
     managed_group_ids = get_managed_group_ids(
         user=user,
@@ -156,7 +147,7 @@ def get_allowed_team_ids(
         )
     }
 
-    return sorted(managed_team_ids | member_team_ids)
+    return authorization.filter_team_ids(sorted(managed_team_ids | member_team_ids))
 
 
 def get_allowed_oncall_team_ids(
@@ -184,16 +175,16 @@ def get_allowed_oncall_team_ids(
     if not group_ids:
         return []
 
-    return [
+    return authorization.filter_team_ids([
         team.id
         for team in teams_repo.list_teams(
             active_only=active_only,
             group_ids=group_ids,
         )
-    ]
+    ])
 
 
-def can_read_group(user, group_id):
+def _user_can_read_group(user, group_id):
     """Return True when a user can read a group."""
     if not user:
         return False
@@ -202,7 +193,7 @@ def can_read_group(user, group_id):
     return groups_repo.get_user_group_role(user.id, group_id) in GROUP_READ_ROLES
 
 
-def can_write_group(user, group_id):
+def _user_can_write_group(user, group_id):
     """Return True when a user can create/edit group operational resources."""
     if not user:
         return False
@@ -211,7 +202,7 @@ def can_write_group(user, group_id):
     return groups_repo.get_user_group_role(user.id, group_id) in GROUP_WRITE_ROLES
 
 
-def can_manage_group_users(user, group_id):
+def _user_can_manage_group_users(user, group_id):
     """Return True when a user can manage users inside the group boundary."""
     if not user:
         return False
@@ -220,7 +211,7 @@ def can_manage_group_users(user, group_id):
     return groups_repo.get_user_group_role(user.id, group_id) in GROUP_USER_ADMIN_ROLES
 
 
-def can_read_team(user, team_id):
+def _user_can_read_team(user, team_id):
     """
     Return True when a user can read a team.
     """
@@ -232,14 +223,14 @@ def can_read_team(user, team_id):
     team = teams_repo.get_team(team_id)
     if not team or not team.group_id:
         return False
-    if can_manage_group_users(user, team.group_id):
+    if _user_can_manage_group_users(user, team.group_id):
         return True
-    if not can_read_group(user, team.group_id):
+    if not _user_can_read_group(user, team.group_id):
         return False
     return teams_repo.get_user_team_role(user.id, team_id) in TEAM_READ_ROLES
 
 
-def can_view_team_oncall(user, team_id):
+def _user_can_view_team_oncall(user, team_id):
     """Return True when user can view on-call schedule for a team."""
 
     if not user:
@@ -253,10 +244,10 @@ def can_view_team_oncall(user, team_id):
     if not team or not team.group_id:
         return False
 
-    return can_read_group(user, team.group_id)
+    return _user_can_read_group(user, team.group_id)
 
 
-def can_respond_team(user, team_id):
+def _user_can_respond_team(user, team_id):
     """Return True when a user can acknowledge or resolve alerts for a team."""
     if not user:
         return False
@@ -266,12 +257,12 @@ def can_respond_team(user, team_id):
     team = teams_repo.get_team(team_id)
     if not team.group_id:
         return False
-    if not can_read_group(user, team.group_id):
+    if not _user_can_read_group(user, team.group_id):
         return False
     return teams_repo.get_user_team_role(user.id, team_id) in TEAM_RESPOND_ROLES
 
 
-def can_write_team(user, team_id):
+def _user_can_write_team(user, team_id):
     """Return True when a user can write team resources."""
     if not user:
         return False
@@ -283,16 +274,16 @@ def can_write_team(user, team_id):
     if not team or not team.group_id:
         return False
 
-    if not can_read_group(user, team.group_id):
+    if not _user_can_read_group(user, team.group_id):
         return False
 
-    if can_manage_group_users(user, team.group_id):
+    if _user_can_manage_group_users(user, team.group_id):
         return True
 
     return teams_repo.get_user_team_role(user.id, team_id) in TEAM_WRITE_ROLES
 
 
-def can_access_team_or_group_resource(user, team_id, write_required=False):
+def _user_can_access_team_or_group_resource(user, team_id, write_required=False):
     """Return True when a user can access a team-owned operational resource.
 
     Used for resources such as notification channels and silences:
@@ -304,17 +295,63 @@ def can_access_team_or_group_resource(user, team_id, write_required=False):
         return False
 
     if write_required:
-        if can_write_team(user, team_id):
+        if _user_can_write_team(user, team_id):
             return True
     else:
-        if can_read_team(user, team_id):
+        if _user_can_read_team(user, team_id):
             return True
 
     team = teams_repo.get_team(team_id)
     if not team or not team.group_id:
         return False
 
-    return can_write_group(user, team.group_id)
+    return _user_can_write_group(user, team.group_id)
+
+
+def can_read_group(user, group_id):
+    """Apply credential bounds and the existing group read permission."""
+    return authorization.authorize_group(user, group_id, "read")
+
+
+def can_write_group(user, group_id):
+    """Apply credential bounds and the existing group write permission."""
+    return authorization.authorize_group(user, group_id, "write")
+
+
+def can_manage_group_users(user, group_id):
+    """Apply credential bounds and the existing group manage_users permission."""
+    return authorization.authorize_group(user, group_id, "manage_users")
+
+
+def can_read_team(user, team_id):
+    """Apply credential bounds and the existing team read permission."""
+    return authorization.authorize_team(user, team_id, "read")
+
+
+def can_view_team_oncall(user, team_id):
+    """Apply credential bounds and the existing team oncall permission."""
+    return authorization.authorize_team(user, team_id, "oncall")
+
+
+def can_respond_team(user, team_id):
+    """Apply credential bounds and the existing team respond permission."""
+    return authorization.authorize_team(user, team_id, "respond")
+
+
+def can_write_team(user, team_id):
+    """Apply credential bounds and the existing team write permission."""
+    return authorization.authorize_team(user, team_id, "write")
+
+
+def can_manage_team_users(user, team_id):
+    """Apply credential bounds and the existing team manage_users permission."""
+    return authorization.authorize_team(user, team_id, "manage_users")
+
+
+def can_access_team_or_group_resource(user, team_id, write_required=False):
+    """Use operational resources with shared token bounds and existing RBAC."""
+    permission = "resource_write" if write_required else "resource_read"
+    return authorization.authorize_team(user, team_id, permission)
 
 
 def get_allowed_team_or_group_resource_ids(
@@ -349,7 +386,7 @@ def get_allowed_team_or_group_resource_ids(
         )
     )
 
-    return sorted(team_ids)
+    return authorization.filter_team_ids(sorted(team_ids))
 
 
 def require_team_or_group_resource_access(team_id, write_required=False):
@@ -388,8 +425,13 @@ def get_audit_log_group_ids(user=None):
     if not user:
         return []
 
-    if user.is_admin:
+    token = current_api_token()
+    if token and token.team_id is not None:
+        return []
+    if is_admin_user(user):
         return None
+    if user.is_admin:
+        return get_allowed_group_ids(user=user, use_active_group=False)
 
     memberships = (
         UserGroup
@@ -403,7 +445,7 @@ def get_audit_log_group_ids(user=None):
             & (Group.deleted == False)
         )
     )
-    return sorted({membership.group_id for membership in memberships})
+    return token_group_filter(sorted({membership.group_id for membership in memberships}))
 
 
 def can_read_audit_logs(user=None):
@@ -428,7 +470,7 @@ def require_audit_log_access():
 def require_admin_user():
     """Return an error response when current user is not an admin."""
     user = current_user()
-    if not user or not user.is_admin:
+    if not is_admin_user(user):
         return jsonify({
             "error": "admin_required",
             "message": "Admin role is required",
@@ -577,14 +619,15 @@ def get_team_permissions(user, team_id):
 
 
 def can_assign_group_role(role, user=None):
-    """Return true when user can assign selected group role."""
-    if is_admin_user(user):
+    """Check role-grant capability after the caller authorizes the Group."""
+    user = user or current_user()
+    if user and user.is_admin:
         return True
 
     return role != GROUP_USER_ADMIN_ROLE
 
 
-def can_manage_team_users(user, team_id):
+def _user_can_manage_team_users(user, team_id):
     """Return True when a user can manage team membership."""
     if not user:
         return False
@@ -597,10 +640,10 @@ def can_manage_team_users(user, team_id):
     if not team or not team.group_id:
         return False
 
-    if can_manage_group_users(user, team.group_id):
+    if _user_can_manage_group_users(user, team.group_id):
         return True
 
-    if not can_read_group(user, team.group_id):
+    if not _user_can_read_group(user, team.group_id):
         return False
 
     return teams_repo.get_user_team_role(user.id, team_id) == TEAM_MANAGER_ROLE

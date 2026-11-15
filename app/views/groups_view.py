@@ -17,6 +17,7 @@ from app.modules.db import groups_repo, users_repo
 from app.modules.db.models import UserGroup
 from app.services.audit import write_audit
 from app.services.rbac import (
+    is_admin_user,
     can_read_group,
     get_allowed_group_ids,
     require_admin_user,
@@ -36,7 +37,7 @@ groups_bp = Blueprint("groups_api", __name__)
 def list_groups():
     """Return groups visible to the current user."""
     user = request.current_user
-    if user and user.is_admin:
+    if is_admin_user(user):
         return jsonify([
             serialize_group(group, user)
             for group in groups_repo.list_groups(active_only=False)
@@ -120,7 +121,7 @@ def update_group(group_id):
 def list_group_users(group_id):
     """Return group users."""
     user = request.current_user
-    if not user or (not user.is_admin and not can_read_group(user, group_id)):
+    if not can_read_group(user, group_id):
         return jsonify({"error": "Access to this group is denied"}), 403
 
     result = []

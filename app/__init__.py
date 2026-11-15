@@ -77,6 +77,12 @@ def create_app(log_role=None):
     flask_app.register_error_handler(IntegrityError, handle_integrity_error)
     flask_app.register_error_handler(DoesNotExist, handle_not_found_error)
 
+    from app.services.authorization import AccessDenied
+
+    @flask_app.errorhandler(AccessDenied)
+    def handle_access_denied(error):
+        return {"error": "access_denied", "message": str(error)}, 403
+
     register_http_metrics(flask_app)
 
     db = init_database()

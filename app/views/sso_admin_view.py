@@ -1,4 +1,4 @@
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify
 from peewee import IntegrityError
 
 from app.api.schemas.sso import (
@@ -257,12 +257,15 @@ def parse_saml_metadata():
     """
     Parse SAML IdP metadata and return fields for the provider form.
     """
-    require_admin_user()
+    error = require_admin_user()
+    if error:
+        return error
+
+    payload, error = validate_body(SsoSamlMetadataParseRequest)
+    if error:
+        return error
 
     try:
-        payload = SsoSamlMetadataParseRequest.model_validate(
-            request.get_json(silent=True) or {}
-        )
         metadata = parse_saml_idp_metadata(payload.metadata_url)
         return jsonify(metadata)
     except SamlMetadataError as exc:

@@ -470,6 +470,7 @@ def test_send_alert_push_to_user_returns_zero_when_disabled(db, monkeypatch):
 
 
 def test_send_test_push_ignores_failed_subscription_and_disables_gone_subscription(db, monkeypatch):
+    monkeypatch.setattr(browser_push.Config, "BROWSER_PUSH_ENABLED", True)
     group = create_group()
     user = create_user("alice", group)
     subscription = create_push_subscription(user)
