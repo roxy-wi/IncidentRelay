@@ -2,6 +2,8 @@ from uuid import uuid4
 from datetime import datetime, timedelta, timezone
 from zoneinfo import ZoneInfo
 
+import pytest
+
 from app.modules.db.models import MaintenanceWindow, MaintenanceWindowScope
 from app.api.schemas.roles import GROUP_USER_ADMIN_ROLE
 from app.login import create_access_token
@@ -1285,6 +1287,137 @@ def test_team_manager_can_update_maintenance_metadata_without_scope_payload(clie
     assert scopes[0].service_id == service.id
 
 
+@pytest.mark.parametrize("same_group,scope_type", [
+    (False, "group"), (False, "team"), (False, "service"), (False, "route"),
+    (True, "team"), (True, "service"), (True, "route"),
+])
+def test_cannot_take_over_foreign_maintenance_with_own_scopes(
+    client, db, monkeypatch, same_group, scope_type,
+):
+    from app.services import maintenance
+
+    group, team, route, service, user, headers = create_manager_context()
+    if same_group:
+        user = create_user(group=group, group_role="viewer")
+        add_user_to_team(team, user, role="manager")
+        headers = make_headers(user)
+    foreign_team = create_team(group if same_group else create_group())
+    foreign_service = create_service(foreign_team)
+    window = create_fixed_maintenance_window(
+        team=foreign_team, service=foreign_service,
+        starts_at=utc_now() + timedelta(days=1),
+        ends_at=utc_now() + timedelta(days=2),
+    )
+    before = MaintenanceWindow.select().where(MaintenanceWindow.id == window.id).dicts().get()
+    scopes_before = list(MaintenanceWindowScope.select().dicts())
+    audits_before = AuditLog.select().count()
+    reconciled = []
+    monkeypatch.setattr(
+        maintenance, "_reconcile_after_command",
+        lambda *args, **kwargs: reconciled.append(args),
+    )
+    target_id = {"group": group.id, "team": team.id, "service": service.id, "route": route.id}[scope_type]
+    response = client.put(
+        f"/api/maintenance-windows/{window.id}", headers=headers,
+        json={
+            "name": "Taken over", "enabled": False,
+            "scopes": [{"scope_type": scope_type, f"{scope_type}_id": target_id}],
+        },
+    )
+    assert response.status_code == 403, response.get_json()
+    assert MaintenanceWindow.select().where(MaintenanceWindow.id == window.id).dicts().get() == before
+    assert list(MaintenanceWindowScope.select().dicts()) == scopes_before
+    assert AuditLog.select().count() == audits_before
+    assert reconciled == []
+
+
+@pytest.mark.parametrize("actor_kind", ["owner", "admin", "legacy_scope_owner"])
+def test_authorized_user_can_replace_maintenance_scopes(client, db, actor_kind):
+    group, team, route, service, user, headers = create_manager_context()
+    window = create_fixed_maintenance_window(
+        team=team, service=service,
+        starts_at=utc_now() + timedelta(days=1),
+        ends_at=utc_now() + timedelta(days=2),
+    )
+    if actor_kind == "admin":
+        headers = make_headers(create_user(is_admin=True))
+    elif actor_kind == "legacy_scope_owner":
+        window.team = None
+        window.group = None
+        window.save()
+    response = client.put(
+        f"/api/maintenance-windows/{window.id}", headers=headers,
+        json={"scopes": [{"scope_type": "team", "team_id": team.id}]},
+    )
+    assert response.status_code == 200, response.get_json()
+    updated = MaintenanceWindow.get_by_id(window.id)
+    assert updated.team_id == team.id
+    scopes = list(MaintenanceWindowScope.select().where(
+        MaintenanceWindowScope.maintenance_window == window.id,
+    ))
+    assert len(scopes) == 1
+    assert scopes[0].scope_type == "team"
+    assert scopes[0].team_id == team.id
+
+
+@pytest.mark.parametrize("token_bound", ["group", "team"])
+@pytest.mark.parametrize("scenario", ["foreign_window", "foreign_scope", "mixed_window", "own", "legacy"])
+def test_maintenance_update_respects_token_bounds(client, db, monkeypatch, token_bound, scenario):
+    from app.modules.db import tokens_repo
+    from app.services import maintenance
+    from app.services.integrations.auth import hash_token
+
+    group, team, route, service, user, _ = create_manager_context()
+    foreign_group = create_group() if token_bound == "group" else group
+    foreign_team = create_team(foreign_group)
+    foreign_service = create_service(foreign_team)
+    admin = create_user(is_admin=True)
+    raw_token = unique_slug("maintenance-token")
+    tokens_repo.create_api_token(
+        name="Scoped maintenance token", token_prefix=raw_token[:12],
+        token_hash=hash_token(raw_token), scopes=["maintenance:write"],
+        user_id=admin.id, group_id=group.id,
+        team_id=team.id if token_bound == "team" else None,
+    )
+    target_team = foreign_team if scenario == "foreign_window" else team
+    target_service = foreign_service if scenario == "foreign_window" else service
+    window = create_fixed_maintenance_window(
+        team=target_team, service=target_service,
+        starts_at=utc_now() + timedelta(days=1), ends_at=utc_now() + timedelta(days=2),
+    )
+    if scenario == "mixed_window":
+        MaintenanceWindowScope.create(
+            maintenance_window=window, scope_type="service", service=foreign_service,
+        )
+    if scenario == "legacy":
+        window.team = None
+        window.group = None
+        window.save()
+    before = MaintenanceWindow.select().where(MaintenanceWindow.id == window.id).dicts().get()
+    scopes_before = list(MaintenanceWindowScope.select().dicts())
+    audits_before = AuditLog.select().count()
+    reconciled = []
+    monkeypatch.setattr(
+        maintenance, "_reconcile_after_command",
+        lambda *args, **kwargs: reconciled.append(args),
+    )
+    proposed = foreign_service if scenario == "foreign_scope" else service
+    response = client.put(
+        f"/api/maintenance-windows/{window.id}",
+        headers={"Authorization": f"Bearer {raw_token}"},
+        json={"enabled": False, "scopes": [{"scope_type": "service", "service_id": proposed.id}]},
+    )
+    if scenario in {"own", "legacy"}:
+        assert response.status_code == 200, response.get_json()
+        assert len(reconciled) == 1
+    else:
+        assert response.status_code == 403, response.get_json()
+        assert MaintenanceWindow.select().where(MaintenanceWindow.id == window.id).dicts().get() == before
+        assert list(MaintenanceWindowScope.select().dicts()) == scopes_before
+        assert AuditLog.select().count() == audits_before
+        assert reconciled == []
+
+
 def upsert_test_alert(*, route, service, suffix, status="firing"):
     dedup_key = f"pytest-maintenance-{suffix}"
     group_key = f"pytest-maintenance-{suffix}"
@@ -1798,7 +1931,7 @@ def test_due_group_notification_is_cancelled_during_maintenance(
     monkeypatch.setattr(
         notification_queue,
         "notify_alert",
-        lambda group, event_type: sent.append((group.id, event_type)) or 1,
+        lambda group, event_type, **kwargs: sent.append((group.id, event_type)) or 1,
     )
 
     result = notification_queue.process_due_alert_group_notifications()

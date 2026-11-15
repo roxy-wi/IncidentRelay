@@ -1,12 +1,11 @@
-"""JWT administrator management; this blueprint exposes no Change intake."""
+"""Administrator management by JWT or personal token; no Change intake."""
 
 from contextlib import nullcontext
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, jsonify, request, url_for
 from peewee import DoesNotExist, fn
 
 from app.api.schemas import change_integrations as schemas
-from app.middleware import load_jwt_user
 from app.modules.db.models import (
     ApiToken,
     Change,
@@ -22,10 +21,12 @@ from app.services.change_intelligence import administration as admin
 from app.services.change_intelligence import job_administration
 from app.services.change_intelligence.authorization import ChangeAccessDenied
 from app.services.change_intelligence.management import (
+    can_manage_all_integrations,
     can_manage_integrations,
     managed_groups,
     visible_integrations,
 )
+from app.services.rbac import current_api_token
 from app.services.serializers.common import serialize_utc_datetime
 from app.services.serializers.tokens import serialize_api_token
 from app.services.validation import make_error_response, validate_body
@@ -34,11 +35,19 @@ change_integrations_bp = Blueprint("change_integrations_api", __name__)
 
 
 @change_integrations_bp.before_request
-def require_admin_jwt():
-    """Require a global/Group administrator JWT even if API auth is disabled."""
-    if not load_jwt_user():
-        return make_error_response("jwt_required", "Valid JWT token is required", 401)
-    if not can_manage_integrations(request.current_user):
+def require_administrator():
+    """Require an active administrator even when global API auth is disabled."""
+    user = getattr(request, "current_user", None)
+    if not user or not user.active or user.deleted:
+        return make_error_response(
+            "authentication_required", "Authentication is required", 401
+        )
+    token = current_api_token()
+    if token and token.team_id is not None:
+        return make_error_response(
+            "access_denied", "Team-scoped tokens cannot manage integrations", 403
+        )
+    if not can_manage_integrations(user):
         return make_error_response("access_denied", "Administrator role required", 403)
     return None
 
@@ -95,6 +104,8 @@ def source_data(source, grants, teams, services, *, identity_editable):
         "source": source.source,
         "active": source.active,
         "ordering_mode": source.ordering_mode,
+        "gitlab_mappings": source.gitlab_mappings,
+        "gitlab_webhook_path": url_for("change_events_api.receive_gitlab_event", source_id=source.id),
         "identity_editable": identity_editable,
         "grants": [grant_data(grant, teams, services) for grant in grants],
     }
@@ -121,8 +132,13 @@ def grant_data(grant, teams, services):
 
 def detail(integration_id):
     """Use a consistent read transaction for config and its edit revision."""
+    token_scope = (
+        "change-integrations:read" if request.method in {"GET", "HEAD"}
+        else "change-integrations:write"
+    )
     with admin.admin_transaction(
-        integration_id, actor_id=request.current_user.id
+        integration_id, actor_id=request.current_user.id,
+        token_scope=token_scope,
     ) as integration:
         result = integration_data(integration)
         sources = list(
@@ -138,7 +154,7 @@ def detail(integration_id):
         team_ids = {source.owner_team_id for source in sources}
         team_ids.update(grant.target_team_id for grant in grants)
         team_query = Team.select().where(Team.id.in_(team_ids))
-        if not request.current_user.is_admin:
+        if not can_manage_all_integrations(request.current_user):
             team_query = team_query.where(Team.group == integration.owner_group_id)
         teams = {team.id: team for team in team_query}
         # Include disabled/deleted targets so existing permissions remain readable.
@@ -234,7 +250,9 @@ def list_targets():
     if "integration_id" in request.args and not integration_id:
         return make_error_response("invalid_id", "Invalid integration ID", 400)
     context = (
-        admin.admin_transaction(integration_id, actor_id=user.id)
+        admin.admin_transaction(
+            integration_id, actor_id=user.id, token_scope="change-integrations:read"
+        )
         if integration_id
         else nullcontext(None)
     )
@@ -252,22 +270,42 @@ def list_targets():
         if integration is not None and integration.owner_group_id is not None:
             teams = teams.where(Team.group == integration.owner_group_id)
         team_id = request.args.get("team_id", type=int)
+        source_id = request.args.get("source_id", type=int)
+        if "source_id" in request.args and (not source_id or integration is None):
+            return make_error_response("invalid_id", "Source requires an integration ID", 400)
         services = (
             Service.select()
             .where(
-                Service.team == team_id,
                 Service.enabled == True,
                 Service.deleted == False,
                 Service.team.in_(teams.select(Team.id)),
             )
             .order_by(Service.name, Service.id)
-            if team_id
-            else []
         )
+        if source_id:
+            ChangeSource.get(
+                ChangeSource.id == source_id, ChangeSource.integration == integration.id
+            )
+            grants = ChangeGrant.select().where(
+                ChangeGrant.source == source_id,
+                ChangeGrant.active == True,
+                ChangeGrant.capability == "changed",
+            )
+            # Pin both service and team: a moved service must not inherit a grant.
+            authorized = grants.where(
+                ChangeGrant.target_team == Service.team,
+                (ChangeGrant.target_service.is_null(True))
+                | (ChangeGrant.target_service == Service.id),
+            )
+            services = services.where(fn.EXISTS(authorized.select(ChangeGrant.id)))
+        elif team_id:
+            services = services.where(Service.team == team_id)
+        else:
+            services = []
         return jsonify(
             {
                 "groups": [{"id": group.id, "name": group.name} for group in groups],
-                "can_create_central": bool(user.is_admin),
+                "can_create_central": can_manage_all_integrations(user),
                 "teams": [
                     {
                         "id": team.id,
@@ -278,7 +316,8 @@ def list_targets():
                     for team in teams
                 ],
                 "services": [
-                    {"id": service.id, "name": service.name, "slug": service.slug}
+                    {"id": service.id, "name": service.name, "slug": service.slug,
+                     "team_id": service.team_id}
                     for service in services
                 ],
             }
@@ -389,7 +428,7 @@ def job_data(job):
 @change_integrations_bp.get("/<int:integration_id>/jobs")
 def list_jobs(integration_id=None):
     if integration_id is None:
-        if not request.current_user.is_admin:
+        if not can_manage_all_integrations(request.current_user):
             raise ChangeAccessDenied()
         query = ChangeJob.select()
     else:
@@ -421,7 +460,7 @@ def list_jobs(integration_id=None):
 @change_integrations_bp.post("/<int:integration_id>/jobs/<int:job_id>/retry")
 def retry_job(job_id, integration_id=None):
     if integration_id is None:
-        if not request.current_user.is_admin:
+        if not can_manage_all_integrations(request.current_user):
             raise ChangeAccessDenied()
     else:
         visible_integrations(request.current_user).where(

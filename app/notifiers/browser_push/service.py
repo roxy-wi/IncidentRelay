@@ -3,8 +3,10 @@ import json
 import logging
 import secrets
 from datetime import timedelta
+from http.client import responses
 
 from pywebpush import WebPushException, webpush
+from requests import Response
 
 from app.modules.db.models import (
     AlertGroup,
@@ -15,6 +17,11 @@ from app.modules.db.models import (
 from app.db import database_proxy as db
 from app.modules.common import truncate_text
 from app.services.links import build_alert_web_url, build_source_event_url
+from app.services.outbound_http import (
+    OutboundHttpError,
+    safe_request,
+    validate_outbound_url,
+)
 from app.settings import Config
 from app.services.alerts.priority import (
     alert_priority_label,
@@ -64,6 +71,10 @@ def list_user_subscriptions(user):
 def save_user_subscription(user, endpoint, keys, device_name=None, user_agent=None):
     if not endpoint:
         raise ValueError("endpoint is required")
+    try:
+        endpoint = validate_outbound_url(endpoint, require_https=True)
+    except OutboundHttpError as exc:
+        raise ValueError("subscription endpoint must be a valid HTTPS URL") from exc
 
     p256dh = keys.get("p256dh")
     auth = keys.get("auth")
@@ -158,17 +169,48 @@ def _subscription_info(subscription):
     }
 
 
+class _SafeWebPushSession:
+    """Adapt pywebpush's POST transport to the shared DNS-pinned HTTP client."""
+
+    def post(self, url, *, data=None, headers=None, timeout=None):
+        """Send ciphertext only to public HTTPS endpoints, without redirects."""
+        result = safe_request(
+            "POST", url, data=data, headers=headers,
+            timeout=timeout if timeout is not None else 10,
+            require_https=True, allow_redirects=False, allow_private_networks=False,
+        )
+        response = Response()
+        response.status_code = result.status_code
+        response.reason = responses.get(result.status_code, "Unknown status")
+        response.headers.update(result.headers)
+        response.url = result.url
+        response.encoding = "utf-8"
+        # pywebpush includes response.text in exceptions logged by callers.
+        # Only the status and headers are needed for delivery/retry decisions.
+        response._content = b""
+        response._content_consumed = True
+        return response
+
+
 def _webpush(subscription, payload, *, timeout=None):
-    options = {"timeout": timeout} if timeout is not None else {}
-    return webpush(
-        subscription_info=_subscription_info(subscription),
-        data=json.dumps(payload),
-        vapid_private_key=Config.BROWSER_PUSH_VAPID_PRIVATE_KEY,
-        vapid_claims={
-            "sub": Config.BROWSER_PUSH_VAPID_SUBJECT,
-        },
-        **options,
-    )
+    subscription_info = _subscription_info(subscription)
+    try:
+        # Revalidate persisted subscriptions as well as newly registered ones.
+        subscription_info["endpoint"] = validate_outbound_url(
+            subscription_info["endpoint"], require_https=True,
+        )
+        return webpush(
+            subscription_info=subscription_info,
+            data=json.dumps(payload),
+            vapid_private_key=Config.BROWSER_PUSH_VAPID_PRIVATE_KEY,
+            vapid_claims={"sub": Config.BROWSER_PUSH_VAPID_SUBJECT},
+            timeout=timeout if timeout is not None else 10,
+            requests_session=_SafeWebPushSession(),
+        )
+    except OutboundHttpError as exc:
+        raise WebPushException(
+            "Browser push request failed outbound network policy or transport checks"
+        ) from exc
 
 
 def _active_user_subscriptions(user_id):
@@ -477,6 +519,9 @@ def send_stakeholder_push_to_user(
 
 
 def send_test_push(user):
+    if not Config.BROWSER_PUSH_ENABLED:
+        return 0
+
     payload = {
         "title": "IncidentRelay test push",
         "body": "Browser push notifications are enabled for this device.",

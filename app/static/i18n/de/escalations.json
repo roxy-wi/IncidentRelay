@@ -73,7 +73,7 @@
   "escalations.form.repeat_count": "Wiederholte Anzahl",
   "escalations.form.description": "Beschreibung",
   "escalations.form.description_placeholder": "Primäre Rotation, Backup Rotation, Team Lead",
-  "escalations.form.rules_help": "Regeln werden anhand von Richtliniendetails konfiguriert, nachdem die Richtlinie gespeichert wurde.",
+  "escalations.form.rules_help": "Konfigurieren Sie nach dem Speichern der Richtlinie ihre Regeln über die Aktion „Regeln“ in der Tabelle.",
   "escalations.rules.title": "Grundsatzregeln",
   "escalations.rules.title_named": "Regeln: {name}",
   "escalations.rules.select_policy": "Wählen Sie zuerst eine Richtlinie.",

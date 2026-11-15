@@ -114,11 +114,9 @@ def get_route_by_intake_hash(token_hash):
 
     return (
         AlertRoute
-        .select(AlertRoute)
+        .select(AlertRoute, Team, Group)
         .join(Team, on=(AlertRoute.team == Team.id))
-        .switch(AlertRoute)
         .join(Group, on=(Team.group == Group.id))
-        .switch(AlertRoute)
         .where(
             (AlertRoute.intake_token_hash == token_hash)
             & (AlertRoute.enabled == True)

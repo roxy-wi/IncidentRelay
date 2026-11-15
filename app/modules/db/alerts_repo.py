@@ -5,7 +5,7 @@ import hashlib
 
 from peewee import Case, JOIN, fn
 
-from app.modules.db import alert_episodes_repo, incident_core_repo
+from app.modules.db import alert_episodes_repo, compiled_select, incident_core_repo
 
 from app.modules.db.models import (
     Alert,
@@ -16,6 +16,9 @@ from app.modules.db.models import (
     AlertRoute,
     AlertComment,
     Group,
+    IncidentAlertGroupLink,
+    IncidentResponder,
+    IncidentStakeholder,
     Rotation,
     Service,
     Team,
@@ -112,6 +115,46 @@ def apply_alert_group_priority_filter(query, values):
     return query.where(reduce(or_, conditions))
 
 
+def alert_group_involvement_condition(involvement, user_id):
+    """Match personal involvement without duplicating groups linked to incidents.
+
+    Assignment belongs to the alert group. Responders and stakeholders belong
+    to Incidents; only links that have not been removed contribute membership.
+    Closed incidents remain searchable in the historical alert inbox.
+    """
+    assigned = AlertGroup.assignee == user_id
+    responder_incidents = IncidentResponder.select(IncidentResponder.incident).where(
+        (
+            (IncidentResponder.target_user == user_id)
+            | (IncidentResponder.accepted_by == user_id)
+        )
+        & IncidentResponder.status.in_(("requested", "accepted", "resolved"))
+    )
+    stakeholder_incidents = IncidentStakeholder.select(IncidentStakeholder.incident).where(
+        (IncidentStakeholder.user == user_id)
+        & (IncidentStakeholder.active == True)  # noqa: E712
+    )
+
+    def linked_groups(incidents):
+        return AlertGroup.id.in_(
+            IncidentAlertGroupLink.select(IncidentAlertGroupLink.alert_group).where(
+                IncidentAlertGroupLink.incident.in_(incidents),
+                IncidentAlertGroupLink.removed_at.is_null(True),
+            )
+        )
+
+    conditions = {
+        "assigned": assigned,
+        "responder": linked_groups(responder_incidents),
+        "stakeholder": linked_groups(stakeholder_incidents),
+    }
+    if involvement == "any":
+        return reduce(or_, conditions.values())
+    if involvement not in conditions:
+        raise ValueError(f"Unsupported involvement: {involvement}")
+    return conditions[involvement]
+
+
 def build_alert_groups_query(
     team_id=None,
     team_ids=None,
@@ -127,6 +170,8 @@ def build_alert_groups_query(
     assigned_to_user_id=None,
     shelved=False,
     include_merged=False,
+    involvement=None,
+    involvement_user_id=None,
 ):
     """Build the base alert groups query with filters."""
 
@@ -156,6 +201,11 @@ def build_alert_groups_query(
 
     if assigned_to_user_id:
         query = query.where(AlertGroup.assignee == assigned_to_user_id)
+
+    if involvement:
+        if not involvement_user_id:
+            return None
+        query = query.where(alert_group_involvement_condition(involvement, involvement_user_id))
 
     if shelved:
         now = utc_now()
@@ -390,6 +440,8 @@ def paginate_alert_groups(
     sort="activity",
     order="desc",
     include_merged=False,
+    involvement=None,
+    involvement_user_id=None,
 ):
     """Return alert groups with backend pagination, filtering and sorting."""
 
@@ -411,6 +463,8 @@ def paginate_alert_groups(
         service_criticality=service_criticality,
         search=search,
         assigned_to_user_id=assigned_to_user_id,
+        involvement=involvement,
+        involvement_user_id=involvement_user_id,
         shelved=shelved,
         include_merged=include_merged,
     )
@@ -472,28 +526,29 @@ def hash_group_key(group_key):
     return hashlib.sha256(value.encode("utf-8")).hexdigest()
 
 
-def find_open_alert_group(source, group_key, team_id=None, route_id=None, service_id=None):
-    """Return open alert group by routing/grouping key."""
-
-    group_key_hash = hash_group_key(group_key)
-
+def _open_group_query(parameters):
     query = AlertGroup.select().where(
-        (AlertGroup.source == source)
-        & (AlertGroup.group_key_hash == group_key_hash)
+        (AlertGroup.source == parameters["source"])
+        & (AlertGroup.group_key_hash == parameters["group_key_hash"])
         & (AlertGroup.status.not_in(("resolved", "merged")))
         & (AlertGroup.merged_into.is_null(True))
     )
+    for name in ("team", "route", "service"):
+        if name in parameters:
+            query = query.where(AlertGroup._meta.fields[name] == parameters[name])
+    return query.order_by(AlertGroup.id.desc())
 
-    if team_id:
-        query = query.where(AlertGroup.team == team_id)
 
-    if route_id:
-        query = query.where(AlertGroup.route == route_id)
-
-    if service_id:
-        query = query.where(AlertGroup.service == service_id)
-
-    return query.order_by(AlertGroup.id.desc()).first()
+def find_open_alert_group(source, group_key, team_id=None, route_id=None, service_id=None):
+    """Return open alert group by routing/grouping key, using fresh row data."""
+    bindings = {
+        "source": (AlertGroup.source, source),
+        "group_key_hash": (AlertGroup.group_key_hash, hash_group_key(group_key)),
+    }
+    for name, value in (("team", team_id), ("route", route_id), ("service", service_id)):
+        if value:
+            bindings[name] = (AlertGroup._meta.fields[name], value)
+    return compiled_select.first(AlertGroup, _open_group_query, bindings)
 
 
 def create_alert_group(**kwargs):
@@ -658,7 +713,7 @@ def _recalculate_alert_group(group, *, event=None):
         group.previous_status = previous_status
 
     group.updated_at = now
-    group.save()
+    group.save(only=group.dirty_fields)
     alert_episodes_repo.refresh_context(group, alerts=alerts)
     if group.status == "resolved":
         alert_episodes_repo.close_episode(
@@ -1064,16 +1119,21 @@ def find_existing_alert(
     This prevents a PagerDuty-compatible routing key from acknowledging or
     resolving an alert owned by another webhook route that reused a dedup key.
     """
+    bindings = {"source": (Alert.source, source), "dedup_key": (Alert.dedup_key, dedup_key)}
+    if route_id is not None:
+        bindings["route"] = (Alert.route, route_id)
+    return compiled_select.first(Alert, _existing_alert_query, bindings)
+
+
+def _existing_alert_query(parameters):
     query = Alert.select().where(
-        (Alert.source == source)
-        & (Alert.dedup_key == dedup_key)
+        (Alert.source == parameters["source"])
+        & (Alert.dedup_key == parameters["dedup_key"])
         & (Alert.status != "resolved")
     )
-
-    if route_id is not None:
-        query = query.where(Alert.route == route_id)
-
-    return query.order_by(Alert.id.desc()).first()
+    if "route" in parameters:
+        query = query.where(Alert.route == parameters["route"])
+    return query.order_by(Alert.id.desc())
 
 
 def create_alert(**kwargs):
@@ -1373,7 +1433,22 @@ def create_alert_explain_step(
     }
     if created_at is not None:
         values["created_at"] = created_at
-    return AlertExplainStep.create(**values)
+    with AlertExplainStep._meta.database.atomic():
+        return AlertExplainStep.create(**values)
+
+
+def create_alert_explain_steps(trace, steps):
+    """Persist ordered trace steps in bounded batches, including on SQLite.
+
+    A savepoint protects the caller's transaction if a diagnostic row fails.
+    The caller can then fall back to individual rows without an aborted PG
+    transaction. Fifty rows stay below older SQLite parameter limits.
+    """
+    database = AlertExplainStep._meta.database
+    with database.atomic():
+        for offset in range(0, len(steps), 50):
+            rows = [dict(item, trace=trace.id) for item in steps[offset:offset + 50]]
+            AlertExplainStep.insert_many(rows).execute()
 
 
 def attach_alert_explain_trace(trace, *, group=None, alert=None):

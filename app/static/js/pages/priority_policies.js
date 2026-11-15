@@ -17,7 +17,7 @@ function isSamePriorityPolicyRuleId(left, right) {
 }
 
 function loadPriorityPolicies() {
-    fillTeamSelect("#priority-policy-team", false, function () { resetPriorityPolicyForm(); });
+    fillTeamSelect("#priority-policy-team", false, function () { resetPriorityPolicyForm(); }, "can_write");
     loadPriorityPolicyPriorities(function () { refreshPriorityPolicies(); });
     updatePriorityPolicyCreateButtonState();
     updatePriorityPolicyBehaviorHints();
@@ -402,11 +402,7 @@ function resetPriorityPolicyForm() {
     $("#priority-policy-team").prop("disabled", false);
     renderPriorityPolicyFallbackPriorityOptions();
 
-    const selectedTeam = $("#global-team-filter").val();
-
-    if (selectedTeam) {
-        $("#priority-policy-team").val(selectedTeam);
-    }
+    selectPreferredTeam("#priority-policy-team");
 
     updatePriorityPolicyBehaviorHints();
 }

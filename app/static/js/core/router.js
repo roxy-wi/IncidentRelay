@@ -112,7 +112,8 @@ function navigate(path, pushState) {
     if (routePath !== "/services" && typeof closeServiceDetailsModal === "function") closeServiceDetailsModal();
 
     if (routePath !== "/admin/change-integrations" && typeof closeChangeIntegrationModal === "function") closeChangeIntegrationModal();
-    if (routePath === "/admin/change-integrations" && !hasGroupUserAdminAccess()) {
+    if (routePath !== "/admin/directory-sync" && typeof closeDirectorySync === "function") closeDirectorySync();
+    if (["/admin/change-integrations", "/admin/directory-sync"].includes(routePath) && !hasGroupUserAdminAccess()) {
         showAppError(i18n.t("errors.group_admin_role_required"));
         path = "/";
     }
@@ -195,7 +196,7 @@ function updateAuthUi() {
     adminSection.addClass("is-hidden");
     $(".menu-link-users").addClass("is-hidden");
     $(".menu-link-groups").addClass("is-hidden");
-    $(".menu-link-global-admin, .menu-link-change-integrations").addClass("is-hidden");
+    $(".menu-link-global-admin, .menu-link-change-integrations, .menu-link-directory-sync").addClass("is-hidden");
     $(".menu-link-audit").addClass("is-hidden");
 
     if (canViewAuditLog) {
@@ -205,6 +206,7 @@ function updateAuthUi() {
 
     if (canManageUsers) {
         $(".menu-link-change-integrations").removeClass("is-hidden");
+        $(".menu-link-directory-sync").removeClass("is-hidden");
         adminSection.removeClass("is-hidden");
         $(".menu-link-users").removeClass("is-hidden");
         $(".menu-link-groups").removeClass("is-hidden");

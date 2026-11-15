@@ -9,8 +9,12 @@ from peewee import (
     Check,
     DateTimeField,
     ForeignKeyField,
+    Expression,
+    Field,
     IntegerField,
     Model,
+    Node,
+    OP,
     TextField,
     SQL,
     DeferredForeignKey,
@@ -19,6 +23,8 @@ from peewee import (
 
 from app.db import database_proxy
 from app.modules.common import utc_now
+from app.modules.db.compiled_lookup import get_by_primary_key
+from app.modules.db import compiled_save
 
 
 class JSONTextField(TextField):
@@ -42,6 +48,36 @@ class JSONTextField(TextField):
 
 class BaseModel(Model):
     """Base model for all tables."""
+    _compiled_write_sql = False
+
+    def save(self, force_insert=False, only=None):
+        if self._compiled_write_sql and type(self).save is BaseModel.save:
+            result = compiled_save.save(self, force_insert=force_insert, only=only)
+            if result is not compiled_save.NOT_SUPPORTED:
+                return result
+        return super().save(force_insert=force_insert, only=only)
+
+    @classmethod
+    def get(cls, *query, **filters):
+        # This includes Peewee's lazy FK lookups. Only optimize the standard
+        # scalar primary-key case: custom SELECTs and compound/security filters
+        # continue through Peewee unchanged. Every lookup still queries the DB.
+        if (not filters and len(query) == 1 and isinstance(cls._meta.primary_key, Field)
+            and type(cls._meta.primary_key).__module__ == "peewee"):
+            predicate = query[0]
+            value = None
+            if isinstance(predicate, int):
+                value = predicate
+            elif (isinstance(predicate, Expression) and predicate.op == OP.EQ
+                  and predicate.lhs is cls._meta.primary_key
+                  and not isinstance(predicate.rhs, (Node, list, tuple, dict, set, frozenset, range))):
+                value = predicate.rhs
+            database = getattr(cls._meta.database, "obj", cls._meta.database)
+            if (value is not None and database is not None
+                and getattr(cls.select, "__func__", None) is Model.select.__func__
+                and (cls._meta.schema is None or isinstance(cls._meta.schema, str))):
+                return get_by_primary_key(cls, value, database)
+        return super().get(*query, **filters)
 
     class Meta:
         database = database_proxy
@@ -70,6 +106,17 @@ class MigrationState(BaseModel):
     name = CharField()
     service_version = CharField(null=True)
     applied_at = DateTimeField(default=utc_now)
+
+
+class EncryptionKeyVerification(BaseModel):
+    """Installation-wide verifier; never stores the plaintext encryption key."""
+
+    id = IntegerField(primary_key=True, constraints=[Check("id = 1")])
+    key_check = TextField(null=True)
+    initialized_at = DateTimeField(null=True)
+
+    class Meta:
+        table_name = "encryption_key_verification"
 
 
 class Group(SoftDeleteModel):
@@ -272,6 +319,96 @@ class RotationOverride(BaseModel):
     ends_at = DateTimeField()
     reason = TextField(null=True)
     created_at = DateTimeField(default=utc_now)
+
+
+class DirectorySyncSource(BaseModel):
+    """Group-owned API configuration and fenced synchronization state."""
+
+    id = AutoField()
+    group = ForeignKeyField(Group, backref="directory_sources", on_delete="CASCADE")
+    name = CharField()
+    config = JSONTextField(default=dict)
+    headers_encrypted = TextField(null=True)
+    revision = IntegerField(default=1)
+    approved_revision = IntegerField(null=True)
+    enabled = BooleanField(default=False)
+    lease = CharField(null=True)
+    lease_until = DateTimeField(null=True)
+    current_lease = CharField(null=True)
+    current_lease_until = DateTimeField(null=True)
+    next_run_at = DateTimeField(default=utc_now)
+    next_current_at = DateTimeField(default=utc_now)
+    last_success_at = DateTimeField(null=True)
+    last_current_at = DateTimeField(null=True)
+    last_error = TextField(null=True)
+    current_error = TextField(null=True)
+    last_result = JSONTextField(default=dict)
+    preview_encrypted = TextField(null=True)
+    preview_token = CharField(null=True)
+    preview_until = DateTimeField(null=True)
+    preview_result = JSONTextField(null=True)
+    pending_mode = CharField(null=True)
+    pending_preview_token = CharField(null=True)
+    created_by = ForeignKeyField(User, null=True, on_delete="SET NULL")
+    created_at = DateTimeField(default=utc_now)
+
+    class Meta:
+        table_name = "directory_sync_source"
+
+
+class DirectorySyncBinding(BaseModel):
+    """Stable external identities; only owned bindings may change local objects."""
+
+    id = AutoField()
+    source = ForeignKeyField(DirectorySyncSource, backref="bindings", on_delete="CASCADE")
+    kind = CharField()
+    external_id = CharField(max_length=255)
+    local_id = IntegerField(index=True)
+    owned = BooleanField(default=True)
+    created = BooleanField(default=False)
+    present = BooleanField(default=True)
+
+    class Meta:
+        table_name = "directory_sync_binding"
+        indexes = ((("source", "kind", "external_id"), True),)
+
+
+class DirectorySyncShift(BaseModel):
+    """Concrete imported intervals; recurrence is never recalculated locally."""
+
+    id = AutoField()
+    source = ForeignKeyField(DirectorySyncSource, backref="shifts", on_delete="CASCADE")
+    rotation = ForeignKeyField(Rotation, backref="imported_shifts", on_delete="CASCADE")
+    external_id = CharField(max_length=255)
+    user = ForeignKeyField(User, null=True, on_delete="SET NULL")
+    starts_at = DateTimeField(index=True)
+    ends_at = DateTimeField(index=True)
+    unavailable = BooleanField(default=False)
+    local_override = BooleanField(default=False)
+    local_from = DateTimeField(null=True)
+    local_until = DateTimeField(null=True)
+    deleted = BooleanField(default=False)
+    replacements = JSONTextField(default=list)
+    title = CharField(default="")
+
+    class Meta:
+        table_name = "directory_sync_shift"
+        indexes = ((("source", "external_id"), True),)
+
+
+class DirectorySyncCurrent(BaseModel):
+    """Bounded current-duty cache, independent from the calendar refresh interval."""
+
+    id = AutoField()
+    source = ForeignKeyField(DirectorySyncSource, backref="current_duties", on_delete="CASCADE")
+    rotation = ForeignKeyField(Rotation, unique=True, on_delete="CASCADE")
+    user = ForeignKeyField(User, null=True, on_delete="SET NULL")
+    status = CharField()
+    observed_at = DateTimeField()
+    valid_until = DateTimeField()
+
+    class Meta:
+        table_name = "directory_sync_current"
 
 
 class NotificationChannel(SoftDeleteModel):
@@ -1873,6 +2010,7 @@ class IncidentEvent(BaseModel):
 
 class AlertGroup(BaseModel):
     """Logical incident/group containing one or more concrete alerts."""
+    _compiled_write_sql = True
 
     id = AutoField()
 
@@ -2103,6 +2241,7 @@ class AlertGroupShelve(BaseModel):
 
 class Alert(BaseModel):
     """Alert stored after normalization and routing."""
+    _compiled_write_sql = True
 
     id = AutoField()
     team = ForeignKeyField(Team, null=True, backref="alerts", on_delete="SET NULL")
@@ -2410,6 +2549,7 @@ class IncidentNotificationDelivery(BaseModel):
 
 class AlertEvent(BaseModel):
     """Alert/group history event."""
+    _compiled_write_sql = True
 
     id = AutoField()
     group = ForeignKeyField(AlertGroup, null=True, backref="events", on_delete="CASCADE")
@@ -2422,6 +2562,7 @@ class AlertEvent(BaseModel):
 
 class AlertExplainTrace(BaseModel):
     """One alert routing/execution explain trace."""
+    _compiled_write_sql = True
 
     id = AutoField()
     trace_id = CharField(unique=True, index=True)
@@ -3712,6 +3853,7 @@ class ChangeSource(BaseModel):
         default="timestamp",
         constraints=[Check("ordering_mode IN ('timestamp', 'sequence')")],
     )
+    gitlab_mappings = JSONTextField(default=list, constraints=[SQL("DEFAULT '[]'")])
     created_at = DateTimeField(default=utc_now)
     updated_at = DateTimeField(default=utc_now)
 
@@ -4073,6 +4215,7 @@ class ChangeJob(BaseModel):
 
 class AlertGroupEpisode(BaseModel):
     """A technical firing cycle with an explicit quality of its start boundary."""
+    _compiled_write_sql = True
 
     id = AutoField()
     uid = UUIDField(default=uuid.uuid4, unique=True)

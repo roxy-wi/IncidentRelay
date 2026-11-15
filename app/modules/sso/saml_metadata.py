@@ -1,6 +1,10 @@
-from urllib.parse import urlparse
-
 from onelogin.saml2.idp_metadata_parser import OneLogin_Saml2_IdPMetadataParser
+
+from app.services.outbound_http import (
+    OutboundHttpError,
+    safe_request,
+    validate_outbound_url,
+)
 
 
 class SamlMetadataError(Exception):
@@ -28,23 +32,14 @@ def _validate_metadata_url(metadata_url: str) -> str:
             400,
         )
 
-    parsed = urlparse(url)
-
-    if parsed.scheme != "https":
+    try:
+        return validate_outbound_url(url, require_https=True)
+    except OutboundHttpError as exc:
         raise SamlMetadataError(
             "sso_saml_metadata_url_invalid",
-            "SAML IdP metadata URL must use https",
+            "SAML IdP metadata URL must be a valid HTTPS URL without credentials or a fragment",
             400,
-        )
-
-    if not parsed.netloc:
-        raise SamlMetadataError(
-            "sso_saml_metadata_url_invalid",
-            "SAML IdP metadata URL host is missing",
-            400,
-        )
-
-    return url
+        ) from exc
 
 
 def _extract_x509_cert(idp_settings: dict) -> str | None:
@@ -72,14 +67,15 @@ def parse_saml_idp_metadata(metadata_url: str) -> dict:
     metadata_url = _validate_metadata_url(metadata_url)
 
     try:
-        parsed_metadata = OneLogin_Saml2_IdPMetadataParser.parse_remote(
-            metadata_url,
-            timeout=10,
+        response = safe_request(
+            "GET", metadata_url, timeout=10, require_https=True,
         )
+        response.raise_for_status()
+        parsed_metadata = OneLogin_Saml2_IdPMetadataParser.parse(response.body)
     except Exception as exc:
         raise SamlMetadataError(
             "sso_saml_metadata_fetch_failed",
-            f"Could not fetch SAML IdP metadata: {exc}",
+            "Could not fetch or parse SAML IdP metadata",
             400,
         ) from exc
 

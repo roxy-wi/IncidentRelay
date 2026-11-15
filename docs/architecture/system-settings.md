@@ -17,6 +17,13 @@ For example, an explicit boolean `false` remains the Group's choice even if the 
 
 ## Storage and writes
 
+`GET /api/admin/system-settings` requires `system-settings:read` and `PATCH`
+requires `system-settings:write` when using a personal API token (`*` also works).
+The token must belong to an active global administrator and have no Group or Team
+bound. JWT remains supported. Authentication is mandatory even when global API
+authentication is optional. Mutations recheck the token and administrator under
+lock and audit both the user and token IDs.
+
 The `system_settings` table has one row with typed columns. Global administrators edit it under **Administration → System settings**. The planned overrides table will reference `Group` through a foreign key and allow at most one row per Group. It contains columns only for settings that allow Group overrides. A missing row or a `NULL` column means inheritance. This preserves `false` and `0` as explicit values when the setting permits them. A new Group inherits immediately, without copying system values.
 
 A shared service returns the effective value and its source, either system or Group. For each eligible setting the Group UI offers an explicit value and a way to resume inheritance. Global administrators manage system values. Permission to edit a Group setting is explicitly delegated and checked on the server against the specific active Group and the [IR roles](../concepts/groups-and-rbac.md).

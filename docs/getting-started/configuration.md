@@ -64,10 +64,30 @@ Docker entrypoint.
 must not change once IncidentRelay has used it, whether it comes from the config
 file, an environment variable or a `__FILE`. When it is empty, IncidentRelay
 encrypts with `main.secret_key` instead, and the same applies to that key. If
-the encryption key changes, the Docker entrypoint refuses to start: restore the
-previous key. Changing the key directly is not supported. The entrypoint
-compares the key with a salted hash it keeps in `/var/lib/incidentrelay`, so the
-check only works when that directory persists between restarts.
+the encryption key changes, every web, scheduler, Telegram and Slack process
+refuses to start: restore the previous key. A salted PBKDF2-SHA256 verifier is
+stored in the database, never the plaintext key. Verification works with an
+ephemeral `/var/lib/incidentrelay` and replicas without a shared runtime directory.
+The Docker entrypoint's runtime-file verifier remains an additional compatible check.
+
+On the first startup after migration, IncidentRelay authenticates all existing
+encrypted orchestration headers, queued request headers/bodies and SSO secrets,
+including disabled/deleted configuration and completed execution history. SSO
+records use the effective `sso.secret_encryption_key` when configured separately;
+the persisted verifier protects the main encryption key. If any ciphertext cannot
+be decrypted, initialization fails without recording the new key. If there are
+no encrypted values, the first key is registered. Subsequent starts compare it
+with the stored verifier even if all encrypted records have since been deleted.
+
+Before the first upgrade, back up the database and original keys and stop all
+old web and worker processes. Keep the keys unchanged, run `python manage.py migrate`,
+then `python -m app.check_encryption_key` with the same configuration and environment
+as the services. Start the services only after the check succeeds. Concurrent
+starts of the new version serialize initialization in the database; mixing old
+writers into the initial bootstrap is not supported. See the
+[Kubernetes upgrade procedure](kubernetes.md#encryption-key-verification-in-251).
+Do not delete/reset the verification record to bypass a failure. Restore the
+original key or investigate damaged data using a backup; this is not key rotation.
 
 In `[voice_provider]`, whose options depend on the provider, a variable only
 overrides an option that is present in the file, and the option keeps its
@@ -153,6 +173,23 @@ password = change-me
 ```
 
 Use PostgreSQL for larger installations, higher alert volume, multiple web workers, or long-term production deployments.
+
+PostgreSQL connections are pooled per process. Closing a request returns its
+connection to the pool; dirty transactions are rolled back before reuse.
+
+```ini
+[database]
+pool_enabled = true
+pool_max_connections = 32
+pool_stale_seconds = 300
+pool_wait_seconds = 5
+```
+
+All three limits must be positive. The pool opens connections on demand, up to
+`pool_max_connections` per process, and waits at most `pool_wait_seconds` when
+full. Set `pool_enabled = false` to close physical connections after use.
+Budget PostgreSQL's connection limit across all web processes, scheduler
+delivery threads, and other workers. Pool limits are not shared between processes.
 
 ## Outbound HTTP network policy
 
@@ -450,7 +487,7 @@ The user-notification queue gauges describe current backlog, not history. `state
 
 ### Grafana dashboard
 
-After Prometheus has successfully scraped the IR web service, import the [tools/grafana/incidentrelay-overview.json](https://github.com/roxy-wi/IncidentRelay/blob/release/2.5.0/tools/grafana/incidentrelay-overview.json) via **Dashboards → New → Import** in Grafana. Select the Prometheus data source at import, then choose **IR scrape job** and **Web target** on the dashboard. Set the data source's scrape interval to the actual Prometheus interval so the rate panels use the right window.
+After Prometheus has successfully scraped the IR web service, import the [tools/grafana/incidentrelay-overview.json](https://github.com/roxy-wi/IncidentRelay/blob/2.5.1/tools/grafana/incidentrelay-overview.json) via **Dashboards → New → Import** in Grafana. Choose **Prometheus**, **IR scrape job** and **Web target** at the top of the dashboard. Changing the **Prometheus** data source refreshes the job and target choices and applies to every panel; no re-import is needed. Set the data source's scrape interval to the actual Prometheus interval so the rate panels use the right window.
 
 Use one job per IR deployment sharing a database. Scrape each web replica as a separate target: the dashboard adds request and event rates, but counts a shared database queue only once. Notification outcomes are rolling **24-hour** counts regardless of the dashboard time range. Missing data is not zero: for example, a database outage can hide the migration count, and an optional worker has no heartbeat line until it first reports. In Docker and Kubernetes, web scrapes may not include counters from separate scheduler or worker containers; their database-backed queue gauges are still available.
 
@@ -588,7 +625,10 @@ may still carry an earlier Change revision.
 
 Global administrators can inspect `GET /api/admin/change-integrations/jobs`;
 Group administrators use `GET /api/admin/change-integrations/{integration_id}/jobs`
-for their owned integrations. These endpoints require JWT, return only queue
+for their owned integrations. These endpoints accept JWT or personal API tokens
+with `change-integrations:read` for listing and `change-integrations:write` for
+retry (`*` also works). Group-bound tokens use the integration-scoped routes;
+Team-bound tokens are rejected. The endpoints return only queue
 metadata, support `state` and `after`, and paginate at 50 records. Retry with
 `POST` to the corresponding `/jobs/{job_id}/retry`, supplying
 `{"expected_generation": <requested_generation>}`. A stale request returns `409`.

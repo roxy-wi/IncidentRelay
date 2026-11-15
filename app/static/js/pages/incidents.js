@@ -41,6 +41,19 @@ function incidentStatusLabel(status) {
     return i18n.t("incidents.status." + String(status || "declared"), {}, status || "-");
 }
 
+function incidentRowClass(status) {
+    const classes = {
+        declared: "alerts-row-firing",
+        investigating: "alerts-row-acknowledged",
+        identified: "alerts-row-acknowledged",
+        monitoring: "alerts-row-acknowledged",
+        resolved: "alerts-row-resolved",
+        closed: "alerts-row-resolved",
+        cancelled: "alerts-row-silenced"
+    };
+    return classes[status] || "";
+}
+
 function incidentStatusPill(status) {
     return $("<span>")
         .addClass("incident-status-pill")
@@ -185,7 +198,7 @@ function renderIncidentsTable(items) {
     }
 
     items.forEach(function (incident) {
-        const row = $("<tr>");
+        const row = $("<tr>").addClass(incidentRowClass(incident.workflow_status));
         row.append(
             $("<td>").append(
                 $("<a>")

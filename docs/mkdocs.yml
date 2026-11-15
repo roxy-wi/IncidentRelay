@@ -67,6 +67,7 @@ nav:
       - Rotation Overrides: usage/rotation-overrides.md
   - Integrations:
       - Overview: integrations/index.md
+      - GitLab deployments (Changes): integrations/gitlab-changes.md
       - Incoming alert sources:
           - Alertmanager: integrations/alertmanager.md
           - New Relic: integrations/new-relic.md
@@ -117,6 +118,7 @@ nav:
   - Administration:
       - Overview: administration/index.md
       - SSO: administration/sso.md
+      - Directory synchronization: administration/directory-sync.md
       - Scheduler: administration/scheduler.md
       - Data Retention: administration/data-retention.md
       - Logging: administration/logging.md

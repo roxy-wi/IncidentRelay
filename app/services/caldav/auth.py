@@ -6,7 +6,7 @@ from flask import Response, g, request
 from app.modules.db import tokens_repo
 from app.modules.db.models import User
 from app.services.integrations.auth import hash_token, token_has_scope
-from app.modules.common import utc_now
+from app.services.authorization import bind_authorization, valid_personal_token
 
 CALDAV_REQUIRED_SCOPES = ["calendar:read"]
 
@@ -60,10 +60,7 @@ def authenticate_caldav_user(username, token):
 
     api_token = tokens_repo.get_active_token_by_hash(hash_token(token))
 
-    if not api_token:
-        return None
-
-    if api_token.expires_at and api_token.expires_at <= utc_now():
+    if not valid_personal_token(api_token):
         return None
 
     if not api_token.user or api_token.user.id != user.id:
@@ -75,6 +72,7 @@ def authenticate_caldav_user(username, token):
     tokens_repo.mark_token_used(api_token)
 
     g.caldav_api_token = api_token
+    bind_authorization(kind="caldav", user=user, token=api_token)
 
     return user
 

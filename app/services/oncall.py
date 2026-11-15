@@ -119,6 +119,9 @@ def get_scheduled_oncall_user(rotation, now=None):
 
     layer = get_active_rotation_layer(rotation, now)
     if not layer:
+        from app.services.directory_sync.runtime import scheduled_user, source_for
+        if source_for("rotation", rotation.id):
+            return scheduled_user(rotation, now)
         return None
 
     return get_scheduled_oncall_user_for_layer(layer, now)
@@ -139,6 +142,11 @@ def get_current_oncall_user(rotation, now=None):
     if override:
         return override.user
 
+    from app.services.directory_sync.runtime import current_user, source_for
+    source = source_for("rotation", rotation.id)
+    if source and not get_active_rotation_layer(rotation, now):
+        return current_user(rotation, source, now)
+
     return get_scheduled_oncall_user(rotation, now)
 
 
@@ -152,6 +160,9 @@ def get_next_rotation_user(rotation, current_user=None, now=None):
 
     layer = get_active_rotation_layer(rotation, now)
     if not layer:
+        from app.services.directory_sync.runtime import next_scheduled_user, source_for
+        if source_for("rotation", rotation.id):
+            return next_scheduled_user(rotation, now, current_user)
         return None
 
     members = rotations_repo.list_rotation_layer_members(

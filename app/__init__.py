@@ -8,6 +8,7 @@ from app.i18n import register_i18n
 from app.middleware import enforce_api_authentication
 from app.views.change_integrations_view import change_integrations_bp
 from app.views.system_settings_view import system_settings_bp
+from app.views.directory_sync_view import directory_sync_bp
 from app.views.change_events_view import change_events_bp
 from app.views.changes_view import changes_bp
 from app.views.admin_users_view import admin_users_bp
@@ -33,6 +34,7 @@ from app.views.version_view import version_bp
 from app.views.sso_admin_view import sso_admin_bp
 from app.views.sso_auth_view import sso_auth_bp
 from app.services.db_errors import handle_integrity_error, handle_not_found_error
+from app.services.encryption_keys import verify_encryption_key
 from app.views.services_view import services_bp
 from app.views.push_view import push_bp
 from app.views.notification_rules_view import notification_rules_bp
@@ -65,6 +67,8 @@ def create_app(log_role=None):
     Create and configure the Flask application.
     """
 
+    verify_encryption_key()
+
     flask_app = Flask(__name__)
     flask_app.config.from_object(Config)
     register_i18n(flask_app)
@@ -72,6 +76,12 @@ def create_app(log_role=None):
 
     flask_app.register_error_handler(IntegrityError, handle_integrity_error)
     flask_app.register_error_handler(DoesNotExist, handle_not_found_error)
+
+    from app.services.authorization import AccessDenied
+
+    @flask_app.errorhandler(AccessDenied)
+    def handle_access_denied(error):
+        return {"error": "access_denied", "message": str(error)}, 403
 
     register_http_metrics(flask_app)
 
@@ -94,6 +104,10 @@ def create_app(log_role=None):
         auth_response = enforce_api_authentication()
         if auth_response is not None:
             return auth_response
+
+        if request.path.startswith("/api/"):
+            from app.services.directory_sync.runtime import guard_mutation
+            return guard_mutation()
 
     @flask_app.teardown_request
     def teardown_request(exc):
@@ -126,6 +140,7 @@ def register_blueprints(flask_app):
     flask_app.register_blueprint(users_bp, url_prefix="/api/users")
     flask_app.register_blueprint(admin_users_bp, url_prefix="/api/admin/users")
     flask_app.register_blueprint(system_settings_bp, url_prefix="/api/admin/system-settings")
+    flask_app.register_blueprint(directory_sync_bp, url_prefix="/api/admin/directory-sync")
     flask_app.register_blueprint(change_integrations_bp, url_prefix="/api/admin/change-integrations")
     flask_app.register_blueprint(change_events_bp, url_prefix="/api/change-events")
     flask_app.register_blueprint(changes_bp, url_prefix="/api")

@@ -580,6 +580,12 @@ def _evaluate_orchestrations(
             )
             continue
 
+        from app.services.authorization import require_intake_route, require_intake_team
+
+        if route_candidate is not None:
+            require_intake_route(route_candidate, service=service_candidate)
+        if team_candidate is not None:
+            require_intake_team(team_candidate.id, source=alert_data.get("source"))
         runtime.steps.append(step)
         runtime.compatibility_mode = max(
             runtime.compatibility_mode,
@@ -796,6 +802,26 @@ def run_event_orchestration(alert_data: Dict[str, Any], *, trace=None) -> Runtim
     """Evaluate published global orchestration before legacy lifecycle routing."""
     runtime = RuntimeResult()
     group_id = _group_id_from_alert(alert_data)
+    from app.services.authorization import (
+        require_intake_group, require_intake_route, require_intake_team,
+    )
+
+    if group_id is not None:
+        require_intake_group(group_id, source=alert_data.get("source"))
+    if alert_data.get("forced_route_id"):
+        require_intake_route(AlertRoute.get_or_none(
+            AlertRoute.id == alert_data["forced_route_id"],
+        ))
+    if alert_data.get("forced_team_id"):
+        require_intake_team(alert_data["forced_team_id"], source=alert_data.get("source"))
+    if alert_data.get("team_slug"):
+        hinted_team = Team.get_or_none(Team.slug == alert_data["team_slug"])
+        if hinted_team is not None:
+            require_intake_team(hinted_team.id, source=alert_data.get("source"))
+    if alert_data.get("service_id"):
+        hinted_service = Service.get_or_none(Service.id == alert_data["service_id"])
+        if hinted_service is not None:
+            require_intake_team(hinted_service.team_id, source=alert_data.get("source"))
     runtime.group_id = group_id
     if group_id is None:
         _trace_runtime(trace, runtime)
@@ -825,6 +851,8 @@ def run_event_orchestration(alert_data: Dict[str, Any], *, trace=None) -> Runtim
         _trace_runtime(trace, runtime)
         return runtime
 
+    if route is not None:
+        require_intake_route(route, service=service)
     context = _build_runtime_context(alert_data, route=route, team=team, service=service)
     context, route, team, service = _evaluate_orchestrations(
         global_orchestrations,

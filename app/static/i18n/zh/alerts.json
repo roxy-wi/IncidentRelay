@@ -103,5 +103,10 @@
   "alerts.summary.total": "告警总数",
   "alerts.summary.total_hint": "当前筛选结果",
   "alerts.status.shelved": "已搁置",
-  "alerts.filters.shelved_only": "仅已搁置"
+  "alerts.filters.shelved_only": "仅已搁置",
+  "alerts.filters.involvement": "参与方式",
+  "alerts.filters.all_involvement": "全部告警",
+  "alerts.filters.any_involvement": "有我参与",
+  "alerts.filters.responder": "响应人员",
+  "alerts.filters.stakeholder": "订阅者"
 }

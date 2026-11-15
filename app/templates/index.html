@@ -82,13 +82,13 @@
     <link rel="stylesheet" href="/static/css/material.css?v=c50eab6cb50b">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/workspace_sections.css', v='5095e31a315b') }}">
     <link rel="stylesheet" href="/static/css/loading.css">
-    <link rel="stylesheet" href="/static/css/table_pages.css?v=460f18264e50">
+    <link rel="stylesheet" href="/static/css/table_pages.css?v=5669f19f5ee8">
     <link rel="stylesheet" href="/static/css/incidents.css?v=59ff81b5e92e">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/changes.css', v='ce3ddb5625aa') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/change_relations.css', v='b5dfbd9a45be') }}">
     <link rel="stylesheet" href="/static/css/orchestrations.css">
     <link rel="stylesheet" href="/static/css/audit_log.css">
-    <link rel="stylesheet" href="/static/css/change_integrations.css?v=3a4824f00c4b">
+    <link rel="stylesheet" href="/static/css/change_integrations.css?v=d41fbb3cc906">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/vendor/tom-select/tom-select.css') }}">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/table_filters.css') }}">
     <link rel="stylesheet" href="/static/css/vendor/select2/select2.min.css">
@@ -292,6 +292,9 @@
             <a href="/admin/change-integrations" data-page="change-integrations" class="menu-link menu-link-change-integrations is-hidden" title="{{ _('ci.title') }}">
               <svg class="menu-icon"><use href="#icon-routes"></use></svg><span class="menu-text">{{ _('ci.title') }}</span>
             </a>
+            <a href="/admin/directory-sync" data-page="directory-sync" class="menu-link menu-link-directory-sync is-hidden" title="{{ _('ds.title') }}">
+              <svg class="menu-icon"><use href="#icon-teams"></use></svg><span class="menu-text">{{ _('ds.title') }}</span>
+            </a>
             <a href="/admin/sso" data-page="sso" class="menu-link menu-link-global-admin is-hidden" title="{{ _('nav.sso') }}">
                             <svg class="menu-icon"><use href="#icon-sso"></use></svg>
                             <span class="menu-text">{{ _('nav.sso') }}</span>
@@ -381,6 +384,7 @@
             <div id="view-sso" class="view">{% include "pages/sso.html" %}</div>
             <div id="view-system-settings" class="view">{% include "pages/system_settings.html" %}</div>
             <div id="view-change-integrations" class="view">{% include "pages/change_integrations.html" %}</div>
+            <div id="view-directory-sync" class="view">{% include "pages/directory_sync.html" %}</div>
             <div id="view-groups" class="view">{% include "pages/groups.html" %}</div>
             <div id="view-profile" class="view">{% include "pages/profile.html" %}</div>
         </section>
@@ -439,6 +443,7 @@
 <script src="/static/js/core/loading.js"></script>
 <script src="/static/js/core/table_pagination.js"></script>
 <script src="{{ url_for('static', filename='js/core/table_filters.js') }}"></script>
+<script src="{{ url_for('static', filename='js/core/alert_filter_state.js') }}"></script>
 <script src="{{ url_for('static', filename='js/core/page_url_state.js') }}"></script>
 <script src="/static/js/core/selects.js"></script>
 <script src="/static/js/core/sortable_table.js"></script>
@@ -461,7 +466,7 @@
 <script src="{{ url_for('static', filename='js/common/slug.js') }}"></script>
 <script src="{{ url_for('static', filename='js/pages/alerts.js', v='6fa094403ce2') }}"></script>
 <script src="{{ url_for('static', filename='js/pages/alert_analytics.js') }}"></script>
-<script src="{{ url_for('static', filename='js/pages/incidents.js', v='c015af96aaf4') }}"></script>
+<script src="{{ url_for('static', filename='js/pages/incidents.js', v='e3caeb1dff4e') }}"></script>
 <script src="{{ url_for('static', filename='js/pages/changes.js', v='a45ecf42677f') }}"></script>
 <script src="{{ url_for('static', filename='js/pages/changes_review.js', v='4e0f502e498f') }}"></script>
 <script src="{{ url_for('static', filename='js/pages/related_changes.js', v='b6abb1391c12') }}"></script>
@@ -495,6 +500,8 @@
 <script src="/static/js/pages/sso.js"></script>
 <script src="/static/js/pages/system_settings.js?v=7c93f59c849d"></script>
 <script src="/static/js/pages/change_integrations.js?v=8c42f9f7fefe"></script>
+<script src="/static/js/pages/directory_sync.js?v=0b2af1a66c94"></script>
+<script src="/static/js/pages/imported_shifts.js"></script>
 <script src="/static/js/pages/services_standards.js"></script>
 <script src="{{ url_for('static', filename='js/core/list_url_state_registry.js') }}"></script>
 </body>

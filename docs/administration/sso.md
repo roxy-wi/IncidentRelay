@@ -18,6 +18,8 @@ Admin → SSO
 
 The page is available only to IncidentRelay administrators.
 
+Importing SAML IdP metadata also requires an administrator account. The metadata URL and every redirect must use HTTPS. Private destinations are blocked unless explicitly allowed by `outbound_private_network_allowlist` in the server's `[security]` configuration. TLS certificate verification remains enabled, and the outbound response-size and redirect limits apply to the import.
+
 ---
 
 ## How SSO Works

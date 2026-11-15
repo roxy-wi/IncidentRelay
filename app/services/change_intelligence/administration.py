@@ -16,6 +16,7 @@ from app.modules.db.models import (
     Service,
 )
 from app.services.audit import record_audit
+from app.services.rbac import current_api_token
 from app.services.change_intelligence.authorization import (
     active_integration_group,
     lock_row,
@@ -50,7 +51,10 @@ def advance_revision(integration):
 
 
 @contextmanager
-def admin_transaction(integration_id, expected_revision=None, *, actor_id=None):
+def admin_transaction(
+    integration_id, expected_revision=None, *, actor_id=None,
+    token_scope="change-integrations:write",
+):
     """Reject stale edits after locking graph state, then the machine principal."""
     with incident_core_repo.write_transaction():
         lock_catalog()
@@ -61,7 +65,7 @@ def admin_transaction(integration_id, expected_revision=None, *, actor_id=None):
             raise ChangeIntegration.DoesNotExist()
         if actor_id is not None:
             try:
-                require_manager(actor_id, integration.owner_group_id)
+                require_manager(actor_id, integration.owner_group_id, token_scope=token_scope)
             except PermissionError as error:
                 raise ChangeIntegration.DoesNotExist() from error
         if (
@@ -80,6 +84,7 @@ def audit(actor_id, action, obj, integration_id, data=None):
         object_id=obj.id,
         group_id=ChangeIntegration.get_by_id(integration_id).owner_group_id,
         user_id=actor_id,
+        api_token_id=getattr(current_api_token(), "id", None),
         data={"integration_id": integration_id, **(data or {})},
     )
 
@@ -148,11 +153,14 @@ def create_source(integration_id, payload, *, actor_id):
             .exists()
         ):
             raise ChangeConflict("Source namespace is already reserved")
+        mappings = [row.model_dump() for row in payload.gitlab_mappings]
+        validate_gitlab_mappings(integration, payload.ordering_mode, mappings)
         source = ChangeSource.create(
             integration=integration,
             owner_team=payload.owner_team_id,
             source=payload.source,
             ordering_mode=payload.ordering_mode,
+            gitlab_mappings=mappings,
         )
         advance_revision(integration)
         audit(actor_id, "source_created", source, integration.id)
@@ -196,11 +204,17 @@ def update_source(integration_id, source_id, payload, *, actor_id):
             "owner_team_id": source.owner_team_id,
             "active": source.active,
             "ordering_mode": source.ordering_mode,
+            "gitlab_mappings": source.gitlab_mappings,
         }
+        mappings = values.get("gitlab_mappings", source.gitlab_mappings)
+        ordering = values.get("ordering_mode", source.ordering_mode)
+        if "gitlab_mappings" in values or "ordering_mode" in values:
+            validate_gitlab_mappings(integration, ordering, mappings)
         source.source = source_name
         source.owner_team = owner_team_id
         source.active = values.get("active", source.active)
-        source.ordering_mode = values.get("ordering_mode", source.ordering_mode)
+        source.ordering_mode = ordering
+        source.gitlab_mappings = mappings
         source.updated_at = utc_now()
         source.save()
         advance_revision(integration)
@@ -212,6 +226,20 @@ def update_source(integration_id, source_id, payload, *, actor_id):
             {"before": previous, "after": values},
         )
         return source
+
+
+def validate_gitlab_mappings(integration, ordering_mode, mappings):
+    """Configuration never grants authority; intake also checks current grants."""
+    if mappings and ordering_mode != "timestamp":
+        raise ChangeConflict("GitLab webhooks require timestamp ordering")
+    service_ids = {sid for row in mappings for sid in row["service_ids"]}
+    services = list(Service.select().where(Service.id.in_(service_ids)))
+    if len(services) != len(service_ids):
+        from app.services.change_intelligence.authorization import ChangeAccessDenied
+
+        raise ChangeAccessDenied("Change access denied")
+    for service in services:
+        validate_grant_target(integration, service.team_id, service.id)
 
 
 def validate_grant_target(integration, team_id, service_id):

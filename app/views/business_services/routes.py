@@ -66,7 +66,7 @@ def require_business_group_read(group_id):
     if not user:
         return None, (jsonify({"error": "Authentication is required"}), 401)
 
-    if user.is_admin or can_read_group(user, group_id):
+    if can_read_group(user, group_id):
         return user, None
 
     return None, (jsonify({"error": "Access to this group is denied"}), 403)

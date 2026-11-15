@@ -50,7 +50,7 @@
   "teams.status.enabled": "Enabled",
   "teams.status.disabled": "Disabled",
   "teams.row.team_id": "Team #{id}",
-  "teams.row.escalation_simple": "Simple after {count}",
+  "teams.row.escalation_simple": "After {count} reminders",
   "teams.details.title": "Team details",
   "teams.details.select": "Select a team",
   "teams.details.select_help": "Click a team name to inspect group, escalation settings and quick actions.",

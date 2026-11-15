@@ -66,12 +66,39 @@
         </div>
 
         <div class="card-header-actions">
-          <a href="/alerts" class="btn btn-small">
+          <a id="dashboard-view-alerts" href="/alerts" class="btn btn-small">
             {{ _('overview.actions.view_all') }}
           </a>
         </div>
       </div>
 
+      <div class="table-toolbar page-toolbar">
+        <div class="card-header-actions">
+          <button id="dashboard-my-alerts" type="button" class="btn btn-small" aria-pressed="false">{{ _('overview.filters.my_alerts') }}</button>
+          <button id="dashboard-all-alerts" type="button" class="btn btn-small btn-primary" aria-pressed="true">{{ _('overview.filters.all_alerts') }}</button>
+        </div>
+        <div class="card-header-actions">
+          <button id="dashboard-toggle-filters" type="button" class="btn btn-small" aria-expanded="false" aria-controls="dashboard-alert-filters">{{ _('overview.filters.filters') }}</button>
+          <button id="dashboard-reset-filters" type="button" class="btn btn-small">{{ _('overview.filters.reset') }}</button>
+        </div>
+      </div>
+      <div id="dashboard-alert-filters" hidden>
+        <div class="form-body">
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label for="dashboard-involvement-filter">{{ _('alerts.filters.involvement') }}</label>
+              <select id="dashboard-involvement-filter" data-table-single-select data-placeholder="{{ _('alerts.filters.all_involvement') }}">
+                {% include 'pages/include/alert_involvement_options.html' %}
+              </select>
+            </div>
+            <div class="form-group">
+              <label for="dashboard-service-filter">{{ _('alerts.filters.service') }}</label>
+              <select id="dashboard-service-filter" multiple data-table-multi-select data-placeholder="{{ _('alerts.filters.all_services') }}" aria-label="{{ _('alerts.filters.service') }}"></select>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div id="dashboard-active-filters" class="table-active-filters"></div>
       <div class="table-wrapper dashboard-alerts-wrapper">
         <table class="data-table dashboard-alerts-table">
           <thead>

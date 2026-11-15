@@ -91,9 +91,39 @@ function fillGroupSelect(selector, includeAll, callback) {
     });
 }
 
-function fillTeamSelect(selector, includeAll, callback) {
-    /* Fill a select element with teams ordered by id. */
+function loadUiTeams(callback) {
+    const user = currentUser;
+    const groupId = getCurrentUserActiveGroupId();
     apiGet("/api/teams", function (teams) {
+        teams = asArray(teams);
+        if (setCurrentUserUiTeams(teams, user, groupId)) {
+            callback(teams);
+        }
+    }, function (xhr) {
+        if (setCurrentUserUiTeams([], user, groupId)) {
+            callback([]);
+            showApiError(xhr);
+        }
+    });
+}
+
+function selectPreferredTeam(selector) {
+    // A read-only team selected in the global filter may be absent here.
+    const select = $(selector);
+    const preferred = String(selectedTeamId() || "");
+    const available = select.find("option").filter(function () {
+        return String($(this).val()) === preferred;
+    });
+    if (preferred && available.length) {
+        select.val(preferred);
+    } else if (!select.val()) {
+        select.val(select.find("option").first().val() || "");
+    }
+}
+
+function fillTeamSelect(selector, includeAll, callback, permission) {
+    /* Fill a select element with teams ordered by id. */
+    loadUiTeams(function (teams) {
         const select = $(selector);
 
         select.empty();
@@ -102,7 +132,11 @@ function fillTeamSelect(selector, includeAll, callback) {
             select.append($("<option>").val("").text(i18n.t("shared.select.all_teams")));
         }
 
-        teams = asArray(teams);
+        if (permission) {
+            teams = teams.filter(function (team) {
+                return canCreateTeamObject(team, permission);
+            });
+        }
 
         teams.forEach(function (team) {
             select.append(
@@ -114,6 +148,8 @@ function fillTeamSelect(selector, includeAll, callback) {
 
         if (select.attr("id") === "global-team-filter") {
             restoreGlobalTeamFilterValue();
+        } else if (permission) {
+            selectPreferredTeam(selector);
         }
 
         if (typeof callback === "function") {

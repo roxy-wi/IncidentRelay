@@ -167,7 +167,7 @@ def test_upsert_alert_with_policy_uses_first_rule_target(monkeypatch, db):
     monkeypatch.setattr(
         notification_queue,
         "notify_alert",
-        lambda alert_group, event_type="notification": calls.append(
+        lambda alert_group, event_type="notification", **kwargs: calls.append(
             (alert_group.id, event_type)
         )
         or 1,
@@ -389,7 +389,7 @@ def test_policy_escalation_moves_alert_to_next_rule(monkeypatch, db):
     monkeypatch.setattr(
         notification_queue,
         "notify_alert",
-        lambda alert_group, event_type="notification": 1,
+        lambda alert_group, event_type="notification", **kwargs: 1,
     )
 
     result = upsert_alert(normalized_alert())
@@ -604,7 +604,7 @@ def test_policy_exhausted_alert_does_not_send_more_reminders(monkeypatch, db):
     monkeypatch.setattr(
         notification_queue,
         "notify_alert",
-        lambda alert_group, event_type="notification": calls.append(event_type) or 1,
+        lambda alert_group, event_type="notification", **kwargs: calls.append(event_type) or 1,
     )
     monkeypatch.setattr(
         "app.services.notifications.rules.has_deliverable_user_notification",

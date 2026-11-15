@@ -260,6 +260,10 @@ def list_effective_layer_members(
 
 
 def check_rotation_structure(rotation, starts_at: datetime, ends_at: datetime) -> list[HealthIssue]:
+    from app.services.directory_sync.runtime import source_for
+    if source_for("rotation", rotation.id):
+        # Imported concrete intervals do not require local cyclic layers.
+        return []
     issues: list[HealthIssue] = []
 
     layers = rotations_repo.list_rotation_layers(rotation.id, enabled_only=False)
@@ -447,8 +451,15 @@ def check_rotation_schedule_gaps(
     gap_start = None
     issues: list[HealthIssue] = []
 
+    from app.services.directory_sync.runtime import source_for
+    from app.services.oncall import get_scheduled_oncall_user
+    imported = source_for("rotation", rotation.id)
     while cursor < ends_at:
-        user = get_current_oncall_user(rotation, cursor)
+        if imported:
+            override = rotations_repo.get_active_override(rotation.id, cursor)
+            user = override.user if override else get_scheduled_oncall_user(rotation, cursor)
+        else:
+            user = get_current_oncall_user(rotation, cursor)
         has_user = bool(
             user
             and getattr(user, "active", False)

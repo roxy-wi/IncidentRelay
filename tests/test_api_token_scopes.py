@@ -10,7 +10,6 @@ from app.services.api_token_scopes import (
     required_scopes_for_path,
     token_can_grant_scopes,
     token_has_scopes,
-    is_jwt_only_api_path,
 )
 from app.services.integrations.auth import hash_token
 from tests.factories import create_user, unique
@@ -173,9 +172,6 @@ def test_every_protected_flask_api_route_has_scope_mapping(app):
         for method in sorted(set(rule.methods or ()) - {"OPTIONS"}):
             if not api_auth_required_for_path(rule.rule, method=method):
                 continue
-            if is_jwt_only_api_path(rule.rule):
-                continue
-
             path = re.sub(r"<uuid:[^>]+>", "00000000-0000-0000-0000-000000000001", rule.rule)
             path = re.sub(r"<int:[^>]+>", "1", path)
             if required_scopes_for_path(path, method) is None:

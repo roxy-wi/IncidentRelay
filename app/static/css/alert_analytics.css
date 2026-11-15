@@ -109,6 +109,7 @@
 
 .alerts-analytics-chart-card,
 .alerts-analytics-table-card {
+    min-width: 0;
     padding: 14px;
     border: 1px solid var(--md-border);
     border-radius: var(--md-radius-md);
@@ -170,6 +171,52 @@
 .alerts-analytics-alert-link:hover {
     text-decoration: underline;
 }
+
+.alerts-analytics-alert-link:disabled {
+    color: var(--md-muted);
+    cursor: default;
+    text-decoration: none;
+}
+
+.alerts-analytics-sample-size {
+    display: block;
+    margin-top: 4px;
+    color: var(--md-muted);
+}
+
+.alerts-analytics-heatmap {
+    width: 100%;
+    min-width: 760px;
+    border-spacing: 3px;
+    font-size: 12px;
+}
+
+.alerts-analytics-heatmap th {
+    color: var(--md-text-soft);
+    font-weight: 650;
+}
+
+.alerts-analytics-heat-cell {
+    width: 100%;
+    min-width: 26px;
+    min-height: 32px;
+    border-radius: 5px;
+    text-align: center;
+    color: var(--md-text);
+    background: var(--md-surface-soft);
+}
+
+.alerts-analytics-heat-cell[data-level="1"] { background: color-mix(in srgb, var(--md-primary) 15%, var(--md-surface)); }
+.alerts-analytics-heat-cell[data-level="2"] { background: color-mix(in srgb, var(--md-primary) 35%, var(--md-surface)); }
+.alerts-analytics-heat-cell[data-level="3"] { background: color-mix(in srgb, var(--md-primary) 65%, var(--md-surface)); color: var(--md-on-accent); }
+.alerts-analytics-heat-cell[data-level="4"] { background: var(--md-primary); color: var(--md-on-accent); }
+.alerts-analytics-heat-cell:focus-visible { outline: 2px solid var(--md-text); outline-offset: 2px; }
+
+#alert-analytics-selection.is-hidden { display: none; }
+#alert-analytics-selection-status:empty { display: none; }
+#alert-analytics-selection-title { margin: 0; }
+#alert-analytics-timezone { max-width: 100%; }
+
 
 .alerts-analytics-empty {
     padding: 18px;

@@ -11,6 +11,7 @@ description: Темы администрирования для эксплуат
 - [Политика хранения данных](data-retention.md)
 - [Журналирование](logging.md)
 - [SSO](sso.md)
+- [Синхронизация команд и дежурств](directory-sync.md)
 - [Демонстрационные данные](demo-data.md)
 - [Проверка схемы](schema-check.md)
 - [Устранение неполадок](troubleshooting.md)

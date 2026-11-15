@@ -11,6 +11,23 @@ An alert group is the incident-level object. It is the object that users acknowl
 
 A child alert is the concrete signal inside the group. For example, three `DiskFull` alerts from three hosts can be shown as one alert group with three child alerts.
 
+## Personal filters on the dashboard
+
+The active alerts card has **My alerts / All alerts** buttons. **My alerts** shows alert groups assigned to you, or linked to an Incident where you are a responder or an active stakeholder. **Filters** opens the involvement selector and the existing service filter. Select several services to include any of them; service, involvement and the global Team selector are combined using AND.
+
+These personal filters affect only the active alerts table. Dashboard totals, charts, system status and service health keep the global team scope. **View all** opens Alerts with the same team, services, involvement and active statuses (`firing` and `acknowledged`). **Reset** clears personal filters without changing the global Team selector. Changing team or active group refreshes the service options and removes incompatible selections.
+
+Involvement and selected services are shared between Dashboard and Alerts, including navigation through the sidebar. They survive a reload and are stored in this browser separately for each user and active group. Alerts keeps its own status, severity, priority, search and pagination settings. Links containing explicit filters take precedence over saved preferences; Back/Forward restores the selection recorded in that history entry. Resetting Dashboard clears the shared filters on both pages.
+
+The Alerts page also exposes **Involvement**. The API accepts `GET /api/alert-groups?involvement=any` (choose one value):
+
+- `assigned`: the alert group's assignee is the current user.
+- `responder`: a linked Incident has a responder request targeting the user or accepted by them, with status `requested`, `accepted` or `resolved`. An unaccepted team request does not include every team member.
+- `stakeholder`: the user has an active stakeholder subscription to a linked Incident.
+- `any`: any of the above, without duplicate alert groups.
+
+Removed Incident links do not count. Closed Incidents can still provide membership when searching historical alert groups. Personal filters never expand team access; without a user identity they return no groups. Existing `assigned_to_me=true` requests still work; if both parameters are supplied, their conditions are combined using AND.
+
 ## Main terms
 
 | Term | Meaning |
@@ -307,6 +324,22 @@ curl -X POST https://incidentrelay.example.com/api/alert-groups/101/resolve \
   -H "Content-Type: application/json" \
   -d '{}'
 ```
+
+## Alert analytics
+
+Open **Alerts → Alert analytics** and select a team and a 7, 30 or 90 day period.
+
+- **Compared with the previous period** compares adjacent windows of equal length. Selecting 7 days compares the last 7 days with the 7 days immediately before them. Values show absolute and percentage changes. ACK rate changes are percentage points. When the previous value is zero, there is no percentage baseline.
+- **When alert groups start** shows new groups by weekday and hour. Choose a timezone using the selector. Values are totals over the period. DST is respected: both occurrences of a repeated local hour contribute to the same cell.
+- **Largest increases in alert noise** compares saved child-alert occurrences by exact name, ranked by absolute increase. Repeated webhook updates to an existing child alert are not separate occurrences. Zero in the previous window does not necessarily mean a new alert rule.
+
+Click a period value, a non-empty heatmap cell, an alert name or an occurrence count. **Matching alert groups** opens on the same page with the exact period, team, name and local-hour selection, and pagination. Click a group title to open its detail page. Several occurrences can belong to one group; the occurrence column counts only matches within the selected period. A message explains occurrences with no accessible parent group.
+
+MTTA/MTTR use eligible groups created in the window with ACK/resolution before its end. The sample size is shown. Currently maintenance- or orchestration-suppressed groups are excluded from response metrics. Open-now counters are not compared with a historical value.
+
+Windows include their start and exclude their end: `[since, until)`. Calculations use retained records and their currently saved lifecycle timestamps, not historical snapshots. Reopening, merging and retention cleanup can change past results. A short history or small sample limits comparisons. Selection is a fresh read: records may change after a chart was loaded.
+
+`GET /api/alert-groups/analytics?days=7&timezone=Europe%2FMoscow` adds `comparison`, `heatmap` and `noise_growth` to the existing response. `GET /api/alert-groups/analytics/selection` takes the returned `since`/`until`, `metric`, optional `team_id`, exact `alertname` for occurrences, or `weekday` (Monday = 0), `hour` and `timezone` for new groups. It supports `page` and `page_size` (1–100), with a maximum window of 365 days and the same access checks.
 
 ## Troubleshooting
 

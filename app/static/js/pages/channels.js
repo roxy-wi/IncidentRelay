@@ -5,25 +5,10 @@ let emailDefaultTemplateCache = null;
 
 function loadChannels() {
     loadDefaultEmailHtmlTemplate(function () {
-        loadChannelGroups(function () {
+        loadChannelTeams(function () {
             loadChannelTypes();
             refreshChannels();
         });
-    });
-}
-
-function loadChannelGroups(callback) {
-    fillGroupSelect("#channel-group", false, function (groups) {
-        groups = asArray(groups);
-        if (!groups.length) {
-            $("#channel-group").append($("<option>").val("").text(i18n.t("channels.empty.groups")));
-            $("#channel-team").empty().append($("<option>").val("").text(i18n.t("channels.empty.teams")));
-            if (typeof callback === "function") {
-                callback();
-            }
-            return;
-        }
-        loadChannelTeams(callback);
     });
 }
 
@@ -49,14 +34,38 @@ function loadDefaultEmailHtmlTemplate(callback) {
 }
 
 function loadChannelTeams(callback) {
-    const groupId = Number($("#channel-group").val());
-    apiGet("/api/teams", function (teams) {
-        teams = asArray(teams);
+    const requestedGroup = $("#channel-group").val();
+    loadUiTeams(function (teams) {
+        if ($("#channel-group").val() !== requestedGroup) {
+            return;
+        }
         channelTeamsCache = teams;
         const select = $("#channel-team");
         select.empty();
 
-        const filteredTeams = teams.filter(function (team) {
+        const writableTeams = teams.filter(function (team) {
+            return canCreateTeamObject(team, "can_write_resources");
+        });
+        // Team responses include group labels. Rebuild both selectors together
+        // so empty/failed loads can recover and groups without write targets
+        // cannot leave the form pointing at an inaccessible team.
+        const groupSelect = $("#channel-group").empty();
+        const writableGroups = new Set();
+        writableTeams.forEach(function (team) {
+            if (!writableGroups.has(Number(team.group_id))) {
+                writableGroups.add(Number(team.group_id));
+                groupSelect.append($("<option>").val(team.group_id).text(
+                    "#" + team.group_id + " " + team.group_name + " (" + team.group_slug + ")"
+                ));
+            }
+        });
+        if (writableGroups.has(Number(requestedGroup))) {
+            groupSelect.val(requestedGroup);
+        } else if (!writableGroups.size) {
+            groupSelect.append($("<option>").val("").text(i18n.t("channels.empty.groups")));
+        }
+        const groupId = Number($("#channel-group").val());
+        const filteredTeams = writableTeams.filter(function (team) {
             return !groupId || Number(team.group_id) === groupId;
         });
 
@@ -72,6 +81,7 @@ function loadChannelTeams(callback) {
             });
         }
 
+        selectPreferredTeam("#channel-team");
         if (typeof callback === "function") {
             callback();
         }
@@ -1050,7 +1060,7 @@ function openCreateChannelModal() {
     resetChannelForm();
     $("#channel-form-title").text(i18n.t("channels.form.create"));
     const team = getSelectedChannelTeam();
-    if (team && !canWriteChannelResourceForTeam(team)) {
+    if (!team || !canWriteChannelResourceForTeam(team)) {
         showAppError(i18n.t("channels.permissions.create_denied"));
         return;
     }
@@ -1090,7 +1100,7 @@ $(document).on("change", "#cfg-email-recipient-mode", showEmailRecipientFields);
 $(document).on("click", "#save-channel", saveChannel);
 $(document).on("click", "#reset-channel-form", resetChannelForm);
 $(document).on("click", "#reload-channels", function () {
-    loadChannelGroups(refreshChannels);
+    loadChannelTeams(refreshChannels);
 });
 $(document).on("click", "#reset-email-template", resetEmailHtmlTemplate);
 $(document).on("input", "#channels-search", renderChannels);

@@ -2,6 +2,9 @@ from app.db import database_proxy as db
 from app.modules.db import alerts_repo, audit_repo, incident_core_repo
 from app.modules.redaction import redact_secrets
 from app.modules.db.models import AlertGroup
+from app.services.authorization import (
+    refresh_authority, require_intake_route, require_intake_target,
+)
 from app.services.alerts.correlation import refresh_alert_group_correlations_safely
 from app.services.alerts.shelving import clear_shelve_on_resolve
 from app.services.notifications.delivery import update_alert_messages
@@ -55,10 +58,17 @@ def _lock_group_for_lifecycle(group_id):
     return query.get()
 
 
-def acknowledge_alert(alert_id, user_id=None, *, source="system", api_token_id=None):
+def acknowledge_alert(
+    alert_id, user_id=None, *, source="system", api_token_id=None, intake_route=None,
+):
     """Acknowledge an alert group."""
     with incident_core_repo.write_transaction():
+        if intake_route is not None:
+            refresh_authority(lock=True)
+            require_intake_route(intake_route, lock=True)
         group_before = _lock_group_for_lifecycle(alert_id)
+        if intake_route is not None:
+            require_intake_target(group_before, intake_route)
         old_status = group_before.status
 
         # Repeated acknowledge is a no-op, even across concurrent workers.
@@ -108,9 +118,12 @@ def resolve_alert(
     defer_stakeholder_notification: bool = False,
     source: str = "system",
     api_token_id: int | None = None,
+    intake_route=None,
 ) -> AlertGroup:
     """Resolve an alert group."""
     group_before = AlertGroup.get_by_id(alert_id)
+    if intake_route is not None:
+        require_intake_target(group_before, intake_route)
     # A completed cycle needs no write or row lock. Waiting for a concurrent
     # reopen could turn this repeated resolve into a write to the new cycle.
     if (
@@ -121,7 +134,12 @@ def resolve_alert(
 
     observed_episode_id = group_before.current_episode_id
     with incident_core_repo.write_transaction():
+        if intake_route is not None:
+            refresh_authority(lock=True)
+            require_intake_route(intake_route, lock=True)
         group_before = _lock_group_for_lifecycle(alert_id)
+        if intake_route is not None:
+            require_intake_target(group_before, intake_route)
         if group_before.current_episode_id != observed_episode_id:
             return group_before
         old_status = group_before.status

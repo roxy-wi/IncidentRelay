@@ -1741,6 +1741,15 @@ body.md-theme .modal-body {
   -webkit-overflow-scrolling: touch;
 }
 
+body.md-theme .app-modal-body > .form-stack,
+body.md-theme .app-modal-body fieldset.form-stack {
+  margin-top: 0;
+}
+
+body.md-theme .app-modal-body > [role="status"]:empty {
+  display: none;
+}
+
 body.md-theme .app-modal-footer,
 body.md-theme .modal-footer {
   display: flex;

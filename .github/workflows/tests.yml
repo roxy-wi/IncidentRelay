@@ -105,6 +105,7 @@ jobs:
           pytest tests/ux/test_incident_workspace_browser.py \
             tests/ux/test_changes_browser.py \
             tests/ux/test_silences_browser.py \
+            tests/ux/test_team_create_permissions.py \
             --junitxml=pytest-browser-results.xml
 
       - name: Upload test reports

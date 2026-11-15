@@ -25,7 +25,7 @@ from tests.factories import (
     reason="Enable browser tests and install Node playwright",
 )
 def test_silences_table_in_browser(app, db, tmp_path):
-    """Keep all rule data and actions available without the details sidebar."""
+    """Keep metadata in the table and matchers in the existing edit form."""
     group = create_group()
     team = create_team(group, name="Production Operations", slug="production-ops")
     user = create_user(group=group, is_admin=True)

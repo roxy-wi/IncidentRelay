@@ -202,16 +202,23 @@
             return;
         }
 
+        const isSingle = select.is("[data-table-single-select]");
         new TomSelect(select[0], {
-            plugins: ["remove_button"],
+            wrapperClass: "ts-wrapper table-filter-control",
+            plugins: isSingle ? [] : ["remove_button"],
             create: false,
             persist: false,
-            maxItems: null,
-            closeAfterSelect: false,
+            maxItems: isSingle ? 1 : null,
+            closeAfterSelect: isSingle,
             hideSelected: true,
-            allowEmptyOption: false,
+            allowEmptyOption: isSingle,
             placeholder: select.data("placeholder") || "All",
+            hidePlaceholder: true,
             render: {
+                item: function (data, escape) {
+                    const label = escape(data.text);
+                    return '<div><span class="table-filter-value" title="' + label + '">' + label + '</span></div>';
+                },
                 no_results: function () {
                     return '<div class="no-results">No results found</div>';
                 }
@@ -223,7 +230,7 @@
         root = root || document;
 
         $(root)
-            .find("select[data-table-multi-select]")
+            .find("select[data-table-multi-select], select[data-table-single-select]")
             .each(function () {
                 ensureTableMultiSelect(this);
             });
@@ -318,6 +325,66 @@
         });
     }
 
+    function tableServiceFilterScope() {
+        return [
+            currentUser && currentUser.id,
+            currentUser && currentUser.active_group_id,
+            selectedTeamId() || "all"
+        ].join(":");
+    }
+
+    function loadTableServiceFilter(selector, selectedValues, callback) {
+        // Cache per control and authorization/team scope. A late response must
+        // not restore options or selections from a previously selected team.
+        const select = $(selector);
+        if (!select.length) {
+            callback();
+            return;
+        }
+        const scope = tableServiceFilterScope();
+        const state = select.data("service-filter-state") || {generation: 0};
+        select.data("service-filter-state", state);
+        const generation = ++state.generation;
+        const control = select[0].tomselect;
+        function enable() {
+            if (control) control.enable();
+            else select.prop("disabled", false);
+        }
+        function applyOptions(options) {
+            replaceTableSelectOptions(select, options, selectedValues);
+            refreshTableMultiSelect(select);
+        }
+        if (state.scope === scope) {
+            enable();
+            applyOptions(state.options);
+            callback();
+            return;
+        }
+        if (control) control.disable();
+        else select.prop("disabled", true);
+        function finish() {
+            if (generation !== state.generation || scope !== tableServiceFilterScope()) return false;
+            enable();
+            return true;
+        }
+        apiGet("/api/services" + selectedTeamQuery(), function (response) {
+            if (!finish()) return;
+            const services = Array.isArray(response) ? response : (response.items || []);
+            state.options = services.filter(service => service.enabled !== false).map(service => ({
+                value: String(service.id),
+                text: [service.team_name || service.team_slug, service.name || service.slug || service.id]
+                    .filter(Boolean).join(" / ")
+            }));
+            state.scope = scope;
+            applyOptions(state.options);
+            callback();
+        }, function (xhr) {
+            if (!finish()) return;
+            callback(xhr);
+        });
+    }
+
+    window.loadTableServiceFilter = loadTableServiceFilter;
     window.normalizeTableFilterValues = normalizeTableFilterValues;
     window.getTableFilterValues = getTableFilterValues;
     window.setTableFilterValues = setTableFilterValues;

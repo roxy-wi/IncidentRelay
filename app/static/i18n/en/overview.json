@@ -77,5 +77,11 @@
   "overview.charts.distribution_subtitle": "Severity and priority breakdown",
   "overview.activity.system": "System",
   "overview.activity.none": "No recent activity",
-  "overview.activity.unavailable": "Activity is temporarily unavailable"
+  "overview.activity.unavailable": "Activity is temporarily unavailable",
+  "overview.filters.my_alerts": "My alerts",
+  "overview.filters.all_alerts": "All alerts",
+  "overview.filters.filters": "Filters",
+  "overview.filters.reset": "Reset",
+  "overview.filters.empty": "No active alerts match these filters.",
+  "overview.filters.load_error": "Could not load active alerts. Try again using Reload."
 }

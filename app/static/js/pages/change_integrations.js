@@ -12,6 +12,10 @@ let changeGrantEditing = null;
 let changeServiceRequest = 0;
 let changeGrantServicesReady = false;
 let changeCreationTeams = [];
+let changeGitlabRequest = 0;
+let changeGitlabReady = true;
+let changeGitlabServices = [];
+let changeGitlabRowId = 0;
 
 function clearChangeSecret() {
     $("#ci-secret").val("");
@@ -189,6 +193,7 @@ function changeIntegrationWrite(method, suffix, payload, onSuccess) {
         controls.prop("disabled", false);
         setAppModalSaving("#ci-modal", false);
         applyChangeSourceIdentityLock();
+        $("#ci-add-source button[type=submit], #ci-gitlab-add").prop("disabled", !changeGitlabReady);
         $("#ci-service, #ci-add-grant button[type=submit]").prop("disabled", !changeGrantServicesReady);
         return true;
     };
@@ -331,8 +336,17 @@ function resetChangeSourceForm() {
     form[0]?.reset();
     form.closest("details").prop("open", false);
     $("#ci-source-form-toggle, #ci-add-source button[type=submit]").text(i18n.t("ci.add_source"));
+    $("#ci-add-source button[type=submit]").addClass("btn-small");
     $("#ci-source-cancel, #ci-source-edit-status, #ci-source-lock-hint").prop("hidden", true);
     $("#ci-source-name, #ci-owner").prop("disabled", false);
+    changeGitlabRequest += 1;
+    changeGitlabReady = true;
+    changeGitlabServices = [];
+    $("#ci-gitlab-mappings select").each(function () { this.tomselect?.destroy(); });
+    $("#ci-gitlab-mappings").empty();
+    $("#ci-gitlab").prop("hidden", true);
+    $("#ci-gitlab-status").text("");
+    $("#ci-ordering, #ci-add-source button[type=submit]").prop("disabled", false);
 }
 
 function applyChangeSourceIdentityLock() {
@@ -340,6 +354,9 @@ function applyChangeSourceIdentityLock() {
     const locked = Boolean(source && !source.identity_editable);
     $("#ci-source-name, #ci-owner").prop("disabled", changeIntegrationBusy || locked);
     $("#ci-source-lock-hint").prop("hidden", !locked);
+    const gitlab = $("#ci-gitlab-mappings").children().length > 0;
+    if (gitlab) $("#ci-ordering").val("timestamp");
+    $("#ci-ordering").prop("disabled", changeIntegrationBusy || gitlab);
 }
 
 function editChangeSource(source) {
@@ -350,8 +367,9 @@ function editChangeSource(source) {
         changeCatalogLabel(source.owner_team_name, source.owner_team_slug, "team", source.owner_team_id));
     $("#ci-ordering").val(source.ordering_mode);
     $("#ci-source-active").prop("checked", source.active);
+    loadChangeGitlabMappings(source);
     $("#ci-source-form-toggle").text(i18n.t("ci.edit_source"));
-    $("#ci-add-source button[type=submit]").text(i18n.t("ci.save"));
+    $("#ci-add-source button[type=submit]").removeClass("btn-small").text(i18n.t("ci.save"));
     $("#ci-source-cancel, #ci-source-edit-status").prop("hidden", false);
     applyChangeSourceIdentityLock();
     $("#ci-add-source").closest("details").prop("open", true);
@@ -359,11 +377,75 @@ function editChangeSource(source) {
     $(source.identity_editable ? "#ci-source-name" : "#ci-ordering").trigger("focus");
 }
 
+function loadChangeGitlabMappings(source) {
+    const version = changeEditorVersion;
+    const requestId = ++changeGitlabRequest;
+    changeGitlabReady = false;
+    $("#ci-gitlab").prop("hidden", false);
+    $("#ci-gitlab-url").val(new URL(source.gitlab_webhook_path, window.location.origin).href);
+    $("#ci-gitlab-status").text(i18n.t("ci.loading"));
+    $("#ci-add-source button[type=submit], #ci-gitlab-add").prop("disabled", true);
+    function current() {
+        return changeEditorCurrent(version) && requestId === changeGitlabRequest && source.id === changeSourceEditingId;
+    }
+    apiGet("/api/admin/change-integrations/targets?integration_id=" + changeIntegration.id + "&source_id=" + source.id, function (data) {
+        if (!current()) return;
+        changeGitlabServices = data.services.map(service => ({id: service.id,
+            label: changeCatalogLabel(service.name, service.slug) + " / "
+                + (data.teams.find(team => team.id === service.team_id)?.name || "#" + service.team_id)}));
+        (source.gitlab_mappings || []).forEach(addChangeGitlabMapping);
+        changeGitlabReady = true;
+        $("#ci-gitlab-status").text(i18n.t("ci.gitlab_permissions"));
+        $("#ci-add-source button[type=submit], #ci-gitlab-add").prop("disabled", changeIntegrationBusy);
+    }, function (xhr) {
+        if (!current()) return;
+        $("#ci-gitlab-status").text(i18n.t("ci.load_failed"));
+        showApiError(xhr);
+    });
+}
+
+function addChangeGitlabMapping(mapping = {}) {
+    const row = $("<div>", {class: "form-section form-stack"});
+    const grid = $("<div>", {class: "form-grid-2"}).appendTo(row);
+    const prefix = "ci-gitlab-" + (++changeGitlabRowId);
+    function field(parent, key, control) {
+        const id = prefix + "-" + key;
+        control.attr("id", id);
+        $("<div>", {class: "form-group"}).append(
+            $("<label>", {for: id}).text(i18n.t("ci.gitlab_" + key)), control
+        ).appendTo(parent);
+    }
+    field(grid, "project", $("<input>", {class: "input ci-gitlab-project", type: "number", min: 1, max: Number.MAX_SAFE_INTEGER, required: true}).val(mapping.project_id || ""));
+    field(grid, "environment", $("<input>", {class: "input ci-gitlab-environment", maxlength: 255, required: true, placeholder: "production"}).val(mapping.environment || ""));
+    const services = $("<select>", {class: "ci-gitlab-services", multiple: true, required: true,
+        "data-table-multi-select": "", "data-placeholder": i18n.t("ci.gitlab_services")});
+    changeGitlabServices.forEach(service => services.append(changeOption(service.id, service.label)));
+    (mapping.service_ids || []).forEach(id => {
+        if (!changeGitlabServices.some(service => service.id === id)) {
+            services.append(changeOption(id, changeCatalogLabel(null, null, "service", id)));
+        }
+    });
+    services.val((mapping.service_ids || []).map(String));
+    field(row, "services", services);
+    $("<div>", {class: "form-actions-inline"}).append(makeIconButton({
+        icon: "fas fa-trash", label: i18n.t("ci.gitlab_remove"), className: "btn-danger",
+        onClick: function () {
+            services[0].tomselect?.destroy();
+            row.remove();
+            applyChangeSourceIdentityLock();
+        }
+    })).appendTo(row);
+    $("#ci-gitlab-mappings").append(row);
+    initTableMultiSelects(row[0]);
+    applyChangeSourceIdentityLock();
+}
+
 function resetChangeGrantForm() {
     changeGrantEditing = null;
     $("#ci-add-grant")[0]?.reset();
     $("#ci-add-grant").closest("details").prop("open", false);
     $("#ci-grant-form-toggle, #ci-add-grant button[type=submit]").text(i18n.t("ci.add_grant"));
+    $("#ci-add-grant button[type=submit]").addClass("btn-small");
     $("#ci-grant-cancel, #ci-grant-edit-status").prop("hidden", true);
     changeServiceRequest += 1;
     changeGrantServicesReady = false;
@@ -381,7 +463,7 @@ function editChangeGrant(source, grant) {
         changeCatalogLabel(grant.target_service_name, grant.target_service_slug, "service", grant.target_service_id));
     $("#ci-grant-active").prop("checked", grant.active);
     $("#ci-grant-form-toggle").text(i18n.t("ci.edit_permission"));
-    $("#ci-add-grant button[type=submit]").text(i18n.t("ci.save"));
+    $("#ci-add-grant button[type=submit]").removeClass("btn-small").text(i18n.t("ci.save"));
     $("#ci-grant-cancel, #ci-grant-edit-status").prop("hidden", false);
     $("#ci-add-grant").closest("details").prop("open", true);
     document.querySelector("#ci-add-grant").scrollIntoView({block: "nearest"});
@@ -410,6 +492,9 @@ $(document).on("click", "#ci-modal [data-ci-panel]", function () { showChangePan
 $(document).on("change", "#ci-team", () => loadChangeGrantServices());
 $(document).on("change", "#ci-new-group", loadChangeCreationTeams);
 $(document).on("click", "#ci-source-cancel", resetChangeSourceForm);
+$(document).on("click", "#ci-gitlab-add", function () {
+    if (changeGitlabReady && !changeIntegrationBusy) addChangeGitlabMapping();
+});
 $(document).on("click", "#ci-grant-cancel", function () { resetChangeGrantForm(); loadChangeGrantServices(); });
 $(document).on("click", "#ci-clear-secret", clearChangeSecret);
 $(window).on("pagehide", closeChangeIntegrationModal);
@@ -428,13 +513,21 @@ $(document).on("submit", "#ci-edit", function (event) {
 });
 $(document).on("submit", "#ci-add-source", function (event) {
     event.preventDefault();
+    if (!changeGitlabReady) return;
     const payload = {ordering_mode: $("#ci-ordering").val()};
     const source = changeIntegration.sources.find(item => item.id === changeSourceEditingId);
     if (!source || source.identity_editable) {
         payload.owner_team_id = Number($("#ci-owner").val());
         payload.source = $("#ci-source-name").val();
     }
-    if (source) payload.active = $("#ci-source-active").is(":checked");
+    if (source) {
+        payload.active = $("#ci-source-active").is(":checked");
+        payload.gitlab_mappings = $("#ci-gitlab-mappings").children().map(function () {
+            return {project_id: Number($(this).find(".ci-gitlab-project").val()),
+                environment: $(this).find(".ci-gitlab-environment").val(),
+                service_ids: ($(this).find("select.ci-gitlab-services").val() || []).map(Number)};
+        }).get();
+    }
     changeIntegrationEdit(source ? "PATCH" : "POST", "/sources" + (source ? "/" + source.id : ""), payload, resetChangeSourceForm);
 });
 $(document).on("submit", "#ci-add-grant", function (event) {

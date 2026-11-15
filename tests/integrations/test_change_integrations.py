@@ -90,7 +90,7 @@ def grant(identity, *, capability="changed", team=None, service=None):
 
 
 @pytest.mark.parametrize("auth_required", [True, False])
-def test_admin_namespace_requires_admin_jwt(
+def test_admin_namespace_requires_administrator(
     client, admin_headers, setup_identity, monkeypatch, auth_required
 ):
     monkeypatch.setattr(Config, "API_AUTH_REQUIRED", auth_required)
@@ -101,7 +101,7 @@ def test_admin_namespace_requires_admin_jwt(
     tokens_repo.create_api_token(
         "personal", "personal", hash_token("personal"), ["*"], user_id=user.id
     )
-    for header, expected in [(None, 401), (jwt, 403), (raw, 403), ("personal", 401)]:
+    for header, expected in [(None, 401), (jwt, 403), (raw, 403), ("personal", 403)]:
         headers = {"Authorization": f"Bearer {header}"} if header else {}
         assert client.get(BASE, headers=headers).status_code == expected
         assert (

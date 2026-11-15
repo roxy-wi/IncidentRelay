@@ -214,7 +214,7 @@ def user_notification_rules_job():
 
 
 def alert_group_notification_job():
-    """Send due alert group notifications under a database lock."""
+    """Deliver a bounded batch; PostgreSQL workers claim individual groups."""
 
     if db.is_closed():
         db.connect(reuse_if_open=True)
@@ -222,11 +222,11 @@ def alert_group_notification_job():
     owner = None
 
     try:
-        owner = acquire_db_lock("alert_group_notification_job")
-
-        if not owner:
-            logger.debug("alert group notification job skipped because lock is busy")
-            return {"processed": 0, "sent": 0, "skipped": 0, "failed": 0}
+        if "postgres" not in db.obj.__class__.__name__.lower():
+            owner = acquire_db_lock("alert_group_notification_job")
+            if not owner:
+                logger.debug("alert group notification job skipped because lock is busy")
+                return {"processed": 0, "sent": 0, "skipped": 0, "failed": 0}
 
         logger.info("alert group notification job started")
 
@@ -714,6 +714,21 @@ def change_intelligence_job():
             db.close()
 
 
+def directory_sync_job(current=False):
+    """Process directory synchronization requests and scheduled refreshes."""
+    from app.services.directory_sync.service import process_due_current, process_due_sources
+    try:
+        if db.is_closed():
+            db.connect(reuse_if_open=True)
+        return process_due_current() if current else process_due_sources()
+    except Exception as error:
+        logger.error("Directory sync worker failed: %s", type(error).__name__)
+        return 0
+    finally:
+        if not db.is_closed():
+            db.close()
+
+
 def refresh_change_worker_schedule(scheduler):
     """Apply the committed interval even while queue processing is paused."""
     with db.connection_context():
@@ -743,6 +758,11 @@ def start_scheduler():
         return _scheduler
 
     _scheduler = BackgroundScheduler()
+    _scheduler.add_job(directory_sync_job, "interval", seconds=5, id="directory_sync_job",
+                       max_instances=1, coalesce=True, next_run_time=datetime.now(timezone.utc))
+    _scheduler.add_job(directory_sync_job, "interval", seconds=5, id="directory_sync_current_job",
+                       kwargs={"current": True}, max_instances=1, coalesce=True,
+                       next_run_time=datetime.now(timezone.utc))
     _scheduler.add_job(
         refresh_change_worker_schedule,
         "interval",
@@ -820,7 +840,7 @@ def start_scheduler():
     _scheduler.add_job(
         alert_group_notification_job,
         "interval",
-        seconds=int(getattr(Config, "ALERT_GROUP_NOTIFICATION_CHECK_INTERVAL_SECONDS", 10)),
+        seconds=int(getattr(Config, "ALERT_GROUP_NOTIFICATION_CHECK_INTERVAL_SECONDS", 1)),
         max_instances=1,
         coalesce=True,
         next_run_time=utc_now(),

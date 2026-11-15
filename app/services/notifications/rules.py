@@ -324,8 +324,15 @@ def has_deliverable_user_notification(group, event_type="notification"):
     return bool(list_matching_rules(group, event_type=event_type))
 
 
-def enqueue_user_notifications(group, event_type="notification"):
-    """Create/send user-level notifications for alert group assignee."""
+def enqueue_user_notifications(
+    group, event_type="notification", *, deferred_voice_deliveries=None,
+):
+    """Create/send user notifications, optionally queueing immediate voice calls.
+
+    The caller must commit before processing deferred delivery IDs. Pending
+    rows also remain available to the scheduled worker if the caller exits.
+    The return value counts completed sends, not queued deliveries.
+    """
 
     group = _ensure_alert_group(group)
 
@@ -383,6 +390,13 @@ def enqueue_user_notifications(group, event_type="notification"):
         )
 
         if rule.delay_seconds and rule.delay_seconds > 0:
+            continue
+
+        if (
+            delivery.method == NOTIFICATION_METHOD_VOICE_CALL
+            and deferred_voice_deliveries is not None
+        ):
+            deferred_voice_deliveries.append(delivery.id)
             continue
 
         sent_count += send_delivery(delivery)
@@ -518,10 +532,13 @@ def reclaim_abandoned_resolved_deliveries(*, now=None, limit=100):
     return reclaimed
 
 
-def process_due_user_notifications(limit=100):
-    """Process due user notification deliveries and return sent count."""
+def process_due_user_notifications(limit=100, *, delivery_ids=None):
+    """Process due deliveries, optionally restricted to committed delivery IDs."""
     now = utc_now()
-    reclaimed = reclaim_abandoned_resolved_deliveries(now=now, limit=limit)
+    reclaimed = (
+        reclaim_abandoned_resolved_deliveries(now=now, limit=limit)
+        if delivery_ids is None else 0
+    )
     if reclaimed:
         logger.warning(
             "abandoned resolved user deliveries reclaimed",
@@ -539,6 +556,14 @@ def process_due_user_notifications(limit=100):
         .order_by(UserNotificationDelivery.scheduled_at.asc())
         .limit(limit)
     )
+    if delivery_ids is not None:
+        # Never send an uncommitted delivery from a nested caller transaction.
+        # The regular scheduler can pick it up after the outer commit.
+        if db.in_transaction():
+            return 0
+        due_deliveries = due_deliveries.where(
+            UserNotificationDelivery.id.in_(delivery_ids)
+        )
 
     for due_delivery in due_deliveries:
         claimed = (
@@ -738,6 +763,13 @@ def _send_delivery_unlocked(delivery):
         mark_delivery_skipped(delivery, "alert_group_not_found")
         return 0
 
+    if (
+        delivery.method == NOTIFICATION_METHOD_VOICE_CALL
+        and group.assignee_id != delivery.user_id
+    ):
+        mark_delivery_skipped(delivery, "assignee_changed")
+        return 0
+
     if delivery.event_type == "resolved" and _stale_resolved_delivery(delivery, group):
         mark_delivery_skipped(delivery, "alert_group_reopened")
         return 0
@@ -773,11 +805,32 @@ def _send_delivery_unlocked(delivery):
     delivery.provider = result.get("provider") or delivery.method
     delivery.external_message_id = result.get("external_message_id")
     delivery.external_channel_id = result.get("external_channel_id")
-    delivery.provider_status = result.get("provider_status")
-    delivery.provider_payload = result.get("provider_payload")
     delivery.last_error = None
     delivery.updated_at = utc_now()
-    delivery.save()
+    if delivery.method == NOTIFICATION_METHOD_VOICE_CALL:
+        # A callback can finish before place_call returns. Do not overwrite its
+        # status/payload with the older provider response or a stale model copy.
+        delivery.save(only=[
+            UserNotificationDelivery.status,
+            UserNotificationDelivery.sent_at,
+            UserNotificationDelivery.provider,
+            UserNotificationDelivery.external_message_id,
+            UserNotificationDelivery.external_channel_id,
+            UserNotificationDelivery.last_error,
+            UserNotificationDelivery.updated_at,
+        ])
+        (UserNotificationDelivery
+         .update(provider_status=result.get("provider_status"),
+                 provider_payload=result.get("provider_payload"))
+         .where((UserNotificationDelivery.id == delivery.id)
+                & UserNotificationDelivery.provider_payload.is_null(True))
+         .execute())
+        if delivery.event_type in {"notification", "update"}:
+            alerts_repo.record_group_notification_time(group, delivery.sent_at)
+    else:
+        delivery.provider_status = result.get("provider_status")
+        delivery.provider_payload = result.get("provider_payload")
+        delivery.save()
 
     return 1
 
@@ -848,4 +901,8 @@ def mark_delivery_failed(delivery, error):
     delivery.status = "failed"
     delivery.last_error = str(error)
     delivery.updated_at = utc_now()
-    delivery.save()
+    delivery.save(only=[
+        UserNotificationDelivery.status,
+        UserNotificationDelivery.last_error,
+        UserNotificationDelivery.updated_at,
+    ])

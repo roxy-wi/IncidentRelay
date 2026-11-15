@@ -1,7 +1,7 @@
 from flask import Blueprint, jsonify, request
 
 from app.modules.db import users_repo
-from app.services.rbac import get_allowed_group_ids
+from app.services.rbac import get_allowed_group_ids, is_admin_user
 from app.services.serializers.users import serialize_user
 
 
@@ -19,7 +19,7 @@ def list_users():
     show_all = request.args.get("all") == "1"
     user = request.current_user
 
-    if user and user.is_admin and show_all:
+    if is_admin_user(user) and show_all:
         return jsonify([
             serialize_user(item)
             for item in users_repo.list_all_users(active_only=True)

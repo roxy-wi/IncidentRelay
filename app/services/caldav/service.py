@@ -4,6 +4,7 @@ from app.modules.db.models import Team, TeamUser
 from app.services.calendar_service import build_team_calendar
 from app.services.caldav.ics import event_uid
 from app.modules.common import utc_now
+from app.services.authorization import filter_team_ids, token_allows_team
 
 DEFAULT_PAST_DAYS = 7
 DEFAULT_FUTURE_DAYS = 90
@@ -23,10 +24,14 @@ def list_user_calendar_teams(user):
         .order_by(Team.name)
     )
 
-    return list(query)
+    teams = list(query)
+    allowed = set(filter_team_ids([team.id for team in teams]))
+    return [team for team in teams if team.id in allowed]
 
 
 def get_user_team_or_none(user, team_id):
+    if not token_allows_team(team_id):
+        return None
     try:
         team = Team.get(
             Team.id == team_id,

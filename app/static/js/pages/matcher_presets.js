@@ -14,7 +14,7 @@ function initializeMatcherPresetEditor() {
 
 function loadMatcherPresets() {
     initializeMatcherPresetEditor();
-    fillTeamSelect("#matcher-preset-team", false, function () { resetMatcherPresetForm(); });
+    fillTeamSelect("#matcher-preset-team", false, function () { resetMatcherPresetForm(); }, "can_write");
     refreshMatcherPresets();
     updateMatcherPresetCreateButtonState();
 }
@@ -412,11 +412,7 @@ function resetMatcherPresetForm() {
     $("#matcher-preset-enabled").prop("checked", true);
     $("#matcher-preset-team").prop("disabled", false);
 
-    const selectedTeam = $("#global-team-filter").val();
-
-    if (selectedTeam) {
-        $("#matcher-preset-team").val(selectedTeam);
-    }
+    selectPreferredTeam("#matcher-preset-team");
 }
 
 function openCreateMatcherPresetModal() {

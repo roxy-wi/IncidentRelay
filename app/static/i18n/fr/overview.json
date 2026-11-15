@@ -77,5 +77,11 @@
   "overview.charts.distribution_subtitle": "Répartition par gravité et priorité",
   "overview.activity.system": "Système",
   "overview.activity.none": "Aucune activité récente",
-  "overview.activity.unavailable": "L’activité est temporairement indisponible"
+  "overview.activity.unavailable": "L’activité est temporairement indisponible",
+  "overview.filters.my_alerts": "Mes alertes",
+  "overview.filters.all_alerts": "Toutes les alertes",
+  "overview.filters.filters": "Filtres",
+  "overview.filters.reset": "Réinitialiser",
+  "overview.filters.empty": "Aucune alerte active ne correspond à ces filtres.",
+  "overview.filters.load_error": "Impossible de charger les alertes actives. Cliquez sur Recharger pour réessayer."
 }

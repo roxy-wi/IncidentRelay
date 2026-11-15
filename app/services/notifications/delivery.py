@@ -194,11 +194,14 @@ def _notification_targets(group, event_type):
 def notify_alert(
     group, event_type="notification", *,
     channel_ids=None, enqueue_rules=True, report_channels=False,
+    deferred_voice_deliveries=None,
 ):
     """Send alert notifications; optionally target specific channels.
 
     The opt-in channel outcome report is used by the persistent recovery retry
     ledger. Existing callers retain the integer return value and semantics.
+    If a deferred voice list is supplied, append immediate call IDs for dispatch
+    after the caller commits; queued calls are excluded from the sent count.
     """
 
     group = _ensure_alert_group(group)
@@ -414,9 +417,11 @@ def notify_alert(
 
     if enqueue_rules:
         try:
+            rule_options = {}
+            if deferred_voice_deliveries is not None:
+                rule_options["deferred_voice_deliveries"] = deferred_voice_deliveries
             user_sent_count = rules.enqueue_user_notifications(
-                group,
-                event_type=event_type,
+                group, event_type=event_type, **rule_options,
             )
 
             sent_count += user_sent_count

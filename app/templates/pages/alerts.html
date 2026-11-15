@@ -122,10 +122,9 @@
                 <option value="priority:asc">{{ _("alerts.sort.priority_first") }}</option>
                 <option value="status_asc">{{ _("alerts.sort.status") }}</option>
             </select>
-            <label class="alerts-switch md-switch alerts-assigned-filter">
-                <input id="assigned-to-me-filter" type="checkbox">
-                <span>{{ _('alerts.filters.assigned_to_me') }}</span>
-            </label>
+            <select id="alerts-involvement-filter" data-table-single-select data-placeholder="{{ _('alerts.filters.all_involvement') }}" aria-label="{{ _('alerts.filters.involvement') }}">
+                {% include 'pages/include/alert_involvement_options.html' %}
+            </select>
             <label class="alerts-switch md-switch alerts-assigned-filter">
                 <input id="shelved-only-filter" type="checkbox">
                 <span>{{ _('alerts.filters.shelved_only') }}</span>

@@ -26,6 +26,9 @@ PUBLIC_API_PREFIXES = (
 # profile API returns this sequence to the UI.
 READ_WRITE_SCOPE_DOMAINS = (
     "changes",
+    "change-integrations",
+    "directory-sync",
+    "system-settings",
     "alerts",
     "incidents",
     "services",
@@ -65,7 +68,8 @@ PROFILE_TOKEN_SCOPE_OPTIONS = (
 ALLOWED_PROFILE_TOKEN_SCOPES = frozenset(PROFILE_TOKEN_SCOPE_OPTIONS)
 
 # resources:* predates granular entity scopes. Preserve it as an aggregate for
-# every non-alert, non-profile resource domain so existing tokens keep working.
+# the explicitly listed resource domains so existing tokens keep working.
+# Changes and administrative settings/integrations require dedicated scopes.
 # alerts:* and profile:* remain separate exactly as they were before.
 LEGACY_RESOURCE_DOMAINS = frozenset({
     "incidents",
@@ -93,6 +97,9 @@ API_SCOPE_RULES = (
     # OpenAPI specification follows the authenticated documentation boundary.
     # Reuse profile:read rather than adding a one-off docs scope.
     ("/api/openapi.json", "profile"),
+    ("/api/admin/change-integrations", "change-integrations"),
+    ("/api/admin/directory-sync", "directory-sync"),
+    ("/api/admin/system-settings", "system-settings"),
     ("/api/admin/audit-logs", "audit"),
     ("/api/admin/sso", "sso"),
     ("/api/admin/users", "users"),
@@ -165,7 +172,7 @@ def required_scopes_for_path(path, method):
     therefore be denied for API-token principals (fail closed).
     """
     method = str(method or "").upper()
-    if path == "/api/change-events":
+    if path == "/api/change-events" or re.fullmatch(r"/api/change-events/gitlab/\d+", path):
         return ["changes:ingest"] if method == "POST" else None
     if re.fullmatch(r"/api/alert-groups/\d+/(episodes|related-changes)", path):
         return ["changes:read", "alerts:read"] if method in READ_METHODS else None
@@ -257,14 +264,6 @@ def token_has_scopes(token_scopes, required_scopes):
 
     effective = expand_token_scopes(raw)
     return all(scope in effective for scope in required_scopes)
-
-
-def is_jwt_only_api_path(path):
-    """Administration has no API-token scopes, including personal wildcard."""
-    return any(
-        path_matches_prefix(path, prefix)
-        for prefix in ("/api/admin/change-integrations", "/api/admin/system-settings")
-    )
 
 
 def token_can_grant_scopes(current_scopes, requested_scopes):

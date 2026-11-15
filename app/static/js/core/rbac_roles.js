@@ -367,10 +367,37 @@ function isCurrentUserViewerOnly() {
     });
 }
 
-function currentUserCanCreateUiObjects() {
+let currentUserUiTeams = null;
+
+function setCurrentUserUiTeams(teams, user, groupId) {
+    // Ignore responses from a previous login or active-group selection.
+    if (currentUser !== user || getCurrentUserActiveGroupId() !== groupId) {
+        return false;
+    }
+    currentUserUiTeams = {teams: asArray(teams), user: user, groupId: groupId};
+    applyCreateButtonsVisibility();
+    return true;
+}
+
+function canCreateTeamObject(team, permission) {
+    return !!currentUser && team.active !== false
+        && getObjectPermissions(team)[permission || "can_write"] === true;
+}
+
+function currentUserCanCreateUiObjects(permission) {
+    /* Use the same team capabilities as the create forms and backend. */
+    if (!currentUserUiTeams || currentUserUiTeams.user !== currentUser
+        || currentUserUiTeams.groupId !== getCurrentUserActiveGroupId()) {
+        return false;
+    }
+    return currentUserUiTeams.teams.some(function (team) {
+        return canCreateTeamObject(team, permission);
+    });
+}
+
+function currentUserCanCreateTeams() {
     /*
-     * UI-only helper for top-level New/Create buttons.
-     * Backend permissions remain authoritative.
+     * Creating a team requires group write access, not a team manager role.
      */
     if (!currentUser) {
         return false;
@@ -407,22 +434,32 @@ function applyCreateButtonsVisibility() {
     /*
      * Hide top-level New/Create buttons according to current user role.
      */
-    const canCreateOperationalObjects = currentUserCanCreateUiObjects();
+    const canCreateTeamObjects = currentUserCanCreateUiObjects();
+    const canCreateResources = currentUserCanCreateUiObjects("can_write_resources");
     const isGlobalAdmin = !!(currentUser && currentUser.is_admin);
     const canManageUsers = typeof hasGroupUserAdminAccess === "function"
         ? hasGroupUserAdminAccess()
         : isGlobalAdmin;
 
     [
-        "#open-team-create-modal",
         "#open-rotation-create-modal",
+        "#open-escalation-policy-create-modal",
+        "#open-notification-policy-create-modal",
+        "#open-priority-policy-create-modal",
+        "#open-matcher-preset-create-modal",
+    ].forEach(function (selector) {
+        setElementAllowed(selector, canCreateTeamObjects);
+    });
+
+    [
         "#open-route-create-modal",
         "#open-channel-create-modal",
         "#open-silence-create-modal",
     ].forEach(function (selector) {
-        setElementAllowed(selector, canCreateOperationalObjects);
+        setElementAllowed(selector, canCreateResources);
     });
 
+    setElementAllowed("#open-team-create-modal", currentUserCanCreateTeams());
     setElementAllowed("#new-admin-user", canManageUsers);
     setElementAllowed("#new-group", isGlobalAdmin);
     setElementAllowed("#open-sso-provider-create-modal", isGlobalAdmin);

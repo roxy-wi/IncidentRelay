@@ -77,5 +77,11 @@
   "overview.charts.distribution_subtitle": "По критичности и приоритету",
   "overview.activity.system": "Система",
   "overview.activity.none": "Недавней активности нет",
-  "overview.activity.unavailable": "Активность временно недоступна"
+  "overview.activity.unavailable": "Активность временно недоступна",
+  "overview.filters.my_alerts": "Мои алерты",
+  "overview.filters.all_alerts": "Все алерты",
+  "overview.filters.filters": "Фильтры",
+  "overview.filters.reset": "Сбросить",
+  "overview.filters.empty": "Нет активных алертов, соответствующих фильтрам.",
+  "overview.filters.load_error": "Не удалось загрузить активные алерты. Нажмите «Обновить», чтобы повторить."
 }

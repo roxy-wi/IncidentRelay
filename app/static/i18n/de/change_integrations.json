@@ -74,5 +74,15 @@
   "ci.auto_source_hint": "Für dieses Team wird automatisch eine Quelle aus dem Integrationsnamen erstellt. Es werden keine Berechtigungen automatisch erteilt.",
   "ci.no_owner_teams": "Keine verfügbaren Teams. Erstellen Sie zuerst ein aktives Team in dieser Gruppe.",
   "ci.source_locked_hint": "Name und Eigentümerteam sind gesperrt, da diese Quelle bereits Changes enthält. Erstellen Sie eine neue Quelle für einen anderen Namen oder ein anderes Team. Status und Reihenfolge neuer Changes bleiben bearbeitbar.",
-  "ci.count_hint": "Alle konfigurierten Einträge, einschließlich deaktivierter."
+  "ci.count_hint": "Alle konfigurierten Einträge, einschließlich deaktivierter.",
+  "ci.gitlab_title": "GitLab-Deployments",
+  "ci.gitlab_hint": "Unter GitLab Settings → Webhooks diese URL und das Integrationstoken als Secret token eintragen. Deployment events aktivieren und die Standard-Nutzlast beibehalten. Regeln gleichen Projekt-ID und Umgebung exakt ab; das verantwortliche Team stammt aus der Quelle.",
+  "ci.gitlab_url": "Webhook-URL",
+  "ci.gitlab_add": "Zuordnung hinzufügen",
+  "ci.gitlab_permissions": "Dienste benötigen eine aktive Berechtigung für geänderte Dienste im Tab Berechtigungen. Ohne passende Regel werden neue Ereignisse ignoriert.",
+  "ci.gitlab_project": "GitLab-Projekt-ID",
+  "ci.gitlab_environment": "Umgebung",
+  "ci.gitlab_services": "Geänderte Dienste",
+  "ci.gitlab_remove": "Zuordnung entfernen",
+  "ci.gitlab_add_short": "Hinzufügen"
 }

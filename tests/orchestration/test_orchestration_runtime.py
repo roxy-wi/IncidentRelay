@@ -547,9 +547,9 @@ def test_lifecycle_uses_orchestration_grouping_window(db, monkeypatch):
 
     original_find_existing_alert = alerts_repo.find_existing_alert
 
-    def capture_window(source, dedup_key, window_seconds):
+    def capture_window(source, dedup_key, window_seconds, **kwargs):
         captured["window_seconds"] = window_seconds
-        return original_find_existing_alert(source, dedup_key, window_seconds)
+        return original_find_existing_alert(source, dedup_key, window_seconds, **kwargs)
 
     monkeypatch.setattr(alerts_repo, "find_existing_alert", capture_window)
     alert_data = {

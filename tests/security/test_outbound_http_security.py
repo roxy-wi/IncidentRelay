@@ -44,3 +44,32 @@ def test_outbound_http_rejects_mixed_public_private_dns(monkeypatch):
 def test_outbound_http_rejects_userinfo_credentials():
     with pytest.raises(OutboundHttpSecurityError, match="userinfo"):
         validate_outbound_url("https://user:password@example.com/hook")
+
+
+@pytest.mark.parametrize("host", ["127.0.0.1", "169.254.169.254", "[::1]", "[::ffff:127.0.0.1]"])
+def test_outbound_http_rejects_nonpublic_literal_hosts(outbound_transport, host):
+    with pytest.raises(OutboundHttpSecurityError, match="blocked network"):
+        resolve_outbound_target(f"https://{host}/push", allow_private_networks=False)
+    assert outbound_transport.dns_calls == []
+
+
+@pytest.mark.parametrize("host", ["2130706433", "0x7f000001", "127.1"])
+def test_outbound_http_rejects_alternative_loopback_forms(outbound_transport, host):
+    outbound_transport.addresses = ["127.0.0.1"]
+    with pytest.raises(OutboundHttpSecurityError, match="blocked network"):
+        resolve_outbound_target(f"https://{host}/push", allow_private_networks=False)
+    assert len(outbound_transport.dns_calls) == 1
+
+
+def test_default_outbound_policy_keeps_admin_http_integrations(outbound_transport, monkeypatch):
+    from app.services.outbound_http import safe_request
+    from app.settings import Config
+
+    monkeypatch.setattr(Config, "OUTBOUND_HTTP_PRIVATE_NETWORK_ALLOWLIST", "10.0.0.0/24")
+    outbound_transport.addresses = ["10.0.0.10"]
+    outbound_transport.responses.extend([
+        (302, {"Location": "/next"}, b""), (200, {}, b"ok"),
+    ])
+    response = safe_request("GET", "http://example.com/integration")
+    assert response.body == b"ok"
+    assert len(outbound_transport.calls) == 2

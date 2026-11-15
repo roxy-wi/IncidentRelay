@@ -47,15 +47,23 @@ class OutboundHttpResponse:
             )
 
 
-def validate_outbound_url(url: str) -> str:
+def validate_outbound_url(url: str, *, require_https: bool = False) -> str:
     """Validate URL syntax without making a network request."""
     value = str(url or "").strip()
-    parsed = urlsplit(value)
+    try:
+        parsed = urlsplit(value)
+        port = parsed.port
+    except ValueError as exc:
+        raise OutboundHttpSecurityError("invalid outbound URL") from exc
+    if port == 0:
+        raise OutboundHttpSecurityError("invalid outbound URL port")
     if parsed.scheme.lower() not in {"http", "https"}:
         raise OutboundHttpSecurityError("outbound URL must use http or https")
+    if require_https and parsed.scheme.lower() != "https":
+        raise OutboundHttpSecurityError("outbound URL must use https")
     if not parsed.hostname:
         raise OutboundHttpSecurityError("outbound URL requires a hostname")
-    if parsed.username or parsed.password:
+    if parsed.username is not None or parsed.password is not None:
         raise OutboundHttpSecurityError("outbound URL must not contain userinfo credentials")
     if parsed.fragment:
         raise OutboundHttpSecurityError("outbound URL must not contain a fragment")
@@ -80,21 +88,20 @@ def _allowlist_networks() -> Sequence[Any]:
     return tuple(networks)
 
 
-def _address_allowed(address: ipaddress._BaseAddress) -> bool:
+def _address_allowed(address: ipaddress._BaseAddress, *, allow_private_networks: bool) -> bool:
     unsafe = (
-        address.is_private
-        or address.is_loopback
-        or address.is_link_local
+        not address.is_global
         or address.is_multicast
         or address.is_reserved
-        or address.is_unspecified
     )
     if not unsafe:
         return True
-    return any(address in network for network in _allowlist_networks())
+    return allow_private_networks and any(
+        address in network for network in _allowlist_networks()
+    )
 
 
-def resolve_outbound_target(url: str):
+def resolve_outbound_target(url: str, *, allow_private_networks: bool = True):
     """Resolve every address, enforce policy, and pin one approved target IP."""
     value = validate_outbound_url(url)
     parsed = urlsplit(value)
@@ -126,7 +133,10 @@ def resolve_outbound_target(url: str):
 
     # Fail closed if DNS returns even one prohibited address. This prevents an
     # attacker from mixing a public answer with loopback/private answers.
-    if not all(_address_allowed(address) for address in addresses):
+    if not all(
+        _address_allowed(address, allow_private_networks=allow_private_networks)
+        for address in addresses
+    ):
         raise OutboundHttpSecurityError(
             "outbound target resolves to a blocked network"
         )
@@ -154,8 +164,11 @@ def _request_once(
     headers: Mapping[str, str],
     body: bytes | None,
     timeout: int | float,
+    allow_private_networks: bool = True,
 ):
-    parsed, target_ip, port = resolve_outbound_target(url)
+    parsed, target_ip, port = resolve_outbound_target(
+        url, allow_private_networks=allow_private_networks,
+    )
     request_headers = {str(k): str(v) for k, v in dict(headers or {}).items()}
     request_headers.pop("Host", None)
     request_headers.pop("host", None)
@@ -221,9 +234,16 @@ def safe_request(
     data: bytes | str | None = None,
     headers: Mapping[str, str] | None = None,
     timeout: int | float = 10,
+    require_https: bool = False,
+    allow_redirects: bool = True,
+    allow_private_networks: bool = True,
 ) -> OutboundHttpResponse:
-    """Perform a DNS-pinned request and re-check every redirect target."""
-    current_url = validate_outbound_url(url)
+    """Perform a bounded, DNS-pinned request under the caller's network policy.
+
+    User-controlled destinations should disable private-network exceptions.
+    HTTPS-only callers enforce that restriction on every redirect as well.
+    """
+    current_url = validate_outbound_url(url, require_https=require_https)
     current_method = str(method or "GET").upper()
     request_headers = dict(headers or {})
 
@@ -248,8 +268,9 @@ def safe_request(
             headers=request_headers,
             body=body,
             timeout=timeout,
+            allow_private_networks=allow_private_networks,
         )
-        if status not in _REDIRECT_STATUSES:
+        if not allow_redirects or status not in _REDIRECT_STATUSES:
             return OutboundHttpResponse(
                 status_code=status,
                 body=response_body,
@@ -263,7 +284,9 @@ def safe_request(
         if redirect_count >= max_redirects:
             raise OutboundHttpSecurityError("outbound redirect limit exceeded")
 
-        current_url = validate_outbound_url(urljoin(current_url, location))
+        current_url = validate_outbound_url(
+            urljoin(current_url, location), require_https=require_https,
+        )
         if status == 303:
             current_method = "GET"
             body = None

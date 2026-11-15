@@ -4,6 +4,7 @@ import hashlib
 import json
 import random
 import time
+from contextlib import contextmanager
 from datetime import timedelta
 
 from peewee import OperationalError, SqliteDatabase
@@ -11,7 +12,7 @@ from peewee import OperationalError, SqliteDatabase
 from app.db import database_proxy as db
 from app.modules.common import utc_now
 from app.modules.db import changes_repo, incident_core_repo
-from app.modules.db.models import Change, ChangeEvent, ChangeIntegration, Team
+from app.modules.db.models import Change, ChangeEvent, ChangeIntegration, ChangeSource, Team
 from app.modules.redaction import redact_secrets
 from app.services.change_intelligence.authorization import (
     ChangeAccessDenied,
@@ -57,7 +58,12 @@ def _transient(error):
 def ingest_event(payload, raw_token):
     """Retry only rolled-back transient database failures, at most three times."""
     content = payload.submitted_content()
-    digest = hashlib.sha256(
+    digest = _content_digest(content)
+    return _retry_intake(lambda: _ingest_once(payload, content, digest, raw_token))
+
+
+def _content_digest(content):
+    return hashlib.sha256(
         json.dumps(
             content,
             ensure_ascii=False,
@@ -66,9 +72,12 @@ def ingest_event(payload, raw_token):
             allow_nan=False,
         ).encode("utf-8")
     ).hexdigest()
+
+
+def _retry_intake(operation):
     for attempt in range(3):
         try:
-            return _ingest_once(payload, content, digest, raw_token)
+            return operation()
         except OperationalError as error:
             if not _transient(error):
                 raise
@@ -79,7 +88,9 @@ def ingest_event(payload, raw_token):
             time.sleep(random.uniform(0.02, 0.06) * (2**attempt))
 
 
-def _ingest_once(payload, content, digest, raw_token):
+@contextmanager
+def _intake_transaction(raw_token):
+    """Serialize routing and authority edits with all writes and their retries."""
     with incident_core_repo.write_transaction():
         if not isinstance(db.obj, SqliteDatabase):
             db.execute_sql("SET LOCAL lock_timeout = '2s'")
@@ -94,6 +105,66 @@ def _ingest_once(payload, content, digest, raw_token):
                 ChangeIntegration.id == token.change_integration_id
             )
         )
+        yield token
+
+
+def _existing_event(source, event_id, digest):
+    existing = ChangeEvent.get_or_none(
+        ChangeEvent.source == source.id,
+        ChangeEvent.external_event_id == event_id,
+    )
+    if existing:
+        if existing.request_digest != digest:
+            raise ChangeEventConflict("event_id was already used with different content")
+        return _result(existing, existing.change, get_settings().change_worker_enabled), False
+    return None
+
+
+def ingest_gitlab_event(payload, raw_token, source_id):
+    """Map native deployments under the same lock used for permission edits.
+
+    The digest describes sender content, independently of mutable mappings.
+    A redelivery never remaps an already accepted event or increments revisions.
+    """
+    content = payload.model_dump(mode="json")
+    digest = _content_digest({"gitlab_deployment": content})
+    event_id = "gitlab:" + _content_digest([
+        payload.project.id, payload.deployment_id, payload.status,
+        payload.status_changed_at.isoformat(),
+    ])
+
+    def accept():
+        with _intake_transaction(raw_token) as token:
+            configured = ChangeSource.get_or_none(
+                ChangeSource.id == source_id,
+                ChangeSource.integration == token.change_integration_id,
+            )
+            if configured is None:
+                raise ChangeAccessDenied("Change access denied")
+            with authorized_source(
+                token.change_integration_id, configured.owner_team_id,
+                configured.source, raw_token=raw_token,
+            ) as (source, _revision):
+                existing = _existing_event(source, event_id, digest)
+                if existing:
+                    return existing
+                mapping = next((
+                    row for row in source.gitlab_mappings
+                    if row["project_id"] == payload.project.id
+                    and row["environment"] == payload.environment
+                ), None)
+                if mapping is None:
+                    return {"status": "ignored", "reason": "no_matching_mapping"}, False
+                if source.ordering_mode != "timestamp":
+                    raise InvalidChangeInput("GitLab webhooks require timestamp ordering")
+                event = payload.change_event(source, mapping["service_ids"], event_id)
+                return _ingest_once(event, event.submitted_content(), digest, raw_token)
+
+    return _retry_intake(accept)
+
+
+def _ingest_once(payload, content, digest, raw_token):
+    with _intake_transaction(raw_token) as token:
         owner = Team.get_or_none(
             Team.id == payload.owner_team_id
             if payload.owner_team_id is not None
@@ -105,16 +176,9 @@ def _ingest_once(payload, content, digest, raw_token):
             token.change_integration_id, owner.id, payload.source, raw_token=raw_token
         ) as (source, auth_revision):
             settings = get_settings()
-            existing = ChangeEvent.get_or_none(
-                ChangeEvent.source == source.id,
-                ChangeEvent.external_event_id == payload.event_id,
-            )
+            existing = _existing_event(source, payload.event_id, digest)
             if existing:
-                if existing.request_digest != digest:
-                    raise ChangeEventConflict(
-                        "event_id was already used with different content"
-                    )
-                return _result(existing, existing.change, settings.change_worker_enabled), False
+                return existing
             now = utc_now()
             occurred_at = payload.occurred_at.replace(tzinfo=None)
             if occurred_at > now + timedelta(

@@ -23,7 +23,9 @@
     min-width: 11rem;
 }
 
-.ts-control {
+.ts-control,
+.ts-wrapper.single .ts-control,
+.ts-wrapper.single.input-active .ts-control {
     min-height: 2.5rem;
     border: 1px solid var(--border-color);
     border-radius: var(--md-radius-md, 0.75rem);
@@ -68,4 +70,96 @@
 
 .ts-wrapper.plugin-remove_button .item .remove {
     border-left-color: var(--border-color);
+}
+
+/* Shared table filters: compact controls with explicit dropdown affordances. */
+body.md-theme .table-filter-control .ts-control,
+body.md-theme .table-filter-control.single.input-active .ts-control,
+body.md-theme .table-filter-control.multi.has-items .ts-control {
+    --ts-pr-min: 30px;
+    min-height: 35px;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 30px 4px 10px;
+    border: 1px solid var(--md-border);
+    border-radius: 8px;
+    background: var(--md-input-bg);
+    color: var(--md-text);
+    line-height: 24px;
+    box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
+}
+
+body.md-theme .table-filter-control .ts-control::after {
+    content: "";
+    position: absolute;
+    right: 12px;
+    top: calc(50% - 5px);
+    width: 6px;
+    height: 6px;
+    border-right: 1.5px solid var(--md-muted);
+    border-bottom: 1.5px solid var(--md-muted);
+    transform: rotate(45deg);
+    pointer-events: none;
+}
+
+body.md-theme .table-filter-control.dropdown-active .ts-control::after {
+    top: calc(50% - 2px);
+    transform: rotate(225deg);
+}
+
+body.md-theme .table-filter-control.focus .ts-control,
+body.md-theme .table-filter-control.single.input-active.focus .ts-control,
+body.md-theme .table-filter-control.multi.has-items.focus .ts-control {
+    border-color: var(--md-primary);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--md-primary) 14%, transparent);
+}
+
+body.md-theme .table-filter-control.multi .ts-control > .item {
+    margin: 0;
+    padding: 0 7px;
+    border: 0;
+    border-radius: 5px;
+    background: var(--md-primary-soft);
+    color: var(--md-text);
+    line-height: 24px;
+}
+
+body.md-theme .table-filter-control .ts-control > .item {
+    display: inline-flex;
+    align-items: center;
+    min-width: 0;
+    max-width: 100%;
+}
+
+.table-filter-value {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+body.md-theme .table-filter-control .item .remove {
+    flex-shrink: 0;
+}
+
+body.md-theme .table-filter-control.has-items:not(.focus) .ts-control > input {
+    min-width: 0;
+    flex-basis: 0;
+    width: 0;
+}
+
+body.md-theme .table-filter-control .ts-dropdown {
+    margin-top: 6px;
+    border: 1px solid var(--md-border);
+    border-radius: 10px;
+    background: var(--md-surface);
+    box-shadow: 0 8px 24px rgba(15, 23, 42, 0.14);
+}
+
+body.md-theme .table-filter-control .ts-dropdown .option {
+    padding: 9px 12px;
+    color: var(--md-text);
+}
+
+body.md-theme .table-filter-control .ts-dropdown .active {
+    background: var(--md-primary-soft);
 }

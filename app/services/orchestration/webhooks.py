@@ -60,9 +60,13 @@ class WebhookSecurityError(RuntimeError):
 
 
 class WebhookDeliveryError(RuntimeError):
-    def __init__(self, message: str, *, retryable: bool = True, status: int | None = None):
+    def __init__(
+        self, message: str, *, retryable: bool = True,
+        status: int | None = None, reason: str = "connection",
+    ):
         self.retryable = bool(retryable)
         self.status = status
+        self.reason = reason
         super().__init__(message)
 
 
@@ -427,7 +431,7 @@ def resolve_webhook_target(url: str, *, private_network_policy: str = "deny"):
                 type=socket.SOCK_STREAM,
             )
         except socket.gaierror as exc:
-            raise WebhookDeliveryError("webhook DNS resolution failed") from exc
+            raise WebhookDeliveryError("webhook DNS resolution failed", reason="dns") from exc
         addresses = []
         for info in infos:
             try:
@@ -437,7 +441,7 @@ def resolve_webhook_target(url: str, *, private_network_policy: str = "deny"):
             if address not in addresses:
                 addresses.append(address)
     if not addresses:
-        raise WebhookDeliveryError("webhook hostname resolved to no addresses")
+        raise WebhookDeliveryError("webhook hostname resolved to no addresses", reason="dns")
     if not all(_ip_allowed(address, private_network_policy) for address in addresses):
         raise WebhookSecurityError("webhook target resolves to a blocked network")
     return parsed, str(addresses[0]), port
@@ -454,6 +458,24 @@ def _host_header(parsed) -> str:
     return f"{host}:{parsed.port}" if parsed.port and parsed.port != default_port else host
 
 
+def _request_failure_reason(error: Exception) -> str:
+    """Classify transport failures without exposing exception text or request data."""
+    if isinstance(error, (socket.gaierror, urllib3.exceptions.NameResolutionError)):
+        return "dns"
+    if isinstance(error, (ssl.SSLError, urllib3.exceptions.SSLError)):
+        return "tls"
+    # NewConnectionError inherits ConnectTimeoutError but is not a timeout.
+    if isinstance(error, urllib3.exceptions.NewConnectionError):
+        return "connection_refused" if isinstance(error.__cause__, ConnectionRefusedError) else "connection"
+    if isinstance(error, ConnectionRefusedError):
+        return "connection_refused"
+    if isinstance(error, (TimeoutError, urllib3.exceptions.TimeoutError)):
+        return "timeout"
+    if isinstance(error, urllib3.exceptions.ProtocolError):
+        return "protocol"
+    return "connection"
+
+
 def _request_once(
     url: str,
     *,
@@ -462,6 +484,8 @@ def _request_once(
     body: bytes,
     timeout_seconds: int,
     private_network_policy: str,
+    max_response_bytes: int | None = None,
+    verify_tls: bool = True,
 ) -> Tuple[int, Mapping[str, str], bytes]:
     parsed, target_ip, port = resolve_webhook_target(
         url,
@@ -479,8 +503,8 @@ def _request_once(
             maxsize=1,
             block=True,
             retries=False,
-            cert_reqs=ssl.CERT_REQUIRED,
-            assert_hostname=parsed.hostname,
+            cert_reqs=ssl.CERT_REQUIRED if verify_tls else ssl.CERT_NONE,
+            assert_hostname=parsed.hostname if verify_tls else False,
             server_hostname=parsed.hostname,
         )
     else:
@@ -503,19 +527,23 @@ def _request_once(
             retries=False,
             preload_content=False,
         )
-        limit = int(getattr(Config, "ORCHESTRATION_WEBHOOK_MAX_RESPONSE_BYTES", 65536))
+        limit = int(max_response_bytes or getattr(Config, "ORCHESTRATION_WEBHOOK_MAX_RESPONSE_BYTES", 65536))
         payload = response.read(amt=limit + 1, decode_content=True)
         if len(payload) > limit:
             raise WebhookDeliveryError(
                 "webhook response exceeded the configured size limit",
                 retryable=False,
                 status=int(response.status),
+                reason="response_too_large",
             )
         return int(response.status), dict(response.headers), payload
     except WebhookDeliveryError:
         raise
     except Exception as exc:
-        raise WebhookDeliveryError(f"webhook request failed: {exc.__class__.__name__}") from exc
+        raise WebhookDeliveryError(
+            f"webhook request failed: {exc.__class__.__name__}",
+            reason=_request_failure_reason(exc),
+        ) from exc
     finally:
         if response is not None:
             response.release_conn()

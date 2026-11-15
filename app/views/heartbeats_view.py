@@ -15,7 +15,10 @@ from app.services.heartbeats.service import (
     receive_heartbeat_ping,
     resume_heartbeat,
 )
-from app.services.rbac import get_allowed_team_ids, require_team_or_group_resource_access, require_team_read
+from app.services.rbac import (
+    get_allowed_team_ids, is_admin_user, require_team_or_group_resource_access,
+    require_team_read,
+)
 from app.services.serializers.heartbeats import serialize_heartbeat, serialize_heartbeat_ping
 from app.services.validation import make_error_response, validate_body
 
@@ -401,14 +404,14 @@ def resume_heartbeat_endpoint(heartbeat_id):
 @heartbeats_bp.route("/check-overdue", methods=["POST"])
 def check_overdue_heartbeats_endpoint():
     team_ids = get_allowed_team_ids(write_required=True, use_active_group=False)
-    if not team_ids and not (request.current_user and request.current_user.is_admin):
+    if not team_ids and not is_admin_user():
         return make_error_response(
             "team_write_required",
             "Team manager or group editor role is required.",
             403,
         )
 
-    team_scope = None if request.current_user and request.current_user.is_admin else team_ids
+    team_scope = None if is_admin_user() else team_ids
     return jsonify(process_overdue_heartbeats(team_ids=team_scope))
 
 

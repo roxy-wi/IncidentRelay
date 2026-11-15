@@ -77,5 +77,11 @@
   "overview.charts.distribution_subtitle": "按严重程度和优先级分类",
   "overview.activity.system": "系统",
   "overview.activity.none": "暂无最近活动",
-  "overview.activity.unavailable": "活动暂时不可用"
+  "overview.activity.unavailable": "活动暂时不可用",
+  "overview.filters.my_alerts": "我的告警",
+  "overview.filters.all_alerts": "全部告警",
+  "overview.filters.filters": "筛选",
+  "overview.filters.reset": "重置",
+  "overview.filters.empty": "没有符合这些筛选条件的活动告警。",
+  "overview.filters.load_error": "无法加载活动告警。请点击重新加载以重试。"
 }

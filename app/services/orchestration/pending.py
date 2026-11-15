@@ -16,6 +16,7 @@ from app.modules.common import utc_now
 from app.modules.db.models import (
     EventOrchestration,
     EventOrchestrationVersion,
+    AlertRoute,
     OrchestrationExecution,
     PendingOrchestratedEvent,
 )
@@ -33,15 +34,42 @@ from app.services.orchestration.runtime import (
 from app.services.validation import make_json_safe
 from app.services.orchestration.webhooks import cleanup_webhook_executions
 from app.settings import Config
+from app.services.authorization import refresh_authority, require_intake_route
 
 logger = logging.getLogger("oncall.orchestration.pending")
 
 TERMINAL_STATUSES = frozenset({"activated", "resolved", "cancelled"})
 
 
-def pending_active_key(group_id: int, source: str, dedup_key: str) -> str:
+def _legacy_pending_active_key(group_id: int, source: str, dedup_key: str) -> str:
     material = f"{int(group_id)}\x1f{source or ''}\x1f{dedup_key or ''}"
     return hashlib.sha256(material.encode("utf-8")).hexdigest()
+
+
+def pending_active_key(group_id: int, source: str, dedup_key: str, *, route_id: int) -> str:
+    """Namespace fingerprints by the route that owns the pending event."""
+    material = f"v2\x1f{int(group_id)}\x1f{int(route_id)}\x1f{source or ''}\x1f{dedup_key or ''}"
+    return hashlib.sha256(material.encode("utf-8")).hexdigest()
+
+
+def _active_pending_event(group_id, source, dedup_key, route_id):
+    """Allow pre-upgrade rows to drain, only under their stored ownership.
+
+    Legacy keys are not reassigned: a live activation claim must remain intact.
+    New rows always use the route-scoped key, so another route cannot collide
+    with or update the legacy row.
+    """
+    keys = (
+        pending_active_key(group_id, source, dedup_key, route_id=route_id),
+        _legacy_pending_active_key(group_id, source, dedup_key),
+    )
+    return PendingOrchestratedEvent.get_or_none(
+        PendingOrchestratedEvent.active_key.in_(keys),
+        PendingOrchestratedEvent.group == group_id,
+        PendingOrchestratedEvent.route == route_id,
+        PendingOrchestratedEvent.source == source,
+        PendingOrchestratedEvent.dedup_key == dedup_key,
+    )
 
 
 def _event_for_storage(alert_data: Mapping[str, Any]) -> Dict[str, Any]:
@@ -128,19 +156,23 @@ def store_paused_event(
         raise ValueError("paused event requires a positive pause duration")
 
     orchestration, version = _source_models(runtime)
-    key = pending_active_key(group_id, source, dedup_key)
     requested_activation_at = now + timedelta(seconds=seconds)
     stored_event = _event_for_storage(alert_data)
     route_id = getattr(route or runtime.route, "id", None)
+    if route_id is None:
+        raise ValueError("paused event requires a route")
+    key = pending_active_key(group_id, source, dedup_key, route_id=route_id)
     service_id = getattr(service or runtime.service, "id", None)
     integration_name = alert_data.get("integration_name") or source
 
     row = None
     for _attempt in range(4):
         with db.atomic():
-            current = PendingOrchestratedEvent.get_or_none(
-                PendingOrchestratedEvent.active_key == key
+            refresh_authority(lock=True)
+            require_intake_route(
+                route or runtime.route, service=service or runtime.service, lock=True,
             )
+            current = _active_pending_event(group_id, source, dedup_key, route_id)
 
             if current is None:
                 try:
@@ -188,7 +220,8 @@ def store_paused_event(
                     )
                     .where(
                         (PendingOrchestratedEvent.id == current.id)
-                        & (PendingOrchestratedEvent.active_key == key)
+                        & (PendingOrchestratedEvent.active_key == current.active_key)
+                        & (PendingOrchestratedEvent.route == route_id)
                         & (PendingOrchestratedEvent.status == "activating")
                         & (PendingOrchestratedEvent.claim_token == current.claim_token)
                     )
@@ -220,7 +253,8 @@ def store_paused_event(
                     )
                     .where(
                         (PendingOrchestratedEvent.id == current.id)
-                        & (PendingOrchestratedEvent.active_key == key)
+                        & (PendingOrchestratedEvent.active_key == current.active_key)
+                        & (PendingOrchestratedEvent.route == route_id)
                         & PendingOrchestratedEvent.status.in_(("pending", "failed"))
                     )
                     .execute()
@@ -251,6 +285,7 @@ def store_paused_event(
 def resolve_pending_event(
     *,
     group_id: int,
+    route_id: int,
     source: str,
     dedup_key: str,
     trace=None,
@@ -258,12 +293,10 @@ def resolve_pending_event(
 ) -> Optional[PendingOrchestratedEvent]:
     """Resolve a paused trigger before its activation transaction commits."""
     now = now or utc_now()
-    key = pending_active_key(group_id, source, dedup_key)
-
     with db.atomic():
-        row = PendingOrchestratedEvent.get_or_none(
-            PendingOrchestratedEvent.active_key == key
-        )
+        refresh_authority(lock=True)
+        require_intake_route(AlertRoute.get_or_none(AlertRoute.id == route_id), lock=True)
+        row = _active_pending_event(group_id, source, dedup_key, route_id)
         if row is None:
             return None
 
@@ -282,7 +315,8 @@ def resolve_pending_event(
             )
             .where(
                 (PendingOrchestratedEvent.id == row.id)
-                & (PendingOrchestratedEvent.active_key == key)
+                & (PendingOrchestratedEvent.active_key == row.active_key)
+                & (PendingOrchestratedEvent.route == route_id)
                 & PendingOrchestratedEvent.status.in_(("pending", "failed", "activating"))
             )
             .execute()
@@ -388,10 +422,11 @@ def _activate_claimed(
 ) -> Optional[AlertProcessingResult]:
     from app.services.alerts.lifecycle import _upsert_alert
 
-    # This write acquires a row lock on PostgreSQL and the write lock on
-    # SQLite. Resolve requests either win before it or wait until the alert
-    # and pending-state transition commit together.
+    # Match synchronous intake's Route -> Team -> Service -> pending-row order.
+    # Resolve requests either win before activation or wait until the alert and
+    # pending-state transition commit together.
     with db.atomic():
+        require_intake_route(row.route, service=row.service, lock=True)
         locked = (
             PendingOrchestratedEvent.update(
                 claimed_at=now,

@@ -75,6 +75,9 @@ def test_promql_handles_replicas_and_missing_data(tmp_path):
     http = "incidentrelay_http_requests_total"
     checks = {
         "Prometheus scrape": [("{}", 0)],
+        "Database probe": [("{}", 1)],
+        "Pending migrations": [("{}", 2)],
+        "Running version": [('{version="2.5.0"}', 1), ('{version="2.5.1"}', 1)],
         "Notification queue depth": [('{state="due"}', 7)],
         "HTTP requests by status": [('{status="200"}', 3)],
         "HTTP 5xx share": [("{}", 0)],
@@ -84,6 +87,12 @@ def test_promql_handles_replicas_and_missing_data(tmp_path):
     data = [
         series("up", "a", "1+0x6"),
         series("up", "b", "0+0x6"),
+        series("incidentrelay_database_up", "a", "1+0x6"),
+        series("incidentrelay_database_up", "b", "1+0x6"),
+        series("incidentrelay_migrations_pending", "a", "0+0x6"),
+        series("incidentrelay_migrations_pending", "b", "2+0x6"),
+        series("incidentrelay_build_info", "a", "1+0x6", ',version="2.5.0"'),
+        series("incidentrelay_build_info", "b", "1+0x6", ',version="2.5.1"'),
         series(depth, "a", "7+0x6", ',state="due"'),
         series(depth, "b", "7+0x6", ',state="due"'),
         series(depth, "c", "99+0x6", ',state="due"'),
@@ -115,6 +124,30 @@ def test_promql_handles_replicas_and_missing_data(tmp_path):
             "input_series": [],
             "promql_expr_test": [
                 case(expr, []) for targets in panels.values() for expr in targets
+            ],
+        },
+        {
+            # An instant stat can have no current value even though a range
+            # query still displays historical points from the same target.
+            "input_series": [
+                series("up", "a", "1 _x6"),
+                series("incidentrelay_database_up", "a", "1 _x6"),
+                series("incidentrelay_migrations_pending", "a", "0 _x6"),
+                series("incidentrelay_build_info", "a", "1 _x6", ',version="2.5.1"'),
+                series("incidentrelay_scheduler_last_run_timestamp_seconds", "a", "1 _x6"),
+                series(http, "a", "1 _x6", ',status="200",method="GET"'),
+            ],
+            "promql_expr_test": [
+                case(panels[title][0], [])
+                for title in (
+                    "Prometheus scrape", "Database probe", "Pending migrations",
+                    "Running version", "Scheduler heartbeat age", "HTTP 5xx share",
+                )
+            ] + [
+                {
+                    **case(panels["Prometheus scrape"][0], [("{}", 1)]),
+                    "eval_time": "0m",
+                },
             ],
         },
     ]

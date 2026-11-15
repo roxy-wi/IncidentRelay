@@ -145,7 +145,7 @@ function initializeRouteMatcherEditors() {
 
 function loadRoutes() {
     initializeRouteMatcherEditors();
-    fillTeamSelect("#route-team", false, loadRouteDependencies);
+    fillTeamSelect("#route-team", false, loadRouteDependencies, "can_write_resources");
     initRoutesTableSorting();
     refreshRoutes();
 }

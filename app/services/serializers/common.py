@@ -60,5 +60,8 @@ def attach_team_permissions(data, team_id, current_user=None):
         )
 
         data["permissions"] = permissions
+        if data.get("sync") and not data["sync"]["editable"]:
+            for key in ("can_write", "can_delete", "can_manage_users"):
+                permissions[key] = False
 
     return data

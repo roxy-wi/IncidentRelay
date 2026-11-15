@@ -5,7 +5,7 @@ from flask import Blueprint, jsonify, request
 from app.api.schemas.auth import ChangePasswordSchema
 from app.api.schemas.profile import ActiveGroupSchema, ProfileTokenCreateSchema, ProfileUpdateSchema
 from app.login import hash_password, verify_password
-from app.modules.db import groups_repo, tokens_repo, users_repo
+from app.modules.db import groups_repo, incident_core_repo, tokens_repo, users_repo
 from app.services.integrations.auth import create_raw_token, hash_token
 from app.services.api_token_scopes import (
     ALLOWED_PROFILE_TOKEN_SCOPES,
@@ -14,6 +14,7 @@ from app.services.api_token_scopes import (
 )
 from app.services.audit import write_audit
 from app.services.rbac import can_read_group
+from app.services.authorization import delegated_token_bounds, refresh_authority
 from app.services.serializers.users import serialize_user
 from app.services.serializers.tokens import serialize_api_token
 from app.services.validation import validate_body
@@ -173,29 +174,29 @@ def create_profile_token():
     if error:
         return error
 
-    scopes, error_response, status_code = validate_profile_token_scopes(payload.scopes)
-    if error_response:
-        return error_response, status_code
+    with incident_core_repo.write_transaction():
+        refresh_authority(lock=True)
+        scopes, error_response, status_code = validate_profile_token_scopes(payload.scopes)
+        if error_response:
+            return error_response, status_code
 
-    group = None
-
-    if payload.group_id:
-        if not can_read_group(request.current_user, payload.group_id):
-            return jsonify({"error": "Access to this group is denied"}), 403
         group = payload.group_id
+        if group and not can_read_group(request.current_user, group):
+            return jsonify({"error": "Access to this group is denied"}), 403
 
-    raw_token = create_raw_token()
-    expires_at = utc_now() + timedelta(days=payload.days) if payload.days else None
-
-    token = tokens_repo.create_token(
-        name=payload.name,
-        token_prefix=raw_token[:12],
-        token_hash=hash_token(raw_token),
-        scopes=scopes,
-        user=request.current_user.id,
-        group=group,
-        expires_at=expires_at,
-    )
+        expires_at = utc_now() + timedelta(days=payload.days) if payload.days else None
+        group, team, expires_at = delegated_token_bounds(group, scopes, expires_at)
+        raw_token = create_raw_token()
+        token = tokens_repo.create_token(
+            name=payload.name,
+            token_prefix=raw_token[:12],
+            token_hash=hash_token(raw_token),
+            scopes=scopes,
+            user=request.current_user.id,
+            group=group,
+            team=team,
+            expires_at=expires_at,
+        )
 
     write_audit(
         "profile.token.create",
