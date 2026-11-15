@@ -7,30 +7,143 @@ let directorySyncDirty = false;
 let directorySyncOpen = false;
 let directorySyncOpener = null;
 let directorySyncSaving = false;
+let directorySyncAction = null;
+let directorySyncListVersion = 0;
+const directorySyncListWrites = new Set();
 const directorySyncPath = "/api/admin/directory-sync";
 const directorySyncMappingKeys = ["team_fields", "detail_fields", "team_filter", "members", "responsible", "schedules", "shift_fields", "replacements", "user_fields", "current_fields", "team_matches", "group_role", "member_role", "responsible_role", "user_fetch", "current_fetch", "timeout_seconds", "current_max_age_seconds"];
 
 function dsText(key) { return i18n.t("ds." + key); }
 
+function dsStatus(message, busy = false) {
+    AppLoading.clear("#ds-status");
+    if (busy) AppLoading.showBlock("#ds-status", message, {compact: true});
+    else $("#ds-status").text(message);
+}
+
+function dsTime(value) {
+    if (!value) return "—";
+    return $("<time>", {datetime: value, text: formatDateTime(value),
+        title: formatBrowserDate(value, "dateTime", {timeZoneName: "short"})});
+}
+
+function dsOperation(source) {
+    return directorySyncAction || source?.pending_mode || (source?.running ? "run" : null);
+}
+
+function dsOperationText(source, action) {
+    const queued = !directorySyncAction && source?.pending_mode && !source.running;
+    return dsText(action + (queued ? "_queued" : "_loading"));
+}
+
+function dsClearButtonLoading() {
+    ["sample", "preview", "apply", "run"].forEach(action => AppLoading.setButtonLoading("#ds-" + action, false));
+}
+
 function dsError(xhr) {
-    $("#ds-status").text(xhr.responseJSON?.message || dsText("failed"));
+    dsClearButtonLoading();
+    dsStatus(xhr.responseJSON?.message || dsText("failed"));
     showApiError(xhr);
 }
 
 function loadDirectorySync() {
-    apiGet(directorySyncPath + "/options", function (data) { directorySyncOptions = data; });
+    const version = ++directorySyncListVersion;
+    apiGet(directorySyncPath + "/options", function (data) {
+        if (version === directorySyncListVersion) directorySyncOptions = data;
+    });
     apiGet(directorySyncPath, function (sources) {
+        if (version !== directorySyncListVersion) return;
         const body = $("#ds-list").empty();
         sources.forEach(source => {
-            const row = $("<tr>");
+            const row = $("<tr>").attr("data-source-id", source.id);
             $("<td>").text(source.name).appendTo(row);
             $("<td>").text(source.group_name).appendTo(row);
-            $("<td>").text(source.last_error || source.current_error || (source.pending_mode || source.running ? dsText("queued") : dsText(source.enabled ? "enabled" : "paused"))).appendTo(row);
-            $("<td>").text(source.last_success_at || "—").appendTo(row);
-            $("<td>").append($("<button>", {type: "button", class: "btn", text: dsText("configure")}).on("click", () => editDirectorySync(source.id))).appendTo(row);
+            const status = $("<td>").text(dsText(source.enabled ? "enabled" : "paused")).appendTo(row);
+            if (source.pending_mode || source.running) status.append($("<div>").text(dsText("queued")));
+            if (source.last_error || source.current_error) status.append($("<div>").addClass("muted").text(source.last_error || source.current_error));
+            $("<td>").append(dsTime(source.last_success_at)).appendTo(row);
+            $("<td>").append(source.running ? dsText("run_loading") : dsTime(source.next_run_at)).appendTo(row);
+            $("<td>").append(source.current_running ? dsText("current_loading") : dsTime(source.next_current_at)).appendTo(row);
+            $("<td>").addClass("actions-cell").append(makeActionMenu({
+                object: source,
+                items: [{
+                    label: dsText("configure"),
+                    icon: "fas fa-cog",
+                    onClick: () => editDirectorySync(source.id),
+                }, {
+                    label: dsText(source.enabled ? "disable_schedule" : "enable_schedule"),
+                    icon: source.enabled ? "fas fa-pause" : "fas fa-play",
+                    onClick: () => dsSetSchedule(source, !source.enabled),
+                }, {
+                    label: dsText("remove_source"),
+                    icon: "fas fa-trash",
+                    danger: true,
+                    onClick: () => dsConfirmRemove(source),
+                }],
+            })).appendTo(row);
             body.append(row);
+            if (directorySyncListWrites.has(source.id)) dsListBusy(source.id, true);
         });
-        if (!sources.length) body.append($("<tr>").append($("<td>", {colspan: 5, text: dsText("empty")})));
+        if (!sources.length) body.append($("<tr>").append($("<td>", {colspan: 7, text: dsText("empty")})));
+    });
+}
+
+function dsListBusy(id, busy) {
+    if (busy) directorySyncListWrites.add(id);
+    else directorySyncListWrites.delete(id);
+    AppLoading.setButtonLoading($("#ds-list tr[data-source-id='" + id + "'] .app-action-menu-toggle"), busy);
+}
+
+function dsCanManage(source) {
+    if (directorySyncListWrites.has(source.id)) return false;
+    if (source.pending_mode || source.running || source.current_running) {
+        showAppError(dsText("source_busy"));
+        return false;
+    }
+    return true;
+}
+
+function dsListWriteFinished(source, xhr) {
+    dsListBusy(source.id, false);
+    loadDirectorySync();
+    if (xhr) showApiError(xhr);
+}
+
+function dsSetSchedule(source, enabled) {
+    if (!dsCanManage(source)) return;
+    if (enabled && !source.approved) {
+        showAppError(dsText("enabled_apply_first"));
+        return;
+    }
+    dsListBusy(source.id, true);
+    apiPut(directorySyncPath + "/" + source.id, {
+        name: source.name, group_id: source.group_id, config: source.config,
+        revision: source.revision, enabled,
+    }, () => dsListWriteFinished(source), xhr => dsListWriteFinished(source, xhr));
+}
+
+function dsConfirmRemove(source) {
+    if (!dsCanManage(source)) return;
+    const choice = $("<select>", {id: "ds-remove-mode", class: "input"})
+        .attr("aria-describedby", "ds-remove-hint")
+        .append($("<option>", {value: "keep", text: dsText("keep_data")}))
+        .append($("<option>", {value: "delete", text: dsText("delete_data")}));
+    const hint = $("<small>", {id: "ds-remove-hint", class: "muted", "aria-live": "polite"}).text(dsText("keep_data_hint"));
+    choice.on("change", () => hint.text(dsText(choice.val() === "keep" ? "keep_data_hint" : "delete_data_hint")));
+    const confirmation = showAppConfirm({
+        title: dsText("remove_source"),
+        message: i18n.t("ds.remove_confirm", {name: source.name}),
+        confirmText: dsText("remove_source"),
+        confirmClass: "btn-danger",
+    });
+    $("#app-dialog-message").append($("<div>").addClass("form-stack").append($("<div>").addClass("form-group")
+        .append($("<label>", {for: "ds-remove-mode", text: dsText("imported_data")})).append(choice).append(hint)));
+    confirmation.done(() => {
+        if (directorySyncListWrites.has(source.id)) return;
+        dsListBusy(source.id, true);
+        apiRequest("DELETE", directorySyncPath + "/" + source.id, {
+            revision: source.revision, data_action: choice.val(),
+        }, () => dsListWriteFinished(source), xhr => dsListWriteFinished(source, xhr));
     });
 }
 
@@ -48,6 +161,8 @@ function closeDirectorySync() {
     directorySyncSource = null;
     directorySyncOpen = false;
     directorySyncSaving = false;
+    directorySyncAction = null;
+    dsClearButtonLoading();
     $("#ds-headers").val("");
     setAppModalSaving("#ds-editor", false);
     closeAppModal("#ds-editor");
@@ -65,6 +180,8 @@ function openDirectorySync(source) {
     clearTimeout(directorySyncTimer);
     directorySyncOpen = true;
     directorySyncSaving = false;
+    directorySyncAction = null;
+    dsClearButtonLoading();
     setAppModalSaving("#ds-editor", false);
     directorySyncSource = source;
     directorySyncDirty = false;
@@ -101,6 +218,10 @@ function openDirectorySync(source) {
 
 function dsRenderResult(source) {
     const busy = directorySyncSaving || Boolean(source?.pending_mode || source?.running);
+    const action = dsOperation(source);
+    // Restore buttons before setting their current availability; the loading helper
+    // remembers the disabled state from before an operation started.
+    dsClearButtonLoading();
     let enabledBlocker = "";
     if (busy) enabledBlocker = dsText("enabled_wait");
     else if (!source) enabledBlocker = dsText("enabled_save_first");
@@ -109,11 +230,12 @@ function dsRenderResult(source) {
     $("#ds-enabled-label").attr("title", enabledBlocker || null);
     $("#ds-enabled-hint").text(enabledBlocker).prop("hidden", !enabledBlocker);
     if (source?.preview_result?.samples) $("#ds-sample-output").text(JSON.stringify(source.preview_result.samples, null, 2)).prop("hidden", false);
-    $("#ds-status").text(source?.last_error || source?.current_error || (source?.pending_mode || source?.running ? dsText("queued") : ""));
+    dsStatus(action ? dsOperationText(source, action) : source?.last_error || source?.current_error || "", Boolean(action));
     $("#ds-save").prop("disabled", busy);
     $("#ds-apply").prop("disabled", !source?.preview_token || directorySyncDirty || busy);
     $("#ds-sample, #ds-preview").prop("disabled", !source || busy);
     $("#ds-run").prop("disabled", !source?.approved || busy);
+    if (action && action !== "save") AppLoading.setButtonLoading("#ds-" + action, true);
     const body = $("#ds-preview-table").empty();
     (source?.preview_result?.changes || []).forEach(change => {
         const row = $("<tr>");
@@ -151,7 +273,7 @@ function dsPoll(version, id) {
             dsRenderResult(data);
             if (data.pending_mode || data.running) dsPoll(version, id);
             else {
-                if (!data.last_error) $("#ds-status").text(dsText("complete"));
+                if (!data.last_error && !data.current_error) dsStatus(dsText("complete"));
                 loadDirectorySync();
             }
         }, xhr => { if (version === directorySyncVersion) dsError(xhr); });
@@ -159,16 +281,18 @@ function dsPoll(version, id) {
 }
 
 function dsQueue(action) {
-    if (!directorySyncSource || directorySyncSaving) return;
+    if (!directorySyncSource || directorySyncSaving || directorySyncSource.pending_mode || directorySyncSource.running) return;
     if (directorySyncDirty) { $("#ds-status").text(dsText("save_first")); return; }
     const version = directorySyncVersion;
     directorySyncSaving = true;
+    directorySyncAction = action;
     setAppModalSaving("#ds-editor", true);
     dsRenderResult(directorySyncSource);
     apiPost(directorySyncPath + "/" + directorySyncSource.id + "/" + action,
         {revision: directorySyncSource.revision, preview_token: directorySyncSource.preview_token}, data => {
             if (version !== directorySyncVersion) return;
             directorySyncSaving = false;
+            directorySyncAction = null;
             setAppModalSaving("#ds-editor", false);
             directorySyncSource = data;
             dsRenderResult(data);
@@ -179,6 +303,7 @@ function dsQueue(action) {
 function dsWriteError(version, xhr) {
     if (version !== directorySyncVersion) return;
     directorySyncSaving = false;
+    directorySyncAction = null;
     setAppModalSaving("#ds-editor", false);
     dsRenderResult(directorySyncSource);
     dsError(xhr);
@@ -210,16 +335,26 @@ $(document).on("click", "#ds-preview", () => dsQueue("preview"));
 $(document).on("click", "#ds-apply", () => dsQueue("apply"));
 $(document).on("click", "#ds-run", () => dsQueue("run"));
 $(document).on("click", "#ds-sample", () => {
+    if (directorySyncSaving || directorySyncSource?.pending_mode || directorySyncSource?.running) return;
     if (!directorySyncSource || directorySyncDirty) { $("#ds-status").text(dsText("save_first")); return; }
     const version = directorySyncVersion;
+    directorySyncSaving = true;
+    directorySyncAction = "sample";
+    setAppModalSaving("#ds-editor", true);
+    dsRenderResult(directorySyncSource);
     apiPost(directorySyncPath + "/" + directorySyncSource.id + "/sample", {}, data => {
         if (version !== directorySyncVersion) return;
+        directorySyncSaving = false;
+        directorySyncAction = null;
+        setAppModalSaving("#ds-editor", false);
+        dsRenderResult(directorySyncSource);
+        dsStatus(directorySyncSource.current_error || directorySyncSource.last_error || dsText("complete"));
         $("#ds-sample-output").text(JSON.stringify(data.samples, null, 2)).prop("hidden", false);
-    }, xhr => { if (version === directorySyncVersion) dsError(xhr); });
+    }, xhr => dsWriteError(version, xhr));
 });
 $(document).on("submit", "#ds-form", function (event) {
     event.preventDefault();
-    if (directorySyncSaving) return;
+    if (directorySyncSaving || directorySyncSource?.pending_mode || directorySyncSource?.running) return;
     let payload;
     try {
         const config = {...(directorySyncSource?.config || directorySyncOptions.preset), ...JSON.parse($("#ds-mapping").val()),
@@ -235,12 +370,13 @@ $(document).on("submit", "#ds-form", function (event) {
     } catch (_error) { $("#ds-status").text(dsText("invalid_json")); return; }
     const version = directorySyncVersion;
     directorySyncSaving = true;
+    directorySyncAction = "save";
     setAppModalSaving("#ds-editor", true);
     dsRenderResult(directorySyncSource);
     apiRequest(directorySyncSource ? "PUT" : "POST", directorySyncPath + (directorySyncSource ? "/" + directorySyncSource.id : ""), payload, data => {
         if (version !== directorySyncVersion) return;
         openDirectorySync(data);
-        $("#ds-status").text(dsText("saved"));
+        $("#ds-status").text(dsText(data.approved || data.preview_token ? "saved_approved" : "saved"));
         loadDirectorySync();
     }, xhr => dsWriteError(version, xhr));
 });

@@ -3,7 +3,7 @@
     <div><h2>{{ _('ds.title') }}</h2><div class="card-subtitle">{{ _('ds.intro') }}</div></div>
     <div class="card-header-actions"><button id="ds-new" class="btn btn-primary" type="button">{{ _('ds.new') }}</button><button id="ds-reload" class="btn btn-reload" type="button">{{ _('common.reload') }}</button></div>
   </div>
-  <div class="table-wrapper"><table class="data-table"><thead><tr><th>{{ _('ds.name') }}</th><th>{{ _('ds.group') }}</th><th>{{ _('ds.status') }}</th><th>{{ _('ds.last_success') }}</th><th>{{ _('ds.actions') }}</th></tr></thead><tbody id="ds-list"></tbody></table></div>
+  <div class="table-wrapper"><table class="data-table"><thead><tr><th>{{ _('ds.name') }}</th><th>{{ _('ds.group') }}</th><th>{{ _('ds.status') }}</th><th>{{ _('ds.last_success') }}</th><th>{{ _('ds.next_sync') }}</th><th>{{ _('ds.next_current') }}</th><th class="actions-th">{{ _('ds.actions') }}</th></tr></thead><tbody id="ds-list"></tbody></table></div>
 </section>
 <div id="ds-editor" class="app-modal is-hidden" role="dialog" aria-modal="true" aria-hidden="true" aria-labelledby="ds-editor-title">
   <div class="app-modal-dialog app-modal-dialog-wide">
@@ -12,7 +12,7 @@
       <button id="ds-close" type="button" class="app-modal-close" aria-label="{{ _('ds.close') }}"><i class="fa-solid fa-xmark" aria-hidden="true"></i></button>
     </div>
     <div class="app-modal-body">
-      <p id="ds-status" role="status" aria-live="polite"></p>
+      <div id="ds-status" role="status" aria-live="polite"></div>
       <form id="ds-form" class="form-stack">
         <fieldset class="form-stack"><legend>{{ _('ds.connection') }}</legend>
           <div class="form-grid-2">

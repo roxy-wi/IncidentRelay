@@ -200,6 +200,64 @@ def fetch_profile(client, person_id, team_id, context):
     return {key: value for key, value in profile.items() if value is not None and (key != "name" or value)}
 
 
+def map_current_status(record, fields, item_number):
+    """Validate mapped duty status with actionable, value-free diagnostics."""
+    expected = "Expected active, gap, unavailable or ambiguous."
+    context = f"current: response item {item_number}: current_fields.status"
+    if "status" not in fields:
+        raise SyncError(f"{context} is not configured. Add a status field mapping. {expected}")
+
+    spec = fields["status"]
+    try:
+        status = map_fields(record, {"status": spec})["status"]
+    except (SyncError, AttributeError, TypeError) as error:
+        raise SyncError(
+            f"{context} has an invalid mapping. Use a field path or an object with "
+            f"path and a values lookup object. {expected}"
+        ) from error
+
+    supported = {"active", "gap", "unavailable", "ambiguous"}
+    if isinstance(status, str) and status in supported:
+        return status
+
+    missing = object()
+    path = spec if isinstance(spec, str) else None
+    if isinstance(spec, dict) and "value" not in spec:
+        path = spec.get("path")
+    if path is not None:
+        raw_status = path_value(record, path, default=missing)
+        if raw_status is missing and (isinstance(spec, str) or "default" not in spec):
+            raise SyncError(
+                f"{context} path was not found. Paths are relative to each record selected "
+                f"by operations.current.items; check the response nesting. {expected}"
+            )
+        if (isinstance(spec, dict) and isinstance(spec.get("values"), dict)
+                and str(raw_status) not in spec["values"] and "default" not in spec):
+            raise SyncError(
+                f"{context}.values has no entry for the returned value. Add an explicit "
+                f"mapping for the external enum; lookup keys are case-sensitive. {expected}"
+            )
+
+    if status is None:
+        reason = "resolved to null. Check the source field and any values/default mapping."
+    elif not isinstance(status, str):
+        kind = {bool: "boolean", int: "number", float: "number", dict: "object", list: "array"}.get(
+            type(status), "non-string value",
+        )
+        reason = (f"must resolve to a string, but received a JSON {kind}. "
+                  "Select the status field inside the returned record.")
+    elif not status.strip():
+        reason = "resolved to an empty string. Check the source field and any default mapping."
+    elif status.strip().lower() in supported:
+        # Only echo a known IR status, never arbitrary values from the response.
+        canonical = status.strip().lower()
+        reason = (f"differs from '{canonical}' only in case or surrounding whitespace. "
+                  f"Map the external value explicitly to '{canonical}' using values.")
+    else:
+        reason = "resolved to an unsupported string. Map the external enum using current_fields.status.values."
+    raise SyncError(f"{context} {reason} {expected} Response values are omitted.")
+
+
 def fetch_current(client, schedule_ids):
     """Require exactly one valid answer per requested slot, including vacant slots."""
     result = []
@@ -212,14 +270,16 @@ def fetch_current(client, schedule_ids):
             rows = value if isinstance(value, list) else [value]
         else:
             rows = client.records("current", {"schedule_ids": ids})
-        mapped = [map_fields(row, client.config.current_fields) for row in rows]
+        if not all(isinstance(row, dict) for row in rows):
+            raise SyncError("current: operations.current.items must select an object or an array of objects")
+        fields = {key: value for key, value in client.config.current_fields.items() if key != "status"}
+        mapped = [map_fields(row, fields) for row in rows]
         returned = [identity(item.get("id"), "current schedule") for item in mapped]
         if len(returned) != len(set(returned)) or set(returned) != set(ids):
             raise SyncError("current: response must include every requested schedule exactly once")
-        for row in mapped:
+        for item_number, (raw, row) in enumerate(zip(rows, mapped), start + 1):
             row["id"] = identity(row.get("id"), "current schedule")
-            if row.get("status") not in {"active", "gap", "unavailable", "ambiguous"}:
-                raise SyncError("current: unknown status")
+            row["status"] = map_current_status(raw, client.config.current_fields, item_number)
             if row["status"] == "active":
                 row["user_id"] = identity(row.get("user_id"), "current person")
             if row.get("valid_until"):

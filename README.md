@@ -207,11 +207,11 @@ The Helm chart is published as an OCI artifact in GHCR:
 ```bash
 helm install incidentrelay \
   oci://ghcr.io/roxy-wi/incidentrelay-charts/incidentrelay \
-  --version 2.2.0 \
+  --version 2.5.2 \
   --set-string config.main.secret_key="$(openssl rand -hex 32)"
 ```
 
-The chart defaults to the `ghcr.io/roxy-wi/incidentrelay:2.2` application image. Configuration can be rendered from `config.*` values or supplied through `existingConfigSecret`.
+The chart defaults to the `ghcr.io/roxy-wi/incidentrelay:2.5.2` application image. Configuration can be rendered from `config.*` values or supplied through `existingConfigSecret`.
 
 Read more: [Kubernetes installation](docs/getting-started/kubernetes.md).
 

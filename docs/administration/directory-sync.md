@@ -106,7 +106,24 @@ After a successful application:
 2. Enable **Periodic synchronization enabled** in the source settings.
 3. Click **Save configuration**.
 
-**Run now** performs the next full import without waiting for its interval. The source list shows status, any error and the last successful import time.
+**Run now** performs the next full import without waiting for its interval. The source list shows status, any error, the last successful import, the next full import and the next current-duty check. Dates use the browser's locale and timezone; hover over a time to see its timezone. A dash means no check is scheduled. A paused source can still have one current-duty check pending after a manual import. Scheduled times are when work becomes due; actual execution depends on worker availability. Reload the list to refresh these times.
+
+Inspect, Preview, Apply and Run now show a spinner on the active button and an operation message. Queued previews/imports show that they are waiting for the scheduler. The indicator clears on completion or failure, and duplicate requests are disabled while an operation is in progress.
+
+The source's three-dot menu includes **Enable schedule**, **Disable schedule** and **Delete source**, alongside **Configure**. Schedule changes preserve the import approval and do not require a new preview. Enabling a source for the first time still requires an applied preview. Wait for queued or running operations to finish before changing the source.
+
+Deleting a source offers two choices:
+
+- **Keep teams and schedules** (the default): teams and existing concrete shifts remain editable. Rotations use the saved shifts and replacements for assignment; no further API data is fetched, so the calendar horizon is not extended. Source-controlled memberships become locally managed.
+- **Delete source-created teams and schedules**: remove teams created by this source with their dependent configuration, rotations created by the source, imported shifts and current-duty cache. Previously existing matched teams and all user accounts remain. Normal team/rotation deletion also cleans up active routing and escalation references.
+
+Both choices stop synchronization, remove the source from the list and erase stored authentication headers and previews. A source record is retained internally so preserved concrete intervals keep their references. The deletion request requires an explicit choice; retrying it does not change the original decision.
+
+You can create a new source with the same name and API address. It receives a new ID and requires credentials and an initial Preview → Apply. Retained schedules are not automatically reassigned to the new source; review its plan before applying.
+
+While a full import or preview is queued or running, the open configuration form polls its status every 1.5 seconds. These reads do not start imports. Polling stops when the operation finishes or the form closes.
+
+Current-duty errors (including an unknown status or an API timeout) are retried separately after 15 seconds and do not move the next full import forward. A newly detected missing person can request one early full import. Further errors do not trigger additional early imports until current duty recovers; scheduled full imports continue at their configured interval. The current-duty error remains visible until a successful refresh.
 
 ## Choosing update behavior
 
@@ -129,7 +146,15 @@ Team and rotation removal uses IR soft deletion. Shift removal is limited to the
 
 Window boundaries use UTC. For example, on November 10, 2026, a horizon of `2` requests `2026-11-01T00:00:00Z` through `2027-01-01T00:00:00Z`.
 
-**To change an active source**, uncheck periodic synchronization, edit and save. Configuration or credential changes require a new preview and application before periodic updates can be enabled again.
+**Changes that do not need another preview:**
+
+- Name, enabling or pausing an already approved source, and allowing local edits.
+- Full-sync and current-duty intervals, request timeout, TLS verification and network policy.
+- Current-duty requests, field mapping, fetch mode and cache lifetime. These are separate from the full-import preview. Changing them clears the current-duty cache and schedules its refresh, without starting a full import.
+
+These settings can be saved while periodic synchronization remains enabled. Interval changes update the next scheduled time; saving does not queue an import. A prepared, unexpired preview remains valid without extending its expiry.
+
+**Changes that need a new preview:** API base URL or credentials; catalog, team, profile and shift requests; imported field mappings, team matches, selection filters, calendar horizon, membership authority, roles, management of existing objects and deletion rules. For these changes, pause periodic synchronization, save, preview and apply before enabling it again. An unchanged authentication header does not require another preview. A new source always needs its first preview and application.
 
 ## Users, roles and OIDC
 
@@ -279,6 +304,10 @@ The calendar shows imported intervals. With `current` configured, actual assignm
 
 The last four states do not assign someone from stale data. Normal IR routing/escalation behavior follows. Without `current`, assignment follows imported shifts and replacements. Permitted local edits and ordinary rotation overrides also apply.
 
+`current_fields.status` must resolve to one of the four API statuses above, with exact spelling and case. Mapping paths are relative to each record selected by `operations.current.items`. If an API uses a different enum, map it explicitly with `values`; for example, **only if your API defines `ON_DUTY` as active**, use `{"path": "status", "values": {"ON_DUTY": "active"}}`. Map its other states according to that API's contract. Nested objects need the path to their status string, such as `state.code`.
+
+Status errors identify the response item and mapping, and distinguish a missing path, null, an invalid JSON type, an unmapped enum and a case/whitespace mismatch. Raw response values are omitted. Failed validation preserves the previous current-duty cache only until its existing expiry. Fixing current-duty mappings does not require another import preview.
+
 Responses remain usable for at most `current_max_age_seconds`, default 120, configurable in mapping JSON. `valid_until` and the effective end can shorten this period. After an API failure, the previous answer is usable only until expiry. Current duty refresh runs separately from full imports and accounts for absence changes without relying on schedule revisions.
 
 Pausing periodic synchronization retains the calendar but lets current-duty data expire. With local editing enabled, use **Imported schedule** in the rotation actions to edit shifts and replacements. This form uses UTC times.
@@ -299,7 +328,7 @@ The server calls the external API. A successful request from your laptop does no
 4. Select server-allowed networks in the source (`private_network_policy: allowlist`).
 5. For an internal CA, install trust in the IR processes' environment. To connect without verifying the certificate, enable **Skip TLS certificate verification** in the source and save its settings.
 
-The API setting is `config.verify_tls`: `true` (the default) enables verification; `false` disables it. It applies to response samples, previews, imports and current-duty refreshes. After changing it, fetch and apply a new preview before re-enabling periodic synchronization. This setting does not bypass the server allowlist or affect other sources or outbound webhooks.
+The API setting is `config.verify_tls`: `true` (the default) enables verification; `false` disables it. It applies to response samples, previews, imports and current-duty refreshes. It can be saved without another preview. This setting does not bypass the server allowlist or affect other sources or outbound webhooks.
 
 Separate multiple subnets with commas. Plain HTTP also requires `webhook_allow_http = true` in that section. Selecting allowlist in the form does not add addresses to the server list: this uses IR's existing outbound network policy.
 
@@ -332,12 +361,15 @@ The response contains accessible `groups`, `teams` and a ready `preset` configur
 | `POST /api/admin/directory-sync` | Create with `name`, `group_id`, `config`, `headers`, `enabled: false`. Use the modified `preset` object as `config`. |
 | `GET /api/admin/directory-sync/{id}` | Read configuration, current `revision`, results and job status. Secrets are not returned. |
 | `PUT /api/admin/directory-sync/{id}` | Update with the current `revision`. Omit `headers` to preserve credentials. |
+| `DELETE /api/admin/directory-sync/{id}` | Remove an idle source with `{"revision":1,"data_action":"keep"}` or `"data_action":"delete"`. |
 | `POST /api/admin/directory-sync/{id}/sample` | Inspect catalog response shape. |
 | `POST /api/admin/directory-sync/{id}/preview` | Queue a preview with `{"revision":1}`. |
 | `POST /api/admin/directory-sync/{id}/apply` | Apply with `revision` and the resulting `preview_token`. |
 | `POST /api/admin/directory-sync/{id}/run` | Import an approved configuration with its `revision`. |
 
 Execution endpoints return **202**, meaning queued. Poll the source: `pending_mode` and `running` indicate unfinished work; `last_error` holds failures, `preview_result` holds the preview and `last_result` holds the application result. Current-duty failures use `current_error`. The full schema is available in IR OpenAPI.
+
+Source responses also include UTC timestamps `next_run_at` and `next_current_at` for scheduled full imports and current-duty checks, respectively. They are `null` when that work is not scheduled. `current_running` indicates a live current-duty worker lease; `running` continues to refer to full imports/previews.
 
 Concrete shift endpoints reuse rotation permissions: `GET/POST /api/rotations/{rotation_id}/imported-shifts`, `PUT/DELETE /api/rotations/imported-shifts/{shift_id}`. Lists use `after`/`next_cursor`; `user_id` is an IR user ID. Local deletion remains a tombstone until the next import.
 
@@ -358,7 +390,7 @@ Concrete shift endpoints reuse rotation permissions: `GET/POST /api/rotations/{r
 | No teams in the preview | Catalog data and `team_filter`; org-service needs nonempty `enrolledScopeUuid`. |
 | A team is marked `skip` | Its local match and whether managing matched teams is enabled. |
 | Email conflict | Emails for everyone referenced, including leaders and replacements; duplicates and deleted matching accounts. |
-| Cannot enable periodic updates | Apply a preview of the current configuration after edits. |
+| Cannot enable periodic updates | Apply the first preview, or a new preview after changing import data, rules, API address or credentials. |
 | `Preview expired` or `Local data changed since preview` | Fetch and review a new preview. |
 | Calendar exists but no current assignee | `current_error`, current status/freshness, user activity and enabled periodic updates. |
 

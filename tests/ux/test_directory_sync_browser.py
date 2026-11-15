@@ -19,6 +19,18 @@ from tests.factories import create_group, create_user
 from tests.integrations.test_directory_sync import snapshot  # noqa: F401
 
 
+def test_directory_sync_polling_lifecycle():
+    """Status polling stops on completion and keeps current-duty errors visible."""
+    node = shutil.which("node")
+    if not node:
+        pytest.skip("Node.js is not available")
+    subprocess.run(
+        [node, "tests/ux/directory_sync_polling.test.js"],
+        cwd=Path(__file__).resolve().parents[2],
+        check=True, capture_output=True, text=True,
+    )
+
+
 @pytest.mark.skipif(os.environ.get("INCIDENTRELAY_BROWSER_TESTS") != "1", reason="Enable browser tests")
 def test_directory_sync_browser(app, db, request, monkeypatch):
     group = create_group(name="Operations")

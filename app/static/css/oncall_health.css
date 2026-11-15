@@ -1,7 +1,9 @@
 /* On-call health row indicator */
 
-.oncall-health-cell {
+body.md-theme .data-table th.oncall-health-th,
+body.md-theme .data-table td.oncall-health-cell {
     text-align: center;
+    vertical-align: middle;
     white-space: nowrap;
 }
 
@@ -16,6 +18,8 @@
     font-size: 15px;
     font-weight: 800;
     line-height: 1;
+    padding: 0;
+    vertical-align: middle;
     cursor: pointer;
     transition: transform 0.12s ease, box-shadow 0.12s ease, background 0.12s ease;
 }

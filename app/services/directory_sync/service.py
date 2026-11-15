@@ -34,14 +34,25 @@ def authorized_actor(actor_id, group_id):
     ))))
 
 
-def claim(source_id, *, current=False):
+def claim(source_id, *, current=False, scheduled=False):
     """CAS lease shared by manual execution, previews and all scheduler processes."""
     now, token = utc_now(), str(uuid.uuid4())
     lease = Source.current_lease if current else Source.lease
     until = Source.current_lease_until if current else Source.lease_until
-    changed = Source.update({lease: token, until: now + timedelta(seconds=180)}).where(
-        Source.id == source_id, (lease.is_null()) | (until <= now),
-    ).execute()
+    query = Source.update({lease: token, until: now + timedelta(seconds=180)}).where(
+        Source.id == source_id, Source.deleted == False, (lease.is_null()) | (until <= now),
+    )
+    if scheduled:
+        query = query.where(Source.approved_revision == Source.revision)
+        if current:
+            query = query.where(
+                Source.last_success_at.is_null(False), Source.next_current_at <= now,
+                (Source.enabled == True) | Source.last_current_at.is_null()
+                | (Source.last_current_at < Source.last_success_at),
+            )
+        else:
+            query = query.where(Source.enabled == True, Source.next_run_at <= now, Source.pending_mode.is_null())
+    changed = query.execute()
     if not changed:
         raise SyncBusy("Synchronization is already running")
     return token
@@ -53,7 +64,7 @@ def heartbeat(source_id, token, *, current=False):
     lease = Source.current_lease if current else Source.lease
     until = Source.current_lease_until if current else Source.lease_until
     if not Source.update({until: now + timedelta(seconds=180)}).where(
-        Source.id == source_id, lease == token, until > now,
+        Source.id == source_id, Source.deleted == False, lease == token, until > now,
     ).execute():
         raise SyncError("Synchronization lease expired")
 
@@ -62,7 +73,7 @@ def locked_source(source_id, token, revision, *, current=False):
     source = lock_row(Source.select().where(Source.id == source_id))
     lease = source.current_lease if current and source else getattr(source, "lease", None)
     until = source.current_lease_until if current and source else getattr(source, "lease_until", None)
-    if (not source or lease != token or not until or until <= utc_now()
+    if (not source or source.deleted or lease != token or not until or until <= utc_now()
             or source.revision != revision):
         raise SyncError("Configuration or synchronization lease changed; fetch a new preview")
     if not authorized_actor(source.created_by_id, source.group_id):
@@ -84,9 +95,9 @@ def digest(value):
     return hashlib.sha256(json.dumps(rows, ensure_ascii=False).encode()).hexdigest()
 
 
-def run(source_id, *, mode="run", preview_token=None):
+def run(source_id, *, mode="run", preview_token=None, scheduled=False):
     """Fetch outside transactions, then preview/apply one complete snapshot atomically."""
-    token = claim(source_id)
+    token = claim(source_id, scheduled=scheduled)
     client = None
     try:
         source = Source.get_by_id(source_id)
@@ -170,9 +181,10 @@ def run(source_id, *, mode="run", preview_token=None):
         Source.update(lease=None, lease_until=None).where(Source.id == source_id, Source.lease == token).execute()
 
 
-def refresh_current(source_id):
+def refresh_current(source_id, *, scheduled=False):
     """Refresh authoritative duty separately; stale cached answers never assign users."""
-    token = claim(source_id, current=True)
+    token = claim(source_id, current=True, scheduled=scheduled)
+    needs_full_sync = False
     try:
         source = Source.get_by_id(source_id)
         config = SyncConfig.model_validate(source.config)
@@ -193,6 +205,7 @@ def refresh_current(source_id):
             now = utc_now()
             for row in rows:
                 if row["status"] == "active" and row["user_id"] not in users:
+                    needs_full_sync = True
                     raise SyncError("Current duty references a new person; a full synchronization is required")
                 expires = now + timedelta(seconds=config.current_max_age_seconds)
                 if row.get("valid_until"):
@@ -220,8 +233,15 @@ def refresh_current(source_id):
                           next_current_at=max(now + timedelta(seconds=5), next_due)).where(Source.id == source.id).execute()
     except Exception as error:
         message = str(error) if isinstance(error, SyncError) else f"Current duty refresh failed ({type(error).__name__})"
-        Source.update(current_error=message, next_current_at=utc_now() + timedelta(seconds=15),
-                      next_run_at=utc_now()).where(Source.id == source_id, Source.current_lease == token).execute()
+        updates = {"current_error": message, "next_current_at": utc_now() + timedelta(seconds=15)}
+        # Transport/response errors cannot be repaired by importing the catalog.
+        # A new person warrants one early import; if it does not resolve the
+        # problem, preserve the full-sync interval until current duty recovers.
+        if needs_full_sync and not source.current_error:
+            updates["next_run_at"] = utc_now()
+        Source.update(**updates).where(
+            Source.id == source_id, Source.current_lease == token,
+        ).execute()
         logger.warning("Current duty refresh failed", extra={"source_id": source_id, "error_type": type(error).__name__})
         raise SyncError(message) from error
     finally:
@@ -234,7 +254,9 @@ def process_due_sources():
     Source.update(preview_encrypted=None, preview_token=None, preview_result=None, preview_until=None).where(
         Source.preview_until < utc_now(), Source.pending_mode.is_null(), Source.lease.is_null(),
     ).execute()
-    for source in Source.select().where((Source.enabled == True) | Source.pending_mode.is_null(False)).order_by(Source.next_current_at):
+    for source in Source.select().where(
+        Source.deleted == False, (Source.enabled == True) | Source.pending_mode.is_null(False),
+    ).order_by(Source.next_current_at):
         if source.lease and source.lease_until and source.lease_until > utc_now():
             continue
         try:
@@ -256,7 +278,7 @@ def process_due_sources():
                     continue
                 count += 1
             elif source.enabled and source.approved_revision == source.revision and source.next_run_at <= utc_now():
-                run(source.id)
+                run(source.id, scheduled=True)
                 count += 1
         except SyncError:
             # Failure is already persisted per source; another source may proceed.
@@ -267,7 +289,7 @@ def process_due_sources():
 def process_due_current():
     """Current duty refresh has its own scheduler job and per-source lease."""
     count = 0
-    for source in Source.select().where(Source.last_success_at.is_null(False),
+    for source in Source.select().where(Source.deleted == False, Source.last_success_at.is_null(False),
                                          Source.approved_revision == Source.revision, Source.next_current_at <= utc_now()):
         if "current" not in source.config.get("operations", {}):
             continue
@@ -276,7 +298,7 @@ def process_due_current():
         if not source.enabled and source.last_current_at and source.last_current_at >= source.last_success_at:
             continue
         try:
-            refresh_current(source.id)
+            refresh_current(source.id, scheduled=True)
             count += 1
         except SyncError:
             continue

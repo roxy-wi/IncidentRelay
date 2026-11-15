@@ -299,13 +299,13 @@
         try {
             ensureRotationHealthColumn();
 
-            const rotations = getVisibleRotations();
+            const rotations = new Map(getVisibleRotations().map(rotation => [String(rotation.id), rotation]));
             const rows = tbody.children("tr").filter(function () {
                 return !$(this).find("td.empty-cell").length;
             });
 
-            rows.each(function (index) {
-                const rotation = rotations[index];
+            rows.each(function () {
+                const rotation = rotations.get($(this).attr("data-rotation-id"));
                 if (!rotation || !rotation.id) {
                     return;
                 }

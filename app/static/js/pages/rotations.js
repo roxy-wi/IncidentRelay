@@ -8,6 +8,11 @@ let layerRestrictionsCache = {};
 let expandedLayerId = null;
 let rotationOverridesAfterChange = null;
 let selectedRotationDetailsId = null;
+const rotationsPagination = createClientTablePagination({
+    id: "rotations-pagination",
+    tableSelector: "#rotations-table",
+    onChange: renderRotationsTable,
+});
 
 const WEEKDAY_LABELS = [
     i18n.t("rotations.weekday.monday"),
@@ -1359,6 +1364,7 @@ function escapeHtml(value) {
 }
 
 function loadRotations() {
+    rotationsPagination.reset();
     fillTeamSelect("#rotation-team", false, null, "can_write");
     fillUserSelect("#member-user");
     fillUserSelect("#override-user");
@@ -1931,12 +1937,13 @@ function renderRotationsTable() {
     tbody.empty();
 
     renderRotationsInboxCounter(rotations, rotationsCache);
+    const pageRotations = rotationsPagination.render(rotations);
 
     if (!rotations.length) {
         tbody.append(
             $("<tr>").append(
                 $("<td>")
-                    .attr("colspan", "8")
+                    .attr("colspan", "9")
                     .addClass("empty-cell")
                     .text(i18n.t("rotations.empty.none"))
             )
@@ -1944,7 +1951,7 @@ function renderRotationsTable() {
         return;
     }
 
-    rotations.forEach(function (rotation) {
+    pageRotations.forEach(function (rotation) {
         tbody.append(renderRotationRow(rotation));
     });
 
@@ -1954,7 +1961,7 @@ function renderRotationsTable() {
 }
 
 function renderRotationRow(rotation) {
-    const row = $("<tr>");
+    const row = $("<tr>").attr("data-rotation-id", rotation.id);
 
     const rotationName = $("<button>")
         .attr("type", "button")
@@ -2376,8 +2383,13 @@ $(document).on("click", "#reload-rotations", refreshRotations);
 $(document).on("click", "#reload-overrides", loadOverrides);
 $(document).on("click", "#create-override", createOverride);
 
-$(document).on("input", "#rotations-search", renderRotationsTable);
-$(document).on("change", "#rotations-status-filter", renderRotationsTable);
+function filterRotationsTable() {
+    rotationsPagination.reset();
+    renderRotationsTable();
+}
+
+$(document).on("input", "#rotations-search", filterRotationsTable);
+$(document).on("change", "#rotations-status-filter", filterRotationsTable);
 
 $(document).on("click", "#open-rotation-create-modal", openCreateRotationModal);
 $(document).on("click", "#close-rotation-form-modal", function () {

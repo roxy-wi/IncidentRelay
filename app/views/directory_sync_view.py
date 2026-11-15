@@ -1,5 +1,8 @@
 """Group-admin API for configurable directory and on-call synchronization."""
 
+from datetime import timedelta
+from typing import Literal
+
 from flask import Blueprint, jsonify, request
 from peewee import DoesNotExist
 from pydantic import Field, ValidationError
@@ -14,6 +17,7 @@ from app.services.change_intelligence.management import managed_groups
 from app.services.directory_sync.client import ApiClient
 from app.services.directory_sync.config import StrictModel, SyncApiError, SyncConfig, SyncError, org_service_preset
 from app.services.directory_sync.fetch import window
+from app.services.directory_sync.management import remove_source
 from app.services.directory_sync.service import authorized_actor
 from app.services.orchestration.webhooks import _normalize_headers, WebhookValidationError
 from app.services.rbac import current_api_token
@@ -29,6 +33,11 @@ class SourceInput(StrictModel):
     headers: dict[str, str] | None = None
     enabled: bool = False
     revision: int | None = None
+
+
+class SourceDeleteInput(StrictModel):
+    revision: int = Field(ge=1, strict=True)
+    data_action: Literal["keep", "delete"]
 
 
 @directory_sync_bp.before_request
@@ -75,11 +84,13 @@ def require_group(group_id):
         raise PermissionError()
 
 
-def load_source(source_id, *, mutable=False):
+def load_source(source_id, *, mutable=False, include_deleted=False):
     source = lock_row(Source.select().where(Source.id == source_id))
     if source is None:
         raise DoesNotExist()
     require_group(source.group_id)
+    if source.deleted and not include_deleted:
+        raise DoesNotExist()
     if mutable and (source.pending_mode or (source.lease and source.lease_until > utc_now())
                     or (source.current_lease and source.current_lease_until > utc_now())):
         raise SyncError("Synchronization is running or queued; wait for it to finish")
@@ -87,14 +98,22 @@ def load_source(source_id, *, mutable=False):
 
 
 def serialize(source):
+    approved = source.approved_revision == source.revision
+    current_scheduled = (
+        approved and source.last_success_at and "current" in source.config.get("operations", {})
+        and (source.enabled or not source.last_current_at or source.last_current_at < source.last_success_at)
+    )
     return {"id": source.id, "name": source.name, "group_id": source.group_id,
             "group_name": source.group.name,
             "config": source.config, "enabled": source.enabled, "revision": source.revision,
-            "approved": source.approved_revision == source.revision,
+            "approved": approved,
             "has_headers": bool(source.headers_encrypted), "last_error": source.last_error,
             "current_error": source.current_error, "last_result": source.last_result,
             "last_success_at": source.last_success_at.isoformat() + "Z" if source.last_success_at else None,
             "last_current_at": source.last_current_at.isoformat() + "Z" if source.last_current_at else None,
+            "next_run_at": source.next_run_at.isoformat() + "Z" if source.enabled and approved else None,
+            "next_current_at": source.next_current_at.isoformat() + "Z" if current_scheduled else None,
+            "current_running": bool(source.current_lease and source.current_lease_until > utc_now()),
             "pending_mode": source.pending_mode, "running": bool(source.lease and source.lease_until > utc_now()),
             "preview_token": source.preview_token, "preview_result": source.preview_result,
             "preview_until": source.preview_until.isoformat() + "Z" if source.preview_until else None}
@@ -103,7 +122,9 @@ def serialize(source):
 @directory_sync_bp.get("")
 def list_sources():
     groups = managed_groups(request.current_user).select(Group.id)
-    return jsonify([serialize(source) for source in Source.select().where(Source.group.in_(groups)).order_by(Source.id)])
+    return jsonify([serialize(source) for source in Source.select().where(
+        Source.group.in_(groups), Source.deleted == False,
+    ).order_by(Source.id)])
 
 
 @directory_sync_bp.get("/options")
@@ -119,6 +140,52 @@ def options():
 def get_source(source_id):
     with write_transaction():
         return jsonify(serialize(load_source(source_id)))
+
+
+@directory_sync_bp.delete("/<int:source_id>")
+def delete_source(source_id):
+    try:
+        payload = SourceDeleteInput.model_validate(request.get_json(silent=True))
+    except ValidationError:
+        return make_error_response("validation_error", "Specify revision and data_action: keep or delete", 400)
+    with write_transaction():
+        source = load_source(source_id, mutable=True, include_deleted=True)
+        if source.deleted:
+            return jsonify(id=source.id, deleted=True)
+        if source.revision != payload.revision:
+            raise SyncError("Configuration changed; reload it before deleting")
+        remove_source(source, delete_imported=payload.data_action == "delete")
+        write_audit("directory_sync.delete", object_type="directory_sync", object_id=source.id,
+                    group_id=source.group_id, data={"data_action": payload.data_action})
+        return jsonify(id=source.id, deleted=True)
+
+
+def update_refresh_schedule(source, previous, config, *, import_changed):
+    """Apply interval changes without starting an import or retaining stale duty."""
+    current_changed = (
+        previous.current_fields != config.current_fields
+        or previous.current_fetch != config.current_fetch
+        or previous.operations.get("current") != config.operations.get("current")
+        or previous.current_max_age_seconds != config.current_max_age_seconds
+    )
+    if import_changed or current_changed:
+        DirectorySyncCurrent.delete().where(DirectorySyncCurrent.source == source.id).execute()
+    if import_changed:
+        return
+    if (previous.interval_seconds != config.interval_seconds
+            and source.last_success_at and not source.last_error):
+        source.next_run_at = source.last_success_at + timedelta(seconds=config.interval_seconds)
+    if current_changed:
+        source.next_current_at = utc_now()
+    elif (previous.current_interval_seconds != config.current_interval_seconds
+            and source.last_current_at and not source.current_error):
+        delay = min(config.current_interval_seconds, max(5, config.current_max_age_seconds - 5))
+        source.next_current_at = source.last_current_at + timedelta(seconds=delay)
+        earliest = (DirectorySyncCurrent.select()
+                    .where(DirectorySyncCurrent.source == source.id)
+                    .order_by(DirectorySyncCurrent.valid_until).first())
+        if earliest:
+            source.next_current_at = min(source.next_current_at, earliest.valid_until)
 
 
 @directory_sync_bp.post("")
@@ -140,21 +207,36 @@ def save_source(source_id=None):
                 raise SyncError("Destination group cannot change after creation")
             if payload.revision != source.revision:
                 raise SyncError("Configuration changed; reload it before saving")
-            previous_config = SyncConfig.model_validate(source.config).model_dump()
-            config_changed = previous_config != payload.config.model_dump() or headers is not None
-            if payload.enabled and (source.approved_revision != source.revision or config_changed):
+            previous_config = SyncConfig.model_validate(source.config)
+            headers_changed = headers is not None and headers != decrypt_json(source.headers_encrypted, default={})
+            import_changed = (
+                previous_config.import_settings() != payload.config.import_settings()
+                or headers_changed
+            )
+            approved = source.approved_revision == source.revision
+            if payload.enabled and (not approved or import_changed):
                 raise SyncError("Apply a preview of this configuration before enabling periodic sync")
             source.name = payload.name.strip()
             source.config = payload.config.model_dump()
             source.enabled = payload.enabled
             source.revision += 1
-            source.approved_revision = None if config_changed else source.revision if source.approved_revision else None
-            if config_changed:
-                DirectorySyncCurrent.delete().where(DirectorySyncCurrent.source == source.id).execute()
+            source.approved_revision = source.revision if approved and not import_changed else None
+            update_refresh_schedule(source, previous_config, payload.config, import_changed=import_changed)
             source.created_by = request.current_user.id
-            source.preview_encrypted = None
-            source.preview_token = None
-            source.preview_result = None
+            preview = None
+            if (not import_changed and source.preview_token and source.preview_encrypted
+                    and source.preview_until and source.preview_until > utc_now()):
+                saved_preview = decrypt_json(source.preview_encrypted)
+                if saved_preview["revision"] == payload.revision:
+                    preview = saved_preview
+            if preview is None:
+                source.preview_encrypted = None
+                source.preview_token = None
+                source.preview_result = None
+                source.preview_until = None
+            else:
+                preview["revision"] = source.revision
+                source.preview_encrypted = encrypt_json(preview)
             if headers is not None:
                 source.headers_encrypted = encrypt_json(headers)
             source.save()

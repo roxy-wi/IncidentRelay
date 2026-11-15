@@ -118,5 +118,8 @@
   "rbac.group.admin": "用户组管理员",
   "rbac.team.viewer": "团队只读成员",
   "rbac.team.responder": "团队响应人员",
-  "rbac.team.manager": "团队管理员"
+  "rbac.team.manager": "团队管理员",
+  "teams.members.read_only": "查看团队成员。无法更改此团队的成员。",
+  "teams.members.load_failed": "无法加载团队成员。请重新打开成员列表以重试。",
+  "teams.permissions.view_members": "您没有权限查看此团队的成员。"
 }

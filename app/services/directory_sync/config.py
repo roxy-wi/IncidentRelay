@@ -92,6 +92,17 @@ class SyncConfig(StrictModel):
     # Explicit external-team -> existing IR team matches, reviewed in preview.
     team_matches: dict[str, int] = Field(default_factory=dict)
 
+    def import_settings(self):
+        """Return settings that determine the full import's data and plan."""
+        settings = self.model_dump(exclude={
+            "editable", "interval_seconds", "current_interval_seconds",
+            "current_max_age_seconds", "timeout_seconds", "verify_tls",
+            "private_network_policy", "current_fetch", "current_fields",
+        })
+        # Current duty is fetched separately and is never part of a preview.
+        settings["operations"].pop("current", None)
+        return settings
+
     @field_validator("base_url")
     @classmethod
     def validate_base_url(cls, value):

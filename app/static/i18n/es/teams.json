@@ -118,5 +118,8 @@
   "rbac.group.admin": "Administrador de grupo",
   "rbac.team.viewer": "Visor de equipo",
   "rbac.team.responder": "Respondedor de equipo",
-  "rbac.team.manager": "Responsable de equipo"
+  "rbac.team.manager": "Responsable de equipo",
+  "teams.members.read_only": "Consulta los miembros del equipo. No se puede modificar la composición de este equipo.",
+  "teams.members.load_failed": "No se pudieron cargar los miembros. Vuelve a abrir la lista para reintentarlo.",
+  "teams.permissions.view_members": "No tienes permiso para ver los miembros de este equipo."
 }

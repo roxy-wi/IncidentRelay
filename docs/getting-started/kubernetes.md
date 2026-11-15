@@ -35,7 +35,7 @@ Each component runs the same image and is selected by `INCIDENTRELAY_SERVICE`, e
 ```bash
 helm install incidentrelay \
   oci://ghcr.io/roxy-wi/incidentrelay-charts/incidentrelay \
-  --version 2.1.0 \
+  --version 2.5.2 \
   --set-string config.main.secret_key="$(openssl rand -hex 32)"
 ```
 
@@ -44,9 +44,9 @@ OCI support is enabled by default in Helm 3.8 and later. No `helm repo add` step
 ```bash
 helm upgrade --install incidentrelay \
   oci://ghcr.io/roxy-wi/incidentrelay-charts/incidentrelay \
-  --version 2.1.0 \
+  --version 2.5.2 \
   --set image.repository=ghcr.io/roxy-wi/incidentrelay \
-  --set image.tag=2.1 \
+  --set image.tag=2.5.2 \
   --set-string config.main.secret_key="$(openssl rand -hex 32)"
 ```
 
@@ -531,7 +531,7 @@ For SQLite, keep `persistence.enabled=true` and `web.replicaCount=1`. For Postgr
 ```bash
 helm upgrade incidentrelay \
   oci://ghcr.io/roxy-wi/incidentrelay-charts/incidentrelay \
-  --version 2.1.0 \
+  --version 2.5.2 \
   --reuse-values
 ```
 

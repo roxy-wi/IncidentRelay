@@ -321,7 +321,7 @@ class RotationOverride(BaseModel):
     created_at = DateTimeField(default=utc_now)
 
 
-class DirectorySyncSource(BaseModel):
+class DirectorySyncSource(SoftDeleteModel):
     """Group-owned API configuration and fenced synchronization state."""
 
     id = AutoField()
