@@ -1,4 +1,7 @@
+from datetime import datetime
 from types import SimpleNamespace
+
+import pytest
 
 from app.login import (
     create_access_token,
@@ -7,7 +10,17 @@ from app.login import (
     normalize_auth_redirect_target,
     verify_password,
 )
+from app.modules.db.models import ApiToken, User
 from app.services.integrations.auth import create_raw_token, get_bearer_token, hash_token, token_has_scope
+
+
+@pytest.fixture
+def api_token():
+    """Build a valid personal token without persisting it."""
+    return ApiToken(
+        user=User(id=42),
+        scopes=["alerts:write", "routes:read"],
+    )
 
 
 def test_password_hash_is_not_plaintext_and_can_be_verified():
@@ -40,19 +53,53 @@ def test_api_token_hash_is_stable_and_not_plaintext():
     assert hash_token(raw) != raw
 
 
-def test_token_scope_matching():
-    token = SimpleNamespace(scopes=["alerts:write", "routes:read"])
-
-    assert token_has_scope(token, [])
-    assert token_has_scope(token, ["alerts:write"])
-    assert token_has_scope(token, ["alerts:write", "routes:read"])
-    assert not token_has_scope(token, ["admin"])
+def test_token_scope_matching(api_token):
+    assert token_has_scope(api_token, [])
+    assert token_has_scope(api_token, ["alerts:write"])
+    assert token_has_scope(api_token, ["alerts:write", "routes:read"])
+    assert not token_has_scope(api_token, ["admin"])
 
 
-def test_token_scope_wildcard_matches_everything():
-    token = SimpleNamespace(scopes=["*"])
+def test_token_scope_wildcard_matches_everything(api_token):
+    api_token.scopes = ["*"]
 
-    assert token_has_scope(token, ["admin", "alerts:write"])
+    assert token_has_scope(api_token, ["admin", "alerts:write"])
+
+
+@pytest.mark.parametrize("required_scopes", [[], ["alerts:write"]])
+@pytest.mark.parametrize(
+    "overrides",
+    [
+        pytest.param({"active": False}, id="inactive"),
+        pytest.param({"deleted": True}, id="deleted"),
+        pytest.param({"expires_at": datetime(2000, 1, 1)}, id="expired"),
+        pytest.param({"user": None}, id="unbounded-ownerless"),
+        pytest.param(
+            {"user": None, "change_integration_id": 1}, id="machine-token",
+        ),
+    ],
+)
+def test_token_scope_rejects_invalid_token(api_token, overrides, required_scopes):
+    api_token.scopes = ["*"]
+    for field, value in overrides.items():
+        setattr(api_token, field, value)
+
+    assert not token_has_scope(api_token, required_scopes)
+
+
+@pytest.mark.parametrize("required_scopes", [[], ["alerts:write"]])
+@pytest.mark.parametrize("active, deleted", [(False, False), (True, True)])
+def test_token_scope_rejects_invalid_owner(api_token, active, deleted, required_scopes):
+    api_token.scopes = ["*"]
+    api_token.user.active = active
+    api_token.user.deleted = deleted
+
+    assert not token_has_scope(api_token, required_scopes)
+
+
+@pytest.mark.parametrize("required_scopes", [[], ["alerts:write"]])
+def test_token_scope_rejects_missing_token(required_scopes):
+    assert not token_has_scope(None, required_scopes)
 
 
 def test_get_bearer_token_extracts_authorization_header(app):
