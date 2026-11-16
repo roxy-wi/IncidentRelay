@@ -69,8 +69,15 @@ class SyncConfig(StrictModel):
         default=True, strict=True,
         description="Use the configured current-duty API instead of the imported schedule.",
     )
-    current_interval_seconds: int = Field(default=60, ge=10, le=3600)
-    current_max_age_seconds: int = Field(default=120, ge=10, le=3600)
+    current_interval_seconds: int = Field(
+        default=60, ge=10, le=3600,
+        description="Delay in seconds after a current-duty check completes, including failures. "
+                    "Changing this value restarts the interval from save time for enabled sources.",
+    )
+    current_max_age_seconds: int = Field(
+        default=120, ge=10, le=3600,
+        description="Maximum age of a usable current-duty answer; does not shorten the polling interval.",
+    )
     horizon_months: int = Field(default=2, ge=1, le=11)
     timeout_seconds: int = Field(default=15, ge=1, le=60)
     editable: bool = False

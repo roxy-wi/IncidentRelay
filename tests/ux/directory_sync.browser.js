@@ -14,6 +14,13 @@ const fixture = JSON.parse(process.env.DIRECTORY_SYNC_FIXTURE);
     page.setDefaultTimeout(20000);
     const errors = [];
     page.on("pageerror", error => errors.push(error.message));
+    async function reopenSavedSource(id) {
+        await page.locator("#ds-editor").waitFor({state: "hidden"});
+        assert.equal(await page.evaluate(() => directorySyncSource), null);
+        await page.locator("#ds-list tr[data-source-id='" + id + "'] .app-action-menu-toggle").click();
+        await page.getByRole("menuitem", {name: "Configure", exact: true}).click();
+        await page.waitForFunction(sourceId => directorySyncSource?.id === sourceId, id);
+    }
     async function assertLoading(button, message) {
         assert.equal(await page.locator(button + " .ui-loading-spinner").isVisible(), true);
         assert.equal(await page.locator(button).getAttribute("aria-busy"), "true");
@@ -45,8 +52,10 @@ const fixture = JSON.parse(process.env.DIRECTORY_SYNC_FIXTURE);
         const legendBounds = await modal.locator("legend").first().boundingBox();
         assert.ok(legendBounds.y - headerBounds.y - headerBounds.height <= 32, "connection section follows modal header without empty space");
         assert.ok((await page.locator("#ds-headers").boundingBox()).height < 50, "authentication headers use a compact input");
-        assert.equal(await page.locator("#ds-enabled").isDisabled(), true);
-        assert.match(await page.locator("#ds-enabled-hint").textContent(), /Save the source/);
+        assert.equal(await page.locator("#ds-enabled").isEnabled(), true);
+        assert.match(await page.locator("#ds-enabled-hint").textContent(), /automatically after Apply/);
+        assert.match(await page.locator("#ds-workflow").textContent(), /1\. Save/);
+        assert.equal(await page.locator("#ds-preview").isDisabled(), true);
         assert.equal(await page.locator("#ds-enabled-label").getAttribute("title"), await page.locator("#ds-enabled-hint").textContent());
         await page.locator("#ds-headers").fill('{"Authorization":"discard-this-secret"}');
         await page.keyboard.press("Escape");
@@ -75,8 +84,8 @@ const fixture = JSON.parse(process.env.DIRECTORY_SYNC_FIXTURE);
         assert.equal(await modal.isVisible(), true);
         assert.equal(await page.locator("#ds-group").isDisabled(), true);
         assert.equal(await page.locator("#ds-headers").inputValue(), "");
-        assert.equal(await page.locator("#ds-enabled").isDisabled(), true);
-        assert.match(await page.locator("#ds-enabled-hint").textContent(), /Preview the changes and apply/);
+        assert.equal(await page.locator("#ds-enabled").isEnabled(), true);
+        assert.match(await page.locator("#ds-workflow").textContent(), /2\. Settings saved/);
         const sampleButtonBounds = await page.locator("#ds-sample").boundingBox();
         const mappingBounds = await page.locator("#ds-mapping").boundingBox();
         assert.ok(sampleButtonBounds.width < mappingBounds.width / 2, "inspect action is a compact button, not a full-width heading");
@@ -160,7 +169,7 @@ const fixture = JSON.parse(process.env.DIRECTORY_SYNC_FIXTURE);
         await page.waitForFunction(() => directorySyncSource?.name === "OnCall <test> reviewed");
         assert.equal(await page.evaluate(() => directorySyncSource.preview_token), previewToken);
         assert.equal(await page.locator("#ds-apply").isEnabled(), true);
-        assert.match(await page.locator("#ds-status").textContent(), /No new preview is required/);
+        assert.match(await page.locator("#ds-workflow").textContent(), /3\. Review/);
         await page.locator("#ds-editor .app-modal-body").evaluate(element => { element.scrollTop = 0; });
         await page.screenshot({path: path.join(fixture.screenshots, "desktop.png"), fullPage: true});
         let releaseApply;
@@ -183,6 +192,7 @@ const fixture = JSON.parse(process.env.DIRECTORY_SYNC_FIXTURE);
         const saved = page.waitForResponse(r => r.url().endsWith("/api/admin/directory-sync/" + source.id) && r.request().method() === "PUT");
         await page.locator("#ds-save").click();
         assert.equal((await saved).status(), 200);
+        await reopenSavedSource(source.id);
         await page.waitForFunction(() => directorySyncSource?.enabled);
         await page.locator("#ds-list td:nth-child(6) time").waitFor({state: "attached"});
         const times = await page.locator("#ds-list time").evaluateAll(elements => elements.map(element => ({
@@ -195,6 +205,96 @@ const fixture = JSON.parse(process.env.DIRECTORY_SYNC_FIXTURE);
             assert.equal(time.text, expected, "UTC timestamps are displayed in the browser timezone");
             assert.match(time.title, /GMT\+3|MSK/);
         }
+        // Reconfigure an enabled source without touching its schedule checkbox.
+        await page.locator("#ds-horizon").fill("3");
+        assert.match(await page.locator("#ds-workflow").textContent(), /1\. Save/);
+        assert.equal(await page.locator("#ds-preview").isDisabled(), true);
+        assert.equal(await page.locator("#ds-apply").isDisabled(), true);
+        assert.equal(await page.locator("#ds-run").isDisabled(), true);
+        let importScroll = await modal.locator(".app-modal-body").evaluate(el => el.scrollTop);
+        assert.ok(importScroll > 100, "edit import settings below the top of the form");
+        await page.route("**/api/admin/directory-sync/" + source.id, route =>
+            route.fulfill({status: 503, json: {message: "Settings temporarily unavailable"}}), {times: 1});
+        await page.locator("#ds-save").click();
+        await page.locator("#app-dialog-confirm").click();
+        assert.equal(await modal.isVisible(), true, "a failed save keeps the editor open");
+        assert.equal(await page.locator("#ds-horizon").inputValue(), "3", "a failed save preserves edits");
+        assert.equal(await page.evaluate(() => directorySyncDirty), true);
+        assert.equal(await page.locator("#ds-save").isEnabled(), true);
+        importScroll = await modal.locator(".app-modal-body").evaluate((el, position) => {
+            el.scrollTop = position;
+            return el.scrollTop;
+        }, importScroll);
+        const changedImport = page.waitForResponse(r => r.url().endsWith("/api/admin/directory-sync/" + source.id)
+            && r.request().method() === "PUT");
+        let releaseSave;
+        const saveGate = new Promise(resolve => { releaseSave = resolve; });
+        await page.route("**/api/admin/directory-sync/" + source.id, async route => {
+            await saveGate;
+            await route.continue();
+        }, {times: 1});
+        try {
+            await page.locator("#ds-save").click();
+            assert.equal(await page.locator("#ds-horizon").isDisabled(), true,
+                "in-flight saving cannot silently discard newer edits");
+        } finally { releaseSave(); }
+        const changedResponse = await changedImport;
+        assert.equal(changedResponse.status(), 200, await changedResponse.text());
+        await page.waitForFunction(() => directorySyncSource?.config.horizon_months === 3 && !directorySyncSaving);
+        assert.equal(await page.locator("#ds-horizon").isEnabled(), true);
+        assert.equal(await page.locator("#ds-enabled").isChecked(), true);
+        assert.equal(await page.evaluate(() => directorySyncSource.approved), false);
+        assert.equal(await page.evaluate(() => directorySyncSource.schedule_state), "pending_approval");
+        assert.match(await page.locator("#ds-workflow").textContent(), /2\. Settings saved/);
+        const savedScroll = await modal.locator(".app-modal-body").evaluate(el => ({
+            top: el.scrollTop, maximum: el.scrollHeight - el.clientHeight,
+        }));
+        assert.ok(Math.abs(savedScroll.top - Math.min(importScroll, savedScroll.maximum)) <= 2,
+            `saving preserves scroll, bounded by the shorter form: ${JSON.stringify({savedScroll, importScroll})}`);
+        assert.equal(await page.locator("#ds-workflow-title").textContent(), "Preview required");
+        assert.equal(await page.locator("#ds-workflow").getAttribute("data-step"), "preview");
+        assert.equal(await page.locator("#ds-workflow-icon").isVisible(), true);
+        assert.equal(await page.evaluate(() => document.activeElement.id), "ds-preview");
+        await page.screenshot({path: path.join(fixture.screenshots, "save-preview-required-desktop.png"), fullPage: true});
+        await page.locator("#ds-preview").click();
+        await page.waitForFunction(() => directorySyncSource?.preview_token && !directorySyncSource.pending_mode && !directorySyncSource.running);
+        assert.equal(await page.locator("#ds-apply").isEnabled(), true);
+        assert.equal(await page.locator("#ds-run").isDisabled(), true);
+        assert.match(await page.locator("#ds-workflow").textContent(), /3\. Review/);
+        await page.screenshot({path: path.join(fixture.screenshots, "workflow-preview-desktop.png"), fullPage: true});
+        await page.setViewportSize({width: 390, height: 844});
+        assert.ok(await modal.locator(".app-modal-footer").evaluate(el => el.scrollWidth <= el.clientWidth + 2), "workflow footer fits on mobile");
+        const workflowSaveBounds = await page.locator("#ds-save").boundingBox();
+        const workflowPreviewBounds = await page.locator("#ds-preview").boundingBox();
+        const workflowApplyBounds = await page.locator("#ds-apply").boundingBox();
+        assert.ok(workflowSaveBounds.y <= workflowPreviewBounds.y + 2 && workflowPreviewBounds.y <= workflowApplyBounds.y + 2, "workflow steps retain their order on mobile");
+        await page.screenshot({path: path.join(fixture.screenshots, "workflow-preview-mobile.png"), fullPage: true});
+        await page.setViewportSize({width: 1440, height: 1080});
+        await page.locator("#ds-apply").click();
+        await page.waitForFunction(() => directorySyncSource?.approved && !directorySyncSource.pending_mode && !directorySyncSource.running);
+        assert.equal(await page.evaluate(() => directorySyncSource.schedule_state), "enabled");
+        assert.equal(await page.locator("#ds-enabled").isChecked(), true);
+        assert.match(await page.locator("#ds-workflow").textContent(), /No new preview/);
+        // A preview on an already approved source must also enable Apply, not Run.
+        await page.locator("#ds-preview").click();
+        await page.waitForFunction(() => directorySyncSource?.preview_token && !directorySyncSource.pending_mode && !directorySyncSource.running);
+        assert.equal(await page.evaluate(() => directorySyncSource.schedule_state), "preview");
+        assert.equal(await page.locator("#ds-apply").isEnabled(), true);
+        assert.equal(await page.locator("#ds-run").isDisabled(), true);
+        // Exercise the local expiry timer without polling an idle source.
+        await page.evaluate(() => {
+            directorySyncSource.preview_until = new Date(Date.now() + 100).toISOString();
+            dsRenderResult(directorySyncSource);
+        });
+        await page.waitForFunction(() => document.querySelector("#ds-apply").disabled);
+        assert.match(await page.locator("#ds-workflow").textContent(), /preview expired/);
+        await page.locator("#ds-close-footer").click();
+        await page.locator("#ds-list .app-action-menu-toggle").first().click();
+        await page.getByRole("menuitem", {name: "Configure", exact: true}).click();
+        await page.waitForFunction(() => directorySyncSource?.preview_token);
+        assert.equal(await page.locator("#ds-apply").isEnabled(), true);
+        await page.locator("#ds-apply").click();
+        await page.waitForFunction(() => directorySyncSource?.approved && !directorySyncSource.preview_token && !directorySyncSource.pending_mode);
         const currentModeImports = [];
         const trackCurrentModeImports = request => {
             if (request.method() === "POST" && /\/directory-sync\/\d+\/(preview|apply|run)$/.test(request.url())) currentModeImports.push(request.url());
@@ -215,6 +315,7 @@ const fixture = JSON.parse(process.env.DIRECTORY_SYNC_FIXTURE);
         assert.ok(disabledData.config.operations.current, "disabling checks preserves the operation configuration");
         assert.equal(disabledData.next_current_at, null);
         assert.equal(disabledData.current_error, null);
+        await reopenSavedSource(source.id);
         await page.waitForFunction(() => directorySyncSource?.config.current_enabled === false && !directorySyncSaving);
         await page.setViewportSize({width: 390, height: 844});
         await page.locator("#ds-current-enabled").focus();
@@ -234,6 +335,7 @@ const fixture = JSON.parse(process.env.DIRECTORY_SYNC_FIXTURE);
         assert.equal(enabledData.config.current_enabled, true);
         assert.equal(enabledData.config.current_interval_seconds, 45);
         assert.equal(enabledData.last_success_at, beforeCurrentMode);
+        await reopenSavedSource(source.id);
         await page.waitForFunction(() => directorySyncSource?.config.current_enabled && !directorySyncSaving);
         assert.equal(await page.locator("#ds-current-interval").inputValue(), "45");
         page.off("request", trackCurrentModeImports);
@@ -320,11 +422,12 @@ const fixture = JSON.parse(process.env.DIRECTORY_SYNC_FIXTURE);
         await page.locator("#ds-save").click();
         const runtimeResponse = await savedRuntime;
         assert.equal(runtimeResponse.status(), 200, await runtimeResponse.text());
+        await reopenSavedSource(source.id);
         await page.waitForFunction(() => directorySyncSource?.config.editable && directorySyncSource.config.interval_seconds === 7200);
         assert.equal(await page.locator("#ds-enabled").isChecked(), true);
         assert.equal(await page.evaluate(() => directorySyncSource.approved), true);
         assert.equal(await page.evaluate(() => directorySyncSource.last_success_at), lastSuccess);
-        assert.match(await page.locator("#ds-status").textContent(), /No new preview is required/);
+        assert.match(await page.locator("#ds-workflow").textContent(), /No new preview is required/);
         page.off("request", recordQueuedOperation);
         assert.deepEqual(queuedOperations, [], "saving runtime settings does not start a preview or import");
         await page.locator("#ds-enabled").uncheck();
@@ -334,6 +437,7 @@ const fixture = JSON.parse(process.env.DIRECTORY_SYNC_FIXTURE);
         await page.locator("#ds-save").click();
         const editedConfig = await editConfig;
         assert.equal(editedConfig.status(), 200, await editedConfig.text());
+        await reopenSavedSource(source.id);
         await page.waitForFunction(() => directorySyncSource && !directorySyncSource.enabled);
         await page.waitForFunction(() => [4, 5].every(index => document.querySelector("#ds-list tr")?.children[index].textContent === "—"));
         assert.equal(await page.evaluate(() => directorySyncSource.config.verify_tls), true);
@@ -481,8 +585,7 @@ const fixture = JSON.parse(process.env.DIRECTORY_SYNC_FIXTURE);
         const reconnectSaved = await reconnectSave;
         assert.equal(reconnectSaved.status(), 200, await reconnectSaved.text());
         assert.equal((await reconnectSaved.json()).config.retained_source_id, source.id);
-        await page.waitForFunction(() => !directorySyncSaving);
-        await page.locator("#ds-close-footer").click();
+        await modal.waitFor({state: "hidden"});
         await page.locator("#ds-list tr[data-source-id='" + reconnectedId + "'] .app-action-menu-toggle").click();
         await page.getByRole("menuitem", {name: "Delete source", exact: true}).click();
         await page.locator("#app-dialog-confirm").click();

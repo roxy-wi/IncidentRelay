@@ -2,7 +2,6 @@
 
 import hashlib
 import json
-import logging
 import uuid
 from datetime import timedelta
 
@@ -16,10 +15,9 @@ from app.modules.db.models import (
 from app.modules.db.transactions import lock_row, write_transaction
 from app.services.directory_sync.client import ApiClient
 from app.services.directory_sync.config import SyncBusy, SyncConfig, SyncError, current_api_enabled
+from app.services.directory_sync.diagnostics import error_message, logged_operation
 from app.services.directory_sync.fetch import fetch_current, fetch_snapshot, instant
 from app.services.directory_sync.reconcile import reconcile
-
-logger = logging.getLogger("oncall.directory_sync")
 
 
 def authorized_actor(actor_id, group_id):
@@ -32,6 +30,12 @@ def authorized_actor(actor_id, group_id):
         UserGroup.user == actor_id, UserGroup.group == group_id,
         UserGroup.role == "user_admin", UserGroup.active == True,
     ))))
+
+
+def has_pending_preview(source, now=None):
+    """Keep a prepared plan available until it is applied or expires."""
+    return bool(source.preview_token and source.preview_until
+                and source.preview_until > (now or utc_now()))
 
 
 def claim(source_id, *, current=False, scheduled=False):
@@ -52,7 +56,10 @@ def claim(source_id, *, current=False, scheduled=False):
                    & (Source.next_current_at <= Source.last_success_at)),
             )
         else:
-            query = query.where(Source.enabled == True, Source.next_run_at <= now, Source.pending_mode.is_null())
+            query = query.where(
+                Source.enabled == True, Source.next_run_at <= now, Source.pending_mode.is_null(),
+                Source.preview_token.is_null() | Source.preview_until.is_null() | (Source.preview_until <= now),
+            )
     changed = query.execute()
     if not changed:
         raise SyncBusy("Synchronization is already running")
@@ -96,6 +103,7 @@ def digest(value):
     return hashlib.sha256(json.dumps(rows, ensure_ascii=False).encode()).hexdigest()
 
 
+@logged_operation("sync")
 def run(source_id, *, mode="run", preview_token=None, scheduled=False):
     """Fetch outside transactions, then preview/apply one complete snapshot atomically."""
     token = claim(source_id, scheduled=scheduled)
@@ -150,7 +158,10 @@ def run(source_id, *, mode="run", preview_token=None, scheduled=False):
                                   "changes": len(changes), "from": snapshot["from"], "to": snapshot["to"],
                                   "schedule_ids": [s["id"] for team in snapshot["teams"] for s in team["schedules"]]}
             source.next_run_at = now + timedelta(seconds=config.interval_seconds)
-            source.next_current_at = now
+            # Periodic imports must not shorten the independent duty interval.
+            # Explicit imports still request an immediate check of the new data.
+            if not scheduled:
+                source.next_current_at = now
             source.preview_encrypted = None
             source.preview_token = None
             source.preview_until = None
@@ -165,7 +176,7 @@ def run(source_id, *, mode="run", preview_token=None, scheduled=False):
     except Exception as error:
         # Exceptions may embed credentials/URLs/response bodies; store only our
         # controlled errors or an exception type. Never log upstream exception text.
-        message = str(error) if isinstance(error, SyncError) else f"Synchronization failed ({type(error).__name__})"
+        message = error_message(error, "Synchronization failed")
         Source.update(last_error=message, next_run_at=utc_now() + timedelta(seconds=60)).where(
             Source.id == source_id, Source.lease == token,
         ).execute()
@@ -174,7 +185,6 @@ def run(source_id, *, mode="run", preview_token=None, scheduled=False):
                           preview_token=None, preview_encrypted=None).where(
                 Source.id == source_id, Source.lease == token,
             ).execute()
-        logger.warning("Directory synchronization failed", extra={"source_id": source_id, "error_type": type(error).__name__})
         if isinstance(error, SyncError):
             raise
         raise SyncError(message) from error
@@ -182,15 +192,19 @@ def run(source_id, *, mode="run", preview_token=None, scheduled=False):
         Source.update(lease=None, lease_until=None).where(Source.id == source_id, Source.lease == token).execute()
 
 
+@logged_operation("current")
 def refresh_current(source_id, *, scheduled=False):
     """Refresh authoritative duty separately; stale cached answers never assign users."""
     token = claim(source_id, current=True, scheduled=scheduled)
     needs_full_sync = False
     revision = None
+    # Keep failure handling usable if the persisted configuration is invalid.
+    retry_interval = SyncConfig.model_fields["current_interval_seconds"].default
     try:
         source = Source.get_by_id(source_id)
         revision = source.revision
         config = SyncConfig.model_validate(source.config)
+        retry_interval = config.current_interval_seconds
         if not current_api_enabled(source.config):
             return
         rotations = {b.external_id: b.local_id for b in Binding.select().where(
@@ -227,16 +241,14 @@ def refresh_current(source_id, *, scheduled=False):
                     Current.update(**values).where(Current.id == old.id).execute()
                 else:
                     Current.create(**values)
-            next_due = now + timedelta(seconds=min(config.current_interval_seconds,
-                                                     max(5, config.current_max_age_seconds - 5)))
-            bounds = [instant(row["valid_until"]) for row in rows if row.get("valid_until")]
-            if bounds:
-                next_due = min(next_due, min(bounds))
+            # Cache expiry controls whether an answer is usable, not polling frequency.
             Source.update(last_current_at=now, current_error=None,
-                          next_current_at=max(now + timedelta(seconds=5), next_due)).where(Source.id == source.id).execute()
+                          next_current_at=now + timedelta(seconds=config.current_interval_seconds)).where(
+                Source.id == source.id,
+            ).execute()
     except Exception as error:
-        message = str(error) if isinstance(error, SyncError) else f"Current duty refresh failed ({type(error).__name__})"
-        updates = {"current_error": message, "next_current_at": utc_now() + timedelta(seconds=15)}
+        message = error_message(error, "Current duty refresh failed")
+        updates = {"current_error": message, "next_current_at": utc_now() + timedelta(seconds=retry_interval)}
         # Transport/response errors cannot be repaired by importing the catalog.
         # A new person warrants one early import; if it does not resolve the
         # problem, preserve the full-sync interval until current duty recovers.
@@ -245,7 +257,6 @@ def refresh_current(source_id, *, scheduled=False):
         Source.update(**updates).where(
             Source.id == source_id, Source.current_lease == token, Source.revision == revision,
         ).execute()
-        logger.warning("Current duty refresh failed", extra={"source_id": source_id, "error_type": type(error).__name__})
         raise SyncError(message) from error
     finally:
         Source.update(current_lease=None, current_lease_until=None).where(Source.id == source_id, Source.current_lease == token).execute()
@@ -282,7 +293,8 @@ def process_due_sources():
                 if mode == "preview":
                     continue
                 count += 1
-            elif source.enabled and source.approved_revision == source.revision and source.next_run_at <= utc_now():
+            elif (source.enabled and source.approved_revision == source.revision
+                    and source.next_run_at <= utc_now() and not has_pending_preview(source)):
                 run(source.id, scheduled=True)
                 count += 1
         except SyncError:

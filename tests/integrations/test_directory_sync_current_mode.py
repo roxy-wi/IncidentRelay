@@ -125,6 +125,8 @@ def test_current_enabled_requires_a_boolean(source, value):
 
 @pytest.mark.parametrize("interval", [10, 45, 90, 3600])
 def test_current_interval_save_and_cache_freshness(client, admin_headers, source, fetched, monkeypatch, interval):
+    from app.views import directory_sync_view
+
     source.enabled = True
     source.save()
     service.run(source.id)
@@ -132,11 +134,13 @@ def test_current_interval_save_and_cache_freshness(client, admin_headers, source
         {"id": key, "status": "active", "user_id": "u1"} for key in ids
     ])
     service.refresh_current(source.id)
-    before = Source.get_by_id(source.id)
+    saved_at = utc_now()
+    monkeypatch.setattr(directory_sync_view, "utc_now", lambda: saved_at)
+    cache = list(Current.select().order_by(Current.id).dicts())
     saved = save(client, admin_headers, source.id, current_interval_seconds=interval)
     assert saved["approved"]
-    expected_delay = min(interval, max(5, source.config["current_max_age_seconds"] - 5))
-    assert Source.get_by_id(source.id).next_current_at == before.last_current_at + timedelta(seconds=expected_delay)
+    assert Source.get_by_id(source.id).next_current_at == saved_at + timedelta(seconds=interval)
+    assert list(Current.select().order_by(Current.id).dicts()) == cache
 
 
 @pytest.mark.parametrize("interval", [0, 9, 3601])

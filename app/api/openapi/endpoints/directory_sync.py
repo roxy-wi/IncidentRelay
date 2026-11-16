@@ -42,7 +42,10 @@ def paths():
               "properties": {"name": {"type": "string", "maxLength": 255}, "group_id": {"type": "integer"},
                              "config": {"$ref": "#/components/schemas/DirectorySyncConfig"},
                              "headers": {"type": "object", "additionalProperties": {"type": "string"}, "writeOnly": True},
-                             "enabled": {"type": "boolean", "default": False}, "revision": {"type": "integer"}}}
+                             "enabled": {"type": "boolean", "default": False,
+                                         "description": "Requested schedule state. Changed imports wait for preview and Apply; "
+                                                        "successful Apply automatically resumes a selected schedule."},
+                             "revision": {"type": "integer"}}}
     common = {"tags": [TAG], "security": [{"bearerAuth": []}],
               "description": "Requires global admin or destination Group user_admin. Personal tokens require directory-sync:read/write; team-bound tokens are denied. Headers are encrypted and never returned.",
               "responses": {"200": response("Result"), "400": response("Invalid configuration"),
@@ -50,7 +53,7 @@ def paths():
                             "404": response("Not found"), "409": response("Busy, stale revision or conflict")}}
     result = {
         ROOT: {"get": {**common, "summary": "List visible synchronization sources"},
-               "post": {**common, "summary": "Create a disabled source", "requestBody": json_body("Source", config),
+               "post": {**common, "summary": "Create a source awaiting preview and Apply", "requestBody": json_body("Source", config),
                         "responses": {**common["responses"], "201": response("Created")}}},
         ROOT + "/options": {"get": {**common, "summary": "Get managed groups, teams, retained sources and the editable org-service preset"}},
         ROOT + "/{source_id}": {"parameters": [path_param("source_id", "Source ID")],

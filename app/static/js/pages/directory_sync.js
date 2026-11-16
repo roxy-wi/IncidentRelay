@@ -3,6 +3,7 @@ let directorySyncOptions = null;
 let directorySyncSource = null;
 let directorySyncVersion = 0;
 let directorySyncTimer = null;
+let directorySyncPreviewTimer = null;
 let directorySyncDirty = false;
 let directorySyncOpen = false;
 let directorySyncOpener = null;
@@ -58,7 +59,9 @@ function loadDirectorySync() {
             const row = $("<tr>").attr("data-source-id", source.id);
             $("<td>").text(source.name).appendTo(row);
             $("<td>").text(source.group_name).appendTo(row);
-            const status = $("<td>").text(dsText(source.enabled ? "enabled" : "paused")).appendTo(row);
+            const statusKey = source.schedule_state === "pending_approval" ? "awaiting_apply"
+                : source.schedule_state === "preview" ? "preview_ready" : source.enabled ? "enabled" : "paused";
+            const status = $("<td>").text(dsText(statusKey)).appendTo(row);
             if (source.pending_mode || source.running) status.append($("<div>").text(dsText("queued")));
             if (source.last_error || source.current_error) status.append($("<div>").addClass("muted").text(source.last_error || source.current_error));
             $("<td>").append(dsTime(source.last_success_at)).appendTo(row);
@@ -111,10 +114,6 @@ function dsListWriteFinished(source, xhr) {
 
 function dsSetSchedule(source, enabled) {
     if (!dsCanManage(source)) return;
-    if (enabled && !source.approved) {
-        showAppError(dsText("enabled_apply_first"));
-        return;
-    }
     dsListBusy(source.id, true);
     apiPut(directorySyncPath + "/" + source.id, {
         name: source.name, group_id: source.group_id, config: source.config,
@@ -158,6 +157,7 @@ function closeDirectorySync() {
     const wasOpen = directorySyncOpen;
     directorySyncVersion += 1;
     clearTimeout(directorySyncTimer);
+    clearTimeout(directorySyncPreviewTimer);
     directorySyncSource = null;
     directorySyncOpen = false;
     directorySyncSaving = false;
@@ -178,6 +178,7 @@ function openDirectorySync(source) {
     if (!directorySyncOpen) directorySyncOpener = document.activeElement;
     directorySyncVersion += 1;
     clearTimeout(directorySyncTimer);
+    clearTimeout(directorySyncPreviewTimer);
     directorySyncOpen = true;
     directorySyncSaving = false;
     directorySyncAction = null;
@@ -239,27 +240,70 @@ function dsCurrentControls(busy = false) {
     $("#ds-current-interval").prop("disabled", busy || !$("#ds-current-enabled").prop("checked"));
 }
 
+function dsPreviewReady(source) {
+    return Boolean(source?.preview_token && Date.parse(source.preview_until) > Date.now());
+}
+
+function dsRenderWorkflow(source) {
+    const busy = directorySyncSaving || Boolean(source?.pending_mode || source?.running);
+    $("#ds-form fieldset").prop("disabled", directorySyncSaving && directorySyncAction === "save");
+    const unsaved = !source || directorySyncDirty;
+    const ready = dsPreviewReady(source);
+    const step = unsaved ? "save" : ready ? "apply" : !source.approved ? "preview" : "saved";
+    const action = dsOperation(source);
+    const expired = !ready && source?.preview_until && Date.parse(source.preview_until) <= Date.now();
+    const displayStep = busy ? "busy" : expired && !unsaved ? "expired" : step;
+    const icon = {save: "pen-to-square", preview: "triangle-exclamation", apply: "list-check",
+        saved: "circle-check", expired: "clock", busy: "hourglass-half"}[displayStep];
+    $("#ds-workflow").attr("data-step", displayStep);
+    $("#ds-workflow-icon").attr("class", "fa-solid fa-" + icon);
+    $("#ds-workflow-title").text(dsText("workflow_title_" + displayStep));
+    $("#ds-workflow-detail").text(action ? dsOperationText(source, action)
+        : dsText(expired && !unsaved ? "workflow_expired" : "workflow_" + step));
+    const wait = busy ? dsText("enabled_wait") : "";
+    const saveFirst = unsaved ? dsText("save_first") : "";
+    const reasons = {
+        save: wait || (!unsaved ? dsText("configuration_saved") : ""),
+        preview: wait || saveFirst,
+        apply: wait || saveFirst || (!ready ? dsText("apply_needs_preview") : ""),
+        run: wait || saveFirst || (ready ? dsText("run_after_preview")
+            : !source?.approved ? dsText("apply_needs_preview") : ""),
+        sample: wait || saveFirst,
+    };
+    Object.entries(reasons).forEach(([name, reason]) => {
+        $("#ds-" + name).prop("disabled", Boolean(reason)).attr("title", reason || null);
+    });
+    ["save", "preview", "apply"].forEach(name => {
+        $("#ds-" + name).toggleClass("btn-primary", !busy && step === name);
+    });
+    const scheduleHint = wait || (!source?.approved ? dsText("schedule_after_apply")
+        : ready && source.enabled ? dsText("schedule_preview_pause") : "");
+    $("#ds-enabled").prop("disabled", busy);
+    $("#ds-enabled-label").attr("title", scheduleHint || null);
+    $("#ds-enabled-hint").text(scheduleHint).prop("hidden", !scheduleHint);
+    dsCurrentControls(busy);
+}
+
+function dsWatchPreviewExpiry(source) {
+    clearTimeout(directorySyncPreviewTimer);
+    if (!dsPreviewReady(source)) return;
+    const version = directorySyncVersion;
+    directorySyncPreviewTimer = setTimeout(() => {
+        if (version === directorySyncVersion && directorySyncOpen) dsRenderWorkflow(directorySyncSource);
+    }, Date.parse(source.preview_until) - Date.now() + 50);
+}
+
 function dsRenderResult(source) {
     const busy = directorySyncSaving || Boolean(source?.pending_mode || source?.running);
     const action = dsOperation(source);
     // Restore buttons before setting their current availability; the loading helper
     // remembers the disabled state from before an operation started.
     dsClearButtonLoading();
-    let enabledBlocker = "";
-    if (busy) enabledBlocker = dsText("enabled_wait");
-    else if (!source) enabledBlocker = dsText("enabled_save_first");
-    else if (!source.approved) enabledBlocker = dsText("enabled_apply_first");
-    $("#ds-enabled").prop("disabled", Boolean(enabledBlocker));
-    $("#ds-enabled-label").attr("title", enabledBlocker || null);
-    $("#ds-enabled-hint").text(enabledBlocker).prop("hidden", !enabledBlocker);
+    dsRenderWorkflow(source);
+    dsWatchPreviewExpiry(source);
     if (source?.preview_result?.samples) $("#ds-sample-output").text(JSON.stringify(source.preview_result.samples, null, 2)).prop("hidden", false);
     dsStatus(action ? dsOperationText(source, action) : source?.last_error || source?.current_error || "", Boolean(action));
-    $("#ds-save").prop("disabled", busy);
-    dsCurrentControls(busy);
     $("#ds-retained-source").prop("disabled", busy || Boolean(source?.last_success_at));
-    $("#ds-apply").prop("disabled", !source?.preview_token || directorySyncDirty || busy);
-    $("#ds-sample, #ds-preview").prop("disabled", !source || busy);
-    $("#ds-run").prop("disabled", !source?.approved || busy);
     if (action && action !== "save") AppLoading.setButtonLoading("#ds-" + action, true);
     const body = $("#ds-preview-table").empty();
     (source?.preview_result?.changes || []).forEach(change => {
@@ -358,7 +402,7 @@ $(document).on("keydown", function (event) {
 $(window).on("pagehide", closeDirectorySync);
 $(document).on("input change", "#ds-form input, #ds-form select, #ds-form textarea", () => {
     directorySyncDirty = true;
-    $("#ds-apply").prop("disabled", true);
+    dsRenderWorkflow(directorySyncSource);
 });
 $(document).on("click", "#ds-preview", () => dsQueue("preview"));
 $(document).on("click", "#ds-apply", () => dsQueue("apply"));
@@ -403,6 +447,7 @@ $(document).on("submit", "#ds-form", function (event) {
             enabled: $("#ds-enabled").prop("checked"), revision: directorySyncSource?.revision};
         if ($("#ds-headers").val().trim()) payload.headers = JSON.parse($("#ds-headers").val());
     } catch (_error) { $("#ds-status").text(dsText("invalid_json")); return; }
+    const scrollTop = $("#ds-editor .app-modal-body").scrollTop();
     const version = directorySyncVersion;
     directorySyncSaving = true;
     directorySyncAction = "save";
@@ -410,8 +455,26 @@ $(document).on("submit", "#ds-form", function (event) {
     dsRenderResult(directorySyncSource);
     apiRequest(directorySyncSource ? "PUT" : "POST", directorySyncPath + (directorySyncSource ? "/" + directorySyncSource.id : ""), payload, data => {
         if (version !== directorySyncVersion) return;
-        openDirectorySync(data);
-        $("#ds-status").text(dsText(data.approved || data.preview_token ? "saved_approved" : "saved"));
+        if (data.approved) {
+            closeDirectorySync();
+        } else {
+            // Updating in place preserves the user's position in the form.
+            const body = $("#ds-editor .app-modal-body");
+            directorySyncSaving = false;
+            directorySyncAction = null;
+            directorySyncSource = data;
+            directorySyncDirty = false;
+            setAppModalSaving("#ds-editor", false);
+            $("#ds-headers").val("");
+            $("#ds-group").prop("disabled", true);
+            $("#ds-name").val(data.name);
+            $("#ds-editor-title").text(data.name);
+            if (!data.preview_result?.team_catalog) $("#ds-team-matches").empty();
+            dsRenderResult(data);
+            body.scrollTop(scrollTop);
+            const nextAction = dsPreviewReady(data) ? "ds-apply" : "ds-preview";
+            document.getElementById(nextAction)?.focus({preventScroll: true});
+        }
         loadDirectorySync();
     }, xhr => dsWriteError(version, xhr));
 });

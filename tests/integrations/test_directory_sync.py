@@ -707,12 +707,14 @@ def test_local_edit_setting_cannot_bypass_import_preview(
         payload["config"]["operations"]["teams"]["path"] = value
     else:
         payload["config"][change] = value
-    assert client.put(f"{URL}/{source.id}", headers=admin_headers, json=payload).status_code == 409
-    assert Source.get_by_id(source.id).config["editable"] is False
-    payload["enabled"] = False
     response = client.put(f"{URL}/{source.id}", headers=admin_headers, json=payload)
     assert response.status_code == 200
     assert response.json["approved"] is False
+    assert response.json["enabled"] is True
+    assert response.json["next_run_at"] is None
+    assert response.json["next_current_at"] is None
+    assert Source.get_by_id(source.id).config["editable"] is True
+    assert service.process_due_sources() == service.process_due_current() == 0
 
 
 @pytest.mark.parametrize("field,value", [
@@ -728,6 +730,8 @@ def test_runtime_settings_do_not_require_import_preview(
     client, admin_headers, source, fetched, monkeypatch, field, value,
 ):
     """Operational settings preserve approval and refresh only affected state."""
+    from app.views import directory_sync_view
+
     source.enabled = True
     source.save()
     service.run(source.id)
@@ -749,6 +753,8 @@ def test_runtime_settings_do_not_require_import_preview(
         payload["config"]["operations"]["current"]["path"] = "/new-current-duty"
     else:
         payload["config"][field] = value
+    saved_at = utc_now()
+    monkeypatch.setattr(directory_sync_view, "utc_now", lambda: saved_at)
     response = client.put(f"{URL}/{source.id}", headers=admin_headers, json=payload)
     assert response.status_code == 200
     assert response.json["approved"] is True
@@ -766,7 +772,7 @@ def test_runtime_settings_do_not_require_import_preview(
     else:
         assert list(Current.select().dicts()) == cache
         if field == "current_interval_seconds":
-            assert after.next_current_at == before.last_current_at + timedelta(seconds=value)
+            assert after.next_current_at == saved_at + timedelta(seconds=value)
         else:
             assert after.next_current_at == before.next_current_at
     assert client.put(f"{URL}/{source.id}", headers=admin_headers, json=payload).status_code == 409
@@ -835,14 +841,14 @@ def test_local_edit_setting_does_not_approve_a_new_source(client, admin_headers,
         "config": {**source.config, "editable": True},
         "revision": source.revision, "enabled": True,
     }
-    assert client.put(f"{URL}/{source.id}", headers=admin_headers, json=payload).status_code == 409
-    payload["enabled"] = False
     response = client.put(f"{URL}/{source.id}", headers=admin_headers, json=payload)
     assert response.status_code == 200
     assert response.json["approved"] is False
+    assert response.json["enabled"] is True
+    assert service.process_due_sources() == service.process_due_current() == 0
 
 
-def test_changed_config_must_be_previewed_before_enabling(client, admin_headers, source, fetched):
+def test_changed_config_must_be_previewed_before_scheduled_execution(client, admin_headers, source, fetched):
     service.run(source.id)
     config = copy.deepcopy(source.config)
     config["delete_missing"] = True
@@ -852,8 +858,11 @@ def test_changed_config_must_be_previewed_before_enabling(client, admin_headers,
     assert not response.json["approved"]
     response = client.put(f"{URL}/{source.id}", headers=admin_headers,
                           json={"name": source.name, "group_id": source.group_id, "config": config, "revision": 2, "enabled": True})
-    assert response.status_code == 409
-    assert response.json["error"] == "sync_conflict"
+    assert response.status_code == 200
+    assert response.json["enabled"] is True
+    assert response.json["approved"] is False
+    assert response.json["schedule_state"] == "pending_approval"
+    assert service.process_due_sources() == service.process_due_current() == 0
 
 
 def test_editable_imported_shifts_use_existing_rotation_access(client, admin_headers, source, fetched):

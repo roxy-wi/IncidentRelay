@@ -266,7 +266,7 @@ def test_failed_current_check_only_retries_while_schedule_is_enabled(
     after = Source.get_by_id(source.id)
     assert after.last_current_at is None
     assert after.current_error == "current: unknown status"
-    clock += timedelta(seconds=16)
+    clock = after.next_current_at
     assert service.process_due_current() == 0
     assert len(calls) == (2 if enabled else 1)
     data = client.get(f"{URL}/{source.id}", headers=admin_headers).json

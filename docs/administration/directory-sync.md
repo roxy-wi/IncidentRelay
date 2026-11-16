@@ -100,17 +100,15 @@ After changing matches, save and request a new preview. Once applied, an externa
 
 Click **Apply preview** within **15 minutes**. If it has expired, or local data has changed enough to alter the plan, request another preview.
 
-After a successful application:
+You can select **Periodic synchronization enabled** before saving. Its choice is remembered while the configuration awaits review. After Apply succeeds, scheduled work starts automatically if selected; otherwise the source stays paused. Check the imported teams and rotations in IR.
 
-1. Check the imported teams and rotations in IR.
-2. Enable **Periodic synchronization enabled** in the source settings.
-3. Click **Save configuration**.
+The modal footer shows the next step and keeps **1. Save configuration → 2. Preview changes → 3. Apply preview** together. For operational settings, a successful save closes the modal. If a preview or Apply is required, the editor stays open at the current scroll position; a highlighted panel beside the action buttons shows the next step. Unsaved edits require Save first. Apply becomes available when the preview finishes; Run now is unavailable while a preview is ready. A prepared preview pauses scheduled full imports so they cannot consume it before review. After 15 minutes, it expires: previously approved imports may resume, while changed configurations still require a new preview and Apply.
 
 **Run now** performs the next full import without waiting for its interval. The source list shows status, any error, the last successful import, the next full import and the next current-duty check. Dates use the browser's locale and timezone; hover over a time to see its timezone. A dash means no check is scheduled. A paused source can still have one current-duty check pending after a manual import. Scheduled times are when work becomes due; actual execution depends on worker availability. Reload the list to refresh these times.
 
 Inspect, Preview, Apply and Run now show a spinner on the active button and an operation message. Queued previews/imports show that they are waiting for the scheduler. The indicator clears on completion or failure, and duplicate requests are disabled while an operation is in progress.
 
-The source's three-dot menu includes **Enable schedule**, **Disable schedule** and **Delete source**, alongside **Configure**. Schedule changes preserve the import approval and do not require a new preview. Enabling a source for the first time still requires an applied preview. Wait for queued or running operations to finish before changing the source.
+The source's three-dot menu includes **Enable schedule**, **Disable schedule** and **Delete source**, alongside **Configure**. Schedule changes preserve the import approval and do not require a new preview. The schedule can be selected before the first preview, but automatic execution starts only after Apply succeeds. Wait for queued or running operations to finish before changing the source.
 
 Deleting a source offers two choices:
 
@@ -125,7 +123,7 @@ Ordinary import rules still apply, including upstream updates, local-edit replac
 
 While a full import or preview is queued or running, the open configuration form polls its status every 1.5 seconds. These reads do not start imports. Polling stops when the operation finishes or the form closes.
 
-While periodic synchronization is enabled, current-duty errors (including an unknown status or an API timeout) are retried separately after 15 seconds and do not move the next full import forward. A paused source gets one current-duty check after a manual import; a failed check is not retried automatically. A newly detected missing person can request one early full import. Further errors do not trigger additional early imports until current duty recovers; scheduled full imports continue at their configured interval. The current-duty error remains visible until a successful refresh.
+While periodic synchronization is enabled, current-duty errors (including an unknown status or an API timeout) are retried separately after the configured current-duty interval and do not move the next full import forward. A paused source gets one current-duty check after a manual import; a failed check is not retried automatically. A newly detected missing person can request one early full import. Further errors do not trigger additional early imports until current duty recovers; scheduled full imports continue at their configured interval. The current-duty error remains visible until a successful refresh.
 
 ## Choosing update behavior
 
@@ -156,7 +154,7 @@ Window boundaries use UTC. For example, on November 10, 2026, a horizon of `2` r
 
 These settings can be saved while periodic synchronization remains enabled. Interval changes update the next scheduled time; saving does not queue an import. A prepared, unexpired preview remains valid without extending its expiry.
 
-**Changes that need a new preview:** API base URL or credentials; catalog, team, profile and shift requests; imported field mappings, team matches, selection filters, calendar horizon, membership authority, roles, management of existing objects and deletion rules. For these changes, pause periodic synchronization, save, preview and apply before enabling it again. An unchanged authentication header does not require another preview. A new source always needs its first preview and application.
+**Changes that need a new preview:** API base URL or credentials; catalog, team, profile and shift requests; imported field mappings, team matches, selection filters, calendar horizon, membership authority, roles, management of existing objects and deletion rules. Save these changes without toggling the schedule, then preview and apply. Automatic execution waits for successful Apply, which restores the selected schedule. A failed or expired preview does not approve the new configuration. An unchanged authentication header does not require another preview. A new source always needs its first preview and application.
 
 ## Users, roles and OIDC
 
@@ -306,13 +304,13 @@ The calendar shows imported intervals. **Check current on-call assignee via API*
 
 The last four states do not assign someone from stale data. Normal IR routing/escalation behavior follows. With the checkbox off or without `current`, assignment follows imported shifts and replacements. Permitted local edits and ordinary rotation overrides also apply.
 
-The adjacent **Current duty interval (seconds)** field accepts 10–3600 seconds, default 60. Checks can happen sooner to refresh an expiring cache or API answer. Automatic checks require the source schedule to be enabled; a paused source gets one check after a manual import. Saving the checkbox or interval requires no new preview and preserves the full-import schedule. Disabling the checkbox clears the API cache and its error while preserving the operation and field mappings for later use. Existing sources keep their previous behavior. The API settings are `config.current_enabled` and `config.current_interval_seconds`.
+The adjacent **Current duty interval (seconds)** field accepts 10–3600 seconds, default 60. After a successful or failed check, the next check is scheduled for that interval later. Changing the interval for an enabled source immediately replaces the next deadline with save time plus the new interval, including after a failed first check. Cache expiry and API answer expiry do not shorten this interval. The scheduler picks up due checks on its next tick, normally within five seconds. Automatic checks require the source schedule to be enabled; a paused source gets one check after a manual import. Saving the checkbox or interval requires no new preview and preserves the full-import schedule. Disabling the checkbox clears the API cache and its error while preserving the operation and field mappings for later use. Existing sources keep API checks enabled by default. The API settings are `config.current_enabled` and `config.current_interval_seconds`.
 
 `current_fields.status` must resolve to one of the four API statuses above, with exact spelling and case. Mapping paths are relative to each record selected by `operations.current.items`. If an API uses a different enum, map it explicitly with `values`; for example, **only if your API defines `ON_DUTY` as active**, use `{"path": "status", "values": {"ON_DUTY": "active"}}`. Map its other states according to that API's contract. Nested objects need the path to their status string, such as `state.code`.
 
 Status errors identify the response item and mapping, and distinguish a missing path, null, an invalid JSON type, an unmapped enum and a case/whitespace mismatch. Raw response values are omitted. Failed validation preserves the previous current-duty cache only until its existing expiry. Fixing current-duty mappings does not require another import preview.
 
-Responses remain usable for at most `current_max_age_seconds`, default 120, configurable in mapping JSON. `valid_until` and the effective end can shorten this period. After an API failure, the previous answer is usable only until expiry. Current duty refresh runs separately from full imports and accounts for absence changes without relying on schedule revisions.
+Responses remain usable for at most `current_max_age_seconds`, default 120, configurable in mapping JSON. `valid_until` and the effective end can shorten this period. This freshness limit is independent of the polling interval: if an answer expires before the next check, IR reports no current assignee until a fresh usable answer arrives. Changing the interval never extends an existing answer's validity. After an API failure, the previous answer is usable only until expiry. Current duty refresh runs separately from full imports and accounts for absence changes without relying on schedule revisions. Scheduled full imports preserve the next current-duty deadline; an explicit import through Apply or Run still requests an immediate check.
 
 Pausing periodic synchronization retains the calendar but lets current-duty data expire. With local editing enabled, use **Imported schedule** in the rotation actions to edit shifts and replacements. This form uses UTC times.
 
@@ -373,11 +371,28 @@ The response contains accessible `groups`, `teams` and a ready `preset` configur
 
 Execution endpoints return **202**, meaning queued. Poll the source: `pending_mode` and `running` indicate unfinished work; `last_error` holds failures, `preview_result` holds the preview and `last_result` holds the application result. Current-duty failures use `current_error`. The full schema is available in IR OpenAPI.
 
+The `enabled` field preserves the requested schedule choice. `schedule_state` reports `disabled`, `pending_approval`, `preview` (full imports await review), or `enabled`. Saving changed import settings leaves `enabled` selected but clears approval until Apply succeeds.
+
 Source responses also include UTC timestamps `next_run_at` and `next_current_at` for scheduled full imports and current-duty checks, respectively. They are `null` when that work is not scheduled. `current_running` indicates a live current-duty worker lease; `running` continues to refer to full imports/previews.
 
 Concrete shift endpoints reuse rotation permissions: `GET/POST /api/rotations/{rotation_id}/imported-shifts`, `PUT/DELETE /api/rotations/imported-shifts/{shift_id}`. Lists use `after`/`next_cursor`; `user_id` is an IR user ID. Local deletion remains a tombstone until the next import.
 
 ## Troubleshooting
+
+Synchronization failures are written as JSON events with logger `oncall.directory_sync`
+and `event_type: directory_sync.error`. Background Preview, Apply, Run and current-duty
+failures go to `[logging] scheduler_file` (default `./logs/incidentrelay-scheduler.log`).
+Inspect and configuration/API failures go to `[logging] app_file` (falling back to
+`file`, default `./logs/incidentrelay.log`).
+
+Each failure includes `error_id`, `source_id` when known, `operation`, a safe
+`error_message`, `database_error` and exception types with stack file/line/function
+locations. SQLite integrity diagnostics distinguish `foreign_key`, `unique`,
+`not_null` and `check`; known affected columns and the SQLite error code are included
+when available. Failures while claiming or releasing a lease and saving error state
+are logged too. Headers, request/response bodies, SQL values and stack locals are
+omitted. Source status also exposes the safe constraint reason instead of only
+`IntegrityError`; this identifies the failure category without changing database data.
 
 | Symptom | Check |
 |---|---|

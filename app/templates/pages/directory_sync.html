@@ -68,13 +68,19 @@
           <small id="ds-enabled-hint" class="muted" aria-live="polite" hidden></small>
           <p class="muted">{{ _('ds.behavior_hint') }}</p>
         </fieldset>
-        <div class="form-actions-inline"><button id="ds-preview" type="button" class="btn">{{ _('ds.preview') }}</button><button id="ds-apply" type="button" class="btn btn-success" disabled>{{ _('ds.apply') }}</button><button id="ds-run" type="button" class="btn btn-success">{{ _('ds.run') }}</button></div>
+        <div class="form-actions-inline"><button id="ds-run" type="button" class="btn">{{ _('ds.run') }}</button></div>
       </form>
       <p class="muted">{{ _('ds.worker_hint') }}</p>
       <div class="table-wrapper"><table class="data-table"><thead><tr><th>{{ _('ds.entity') }}</th><th>{{ _('ds.external_id') }}</th><th>{{ _('ds.action') }}</th><th>{{ _('ds.changes') }}</th></tr></thead><tbody id="ds-preview-table"></tbody></table></div>
     </div>
     <div class="app-modal-footer">
-      <button id="ds-save" class="btn btn-primary" type="submit" form="ds-form">{{ _('ds.save') }}</button>
+      <div id="ds-workflow" role="status" aria-live="polite" aria-atomic="true">
+        <i id="ds-workflow-icon" class="fa-solid fa-circle-info" aria-hidden="true"></i>
+        <div><strong id="ds-workflow-title"></strong><p id="ds-workflow-detail"></p></div>
+      </div>
+      <button id="ds-save" class="btn btn-primary" type="submit" form="ds-form" aria-describedby="ds-workflow">1. {{ _('ds.save') }}</button>
+      <button id="ds-preview" type="button" class="btn" aria-describedby="ds-workflow">2. {{ _('ds.preview') }}</button>
+      <button id="ds-apply" type="button" class="btn" aria-describedby="ds-workflow" disabled>3. {{ _('ds.apply') }}</button>
       <button id="ds-close-footer" class="btn" type="button">{{ _('ds.close') }}</button>
     </div>
   </div>

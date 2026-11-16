@@ -110,7 +110,7 @@ def test_invalid_current_status_preserves_cache_and_full_schedule(client, admin_
     assert after.last_success_at == before.last_success_at
     assert after.last_current_at == before.last_current_at
     assert after.next_run_at == before.next_run_at
-    assert after.next_current_at == failed_at + timedelta(seconds=15)
+    assert after.next_current_at == failed_at + timedelta(seconds=source.config["current_interval_seconds"])
     assert after.current_lease is None
     response = client.get(f"/api/admin/directory-sync/{source.id}", headers=admin_headers)
     assert response.status_code == 200

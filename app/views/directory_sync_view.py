@@ -3,7 +3,7 @@
 from datetime import timedelta
 from typing import Literal
 
-from flask import Blueprint, jsonify, request
+from flask import Blueprint, g, jsonify, request
 from peewee import DoesNotExist
 from pydantic import Field, ValidationError
 
@@ -19,9 +19,10 @@ from app.services.directory_sync.config import (
     StrictModel, SyncApiError, SyncConfig, SyncError, current_api_enabled, org_service_preset,
 )
 from app.services.directory_sync.fetch import window
+from app.services.directory_sync.diagnostics import log_failure
 from app.services.directory_sync.management import remove_source
 from app.services.directory_sync.reconnect import archived_source, retained_sources
-from app.services.directory_sync.service import authorized_actor
+from app.services.directory_sync.service import authorized_actor, has_pending_preview
 from app.services.orchestration.webhooks import _normalize_headers, WebhookValidationError
 from app.services.rbac import current_api_token
 from app.services.validation import make_error_response
@@ -57,17 +58,32 @@ def require_admin():
 @directory_sync_bp.after_request
 def no_cache(response):
     response.headers["Cache-Control"] = "no-store"
+    if response.status_code >= 400 and not getattr(g, "directory_sync_error_logged", False):
+        # Also record failures returned directly by validation and access checks.
+        # The request/configuration and response body are deliberately omitted.
+        log_failure(SyncError(f"Synchronization request failed with HTTP {response.status_code}"),
+                    source_id=(request.view_args or {}).get("source_id"),
+                    operation=request.endpoint, http_status=response.status_code)
     return response
 
 
 @directory_sync_bp.errorhandler(SyncError)
 def sync_error(error):
+    log_request_failure(error, 409)
     return make_error_response("sync_conflict", str(error), 409)
 
 
 @directory_sync_bp.errorhandler(SyncApiError)
 def sync_api_error(error):
+    log_request_failure(error, error.status_code)
     return make_error_response("sync_api_error", str(error), error.status_code)
+
+
+def log_request_failure(error, status):
+    """Keep the safe exception detail once, rather than logging response bodies."""
+    log_failure(error, source_id=(request.view_args or {}).get("source_id"),
+                operation=request.endpoint, http_status=status)
+    g.directory_sync_error_logged = True
 
 
 @directory_sync_bp.errorhandler(DoesNotExist)
@@ -102,6 +118,9 @@ def load_source(source_id, *, mutable=False, include_deleted=False):
 
 def serialize(source):
     approved = source.approved_revision == source.revision
+    preview_ready = has_pending_preview(source, utc_now())
+    schedule_state = ("disabled" if not source.enabled else "pending_approval" if not approved
+                      else "preview" if preview_ready else "enabled")
     current_scheduled = (
         approved and source.last_success_at and current_api_enabled(source.config)
         and (source.enabled or (
@@ -112,16 +131,16 @@ def serialize(source):
     return {"id": source.id, "name": source.name, "group_id": source.group_id,
             "group_name": source.group.name,
             "config": source.config, "enabled": source.enabled, "revision": source.revision,
-            "approved": approved,
+            "approved": approved, "schedule_state": schedule_state,
             "has_headers": bool(source.headers_encrypted), "last_error": source.last_error,
             "current_error": source.current_error, "last_result": source.last_result,
             "last_success_at": source.last_success_at.isoformat() + "Z" if source.last_success_at else None,
             "last_current_at": source.last_current_at.isoformat() + "Z" if source.last_current_at else None,
-            "next_run_at": source.next_run_at.isoformat() + "Z" if source.enabled and approved else None,
+            "next_run_at": source.next_run_at.isoformat() + "Z" if schedule_state == "enabled" else None,
             "next_current_at": source.next_current_at.isoformat() + "Z" if current_scheduled else None,
             "current_running": bool(source.current_lease and source.current_lease_until > utc_now()),
             "pending_mode": source.pending_mode, "running": bool(source.lease and source.lease_until > utc_now()),
-            "preview_token": source.preview_token, "preview_result": source.preview_result,
+            "preview_token": source.preview_token if preview_ready else None, "preview_result": source.preview_result,
             "preview_until": source.preview_until.isoformat() + "Z" if source.preview_until else None}
 
 
@@ -189,15 +208,10 @@ def update_refresh_schedule(source, previous, config, *, import_changed):
         source.next_run_at = source.last_success_at + timedelta(seconds=config.interval_seconds)
     if current_changed:
         source.next_current_at = utc_now()
-    elif (previous.current_interval_seconds != config.current_interval_seconds
-            and source.last_current_at and not source.current_error):
-        delay = min(config.current_interval_seconds, max(5, config.current_max_age_seconds - 5))
-        source.next_current_at = source.last_current_at + timedelta(seconds=delay)
-        earliest = (DirectorySyncCurrent.select()
-                    .where(DirectorySyncCurrent.source == source.id)
-                    .order_by(DirectorySyncCurrent.valid_until).first())
-        if earliest:
-            source.next_current_at = min(source.next_current_at, earliest.valid_until)
+    elif previous.current_interval_seconds != config.current_interval_seconds and source.enabled:
+        # Restart the interval on save, including after a failed first check.
+        # Paused sources retain their one immediate check after a manual import.
+        source.next_current_at = utc_now() + timedelta(seconds=config.current_interval_seconds)
 
 
 @directory_sync_bp.post("")
@@ -230,10 +244,10 @@ def save_source(source_id=None):
                 or headers_changed
             )
             approved = source.approved_revision == source.revision
-            if payload.enabled and (not approved or import_changed):
-                raise SyncError("Apply a preview of this configuration before enabling periodic sync")
             source.name = payload.name.strip()
             source.config = payload.config.model_dump()
+            # Keep the requested schedule state. Approval fences both schedulers
+            # until the changed import has been previewed and applied.
             source.enabled = payload.enabled
             source.revision += 1
             source.approved_revision = source.revision if approved and not import_changed else None
@@ -257,11 +271,9 @@ def save_source(source_id=None):
                 source.headers_encrypted = encrypt_json(headers)
             source.save()
         else:
-            if payload.enabled:
-                raise SyncError("Create a disabled source, then fetch and apply a preview")
             source = Source.create(group=payload.group_id, name=payload.name.strip(),
                                    config=payload.config.model_dump(), headers_encrypted=encrypt_json(headers or {}),
-                                   created_by=request.current_user.id)
+                                   enabled=payload.enabled, created_by=request.current_user.id)
         write_audit("directory_sync.save", object_type="directory_sync", object_id=source.id,
                     group_id=source.group_id, data={"revision": source.revision, "enabled": source.enabled})
         return jsonify(serialize(source)), 200 if source_id else 201
