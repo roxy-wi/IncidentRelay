@@ -6,7 +6,6 @@ from datetime import datetime
 
 from peewee import fn
 
-from app.modules.common import utc_now
 from app.modules.db import rotations_repo, teams_repo, users_repo
 from app.modules.db.models import (
     DirectorySyncBinding as Binding, DirectorySyncShift as Shift,

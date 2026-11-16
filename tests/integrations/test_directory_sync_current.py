@@ -11,7 +11,11 @@ from app.services.directory_sync import client as client_module, service
 from app.services.directory_sync.client import ApiClient
 from app.services.directory_sync.config import SyncConfig, SyncError, org_service_preset
 from app.services.directory_sync.fetch import fetch_current, map_current_status
-from tests.integrations.test_directory_sync import fetched, snapshot, source  # noqa: F401
+from tests.integrations.test_directory_sync import (
+    fetched as fetched,
+    snapshot as snapshot,
+    source as source,
+)
 
 
 @pytest.mark.parametrize(("fields", "record", "reason"), [
@@ -89,7 +93,7 @@ def test_invalid_current_status_preserves_cache_and_full_schedule(client, admin_
 
     def transport(_url, **_kwargs):
         rows = [{"scheduleUuid": key, "status": status, "currentEmployeeUuid": "u1"}
-                for key, status in zip(("s1", "s2"), statuses)]
+                for key, status in zip(("s1", "s2"), statuses, strict=True)]
         return 200, {}, json.dumps({"duties": rows}).encode()
 
     monkeypatch.setattr(client_module, "_request_once", transport)

@@ -277,7 +277,7 @@ def fetch_current(client, schedule_ids):
         returned = [identity(item.get("id"), "current schedule") for item in mapped]
         if len(returned) != len(set(returned)) or set(returned) != set(ids):
             raise SyncError("current: response must include every requested schedule exactly once")
-        for item_number, (raw, row) in enumerate(zip(rows, mapped), start + 1):
+        for item_number, (raw, row) in enumerate(zip(rows, mapped, strict=True), start + 1):
             row["id"] = identity(row.get("id"), "current schedule")
             row["status"] = map_current_status(raw, client.config.current_fields, item_number)
             if row["status"] == "active":

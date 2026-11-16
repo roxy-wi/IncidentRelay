@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 import pytest
 
 from app.modules.common import utc_now
-from tests.integrations.test_directory_sync import source  # noqa: F401
+from tests.integrations.test_directory_sync import source as source
 
 
 @pytest.mark.parametrize("listing", [False, True])

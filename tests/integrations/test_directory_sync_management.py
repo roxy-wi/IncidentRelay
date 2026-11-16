@@ -16,7 +16,12 @@ from app.services.directory_sync.config import SyncBusy, SyncError
 from app.services.directory_sync.runtime import readonly, source_for, sync_managed_groups
 from app.services.oncall import get_current_oncall_user
 from tests.factories import create_group, create_team, create_user
-from tests.integrations.test_directory_sync import binding, fetched, snapshot, source  # noqa: F401
+from tests.integrations.test_directory_sync import (
+    binding,
+    fetched as fetched,
+    snapshot as snapshot,
+    source as source,
+)
 
 URL = "/api/admin/directory-sync"
 

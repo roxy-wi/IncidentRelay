@@ -254,9 +254,11 @@ def process_due_sources():
     Source.update(preview_encrypted=None, preview_token=None, preview_result=None, preview_until=None).where(
         Source.preview_until < utc_now(), Source.pending_mode.is_null(), Source.lease.is_null(),
     ).execute()
-    for source in Source.select().where(
+    # Finish the read before per-source transactions can invalidate its cursor.
+    sources = list(Source.select().where(
         Source.deleted == False, (Source.enabled == True) | Source.pending_mode.is_null(False),
-    ).order_by(Source.next_current_at):
+    ).order_by(Source.next_current_at))
+    for source in sources:
         if source.lease and source.lease_until and source.lease_until > utc_now():
             continue
         try:
@@ -289,8 +291,12 @@ def process_due_sources():
 def process_due_current():
     """Current duty refresh has its own scheduler job and per-source lease."""
     count = 0
-    for source in Source.select().where(Source.deleted == False, Source.last_success_at.is_null(False),
-                                         Source.approved_revision == Source.revision, Source.next_current_at <= utc_now()):
+    # A failed refresh rolls back; do not leave the scheduler's read cursor open.
+    sources = list(Source.select().where(
+        Source.deleted == False, Source.last_success_at.is_null(False),
+        Source.approved_revision == Source.revision, Source.next_current_at <= utc_now(),
+    ))
+    for source in sources:
         if "current" not in source.config.get("operations", {}):
             continue
         # Disabling periodic synchronization also stops authoritative polling.

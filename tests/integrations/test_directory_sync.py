@@ -3,6 +3,7 @@
 import copy
 import json
 import socket
+import sqlite3
 import ssl
 import threading
 from datetime import datetime, timedelta, timezone
@@ -61,6 +62,43 @@ def snapshot():
 def fetched(monkeypatch, snapshot):
     monkeypatch.setattr(service, "fetch_snapshot", lambda _client: copy.deepcopy(snapshot))
     return snapshot
+
+
+@pytest.fixture
+def rollback_resets_cursors(db, monkeypatch):
+    """Emulate SQLite drivers that invalidate unfinished reads on rollback."""
+    execute_sql = db.execute_sql
+    rollback = db.rollback
+    generation = 0
+
+    class RollbackSensitiveCursor:
+        def __init__(self, cursor):
+            self.cursor = cursor
+            self.generation = generation
+
+        def __getattr__(self, name):
+            return getattr(self.cursor, name)
+
+        def fetchone(self):
+            if self.generation != generation:
+                raise sqlite3.InterfaceError(
+                    "Cursor needed to be reset because of commit/rollback "
+                    "and can no longer be fetched from."
+                )
+            return self.cursor.fetchone()
+
+    def execute(*args, **kwargs):
+        cursor = execute_sql(*args, **kwargs)
+        return RollbackSensitiveCursor(cursor) if cursor.description else cursor
+
+    def reset(*args, **kwargs):
+        nonlocal generation
+        result = rollback(*args, **kwargs)
+        generation += 1
+        return result
+
+    monkeypatch.setattr(db, "execute_sql", execute)
+    monkeypatch.setattr(db, "rollback", reset)
 
 
 def binding(source, kind, key):
@@ -970,7 +1008,9 @@ def test_current_failure_preserves_full_sync_schedule(source, fetched, monkeypat
     assert Source.get_by_id(source.id).last_success_at == scheduled
 
 
-def test_unresolved_current_person_does_not_loop_full_imports(source, fetched, monkeypatch):
+def test_unresolved_current_person_does_not_loop_full_imports(
+    source, fetched, monkeypatch, rollback_resets_cursors,
+):
     """Request one early import for a new person, then keep the normal interval."""
     now = utc_now()
     clock = [now]
@@ -1013,6 +1053,55 @@ def test_unresolved_current_person_does_not_loop_full_imports(source, fetched, m
     rows[0]["user_id"] = "another-new-person"
     assert service.process_due_current() == 0
     assert service.process_due_sources() == 1
+
+
+@pytest.mark.parametrize("mode", ["current", "run", "preview"])
+def test_scheduler_continues_after_one_source_rolls_back(
+    source, fetched, monkeypatch, rollback_resets_cursors, mode,
+):
+    second = Source.create(name="Second source", group=create_group(), created_by=source.created_by,
+                           config=source.config, headers_encrypted=encrypt_json({}))
+    service.run(source.id)
+    service.run(second.id)
+    now = utc_now()
+    monkeypatch.setattr(service, "utc_now", lambda: now)
+    Source.update(enabled=True, next_run_at=now, next_current_at=now,
+                  pending_mode="preview" if mode == "preview" else None).where(
+        Source.id.in_([source.id, second.id]),
+    ).execute()
+    monkeypatch.setattr(service, "fetch_current", lambda _client, ids: [
+        {"id": key, "status": "active", "user_id": "u1"} for key in ids
+    ])
+    locked_source = service.locked_source
+    attempted = []
+
+    def fail_first_source(source_id, *args, **kwargs):
+        locked = locked_source(source_id, *args, **kwargs)
+        attempted.append(source_id)
+        if source_id == source.id:
+            Source.update(name="Must roll back").where(Source.id == source_id).execute()
+            raise SyncError("Injected source failure")
+        return locked
+
+    monkeypatch.setattr(service, "locked_source", fail_first_source)
+    process = service.process_due_current if mode == "current" else service.process_due_sources
+    assert process() == (0 if mode == "preview" else 1)
+    assert set(attempted) == {source.id, second.id}
+    failed = Source.get_by_id(source.id)
+    healthy = Source.get_by_id(second.id)
+    assert failed.name == source.name
+    assert (failed.current_error if mode == "current" else failed.last_error) == "Injected source failure"
+    assert failed.lease is None and failed.current_lease is None
+    assert healthy.lease is None and healthy.current_lease is None
+    if mode == "current":
+        assert healthy.last_current_at == now
+        assert Current.select().where(Current.source == healthy.id).count() == 2
+    elif mode == "preview":
+        assert healthy.preview_token
+        assert healthy.pending_mode is None
+    else:
+        assert healthy.last_success_at == now
+        assert healthy.next_run_at > now
 
 
 def test_concurrent_workers_only_one_claims_source(source, db):

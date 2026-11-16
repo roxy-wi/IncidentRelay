@@ -68,7 +68,7 @@ def test_publication_waits_and_rechecks_committed_input(
     with ThreadPoolExecutor(max_workers=1) as pool:
         if mutation == "episode":
             with incident_core_repo.write_transaction():
-                group = incident_core_repo.lock_alert_group(episode.alert_group_id)
+                incident_core_repo.lock_alert_group(episode.alert_group_id)
                 original(
                     AlertGroupEpisode.select().where(AlertGroupEpisode.id == episode.id)
                 )
