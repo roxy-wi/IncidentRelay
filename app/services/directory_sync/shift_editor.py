@@ -35,10 +35,21 @@ def serialize_shift(shift):
             "replacements": [{**item, "precedence": str(item["precedence"])} for item in shift.replacements]}
 
 
-def edit_shift(rotation, payload, shift=None):
+def editable_source(rotation):
+    """Resolve ownership after serializing against imports and reconnections."""
+    from app.services.directory_sync.service import apply_lock
+
+    apply_lock()
     source = source_for("rotation", rotation.id)
     if not source or not source.config.get("editable"):
         raise SyncError("Imported schedule is read-only")
+    return source
+
+
+def edit_shift(rotation, payload, shift=None):
+    source = editable_source(rotation)
+    if shift:
+        shift = Shift.get_by_id(shift.id)
     start, end = instant(payload.start), instant(payload.end)
     if start >= end:
         raise SyncError("Shift end must follow its start")

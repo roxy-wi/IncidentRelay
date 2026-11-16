@@ -92,5 +92,14 @@
   "ds.keep_data": "Teams und Dienstpläne behalten",
   "ds.delete_data": "Von der Quelle erstellte Teams und Dienstpläne löschen",
   "ds.keep_data_hint": "Teams und gespeicherte Schichten bleiben bearbeitbar. Zuweisungen verwenden den gespeicherten Dienstplan; neue Daten werden nicht abgerufen. Alle Benutzerkonten bleiben erhalten.",
-  "ds.delete_data_hint": "Von dieser Quelle erstellte Teams einschließlich abhängiger Konfiguration, erstellte Rotationen und importierte Schichten werden gelöscht. Bereits vorhandene Teams und alle Benutzerkonten bleiben erhalten."
+  "ds.delete_data_hint": "Von dieser Quelle erstellte Teams einschließlich abhängiger Konfiguration, erstellte Rotationen und importierte Schichten werden gelöscht. Bereits vorhandene Teams und alle Benutzerkonten bleiben erhalten.",
+  "ds.retained_source": "Aufbewahrte Daten verbinden",
+  "ds.retained_none": "Nicht verbinden",
+  "ds.retained_selected": "Verbundene Quelle",
+  "ds.retained_hint": "Wählen Sie eine gelöschte Quelle dieser Gruppe. Die Vorschau zeigt die Verknüpfung und API-Änderungen; Anwenden übernimmt Teams, Dienstpläne und Schichtverlauf anhand externer IDs. Nach dem ersten Import ist die Auswahl fest.",
+  "ds.reconnect": "Neu verbinden",
+  "ds.current_enabled": "Aktuellen Bereitschaftsdienst über die API prüfen",
+  "ds.current_hint": "Wenn deaktiviert, verwendet IR importierte Schichten und Vertretungen. Wenn aktiviert, wird die API für den aktuellen Dienst verwendet; automatische Prüfungen folgen dem Zeitplan der Quelle.",
+  "ds.current_interval_hint": "10–3600 Sekunden. Prüfungen können früher erfolgen, wenn der Cache oder die API-Antwort abläuft.",
+  "ds.current_missing": "Konfigurieren Sie zuerst die Operation current unter API-Operationen, bevor Sie diese Prüfung aktivieren."
 }

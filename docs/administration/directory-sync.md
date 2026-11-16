@@ -119,11 +119,13 @@ Deleting a source offers two choices:
 
 Both choices stop synchronization, remove the source from the list and erase stored authentication headers and previews. A source record is retained internally so preserved concrete intervals keep their references. The deletion request requires an explicit choice; retrying it does not change the original decision.
 
-You can create a new source with the same name and API address. It receives a new ID and requires credentials and an initial Preview → Apply. Retained schedules are not automatically reassigned to the new source; review its plan before applying.
+You can create a new source with the same name and API address. Enter the credentials again. In **Reconnect retained data**, choose the deleted source from the same destination group, then save and run **Preview → Apply**. The preview shows `reconnect` actions alongside upstream changes. Apply reuses local team, rotation and shift IDs, including history outside the import window, by their saved external IDs. Names do not need to match; routes and escalation references keep pointing to the same objects.
+
+Ordinary import rules still apply, including upstream updates, local-edit replacement and removal of missing objects if enabled. Active sources cannot be selected, and retained data can only be claimed once. The selection cannot change after the first successful import. Leave **Do not reconnect** selected for the usual new import behavior. The API uses `config.retained_source_id`; candidates are returned in `GET /api/admin/directory-sync/options` as `retained_sources`.
 
 While a full import or preview is queued or running, the open configuration form polls its status every 1.5 seconds. These reads do not start imports. Polling stops when the operation finishes or the form closes.
 
-Current-duty errors (including an unknown status or an API timeout) are retried separately after 15 seconds and do not move the next full import forward. A newly detected missing person can request one early full import. Further errors do not trigger additional early imports until current duty recovers; scheduled full imports continue at their configured interval. The current-duty error remains visible until a successful refresh.
+While periodic synchronization is enabled, current-duty errors (including an unknown status or an API timeout) are retried separately after 15 seconds and do not move the next full import forward. A paused source gets one current-duty check after a manual import; a failed check is not retried automatically. A newly detected missing person can request one early full import. Further errors do not trigger additional early imports until current duty recovers; scheduled full imports continue at their configured interval. The current-duty error remains visible until a successful refresh.
 
 ## Choosing update behavior
 
@@ -292,7 +294,7 @@ Org-service identifies a team by **`enrolledScopeUuid`**, not the CMDB `external
 
 One external `scheduleUuid` becomes one IR rotation. Two parallel team slots create two rotations. IR stores concrete intervals without expanding recurrence again. Higher numerical replacement precedence wins; overlapping shifts in one slot do not select an arbitrary person.
 
-The calendar shows imported intervals. With `current` configured, actual assignment uses its response:
+The calendar shows imported intervals. **Check current on-call assignee via API** selects how IR determines the current assignee. When off, IR uses the imported shifts and replacements. When on, a configured `current` operation supplies the actual assignment:
 
 | Status | Meaning |
 |---|---|
@@ -302,7 +304,9 @@ The calendar shows imported intervals. With `current` configured, actual assignm
 | `ambiguous` | The source could not determine a unique assignee. |
 | `stale` in IR | No fresh response yet, or the previous response expired. |
 
-The last four states do not assign someone from stale data. Normal IR routing/escalation behavior follows. Without `current`, assignment follows imported shifts and replacements. Permitted local edits and ordinary rotation overrides also apply.
+The last four states do not assign someone from stale data. Normal IR routing/escalation behavior follows. With the checkbox off or without `current`, assignment follows imported shifts and replacements. Permitted local edits and ordinary rotation overrides also apply.
+
+The adjacent **Current duty interval (seconds)** field accepts 10–3600 seconds, default 60. Checks can happen sooner to refresh an expiring cache or API answer. Automatic checks require the source schedule to be enabled; a paused source gets one check after a manual import. Saving the checkbox or interval requires no new preview and preserves the full-import schedule. Disabling the checkbox clears the API cache and its error while preserving the operation and field mappings for later use. Existing sources keep their previous behavior. The API settings are `config.current_enabled` and `config.current_interval_seconds`.
 
 `current_fields.status` must resolve to one of the four API statuses above, with exact spelling and case. Mapping paths are relative to each record selected by `operations.current.items`. If an API uses a different enum, map it explicitly with `values`; for example, **only if your API defines `ON_DUTY` as active**, use `{"path": "status", "values": {"ON_DUTY": "active"}}`. Map its other states according to that API's contract. Nested objects need the path to their status string, such as `state.code`.
 

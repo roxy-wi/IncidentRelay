@@ -13,6 +13,7 @@ from app.modules.db.models import (
 )
 from app.services.directory_sync.config import SyncConfig, SyncError
 from app.services.directory_sync.fetch import instant
+from app.services.directory_sync.reconnect import reconnect
 
 
 def slug(value, suffix):
@@ -30,8 +31,9 @@ def shared_user(user_id, group_id):
 def reconcile(source, snapshot):
     """Apply inside the caller's transaction; preview rolls this transaction back."""
     config = SyncConfig.model_validate(source.config)
+    changes, reconnected_teams = reconnect(source, config)
     bindings = {(row.kind, row.external_id): row for row in Binding.select().where(Binding.source == source.id)}
-    seen, changes = set(), []
+    seen = set()
     users, rotations = {}, {}
     labels = {("user", item["id"]): item.get("name") or item["email"] for item in snapshot["users"]}
     labels.update({("group_member", item["id"]): item.get("name") or item["email"] for item in snapshot["users"]})
@@ -161,8 +163,9 @@ def reconcile(source, snapshot):
                                           group_id=source.group_id, active=data["enabled"])
             record("team", key, "create", {"name": data["name"]})
         binding = bind("team", key, team, owned=created or config.overwrite_existing, created=created)
-        if not binding.created and binding.owned != config.overwrite_existing:
-            binding.owned = config.overwrite_existing
+        manage_existing = config.overwrite_existing or team.id in reconnected_teams
+        if not binding.created and binding.owned != manage_existing:
+            binding.owned = manage_existing
             binding.save()
         if not binding.owned:
             for existing_key, existing_binding in bindings.items():

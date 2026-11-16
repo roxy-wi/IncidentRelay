@@ -38,7 +38,7 @@ function user(role = "viewer", groupId = 10) {
 
 function team(write, resources = write, extra = {}) {
     return {id: 20, group_id: 10, active: true,
-        permissions: {can_write: write, can_write_resources: resources}, ...extra};
+        permissions: {can_write: write, can_manage_policies: write, can_write_resources: resources}, ...extra};
 }
 
 function load(teams) {
@@ -78,10 +78,21 @@ load([team(true)]);
 for (const name of [...strictObjects, ...resources, "team"]) button(name, true);
 
 context.currentUser = user();
+load([team(false, true, {
+    sync: {editable: false},
+    permissions: {can_write: false, can_manage_policies: true, can_write_resources: true},
+})]);
+for (const name of ["escalation-policy", "notification-policy", "priority-policy", ...resources]) button(name, true);
+for (const name of ["rotation", "matcher-preset", "team"]) button(name, false);
+assert.equal(context.currentUserCanCreateUiObjects("can_manage_policies"), true,
+    "local policies stay writable when imported team fields are read-only");
+
 load([team(true, true, {active: false})]);
 assert.equal(context.currentUserCanCreateUiObjects(), false, "inactive teams cannot enable creation");
+assert.equal(context.currentUserCanCreateUiObjects("can_manage_policies"), false);
 load([team(false, false, {current_user_role: "manager"}), {id: 21, role: "manager"}]);
 assert.equal(context.currentUserCanCreateUiObjects(), false, "missing or denied capabilities stay denied");
+assert.equal(context.currentUserCanCreateUiObjects("can_manage_policies"), false);
 load([]);
 assert.equal(context.currentUserCanCreateUiObjects(), false, "empty groups have no create target");
 

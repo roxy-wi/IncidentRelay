@@ -92,5 +92,14 @@
   "ds.keep_data": "Keep teams and schedules",
   "ds.delete_data": "Delete source-created teams and schedules",
   "ds.keep_data_hint": "Teams and saved shifts remain editable. Assignments use the saved schedule; no further data is fetched. All user accounts are kept.",
-  "ds.delete_data_hint": "Teams created by this source, their dependent configuration, source-created rotations and imported shifts will be deleted. Previously existing teams and all user accounts are kept."
+  "ds.delete_data_hint": "Teams created by this source, their dependent configuration, source-created rotations and imported shifts will be deleted. Previously existing teams and all user accounts are kept.",
+  "ds.retained_source": "Reconnect retained data",
+  "ds.retained_none": "Do not reconnect",
+  "ds.retained_selected": "Connected source",
+  "ds.retained_hint": "Choose a deleted source in this group. Preview reviews the reconnection and any upstream changes; Apply reuses teams, schedules and shift history by external ID. The choice is fixed after the first import.",
+  "ds.reconnect": "Reconnect",
+  "ds.current_enabled": "Check current on-call assignee via API",
+  "ds.current_hint": "When off, IR uses imported shifts and replacements. When on, it uses the current-duty API; automatic checks follow the source schedule.",
+  "ds.current_interval_hint": "10–3600 seconds. Checks may run earlier when the cache or API response expires.",
+  "ds.current_missing": "Configure the current operation in API operations before enabling current-duty API checks."
 }

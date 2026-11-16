@@ -30,6 +30,11 @@
         </fieldset>
         <fieldset class="form-stack"><legend>{{ _('ds.mapping') }}</legend>
           <p class="muted">{{ _('ds.mapping_hint') }}</p>
+          <div class="form-group">
+            <label for="ds-retained-source">{{ _('ds.retained_source') }}</label>
+            <select id="ds-retained-source" class="input" aria-describedby="ds-retained-hint"></select>
+            <small id="ds-retained-hint" class="muted">{{ _('ds.retained_hint') }}</small>
+          </div>
           <div class="form-actions-inline">
             <button id="ds-sample" class="btn btn-info" type="button"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i> {{ _('ds.sample') }}</button>
           </div>
@@ -40,9 +45,19 @@
         <fieldset class="form-stack"><legend>{{ _('ds.behavior') }}</legend>
           <div class="form-grid-2">
             <div class="form-group"><label for="ds-interval">{{ _('ds.interval') }}</label><input id="ds-interval" type="number" min="60" max="604800" class="input" required></div>
-            <div class="form-group"><label for="ds-current-interval">{{ _('ds.current_interval') }}</label><input id="ds-current-interval" type="number" min="10" max="3600" class="input" required></div>
             <div class="form-group"><label for="ds-horizon">{{ _('ds.horizon') }}</label><input id="ds-horizon" type="number" min="1" max="11" class="input" required></div>
             <div class="form-group"><label for="ds-authority">{{ _('ds.authority') }}</label><select id="ds-authority" class="input"><option value="sync">{{ _('ds.api_authority') }}</option><option value="oidc">OIDC</option></select></div>
+          </div>
+          <div class="form-grid-2">
+            <div class="form-group">
+              <label class="checkbox-label"><input id="ds-current-enabled" type="checkbox" aria-describedby="ds-current-hint"><span>{{ _('ds.current_enabled') }}</span></label>
+              <small id="ds-current-hint" class="muted">{{ _('ds.current_hint') }}</small>
+            </div>
+            <div class="form-group">
+              <label for="ds-current-interval">{{ _('ds.current_interval') }}</label>
+              <input id="ds-current-interval" type="number" min="10" max="3600" class="input" required aria-describedby="ds-current-interval-hint">
+              <small id="ds-current-interval-hint" class="muted">{{ _('ds.current_interval_hint') }}</small>
+            </div>
           </div>
           <div class="form-actions-inline">
             <label class="checkbox-label"><input id="ds-editable" type="checkbox"><span>{{ _('ds.editable') }}</span></label>

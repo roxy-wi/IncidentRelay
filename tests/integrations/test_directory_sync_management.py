@@ -245,6 +245,41 @@ def test_scheduler_rechecks_pause_after_reading_due_source(source, fetched, monk
     assert not Source.get_by_id(source.id).enabled
 
 
+@pytest.mark.parametrize("enabled", [False, True])
+def test_failed_current_check_only_retries_while_schedule_is_enabled(
+    client, admin_headers, source, fetched, monkeypatch, enabled,
+):
+    source.enabled = enabled
+    source.save()
+    service.run(source.id)
+    clock = utc_now()
+    calls = []
+
+    def fail_current(_client, _ids):
+        calls.append(clock)
+        raise SyncError("current: unknown status")
+
+    monkeypatch.setattr(service, "utc_now", lambda: clock)
+    monkeypatch.setattr(service, "fetch_current", fail_current)
+    assert service.process_due_current() == 0
+    assert len(calls) == 1
+    after = Source.get_by_id(source.id)
+    assert after.last_current_at is None
+    assert after.current_error == "current: unknown status"
+    clock += timedelta(seconds=16)
+    assert service.process_due_current() == 0
+    assert len(calls) == (2 if enabled else 1)
+    data = client.get(f"{URL}/{source.id}", headers=admin_headers).json
+    assert bool(data["next_current_at"]) is enabled
+    if not enabled:
+        with pytest.raises(SyncBusy):
+            service.refresh_current(source.id, scheduled=True)
+        # A later explicit import still gets its one immediate duty check.
+        service.run(source.id)
+        assert service.process_due_current() == 0
+        assert len(calls) == 2
+
+
 def test_openapi_describes_explicit_removal_choice():
     from app.api.openapi.spec import build_openapi_spec
     operation = build_openapi_spec()["paths"][URL + "/{source_id}"]["delete"]

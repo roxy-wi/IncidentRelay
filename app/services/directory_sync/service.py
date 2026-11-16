@@ -15,7 +15,7 @@ from app.modules.db.models import (
 )
 from app.modules.db.transactions import lock_row, write_transaction
 from app.services.directory_sync.client import ApiClient
-from app.services.directory_sync.config import SyncBusy, SyncConfig, SyncError
+from app.services.directory_sync.config import SyncBusy, SyncConfig, SyncError, current_api_enabled
 from app.services.directory_sync.fetch import fetch_current, fetch_snapshot, instant
 from app.services.directory_sync.reconcile import reconcile
 
@@ -47,8 +47,9 @@ def claim(source_id, *, current=False, scheduled=False):
         if current:
             query = query.where(
                 Source.last_success_at.is_null(False), Source.next_current_at <= now,
-                (Source.enabled == True) | Source.last_current_at.is_null()
-                | (Source.last_current_at < Source.last_success_at),
+                (Source.enabled == True)
+                | ((Source.last_current_at.is_null() | (Source.last_current_at < Source.last_success_at))
+                   & (Source.next_current_at <= Source.last_success_at)),
             )
         else:
             query = query.where(Source.enabled == True, Source.next_run_at <= now, Source.pending_mode.is_null())
@@ -185,10 +186,12 @@ def refresh_current(source_id, *, scheduled=False):
     """Refresh authoritative duty separately; stale cached answers never assign users."""
     token = claim(source_id, current=True, scheduled=scheduled)
     needs_full_sync = False
+    revision = None
     try:
         source = Source.get_by_id(source_id)
+        revision = source.revision
         config = SyncConfig.model_validate(source.config)
-        if "current" not in config.operations:
+        if not current_api_enabled(source.config):
             return
         rotations = {b.external_id: b.local_id for b in Binding.select().where(
             Binding.source == source.id, Binding.kind == "rotation", Binding.owned == True, Binding.present == True,
@@ -240,7 +243,7 @@ def refresh_current(source_id, *, scheduled=False):
         if needs_full_sync and not source.current_error:
             updates["next_run_at"] = utc_now()
         Source.update(**updates).where(
-            Source.id == source_id, Source.current_lease == token,
+            Source.id == source_id, Source.current_lease == token, Source.revision == revision,
         ).execute()
         logger.warning("Current duty refresh failed", extra={"source_id": source_id, "error_type": type(error).__name__})
         raise SyncError(message) from error
@@ -297,11 +300,15 @@ def process_due_current():
         Source.approved_revision == Source.revision, Source.next_current_at <= utc_now(),
     ))
     for source in sources:
-        if "current" not in source.config.get("operations", {}):
+        if not current_api_enabled(source.config):
             continue
         # Disabling periodic synchronization also stops authoritative polling.
-        # Allow one immediate refresh after a manually applied snapshot.
-        if not source.enabled and source.last_current_at and source.last_current_at >= source.last_success_at:
+        # Import sets next_current_at to last_success_at. Every completed attempt
+        # advances it, including failures, so a paused source gets one check only.
+        if not source.enabled and (
+            source.next_current_at > source.last_success_at
+            or (source.last_current_at and source.last_current_at >= source.last_success_at)
+        ):
             continue
         try:
             refresh_current(source.id, scheduled=True)

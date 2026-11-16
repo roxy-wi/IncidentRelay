@@ -79,7 +79,7 @@ function createUnsavedEscalationRule() {
 function loadEscalationPolicies() {
     fillTeamSelect("#escalation-policy-team", false, function () {
         resetEscalationPolicyForm();
-    }, "can_write");
+    }, "can_manage_policies");
 
     refreshEscalationPolicies();
     updateEscalationPolicyCreateButtonState();
@@ -90,7 +90,7 @@ function buildEscalationPoliciesApiUrl() {
 }
 
 function updateEscalationPolicyCreateButtonState() {
-    const allowed = currentUserCanCreateUiObjects();
+    const allowed = currentUserCanCreateUiObjects("can_manage_policies");
 
     $("#open-escalation-policy-create-modal")
         .toggleClass("is-hidden", !allowed)
@@ -390,7 +390,7 @@ function resetEscalationPolicyForm() {
 }
 
 function openCreateEscalationPolicyModal() {
-    if (!currentUserCanCreateUiObjects()) {
+    if (!currentUserCanCreateUiObjects("can_manage_policies")) {
         showAppError(i18n.t("escalations.errors.create"), i18n.t("escalations.errors.access_denied"));
         return;
     }

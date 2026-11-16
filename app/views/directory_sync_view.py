@@ -15,9 +15,12 @@ from app.services.admin_tokens import lock_admin_api_token
 from app.services.audit import write_audit
 from app.services.change_intelligence.management import managed_groups
 from app.services.directory_sync.client import ApiClient
-from app.services.directory_sync.config import StrictModel, SyncApiError, SyncConfig, SyncError, org_service_preset
+from app.services.directory_sync.config import (
+    StrictModel, SyncApiError, SyncConfig, SyncError, current_api_enabled, org_service_preset,
+)
 from app.services.directory_sync.fetch import window
 from app.services.directory_sync.management import remove_source
+from app.services.directory_sync.reconnect import archived_source, retained_sources
 from app.services.directory_sync.service import authorized_actor
 from app.services.orchestration.webhooks import _normalize_headers, WebhookValidationError
 from app.services.rbac import current_api_token
@@ -100,8 +103,11 @@ def load_source(source_id, *, mutable=False, include_deleted=False):
 def serialize(source):
     approved = source.approved_revision == source.revision
     current_scheduled = (
-        approved and source.last_success_at and "current" in source.config.get("operations", {})
-        and (source.enabled or not source.last_current_at or source.last_current_at < source.last_success_at)
+        approved and source.last_success_at and current_api_enabled(source.config)
+        and (source.enabled or (
+            source.next_current_at <= source.last_success_at
+            and (not source.last_current_at or source.last_current_at < source.last_success_at)
+        ))
     )
     return {"id": source.id, "name": source.name, "group_id": source.group_id,
             "group_name": source.group.name,
@@ -133,6 +139,9 @@ def options():
     teams = Team.select().where(Team.group.in_([group.id for group in groups]), Team.deleted == False)
     return jsonify(groups=[{"id": group.id, "name": group.name} for group in groups],
                    teams=[{"id": team.id, "name": team.name, "group_id": team.group_id} for team in teams],
+                   retained_sources=[{"id": source.id, "name": source.name, "group_id": source.group_id,
+                                      "base_url": source.config["base_url"]}
+                                     for source in retained_sources([group.id for group in groups])],
                    preset=org_service_preset())
 
 
@@ -163,13 +172,16 @@ def delete_source(source_id):
 def update_refresh_schedule(source, previous, config, *, import_changed):
     """Apply interval changes without starting an import or retaining stale duty."""
     current_changed = (
-        previous.current_fields != config.current_fields
+        previous.current_enabled != config.current_enabled
+        or previous.current_fields != config.current_fields
         or previous.current_fetch != config.current_fetch
         or previous.operations.get("current") != config.operations.get("current")
         or previous.current_max_age_seconds != config.current_max_age_seconds
     )
     if import_changed or current_changed:
         DirectorySyncCurrent.delete().where(DirectorySyncCurrent.source == source.id).execute()
+    if current_changed:
+        source.current_error = None
     if import_changed:
         return
     if (previous.interval_seconds != config.interval_seconds
@@ -201,6 +213,8 @@ def save_source(source_id=None):
         return jsonify(error="validation_error", message="Invalid synchronization configuration", details=details), 400
     with write_transaction():
         require_group(payload.group_id)
+        if payload.config.retained_source_id is not None:
+            archived_source(payload.config.retained_source_id, payload.group_id)
         if source_id:
             source = load_source(source_id, mutable=True)
             if source.group_id != payload.group_id:
@@ -208,6 +222,8 @@ def save_source(source_id=None):
             if payload.revision != source.revision:
                 raise SyncError("Configuration changed; reload it before saving")
             previous_config = SyncConfig.model_validate(source.config)
+            if source.last_success_at and previous_config.retained_source_id != payload.config.retained_source_id:
+                raise SyncError("The retained source cannot change after the first successful import")
             headers_changed = headers is not None and headers != decrypt_json(source.headers_encrypted, default={})
             import_changed = (
                 previous_config.import_settings() != payload.config.import_settings()

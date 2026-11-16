@@ -58,7 +58,7 @@ function isSameNotificationPolicyRuleId(left, right) {
 function loadNotificationPolicies() {
     fillTeamSelect("#notification-policy-team", false, function () {
         resetNotificationPolicyForm();
-    }, "can_write");
+    }, "can_manage_policies");
     refreshNotificationPolicies();
     updateNotificationPolicyCreateButtonState();
 }
@@ -68,7 +68,7 @@ function buildNotificationPoliciesApiUrl() {
 }
 
 function updateNotificationPolicyCreateButtonState() {
-    const allowed = currentUserCanCreateUiObjects();
+    const allowed = currentUserCanCreateUiObjects("can_manage_policies");
 
     $("#open-notification-policy-create-modal")
         .toggleClass("is-hidden", !allowed)
@@ -1767,7 +1767,7 @@ function resetNotificationPolicyForm() {
 }
 
 function openCreateNotificationPolicyModal() {
-    if (!currentUserCanCreateUiObjects()) {
+    if (!currentUserCanCreateUiObjects("can_manage_policies")) {
         showAppError(
             i18n.t("notification_policies.permissions.create"),
             i18n.t("notification_policies.errors.access_denied")

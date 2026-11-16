@@ -435,6 +435,7 @@ function applyCreateButtonsVisibility() {
      * Hide top-level New/Create buttons according to current user role.
      */
     const canCreateTeamObjects = currentUserCanCreateUiObjects();
+    const canManagePolicies = currentUserCanCreateUiObjects("can_manage_policies");
     const canCreateResources = currentUserCanCreateUiObjects("can_write_resources");
     const isGlobalAdmin = !!(currentUser && currentUser.is_admin);
     const canManageUsers = typeof hasGroupUserAdminAccess === "function"
@@ -443,12 +444,17 @@ function applyCreateButtonsVisibility() {
 
     [
         "#open-rotation-create-modal",
-        "#open-escalation-policy-create-modal",
-        "#open-notification-policy-create-modal",
-        "#open-priority-policy-create-modal",
         "#open-matcher-preset-create-modal",
     ].forEach(function (selector) {
         setElementAllowed(selector, canCreateTeamObjects);
+    });
+
+    [
+        "#open-escalation-policy-create-modal",
+        "#open-notification-policy-create-modal",
+        "#open-priority-policy-create-modal",
+    ].forEach(function (selector) {
+        setElementAllowed(selector, canManagePolicies);
     });
 
     [

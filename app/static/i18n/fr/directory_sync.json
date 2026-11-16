@@ -92,5 +92,14 @@
   "ds.keep_data": "Conserver les équipes et les plannings",
   "ds.delete_data": "Supprimer les équipes et plannings créés par la source",
   "ds.keep_data_hint": "Les équipes et les créneaux enregistrés restent modifiables. Les affectations suivent le planning enregistré ; aucune nouvelle donnée ne sera chargée. Tous les comptes utilisateurs sont conservés.",
-  "ds.delete_data_hint": "Les équipes créées par cette source et leur configuration dépendante, les rotations créées par la source et les créneaux importés seront supprimés. Les équipes préexistantes et tous les comptes utilisateurs sont conservés."
+  "ds.delete_data_hint": "Les équipes créées par cette source et leur configuration dépendante, les rotations créées par la source et les créneaux importés seront supprimés. Les équipes préexistantes et tous les comptes utilisateurs sont conservés.",
+  "ds.retained_source": "Rattacher les données conservées",
+  "ds.retained_none": "Ne pas rattacher",
+  "ds.retained_selected": "Source rattachée",
+  "ds.retained_hint": "Choisissez une source supprimée de ce groupe. L’aperçu présente le rattachement et les changements de l’API ; l’application réutilise les équipes, plannings et historiques des gardes par identifiant externe. Le choix est définitif après le premier import.",
+  "ds.reconnect": "Rattacher",
+  "ds.current_enabled": "Vérifier la personne de garde actuelle via l’API",
+  "ds.current_hint": "Si désactivé, IR utilise les gardes et remplacements importés. Si activé, il utilise l’API de garde actuelle ; les vérifications automatiques suivent la planification de la source.",
+  "ds.current_interval_hint": "10–3600 secondes. Les vérifications peuvent être avancées si le cache ou la réponse de l’API expire.",
+  "ds.current_missing": "Configurez d’abord l’opération current dans les opérations API pour activer cette vérification."
 }

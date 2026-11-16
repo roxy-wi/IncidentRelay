@@ -92,5 +92,14 @@
   "ds.keep_data": "Conservar equipos y horarios",
   "ds.delete_data": "Eliminar equipos y horarios creados por el origen",
   "ds.keep_data_hint": "Los equipos y turnos guardados seguirán siendo editables. Las asignaciones usarán el horario guardado; no se obtendrán más datos. Se conservarán todas las cuentas de usuario.",
-  "ds.delete_data_hint": "Se eliminarán los equipos creados por este origen con su configuración dependiente, las rotaciones creadas por él y los turnos importados. Se conservarán los equipos preexistentes y todas las cuentas de usuario."
+  "ds.delete_data_hint": "Se eliminarán los equipos creados por este origen con su configuración dependiente, las rotaciones creadas por él y los turnos importados. Se conservarán los equipos preexistentes y todas las cuentas de usuario.",
+  "ds.retained_source": "Vincular datos conservados",
+  "ds.retained_none": "No vincular",
+  "ds.retained_selected": "Fuente vinculada",
+  "ds.retained_hint": "Seleccione una fuente eliminada de este grupo. La vista previa muestra la vinculación y los cambios de la API; al aplicar se reutilizan equipos, horarios e historial de turnos por ID externo. La selección queda fija tras la primera importación.",
+  "ds.reconnect": "Volver a vincular",
+  "ds.current_enabled": "Consultar la persona de guardia actual mediante la API",
+  "ds.current_hint": "Si está desactivado, IR usa los turnos y reemplazos importados. Si está activado, usa la API de guardia actual; las consultas automáticas siguen la programación de la fuente.",
+  "ds.current_interval_hint": "10–3600 segundos. Las consultas pueden adelantarse si caduca la caché o la respuesta de la API.",
+  "ds.current_missing": "Configure primero la operación current en Operaciones de API para activar estas consultas."
 }

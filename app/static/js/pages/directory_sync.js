@@ -192,6 +192,7 @@ function openDirectorySync(source) {
     const groups = $("#ds-group").empty().prop("disabled", Boolean(source));
     directorySyncOptions.groups.forEach(group => groups.append($("<option>", {value: group.id, text: group.name})));
     if (source) groups.val(source.group_id);
+    dsRetainedSources(config.retained_source_id);
     $("#ds-url").val(config.base_url);
     $("#ds-network").val(config.private_network_policy);
     $("#ds-skip-tls").prop("checked", config.verify_tls === false);
@@ -200,6 +201,7 @@ function openDirectorySync(source) {
     directorySyncMappingKeys.forEach(key => { mapping[key] = config[key]; });
     $("#ds-mapping").val(JSON.stringify(mapping, null, 2));
     $("#ds-interval").val(config.interval_seconds);
+    $("#ds-current-enabled").prop("checked", config.current_enabled !== false && Boolean(config.operations?.current));
     $("#ds-current-interval").val(config.current_interval_seconds);
     $("#ds-horizon").val(config.horizon_months);
     $("#ds-authority").val(config.membership_authority);
@@ -214,6 +216,27 @@ function openDirectorySync(source) {
     $("#ds-editor .app-modal-body").scrollTop(0);
     $("#ds-name").trigger("focus");
     if (source?.pending_mode || source?.running) dsPoll(directorySyncVersion, source.id);
+}
+
+function dsRetainedSources(selected = null) {
+    const groupId = Number($("#ds-group").val());
+    const select = $("#ds-retained-source").empty();
+    select.append($("<option>", {value: "", text: dsText("retained_none")}));
+    const candidates = (directorySyncOptions.retained_sources || []).filter(item => item.group_id === groupId);
+    candidates.forEach(item => select.append($("<option>", {
+        value: item.id, text: item.name + " (#" + item.id + ") — " + item.base_url
+    })));
+    // Applied sources consume their archived bindings and disappear from options.
+    // Keep the immutable selection when reopening or saving operational settings.
+    if (selected && !candidates.some(item => item.id === selected)) {
+        select.append($("<option>", {value: selected, text: dsText("retained_selected") + " #" + selected}));
+    }
+    select.val(selected || "").prop("disabled", Boolean(directorySyncSource?.last_success_at));
+}
+
+function dsCurrentControls(busy = false) {
+    $("#ds-current-enabled").prop("disabled", busy);
+    $("#ds-current-interval").prop("disabled", busy || !$("#ds-current-enabled").prop("checked"));
 }
 
 function dsRenderResult(source) {
@@ -232,6 +255,8 @@ function dsRenderResult(source) {
     if (source?.preview_result?.samples) $("#ds-sample-output").text(JSON.stringify(source.preview_result.samples, null, 2)).prop("hidden", false);
     dsStatus(action ? dsOperationText(source, action) : source?.last_error || source?.current_error || "", Boolean(action));
     $("#ds-save").prop("disabled", busy);
+    dsCurrentControls(busy);
+    $("#ds-retained-source").prop("disabled", busy || Boolean(source?.last_success_at));
     $("#ds-apply").prop("disabled", !source?.preview_token || directorySyncDirty || busy);
     $("#ds-sample, #ds-preview").prop("disabled", !source || busy);
     $("#ds-run").prop("disabled", !source?.approved || busy);
@@ -239,7 +264,9 @@ function dsRenderResult(source) {
     const body = $("#ds-preview-table").empty();
     (source?.preview_result?.changes || []).forEach(change => {
         const row = $("<tr>");
-        [change.kind, change.label || change.external_id, change.action, JSON.stringify(change.fields)].forEach(value => $("<td>").text(value).appendTo(row));
+        [change.kind, change.label || change.external_id,
+            change.action === "reconnect" ? dsText("reconnect") : change.action,
+            JSON.stringify(change.fields)].forEach(value => $("<td>").text(value).appendTo(row));
         body.append(row);
     });
     if (source?.preview_result?.team_catalog && !directorySyncDirty) {
@@ -311,6 +338,8 @@ function dsWriteError(version, xhr) {
 
 $(document).on("click", "#ds-new", () => openDirectorySync(null));
 $(document).on("click", "#ds-reload", loadDirectorySync);
+$(document).on("change", "#ds-group", () => dsRetainedSources());
+$(document).on("change", "#ds-current-enabled", () => dsCurrentControls());
 $(document).on("click", "#ds-close, #ds-close-footer, #ds-editor", function (event) {
     if (this.id === "ds-editor" && event.target !== this) return;
     if (!directorySyncSaving) closeDirectorySync();
@@ -358,12 +387,18 @@ $(document).on("submit", "#ds-form", function (event) {
     let payload;
     try {
         const config = {...(directorySyncSource?.config || directorySyncOptions.preset), ...JSON.parse($("#ds-mapping").val()),
+            retained_source_id: Number($("#ds-retained-source").val()) || null,
             operations: JSON.parse($("#ds-operations").val()), base_url: $("#ds-url").val(),
             private_network_policy: $("#ds-network").val(), interval_seconds: Number($("#ds-interval").val()),
             verify_tls: !$("#ds-skip-tls").prop("checked"),
+            current_enabled: $("#ds-current-enabled").prop("checked"),
             current_interval_seconds: Number($("#ds-current-interval").val()), horizon_months: Number($("#ds-horizon").val()),
             membership_authority: $("#ds-authority").val(), editable: $("#ds-editable").prop("checked"),
             overwrite_existing: $("#ds-overwrite").prop("checked"), delete_missing: $("#ds-delete").prop("checked")};
+        if (config.current_enabled && !config.operations.current) {
+            dsStatus(dsText("current_missing"));
+            return;
+        }
         payload = {name: $("#ds-name").val(), group_id: Number($("#ds-group").val()), config,
             enabled: $("#ds-enabled").prop("checked"), revision: directorySyncSource?.revision};
         if ($("#ds-headers").val().trim()) payload.headers = JSON.parse($("#ds-headers").val());

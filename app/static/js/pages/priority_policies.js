@@ -17,7 +17,7 @@ function isSamePriorityPolicyRuleId(left, right) {
 }
 
 function loadPriorityPolicies() {
-    fillTeamSelect("#priority-policy-team", false, function () { resetPriorityPolicyForm(); }, "can_write");
+    fillTeamSelect("#priority-policy-team", false, function () { resetPriorityPolicyForm(); }, "can_manage_policies");
     loadPriorityPolicyPriorities(function () { refreshPriorityPolicies(); });
     updatePriorityPolicyCreateButtonState();
     updatePriorityPolicyBehaviorHints();
@@ -28,7 +28,7 @@ function buildPriorityPoliciesApiUrl() {
 }
 
 function updatePriorityPolicyCreateButtonState() {
-    const allowed = currentUserCanCreateUiObjects();
+    const allowed = currentUserCanCreateUiObjects("can_manage_policies");
     $("#open-priority-policy-create-modal").toggleClass("is-hidden", !allowed).prop("disabled", !allowed);
 }
 
@@ -408,7 +408,7 @@ function resetPriorityPolicyForm() {
 }
 
 function openCreatePriorityPolicyModal() {
-    if (!currentUserCanCreateUiObjects()) {
+    if (!currentUserCanCreateUiObjects("can_manage_policies")) {
         showAppError(i18n.t("priority_policies.permissions.create"), i18n.t("priority_policies.errors.access_denied"));
         return;
     }

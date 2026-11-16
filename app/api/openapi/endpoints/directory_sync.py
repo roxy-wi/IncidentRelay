@@ -52,7 +52,7 @@ def paths():
         ROOT: {"get": {**common, "summary": "List visible synchronization sources"},
                "post": {**common, "summary": "Create a disabled source", "requestBody": json_body("Source", config),
                         "responses": {**common["responses"], "201": response("Created")}}},
-        ROOT + "/options": {"get": {**common, "summary": "Get managed groups, teams and the editable org-service preset"}},
+        ROOT + "/options": {"get": {**common, "summary": "Get managed groups, teams, retained sources and the editable org-service preset"}},
         ROOT + "/{source_id}": {"parameters": [path_param("source_id", "Source ID")],
                                "get": {**common, "summary": "Read configuration, queue and preview status"},
                                "put": {**common, "summary": "Update using the last read revision", "requestBody": json_body("Source", config)},

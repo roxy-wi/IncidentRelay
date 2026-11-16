@@ -47,6 +47,14 @@ def remove_source(source, *, delete_imported):
         Shift.delete().where(Shift.source == source.id).execute()
         Binding.delete().where(Binding.source == source.id).execute()
     else:
+        # Ownership is released below. Keep explicit team provenance for a later
+        # reconnection, including matched teams that have no schedules yet.
+        source.last_result = {**(source.last_result or {}), "retained_team_ids": [
+            row.local_id for row in Binding.select().where(
+                Binding.source == source.id, Binding.kind == "team",
+                Binding.owned == True, Binding.present == True,
+            ).order_by(Binding.local_id)
+        ]}
         # Concrete intervals still use their existing editor/calendar. Retain only
         # rotation ownership; people and team memberships become locally managed.
         Binding.update(owned=False).where(Binding.source == source.id, Binding.kind != "rotation").execute()

@@ -83,7 +83,7 @@ def edit_imported_rotation_shift(shift_id):
     from app.modules.db.models import DirectorySyncShift
     from app.modules.db.transactions import write_transaction
     from app.services.directory_sync.config import SyncError
-    from app.services.directory_sync.shift_editor import ShiftInput, edit_shift, serialize_shift
+    from app.services.directory_sync.shift_editor import ShiftInput, edit_shift, editable_source, serialize_shift
     shift = DirectorySyncShift.get_or_none(DirectorySyncShift.id == shift_id)
     if shift is None:
         return _not_found("Imported shift")
@@ -91,9 +91,13 @@ def edit_imported_rotation_shift(shift_id):
     if error:
         return error
     if request.method == "DELETE":
-        with write_transaction():
-            DirectorySyncShift.update(deleted=True, local_override=True).where(DirectorySyncShift.id == shift.id).execute()
-            write_audit("rotation.imported_shift.delete", object_type="rotation", object_id=rotation.id, team_id=rotation.team_id)
+        try:
+            with write_transaction():
+                editable_source(rotation)
+                DirectorySyncShift.update(deleted=True, local_override=True).where(DirectorySyncShift.id == shift.id).execute()
+                write_audit("rotation.imported_shift.delete", object_type="rotation", object_id=rotation.id, team_id=rotation.team_id)
+        except SyncError as error:
+            return make_error_response("sync_conflict", str(error), 409)
         return jsonify(deleted=True)
     payload, error = validate_body(ShiftInput)
     if error:

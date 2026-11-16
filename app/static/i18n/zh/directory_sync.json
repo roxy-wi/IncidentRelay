@@ -92,5 +92,14 @@
   "ds.keep_data": "保留团队和排班",
   "ds.delete_data": "删除此来源创建的团队和排班",
   "ds.keep_data_hint": "团队和已保存的班次仍可编辑。值班分配使用已保存的排班，不再获取新数据。保留所有用户账户。",
-  "ds.delete_data_hint": "将删除此来源创建的团队及其关联配置、此来源创建的轮值和已导入的班次。保留原有团队和所有用户账户。"
+  "ds.delete_data_hint": "将删除此来源创建的团队及其关联配置、此来源创建的轮值和已导入的班次。保留原有团队和所有用户账户。",
+  "ds.retained_source": "关联保留的数据",
+  "ds.retained_none": "不关联",
+  "ds.retained_selected": "已关联的来源",
+  "ds.retained_hint": "请选择此组中已删除的来源。预览会显示重新关联及 API 数据变更；应用后将按外部 ID 复用团队、排班和班次历史。首次导入后无法更改此选择。",
+  "ds.reconnect": "重新关联",
+  "ds.current_enabled": "通过 API 查询当前值班人员",
+  "ds.current_hint": "关闭时，IR 使用已导入的班次和替班记录。开启时，使用当前值班 API；自动查询遵循来源的同步计划。",
+  "ds.current_interval_hint": "10–3600 秒。缓存或 API 响应过期时，可能提前查询。",
+  "ds.current_missing": "启用当前值班 API 查询前，请先在 API 操作中配置 current 操作。"
 }

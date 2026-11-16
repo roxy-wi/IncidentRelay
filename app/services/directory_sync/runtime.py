@@ -12,6 +12,7 @@ from app.modules.db.models import (
     TeamUser, User, UserGroup,
 )
 from app.modules.user_colors import user_color
+from app.services.directory_sync.config import current_api_enabled
 from app.services.directory_sync.fetch import instant
 from app.services.directory_sync.reconcile import shared_user
 from app.services.rbac import can_manage_group_users, can_read_team
@@ -32,7 +33,7 @@ def import_metadata(kind, local_id):
         return None
     result = {"source_id": source.id, "source_name": source.name,
               "editable": source.config.get("editable", False)}
-    if kind == "rotation" and "current" in source.config.get("operations", {}):
+    if kind == "rotation" and current_api_enabled(source.config):
         current = Current.get_or_none(Current.rotation == local_id)
         result["current_status"] = current.status if current and current.valid_until > utc_now() else "stale"
         result["current_valid_until"] = current.valid_until.isoformat() + "Z" if current else None
@@ -139,7 +140,7 @@ def current_user(rotation, source, at):
         | ((Shift.starts_at <= at) & (Shift.ends_at > at)),
     ).exists():
         return scheduled_user(rotation, at)
-    if "current" in source.config.get("operations", {}):
+    if current_api_enabled(source.config):
         cached = Current.get_or_none(Current.rotation == rotation.id)
         if (not cached or cached.status != "active" or cached.observed_at > at + timedelta(seconds=1)
                 or cached.valid_until <= at or cached.valid_until <= utc_now()):
