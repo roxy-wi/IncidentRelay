@@ -32,6 +32,36 @@ def active_duties(_client, ids):
     return [{"id": key, "status": "active", "user_id": "u1"} for key in ids]
 
 
+@pytest.mark.parametrize("interval", [60, 600, 7200])
+@pytest.mark.parametrize("mode", ["run", "preview", "apply"])
+def test_full_sync_failures_wait_for_configured_interval(source, fetched, monkeypatch, clock, interval, mode):
+    source.enabled = True
+    source.config["interval_seconds"] = interval
+    source.save()
+    service.run(source.id)
+    preview = service.run(source.id, mode="preview") if mode == "apply" else {}
+
+    def fail(*_args):
+        raise SyncError("Controlled import failure")
+
+    monkeypatch.setattr(service, "reconcile", fail)
+    with pytest.raises(SyncError, match="Controlled import failure"):
+        service.run(source.id, mode=mode, preview_token=preview.get("preview_token"))
+    after = Source.get_by_id(source.id)
+    assert after.next_run_at == clock[0] + timedelta(seconds=interval)
+    clock[0] += timedelta(seconds=interval - 1)
+    assert service.process_due_sources() == 0
+
+
+def test_full_interval_save_reschedules_failed_import(client, admin_headers, source, clock):
+    source.enabled = True
+    source.last_error = "Controlled import failure"
+    source.save()
+    saved = save(client, admin_headers, source.id, interval_seconds=7200)
+    assert Source.get_by_id(source.id).next_run_at == clock[0] + timedelta(seconds=7200)
+    assert saved["last_error"] == "Controlled import failure"
+
+
 @pytest.mark.parametrize("interval", [10, 45, 300, 600, 3600])
 def test_saving_interval_reschedules_from_save_time(
     client, admin_headers, source, fetched, monkeypatch, clock, interval,

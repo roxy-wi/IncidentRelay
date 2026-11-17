@@ -1,4 +1,12 @@
 {
+  "ds.format_json": "格式化 JSON",
+  "ds.workflow_title_error": "同步失败",
+  "ds.workflow_title_current_error": "值班检查失败",
+  "ds.workflow_title_retrying": "正在重新连接同步",
+  "ds.workflow_title_disconnected": "无法获取同步状态",
+  "ds.workflow_retrying": "无法读取操作状态。操作可能仍在进行，将自动重试。",
+  "ds.workflow_disconnected": "多次尝试后仍无法读取操作状态。操作可能仍在进行，请刷新状态后再执行其他操作。",
+  "ds.refresh_status": "刷新状态",
   "ds.skip_tls": "跳过 TLS 证书验证",
   "ds.skip_tls_hint": "适用于使用自签名证书的 API。仅对此来源的所有请求禁用证书和主机名验证。默认关闭。",
   "ds.title": "目录同步",

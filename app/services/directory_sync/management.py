@@ -17,6 +17,21 @@ def remove_source(source, *, delete_imported):
 
         # Follow the lock order used by normal team lifecycle changes.
         lock_catalog()
+        bindings = Binding.select().where(Binding.source == source.id)
+        result = source.last_result or {}
+        team_bindings = list(bindings.where(Binding.kind == "team"))
+        known_schedules = {row.external_id for row in bindings.where(Binding.kind == "rotation")}
+        # Unmanaged matched teams are intentionally skipped during import, so
+        # their upstream schedules need not have local rotation bindings.
+        missing_schedules = set()
+        if all(row.owned for row in team_bindings):
+            missing_schedules = set(result.get("schedule_ids", [])) - known_schedules
+        if missing_schedules or result.get("teams", 0) > len(team_bindings):
+            raise SyncError(
+                "Imported resource bindings are missing; cannot identify all teams and rotations to delete. "
+                "Nothing was deleted. Delete the old resources explicitly, then remove the source "
+                "with the keep-data option."
+            )
         owned = Binding.select(Binding.local_id).where(
             Binding.source == source.id, Binding.created == True, Binding.owned == True,
         )

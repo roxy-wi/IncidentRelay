@@ -82,7 +82,7 @@ def get_json_routing_key():
     return routing_key or None
 
 
-def authenticate_api_token(raw_token=None):
+def authenticate_api_token(raw_token=None, *, track_usage=True):
     """
     Authenticate a stored API token.
     """
@@ -101,7 +101,8 @@ def authenticate_api_token(raw_token=None):
         request.current_api_token = None
         return None
 
-    tokens_repo.mark_token_used(api_token)
+    if track_usage:
+        tokens_repo.mark_token_used(api_token)
 
     bind_authorization(kind="api_token", user=api_token.user, token=api_token)
 

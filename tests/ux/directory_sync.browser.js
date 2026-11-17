@@ -26,7 +26,7 @@ const fixture = JSON.parse(process.env.DIRECTORY_SYNC_FIXTURE);
         assert.equal(await page.locator(button).getAttribute("aria-busy"), "true");
         assert.equal(await page.locator("#ds-status .ui-loading-spinner").count(), 1);
         assert.match(await page.locator("#ds-status").textContent(), message);
-        for (const id of ["sample", "preview", "apply", "run", "save"]) {
+        for (const id of ["sample", "preview", "apply", "run", "save", "format-operations", "format-mapping"]) {
             assert.equal(await page.locator("#ds-" + id).isDisabled(), true);
         }
     }
@@ -57,6 +57,37 @@ const fixture = JSON.parse(process.env.DIRECTORY_SYNC_FIXTURE);
         assert.match(await page.locator("#ds-workflow").textContent(), /1\. Save/);
         assert.equal(await page.locator("#ds-preview").isDisabled(), true);
         assert.equal(await page.locator("#ds-enabled-label").getAttribute("title"), await page.locator("#ds-enabled-hint").textContent());
+        const formatRequests = [];
+        const trackFormatRequests = request => {
+            if (request.method() !== "GET" && request.url().includes("/api/admin/directory-sync")) {
+                formatRequests.push(request.url());
+            }
+        };
+        page.on("request", trackFormatRequests);
+        for (const field of ["operations", "mapping"]) {
+            const editor = page.locator("#ds-" + field);
+            const format = page.locator("#ds-format-" + field);
+            assert.equal(await format.textContent(), "Format JSON");
+            const original = JSON.parse(await editor.inputValue());
+            await editor.fill(JSON.stringify(original));
+            await format.click();
+            assert.equal(await editor.inputValue(), JSON.stringify(original, null, 2));
+            assert.equal(await page.evaluate(() => directorySyncDirty), true, "formatting preserves unsaved edits");
+            const invalid = '{"unfinished":';
+            await editor.fill(invalid);
+            await format.click();
+            await page.locator("#app-dialog-modal").waitFor({state: "visible"});
+            assert.match(await page.locator("#app-dialog-modal").textContent(), /Invalid JSON/);
+            assert.equal(await editor.inputValue(), invalid, "invalid JSON remains available for correction");
+            await page.locator("#app-dialog-confirm").click();
+            assert.equal(await modal.isVisible(), true);
+            await editor.fill(JSON.stringify(original));
+            await format.click();
+            assert.equal(await editor.inputValue(), JSON.stringify(original, null, 2));
+        }
+        await page.screenshot({path: path.join(fixture.screenshots, "json-formatting.png"), fullPage: true});
+        assert.deepEqual(formatRequests, [], "formatting does not save or queue synchronization");
+        page.off("request", trackFormatRequests);
         await page.locator("#ds-headers").fill('{"Authorization":"discard-this-secret"}');
         await page.keyboard.press("Escape");
         assert.equal(await modal.isVisible(), false);
@@ -161,6 +192,13 @@ const fixture = JSON.parse(process.env.DIRECTORY_SYNC_FIXTURE);
         assert.equal(await page.locator("#ds-skip-tls").isChecked(), true);
         assert.ok(await page.locator("#ds-preview-table tr").count() >= 5);
         const previewToken = await page.evaluate(() => directorySyncSource.preview_token);
+        for (const field of ["operations", "mapping"]) {
+            await page.locator("#ds-format-" + field).click();
+            assert.equal(await page.evaluate(() => directorySyncDirty), false, "formatting alone does not change configuration");
+            assert.equal(await page.evaluate(() => directorySyncSource.preview_token), previewToken);
+            assert.equal(await page.locator("#ds-apply").isEnabled(), true, "formatting keeps the reviewed preview applicable");
+            assert.equal(await page.locator("#ds-save").isDisabled(), true);
+        }
         await page.locator("#ds-name").fill("OnCall <test> reviewed");
         const savedName = page.waitForResponse(r => r.url().endsWith("/api/admin/directory-sync/" + source.id) && r.request().method() === "PUT");
         await page.locator("#ds-save").click();
@@ -256,7 +294,14 @@ const fixture = JSON.parse(process.env.DIRECTORY_SYNC_FIXTURE);
         assert.equal(await page.locator("#ds-workflow-icon").isVisible(), true);
         assert.equal(await page.evaluate(() => document.activeElement.id), "ds-preview");
         await page.screenshot({path: path.join(fixture.screenshots, "save-preview-required-desktop.png"), fullPage: true});
+        await page.route("**/api/admin/directory-sync/" + source.id, route =>
+            route.fulfill({status: 500, json: {message: "Temporary status read failure"}}), {times: 1});
         await page.locator("#ds-preview").click();
+        await page.waitForFunction(() => document.querySelector("#ds-workflow").dataset.step === "retrying");
+        assert.equal(await page.locator("#ds-editor .ui-loading-spinner").count(), 0);
+        assert.equal(await page.locator("#ds-refresh-status").isVisible(), true);
+        assert.equal(await page.locator("#ds-preview").isDisabled(), true);
+        await page.screenshot({path: path.join(fixture.screenshots, "preview-status-retry.png"), fullPage: true});
         await page.waitForFunction(() => directorySyncSource?.preview_token && !directorySyncSource.pending_mode && !directorySyncSource.running);
         assert.equal(await page.locator("#ds-apply").isEnabled(), true);
         assert.equal(await page.locator("#ds-run").isDisabled(), true);
@@ -270,7 +315,12 @@ const fixture = JSON.parse(process.env.DIRECTORY_SYNC_FIXTURE);
         assert.ok(workflowSaveBounds.y <= workflowPreviewBounds.y + 2 && workflowPreviewBounds.y <= workflowApplyBounds.y + 2, "workflow steps retain their order on mobile");
         await page.screenshot({path: path.join(fixture.screenshots, "workflow-preview-mobile.png"), fullPage: true});
         await page.setViewportSize({width: 1440, height: 1080});
+        await page.route("**/api/admin/directory-sync/" + source.id, route =>
+            route.fulfill({status: 503, json: {message: "Temporary status read failure"}}), {times: 1});
         await page.locator("#ds-apply").click();
+        await page.waitForFunction(() => document.querySelector("#ds-workflow").dataset.step === "retrying");
+        assert.equal(await page.locator("#ds-editor .ui-loading-spinner").count(), 0);
+        assert.equal(await page.locator("#ds-apply").isDisabled(), true);
         await page.waitForFunction(() => directorySyncSource?.approved && !directorySyncSource.pending_mode && !directorySyncSource.running);
         assert.equal(await page.evaluate(() => directorySyncSource.schedule_state), "enabled");
         assert.equal(await page.locator("#ds-enabled").isChecked(), true);

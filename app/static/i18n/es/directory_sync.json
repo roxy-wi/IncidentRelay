@@ -1,4 +1,12 @@
 {
+  "ds.format_json": "Formatear JSON",
+  "ds.workflow_title_error": "Error de sincronización",
+  "ds.workflow_title_current_error": "Error al comprobar la guardia",
+  "ds.workflow_title_retrying": "Reconectando con la sincronización",
+  "ds.workflow_title_disconnected": "Estado de sincronización no disponible",
+  "ds.workflow_retrying": "No se pudo consultar el estado. La operación puede seguir en curso; se reintentará automáticamente.",
+  "ds.workflow_disconnected": "No se pudo consultar el estado tras varios intentos. La operación puede seguir en curso. Actualice el estado antes de iniciar otra acción.",
+  "ds.refresh_status": "Actualizar estado",
   "ds.skip_tls": "Omitir la verificación del certificado TLS",
   "ds.skip_tls_hint": "Para API con certificados autofirmados. Desactiva la verificación del certificado y del nombre del servidor en todas las solicitudes de esta fuente únicamente. Desactivado de forma predeterminada.",
   "ds.title": "Sincronización de directorios",

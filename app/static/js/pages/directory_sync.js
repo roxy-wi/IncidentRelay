@@ -10,6 +10,7 @@ let directorySyncOpener = null;
 let directorySyncSaving = false;
 let directorySyncAction = null;
 let directorySyncListVersion = 0;
+let directorySyncPollFailure = null;
 const directorySyncListWrites = new Set();
 const directorySyncPath = "/api/admin/directory-sync";
 const directorySyncMappingKeys = ["team_fields", "detail_fields", "team_filter", "members", "responsible", "schedules", "shift_fields", "replacements", "user_fields", "current_fields", "team_matches", "group_role", "member_role", "responsible_role", "user_fetch", "current_fetch", "timeout_seconds", "current_max_age_seconds"];
@@ -162,6 +163,7 @@ function closeDirectorySync() {
     directorySyncOpen = false;
     directorySyncSaving = false;
     directorySyncAction = null;
+    directorySyncPollFailure = null;
     dsClearButtonLoading();
     $("#ds-headers").val("");
     setAppModalSaving("#ds-editor", false);
@@ -182,6 +184,7 @@ function openDirectorySync(source) {
     directorySyncOpen = true;
     directorySyncSaving = false;
     directorySyncAction = null;
+    directorySyncPollFailure = null;
     dsClearButtonLoading();
     setAppModalSaving("#ds-editor", false);
     directorySyncSource = source;
@@ -245,21 +248,29 @@ function dsPreviewReady(source) {
 }
 
 function dsRenderWorkflow(source) {
-    const busy = directorySyncSaving || Boolean(source?.pending_mode || source?.running);
+    const busy = directorySyncSaving || Boolean(source?.pending_mode || source?.running || directorySyncPollFailure);
     $("#ds-form fieldset").prop("disabled", directorySyncSaving && directorySyncAction === "save");
     const unsaved = !source || directorySyncDirty;
     const ready = dsPreviewReady(source);
     const step = unsaved ? "save" : ready ? "apply" : !source.approved ? "preview" : "saved";
     const action = dsOperation(source);
     const expired = !ready && source?.preview_until && Date.parse(source.preview_until) <= Date.now();
-    const displayStep = busy ? "busy" : expired && !unsaved ? "expired" : step;
+    const error = source?.last_error || source?.current_error;
+    const displayStep = directorySyncPollFailure ? (directorySyncPollFailure.retrying ? "retrying" : "disconnected")
+        : busy ? "busy" : !unsaved && error ? (source.last_error ? "error" : "current_error")
+        : expired && !unsaved ? "expired" : step;
     const icon = {save: "pen-to-square", preview: "triangle-exclamation", apply: "list-check",
-        saved: "circle-check", expired: "clock", busy: "hourglass-half"}[displayStep];
+        saved: "circle-check", expired: "clock", busy: "hourglass-half", error: "circle-exclamation",
+        current_error: "triangle-exclamation", retrying: "arrows-rotate", disconnected: "circle-exclamation"}[displayStep];
     $("#ds-workflow").attr("data-step", displayStep);
     $("#ds-workflow-icon").attr("class", "fa-solid fa-" + icon);
     $("#ds-workflow-title").text(dsText("workflow_title_" + displayStep));
-    $("#ds-workflow-detail").text(action ? dsOperationText(source, action)
+    $("#ds-workflow-detail").text(directorySyncPollFailure ? dsText("workflow_" + displayStep)
+        : !busy && !unsaved && error ? error
+        : action ? dsOperationText(source, action)
         : dsText(expired && !unsaved ? "workflow_expired" : "workflow_" + step));
+    $("#ds-refresh-status").prop("hidden", !directorySyncPollFailure)
+        .prop("disabled", Boolean(directorySyncPollFailure?.retrying));
     const wait = busy ? dsText("enabled_wait") : "";
     const saveFirst = unsaved ? dsText("save_first") : "";
     const reasons = {
@@ -269,6 +280,8 @@ function dsRenderWorkflow(source) {
         run: wait || saveFirst || (ready ? dsText("run_after_preview")
             : !source?.approved ? dsText("apply_needs_preview") : ""),
         sample: wait || saveFirst,
+        "format-operations": wait,
+        "format-mapping": wait,
     };
     Object.entries(reasons).forEach(([name, reason]) => {
         $("#ds-" + name).prop("disabled", Boolean(reason)).attr("title", reason || null);
@@ -302,9 +315,11 @@ function dsRenderResult(source) {
     dsRenderWorkflow(source);
     dsWatchPreviewExpiry(source);
     if (source?.preview_result?.samples) $("#ds-sample-output").text(JSON.stringify(source.preview_result.samples, null, 2)).prop("hidden", false);
-    dsStatus(action ? dsOperationText(source, action) : source?.last_error || source?.current_error || "", Boolean(action));
+    dsStatus(directorySyncPollFailure ? dsText("workflow_" + (directorySyncPollFailure.retrying ? "retrying" : "disconnected"))
+        : action ? dsOperationText(source, action) : source?.last_error || source?.current_error || "",
+        Boolean(action) && !directorySyncPollFailure);
     $("#ds-retained-source").prop("disabled", busy || Boolean(source?.last_success_at));
-    if (action && action !== "save") AppLoading.setButtonLoading("#ds-" + action, true);
+    if (action && action !== "save" && !directorySyncPollFailure) AppLoading.setButtonLoading("#ds-" + action, true);
     const body = $("#ds-preview-table").empty();
     (source?.preview_result?.changes || []).forEach(change => {
         const row = $("<tr>");
@@ -334,12 +349,13 @@ function dsRenderResult(source) {
     }
 }
 
-function dsPoll(version, id) {
+function dsPoll(version, id, failures = 0) {
     clearTimeout(directorySyncTimer);
     directorySyncTimer = setTimeout(() => {
-        if (version !== directorySyncVersion || location.pathname !== "/admin/directory-sync") return;
+        if (version !== directorySyncVersion || !directorySyncOpen || location.pathname !== "/admin/directory-sync") return;
         apiGet(directorySyncPath + "/" + id, data => {
-            if (version !== directorySyncVersion) return;
+            if (version !== directorySyncVersion || !directorySyncOpen || location.pathname !== "/admin/directory-sync") return;
+            directorySyncPollFailure = null;
             directorySyncSource = data;
             dsRenderResult(data);
             if (data.pending_mode || data.running) dsPoll(version, id);
@@ -347,9 +363,24 @@ function dsPoll(version, id) {
                 if (!data.last_error && !data.current_error) dsStatus(dsText("complete"));
                 loadDirectorySync();
             }
-        }, xhr => { if (version === directorySyncVersion) dsError(xhr); });
-    }, 1500);
+        }, xhr => {
+            if (version !== directorySyncVersion || !directorySyncOpen || location.pathname !== "/admin/directory-sync") return;
+            const transient = !xhr.status || [408, 429].includes(xhr.status) || xhr.status >= 500;
+            const retrying = transient && failures + 1 < 5;
+            directorySyncPollFailure = {retrying};
+            dsRenderResult(directorySyncSource);
+            if (retrying) dsPoll(version, id, failures + 1);
+            else showApiError(xhr);
+        });
+    }, Math.min(1500 * (2 ** failures), 15000));
 }
+
+$(document).on("click", "#ds-refresh-status", () => {
+    if (!directorySyncSource || !directorySyncOpen) return;
+    directorySyncPollFailure = {retrying: true};
+    dsRenderResult(directorySyncSource);
+    dsPoll(directorySyncVersion, directorySyncSource.id);
+});
 
 function dsQueue(action) {
     if (!directorySyncSource || directorySyncSaving || directorySyncSource.pending_mode || directorySyncSource.running) return;
@@ -403,6 +434,12 @@ $(window).on("pagehide", closeDirectorySync);
 $(document).on("input change", "#ds-form input, #ds-form select, #ds-form textarea", () => {
     directorySyncDirty = true;
     dsRenderWorkflow(directorySyncSource);
+});
+$(document).on("click", "#ds-format-operations", () => {
+    formatJsonTextarea("#ds-operations", {}, dsText("operations"));
+});
+$(document).on("click", "#ds-format-mapping", () => {
+    formatJsonTextarea("#ds-mapping", {}, dsText("fields"));
 });
 $(document).on("click", "#ds-preview", () => dsQueue("preview"));
 $(document).on("click", "#ds-apply", () => dsQueue("apply"));

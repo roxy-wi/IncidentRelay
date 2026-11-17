@@ -96,18 +96,19 @@ def access_denied(_error):
     return make_error_response("access_denied", "Group administrator role required", 403)
 
 
-def require_group(group_id):
+def require_group(group_id, *, for_update=True):
     scope = "directory-sync:read" if request.method in {"GET", "HEAD"} else "directory-sync:write"
-    lock_admin_api_token(request.current_user.id, scope, group_id=group_id)
+    lock_admin_api_token(request.current_user.id, scope, group_id=group_id, for_update=for_update)
     if not authorized_actor(request.current_user.id, group_id):
         raise PermissionError()
 
 
-def load_source(source_id, *, mutable=False, include_deleted=False):
-    source = lock_row(Source.select().where(Source.id == source_id))
+def load_source(source_id, *, mutable=False, include_deleted=False, for_update=True):
+    query = Source.select().where(Source.id == source_id)
+    source = lock_row(query) if for_update else query.first()
     if source is None:
         raise DoesNotExist()
-    require_group(source.group_id)
+    require_group(source.group_id, for_update=for_update)
     if source.deleted and not include_deleted:
         raise DoesNotExist()
     if mutable and (source.pending_mode or (source.lease and source.lease_until > utc_now())
@@ -166,8 +167,8 @@ def options():
 
 @directory_sync_bp.get("/<int:source_id>")
 def get_source(source_id):
-    with write_transaction():
-        return jsonify(serialize(load_source(source_id)))
+    # Polling must remain readable while preview/apply holds SQLite's writer lock.
+    return jsonify(serialize(load_source(source_id, for_update=False)))
 
 
 @directory_sync_bp.delete("/<int:source_id>")
@@ -203,9 +204,11 @@ def update_refresh_schedule(source, previous, config, *, import_changed):
         source.current_error = None
     if import_changed:
         return
-    if (previous.interval_seconds != config.interval_seconds
-            and source.last_success_at and not source.last_error):
-        source.next_run_at = source.last_success_at + timedelta(seconds=config.interval_seconds)
+    if previous.interval_seconds != config.interval_seconds:
+        if source.last_error:
+            source.next_run_at = utc_now() + timedelta(seconds=config.interval_seconds)
+        elif source.last_success_at:
+            source.next_run_at = source.last_success_at + timedelta(seconds=config.interval_seconds)
     if current_changed:
         source.next_current_at = utc_now()
     elif previous.current_interval_seconds != config.current_interval_seconds and source.enabled:

@@ -2,6 +2,17 @@ body.md-theme #ds-editor .app-modal-footer {
     flex-wrap: wrap;
 }
 
+body.md-theme #ds-editor .json-editor-header .btn {
+    background: var(--md-primary-soft);
+    color: var(--md-text);
+    border-color: var(--md-primary);
+}
+
+body.md-theme #ds-editor .json-editor-header .btn:hover {
+    background: var(--md-surface-hover);
+    color: var(--md-text);
+}
+
 #ds-workflow {
     display: flex;
     align-items: flex-start;
@@ -29,6 +40,7 @@ body.md-theme #ds-editor .app-modal-footer {
     margin: 0;
     color: var(--md-text-soft);
     font-size: 13px;
+    overflow-wrap: anywhere;
 }
 
 #ds-workflow-icon {
@@ -39,6 +51,8 @@ body.md-theme #ds-editor .app-modal-footer {
 }
 
 #ds-workflow[data-step="preview"],
+#ds-workflow[data-step="current_error"],
+#ds-workflow[data-step="retrying"],
 #ds-workflow[data-step="expired"] {
     border-color: var(--md-warning-border);
     border-left-color: var(--md-warning);
@@ -46,12 +60,26 @@ body.md-theme #ds-editor .app-modal-footer {
 }
 
 #ds-workflow[data-step="preview"] #ds-workflow-icon,
+#ds-workflow[data-step="current_error"] #ds-workflow-icon,
+#ds-workflow[data-step="retrying"] #ds-workflow-icon,
 #ds-workflow[data-step="expired"] #ds-workflow-icon {
     color: var(--md-warning);
 }
 
 #ds-workflow[data-step="apply"] {
     background: var(--md-primary-soft);
+}
+
+#ds-workflow[data-step="error"],
+#ds-workflow[data-step="disconnected"] {
+    border-color: var(--md-danger-border);
+    border-left-color: var(--md-danger);
+    background: var(--md-danger-soft);
+}
+
+#ds-workflow[data-step="error"] #ds-workflow-icon,
+#ds-workflow[data-step="disconnected"] #ds-workflow-icon {
+    color: var(--md-danger);
 }
 
 @media (max-width: 600px) {

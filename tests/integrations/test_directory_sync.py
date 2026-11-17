@@ -1009,7 +1009,13 @@ def test_current_failure_preserves_full_sync_schedule(source, fetched, monkeypat
         assert updated.current_error
         assert updated.lease is None
         assert updated.current_lease is None
-        assert list(Current.select().dicts()) == previous
+        if failure == "timeout":
+            assert list(Current.select().dicts()) == previous
+        else:
+            assert not Current.select().where(Current.rotation == binding(source, "rotation", "s1").local_id).exists()
+            healthy = Current.get(Current.rotation == binding(source, "rotation", "s2").local_id)
+            assert healthy.status == "active"
+            assert healthy.observed_at == now + timedelta(seconds=60)
 
     clock[0] = scheduled
     assert service.process_due_sources() == 1

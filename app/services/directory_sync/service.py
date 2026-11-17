@@ -15,7 +15,7 @@ from app.modules.db.models import (
 from app.modules.db.transactions import lock_row, write_transaction
 from app.services.directory_sync.client import ApiClient
 from app.services.directory_sync.config import SyncBusy, SyncConfig, SyncError, current_api_enabled
-from app.services.directory_sync.diagnostics import error_message, logged_operation
+from app.services.directory_sync.diagnostics import error_message, log_failure, logged_operation
 from app.services.directory_sync.fetch import fetch_current, fetch_snapshot, instant
 from app.services.directory_sync.reconcile import reconcile
 
@@ -108,9 +108,11 @@ def run(source_id, *, mode="run", preview_token=None, scheduled=False):
     """Fetch outside transactions, then preview/apply one complete snapshot atomically."""
     token = claim(source_id, scheduled=scheduled)
     client = None
+    retry_interval = SyncConfig.model_fields["interval_seconds"].default
     try:
         source = Source.get_by_id(source_id)
         config = SyncConfig.model_validate(source.config)
+        retry_interval = config.interval_seconds
         if not authorized_actor(source.created_by_id, source.group_id):
             raise SyncError("Source owner no longer administers the destination group")
         client = ApiClient(config, decrypt_json(source.headers_encrypted, default={}),
@@ -177,7 +179,7 @@ def run(source_id, *, mode="run", preview_token=None, scheduled=False):
         # Exceptions may embed credentials/URLs/response bodies; store only our
         # controlled errors or an exception type. Never log upstream exception text.
         message = error_message(error, "Synchronization failed")
-        Source.update(last_error=message, next_run_at=utc_now() + timedelta(seconds=60)).where(
+        Source.update(last_error=message, next_run_at=utc_now() + timedelta(seconds=retry_interval)).where(
             Source.id == source_id, Source.lease == token,
         ).execute()
         if mode == "preview" and client:
@@ -214,6 +216,7 @@ def refresh_current(source_id, *, scheduled=False):
         client = ApiClient(config, decrypt_json(source.headers_encrypted, default={}),
                            heartbeat=lambda: heartbeat(source_id, token, current=True))
         rows = fetch_current(client, list(rotations))
+        status_failures = []
         with write_transaction():
             source = locked_source(source_id, token, source.revision, current=True)
             users = {b.external_id: b.local_id for b in Binding.select().where(
@@ -221,6 +224,13 @@ def refresh_current(source_id, *, scheduled=False):
             )}
             now = utc_now()
             for row in rows:
+                if row.get("_status_error"):
+                    rotation_id = rotations[row["id"]]
+                    status_failures.append((rotation_id, row["_status_error"]))
+                    # A malformed answer must not leave this slot assigned to
+                    # the previous person while healthy slots are refreshed.
+                    Current.delete().where(Current.source == source.id, Current.rotation == rotation_id).execute()
+                    continue
                 if row["status"] == "active" and row["user_id"] not in users:
                     needs_full_sync = True
                     raise SyncError("Current duty references a new person; a full synchronization is required")
@@ -242,10 +252,24 @@ def refresh_current(source_id, *, scheduled=False):
                 else:
                     Current.create(**values)
             # Cache expiry controls whether an answer is usable, not polling frequency.
-            Source.update(last_current_at=now, current_error=None,
-                          next_current_at=now + timedelta(seconds=config.current_interval_seconds)).where(
+            updates = {"next_current_at": now + timedelta(seconds=config.current_interval_seconds)}
+            if status_failures:
+                rotation_id, first_error = status_failures[0]
+                partial_message = (
+                    f"Current duty updated for {len(rows) - len(status_failures)} of {len(rows)} schedules; "
+                    f"{len(status_failures)} failed. Rotation {rotation_id}: {first_error}"
+                )
+                updates["current_error"] = partial_message
+            else:
+                updates.update(last_current_at=now, current_error=None)
+            Source.update(**updates).where(
                 Source.id == source.id,
             ).execute()
+        if status_failures:
+            for rotation_id, error in status_failures:
+                log_failure(error, source_id=source_id, operation="current.status", rotation_id=rotation_id)
+            # Report the partial result only after committing healthy answers.
+            raise SyncError(partial_message)
     except Exception as error:
         message = error_message(error, "Current duty refresh failed")
         updates = {"current_error": message, "next_current_at": utc_now() + timedelta(seconds=retry_interval)}

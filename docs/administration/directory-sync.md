@@ -123,6 +123,14 @@ Ordinary import rules still apply, including upstream updates, local-edit replac
 
 While a full import or preview is queued or running, the open configuration form polls its status every 1.5 seconds. These reads do not start imports. Polling stops when the operation finishes or the form closes.
 
+Status reads do not acquire a database write lock. If a status request fails temporarily, the editor shows that the operation's state is unknown and retries with increasing delays, up to five failed reads. It then offers **Refresh status**; it does not submit Preview or Apply again. Preview/import errors appear in the footer beside the action buttons.
+
+An invalid current-duty status affects only that schedule: its cached assignment is removed and valid answers for other schedules are saved. The source error reports the number updated and the first affected local rotation ID; logs identify every affected rotation without including response values. A fully successful check clears the error. Transport failures and responses with missing or duplicate schedule IDs still reject the whole refresh.
+
+Failed full imports retry after the configured full-sync interval, rather than a fixed 60 seconds. Changing that interval after an error sets the next attempt relative to the save time.
+
+Deleting imported resources requires their ownership bindings. If the recorded import indicates missing bindings, deletion stops without changing data and explains that the old resources must be selected explicitly. It never guesses ownership from matching names. The SQLite source-deletion migration preserves bindings, imported shifts and current-duty cache when adding or removing its columns; it cannot reconstruct data lost by an earlier version of the migration.
+
 While periodic synchronization is enabled, current-duty errors (including an unknown status or an API timeout) are retried separately after the configured current-duty interval and do not move the next full import forward. A paused source gets one current-duty check after a manual import; a failed check is not retried automatically. A newly detected missing person can request one early full import. Further errors do not trigger additional early imports until current duty recovers; scheduled full imports continue at their configured interval. The current-duty error remains visible until a successful refresh.
 
 ## Choosing update behavior
@@ -308,7 +316,9 @@ The adjacent **Current duty interval (seconds)** field accepts 10–3600 seconds
 
 `current_fields.status` must resolve to one of the four API statuses above, with exact spelling and case. Mapping paths are relative to each record selected by `operations.current.items`. If an API uses a different enum, map it explicitly with `values`; for example, **only if your API defines `ON_DUTY` as active**, use `{"path": "status", "values": {"ON_DUTY": "active"}}`. Map its other states according to that API's contract. Nested objects need the path to their status string, such as `state.code`.
 
-Status errors identify the response item and mapping, and distinguish a missing path, null, an invalid JSON type, an unmapped enum and a case/whitespace mismatch. Raw response values are omitted. Failed validation preserves the previous current-duty cache only until its existing expiry. Fixing current-duty mappings does not require another import preview.
+The org-service preset maps `not_configured` to `unavailable`, preserving the four standard statuses. Such a response assigns no person. This default applies to new sources; existing saved mappings are not overwritten.
+
+Status errors identify the response item and mapping, and distinguish a missing path, null, an invalid JSON type, an unmapped enum and a case/whitespace mismatch. Raw response values are omitted. An invalid status clears only that schedule's cached assignment; valid answers for other schedules are saved. Transport or whole-response validation failures preserve the previous cache only until its existing expiry. Fixing current-duty mappings does not require another import preview.
 
 Responses remain usable for at most `current_max_age_seconds`, default 120, configurable in mapping JSON. `valid_until` and the effective end can shorten this period. This freshness limit is independent of the polling interval: if an answer expires before the next check, IR reports no current assignee until a fresh usable answer arrives. Changing the interval never extends an existing answer's validity. After an API failure, the previous answer is usable only until expiry. Current duty refresh runs separately from full imports and accounts for absence changes without relying on schedule revisions. Scheduled full imports preserve the next current-duty deadline; an explicit import through Apply or Run still requests an immediate check.
 
@@ -409,6 +419,8 @@ omitted. Source status also exposes the safe constraint reason instead of only
 | No teams in the preview | Catalog data and `team_filter`; org-service needs nonempty `enrolledScopeUuid`. |
 | A team is marked `skip` | Its local match and whether managing matched teams is enabled. |
 | Email conflict | Emails for everyone referenced, including leaders and replacements; duplicates and deleted matching accounts. |
+| `Schedule names are not unique` | The message identifies external schedules with the same mapped name. Configure distinct names within each team. |
+| `Rotation name conflict` | The message identifies the team, external schedule and existing IR rotation. Rename the conflicting rotation or adjust the mapping. For retained imports, select the archived source explicitly. If an obsolete imported slot is holding the name, review whether `delete_missing` should remove it. |
 | Cannot enable periodic updates | Apply the first preview, or a new preview after changing import data, rules, API address or credentials. |
 | `Preview expired` or `Local data changed since preview` | Fetch and review a new preview. |
 | Calendar exists but no current assignee | `current_error`, current status/freshness, user activity and enabled periodic updates. |
@@ -418,3 +430,5 @@ Transient failures receive up to three attempts. Limits are 8 MiB per response, 
 Response sample requests report external API failures as `sync_api_error`: HTTP 502 for connection or response failures, and HTTP 504 for timeouts. HTTP 409 `sync_conflict` refers to synchronization state, such as a busy source or stale revision. Earlier versions also returned `teams: API connection failed` as `sync_conflict`; that code alone does not prove a team conflict or concurrent run. Background execution requests still return HTTP 202; read subsequent failure details from `last_error` or `current_error`.
 
 A full import is applied in one transaction after all data has loaded. A failed request prevents a partial result from being applied. A per-source lock limits concurrent runs, and queued work survives scheduler restarts.
+
+Schedules are matched by external ID. Reordering unnamed API schedules can change their generated names; these renames are applied together without replacing rotation IDs or shift links. Preview rolls them back. Missing imported rotations release their names only when removal is enabled with `delete_missing`.

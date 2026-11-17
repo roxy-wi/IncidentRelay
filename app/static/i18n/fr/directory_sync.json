@@ -1,4 +1,12 @@
 {
+  "ds.format_json": "Formater le JSON",
+  "ds.workflow_title_error": "Échec de la synchronisation",
+  "ds.workflow_title_current_error": "Échec de la vérification des astreintes",
+  "ds.workflow_title_retrying": "Reconnexion en cours",
+  "ds.workflow_title_disconnected": "État de synchronisation indisponible",
+  "ds.workflow_retrying": "Impossible de lire l’état de l’opération. Elle est peut-être toujours en cours ; nouvelle tentative automatique.",
+  "ds.workflow_disconnected": "Impossible de lire l’état après plusieurs tentatives. L’opération est peut-être toujours en cours. Actualisez son état avant toute autre action.",
+  "ds.refresh_status": "Actualiser l’état",
   "ds.skip_tls": "Ignorer la vérification du certificat TLS",
   "ds.skip_tls_hint": "Pour les API avec des certificats autosignés. Désactive la vérification du certificat et du nom du serveur pour toutes les requêtes de cette source uniquement. Désactivé par défaut.",
   "ds.title": "Synchronisation d'annuaires",

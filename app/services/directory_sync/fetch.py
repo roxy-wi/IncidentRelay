@@ -259,7 +259,7 @@ def map_current_status(record, fields, item_number):
 
 
 def fetch_current(client, schedule_ids):
-    """Require exactly one valid answer per requested slot, including vacant slots."""
+    """Match every requested slot and isolate invalid statuses to their own rows."""
     result = []
     size = 1 if client.config.current_fetch == "per_schedule" else 500
     for start in range(0, len(schedule_ids), size):
@@ -279,7 +279,13 @@ def fetch_current(client, schedule_ids):
             raise SyncError("current: response must include every requested schedule exactly once")
         for item_number, (raw, row) in enumerate(zip(rows, mapped, strict=True), start + 1):
             row["id"] = identity(row.get("id"), "current schedule")
-            row["status"] = map_current_status(raw, client.config.current_fields, item_number)
+            try:
+                row["status"] = map_current_status(raw, client.config.current_fields, item_number)
+            except SyncError as error:
+                # Keep identity/coverage validation strict; only a known schedule
+                # can be marked failed without affecting other assignments.
+                row["_status_error"] = error
+                continue
             if row["status"] == "active":
                 row["user_id"] = identity(row.get("user_id"), "current person")
             if row.get("valid_until"):

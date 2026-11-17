@@ -26,7 +26,17 @@
             <small id="ds-skip-tls-hint" class="muted">{{ _('ds.skip_tls_hint') }}</small>
           </div>
           <div class="form-group"><label for="ds-headers">{{ _('ds.headers') }}</label><input id="ds-headers" type="text" class="input code-textarea" spellcheck="false" autocomplete="off" aria-describedby="ds-headers-hint" placeholder='{"Authorization": "PAT …"}'><small id="ds-headers-hint" class="muted">{{ _('ds.headers_hint') }}</small></div>
-          <div class="form-group"><label for="ds-operations">{{ _('ds.operations') }}</label><textarea id="ds-operations" class="code-textarea" rows="12" spellcheck="false" required></textarea><small class="muted">{{ _('ds.operations_hint') }}</small></div>
+          <div class="form-group">
+            <label for="ds-operations">{{ _('ds.operations') }}</label>
+            <div class="json-editor">
+              <div class="json-editor-header">
+                <span>JSON</span>
+                <button id="ds-format-operations" type="button" class="btn btn-small">{{ _('ds.format_json') }}</button>
+              </div>
+              <textarea id="ds-operations" class="input code-textarea json-editor-textarea" rows="12" spellcheck="false" autocomplete="off" required></textarea>
+            </div>
+            <small class="muted">{{ _('ds.operations_hint') }}</small>
+          </div>
         </fieldset>
         <fieldset class="form-stack"><legend>{{ _('ds.mapping') }}</legend>
           <p class="muted">{{ _('ds.mapping_hint') }}</p>
@@ -39,7 +49,16 @@
             <button id="ds-sample" class="btn btn-info" type="button"><i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i> {{ _('ds.sample') }}</button>
           </div>
           <pre id="ds-sample-output" class="table-wrapper" hidden></pre>
-          <div class="form-group"><label for="ds-mapping">{{ _('ds.fields') }}</label><textarea id="ds-mapping" class="code-textarea" rows="14" spellcheck="false" required></textarea></div>
+          <div class="form-group">
+            <label for="ds-mapping">{{ _('ds.fields') }}</label>
+            <div class="json-editor">
+              <div class="json-editor-header">
+                <span>JSON</span>
+                <button id="ds-format-mapping" type="button" class="btn btn-small">{{ _('ds.format_json') }}</button>
+              </div>
+              <textarea id="ds-mapping" class="input code-textarea json-editor-textarea" rows="14" spellcheck="false" autocomplete="off" required></textarea>
+            </div>
+          </div>
           <div id="ds-team-matches" class="form-grid-2"></div>
         </fieldset>
         <fieldset class="form-stack"><legend>{{ _('ds.behavior') }}</legend>
@@ -78,6 +97,7 @@
         <i id="ds-workflow-icon" class="fa-solid fa-circle-info" aria-hidden="true"></i>
         <div><strong id="ds-workflow-title"></strong><p id="ds-workflow-detail"></p></div>
       </div>
+      <button id="ds-refresh-status" class="btn" type="button" hidden>{{ _('ds.refresh_status') }}</button>
       <button id="ds-save" class="btn btn-primary" type="submit" form="ds-form" aria-describedby="ds-workflow">1. {{ _('ds.save') }}</button>
       <button id="ds-preview" type="button" class="btn" aria-describedby="ds-workflow">2. {{ _('ds.preview') }}</button>
       <button id="ds-apply" type="button" class="btn" aria-describedby="ds-workflow" disabled>3. {{ _('ds.apply') }}</button>

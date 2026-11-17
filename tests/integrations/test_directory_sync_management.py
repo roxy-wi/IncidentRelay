@@ -103,6 +103,32 @@ def test_delete_data_only_removes_source_created_resources(client, admin_headers
     assert [row.id for row in User.select().where(User.deleted == False)] == user_ids
 
 
+@pytest.mark.parametrize("kind", [None, "team", "rotation"])
+def test_delete_refuses_missing_provenance_without_removing_any_data(client, admin_headers, source, fetched, kind):
+    service.run(source.id)
+    query = Binding.delete().where(Binding.source == source.id)
+    if kind:
+        query = query.where(Binding.kind == kind)
+    query.execute()
+    response = remove(client, admin_headers, source, "delete")
+    assert response.status_code == 409
+    assert "bindings are missing" in response.json["message"]
+    assert not Source.get_by_id(source.id).deleted
+    assert not Team.get().deleted
+    assert not Rotation.select().where(Rotation.deleted == True).exists()
+    assert Shift.select().count() == 1
+    assert remove(client, admin_headers, source, "keep").status_code == 200
+
+
+def test_delete_allows_intentionally_skipped_existing_teams(client, admin_headers, source, fetched):
+    existing = create_team(group=source.group, name="Platform")
+    service.run(source.id)
+    assert not Binding.select().where(Binding.kind == "rotation").exists()
+    response = remove(client, admin_headers, source, "delete")
+    assert response.status_code == 200, response.json
+    assert not Team.get_by_id(existing.id).deleted
+
+
 @pytest.mark.parametrize("action", ["keep", "delete"])
 def test_repeated_removal_is_idempotent(client, admin_headers, source, fetched, action):
     service.run(source.id)

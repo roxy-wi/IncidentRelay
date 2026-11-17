@@ -94,7 +94,7 @@ def error_message(error, prefix):
     return f"{prefix} ({type(error).__name__})"
 
 
-def log_failure(error, *, source_id=None, operation, http_status=None):
+def log_failure(error, *, source_id=None, operation, http_status=None, rotation_id=None):
     """Record one failure once, including safe stack frames and all causal types."""
     if getattr(error, "_directory_sync_error_id", None):
         return error._directory_sync_error_id
@@ -113,6 +113,8 @@ def log_failure(error, *, source_id=None, operation, http_status=None):
         "error_type": type(error).__name__, "error_message": error_message(error, "Synchronization failed"),
         "database_error": database_error_details(error), "exceptions": exceptions,
     }
+    if rotation_id is not None:
+        context["rotation_id"] = rotation_id
     level = logging.WARNING if isinstance(error, SyncBusy) else logging.ERROR
     logger.log(level, "Directory synchronization failed", extra={"extra": redact_secrets(context)})
     error._directory_sync_error_id = error_id

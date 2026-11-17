@@ -207,6 +207,10 @@ def org_service_preset():
         }),
         user_fields={"id": "uuid", "username": "username", "email": "email", "phone": "contactPhone",
                      "name": {"paths": ["firstname", "lastname"], "join": " "}},
-        current_fields={"id": "scheduleUuid", "user_id": "currentEmployeeUuid", "status": "status",
+        current_fields={"id": "scheduleUuid", "user_id": "currentEmployeeUuid",
+                        "status": {"path": "status", "values": {
+                            "active": "active", "gap": "gap", "unavailable": "unavailable",
+                            "ambiguous": "ambiguous", "not_configured": "unavailable",
+                        }},
                         "valid_until": "validUntil", "start": "effectiveStart", "end": "effectiveEnd"},
     ).model_dump()

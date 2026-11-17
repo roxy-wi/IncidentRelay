@@ -1,5 +1,6 @@
 """Save, preview and apply without manually toggling the source schedule."""
 
+import sqlite3
 from datetime import timedelta
 
 import pytest
@@ -17,6 +18,31 @@ from tests.integrations.test_directory_sync import (
 from tests.integrations.test_directory_sync_current_mode import save
 
 URL = "/api/admin/directory-sync"
+
+
+@pytest.mark.parametrize("mode", ["preview", "apply"])
+@pytest.mark.parametrize("credential", ["jwt", "personal_token"])
+def test_status_read_during_sqlite_write_transaction(client, admin_headers, admin_user, source, db, mode, credential):
+    """A second connection holding the writer lock must not block UI polling."""
+    source.pending_mode = mode
+    source.save()
+    if credential == "personal_token":
+        from tests.integrations.test_admin_api_tokens import personal_token
+
+        _, admin_headers = personal_token(admin_user, ["directory-sync:read"], group_id=source.group_id)
+    writer = sqlite3.connect(db.database, timeout=0.1)
+    try:
+        writer.execute("BEGIN IMMEDIATE")
+        writer.execute("UPDATE directory_sync_source SET pending_mode = NULL WHERE id = ?", (source.id,))
+        response = client.get(f"{URL}/{source.id}", headers=admin_headers)
+        assert response.status_code == 200, response.json
+        assert response.json["pending_mode"] == mode
+        assert response.json["id"] == source.id
+        writer.commit()
+        assert client.get(f"{URL}/{source.id}", headers=admin_headers).json["pending_mode"] is None
+    finally:
+        writer.rollback()
+        writer.close()
 
 
 def queue(client, headers, source_id, action):

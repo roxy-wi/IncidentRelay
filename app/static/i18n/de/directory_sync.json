@@ -1,4 +1,12 @@
 {
+  "ds.format_json": "JSON formatieren",
+  "ds.workflow_title_error": "Synchronisierung fehlgeschlagen",
+  "ds.workflow_title_current_error": "Bereitschaftsprüfung fehlgeschlagen",
+  "ds.workflow_title_retrying": "Verbindung wird wiederhergestellt",
+  "ds.workflow_title_disconnected": "Synchronisierungsstatus nicht verfügbar",
+  "ds.workflow_retrying": "Der Vorgangsstatus konnte nicht gelesen werden. Der Vorgang läuft möglicherweise noch; die Abfrage wird automatisch wiederholt.",
+  "ds.workflow_disconnected": "Der Vorgangsstatus konnte auch nach mehreren Versuchen nicht gelesen werden. Der Vorgang läuft möglicherweise noch. Aktualisieren Sie den Status vor einer weiteren Aktion.",
+  "ds.refresh_status": "Status aktualisieren",
   "ds.skip_tls": "TLS-Zertifikat nicht prüfen",
   "ds.skip_tls_hint": "Für APIs mit selbstsignierten Zertifikaten. Deaktiviert die Zertifikats- und Hostnamenprüfung für alle Anfragen nur dieser Quelle. Standardmäßig ausgeschaltet.",
   "ds.title": "Verzeichnissynchronisierung",

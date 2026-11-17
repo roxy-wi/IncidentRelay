@@ -1,4 +1,12 @@
 {
+  "ds.format_json": "Format JSON",
+  "ds.workflow_title_error": "Synchronization failed",
+  "ds.workflow_title_current_error": "Current-duty check failed",
+  "ds.workflow_title_retrying": "Reconnecting to synchronization",
+  "ds.workflow_title_disconnected": "Synchronization status unavailable",
+  "ds.workflow_retrying": "Could not read the operation status. The operation may still be running; retrying automatically.",
+  "ds.workflow_disconnected": "Could not read the operation status after repeated attempts. The operation may still be running. Refresh its status before starting another action.",
+  "ds.refresh_status": "Refresh status",
   "ds.skip_tls": "Skip TLS certificate verification",
   "ds.skip_tls_hint": "For APIs with self-signed certificates. Disables certificate and hostname verification for all requests from this source only. Off by default.",
   "ds.title": "Directory synchronization",
