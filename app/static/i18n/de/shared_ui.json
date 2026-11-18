@@ -1,4 +1,6 @@
 {
+  "shared.user_teams.title": "Teams",
+  "shared.user_teams.empty": "Keine Teams zum Anzeigen.",
   "shared.action": "Aktion",
   "shared.actions": "Aktionen",
   "shared.edit": "Bearbeiten",

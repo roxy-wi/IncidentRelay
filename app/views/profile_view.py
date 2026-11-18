@@ -5,7 +5,7 @@ from flask import Blueprint, jsonify, request
 from app.api.schemas.auth import ChangePasswordSchema
 from app.api.schemas.profile import ActiveGroupSchema, ProfileTokenCreateSchema, ProfileUpdateSchema
 from app.login import hash_password, verify_password
-from app.modules.db import groups_repo, incident_core_repo, tokens_repo, users_repo
+from app.modules.db import groups_repo, incident_core_repo, teams_repo, tokens_repo, users_repo
 from app.services.integrations.auth import create_raw_token, hash_token
 from app.services.api_token_scopes import (
     ALLOWED_PROFILE_TOKEN_SCOPES,
@@ -14,8 +14,8 @@ from app.services.api_token_scopes import (
 )
 from app.services.audit import write_audit
 from app.services.rbac import can_read_group
-from app.services.authorization import delegated_token_bounds, refresh_authority
-from app.services.serializers.users import serialize_user
+from app.services.authorization import delegated_token_bounds, filter_team_ids, refresh_authority
+from app.services.serializers.users import serialize_user, serialize_user_team
 from app.services.serializers.tokens import serialize_api_token
 from app.services.validation import validate_body
 from app.services.user_oncall_status import get_user_oncall_status
@@ -61,6 +61,11 @@ def get_profile_groups(user):
 def serialize_profile(user):
     """Serialize profile data with token scopes selectable by this user."""
     data = serialize_user(user, groups=get_profile_groups(user))
+    memberships = teams_repo.list_user_team_memberships([user.id])
+    allowed_team_ids = set(filter_team_ids([item.team_id for item in memberships]))
+    data["teams"] = [
+        serialize_user_team(item) for item in memberships if item.team_id in allowed_team_ids
+    ]
     data["available_token_scopes"] = [
         scope
         for scope in PROFILE_TOKEN_SCOPE_OPTIONS

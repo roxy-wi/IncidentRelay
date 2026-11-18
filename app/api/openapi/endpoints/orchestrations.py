@@ -359,7 +359,10 @@ SIMULATION_SCHEMA = {
     "additionalProperties": False,
     "description": (
         "Provide exactly one of normalized_event or payload. source is required "
-        "when payload is used."
+        "when payload is used. normalized_event requires source, dedup_key and title. "
+        "The latest_payload wrapper copied from alert details is accepted. "
+        "Alertmanager payload accepts a webhook with an alerts array or a single "
+        "raw alert copied from the alert details."
     ),
 }
 

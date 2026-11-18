@@ -40,6 +40,7 @@ function renderProfileHeader(profile) {
     $("#profile-display-title").text(title);
     $("#profile-display-meta").text(metaItems.join(" · ") || i18n.t("profile.header.no_contact"));
     renderProfileGroupsSummary(profile.groups || []);
+    renderUserTeamMemberships("#profile-teams", profile.teams);
 }
 
 function renderProfileGroupsSummary(groups) {

@@ -1,4 +1,6 @@
 {
+  "shared.user_teams.title": "Команды",
+  "shared.user_teams.empty": "Нет команд для отображения.",
   "shared.action": "Действие",
   "shared.actions": "Действия",
   "shared.edit": "Изменить",

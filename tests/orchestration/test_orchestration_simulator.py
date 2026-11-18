@@ -181,6 +181,48 @@ def test_raw_alertmanager_payload_reports_selected_normalizer(db):
     assert event["title"] == "Disk full"
 
 
+@pytest.mark.parametrize("input_format", ["single_alert", "webhook", "alert_details"])
+def test_alertmanager_simulation_preserves_input_and_event_selection(input_format):
+    raw = {
+        "fingerprint": "disk-full",
+        "labels": {"alertname": "DiskFull", "instance": "host1:9100"},
+        "annotations": {"summary": "Disk full"},
+    }
+    if input_format == "alert_details":
+        payload = {"latest_alert_id": 1, "latest_payload": raw}
+    elif input_format == "single_alert":
+        payload = raw
+    else:
+        payload = {"alerts": [{"labels": {}}, raw]}
+    original = copy.deepcopy(payload)
+    _, event, count = normalize_simulation_payload(
+        source="alertmanager",
+        payload=payload,
+        event_index=1 if input_format == "webhook" else 0,
+    )
+
+    assert count == (2 if input_format == "webhook" else 1)
+    assert event["dedup_key"] == "disk-full"
+    assert event["labels"]["hostname"] == "host1"
+    assert event["payload"] == raw
+    assert payload == original
+
+
+def test_simulation_unwraps_alert_details_before_other_normalizers():
+    payload = {
+        "latest_alert_id": 1,
+        "latest_payload": {"title": "Database unavailable", "fingerprint": "db-1"},
+    }
+    original = copy.deepcopy(payload)
+    source, event, count = normalize_simulation_payload(source="webhook", payload=payload)
+
+    assert source == "webhook"
+    assert count == 1
+    assert event["title"] == "Database unavailable"
+    assert event["dedup_key"] == "db-1"
+    assert payload == original
+
+
 def test_replay_alert_and_execution_never_modify_production_state(db):
     group = create_group()
     team = create_team(group)

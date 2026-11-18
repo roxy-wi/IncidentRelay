@@ -66,7 +66,7 @@
   "orchestrations.rules.no_actions": "No actions",
   "orchestrations.rules.no_draft": "No draft",
   "orchestrations.simulator.input": "Eingabeereignis",
-  "orchestrations.simulator.help": "Test a draft without creating alerts or executing webhooks.",
+  "orchestrations.simulator.help": "Test ohne neue Alarme oder Webhook-Aufrufe. Normalisierte Ereignisse benötigen source, dedup_key und title. Für Rohdaten aus einem Alarm wählen Sie das Integrationsformat; Alertmanager akzeptiert einen einzelnen Alarm oder einen vollständigen Webhook.",
   "orchestrations.simulator.source": "Input format",
   "orchestrations.simulator.normalized": "Normalized event",
   "orchestrations.simulator.payload": "Event JSON",

@@ -1,7 +1,10 @@
+from peewee import JOIN
+
 from app.api.schemas.roles import TEAM_VIEWER_ROLE
 from app.db import database_proxy
 from app.modules.db.models import (
     AlertRoute,
+    Group,
     Rotation,
     RotationMember,
     RotationOverride,
@@ -47,6 +50,27 @@ def list_teams_for_user(user_id, roles=None, group_ids=None, active_only=True):
     if group_ids is not None:
         if not group_ids:
             return []
+        query = query.where(Team.group.in_(group_ids))
+    return list(query)
+
+
+def list_user_team_memberships(user_ids, group_ids=None):
+    """Load current memberships and team/group names together for a set of users."""
+    if not user_ids or group_ids == []:
+        return []
+    query = (
+        TeamUser.select(TeamUser, Team, Group)
+        .join(Team)
+        .join(Group, JOIN.LEFT_OUTER)
+        .where(
+            TeamUser.user.in_(user_ids),
+            TeamUser.active == True,
+            Team.deleted == False,
+            Team.group.is_null(True) | (Group.deleted == False),
+        )
+        .order_by(Team.name, Team.id)
+    )
+    if group_ids is not None:
         query = query.where(Team.group.in_(group_ids))
     return list(query)
 

@@ -28,6 +28,21 @@ def serialize_user_group(membership):
     }
 
 
+def serialize_user_team(membership):
+    """Serialize actual team membership, independently of administrative access."""
+    team = membership.team
+    group = team.group
+    return {
+        "team_id": team.id,
+        "team_slug": team.slug,
+        "team_name": team.name,
+        "group_id": team.group_id,
+        "group_name": group.name if group else None,
+        "role": membership.role,
+        "active": bool(team.active and (group is None or group.active)),
+    }
+
+
 def serialize_user(user, groups=None):
     """
     Serialize a user.

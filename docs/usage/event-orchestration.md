@@ -1051,6 +1051,8 @@ Minimum useful example:
 
 Choose an integration source to pass the payload through the same registered normalizer used by production ingestion.
 
+You can paste the entire **Payload** JSON from the IR alert details, including its `latest_payload` wrapper; select the original integration format. For Alertmanager, the simulator accepts a single raw alert or the full webhook with its `alerts` array. **Normalized event** requires `source`, `dedup_key`, and `title`; copying only labels is not enough. Input errors identify the missing fields or invalid structure in the error dialog.
+
 Supported sources in this release are:
 
 ```text

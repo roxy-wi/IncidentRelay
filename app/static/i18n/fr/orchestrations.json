@@ -66,7 +66,7 @@
   "orchestrations.rules.no_actions": "Aucune action",
   "orchestrations.rules.no_draft": "Aucun brouillon",
   "orchestrations.simulator.input": "Événement d’entrée",
-  "orchestrations.simulator.help": "Testez un brouillon sans créer d’alertes ni exécuter de webhooks.",
+  "orchestrations.simulator.help": "Test sans créer d’alertes ni appeler de webhooks. Un événement normalisé nécessite source, dedup_key et title. Pour les données brutes copiées d’une alerte, choisissez le format de l’intégration ; Alertmanager accepte une alerte seule ou un webhook complet.",
   "orchestrations.simulator.source": "Format d’entrée",
   "orchestrations.simulator.normalized": "Événement normalisé",
   "orchestrations.simulator.payload": "JSON de l’événement",

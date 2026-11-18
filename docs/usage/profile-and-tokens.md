@@ -55,6 +55,12 @@ The active group controls the current group context in the UI and for group-scop
 
 A normal user sees groups where they have active membership. A global admin can access all active groups according to global admin behavior.
 
+## Team memberships
+
+The **Teams** section in your profile lists your current team memberships across groups, with each team's group and your role. Disabled teams are marked; deleted teams and inactive memberships are omitted. Selecting an active group does not narrow this personal list. Administrative access alone does not count as team membership.
+
+The user details modal in **Administration → Users** shows the selected user's memberships. Group administrators see teams only within their current user-management scope. These lists are read-only; manage membership from the team page.
+
 ## Personal API tokens
 
 Personal tokens allow API access as the current user.

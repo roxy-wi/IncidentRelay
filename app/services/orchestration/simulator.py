@@ -48,6 +48,10 @@ class OrchestrationSimulationError(ValueError):
     """Base error for invalid or inaccessible simulation inputs."""
 
 
+class OrchestrationSimulationInputError(OrchestrationSimulationError):
+    """Input validation error whose message is safe to show to the caller."""
+
+
 class OrchestrationSimulationNotFound(OrchestrationSimulationError):
     pass
 
@@ -87,7 +91,7 @@ def _ensure_payload_size(value: Any, *, label: str) -> None:
         message = str(exc)
         if " exceeds the " in message:
             message = f"{label} exceeds the {maximum}-byte simulation limit"
-        raise OrchestrationSimulationError(message) from exc
+        raise OrchestrationSimulationInputError(message) from exc
 
 
 def get_orchestration(orchestration_id: int) -> EventOrchestration:
@@ -131,6 +135,41 @@ def get_simulation_version(
     )
 
 
+def _prepare_alertmanager_payload(payload: Mapping[str, Any]) -> Mapping[str, Any]:
+    """Accept both a webhook envelope and the single alert stored by IR."""
+    if "alerts" not in payload:
+        if all(key in payload for key in ("source", "dedup_key", "title")):
+            raise OrchestrationSimulationInputError(
+                "This is a normalized event. Select the Normalized event input format."
+            )
+        if not isinstance(payload.get("labels"), Mapping):
+            raise OrchestrationSimulationInputError(
+                "Alertmanager input must contain an alerts array or a single alert "
+                "with a labels object. Copy the raw payload from the alert details."
+            )
+        payload = {"alerts": [payload]}
+
+    alerts = payload.get("alerts")
+    if not isinstance(alerts, list) or not alerts:
+        raise OrchestrationSimulationInputError(
+            "Alertmanager alerts must be a non-empty array."
+        )
+    for index, alert in enumerate(alerts):
+        if not isinstance(alert, Mapping):
+            raise OrchestrationSimulationInputError(
+                f"Alertmanager alerts[{index}] must be an object."
+            )
+        for field in ("labels", "annotations"):
+            value = alert.get(field, {})
+            if field == "labels" and value is None:
+                continue
+            if not isinstance(value, Mapping):
+                raise OrchestrationSimulationInputError(
+                    f"Alertmanager alerts[{index}].{field} must be an object."
+                )
+    return payload
+
+
 def normalize_simulation_payload(
     *,
     source: str,
@@ -140,12 +179,21 @@ def normalize_simulation_payload(
 ) -> Tuple[str, Dict[str, Any], int]:
     source = str(source or "").strip().lower()
     if source not in SUPPORTED_SIMULATION_SOURCES:
-        raise OrchestrationSimulationError(
+        raise OrchestrationSimulationInputError(
             "Unsupported simulation source: " + (source or "missing")
         )
     if not isinstance(payload, Mapping):
-        raise OrchestrationSimulationError("Simulation payload must be an object")
+        raise OrchestrationSimulationInputError("Simulation payload must be an object")
     _ensure_payload_size(payload, label="Simulation payload")
+    # The alert details display AlertGroup.payload_summary, not just its raw event.
+    if "latest_alert_id" in payload and "latest_payload" in payload:
+        payload = payload["latest_payload"]
+        if not isinstance(payload, Mapping):
+            raise OrchestrationSimulationInputError(
+                "Alert details latest_payload must be an object."
+            )
+    if source == "alertmanager":
+        payload = _prepare_alertmanager_payload(payload)
 
     try:
         events = normalize_for_source(
@@ -156,26 +204,27 @@ def normalize_simulation_payload(
             copy_payload=True,
         )
     except UnknownNormalizerSource as exc:
-        raise OrchestrationSimulationError(str(exc)) from exc
+        raise OrchestrationSimulationInputError(str(exc)) from exc
     except Exception as exc:
-        raise OrchestrationSimulationError(
-            f"{source} payload could not be normalized"
+        raise OrchestrationSimulationInputError(
+            f"{source} payload could not be normalized. "
+            "Check the selected input format and the payload structure."
         ) from exc
 
     if isinstance(events, Mapping):
         events = [events]
     if not isinstance(events, list) or not events:
-        raise OrchestrationSimulationError(
+        raise OrchestrationSimulationInputError(
             "The selected normalizer produced no events"
         )
     if event_index < 0 or event_index >= len(events):
-        raise OrchestrationSimulationError(
+        raise OrchestrationSimulationInputError(
             f"event_index must be between 0 and {len(events) - 1}"
         )
 
     event = events[event_index]
     if not isinstance(event, Mapping):
-        raise OrchestrationSimulationError(
+        raise OrchestrationSimulationInputError(
             "The selected normalizer produced an invalid event"
         )
     normalized = copy.deepcopy(dict(event))
@@ -187,7 +236,7 @@ def normalize_simulation_payload(
 
 def prepare_normalized_event(event: Mapping[str, Any]) -> Dict[str, Any]:
     if not isinstance(event, Mapping):
-        raise OrchestrationSimulationError("normalized_event must be an object")
+        raise OrchestrationSimulationInputError("normalized_event must be an object")
     normalized = copy.deepcopy(dict(event))
     _ensure_payload_size(normalized, label="Normalized event")
     _validate_normalized_event(normalized)
@@ -201,12 +250,14 @@ def _validate_normalized_event(event: Mapping[str, Any]) -> None:
         if event.get(key) in (None, "")
     ]
     if missing:
-        raise OrchestrationSimulationError(
-            "Normalized event is missing: " + ", ".join(missing)
+        raise OrchestrationSimulationInputError(
+            "Normalized event is missing: " + ", ".join(missing) + ". "
+            "For raw integration data, select its input format (for example, Alertmanager). "
+            "Labels alone are not a normalized event."
         )
     labels = event.get("labels")
     if labels is not None and not isinstance(labels, Mapping):
-        raise OrchestrationSimulationError(
+        raise OrchestrationSimulationInputError(
             "normalized_event.labels must be an object"
         )
 

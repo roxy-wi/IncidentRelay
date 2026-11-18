@@ -205,7 +205,12 @@ def handle_orchestration_simulation_error(error):
     else:
         code = "orchestration_simulation_invalid"
         status = 400
-    return jsonify({"error": code, "message": "Orchestration simulation failed."}), status
+    message = (
+        str(error)
+        if isinstance(error, simulator.OrchestrationSimulationInputError)
+        else "Orchestration simulation failed."
+    )
+    return jsonify({"error": code, "message": message}), status
 
 
 @orchestrations_bp.route("", methods=["GET"])

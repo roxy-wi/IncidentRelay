@@ -1,4 +1,6 @@
 {
+  "shared.user_teams.title": "团队",
+  "shared.user_teams.empty": "没有可显示的团队。",
   "shared.action": "操作",
   "shared.actions": "操作",
   "shared.edit": "编辑",

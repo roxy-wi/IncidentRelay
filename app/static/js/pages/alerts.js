@@ -2092,19 +2092,34 @@ function renderAlertPrimaryDetails(alert, modal) {
         );
     }
 
-    if (eventLink) {
-        target.append(
-            $("<div>")
-                .addClass("alert-primary-links")
-                .append(
-                    $("<a>")
-                        .attr("href", eventLink)
-                        .attr("target", "_blank")
-                        .attr("rel", "noopener noreferrer")
-                        .addClass("btn btn-secondary btn-sm")
-                        .text(i18n.t("alert_details.primary.open_source"))
-                )
+    const resourceLinks = Array.isArray(alert.resource_links)
+        ? alert.resource_links : (eventLink ? [{kind: "source", url: eventLink}] : []);
+    const linkLabels = {
+        source: "alert_details.primary.open_source",
+        dashboard: "alert_details.primary.open_dashboard",
+        panel: "alert_details.primary.open_panel",
+        runbook: "alert_details.primary.open_runbook"
+    };
+    const links = $("<div>").addClass("alert-primary-links");
+    const seenUrls = new Set();
+    resourceLinks.forEach(function (link) {
+        if (!link || !Object.hasOwn(linkLabels, link.kind) || typeof link.url !== "string") { return; }
+        let url;
+        try { url = new URL(link.url); } catch (_) { return; }
+        if (!["http:", "https:"].includes(url.protocol) || seenUrls.has(url.href)) { return; }
+        seenUrls.add(url.href);
+        links.append(
+            $("<a>")
+                .attr("href", link.url)
+                .attr("target", "_blank")
+                .attr("rel", "noopener noreferrer")
+                .attr("data-alert-resource", link.kind)
+                .addClass("btn btn-secondary btn-sm")
+                .text(i18n.t(linkLabels[link.kind]))
         );
+    });
+    if (links.children().length) {
+        target.append(links);
     }
 
     target.append(renderAlertPrimaryLabels(labels));

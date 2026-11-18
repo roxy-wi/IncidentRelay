@@ -10,6 +10,7 @@ from app.services.serializers.services import serialize_service_short, serialize
 from app.services.serializers.teams import serialize_team_short
 from app.services.serializers.users import serialize_user_short
 from app.services.alerts.shelving import serialize_shelve_state
+from app.services.links import build_alert_resource_links
 
 
 def extract_alert_event_link(alert):
@@ -277,6 +278,7 @@ def serialize_alert(
         "labels": alert.labels or {},
         "labels_count": len(alert.labels or {}),
         "event_link": extract_alert_event_link(alert),
+        "resource_links": build_alert_resource_links(alert),
         "assignee": alert.assignee.username if alert.assignee else None,
         "assignee_id": alert.assignee.id if alert.assignee else None,
         "assignee_details": serialize_user_short(alert.assignee),
@@ -636,6 +638,7 @@ def serialize_alert_group(
         "label_values": group.label_values or {},
         "labels": group.common_labels or {},
         "labels_count": len(group.common_labels or {}),
+        "resource_links": build_alert_resource_links(group),
 
         "alert_count": group.alert_count,
         "firing_count": group.firing_count,
@@ -797,8 +800,22 @@ def serialize_attached_maintenance_ref(obj):
     }
 
 
+LEGACY_ALERT_GROUP_STEP_TITLES = {
+    ("group_created", "Incident group created"): "Alert group created",
+    (
+        "group_created_for_existing_alert",
+        "Incident group created for existing alert",
+    ): "Alert group created for existing alert",
+    ("group_reused", "Existing incident group reused"): "Existing alert group reused",
+}
+
+
 def serialize_alert_explain_step(row):
     created_at = serialize_utc_datetime(getattr(row, "created_at", None))
+    title = row.title
+    if row.stage == "group":
+        # Display historical terminology consistently without rewriting stored traces.
+        title = LEGACY_ALERT_GROUP_STEP_TITLES.get((row.code, title), title)
 
     return {
         "id": row.id,
@@ -806,7 +823,7 @@ def serialize_alert_explain_step(row):
         "stage": row.stage,
         "code": row.code,
         "status": row.status,
-        "title": row.title,
+        "title": title,
         "message": row.message,
         "data": row.data or {},
         "created_at": created_at,

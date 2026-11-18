@@ -66,7 +66,7 @@
   "orchestrations.rules.no_actions": "无操作",
   "orchestrations.rules.no_draft": "无草稿",
   "orchestrations.simulator.input": "输入事件",
-  "orchestrations.simulator.help": "测试草稿，不会创建告警或执行 Webhook。",
+  "orchestrations.simulator.help": "测试不会创建告警或调用 Webhook。标准化事件需要 source、dedup_key 和 title。对于从告警详情复制的原始数据，请选择对应的集成格式；Alertmanager 支持单条告警或完整的 Webhook。",
   "orchestrations.simulator.source": "输入格式",
   "orchestrations.simulator.normalized": "标准化事件",
   "orchestrations.simulator.payload": "事件 JSON",

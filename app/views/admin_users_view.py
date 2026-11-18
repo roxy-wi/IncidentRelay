@@ -5,7 +5,8 @@ from app.api.schemas.roles import GROUP_VIEWER_ROLE
 from app.api.schemas.users import UserCreateSchema, UserUpdateSchema
 from app.db import database_proxy as db
 from app.login import hash_password
-from app.modules.db import groups_repo, users_repo
+from app.modules.db import groups_repo, teams_repo, users_repo
+from app.services.authorization import filter_team_ids
 from app.services.audit import write_audit
 from app.services.rbac import (
     is_admin_user,
@@ -13,7 +14,7 @@ from app.services.rbac import (
     require_admin_user,
     require_user_management_access,
 )
-from app.services.serializers.users import serialize_user
+from app.services.serializers.users import serialize_user, serialize_user_team
 from app.services.validation import (
     make_error_response,
     safe_exception_response,
@@ -24,10 +25,15 @@ from app.services.validation import (
 admin_users_bp = Blueprint("admin_users_api", __name__)
 
 
-def serialize_admin_user(user):
-    """Serialize a user for the admin workspace with group membership metadata."""
+def serialize_admin_user(user, teams=None):
+    """Serialize a user with group metadata and caller-visible team memberships."""
     memberships = groups_repo.list_user_groups(user.id)
     data = serialize_user(user, groups=memberships)
+    if teams is None:
+        teams = teams_repo.list_user_team_memberships([user.id])
+        allowed_team_ids = set(filter_team_ids([item.team_id for item in teams]))
+        teams = [item for item in teams if item.team_id in allowed_team_ids]
+    data["teams"] = [serialize_user_team(item) for item in teams]
     current_user = getattr(request, "current_user", None)
 
     data["is_current_user"] = bool(current_user and current_user.id == user.id)
@@ -82,7 +88,19 @@ def _empty_users_response(page_size=None):
     return jsonify(result)
 
 
-def _paginated_users_response(query):
+def _serialize_admin_users(users, group_ids):
+    """Fetch team memberships once per page, within the caller's group scope."""
+    users = list(users)
+    teams_by_user = {user.id: [] for user in users}
+    memberships = teams_repo.list_user_team_memberships(list(teams_by_user), group_ids=group_ids)
+    allowed_team_ids = set(filter_team_ids([item.team_id for item in memberships]))
+    for item in memberships:
+        if item.team_id in allowed_team_ids:
+            teams_by_user[item.user_id].append(item)
+    return [serialize_admin_user(user, teams=teams_by_user[user.id]) for user in users]
+
+
+def _paginated_users_response(query, group_ids):
     result = users_repo.paginate_user_query(
         query,
         page=_request_page(),
@@ -92,7 +110,7 @@ def _paginated_users_response(query):
 
     return jsonify(
         {
-            "items": [serialize_admin_user(item) for item in result["items"]],
+            "items": _serialize_admin_users(result["items"], group_ids),
             "pagination": result["pagination"],
             "summary": result["summary"],
             "search": _request_search(),
@@ -111,6 +129,7 @@ def admin_list_users():
     user = request.current_user
 
     if is_admin_user(user):
+        group_ids = None
         query = users_repo.build_all_users_query()
     else:
         group_ids = get_allowed_group_ids(
@@ -124,12 +143,12 @@ def admin_list_users():
         if query is None:
             return _empty_users_response()
 
-        return _paginated_users_response(query)
+        return _paginated_users_response(query, group_ids)
 
     if query is None:
         return jsonify([])
 
-    return jsonify([serialize_admin_user(item) for item in query])
+    return jsonify(_serialize_admin_users(query, group_ids))
 
 
 @admin_users_bp.route("", methods=["POST"])
