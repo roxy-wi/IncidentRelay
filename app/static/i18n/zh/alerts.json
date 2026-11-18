@@ -8,7 +8,7 @@
   "alerts.actions.reload": "重新加载",
   "alerts.actions.create_incident": "创建事件",
   "alerts.actions.explain_trace": "解释处理轨迹",
-  "alerts.search.placeholder": "按 ID、告警名称、团队、负责人或来源搜索...",
+  "alerts.search.placeholder": "搜索文本、ID 或 label=value...",
   "alerts.filters.all_services": "全部服务",
   "alerts.filters.all_statuses": "全部状态",
   "alerts.filters.all_severities": "全部严重程度",

@@ -1179,7 +1179,9 @@ def paths():
                     ),
                     query_param(
                         "search",
-                        "Search by id, title, team, assignee, source, route, rotation or group fields.",
+                        "Search text in group and child alert fields, including labels, or use one "
+                        "case-sensitive label=value condition. Values may be double-quoted JSON strings. "
+                        "Exact label conditions only match scalar labels, not titles or payload fields.",
                     ),
                     query_param(
                         "page",

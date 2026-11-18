@@ -2045,15 +2045,15 @@ body.md-theme .json-editor-header .btn {
   min-height: 28px;
   height: 28px;
   padding: 0 10px;
-  background: var(--md-sidebar-overlay);
-  color: var(--md-on-accent);
-  border-color: rgba(255, 255, 255, 0.12);
+  background: var(--md-primary-soft);
+  color: var(--md-text);
+  border-color: var(--md-primary);
   box-shadow: none;
 }
 
 body.md-theme .json-editor-header .btn:hover {
-  background: var(--md-sidebar-overlay-hover);
-  color: var(--md-on-accent);
+  background: var(--md-surface-hover);
+  color: var(--md-text);
 }
 
 body.md-theme .code-textarea,

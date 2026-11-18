@@ -6,6 +6,7 @@ import hashlib
 from peewee import Case, JOIN, fn
 
 from app.modules.db import alert_episodes_repo, compiled_select, incident_core_repo
+from app.modules.db.alert_search import json_text_contains, label_equals, parse_label_search
 
 from app.modules.db.models import (
     Alert,
@@ -287,6 +288,17 @@ def build_alert_groups_query(
         search = str(search).strip()
 
         if search:
+            label = parse_label_search(search)
+            if label is not None:
+                key, value = label
+                child_groups = Alert.select(Alert.group).where(
+                    Alert.group.is_null(False), label_equals(Alert.labels, key, value),
+                )
+                return query.where(
+                    label_equals(AlertGroup.common_labels, key, value)
+                    | AlertGroup.id.in_(child_groups)
+                )
+
             group_conditions = [
                 AlertGroup.title.contains(search),
                 AlertGroup.message.contains(search),
@@ -294,9 +306,9 @@ def build_alert_groups_query(
                 AlertGroup.group_key.contains(search),
                 AlertGroup.severity.contains(search),
                 AlertGroup.status.contains(search),
-                AlertGroup.common_labels.contains(search),
-                AlertGroup.label_values.contains(search),
-                AlertGroup.payload_summary.contains(search),
+                json_text_contains(AlertGroup.common_labels, search),
+                json_text_contains(AlertGroup.label_values, search),
+                json_text_contains(AlertGroup.payload_summary, search),
                 Team.slug.contains(search),
                 Team.name.contains(search),
                 AlertRoute.name.contains(search),
@@ -314,8 +326,8 @@ def build_alert_groups_query(
                 Alert.group_key.contains(search),
                 Alert.severity.contains(search),
                 Alert.status.contains(search),
-                Alert.labels.contains(search),
-                Alert.payload.contains(search),
+                json_text_contains(Alert.labels, search),
+                json_text_contains(Alert.payload, search),
             ]
 
             if search.isdigit():
