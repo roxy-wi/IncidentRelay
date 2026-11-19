@@ -4,6 +4,7 @@ import sqlite3
 from datetime import timedelta
 
 import pytest
+from peewee import SqliteDatabase
 
 from app.modules.common import utc_now
 from app.modules.db.models import DirectorySyncSource as Source
@@ -24,6 +25,9 @@ URL = "/api/admin/directory-sync"
 @pytest.mark.parametrize("credential", ["jwt", "personal_token"])
 def test_status_read_during_sqlite_write_transaction(client, admin_headers, admin_user, source, db, mode, credential):
     """A second connection holding the writer lock must not block UI polling."""
+    if not isinstance(db, SqliteDatabase):
+        pytest.skip("SQLite-specific writer locking regression")
+
     source.pending_mode = mode
     source.save()
     if credential == "personal_token":
