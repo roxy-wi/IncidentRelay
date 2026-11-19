@@ -44,6 +44,8 @@
   "shared.select.user": "Utilisateur n° {id}",
   "shared.select.user_placeholder": "Sélectionner un utilisateur...",
   "shared.select.no_users": "Aucun utilisateur trouvé",
+  "shared.select.search_placeholder": "Saisir pour rechercher…",
+  "shared.select.no_results": "Aucun résultat trouvé",
   "shared.timezone.select": "Sélectionner un fuseau horaire",
   "shared.timezone.browser": "Utiliser le fuseau horaire du navigateur",
   "shared.timezone.browser_named": "Utiliser le fuseau horaire du navigateur ({timezone})",

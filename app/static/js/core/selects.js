@@ -49,12 +49,12 @@ function restoreGlobalTeamFilterValue() {
             return String($(this).val()) === String(preferredTeamId);
         }).length
     ) {
-        select.val(preferredTeamId);
+        setSelectValue(select, preferredTeamId);
         writeStoredGlobalTeamId(preferredTeamId);
         return;
     }
 
-    select.val("");
+    setSelectValue(select, "");
     writeStoredGlobalTeamId("");
 }
 
@@ -73,7 +73,7 @@ function setSelectedTeamId(teamId, triggerChange) {
         return;
     }
 
-    select.val(value);
+    setSelectValue(select, value);
     writeStoredGlobalTeamId(value);
 
     if (triggerChange) {
@@ -126,6 +126,7 @@ function fillTeamSelect(selector, includeAll, callback, permission) {
     loadUiTeams(function (teams) {
         const select = $(selector);
 
+        destroyTomSelectIfExists(select[0]);
         select.empty();
 
         if (includeAll) {
@@ -148,6 +149,7 @@ function fillTeamSelect(selector, includeAll, callback, permission) {
 
         if (select.attr("id") === "global-team-filter") {
             restoreGlobalTeamFilterValue();
+            initSearchableSelect(select, {wrapperClass: "ts-wrapper searchable-select global-team-select"});
         } else if (permission) {
             selectPreferredTeam(selector);
         }
@@ -254,8 +256,84 @@ function isTomSelectLoaded() {
 
 function destroyTomSelectIfExists(selectElement) {
     if (selectElement && selectElement.tomselect) {
+        // Tom Select rewrites labels but does not restore them on destroy.
+        const controlId = selectElement.tomselect.control_input.id;
+        document.querySelectorAll("label").forEach(function (label) {
+            if (label.htmlFor === controlId) label.htmlFor = selectElement.id;
+        });
         selectElement.tomselect.destroy();
     }
+}
+
+function destroyTomSelects(root) {
+    $(root).find("select").each(function () { destroyTomSelectIfExists(this); });
+}
+
+function initSearchableSelect(selector, options) {
+    const element = getSelectElement(selector);
+    if (!element || !isTomSelectLoaded()) return null;
+    if (element.tomselect) return element.tomselect;
+
+    const modal = element.closest(".app-modal, .modal");
+    const picker = new TomSelect(element, Object.assign({
+        wrapperClass: "ts-wrapper searchable-select",
+        dropdownClass: "ts-dropdown searchable-select-dropdown",
+        dropdownParent: modal,
+        copyClassesToDropdown: false,
+        create: false,
+        allowEmptyOption: true,
+        maxOptions: 300,
+        searchField: ["text"],
+        placeholder: i18n.t("shared.select.search_placeholder"),
+        render: {
+            no_results: function (data, escape) {
+                return '<div class="no-results">' + escape(i18n.t("shared.select.no_results")) + '</div>';
+            }
+        }
+    }, options || {}));
+    // Keep form-field classes on the select: delegated change handlers and
+    // value readers must never match the generated wrapper or dropdown.
+    picker.wrapper.classList.remove(...element.classList);
+    if (modal && picker.dropdown.parentElement === modal) {
+        positionSearchableSelectInModal(picker, modal);
+    }
+    return picker;
+}
+
+function positionSearchableSelectInModal(picker, modal) {
+    // Keep the menu in the modal's stacking context, outside clipped cards and
+    // the scrolling dialog body. Its options scroll within the available space.
+    picker.dropdown.classList.add("searchable-select-modal-dropdown");
+    picker.positionDropdown = function () {
+        const control = picker.control.getBoundingClientRect();
+        const parent = modal.getBoundingClientRect();
+        const gap = 6;
+        const edge = 8;
+        const above = Math.max(0, control.top - Math.max(parent.top, 0) - edge - gap);
+        const below = Math.max(0, Math.min(parent.bottom, window.innerHeight) - control.bottom - edge - gap);
+        const desired = Math.min(200, picker.dropdown_content.scrollHeight);
+        const openAbove = below < desired + 2 && above > below;
+        picker.dropdown_content.style.maxHeight = Math.max(0, Math.min(200, (openAbove ? above : below) - 2)) + "px";
+        const width = Math.min(control.width, parent.width - edge * 2);
+        const left = Math.max(parent.left + edge, Math.min(control.left, parent.right - edge - width));
+        picker.dropdown.style.width = width + "px";
+        picker.dropdown.style.left = (left - parent.left) + "px";
+        picker.dropdown.style.top = (openAbove
+            ? control.top - parent.top - gap - picker.dropdown.offsetHeight
+            : control.bottom - parent.top + gap) + "px";
+    };
+    function onScroll(event) {
+        // Scrolling the option list must not dismiss it. Scrolling the form
+        // closes the menu so it cannot float over an unrelated field.
+        if (!picker.dropdown.contains(event.target)) picker.close();
+    }
+    function stopTracking() {
+        modal.removeEventListener("scroll", onScroll, true);
+    }
+    picker.on("dropdown_open", function () { modal.addEventListener("scroll", onScroll, true); });
+    picker.on("dropdown_close", stopTracking);
+    picker.on("destroy", stopTracking);
+    picker.on("type", function () { if (picker.isOpen) picker.positionDropdown(); });
 }
 
 function shouldUseTomSelect(selectElement) {

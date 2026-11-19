@@ -72,10 +72,37 @@
     border-left-color: var(--border-color);
 }
 
-/* Shared table filters: compact controls with explicit dropdown affordances. */
-body.md-theme .table-filter-control .ts-control,
-body.md-theme .table-filter-control.single.input-active .ts-control,
-body.md-theme .table-filter-control.multi.has-items .ts-control {
+.searchable-select {
+    width: 100%;
+    min-width: 0;
+}
+
+.searchable-select.single .ts-control > .item {
+    min-width: 0;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+}
+
+.searchable-select-dropdown .option {
+    overflow-wrap: anywhere;
+}
+
+body.md-theme .global-team-select {
+    width: clamp(180px, 22vw, 320px);
+}
+
+@media (max-width: 768px) {
+    body.md-theme .global-team-select {
+        width: 100%;
+    }
+}
+
+/* Shared filters and searchable fields use the same compact control style. */
+body.md-theme :is(.table-filter-control, .searchable-select) .ts-control,
+body.md-theme :is(.table-filter-control, .searchable-select).single.input-active .ts-control,
+body.md-theme :is(.table-filter-control, .searchable-select).multi.has-items .ts-control {
     --ts-pr-min: 30px;
     min-height: 35px;
     align-items: center;
@@ -89,7 +116,7 @@ body.md-theme .table-filter-control.multi.has-items .ts-control {
     box-shadow: 0 1px 2px rgba(15, 23, 42, 0.04);
 }
 
-body.md-theme .table-filter-control .ts-control::after {
+body.md-theme :is(.table-filter-control, .searchable-select) .ts-control::after {
     content: "";
     position: absolute;
     right: 12px;
@@ -102,19 +129,19 @@ body.md-theme .table-filter-control .ts-control::after {
     pointer-events: none;
 }
 
-body.md-theme .table-filter-control.dropdown-active .ts-control::after {
+body.md-theme :is(.table-filter-control, .searchable-select).dropdown-active .ts-control::after {
     top: calc(50% - 2px);
     transform: rotate(225deg);
 }
 
-body.md-theme .table-filter-control.focus .ts-control,
-body.md-theme .table-filter-control.single.input-active.focus .ts-control,
-body.md-theme .table-filter-control.multi.has-items.focus .ts-control {
+body.md-theme :is(.table-filter-control, .searchable-select).focus .ts-control,
+body.md-theme :is(.table-filter-control, .searchable-select).single.input-active.focus .ts-control,
+body.md-theme :is(.table-filter-control, .searchable-select).multi.has-items.focus .ts-control {
     border-color: var(--md-primary);
     box-shadow: 0 0 0 3px color-mix(in srgb, var(--md-primary) 14%, transparent);
 }
 
-body.md-theme .table-filter-control.multi .ts-control > .item {
+body.md-theme :is(.table-filter-control, .searchable-select).multi .ts-control > .item {
     margin: 0;
     padding: 0 7px;
     border: 0;
@@ -124,7 +151,7 @@ body.md-theme .table-filter-control.multi .ts-control > .item {
     line-height: 24px;
 }
 
-body.md-theme .table-filter-control .ts-control > .item {
+body.md-theme :is(.table-filter-control, .searchable-select) .ts-control > .item {
     display: inline-flex;
     align-items: center;
     min-width: 0;
@@ -137,7 +164,7 @@ body.md-theme .table-filter-control .ts-control > .item {
     white-space: nowrap;
 }
 
-body.md-theme .table-filter-control .item .remove {
+body.md-theme :is(.table-filter-control, .searchable-select) .item .remove {
     flex-shrink: 0;
 }
 
@@ -147,7 +174,7 @@ body.md-theme .table-filter-control.has-items:not(.focus) .ts-control > input {
     width: 0;
 }
 
-body.md-theme .table-filter-control .ts-dropdown {
+body.md-theme :is(.table-filter-control .ts-dropdown, .searchable-select-dropdown) {
     margin-top: 6px;
     border: 1px solid var(--md-border);
     border-radius: 10px;
@@ -155,11 +182,17 @@ body.md-theme .table-filter-control .ts-dropdown {
     box-shadow: 0 8px 24px rgba(15, 23, 42, 0.14);
 }
 
-body.md-theme .table-filter-control .ts-dropdown .option {
+body.md-theme :is(.table-filter-control .ts-dropdown, .searchable-select-dropdown) .option {
     padding: 9px 12px;
     color: var(--md-text);
 }
 
-body.md-theme .table-filter-control .ts-dropdown .active {
+body.md-theme :is(.table-filter-control .ts-dropdown, .searchable-select-dropdown) .active {
     background: var(--md-primary-soft);
+}
+
+/* Portaled menus remain inside their modal without being clipped by its cards. */
+body.md-theme .ts-dropdown.searchable-select-modal-dropdown {
+    position: absolute;
+    margin: 0;
 }

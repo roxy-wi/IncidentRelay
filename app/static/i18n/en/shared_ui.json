@@ -44,6 +44,8 @@
   "shared.select.user": "User #{id}",
   "shared.select.user_placeholder": "Select user...",
   "shared.select.no_users": "No users found",
+  "shared.select.search_placeholder": "Type to search…",
+  "shared.select.no_results": "No results found",
   "shared.timezone.select": "Select timezone",
   "shared.timezone.browser": "Use browser timezone",
   "shared.timezone.browser_named": "Use browser timezone ({timezone})",

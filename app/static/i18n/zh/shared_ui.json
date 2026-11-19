@@ -44,6 +44,8 @@
   "shared.select.user": "用户 #{id}",
   "shared.select.user_placeholder": "请选择用户...",
   "shared.select.no_users": "未找到用户",
+  "shared.select.search_placeholder": "输入以搜索…",
+  "shared.select.no_results": "未找到结果",
   "shared.timezone.select": "选择时区",
   "shared.timezone.browser": "使用浏览器时区",
   "shared.timezone.browser_named": "使用浏览器时区（{timezone}）",

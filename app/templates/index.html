@@ -91,7 +91,7 @@
     <link rel="stylesheet" href="/static/css/change_integrations.css?v=d41fbb3cc906">
     <link rel="stylesheet" href="/static/css/directory_sync.css?v=862596e4f4bf">
     <link rel="stylesheet" href="{{ url_for('static', filename='css/vendor/tom-select/tom-select.css') }}">
-    <link rel="stylesheet" href="{{ url_for('static', filename='css/table_filters.css') }}">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/table_filters.css', v='54f89b1dbe37') }}">
     <link rel="stylesheet" href="/static/css/vendor/select2/select2.min.css">
     <link rel="stylesheet" href="/static/css/vendor/select2/override-select2.css">
     <link rel="stylesheet" href="/static/css/theme_dark.css?v=425497c16706">
@@ -104,7 +104,7 @@
   messages: {{ i18n_messages | tojson }}
  };
  </script>
- <script src="{{ url_for('static', filename='js/core/i18n.js', v='b91b059d9f49') }}"></script>
+ <script src="{{ url_for('static', filename='js/core/i18n.js', v='d3b07d0505ba') }}"></script>
     <script src="/static/js/vendor/jquery-3.7.1.min.js"></script>
     <script src="/static/js/vendor/select2.min.js"></script>
     <script src="{{ url_for('static', filename='js/vendor/tom-select.complete.min.js') }}"></script>
@@ -317,7 +317,7 @@
                 <div class="topbar-actions">
 
                     <div class="topbar-select-group">
-                        <label class="topbar-select-label" for="global-team-filter">{{ _('common.team') }}</label>
+                        <label id="global-team-filter-label" class="topbar-select-label" for="global-team-filter">{{ _('common.team') }}</label>
                         <select id="global-team-filter" class="input topbar-select"></select>
                     </div>
                     <button id="topbar-profile" type="button" class="btn btn-small topbar-profile-btn">
@@ -446,7 +446,7 @@
 <script src="{{ url_for('static', filename='js/core/table_filters.js') }}"></script>
 <script src="{{ url_for('static', filename='js/core/alert_filter_state.js') }}"></script>
 <script src="{{ url_for('static', filename='js/core/page_url_state.js') }}"></script>
-<script src="/static/js/core/selects.js"></script>
+<script src="/static/js/core/selects.js?v=65111752c556"></script>
 <script src="/static/js/core/sortable_table.js"></script>
 <script src="/static/js/core/pwa.js"></script>
 <script src="/static/js/core/browser_push.js"></script>
@@ -485,7 +485,7 @@
 <script src="{{ url_for('static', filename='js/pages/business_services.js', v='8f2bde6b8979') }}"></script>
 <script src="{{ url_for('static', filename='js/pages/heartbeats.js') }}"></script>
 <script src="{{ url_for('static', filename='js/pages/maintenance_windows.js') }}"></script>
-<script src="{{ url_for('static', filename='js/pages/orchestrations.js') }}"></script>
+<script src="{{ url_for('static', filename='js/pages/orchestrations.js', v='eb63f57dfcd3') }}"></script>
 <script src="{{ url_for('static', filename='js/pages/orchestration_execution_trace.js') }}"></script>
 <script src="{{ url_for('static', filename='js/pages/escalation_policies.js') }}"></script>
 <script src="{{ url_for('static', filename='js/pages/notification_policies.js') }}"></script>

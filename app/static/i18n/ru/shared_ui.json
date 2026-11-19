@@ -44,6 +44,8 @@
   "shared.select.user": "Пользователь №{id}",
   "shared.select.user_placeholder": "Выберите пользователя...",
   "shared.select.no_users": "Пользователи не найдены",
+  "shared.select.search_placeholder": "Введите текст для поиска…",
+  "shared.select.no_results": "Ничего не найдено",
   "shared.timezone.select": "Выберите часовой пояс",
   "shared.timezone.browser": "Использовать часовой пояс браузера",
   "shared.timezone.browser_named": "Использовать часовой пояс браузера ({timezone})",
