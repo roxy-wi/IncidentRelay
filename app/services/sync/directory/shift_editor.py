@@ -5,9 +5,9 @@ import uuid
 from pydantic import Field
 
 from app.modules.db.models import DirectorySyncBinding as Binding, DirectorySyncShift as Shift, User
-from app.services.directory_sync.config import StrictModel, SyncError
-from app.services.directory_sync.fetch import instant, iso
-from app.services.directory_sync.runtime import source_for
+from app.services.sync.directory.config import StrictModel, SyncError
+from app.services.sync.directory.fetch import instant, iso
+from app.services.sync.directory.runtime import source_for
 
 
 class ReplacementInput(StrictModel):
@@ -37,7 +37,7 @@ def serialize_shift(shift):
 
 def editable_source(rotation):
     """Resolve ownership after serializing against imports and reconnections."""
-    from app.services.directory_sync.service import apply_lock
+    from app.services.sync.directory.service import apply_lock
 
     apply_lock()
     source = source_for("rotation", rotation.id)

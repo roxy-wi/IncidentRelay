@@ -7,11 +7,16 @@ from app.modules.db.models import (
     DirectorySyncShift as Shift, Rotation, Team,
 )
 from app.modules.db.transactions import lock_row
-from app.services.directory_sync.config import SyncError
+from app.services.sync.directory.config import SyncError
 
 
 def remove_source(source, *, delete_imported):
     """Archive a locked idle source within the caller's write transaction."""
+    from app.services.sync.cmdb.config import is_cmdb
+
+    if is_cmdb(source.config):
+        from app.services.sync.cmdb.reconcile import remove_catalog
+        return remove_catalog(source, delete_imported=delete_imported)
     if delete_imported:
         from app.services.change_intelligence.administration import lock_catalog
 

@@ -15,6 +15,7 @@
       <div id="ds-status" role="status" aria-live="polite"></div>
       <form id="ds-form" class="form-stack">
         <fieldset class="form-stack"><legend>{{ _('ds.connection') }}</legend>
+          <div class="form-group"><label for="ds-type">{{ _('ds.source_type') }}</label><select id="ds-type" class="input"><option value="directory">{{ _('ds.type_directory') }}</option><option value="jira_assets">{{ _('ds.type_jira_assets') }}</option></select></div>
           <div class="form-grid-2">
             <div class="form-group"><label for="ds-name">{{ _('ds.name') }}</label><input id="ds-name" class="input" required maxlength="255"></div>
             <div class="form-group"><label for="ds-group">{{ _('ds.group') }}</label><select id="ds-group" class="input" required></select></div>
@@ -26,7 +27,7 @@
             <small id="ds-skip-tls-hint" class="muted">{{ _('ds.skip_tls_hint') }}</small>
           </div>
           <div class="form-group"><label for="ds-headers">{{ _('ds.headers') }}</label><input id="ds-headers" type="text" class="input code-textarea" spellcheck="false" autocomplete="off" aria-describedby="ds-headers-hint" placeholder='{"Authorization": "PAT …"}'><small id="ds-headers-hint" class="muted">{{ _('ds.headers_hint') }}</small></div>
-          <div class="form-group">
+          <div class="form-group ds-directory-only">
             <label for="ds-operations">{{ _('ds.operations') }}</label>
             <div class="json-editor">
               <div class="json-editor-header">
@@ -38,7 +39,8 @@
             <small class="muted">{{ _('ds.operations_hint') }}</small>
           </div>
         </fieldset>
-        <fieldset class="form-stack"><legend>{{ _('ds.mapping') }}</legend>
+        {% include 'pages/cmdb_sync_fields.html' %}
+        <fieldset class="form-stack ds-directory-only"><legend>{{ _('ds.mapping') }}</legend>
           <p class="muted">{{ _('ds.mapping_hint') }}</p>
           <div class="form-group">
             <label for="ds-retained-source">{{ _('ds.retained_source') }}</label>
@@ -85,11 +87,11 @@
             <label id="ds-enabled-label" class="checkbox-label"><input id="ds-enabled" type="checkbox" aria-describedby="ds-enabled-hint"><span>{{ _('ds.enabled') }}</span></label>
           </div>
           <small id="ds-enabled-hint" class="muted" aria-live="polite" hidden></small>
-          <p class="muted">{{ _('ds.behavior_hint') }}</p>
+          <p id="ds-behavior-hint" class="muted">{{ _('ds.behavior_hint') }}</p>
         </fieldset>
         <div class="form-actions-inline"><button id="ds-run" type="button" class="btn">{{ _('ds.run') }}</button></div>
       </form>
-      <p class="muted">{{ _('ds.worker_hint') }}</p>
+      <p id="ds-worker-hint" class="muted">{{ _('ds.worker_hint') }}</p>
       <div class="table-wrapper"><table class="data-table"><thead><tr><th>{{ _('ds.entity') }}</th><th>{{ _('ds.external_id') }}</th><th>{{ _('ds.action') }}</th><th>{{ _('ds.changes') }}</th></tr></thead><tbody id="ds-preview-table"></tbody></table></div>
     </div>
     <div class="app-modal-footer">

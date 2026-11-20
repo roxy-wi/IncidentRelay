@@ -51,6 +51,7 @@ body.md-theme #ds-editor .json-editor-header .btn:hover {
 }
 
 #ds-workflow[data-step="preview"],
+#ds-workflow[data-step="mapping"],
 #ds-workflow[data-step="current_error"],
 #ds-workflow[data-step="retrying"],
 #ds-workflow[data-step="expired"] {
@@ -60,6 +61,7 @@ body.md-theme #ds-editor .json-editor-header .btn:hover {
 }
 
 #ds-workflow[data-step="preview"] #ds-workflow-icon,
+#ds-workflow[data-step="mapping"] #ds-workflow-icon,
 #ds-workflow[data-step="current_error"] #ds-workflow-icon,
 #ds-workflow[data-step="retrying"] #ds-workflow-icon,
 #ds-workflow[data-step="expired"] #ds-workflow-icon {
@@ -95,4 +97,14 @@ body.md-theme #ds-editor .json-editor-header .btn:hover {
         height: auto;
         white-space: normal;
     }
+}
+#ds-editor [hidden] {
+    display: none !important;
+}
+
+#cmdb-issues {
+    padding: 12px;
+    border-left: 4px solid var(--md-warning);
+    background: var(--md-warning-soft);
+    overflow-wrap: anywhere;
 }

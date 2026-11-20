@@ -5,7 +5,7 @@ from app.modules.db.models import (
     DirectorySyncShift as Shift, DirectorySyncSource as Source,
     Rotation, Team, TeamUser, User, UserGroup,
 )
-from app.services.directory_sync.config import SyncError
+from app.services.sync.directory.config import SyncError
 
 
 def retained_sources(group_ids):

@@ -7,8 +7,8 @@ from peewee import IntegrityError
 
 from app.modules.common import utc_now
 from app.modules.db.models import DirectorySyncCurrent as Current, DirectorySyncSource as Source, Rotation
-from app.services.directory_sync import runtime, service
-from app.services.directory_sync.config import SyncError
+from app.services.sync.directory import runtime, service
+from app.services.sync.directory.config import SyncError
 from app.services.oncall import get_current_oncall_user
 from app.views import directory_sync_view as view
 from tests.integrations.test_directory_sync import (

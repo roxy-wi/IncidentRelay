@@ -5,7 +5,7 @@ import re
 import time
 from urllib.parse import quote, urlencode
 
-from app.services.directory_sync.config import SyncApiError, SyncError, path_value
+from app.services.sync.directory.config import SyncApiError, SyncError, path_value
 from app.services.orchestration.webhooks import (
     WebhookDeliveryError, WebhookSecurityError, WebhookValidationError, _request_once,
 )

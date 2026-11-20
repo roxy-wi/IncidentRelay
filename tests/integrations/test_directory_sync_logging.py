@@ -9,9 +9,9 @@ from peewee import IntegrityError, OperationalError, SqliteDatabase
 
 from app.modules.logger import EventOnlyFilter, JsonFormatter
 from app.modules.db.models import DirectorySyncBinding as Binding, DirectorySyncCurrent as Current, DirectorySyncSource as Source
-from app.services.directory_sync import service
-from app.services.directory_sync.config import SyncApiError, SyncBusy, SyncError
-from app.services.directory_sync.diagnostics import log_failure
+from app.services.sync.directory import service
+from app.services.sync.directory.config import SyncApiError, SyncBusy, SyncError
+from app.services.sync.directory.diagnostics import log_failure
 from tests.integrations.test_directory_sync import (
     binding,
     fetched as fetched,

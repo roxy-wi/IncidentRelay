@@ -13,8 +13,8 @@ from werkzeug.serving import make_server
 
 from app.login import create_access_token
 from app.modules.common import utc_now
-from app.services.directory_sync import client as client_module, service
-from app.services.directory_sync.fetch import iso
+from app.services.sync.directory import client as client_module, service
+from app.services.sync.directory.fetch import iso
 from tests.factories import create_group, create_user
 from tests.integrations.test_directory_sync import snapshot  # noqa: F401
 

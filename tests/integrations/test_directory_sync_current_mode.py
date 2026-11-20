@@ -7,9 +7,9 @@ from pydantic import ValidationError
 
 from app.modules.common import utc_now
 from app.modules.db.models import DirectorySyncCurrent as Current, DirectorySyncSource as Source, Rotation
-from app.services.directory_sync import service
-from app.services.directory_sync.config import SyncConfig, SyncError, current_api_enabled
-from app.services.directory_sync.runtime import import_metadata
+from app.services.sync.directory import service
+from app.services.sync.directory.config import SyncConfig, SyncError, current_api_enabled
+from app.services.sync.directory.runtime import import_metadata
 from app.services.oncall import get_current_oncall_user
 from tests.integrations.test_directory_sync import (
     binding,

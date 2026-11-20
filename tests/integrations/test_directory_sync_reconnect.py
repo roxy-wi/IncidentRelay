@@ -9,9 +9,9 @@ from app.modules.db.models import (
     DirectorySyncBinding as Binding, DirectorySyncShift as Shift,
     DirectorySyncSource as Source, Rotation, Team, TeamUser, User,
 )
-from app.services.directory_sync import service
-from app.services.directory_sync.config import SyncError
-from app.services.directory_sync.runtime import source_for
+from app.services.sync.directory import service
+from app.services.sync.directory.config import SyncError
+from app.services.sync.directory.runtime import source_for
 from tests.factories import create_group, create_team
 from tests.integrations.test_directory_sync import (
     binding,

@@ -19,7 +19,9 @@ const screenshots = path.join(root, "tests/.tmp/searchable-select-layout");
                 const options = Array.from({length: 40}, (_, i) => `<option value="${i}">Action ${i}</option>`).join("");
                 await page.setContent(`<html data-color-scheme="${theme}"><body class="md-theme">
                     <select id="filter" data-table-single-select>${options}</select>
-                    <select id="global">${options}</select>
+                    <header class="topbar"><div class="topbar-actions"><div class="topbar-select-group">
+                        <label for="global">Team</label><select id="global" class="input topbar-select">${options}</select>
+                    </div></div></header>
                     <div id="modal" class="app-modal is-open"><div class="app-modal-dialog app-modal-dialog-wide">
                         <div class="app-modal-header"><h2>Edit rule</h2></div>
                         <div class="app-modal-body"><div style="height: 700px">Rule conditions</div>
@@ -41,9 +43,11 @@ const screenshots = path.join(root, "tests/.tmp/searchable-select-layout");
                 await page.evaluate(() => {
                     window.i18n = {t: key => key};
                     initTableMultiSelects(document);
-                    initSearchableSelect("#global");
+                    initSearchableSelect("#global", {wrapperClass: "ts-wrapper searchable-select global-team-select"});
                     initSearchableSelect("#action");
                 });
+                assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1), true,
+                    "the clipped native team select must not widen the mobile page");
                 const styles = await page.evaluate(() => ["filter", "global", "action"].map(id => {
                     const picker = document.getElementById(id).tomselect;
                     const control = getComputedStyle(picker.control);

@@ -12,9 +12,9 @@ from app.modules.db.models import (
     DirectorySyncBinding as Binding, DirectorySyncShift as Shift,
     Rotation, Team, TeamUser, User, UserGroup,
 )
-from app.services.directory_sync.config import SyncConfig, SyncError
-from app.services.directory_sync.fetch import instant
-from app.services.directory_sync.reconnect import reconnect
+from app.services.sync.directory.config import SyncConfig, SyncError
+from app.services.sync.directory.fetch import instant
+from app.services.sync.directory.reconnect import reconnect
 
 
 def slug(value, suffix):

@@ -53,7 +53,7 @@ def build_rotation_calendar(rotation, start_at, end_at):
     Final output contains only the winner for every time slice.
     """
 
-    from app.services.directory_sync.runtime import imported_candidates, source_for
+    from app.services.sync.directory.runtime import imported_candidates, source_for
     candidates = imported_candidates(rotation, start_at, end_at) if source_for("rotation", rotation.id) else []
 
     layers = rotations_repo.list_rotation_layers(

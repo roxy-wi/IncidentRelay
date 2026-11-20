@@ -716,8 +716,8 @@ def change_intelligence_job():
 
 def directory_sync_job(current=False):
     """Process directory synchronization requests and scheduled refreshes."""
-    from app.services.directory_sync.diagnostics import log_failure
-    from app.services.directory_sync.service import process_due_current, process_due_sources
+    from app.services.sync.directory.diagnostics import log_failure
+    from app.services.sync.directory.service import process_due_current, process_due_sources
     try:
         if db.is_closed():
             db.connect(reuse_if_open=True)

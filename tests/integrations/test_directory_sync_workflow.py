@@ -8,8 +8,8 @@ from peewee import SqliteDatabase
 
 from app.modules.common import utc_now
 from app.modules.db.models import DirectorySyncSource as Source
-from app.services.directory_sync import service
-from app.services.directory_sync.config import SyncBusy, SyncError
+from app.services.sync.directory import service
+from app.services.sync.directory.config import SyncBusy, SyncError
 from app.views import directory_sync_view as view
 from tests.integrations.test_directory_sync import (
     fetched as fetched,

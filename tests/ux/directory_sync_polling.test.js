@@ -23,7 +23,7 @@ const context = {
     $: selector => {
         if (!elements.has(selector)) {
             const element = {value: "", properties: {}, attributes: {}};
-            for (const name of ["on", "empty", "append", "scrollTop", "trigger", "toggleClass", "addClass"]) {
+            for (const name of ["on", "empty", "append", "scrollTop", "trigger", "toggleClass", "addClass", "find", "closest", "each"]) {
                 element[name] = () => element;
             }
             element.on = (_event, target, callback) => { handlers.set(target, callback); return element; };
@@ -38,6 +38,7 @@ const context = {
                 return element;
             };
             element.val = value => { element.value = value; return element; };
+            element.is = () => false;
             element.text = value => { element.value = value; return element; };
             elements.set(selector, element);
         }
@@ -50,6 +51,7 @@ context.AppLoading = {
     setButtonLoading: (selector, busy) => context.$(selector).prop("loading", busy),
 };
 vm.createContext(context);
+vm.runInContext(fs.readFileSync("app/static/js/pages/cmdb_sync.js", "utf8"), context);
 vm.runInContext(fs.readFileSync("app/static/js/pages/directory_sync.js", "utf8"), context);
 vm.runInContext("directorySyncOptions = {preset: {}, groups: [], teams: []}", context);
 context.loadDirectorySync = () => { refreshes++; };

@@ -12,9 +12,9 @@ from app.modules.db.models import (
     TeamUser, User, UserGroup,
 )
 from app.modules.user_colors import user_color
-from app.services.directory_sync.config import current_api_enabled
-from app.services.directory_sync.fetch import instant
-from app.services.directory_sync.reconcile import shared_user
+from app.services.sync.directory.config import current_api_enabled
+from app.services.sync.directory.fetch import instant
+from app.services.sync.directory.reconcile import shared_user
 from app.services.rbac import can_manage_group_users, can_read_team
 
 

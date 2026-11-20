@@ -12,7 +12,7 @@ from werkzeug.serving import make_server
 
 from app.login import create_access_token
 from app.modules.db.models import DirectorySyncBinding, DirectorySyncSource, UserGroup
-from app.services.directory_sync.config import org_service_preset
+from app.services.sync.directory.config import org_service_preset
 from tests.factories import (
     add_user_to_team,
     create_group,

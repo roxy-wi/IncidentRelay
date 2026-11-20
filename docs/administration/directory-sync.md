@@ -9,6 +9,8 @@ Directory synchronization imports teams, people and on-call schedules into Incid
 
 A **source** is one connection: its API address, credentials, requests, field mapping and update rules. Each source belongs to one destination group in IR.
 
+The same page also supports [Jira Assets service and business-service synchronization](jira-cmdb.md). Choose the source type when creating a connection; existing team/on-call sources keep their behavior.
+
 ## Before you start
 
 | Requirement | Purpose |

@@ -6,7 +6,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from email_validator import EmailNotValidError, validate_email
 
 from app.modules.common import utc_now
-from app.services.directory_sync.config import SyncError, map_fields, path_value
+from app.services.sync.directory.config import SyncError, map_fields, path_value
 
 
 def identity(value, label):

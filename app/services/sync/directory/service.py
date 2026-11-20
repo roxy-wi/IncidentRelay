@@ -13,11 +13,11 @@ from app.modules.db.models import (
     DirectorySyncSource as Source, Group, User, UserGroup,
 )
 from app.modules.db.transactions import lock_row, write_transaction
-from app.services.directory_sync.client import ApiClient
-from app.services.directory_sync.config import SyncBusy, SyncConfig, SyncError, current_api_enabled
-from app.services.directory_sync.diagnostics import error_message, log_failure, logged_operation
-from app.services.directory_sync.fetch import fetch_current, fetch_snapshot, instant
-from app.services.directory_sync.reconcile import reconcile
+from app.services.sync.directory.client import ApiClient
+from app.services.sync.directory.config import SyncBusy, SyncConfig, SyncError, current_api_enabled
+from app.services.sync.directory.diagnostics import error_message, log_failure, logged_operation
+from app.services.sync.directory.fetch import fetch_current, fetch_snapshot, instant
+from app.services.sync.directory.reconcile import reconcile
 
 
 def authorized_actor(actor_id, group_id):
@@ -106,6 +106,11 @@ def digest(value):
 @logged_operation("sync")
 def run(source_id, *, mode="run", preview_token=None, scheduled=False):
     """Fetch outside transactions, then preview/apply one complete snapshot atomically."""
+    from app.services.sync.cmdb.config import is_cmdb
+
+    if is_cmdb(Source.get_by_id(source_id).config):
+        from app.services.sync.cmdb.execution import run as run_catalog
+        return run_catalog(source_id, mode=mode, preview_token=preview_token, scheduled=scheduled)
     token = claim(source_id, scheduled=scheduled)
     client = None
     retry_interval = SyncConfig.model_fields["interval_seconds"].default
@@ -314,7 +319,7 @@ def process_due_sources():
                 Source.update(pending_mode=None, pending_preview_token=None).where(
                     Source.id == source.id, Source.pending_mode == mode, Source.lease.is_null(),
                 ).execute()
-                if mode == "preview":
+                if mode in {"preview", "inspect"}:
                     continue
                 count += 1
             elif (source.enabled and source.approved_revision == source.revision

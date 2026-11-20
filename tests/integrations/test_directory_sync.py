@@ -24,11 +24,11 @@ from app.modules.db.models import (
     DirectorySyncShift as Shift, DirectorySyncSource as Source,
     Rotation, SsoIdentity, SsoProvider, Team, TeamUser, User, UserGroup,
 )
-from app.services.directory_sync import client as client_module, service
-from app.services.directory_sync.client import ApiClient
-from app.services.directory_sync.config import SyncApiError, SyncBusy, SyncConfig, SyncError, org_service_preset
-from app.services.directory_sync.fetch import fetch_snapshot, iso, window
-from app.services.directory_sync.runtime import imported_candidates
+from app.services.sync.directory import client as client_module, service
+from app.services.sync.directory.client import ApiClient
+from app.services.sync.directory.config import SyncApiError, SyncBusy, SyncConfig, SyncError, org_service_preset
+from app.services.sync.directory.fetch import fetch_snapshot, iso, window
+from app.services.sync.directory.runtime import imported_candidates
 from app.services.oncall import get_current_oncall_user
 from app.services.orchestration import webhooks
 from tests.factories import create_group, create_team, create_user

@@ -12,16 +12,18 @@ from peewee import IntegrityError
 from app.modules.db.models import (
     AppLock, AuditLog, DirectorySyncBinding, DirectorySyncCurrent, DirectorySyncShift,
     DirectorySyncSource, Rotation, Team, TeamUser, User, UserGroup,
+    Service, BusinessService, BusinessServiceComponent,
 )
 from app.modules.redaction import redact_secrets
-from app.services.directory_sync.config import SyncBusy, SyncError
+from app.services.sync.directory.config import SyncBusy, SyncError
 
 
 logger = logging.getLogger("oncall.directory_sync")
 KNOWN_COLUMNS = frozenset(
     f"{model._meta.table_name}.{field.column_name}"
     for model in (AppLock, AuditLog, DirectorySyncBinding, DirectorySyncCurrent,
-                  DirectorySyncShift, DirectorySyncSource, Rotation, Team, TeamUser, User, UserGroup)
+                  DirectorySyncShift, DirectorySyncSource, Rotation, Team, TeamUser, User, UserGroup,
+                  Service, BusinessService, BusinessServiceComponent)
     for field in model._meta.sorted_fields
 )
 

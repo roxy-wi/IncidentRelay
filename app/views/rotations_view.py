@@ -45,9 +45,9 @@ def imported_rotation_shifts(rotation_id):
     """Read or edit concrete imported intervals using the rotation's access boundary."""
     from app.modules.db.models import DirectorySyncBinding, DirectorySyncShift, User
     from app.modules.db.transactions import write_transaction
-    from app.services.directory_sync.config import SyncError
-    from app.services.directory_sync.runtime import source_for
-    from app.services.directory_sync.shift_editor import ShiftInput, edit_shift, serialize_shift
+    from app.services.sync.directory.config import SyncError
+    from app.services.sync.directory.runtime import source_for
+    from app.services.sync.directory.shift_editor import ShiftInput, edit_shift, serialize_shift
     rotation, error = (_require_rotation_read(rotation_id) if request.method == "GET"
                        else _require_rotation_write(rotation_id))
     if error:
@@ -82,8 +82,8 @@ def edit_imported_rotation_shift(shift_id):
     """Apply a local edit or tombstone within the existing rotation boundary."""
     from app.modules.db.models import DirectorySyncShift
     from app.modules.db.transactions import write_transaction
-    from app.services.directory_sync.config import SyncError
-    from app.services.directory_sync.shift_editor import ShiftInput, edit_shift, editable_source, serialize_shift
+    from app.services.sync.directory.config import SyncError
+    from app.services.sync.directory.shift_editor import ShiftInput, edit_shift, editable_source, serialize_shift
     shift = DirectorySyncShift.get_or_none(DirectorySyncShift.id == shift_id)
     if shift is None:
         return _not_found("Imported shift")

@@ -1,0 +1,35 @@
+<fieldset id="cmdb-settings" class="form-stack" hidden><legend>{{ _('ds.cmdb_objects') }}</legend>
+  <p class="muted">{{ _('ds.cmdb_query_hint') }}</p>
+  <div class="form-grid-2">
+    <div class="form-group"><label for="cmdb-api-path">{{ _('ds.cmdb_api_path') }}</label><input id="cmdb-api-path" class="input" required></div>
+    <div class="form-group"><label for="cmdb-query-parameter">{{ _('ds.cmdb_query_parameter') }}</label><select id="cmdb-query-parameter" class="input"><option value="qlQuery">qlQuery</option><option value="iql">iql</option></select></div>
+    <div class="form-group"><label for="cmdb-page-size">{{ _('ds.cmdb_page_size') }}</label><input id="cmdb-page-size" type="number" min="1" max="1000" class="input" required></div>
+  </div>
+  <div class="form-grid-2">
+    {% for kind in ['services', 'business_services'] %}
+    <div class="form-stack">
+      <h3>{{ _('ds.cmdb_' ~ kind) }}</h3>
+      <div class="form-group"><label for="cmdb-{{ kind }}-query">{{ _('ds.cmdb_query') }}</label><textarea id="cmdb-{{ kind }}-query" class="input code-textarea" rows="3" required spellcheck="false"></textarea></div>
+      {% for field in ['owner_team_attribute', 'name_attribute', 'description_attribute', 'fallback_description_attribute', 'criticality_attribute', 'status_attribute'] %}
+      <div class="form-group"><label for="cmdb-{{ kind }}-{{ field }}">{{ _('ds.cmdb_' ~ field) }}</label><select id="cmdb-{{ kind }}-{{ field }}" class="input cmdb-attribute" data-kind="{{ kind }}" data-field="{{ field }}"></select></div>
+      {% endfor %}
+      {% if kind == 'services' %}
+      <div class="form-group"><label for="cmdb-services-environment_attribute">{{ _('ds.cmdb_environment_attribute') }}</label><select id="cmdb-services-environment_attribute" class="input cmdb-attribute" data-kind="services" data-field="environment_attribute"></select></div>
+      {% endif %}
+    </div>
+    {% endfor %}
+  </div>
+  <div class="form-grid-2">
+    <div class="form-group"><label for="cmdb-relationship-side">{{ _('ds.cmdb_relationship_side') }}</label><select id="cmdb-relationship-side" class="input"><option value="services">{{ _('ds.cmdb_services') }}</option><option value="business_services">{{ _('ds.cmdb_business_services') }}</option></select></div>
+    <div class="form-group"><label for="cmdb-relationship-attribute">{{ _('ds.cmdb_relationship_attribute') }}</label><select id="cmdb-relationship-attribute" class="input"></select></div>
+  </div>
+  <p class="muted">{{ _('ds.cmdb_mapping_hint') }}</p>
+  <button id="ds-inspect" type="button" class="btn btn-info">{{ _('ds.cmdb_inspect') }}</button>
+  <h3>{{ _('ds.cmdb_team_matches') }}</h3>
+  <p class="muted">{{ _('ds.cmdb_team_hint') }}</p>
+  <div id="cmdb-team-matches" class="form-grid-2"></div>
+  <details><summary>{{ _('ds.cmdb_value_mappings') }}</summary>
+    <div class="json-editor"><div class="json-editor-header"><span>JSON</span><button id="cmdb-format-values" type="button" class="btn btn-small">{{ _('ds.format_json') }}</button></div><textarea id="cmdb-values" class="input code-textarea json-editor-textarea" rows="10" spellcheck="false"></textarea></div>
+  </details>
+  <div id="cmdb-issues" role="status" aria-live="polite" hidden></div>
+</fieldset>

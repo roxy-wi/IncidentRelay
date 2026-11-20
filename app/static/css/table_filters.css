@@ -23,6 +23,11 @@
     min-width: 11rem;
 }
 
+/* Native field sizing must not expand Tom Select's clipped source element. */
+body.md-theme select.ts-hidden-accessible {
+    min-width: 0;
+}
+
 .ts-control,
 .ts-wrapper.single .ts-control,
 .ts-wrapper.single.input-active .ts-control {

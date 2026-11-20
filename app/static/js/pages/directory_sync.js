@@ -39,7 +39,7 @@ function dsOperationText(source, action) {
 }
 
 function dsClearButtonLoading() {
-    ["sample", "preview", "apply", "run"].forEach(action => AppLoading.setButtonLoading("#ds-" + action, false));
+    ["sample", "preview", "apply", "run", "inspect"].forEach(action => AppLoading.setButtonLoading("#ds-" + action, false));
 }
 
 function dsError(xhr) {
@@ -58,7 +58,7 @@ function loadDirectorySync() {
         const body = $("#ds-list").empty();
         sources.forEach(source => {
             const row = $("<tr>").attr("data-source-id", source.id);
-            $("<td>").text(source.name).appendTo(row);
+            $("<td>").text(source.name).append($("<div>", {class: "muted", text: dsText("type_" + (source.source_type || "directory"))})).appendTo(row);
             $("<td>").text(source.group_name).appendTo(row);
             const statusKey = source.schedule_state === "pending_approval" ? "awaiting_apply"
                 : source.schedule_state === "preview" ? "preview_ready" : source.enabled ? "enabled" : "paused";
@@ -124,12 +124,13 @@ function dsSetSchedule(source, enabled) {
 
 function dsConfirmRemove(source) {
     if (!dsCanManage(source)) return;
+    const prefix = source.source_type === "jira_assets" ? "cmdb_" : "";
     const choice = $("<select>", {id: "ds-remove-mode", class: "input"})
         .attr("aria-describedby", "ds-remove-hint")
-        .append($("<option>", {value: "keep", text: dsText("keep_data")}))
-        .append($("<option>", {value: "delete", text: dsText("delete_data")}));
-    const hint = $("<small>", {id: "ds-remove-hint", class: "muted", "aria-live": "polite"}).text(dsText("keep_data_hint"));
-    choice.on("change", () => hint.text(dsText(choice.val() === "keep" ? "keep_data_hint" : "delete_data_hint")));
+        .append($("<option>", {value: "keep", text: dsText(prefix + "keep_data")}))
+        .append($("<option>", {value: "delete", text: dsText(prefix + "delete_data")}));
+    const hint = $("<small>", {id: "ds-remove-hint", class: "muted", "aria-live": "polite"}).text(dsText(prefix + "keep_data_hint"));
+    choice.on("change", () => hint.text(dsText(prefix + (choice.val() === "keep" ? "keep_data_hint" : "delete_data_hint"))));
     const confirmation = showAppConfirm({
         title: dsText("remove_source"),
         message: i18n.t("ds.remove_confirm", {name: source.name}),
@@ -190,6 +191,8 @@ function openDirectorySync(source) {
     directorySyncSource = source;
     directorySyncDirty = false;
     const config = source ? source.config : directorySyncOptions.preset;
+    $("#ds-type").val(source?.source_type || "directory");
+    if (dsIsCmdb()) cmdbOpen(config, source?.preview_result);
     $("#ds-headers").val("");
     $("#ds-editor-title").text(source ? source.name : dsText("new"));
     $("#ds-name").val(source?.name || "");
@@ -200,7 +203,7 @@ function openDirectorySync(source) {
     $("#ds-url").val(config.base_url);
     $("#ds-network").val(config.private_network_policy);
     $("#ds-skip-tls").prop("checked", config.verify_tls === false);
-    $("#ds-operations").val(JSON.stringify(config.operations, null, 2));
+    $("#ds-operations").val(JSON.stringify(config.operations || {}, null, 2));
     const mapping = {};
     directorySyncMappingKeys.forEach(key => { mapping[key] = config[key]; });
     $("#ds-mapping").val(JSON.stringify(mapping, null, 2));
@@ -215,6 +218,7 @@ function openDirectorySync(source) {
     $("#ds-enabled").prop("checked", Boolean(source?.enabled));
     $("#ds-sample-output").empty().prop("hidden", true);
     $("#ds-team-matches").empty();
+    dsApplyType();
     dsRenderResult(source);
     openAppModal("#ds-editor");
     $("#ds-editor .app-modal-body").scrollTop(0);
@@ -239,8 +243,8 @@ function dsRetainedSources(selected = null) {
 }
 
 function dsCurrentControls(busy = false) {
-    $("#ds-current-enabled").prop("disabled", busy);
-    $("#ds-current-interval").prop("disabled", busy || !$("#ds-current-enabled").prop("checked"));
+    $("#ds-current-enabled").prop("disabled", busy || dsIsCmdb());
+    $("#ds-current-interval").prop("disabled", busy || dsIsCmdb() || !$("#ds-current-enabled").prop("checked"));
 }
 
 function dsPreviewReady(source) {
@@ -252,7 +256,10 @@ function dsRenderWorkflow(source) {
     $("#ds-form fieldset").prop("disabled", directorySyncSaving && directorySyncAction === "save");
     const unsaved = !source || directorySyncDirty;
     const ready = dsPreviewReady(source);
-    const step = unsaved ? "save" : ready ? "apply" : !source.approved ? "preview" : "saved";
+    const needsInspect = dsIsCmdb() && !Object.keys(source?.preview_result?.attributes || {}).length;
+    const needsMapping = dsIsCmdb() && (source?.preview_result?.issues?.length || source?.preview_result?.inspection);
+    const step = unsaved ? "save" : ready ? "apply" : needsInspect ? "inspect" : needsMapping ? "mapping"
+        : !source.approved ? "preview" : "saved";
     const action = dsOperation(source);
     const expired = !ready && source?.preview_until && Date.parse(source.preview_until) <= Date.now();
     const error = source?.last_error || source?.current_error;
@@ -261,7 +268,8 @@ function dsRenderWorkflow(source) {
         : expired && !unsaved ? "expired" : step;
     const icon = {save: "pen-to-square", preview: "triangle-exclamation", apply: "list-check",
         saved: "circle-check", expired: "clock", busy: "hourglass-half", error: "circle-exclamation",
-        current_error: "triangle-exclamation", retrying: "arrows-rotate", disconnected: "circle-exclamation"}[displayStep];
+        current_error: "triangle-exclamation", retrying: "arrows-rotate", disconnected: "circle-exclamation",
+        inspect: "magnifying-glass", mapping: "list-check"}[displayStep];
     $("#ds-workflow").attr("data-step", displayStep);
     $("#ds-workflow-icon").attr("class", "fa-solid fa-" + icon);
     $("#ds-workflow-title").text(dsText("workflow_title_" + displayStep));
@@ -280,13 +288,14 @@ function dsRenderWorkflow(source) {
         run: wait || saveFirst || (ready ? dsText("run_after_preview")
             : !source?.approved ? dsText("apply_needs_preview") : ""),
         sample: wait || saveFirst,
+        inspect: wait || saveFirst,
         "format-operations": wait,
         "format-mapping": wait,
     };
     Object.entries(reasons).forEach(([name, reason]) => {
         $("#ds-" + name).prop("disabled", Boolean(reason)).attr("title", reason || null);
     });
-    ["save", "preview", "apply"].forEach(name => {
+    ["save", "preview", "apply", "inspect"].forEach(name => {
         $("#ds-" + name).toggleClass("btn-primary", !busy && step === name);
     });
     const scheduleHint = wait || (!source?.approved ? dsText("schedule_after_apply")
@@ -294,6 +303,7 @@ function dsRenderWorkflow(source) {
     $("#ds-enabled").prop("disabled", busy);
     $("#ds-enabled-label").attr("title", scheduleHint || null);
     $("#ds-enabled-hint").text(scheduleHint).prop("hidden", !scheduleHint);
+    $("#cmdb-format-values").prop("disabled", busy);
     dsCurrentControls(busy);
 }
 
@@ -328,7 +338,8 @@ function dsRenderResult(source) {
             JSON.stringify(change.fields)].forEach(value => $("<td>").text(value).appendTo(row));
         body.append(row);
     });
-    if (source?.preview_result?.team_catalog && !directorySyncDirty) {
+    if (dsIsCmdb()) cmdbRenderResult(source);
+    if (!dsIsCmdb() && source?.preview_result?.team_catalog && !directorySyncDirty) {
         const matches = $("#ds-team-matches").empty();
         source.preview_result.team_catalog.forEach(team => {
             const select = $("<select>").addClass("input").append($("<option>", {value: "", text: dsText("automatic_match")}));
@@ -467,7 +478,7 @@ $(document).on("submit", "#ds-form", function (event) {
     if (directorySyncSaving || directorySyncSource?.pending_mode || directorySyncSource?.running) return;
     let payload;
     try {
-        const config = {...(directorySyncSource?.config || directorySyncOptions.preset), ...JSON.parse($("#ds-mapping").val()),
+        const config = dsIsCmdb() ? cmdbConfigFromForm() : {...(directorySyncSource?.config || directorySyncOptions.preset), ...JSON.parse($("#ds-mapping").val()),
             retained_source_id: Number($("#ds-retained-source").val()) || null,
             operations: JSON.parse($("#ds-operations").val()), base_url: $("#ds-url").val(),
             private_network_policy: $("#ds-network").val(), interval_seconds: Number($("#ds-interval").val()),
@@ -504,6 +515,7 @@ $(document).on("submit", "#ds-form", function (event) {
             setAppModalSaving("#ds-editor", false);
             $("#ds-headers").val("");
             $("#ds-group").prop("disabled", true);
+            $("#ds-type").prop("disabled", true);
             $("#ds-name").val(data.name);
             $("#ds-editor-title").text(data.name);
             if (!data.preview_result?.team_catalog) $("#ds-team-matches").empty();

@@ -7,10 +7,10 @@ import pytest
 
 from app.modules.common import utc_now
 from app.modules.db.models import DirectorySyncCurrent as Current, DirectorySyncSource as Source
-from app.services.directory_sync import client as client_module, service
-from app.services.directory_sync.client import ApiClient
-from app.services.directory_sync.config import SyncConfig, SyncError, org_service_preset
-from app.services.directory_sync.fetch import fetch_current, map_current_status
+from app.services.sync.directory import client as client_module, service
+from app.services.sync.directory.client import ApiClient
+from app.services.sync.directory.config import SyncConfig, SyncError, org_service_preset
+from app.services.sync.directory.fetch import fetch_current, map_current_status
 from tests.integrations.test_directory_sync import (
     binding,
     fetched as fetched,

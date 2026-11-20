@@ -6,9 +6,9 @@ from types import SimpleNamespace
 import pytest
 
 from app.modules.db.models import DirectorySyncShift as Shift, Rotation
-from app.services.directory_sync import service
-from app.services.directory_sync.config import SyncConfig, SyncError
-from app.services.directory_sync.fetch import fetch_snapshot
+from app.services.sync.directory import service
+from app.services.sync.directory.config import SyncConfig, SyncError
+from app.services.sync.directory.fetch import fetch_snapshot
 from tests.integrations.test_directory_sync import (
     binding,
     fetched as fetched,

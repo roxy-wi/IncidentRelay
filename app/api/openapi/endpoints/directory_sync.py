@@ -1,21 +1,24 @@
 """Configurable directory sync administration, including personal token access."""
 
 from app.api.openapi.common import json_body, path_param, query_param, response
-from app.services.directory_sync.config import SyncConfig
-from app.services.directory_sync.shift_editor import ShiftInput
+from app.services.sync.directory.config import SyncConfig
+from app.services.sync.cmdb.config import CmdbConfig
+from app.services.sync.directory.shift_editor import ShiftInput
 
 TAG = "Directory synchronization"
 ROOT = "/api/admin/directory-sync"
 
 
 def tags():
-    return [{"name": TAG, "description": "Group-owned team, user and on-call imports with preview."}]
+    return [{"name": TAG, "description": "Group-owned directory/on-call and Jira Assets service catalog imports with preview."}]
 
 
 def components():
     """Expose the same configuration contract that validates API writes."""
     schema = SyncConfig.model_json_schema(ref_template="#/components/schemas/DirectorySync{model}")
     definitions = schema.pop("$defs", {})
+    cmdb = CmdbConfig.model_json_schema(ref_template="#/components/schemas/DirectorySync{model}")
+    definitions.update(cmdb.pop("$defs", {}))
     shift = ShiftInput.model_json_schema(ref_template="#/components/schemas/DirectorySync{model}")
     definitions.update(shift.pop("$defs", {}))
 
@@ -33,14 +36,15 @@ def components():
             result["nullable"] = True
         return result
 
-    return {"DirectorySyncConfig": convert(schema), "DirectorySyncShiftInput": convert(shift),
+    return {"DirectorySyncConfig": convert(schema), "DirectorySyncCmdbConfig": convert(cmdb), "DirectorySyncShiftInput": convert(shift),
             **{"DirectorySync" + key: convert(value) for key, value in definitions.items()}}
 
 
 def paths():
     config = {"type": "object", "required": ["name", "group_id", "config"], "additionalProperties": False,
               "properties": {"name": {"type": "string", "maxLength": 255}, "group_id": {"type": "integer"},
-                             "config": {"$ref": "#/components/schemas/DirectorySyncConfig"},
+                             "config": {"oneOf": [{"$ref": "#/components/schemas/DirectorySyncConfig"},
+                                                  {"$ref": "#/components/schemas/DirectorySyncCmdbConfig"}]},
                              "headers": {"type": "object", "additionalProperties": {"type": "string"}, "writeOnly": True},
                              "enabled": {"type": "boolean", "default": False,
                                          "description": "Requested schedule state. Changed imports wait for preview and Apply; "
@@ -71,7 +75,7 @@ def paths():
                                                               "502": response("External API failure (sync_api_error)"),
                                                               "504": response("External API timeout (sync_api_error)")}}},
     }
-    for action in ("preview", "apply", "run"):
+    for action in ("preview", "apply", "run", "inspect"):
         result[ROOT + "/{source_id}/" + action] = {
             "parameters": [path_param("source_id", "Source ID")],
             "post": {**common, "summary": f"Queue {action}; poll the source for completion",

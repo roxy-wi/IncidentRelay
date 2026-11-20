@@ -11,9 +11,9 @@ from app.modules.db.models import (
     DirectorySyncShift as Shift, DirectorySyncSource as Source,
     Rotation, Team, User,
 )
-from app.services.directory_sync import management, service
-from app.services.directory_sync.config import SyncBusy, SyncError
-from app.services.directory_sync.runtime import readonly, source_for, sync_managed_groups
+from app.services.sync.directory import management, service
+from app.services.sync.directory.config import SyncBusy, SyncError
+from app.services.sync.directory.runtime import readonly, source_for, sync_managed_groups
 from app.services.oncall import get_current_oncall_user
 from tests.factories import create_group, create_team, create_user
 from tests.integrations.test_directory_sync import (
