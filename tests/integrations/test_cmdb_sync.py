@@ -6,6 +6,9 @@ from datetime import timedelta
 from urllib.parse import parse_qs, urlsplit
 
 import pytest
+from openapi_schema_validator import OAS30Validator
+from openapi_spec_validator import validate
+from pydantic import ValidationError
 
 from app.modules.common import utc_now
 from app.modules.crypto import encrypt_json
@@ -322,11 +325,31 @@ def test_unknown_enums_and_multiple_owner_teams_block_preview(cmdb_source, upstr
 
 
 def test_catalog_openapi_schema():
-    from app.api.openapi.endpoints.directory_sync import components, paths
-    schemas = components()
+    """The new catalog components must preserve a valid OpenAPI 3.0 document."""
+    from app.api.openapi.spec import build_openapi_spec
+
+    spec = build_openapi_spec()
+    validate(spec)
+    schemas = spec["components"]["schemas"]
     assert "DirectorySyncCmdbConfig" in schemas
-    assert schemas["DirectorySyncCmdbConfig"]["properties"]["source_type"]["const"] == "jira_assets"
-    assert URL + "/{source_id}/inspect" in paths()
+    assert URL + "/{source_id}/inspect" in spec["paths"]
+
+
+@pytest.mark.parametrize("source_type, valid", [
+    ("jira_assets", True), ("directory", False), ("unknown", False), (None, False), (True, False),
+])
+def test_catalog_source_type_openapi_matches_runtime(source_type, valid):
+    """Published source-type constraints must reject the same values as the API."""
+    from app.api.openapi.endpoints.directory_sync import components
+
+    schema = components()["DirectorySyncCmdbConfig"]["properties"]["source_type"]
+    assert OAS30Validator(schema).is_valid(source_type) is valid
+    config = {**jira_assets_preset(), "source_type": source_type}
+    if valid:
+        CmdbConfig.model_validate(config)
+    else:
+        with pytest.raises(ValidationError):
+            CmdbConfig.model_validate(config)
 
 
 def test_pause_source_after_team_becomes_inactive(cmdb_source, upstream, client, admin_headers):

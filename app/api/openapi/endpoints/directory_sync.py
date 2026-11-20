@@ -28,6 +28,9 @@ def components():
         if not isinstance(value, dict):
             return value
         result = {key: convert(item) for key, item in value.items()}
+        # OpenAPI 3.0 expresses a single allowed value with enum, not const.
+        if "const" in result:
+            result["enum"] = [result.pop("const")]
         choices = result.get("anyOf", [])
         if any(item == {"type": "null"} for item in choices):
             choices = [item for item in choices if item != {"type": "null"}]
