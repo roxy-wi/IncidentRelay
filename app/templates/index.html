@@ -103,6 +103,7 @@
   supportedLocales: {{ supported_locales | tojson }},
   messages: {{ i18n_messages | tojson }}
  };
+ window.__INCIDENTRELAY_SLI_RULES__ = {{ service_sli_rules | tojson }};
  </script>
  <script src="{{ url_for('static', filename='js/core/i18n.js', v='d3b07d0505ba') }}"></script>
     <script src="/static/js/vendor/jquery-3.7.1.min.js"></script>
@@ -477,7 +478,7 @@
 <script src="/static/js/pages/routes.js"></script>
 <script src="{{ url_for('static', filename='js/pages/services/i18n_runtime.js', v='b8bf7ede656d') }}"></script>
 <script src="{{ url_for('static', filename='js/pages/services/core.js', v='4f132e1c00e4') }}"></script>
-<script src="{{ url_for('static', filename='js/pages/services/details.js', v='5024bcaf83f9') }}"></script>
+<script src="{{ url_for('static', filename='js/pages/services/details.js', v='e5f015aab9d4') }}"></script>
 <script src="{{ url_for('static', filename='js/pages/services/context.js') }}?v=62cdc5d6083b"></script>
 <script src="{{ url_for('static', filename='js/pages/services/analytics.js') }}"></script>
 <script src="{{ url_for('static', filename='js/pages/services/impact.js') }}"></script>

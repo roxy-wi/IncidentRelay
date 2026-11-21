@@ -5,8 +5,6 @@ from app.modules.db.models import (
     IncidentPriority,
     IncidentResponder,
     IncidentStakeholder,
-    ServiceOwner,
-    User,
 )
 from app.modules.db import alerts_repo
 from app.modules.common import utc_now
@@ -439,98 +437,6 @@ def list_incident_stakeholders(group_id, *, include_inactive=False):
         query = query.where(IncidentStakeholder.active == True)  # noqa: E712
 
     return list(query)
-
-
-def get_incident_stakeholder(stakeholder_id):
-    return IncidentStakeholder.get_or_none(
-        IncidentStakeholder.id == stakeholder_id
-    )
-
-
-def deactivate_incident_stakeholder(stakeholder_id):
-    updated = (
-        IncidentStakeholder
-        .update(
-            active=False,
-            updated_at=utc_now(),
-        )
-        .where(
-            IncidentStakeholder.id == stakeholder_id,
-            IncidentStakeholder.active == True,  # noqa: E712
-        )
-        .execute()
-    )
-
-    return bool(updated)
-
-
-def add_service_stakeholders_to_incident(group):
-    """Copy active service owners to incident stakeholders.
-
-    Service owners are default stakeholders for a service. They are copied as a
-    snapshot to a newly created incident, so later service owner changes do not
-    rewrite existing incident stakeholders.
-    """
-    if not group or not getattr(group, "service_id", None):
-        return []
-
-    existing_user_ids = set(
-        row.user_id
-        for row in (
-            IncidentStakeholder
-            .select(IncidentStakeholder.user)
-            .where(
-                IncidentStakeholder.incident == group.id,
-                IncidentStakeholder.active == True,  # noqa: E712
-                IncidentStakeholder.user.is_null(False),
-            )
-        )
-    )
-
-    owners = (
-        ServiceOwner
-        .select(ServiceOwner, User)
-        .join(User)
-        .where(
-            ServiceOwner.service == group.service_id,
-            ServiceOwner.active == True,  # noqa: E712
-            User.active == True,  # noqa: E712
-            User.deleted == False,  # noqa: E712
-        )
-        .order_by(ServiceOwner.id)
-    )
-
-    rows = []
-
-    for owner in owners:
-        if not owner.user_id:
-            continue
-
-        if owner.user_id in existing_user_ids:
-            continue
-
-        rows.append(
-            create_incident_stakeholder(
-                group.id,
-                {
-                    "user_id": owner.user_id,
-                    "role": owner.role,
-                    "source": "service_owner",
-                    "created_by_id": None,
-                    "notify_on_created": owner.notify_on_created,
-                    "notify_on_priority_change": (
-                        owner.notify_on_priority_change
-                    ),
-                    "notify_on_status_change": owner.notify_on_status_change,
-                    "notify_on_resolved": owner.notify_on_resolved,
-                    "notify_on_comment": owner.notify_on_comment,
-                },
-            )
-        )
-
-        existing_user_ids.add(owner.user_id)
-
-    return rows
 
 
 def list_requested_incident_responders(limit=100):

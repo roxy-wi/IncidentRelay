@@ -17,6 +17,7 @@ from app.api.schemas.system_settings import settings_properties
 from app.i18n import get_current_locale, translate
 from app.login import normalize_auth_redirect_target
 from app.middleware import load_jwt_user
+from app.modules.service_sli import DEFAULT_IMPACT_PRIORITY_SCOPE, IMPACT_SLI_TYPES, PRIORITY_VALUES
 from app.services.rbac import can_read_audit_logs
 from app.ui_preferences import get_current_theme
 
@@ -180,4 +181,9 @@ def app_page(alert_id=None, incident_id=None, change_uid=None):
         initial_page=request.path,
         initial_alert_id=alert_id,
         current_theme=get_current_theme(),
+        service_sli_rules={
+            "priorities": PRIORITY_VALUES,
+            "impact_types": IMPACT_SLI_TYPES,
+            "default_impact_scope": DEFAULT_IMPACT_PRIORITY_SCOPE,
+        },
     )

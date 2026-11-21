@@ -3,10 +3,8 @@ from functools import wraps
 
 from flask import jsonify, request
 
-from app.middleware import load_jwt_user
 from app.modules.db import routes_repo, tokens_repo
 from app.modules.token_hashing import hash_token as hash_token
-from app.settings import Config
 
 
 def create_raw_token():
@@ -125,62 +123,10 @@ def authenticate_route_token(raw_token=None):
     return route
 
 
-def authenticate_request():
-    """
-    Authenticate the request using JWT first, then personal/API tokens.
-    """
-
-    user = load_jwt_user()
-
-    if user:
-        request.current_api_token = None
-        request.current_auth_type = "jwt"
-        return user
-
-    api_token = authenticate_api_token()
-
-    if api_token:
-        return api_token
-
-    request.current_auth_type = None
-    return None
-
-
 def token_has_scope(api_token, required_scopes):
     """Return True when an API token has all required effective scopes."""
     from app.services.authorization import token_allows_operation
     return token_allows_operation(api_token, required_scopes)
-
-
-def require_api_token(scopes=None, required=None):
-    """
-    Require JWT or API token authentication for a view.
-    """
-
-    scopes = scopes or []
-    required = Config.API_AUTH_REQUIRED if required is None else required
-
-    def decorator(func):
-        @wraps(func)
-        def wrapper(*args, **kwargs):
-            principal = authenticate_request()
-
-            if not required and not principal:
-                return func(*args, **kwargs)
-
-            if not principal:
-                return jsonify({"error": "Authentication is required"}), 401
-
-            api_token = getattr(request, "current_api_token", None)
-
-            if api_token and not token_has_scope(api_token, scopes):
-                return jsonify({"error": "Missing API token scope", "missing_scopes": scopes}), 403
-
-            return func(*args, **kwargs)
-
-        return wrapper
-
-    return decorator
 
 
 def require_alert_token(allow_json_routing_key=False, allow_basic_route_token=False):

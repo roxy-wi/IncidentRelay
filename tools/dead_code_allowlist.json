@@ -1,0 +1,4 @@
+{
+  "app/migrations/introspection.py:index_exists": "Imported by the migration source template in app/modules/db/migrations.py:create_migration; generated files are outside static analysis until written.",
+  "app/modules/db/audit_repo.py:list_audit_logs": "Explicit backwards-compatible internal API documented in its docstring; retained while application callers use scoped_audit_query and paginate_audit_query."
+}

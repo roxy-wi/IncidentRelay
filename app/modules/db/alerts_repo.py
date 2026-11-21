@@ -900,18 +900,6 @@ def create_alert_event(alert_id=None, event_type=None, message=None, user_id=Non
     )
 
 
-def list_alert_events(alert_id):
-    """
-    Return alert events.
-    """
-
-    return list(
-        AlertEvent.select()
-        .where(AlertEvent.alert == alert_id)
-        .order_by(AlertEvent.id.asc())
-    )
-
-
 def schedule_alert_group_notification(group, due_at, reason="notification"):
     """Schedule a pending notification for an alert group."""
 

@@ -95,6 +95,11 @@ jobs:
             -ll \
             -ii
 
+      - name: Check unused public Python definitions
+        id: dead_code
+        continue-on-error: true
+        run: python tools/check_dead_code.py
+
       - name: Check all JavaScript syntax
         id: javascript
         continue-on-error: true
@@ -121,6 +126,7 @@ jobs:
           BANDIT_OUTCOME: ${{ steps.bandit.outcome }}
           RUFF_HYGIENE_OUTCOME: ${{ steps.ruff_hygiene.outcome }}
           JAVASCRIPT_OUTCOME: ${{ steps.javascript.outcome }}
+          DEAD_CODE_OUTCOME: ${{ steps.dead_code.outcome }}
         run: |
           set -euo pipefail
 
@@ -134,6 +140,7 @@ jobs:
             echo "| Ruff hygiene (advisory) | $RUFF_HYGIENE_OUTCOME |"
             echo "| Bandit | $BANDIT_OUTCOME |"
             echo "| JavaScript syntax | $JAVASCRIPT_OUTCOME |"
+            echo "| Unused public definitions (Vulture 60%) | $DEAD_CODE_OUTCOME |"
           } >> "$GITHUB_STEP_SUMMARY"
 
           failed=0
@@ -141,6 +148,7 @@ jobs:
             "$PIP_CHECK_OUTCOME" \
             "$RUFF_OUTCOME" \
             "$BANDIT_OUTCOME" \
+            "$DEAD_CODE_OUTCOME" \
             "$JAVASCRIPT_OUTCOME"; do
             if [[ "$outcome" != "success" ]]; then
               failed=1

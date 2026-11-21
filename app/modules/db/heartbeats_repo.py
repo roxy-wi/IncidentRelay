@@ -49,18 +49,6 @@ def list_heartbeats(
     return list(query.order_by(Team.slug.asc(), Heartbeat.name.asc()))
 
 
-def list_heartbeats_for_service(service_id, *, enabled_only=False):
-    query = Heartbeat.select().where(
-        (Heartbeat.service == service_id)
-        & (Heartbeat.deleted == False)
-    )
-
-    if enabled_only:
-        query = query.where(Heartbeat.enabled == True)
-
-    return list(query.order_by(Heartbeat.name.asc()))
-
-
 def list_due_heartbeat_candidates(now, limit=100, team_ids=None):
     """Return enabled single-producer checks that may be overdue now."""
     query = (
@@ -147,18 +135,6 @@ def get_heartbeat(heartbeat_id, *, include_deleted=False):
         query = query.where(Heartbeat.deleted == False)
 
     return query.get()
-
-
-def get_heartbeat_or_none(heartbeat_id, *, include_deleted=False):
-    if not heartbeat_id:
-        return None
-
-    query = Heartbeat.select().where(Heartbeat.id == heartbeat_id)
-
-    if not include_deleted:
-        query = query.where(Heartbeat.deleted == False)
-
-    return query.first()
 
 
 def get_heartbeat_by_slug(team_id, slug, *, include_deleted=False):
@@ -307,18 +283,6 @@ def create_heartbeat_instance(heartbeat, instance_key, **data):
         instance_key=str(instance_key),
         **data,
     )
-
-
-def update_heartbeat_instance(instance, data):
-    for key, value in data.items():
-        setattr(instance, key, value)
-    instance.updated_at = utc_now()
-    instance.save()
-    return instance
-
-
-def delete_heartbeat_instance(instance):
-    instance.delete_instance()
 
 
 def disable_heartbeat_instance(instance, status="paused"):

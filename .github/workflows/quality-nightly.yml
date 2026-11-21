@@ -114,7 +114,8 @@ jobs:
             echo "| mypy | ${{ steps.mypy.outcome }} |"
             echo "| Vulture | ${{ steps.vulture.outcome }} |"
             echo
-            echo "Ruff hygiene, mypy and Vulture are advisory during the initial legacy audit."
+            echo "Ruff hygiene, mypy and the full Vulture scan are advisory."
+            echo "Unused public functions/classes are enforced separately by the Quality workflow."
             echo "Ruff and Bandit remain blocking."
           } >> "$GITHUB_STEP_SUMMARY"
 

@@ -226,16 +226,6 @@ def soft_delete_notification_policy(policy_id):
     return policy
 
 
-def policy_belongs_to_team(policy_id, team_id):
-    """Return True when policy belongs to team."""
-    policy = get_notification_policy_or_none(policy_id)
-
-    return bool(
-        policy
-        and policy.team_id == team_id
-    )
-
-
 def count_policy_services(policy_id):
     """Return number of active services using policy."""
     return (
@@ -307,27 +297,6 @@ def get_policy_rule(
         )
 
     return query.get()
-
-
-def get_policy_rule_or_none(
-    rule_id,
-    *,
-    include_deleted=False,
-):
-    """Return notification policy rule or None."""
-    if not rule_id:
-        return None
-
-    query = NotificationPolicyRule.select().where(
-        NotificationPolicyRule.id == rule_id
-    )
-
-    if not include_deleted:
-        query = query.where(
-            NotificationPolicyRule.deleted == False
-        )
-
-    return query.first()
 
 
 def get_next_rule_position(policy_id):

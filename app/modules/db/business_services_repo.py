@@ -71,14 +71,6 @@ def get_business_service_or_none(business_service_id):
     )
 
 
-def get_business_service_by_slug(group_id, slug):
-    return BusinessService.get_or_none(
-        (BusinessService.group == group_id)
-        & (BusinessService.slug == slug)
-        & (BusinessService.deleted == False)  # noqa: E712
-    )
-
-
 def list_business_services(group_id=None, public_only=False, active_only=True):
     query = BusinessService.select().where(BusinessService.deleted == False)  # noqa: E712
 
@@ -246,19 +238,6 @@ def update_business_service_component(component_id, data):
     component.save()
 
     return component
-
-
-def count_business_service_components(business_service_id, active_only=True):
-    query = BusinessServiceComponent.select().where(
-        (BusinessServiceComponent.business_service == business_service_id)
-        & (BusinessServiceComponent.deleted == False)  # noqa: E712
-        & (BusinessServiceComponent.service.in_(_active_component_service_ids()))
-    )
-
-    if active_only:
-        query = query.where(BusinessServiceComponent.enabled == True)  # noqa: E712
-
-    return query.count()
 
 
 def count_components_by_business_service_ids(business_service_ids, active_only=True):

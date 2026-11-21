@@ -1,5 +1,5 @@
 
-from app.modules.db.models import AlertNotification, AlertNotificationEvent
+from app.modules.db.models import AlertNotification
 from app.modules.common import utc_now
 
 
@@ -9,18 +9,6 @@ def get_notification(group_id, channel_id):
     return AlertNotification.get_or_none(
         (AlertNotification.group == group_id)
         & (AlertNotification.channel == channel_id)
-    )
-
-
-def get_notification_by_external_id(channel_id, external_message_id):
-    """Return a delivery record by provider call/message id."""
-
-    if not external_message_id:
-        return None
-
-    return AlertNotification.get_or_none(
-        (AlertNotification.channel == channel_id)
-        & (AlertNotification.external_message_id == external_message_id)
     )
 
 
@@ -70,50 +58,6 @@ def save_notification(
     record.save()
 
     return record
-
-
-def update_notification_callback_state(
-    notification,
-    event_type,
-    provider_status=None,
-    provider_payload=None,
-):
-    """Update notification state after provider callback."""
-
-    notification.last_event_type = event_type or notification.last_event_type
-    notification.provider_status = provider_status or notification.provider_status
-
-    if provider_payload is not None:
-        notification.provider_payload = provider_payload
-
-    notification.last_callback_at = utc_now()
-    notification.callback_count = (notification.callback_count or 0) + 1
-    notification.updated_at = utc_now()
-    notification.save()
-
-    return notification
-
-
-def create_notification_event(
-    notification,
-    event_type,
-    provider_status=None,
-    digit=None,
-    action=None,
-    message=None,
-    payload=None,
-):
-    """Create provider callback history event."""
-
-    return AlertNotificationEvent.create(
-        notification=notification.id,
-        event_type=event_type,
-        provider_status=provider_status,
-        digit=digit,
-        action=action,
-        message=message,
-        payload=payload,
-    )
 
 
 def mark_notification_error(

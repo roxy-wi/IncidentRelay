@@ -4,6 +4,13 @@ from pydantic import Field, model_validator
 from pydantic_core import PydanticCustomError
 
 from app.api.schemas.base import ApiModel
+from app.modules.service_sli import (
+    DEFAULT_IMPACT_PRIORITY_SCOPE as _DEFAULT_IMPACT_PRIORITY_SCOPE,
+    IMPACT_SLI_TYPES as SERVICE_IMPACT_SLI_TYPES,
+    PRIORITY_PATTERN as SERVICE_SLI_PRIORITY_PATTERN,
+    PRIORITY_VALUES,
+    normalize_priority_scope,
+)
 from app.api.schemas.limits import (
     DESCRIPTION_MAX_LENGTH,
     NAME_MAX_LENGTH,
@@ -333,10 +340,9 @@ SERVICE_SLI_SOURCE_PATTERN = r"^(incidentrelay_alert_groups|incidentrelay_servic
 
 SERVICE_SLI_SEVERITY_PATTERN = r"^(critical|high|warning|info)$"
 
-SERVICE_SLI_PRIORITY_PATTERN = r"^(p1|p2|p3|p4)$"
-SERVICE_IMPACT_SLI_TYPES = {"incident_availability", "incident_count"}
-SERVICE_SLI_PRIORITY_VALUES = ["p1", "p2", "p3", "p4"]
-DEFAULT_IMPACT_PRIORITY_SCOPE = ["p1", "p2"]
+# Preserve existing module constants while deriving their values from shared rules.
+SERVICE_SLI_PRIORITY_VALUES = list(PRIORITY_VALUES)
+DEFAULT_IMPACT_PRIORITY_SCOPE = list(_DEFAULT_IMPACT_PRIORITY_SCOPE)
 
 SERVICE_SLO_COMPARISON_PATTERN = r"^(percent_good_gte|value_gte|value_lte)$"
 SERVICE_SLO_NAME_MAX_LENGTH = 160
@@ -363,43 +369,16 @@ class ServiceSliBaseSchema(ApiModel):
     def validate_scope_shape(self):
         """Validate and normalize SLI scope fields."""
         configuration = dict(self.configuration or {})
-        priority_scope = configuration.get("priority_scope")
-
-        if priority_scope is None and self.priority:
-            priority_scope = [self.priority]
-
-        if priority_scope is None and self.sli_type in SERVICE_IMPACT_SLI_TYPES:
-            priority_scope = list(DEFAULT_IMPACT_PRIORITY_SCOPE)
-
-        if isinstance(priority_scope, str):
-            priority_scope = [priority_scope]
-
-        normalized = []
-
-        if priority_scope is not None:
-            if not isinstance(priority_scope, list):
-                raise PydanticCustomError(
-                    "service_sli_priority_scope",
-                    "priority_scope must be a list",
-                )
-
-            for value in priority_scope:
-                value = str(value or "").strip().lower()
-
-                if value not in SERVICE_SLI_PRIORITY_VALUES:
-                    raise PydanticCustomError(
-                        "service_sli_priority_scope",
-                        "priority_scope values must be one of p1, p2, p3, p4",
-                    )
-
-                if value not in normalized:
-                    normalized.append(value)
-
-        if self.sli_type in SERVICE_IMPACT_SLI_TYPES and not normalized:
-            raise PydanticCustomError(
-                "service_sli_priority_scope",
-                "Impact SLI requires priority_scope",
+        try:
+            normalized = normalize_priority_scope(
+                configuration.get("priority_scope"),
+                sli_type=self.sli_type,
+                priority=self.priority,
             )
+        except ValueError as exc:
+            raise PydanticCustomError(
+                "service_sli_priority_scope", str(exc),
+            ) from exc
 
         if normalized:
             configuration["priority_scope"] = normalized
@@ -524,37 +503,6 @@ class ServiceImpactServiceQuerySchema(ApiModel):
     )
 
 
-class ServiceImpactExplainQuerySchema(ApiModel):
-    """Validate Service Impact v2 explanation query."""
-
-    include_paths: bool = True
-    include_root_causes: bool = True
-    include_blast_radius: bool = True
-
-    max_depth: int = Field(
-        default=SERVICE_IMPACT_MAX_DEPTH_DEFAULT,
-        ge=1,
-        le=SERVICE_IMPACT_MAX_DEPTH_LIMIT,
-    )
-
-
-class ServiceImpactAnalyticsQuerySchema(ApiModel):
-    """Validate Service Impact v2 analytics query."""
-
-    team_id: int | None = Field(default=None, ge=1)
-    service_id: int | None = Field(default=None, ge=1)
-
-    days: int = Field(default=30, ge=1, le=365)
-    include_disabled: bool = False
-    include_operational: bool = False
-
-    max_depth: int = Field(
-        default=SERVICE_IMPACT_MAX_DEPTH_DEFAULT,
-        ge=1,
-        le=SERVICE_IMPACT_MAX_DEPTH_LIMIT,
-    )
-
-
 class ServiceImpactSnapshotQuerySchema(ApiModel):
     """Validate manual Service Impact snapshot creation query/body."""
 
@@ -592,121 +540,6 @@ class ServiceImpactHistoryQuerySchema(ApiModel):
     days: int = Field(default=30, ge=1, le=365)
     bucket: str = Field(default="day", pattern=r"^(hour|day)$")
     limit: int = Field(default=25, ge=1, le=200)
-
-
-class ServiceImpactPathNodeSchema(ApiModel):
-    """Service node inside an impact path."""
-
-    service_id: int = Field(ge=1)
-    service_slug: str | None = None
-    service_name: str | None = None
-    status: str = Field(pattern=SERVICE_IMPACT_STATUS_PATTERN)
-    effective_status: str = Field(pattern=SERVICE_IMPACT_STATUS_PATTERN)
-    impact_score: int = Field(default=0, ge=0, le=100)
-    propagated_impact_score: int | None = Field(default=None, ge=0, le=100)
-    dependency_multiplier: float | None = None
-    dependency_type: str | None = Field(default=None, pattern=SERVICE_DEPENDENCY_TYPE_PATTERN)
-    dependency_criticality: str | None = Field(
-        default=None,
-        pattern=SERVICE_DEPENDENCY_CRITICALITY_PATTERN,
-    )
-
-
-class ServiceImpactRootCauseSchema(ApiModel):
-    """Root cause entry for Service Impact v2."""
-
-    service_id: int = Field(ge=1)
-    service_slug: str | None = None
-    service_name: str | None = None
-    reason: str = Field(pattern=SERVICE_IMPACT_REASON_PATTERN)
-    status: str = Field(pattern=SERVICE_IMPACT_STATUS_PATTERN)
-    effective_status: str = Field(pattern=SERVICE_IMPACT_STATUS_PATTERN)
-    impact_score: int = Field(default=0, ge=0, le=100)
-    severity: str | None = None
-    priority_slug: str | None = None
-    priority_order: int | None = None
-    open_alert_groups: int = Field(default=0, ge=0)
-    critical_open_alert_groups: int = Field(default=0, ge=0)
-    path: list[ServiceImpactPathNodeSchema] = Field(default_factory=list)
-
-
-class ServiceImpactExplanationSchema(ApiModel):
-    """Human-readable explanation block for Service Impact v2."""
-
-    primary_reason: str = Field(pattern=SERVICE_IMPACT_REASON_PATTERN)
-    primary_source_service_id: int | None = Field(default=None, ge=1)
-    primary_source_service_slug: str | None = None
-    primary_source_service_name: str | None = None
-
-    title: str
-    message: str
-
-    own_impact_score: int = Field(default=0, ge=0, le=100)
-    alert_impact_score: int = Field(default=0, ge=0, le=100)
-    dependency_impact_score: int = Field(default=0, ge=0, le=100)
-    effective_impact_score: int = Field(default=0, ge=0, le=100)
-
-    rules: list[str] = Field(default_factory=list)
-    paths: list[list[ServiceImpactPathNodeSchema]] = Field(default_factory=list)
-
-
-class ServiceBlastRadiusSchema(ApiModel):
-    """Downstream blast radius for a service."""
-
-    direct_downstream: int = Field(default=0, ge=0)
-    transitive_downstream: int = Field(default=0, ge=0)
-    critical_downstream: int = Field(default=0, ge=0)
-    tier_1_downstream: int = Field(default=0, ge=0)
-    affected_downstream: int = Field(default=0, ge=0)
-    paths: list[list[ServiceImpactPathNodeSchema]] = Field(default_factory=list)
-    cycle_detected: bool = False
-    depth_limited: bool = False
-
-
-class ServiceImpactV2ItemSchema(ApiModel):
-    """Single service item in Service Impact v2 response."""
-
-    service_id: int = Field(ge=1)
-    service_slug: str
-    service_name: str
-
-    team_id: int = Field(ge=1)
-    team_slug: str | None = None
-    team_name: str | None = None
-
-    own_status: str = Field(pattern=SERVICE_IMPACT_STATUS_PATTERN)
-    alert_impact_status: str = Field(pattern=SERVICE_IMPACT_STATUS_PATTERN)
-    dependency_impact_status: str = Field(pattern=SERVICE_IMPACT_STATUS_PATTERN)
-    effective_status: str = Field(pattern=SERVICE_IMPACT_STATUS_PATTERN)
-
-    own_impact_score: int = Field(default=0, ge=0, le=100)
-    alert_impact_score: int = Field(default=0, ge=0, le=100)
-    dependency_impact_score: int = Field(default=0, ge=0, le=100)
-    effective_impact_score: int = Field(default=0, ge=0, le=100)
-    impact_score: int = Field(default=0, ge=0, le=100)
-
-    primary_reason: str = Field(pattern=SERVICE_IMPACT_REASON_PATTERN)
-
-    open_alert_groups: int = Field(default=0, ge=0)
-    critical_open_alert_groups: int = Field(default=0, ge=0)
-    upstream_issues_count: int = Field(default=0, ge=0)
-
-    root_causes: list[ServiceImpactRootCauseSchema] = Field(default_factory=list)
-    explanation: ServiceImpactExplanationSchema | None = None
-    blast_radius: ServiceBlastRadiusSchema | None = None
-
-    cycle_detected: bool = False
-    depth_limited: bool = False
-
-
-class ServiceImpactV2ResponseSchema(ApiModel):
-    """Full Service Impact v2 response contract."""
-
-    version: int = Field(default=2)
-    items: list[ServiceImpactV2ItemSchema] = Field(default_factory=list)
-
-    summary: dict = Field(default_factory=dict)
-    filters: dict = Field(default_factory=dict)
 
 
 SERVICE_ANALYTICS_SORT_PATTERN = (

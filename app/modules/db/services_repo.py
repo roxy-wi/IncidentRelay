@@ -94,12 +94,6 @@ def is_service_active(service):
     return True
 
 
-def service_belongs_to_team(service_id, team_id):
-    """Return True when service belongs to team."""
-    service = get_service_or_none(service_id)
-    return bool(service and service.team_id == team_id)
-
-
 def list_enabled_match_rules(team_id, route_id=None):
     """Return route-specific rules first, then team-level rules."""
     route_rules = []

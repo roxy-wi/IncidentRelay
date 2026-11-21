@@ -254,11 +254,3 @@ class SsoGroupMappingUpdateSchema(SsoGroupMappingCreateSchema):
 
 class SsoSamlMetadataParseRequest(ApiModel):
     metadata_url: str = Field(min_length=1, max_length=2048)
-
-
-class SsoSamlMetadataParseResponse(ApiModel):
-    metadata_url: str
-    saml_idp_entity_id: str | None = None
-    saml_idp_sso_url: str | None = None
-    saml_idp_slo_url: str | None = None
-    saml_idp_x509_cert: str | None = None

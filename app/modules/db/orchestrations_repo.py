@@ -516,23 +516,6 @@ def ensure_draft_with_creation_status(
         return get_or_create_draft(orchestration_id, actor_id=actor_id), True
 
 
-def archive_draft(version_id: int) -> EventOrchestrationVersion:
-    with database_proxy.atomic():
-        version = _locked_version(version_id)
-        _assert_draft(version)
-        EventOrchestrationRule.delete().where(
-            EventOrchestrationRule.version == version.id
-        ).execute()
-        EventOrchestrationVersion.update(
-            status="archived",
-            updated_at=utc_now(),
-        ).where(
-            (EventOrchestrationVersion.id == version.id)
-            & (EventOrchestrationVersion.status == "draft")
-        ).execute()
-    return _get_version(version_id)
-
-
 def set_runtime_state(
     orchestration_id: int,
     *,
