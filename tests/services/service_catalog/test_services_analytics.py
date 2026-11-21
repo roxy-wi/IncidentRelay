@@ -1,5 +1,4 @@
 from app.login import create_access_token
-from app.modules.db import services_repo
 from tests.factories import (
     create_service,
     create_group,
@@ -10,6 +9,7 @@ from tests.factories import (
     create_route,
     create_service_dependency,
 )
+from app.services.service_catalog import mutations as service_mutations
 
 
 def make_headers(user):
@@ -18,7 +18,7 @@ def make_headers(user):
 
 
 def create_test_service(team, *, name, enabled=True):
-    return services_repo.create_service({
+    return service_mutations.create_service({
         "team": team.id,
         "slug": unique("service"),
         "name": name,

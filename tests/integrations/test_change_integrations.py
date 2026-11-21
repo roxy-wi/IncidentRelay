@@ -14,7 +14,7 @@ from app.api.schemas.change_integrations import (
 )
 from app.login import create_access_token
 from app.modules.common import utc_now
-from app.modules.db import groups_repo, services_repo, teams_repo, tokens_repo
+from app.modules.db import tokens_repo
 from app.modules.db.models import (
     ApiToken,
     AuditLog,
@@ -35,6 +35,9 @@ from app.services.change_intelligence.authorization import (
 from app.services.integrations.auth import hash_token
 from app.settings import Config
 from tests.factories import create_group, create_service, create_team, create_user
+from app.services import group_management
+from app.services import team_management
+from app.services.service_catalog import mutations as service_mutations
 
 
 BASE = "/api/admin/change-integrations"
@@ -390,21 +393,21 @@ def test_catalog_changes_invalidate_authority_atomically(setup_identity, operati
     grant(setup_identity, service=service.id)
     before = revision(integration)
     if operation == "move":
-        services_repo.update_service(
+        service_mutations.update_service(
             service.id, {"team": create_team(create_group()).id}
         )
     elif operation == "disable_service":
-        services_repo.update_service(service.id, {"enabled": False})
+        service_mutations.update_service(service.id, {"enabled": False})
     elif operation == "delete_service":
-        services_repo.soft_delete_service(service.id)
+        service_mutations.soft_delete_service(service.id)
     elif operation == "disable_team":
-        teams_repo.update_team(service.team_id, {"active": False})
+        team_management.update_team(service.team_id, {"active": False})
     elif operation == "delete_team":
-        teams_repo.soft_delete_team(service.team_id)
+        team_management.soft_delete_team(service.team_id)
     elif operation == "disable_group":
-        groups_repo.update_group(service.group_id, {"active": False})
+        group_management.update_group(service.group_id, {"active": False})
     else:
-        groups_repo.soft_delete_group(service.group_id)
+        group_management.soft_delete_group(service.group_id)
     assert revision(integration) > before
     job = ChangeJob.get(
         ChangeJob.job_type == "discover_auth", ChangeJob.entity_id == integration.id
@@ -451,7 +454,7 @@ def test_failed_catalog_invalidation_rolls_back_service(setup_identity, monkeypa
 
     monkeypatch.setattr(admin.changes_repo, "request_job", fail)
     with pytest.raises(RuntimeError, match="injected"):
-        services_repo.update_service(service.id, {"enabled": False})
+        service_mutations.update_service(service.id, {"enabled": False})
     assert Service.get_by_id(service.id).enabled
     assert revision(integration) == before
 
@@ -638,7 +641,7 @@ def test_team_rename_keeps_pinned_namespace_and_service_restore_invalidates(
 ):
     integration, source, service, actor = setup_identity
     grant(setup_identity)
-    teams_repo.update_team(service.team_id, {"slug": "renamed-owner"})
+    team_management.update_team(service.team_id, {"slug": "renamed-owner"})
     with authorized_source(integration.id, source.owner_team_id, source.source) as (
         current,
         _,
@@ -649,9 +652,9 @@ def test_team_rename_keeps_pinned_namespace_and_service_restore_invalidates(
             )
             is None
         )
-    services_repo.soft_delete_service(service.id)
+    service_mutations.soft_delete_service(service.id)
     before = revision(integration)
-    services_repo.restore_service(service.id, {"enabled": True})
+    service_mutations.restore_service(service.id, {"enabled": True})
     assert revision(integration) > before
     with authorized_source(integration.id, source.owner_team_id, source.source) as (
         current,

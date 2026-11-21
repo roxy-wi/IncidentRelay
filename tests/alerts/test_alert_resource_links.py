@@ -6,11 +6,11 @@ from types import SimpleNamespace
 import pytest
 
 from app.api.openapi.endpoints.alerts import alert_child_schema, alert_group_schema
-from app.modules.db import alerts_repo
 from app.modules.db.models import AlertGroup
 from app.services.integrations.normalizers.alertmanager import normalize_alertmanager
 from app.services.links import build_alert_resource_links
 from tests.factories import create_alert, create_group, create_route, create_team
+from app.services.alerts import group_state
 
 
 @pytest.fixture
@@ -43,7 +43,7 @@ def stored_alert_with_links(db):
     )
     alert.group = group
     alert.save()
-    group = alerts_repo.recalculate_alert_group(group)
+    group = group_state.recalculate_alert_group(group)
     return alert, group
 
 

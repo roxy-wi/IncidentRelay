@@ -1,4 +1,3 @@
-import hashlib
 import secrets
 from functools import wraps
 
@@ -6,6 +5,7 @@ from flask import jsonify, request
 
 from app.middleware import load_jwt_user
 from app.modules.db import routes_repo, tokens_repo
+from app.modules.token_hashing import hash_token as hash_token
 from app.settings import Config
 
 
@@ -15,14 +15,6 @@ def create_raw_token():
     """
 
     return secrets.token_urlsafe(48)
-
-
-def hash_token(raw_token):
-    """
-    Hash a token before storing it.
-    """
-
-    return hashlib.sha256(raw_token.encode("utf-8")).hexdigest()
 
 
 def get_bearer_token():

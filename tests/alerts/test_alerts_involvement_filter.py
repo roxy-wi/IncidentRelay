@@ -15,12 +15,13 @@ from tests.factories import (
     create_team,
     create_user,
 )
+from app.services.alerts import group_state
 
 
 def alert_group(team, title, *, assignee=None, service=None, status="firing"):
     """Create a technical group independently of an operational Incident."""
     route = create_route(team, service=service)
-    return alerts_repo.create_alert_group(
+    return group_state.create_alert_group(
         team=team,
         route=route,
         service=service,

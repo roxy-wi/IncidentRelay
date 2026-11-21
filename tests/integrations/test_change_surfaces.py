@@ -6,7 +6,7 @@ from datetime import timedelta
 import pytest
 
 from app.modules.common import utc_now
-from app.modules.db import changes_repo, incident_core_repo, services_repo
+from app.modules.db import changes_repo, incident_core_repo
 from app.modules.db.models import (
     SystemSettings,
     AlertGroup,
@@ -33,6 +33,7 @@ from tests.integrations.test_change_correlation import (
     run_change,
 )
 from tests.integrations.test_change_worker import process_resolution
+from app.services.service_catalog import mutations as service_mutations
 
 __all__ = ["changes", "intake", "setup_identity"]
 
@@ -170,7 +171,7 @@ def test_revocation_filters_before_cursor_limit_and_preserves_legacy_history(
 def test_service_move_hides_derived_history_from_new_reader(client, changes):
     run_change(changes["change"], "sync_service_timeline")
     team = create_team(create_group())
-    services_repo.update_service(changes["service"].id, {"team": team.id})
+    service_mutations.update_service(changes["service"].id, {"team": team.id})
     response = client.get(
         timeline_url(changes["service"]), headers=headers(reader(team))
     )

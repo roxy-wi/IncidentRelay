@@ -2,6 +2,7 @@
 
 from app.api.schemas.system_settings import SystemSettingsUpdate
 from app.modules.db.models import SystemSettings, User
+from app.modules.db.system_settings_repo import get_settings as get_settings
 from app.modules.db.transactions import lock_row, write_transaction
 from app.services.audit import record_audit
 from app.services.admin_tokens import lock_admin_api_token
@@ -14,11 +15,6 @@ class SystemSettingsAccessDenied(PermissionError):
 
 class InvalidRetryWindow(ValueError):
     """The base delay exceeds the maximum delay in the resulting settings."""
-
-
-def get_settings() -> SystemSettings:
-    """Read the committed singleton on each request or scheduler tick."""
-    return SystemSettings.get_by_id(1)
 
 
 def update_settings(payload: SystemSettingsUpdate, *, actor_id: int) -> SystemSettings:

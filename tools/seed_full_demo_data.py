@@ -49,6 +49,7 @@ from app.services.alerts.actions import acknowledge_alert, resolve_alert
 from app.services.alerts.lifecycle import upsert_alert
 from app.services.integrations.auth import hash_token
 from app.services.service_catalog.presets import ensure_basic_operational_standard
+from app.services.orchestration import publication
 
 
 SUPPORTED_ROUTE_SOURCES = (
@@ -2168,13 +2169,13 @@ def seed_orchestration(prefix: str, groups: list, services: list, users: list):
                     f"({SEED_SCRIPT_VERSION})"
                 ),
             )
-            validation = orchestrations_repo.validate_version(draft.id)
+            validation = publication.validate_version(draft.id)
             if not validation["valid"]:
                 raise RuntimeError(
                     f"Invalid demo orchestration {orchestration.name}: "
                     + "; ".join(validation["errors"])
                 )
-            published = orchestrations_repo.publish_draft(
+            published = publication.publish_draft(
                 orchestration.id,
                 actor_id=actor.id,
                 comment=(
@@ -2214,7 +2215,7 @@ def seed_orchestration(prefix: str, groups: list, services: list, users: list):
                 f"({SEED_SCRIPT_VERSION})"
             ),
         )
-        validation = orchestrations_repo.validate_version(draft.id)
+        validation = publication.validate_version(draft.id)
         if not validation["valid"]:
             raise RuntimeError(
                 f"Invalid demo orchestration draft {orchestration.name}: "

@@ -39,6 +39,7 @@ from app.services.orchestration.safety import (
     safe_trace_value,
 )
 from app.settings import Config
+from app.services.orchestration import publication
 
 
 SUPPORTED_SIMULATION_SOURCES = SUPPORTED_NORMALIZER_SOURCES
@@ -416,7 +417,7 @@ def _simulate_version(
     *,
     evaluated_at: str,
 ) -> Dict[str, Any]:
-    validation = orchestrations_repo.validate_version(version.id)
+    validation = publication.validate_version(version.id)
     response: Dict[str, Any] = {
         "orchestration_id": orchestration.id,
         "version_id": version.id,

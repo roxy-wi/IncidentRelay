@@ -3,12 +3,13 @@
 import re
 
 from app.modules.common import utc_now
-from app.modules.db import business_services_repo, services_repo
+from app.modules.db import business_services_repo
 from app.modules.db.models import (
     BusinessService, BusinessServiceComponent, DirectorySyncBinding as Binding,
     DirectorySyncSource as Source, Service, ServiceChannel, Team,
 )
 from app.modules.db.transactions import lock_row
+from app.services.service_catalog import mutations as service_mutations
 from app.services.sync.cmdb.config import CmdbConfig, is_cmdb
 from app.services.sync.directory.config import SyncError
 
@@ -98,6 +99,14 @@ def reconcile(source, snapshot):
 
     locals_by_kind = {"service": {}, "business_service": {}}
     for kind, collection in (("business_service", "business_services"), ("service", "services")):
+        create_object = (
+            service_mutations.create_service if kind == "service"
+            else business_services_repo.create_business_service
+        )
+        update_object = (
+            service_mutations.update_service if kind == "service"
+            else business_services_repo.update_business_service
+        )
         for row in sorted(snapshot[collection], key=lambda item: int(item["id"])):
             binding = existing_binding(source, kind, row["id"])
             local = validate_local(source, kind, binding) if binding else None
@@ -106,12 +115,11 @@ def reconcile(source, snapshot):
             if values or reconnect:
                 changes.append({"kind": kind, "external_id": row["id"], "label": row["name"],
                                 "action": "reconnect" if reconnect else "update" if local else "create", "fields": values})
-            repo = services_repo if kind == "service" else business_services_repo
             if not local:
-                local = getattr(repo, "create_" + kind)(values)
+                local = create_object(values)
                 binding = Binding.create(source=source.id, kind=kind, external_id=row["id"], local_id=local.id, created=True)
             elif values:
-                local = getattr(repo, "update_" + kind)(local.id, values)
+                local = update_object(local.id, values)
             if reconnect:
                 binding.source = source.id
                 binding.owned = True
@@ -187,12 +195,15 @@ def remove_catalog(source, *, delete_imported):
                 local = model.get_or_none(model.id == binding.local_id)
                 if local and not local.deleted:
                     validate_local(source, binding.kind, binding)
-        for kind, repo in (("business_service", business_services_repo), ("service", services_repo)):
+        for kind, delete_object in (
+            ("business_service", business_services_repo.soft_delete_business_service),
+            ("service", service_mutations.soft_delete_service),
+        ):
             for binding in bindings:
                 if binding.kind == kind:
                     local = MODELS[kind].get_or_none(MODELS[kind].id == binding.local_id)
                     if local and not local.deleted:
-                        getattr(repo, "soft_delete_" + kind)(local.id)
+                        delete_object(local.id)
         Binding.delete().where(Binding.source == source.id).execute()
     else:
         Binding.update(owned=False).where(Binding.source == source.id).execute()

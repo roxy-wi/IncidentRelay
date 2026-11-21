@@ -17,7 +17,8 @@ from tests.integrations.test_cmdb_sync import cmdb_source as cmdb_source, pages 
 
 
 @pytest.mark.skipif(os.environ.get("INCIDENTRELAY_BROWSER_TESTS") != "1", reason="Enable browser tests")
-def test_cmdb_sync_browser(app, db, cmdb_source, upstream, admin_user):
+@pytest.mark.parametrize("locale", ["en", "ru"])
+def test_cmdb_sync_browser(app, db, cmdb_source, upstream, admin_user, locale):
     stop = threading.Event()
     failures = []
 
@@ -35,10 +36,11 @@ def test_cmdb_sync_browser(app, db, cmdb_source, upstream, admin_user):
     server_thread.start()
     worker.start()
     root = Path(__file__).resolve().parents[2]
-    screenshots = root / "tests/.tmp/cmdb-sync-browser"
+    screenshots = root / "tests/.tmp/cmdb-sync-browser" / locale
     screenshots.mkdir(parents=True, exist_ok=True)
     fixture = {"baseUrl": f"http://127.0.0.1:{server.server_port}", "token": create_access_token(admin_user)[0],
-               "groupId": cmdb_source.group_id, "teams": cmdb_source.config["team_matches"], "screenshots": str(screenshots)}
+               "groupId": cmdb_source.group_id, "teams": cmdb_source.config["team_matches"],
+               "locale": locale, "screenshots": str(screenshots)}
     try:
         result = subprocess.run(
             [shutil.which("node") or "node", "tests/ux/cmdb_sync.browser.js"], cwd=root,

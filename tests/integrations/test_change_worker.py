@@ -11,8 +11,6 @@ from app.modules.common import utc_now
 from app.modules.db import (
     changes_repo as queue,
     incident_core_repo,
-    services_repo,
-    teams_repo,
 )
 from app.modules.db.models import (
     ApiToken,
@@ -44,6 +42,8 @@ from tests.integrations.test_change_integrations import (
     grant,
     revision,
 )
+from app.services import team_management
+from app.services.service_catalog import mutations as service_mutations
 
 __all__ = ["intake", "setup_identity", "owned_identity"]
 
@@ -184,7 +184,7 @@ def test_new_event_retry_keeps_resolved_identity_after_slug_reuse(intake):
     change = pending_change(intake)
     service = create_service(intake[0][2].team, slug="late-service")
     process_resolution(change)
-    services_repo.update_service(service.id, {"slug": "renamed-service"})
+    service_mutations.update_service(service.id, {"slug": "renamed-service"})
     replacement = create_service(service.team, slug="late-service")
     ChangeServiceReference.update(
         resolution_status="denied", verification_state="rejected"
@@ -207,7 +207,7 @@ def test_team_rename_and_slug_reuse_keep_numeric_namespace(intake):
     change = pending_change(intake)
     team = intake[0][2].team
     old_slug = team.slug
-    teams_repo.update_team(team.id, {"slug": "renamed-team"})
+    team_management.update_team(team.id, {"slug": "renamed-team"})
     other = create_team(create_group(), slug=old_slug)
     create_service(other, slug="late-service")
     process_resolution(change)
@@ -224,7 +224,7 @@ def test_resolved_service_move_never_rebinds_to_slug_replacement(intake):
     change = Change.get()
     service = intake[0][2]
     other = create_team(create_group())
-    services_repo.update_service(service.id, {"team": other.id})
+    service_mutations.update_service(service.id, {"team": other.id})
     create_service(service.team, slug=service.slug)
     process_resolution(change)
     ref = ChangeServiceReference.get()
@@ -468,7 +468,7 @@ def test_catalog_mutation_and_queue_failure_roll_back_together(intake, monkeypat
     with monkeypatch.context() as patch:
         patch.setattr(queue, "request_job", fail)
         with pytest.raises(RuntimeError):
-            services_repo.update_service(service.id, {"name": "must roll back"})
+            service_mutations.update_service(service.id, {"name": "must roll back"})
     assert Service.get_by_id(service.id).name == service.name
     assert ChangeGraphState.get_by_id(1).revision == before
 
@@ -596,7 +596,7 @@ def test_catalog_creation_triggers_resolution_through_scheduler_worker(intake):
     ChangeJob.update(next_attempt_at=utc_now()).where(
         ChangeJob.job_type != "resolve_references"
     ).execute()
-    service = services_repo.create_service(
+    service = service_mutations.create_service(
         {"team": intake[0][2].team_id, "slug": "late-service", "name": "Late service"}
     )
     for _ in range(3):
@@ -661,11 +661,11 @@ def test_dependency_mutations_advance_graph_and_request_discovery(intake):
     source = intake[0][2]
     target = create_service(source.team)
     before = ChangeGraphState.get_by_id(1).revision
-    dependency = services_repo.create_service_dependency(
+    dependency = service_mutations.create_service_dependency(
         source.id, {"depends_on_service": target.id}
     )
-    services_repo.update_service_dependency(dependency.id, {"enabled": False})
-    services_repo.soft_delete_service_dependency(dependency.id)
+    service_mutations.update_service_dependency(dependency.id, {"enabled": False})
+    service_mutations.soft_delete_service_dependency(dependency.id)
     assert ChangeGraphState.get_by_id(1).revision == before + 3
     job = ChangeJob.get(ChangeJob.job_type == "discover_graph")
     assert job.target_revision == before + 3

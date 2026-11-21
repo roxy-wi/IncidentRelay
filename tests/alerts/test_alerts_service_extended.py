@@ -23,6 +23,7 @@ from tests.factories import (
     create_user,
 )
 from app.modules.common import utc_now
+from app.services.alerts import group_state
 
 
 def normalized_alert(**overrides):
@@ -143,7 +144,7 @@ def test_upsert_alert_preserves_acknowledged_status_when_payload_fires_again(db)
 
     assert created is True
 
-    alerts_repo.acknowledge_alert_group(alert_group.id)
+    group_state.acknowledge_alert_group(alert_group.id)
 
     result = upsert_alert(normalized_alert(message="updated message"))
     alert_group = result.group

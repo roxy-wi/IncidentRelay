@@ -22,6 +22,7 @@ from app.services.alerts.maintenance_state import (
     resume_notification_lifecycle,
 )
 from app.modules.common import utc_now
+from app.services.alerts import group_state
 
 logger = logging.getLogger("oncall.alerts")
 
@@ -372,7 +373,7 @@ def _process_due_firing_group(selected_group, *, now):
                 alerts_repo.clear_alert_group_notification(group)
             return "skipped"
 
-        group = alerts_repo.recalculate_alert_group(group)
+        group = group_state.recalculate_alert_group(group)
         if is_alert_group_shelved(group, now=now):
             alerts_repo.clear_alert_group_notification(group)
             return "skipped"

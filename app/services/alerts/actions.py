@@ -11,6 +11,7 @@ from app.services.notifications.delivery import update_alert_messages
 from app.services.notifications.rules import cancel_pending_group_deliveries
 from app.services.business_services.impact import refresh_business_impacts_safely_for_group
 from app.services.business_services.status import refresh_business_services_safely_for_technical_service
+from app.services.alerts import group_state
 
 
 ACK_CANCELLED_DELIVERY_EVENT_TYPES = frozenset({
@@ -79,7 +80,7 @@ def acknowledge_alert(
         if old_status in {"resolved", "merged"} or group_before.merged_into_id:
             return group_before
 
-        group = alerts_repo.acknowledge_alert_group(alert_id, user_id=user_id)
+        group = group_state.acknowledge_alert_group(alert_id, user_id=user_id)
         _cancel_acknowledged_notification_work(group)
         alerts_repo.create_alert_event(
             group_id=group.id,
@@ -154,7 +155,7 @@ def resolve_alert(
             message="Alert group resolved",
             user_id=user_id,
         )
-        group = alerts_repo.resolve_alert_group(alert_id, user_id=user_id, event=event)
+        group = group_state.resolve_alert_group(alert_id, user_id=user_id, event=event)
         # A manual resolve must not leave a stale firing group_wait job behind.
         alerts_repo.clear_alert_group_notification(group)
         clear_shelve_on_resolve(group.id, user_id=user_id, api_token_id=api_token_id)

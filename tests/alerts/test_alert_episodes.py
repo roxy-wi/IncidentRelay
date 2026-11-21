@@ -6,11 +6,8 @@ import pytest
 
 from app.modules.common import utc_now
 from app.modules.db import (
-    alert_episodes_repo,
     alerts_repo,
     changes_repo,
-    heartbeats_repo,
-    soft_delete_hardening,
 )
 from app.modules.db.models import (
     Alert,
@@ -38,6 +35,10 @@ from tests.factories import (
     create_team,
     unique,
 )
+from app.services import heartbeat_management
+from app.services.alerts import episodes
+from app.services.alerts import group_state
+from app.services.alerts import resource_deletion
 
 
 @pytest.fixture
@@ -193,7 +194,7 @@ def test_manual_creation_and_callback_resolution_share_episode_contract(intake):
 def test_terminal_input_does_not_invent_an_episode(intake):
     team, _, data = intake
     assert upsert_alert(dict(data, status="resolved")).group is None
-    group = alerts_repo.create_alert_group(
+    group = group_state.create_alert_group(
         team=team,
         source="test",
         title="Terminal",
@@ -214,7 +215,7 @@ def test_legacy_group_is_tracked_only_after_a_genuine_reopen(intake, resolution)
     repeated = upsert_alert(dict(data))
     other_data = dict(data, dedup_key=unique("second"))
     added = upsert_alert(dict(other_data))
-    recalculated = alerts_repo.recalculate_alert_group(legacy)
+    recalculated = group_state.recalculate_alert_group(legacy)
     assert repeated.group.id == added.group.id == recalculated.id == legacy.id
     assert recalculated.current_episode_id is None
     assert not AlertGroupEpisode.select().exists()
@@ -226,7 +227,7 @@ def test_legacy_group_is_tracked_only_after_a_genuine_reopen(intake, resolution)
     elif resolution == "manual":
         actions.resolve_alert(legacy.id)
     else:
-        soft_delete_hardening.resolve_alert_groups_by_ids([legacy.id])
+        resource_deletion.resolve_alert_groups_by_ids([legacy.id])
     assert AlertGroup.get_by_id(legacy.id).status == "resolved"
     assert not AlertGroupEpisode.select().exists()
     assert not ChangeJob.select().exists()
@@ -250,7 +251,7 @@ def test_missing_start_never_initializes_a_legacy_episode(intake):
     event = AlertEvent.create(group=group, event_type="updated")
     with incident_core_repo.write_transaction():
         locked = incident_core_repo.lock_alert_group(group.id)
-        assert alert_episodes_repo.open_episode(locked, event=event) is None
+        assert episodes.open_episode(locked, event=event) is None
     assert AlertGroup.get_by_id(group.id).current_episode_id is None
     assert not AlertGroupEpisode.select().exists()
     assert not ChangeJob.select().exists()
@@ -266,7 +267,7 @@ def test_merge_tracks_legacy_target_only_when_it_reopens(intake, resolved_target
         {"team_id": team.id, "service_id": intake[1].service_id, "title": "Source", "notify": False}
     )
 
-    merged = alerts_repo.merge_alert_groups(target.id, [source.id])
+    merged = group_state.merge_alert_groups(target.id, [source.id])
 
     assert merged.status == "firing"
     assert len(_episodes(target.id)) == int(resolved_target)
@@ -346,8 +347,8 @@ def test_merge_closes_source_without_transferring_its_episode(intake):
     source_episode = second.current_episode
     target_episode_id = first.current_episode_id
 
-    merged = alerts_repo.merge_alert_groups(first.id, [second.id])
-    alerts_repo.merge_alert_groups(first.id, [second.id])
+    merged = group_state.merge_alert_groups(first.id, [second.id])
+    group_state.merge_alert_groups(first.id, [second.id])
 
     assert merged.current_episode_id == target_episode_id
     source = AlertGroup.get_by_id(second.id)
@@ -368,7 +369,7 @@ def test_merge_into_already_merged_target_returns_conflict(
         create_manual_alert_group({"team_id": team.id, "service_id": intake[1].service_id, "title": title, "notify": False})
         for title in ("Target", "Source", "Destination")
     ]
-    alerts_repo.merge_alert_groups(destination.id, [target.id])
+    group_state.merge_alert_groups(destination.id, [target.id])
     before = _snapshot()
 
     response = client.post(
@@ -391,7 +392,7 @@ def test_merge_failure_rolls_back_children_and_both_groups(intake, monkeypatch):
     before = _snapshot()
     monkeypatch.setattr(changes_repo, "request_job", _fail)
     with pytest.raises(RuntimeError, match="injected"):
-        alerts_repo.merge_alert_groups(groups[0].id, [groups[1].id])
+        group_state.merge_alert_groups(groups[0].id, [groups[1].id])
     assert _snapshot() == before
 
 
@@ -406,11 +407,11 @@ def test_resource_deletion_closes_episode_atomically(intake, monkeypatch, fail):
     if fail:
         monkeypatch.setattr(changes_repo, "request_job", _fail)
         with pytest.raises(RuntimeError, match="injected"):
-            heartbeats_repo.soft_delete_heartbeat(heartbeat)
+            heartbeat_management.soft_delete_heartbeat(heartbeat)
         assert _snapshot() == before
         assert not Heartbeat.get_by_id(heartbeat.id).deleted
     else:
-        heartbeats_repo.soft_delete_heartbeat(heartbeat)
+        heartbeat_management.soft_delete_heartbeat(heartbeat)
         episode = _episodes(first.group.id)[0]
         assert episode.state == "resolved"
         assert _job(episode).requested_generation == 2
@@ -421,8 +422,8 @@ def test_resource_deletion_closes_episode_atomically(intake, monkeypatch, fail):
 def test_team_deletion_closes_current_episode_once(intake):
     team, _, data = intake
     first = upsert_alert(dict(data))
-    soft_delete_hardening.resolve_team_runtime_alerts(team.id)
-    soft_delete_hardening.resolve_team_runtime_alerts(team.id)
+    resource_deletion.resolve_team_runtime_alerts(team.id)
+    resource_deletion.resolve_team_runtime_alerts(team.id)
     episode = _episodes(first.group.id)[0]
     assert episode.state == "resolved"
     assert _job(episode).requested_generation == 2
@@ -432,7 +433,7 @@ def test_team_deletion_closes_current_episode_once(intake):
 def test_resource_closure_does_not_use_a_timestamp_from_before_the_cycle(intake):
     initial = upsert_alert(dict(intake[2]))
     episode = initial.group.current_episode
-    soft_delete_hardening.resolve_alert_groups_by_ids(
+    resource_deletion.resolve_alert_groups_by_ids(
         [initial.group.id],
         now=episode.started_at - timedelta(seconds=1),
     )
@@ -466,9 +467,9 @@ def test_heartbeat_overdue_and_ping_close_the_same_episode(db):
 def test_episode_writes_require_a_transaction(intake):
     group = upsert_alert(dict(intake[2])).group
     with pytest.raises(RuntimeError, match="transaction"):
-        alert_episodes_repo.open_episode(group)
+        episodes.open_episode(group)
     with pytest.raises(RuntimeError, match="transaction"):
-        alert_episodes_repo.close_episode(group, state="resolved", ended_at=utc_now())
+        episodes.close_episode(group, state="resolved", ended_at=utc_now())
 
 
 def test_incident_only_reopen_does_not_open_a_technical_episode(intake):
@@ -562,7 +563,7 @@ def test_silence_release_retries_a_child_moved_after_parent_selection(
     silences.reconcile_silence(silence)
 
     def merge_after_selection(alert_ids):
-        alerts_repo.merge_alert_groups(target.id, [source.id])
+        group_state.merge_alert_groups(target.id, [source.id])
         return {source.id: AlertGroup.get_by_id(source.id)}
 
     with monkeypatch.context() as patch:
@@ -592,7 +593,7 @@ def test_maintenance_release_cannot_reactivate_a_merged_group(intake):
     ]
     for window in windows:
         reconcile_maintenance_window(window)
-    alerts_repo.merge_alert_groups(target.id, [source.id])
+    group_state.merge_alert_groups(target.id, [source.id])
 
     reconcile_maintenance_window(windows[0], force_release=True)
 

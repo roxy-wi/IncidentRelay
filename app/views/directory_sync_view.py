@@ -5,7 +5,7 @@ from typing import Literal
 
 from flask import Blueprint, g, jsonify, request
 from peewee import DoesNotExist
-from pydantic import Field, ValidationError
+from pydantic import Field, ValidationError, field_validator
 
 from app.modules.common import utc_now
 from app.modules.crypto import decrypt_json, encrypt_json
@@ -38,6 +38,15 @@ class SourceInput(StrictModel):
     headers: dict[str, str] | None = None
     enabled: bool = False
     revision: int | None = None
+
+    @field_validator("config", mode="before")
+    @classmethod
+    def validate_selected_config(cls, value):
+        """Report only CMDB errors when its source type is explicitly selected."""
+        if isinstance(value, dict) and is_cmdb(value):
+            return CmdbConfig.model_validate(value)
+        # Preserve the existing union contract for configs without a source type.
+        return value
 
 
 class SourceDeleteInput(StrictModel):

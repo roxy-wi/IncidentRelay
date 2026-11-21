@@ -22,6 +22,7 @@ from app.services.rbac import (
 )
 from app.services.serializers.teams import serialize_team
 from app.services.validation import validate_body
+from app.services import team_management
 
 teams_bp = Blueprint("teams_api", __name__)
 
@@ -78,7 +79,7 @@ def create_team():
         return error
 
     try:
-        team = teams_repo.create_team(
+        team = team_management.create_team(
             group_id=payload.group_id,
             slug=payload.slug,
             name=payload.name,
@@ -137,7 +138,7 @@ def update_team(team_id):
             return group_error
 
     try:
-        team = teams_repo.update_team(team_id, {
+        team = team_management.update_team(team_id, {
             "group": payload.group_id,
             "slug": payload.slug,
             "name": payload.name,
@@ -176,7 +177,7 @@ def delete_team(team_id):
     if error:
         return error
 
-    team = teams_repo.remove_team(team_id)
+    team = team_management.remove_team(team_id)
     write_audit(
         "team.remove",
         object_type="team",

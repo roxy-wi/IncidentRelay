@@ -5,7 +5,7 @@
     <div class="form-group"><label for="cmdb-query-parameter">{{ _('ds.cmdb_query_parameter') }}</label><select id="cmdb-query-parameter" class="input"><option value="qlQuery">qlQuery</option><option value="iql">iql</option></select></div>
     <div class="form-group"><label for="cmdb-page-size">{{ _('ds.cmdb_page_size') }}</label><input id="cmdb-page-size" type="number" min="1" max="1000" class="input" required></div>
   </div>
-  <div class="form-grid-2">
+  <div class="form-grid-2 cmdb-object-columns">
     {% for kind in ['services', 'business_services'] %}
     <div class="form-stack">
       <h3>{{ _('ds.cmdb_' ~ kind) }}</h3>

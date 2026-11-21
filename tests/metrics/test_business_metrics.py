@@ -3,7 +3,6 @@ from datetime import timedelta, timezone
 import app.services.metrics as business_metrics
 import app.services.readiness as readiness
 from app.modules.common import utc_now
-from app.modules.db import alerts_repo
 from app.modules.db.locks_repo import touch_lock
 from app.modules.db.models import (
     AlertGroup,
@@ -26,6 +25,7 @@ from tests.factories import (
     create_user,
 )
 from tests.metrics.exposition import sample_value
+from app.services.alerts import group_state
 
 
 def _enable(monkeypatch, token=""):
@@ -167,8 +167,8 @@ def test_record_helpers_are_noops_when_metrics_disabled(monkeypatch):
 # ---------------------------------------------------------------------------
 
 
-def test_alert_group_action_counters_follow_repo_transitions(client, monkeypatch):
-    """created/acknowledged/resolved land on the repo-level hook points."""
+def test_alert_group_action_counters_follow_service_transitions(client, monkeypatch):
+    """created/acknowledged/resolved are recorded by lifecycle services."""
     _enable(monkeypatch)
     group = create_group(slug="platform")
     team = create_team(group, slug="sre")
@@ -183,7 +183,7 @@ def test_alert_group_action_counters_follow_repo_transitions(client, monkeypatch
         )
 
     created_before = action_total("created")
-    created = alerts_repo.create_alert_group(
+    created = group_state.create_alert_group(
         team=team.id,
         source="manual",
         group_key="metrics-test-key",
@@ -195,11 +195,11 @@ def test_alert_group_action_counters_follow_repo_transitions(client, monkeypatch
     assert action_total("created") == created_before + 1.0
 
     acknowledged_before = action_total("acknowledged")
-    alerts_repo.acknowledge_alert_group(created.id)
+    group_state.acknowledge_alert_group(created.id)
     assert action_total("acknowledged") == acknowledged_before + 1.0
 
     resolved_before = action_total("resolved")
-    alerts_repo.resolve_alert_group(created.id)
+    group_state.resolve_alert_group(created.id)
     assert action_total("resolved") == resolved_before + 1.0
 
 
@@ -283,7 +283,7 @@ def _alert_group_for_deliveries():
     tenant = create_group(slug="platform")
     team = create_team(tenant, slug="sre")
 
-    alert_group = alerts_repo.create_alert_group(
+    alert_group = group_state.create_alert_group(
         team=team.id,
         source="manual",
         group_key="deliveries-key",

@@ -8,6 +8,7 @@ from app.services.alerts import shelving
 from app.services.alerts.lifecycle import upsert_alert
 from app.services.serializers.alerts import serialize_alert_group
 from tests.factories import add_user_to_team, create_group, create_route, create_team, create_user
+from app.services.alerts import group_state
 
 
 def _open_group():
@@ -206,7 +207,6 @@ def test_resolved_group_cannot_be_shelved(db):
 
 
 def test_merge_closes_source_group_shelf_without_resume(db):
-    from app.modules.db import alerts_repo
 
     source, user = _open_group()
     shelving.shelve_alert_group(
@@ -226,7 +226,7 @@ def test_merge_closes_source_group_shelf_without_resume(db):
         "status": "firing",
     })
 
-    alerts_repo.merge_alert_groups(
+    group_state.merge_alert_groups(
         target_result.group.id,
         [source.id],
         user_id=user.id,

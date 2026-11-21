@@ -71,6 +71,8 @@ from app.services.silences import find_active_silences, record_new_alert_silence
 from app.services.alerts.correlation import refresh_alert_group_correlations_safely
 from app.services.business_services.impact import refresh_business_impacts_safely_for_group
 from app.services.business_services.status import refresh_business_services_safely_for_technical_service
+from app.services.alerts import episodes
+from app.services.alerts import group_state
 
 logger = logging.getLogger("oncall.alerts")
 
@@ -317,7 +319,7 @@ def _create_group(
     orchestration_suppressed=False,
     orchestration_suppress_reason=None,
 ):
-    return alerts_repo.create_alert_group(
+    return group_state.create_alert_group(
         team=team,
         route=route,
         service=service,
@@ -472,7 +474,7 @@ def _handle_existing_alert(
                 event_type="created",
                 message="Incident created for existing alert",
             )
-            alert_episodes_repo.open_episode(group, event=event)
+            episodes.open_episode(group, event=event)
 
             record_maintenance_match(
                 group,
@@ -529,7 +531,7 @@ def _handle_existing_alert(
         apply_maintenance_to_existing_alert(existing_alert, maintenance_decision)
 
         existing_alert.save()
-        alert_episodes_repo.refresh_context(group, observed_alert=existing_alert)
+        episodes.refresh_context(group, observed_alert=existing_alert)
 
         trace.alert_updated(
             existing_alert,
@@ -564,7 +566,7 @@ def _handle_existing_alert(
                 message="Alert updated from incoming payload",
             )
 
-        group = alerts_repo.recalculate_alert_group(group, event=resolution_event)
+        group = group_state.recalculate_alert_group(group, event=resolution_event)
         group = restore_group_priority_state(
             group,
             priority_state_before_recalculate,
@@ -1163,7 +1165,7 @@ def _upsert_alert(alert_data, trace, runtime=None):
                     event_type="created",
                     message="Incident created",
                 )
-                alert_episodes_repo.open_episode(group, event=event)
+                episodes.open_episode(group, event=event)
 
                 record_maintenance_match(
                     group,
@@ -1330,7 +1332,7 @@ def _upsert_alert(alert_data, trace, runtime=None):
                     message=f"Matched silence: {matched_silence.name}",
                 )
 
-            group = alerts_repo.recalculate_alert_group(group)
+            group = group_state.recalculate_alert_group(group)
             group = restore_group_priority_state(
                 group,
                 priority_state_before_recalculate,

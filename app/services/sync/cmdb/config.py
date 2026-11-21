@@ -1,6 +1,7 @@
 """Declarative Jira Data Center / Insight catalog configuration."""
 
 from typing import Annotated, Literal
+from urllib.parse import urlsplit
 
 from pydantic import Field, field_validator
 
@@ -29,7 +30,11 @@ class CmdbConfig(StrictModel):
     verify_tls: bool = Field(default=True, strict=True)
     timeout_seconds: int = Field(default=30, ge=1, le=60)
     interval_seconds: int = Field(default=3600, ge=60, le=604800)
-    api_path: str = "/rest/assets/1.0/aql/objects"
+    api_path: str = Field(
+        default="/rest/assets/1.0/aql/objects",
+        description="API path relative to the Jira base URL, without query parameters. "
+                    "A missing leading slash is added automatically.",
+    )
     query_parameter: Literal["qlQuery", "iql"] = "qlQuery"
     page_size: int = Field(default=25, ge=1, le=1000)
     max_pages: int = Field(default=1000, ge=1, le=1000)
@@ -54,6 +59,11 @@ class CmdbConfig(StrictModel):
     @field_validator("api_path")
     @classmethod
     def valid_path(cls, value):
+        if not value or "\\" in value or value.startswith("//") or urlsplit(value).scheme:
+            raise ValueError("Use an API path such as /rest/insight/1.0/iql/objects; "
+                             "enter the Jira URL in base_url")
+        if not value.startswith("/"):
+            value = "/" + value
         Operation.relative_path(value)
         if "?" in value:
             raise ValueError("Put AQL in the object selection, not in the API path")

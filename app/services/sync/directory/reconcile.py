@@ -7,7 +7,7 @@ from uuid import uuid4
 
 from peewee import fn
 
-from app.modules.db import rotations_repo, teams_repo, users_repo
+from app.modules.db import rotations_repo, users_repo
 from app.modules.db.models import (
     DirectorySyncBinding as Binding, DirectorySyncShift as Shift,
     Rotation, Team, TeamUser, User, UserGroup,
@@ -15,6 +15,7 @@ from app.modules.db.models import (
 from app.services.sync.directory.config import SyncConfig, SyncError
 from app.services.sync.directory.fetch import instant
 from app.services.sync.directory.reconnect import reconnect
+from app.services import team_management
 
 
 def slug(value, suffix):
@@ -215,7 +216,7 @@ def reconcile(source, snapshot):
             raise SyncError("Team is managed by another synchronization source")
         created = team is None
         if created:
-            team = teams_repo.create_team(slug=slug(data["name"], f"{source.id}:{key}"),
+            team = team_management.create_team(slug=slug(data["name"], f"{source.id}:{key}"),
                                           name=data["name"], description=data.get("description"),
                                           group_id=source.group_id, active=data["enabled"])
             record("team", key, "create", {"name": data["name"]})
@@ -322,7 +323,7 @@ def reconcile(source, snapshot):
                     rotations_repo.soft_delete_rotation(binding.local_id)
             elif kind == "team":
                 if Team.select().where(Team.id == binding.local_id, Team.deleted == False).exists():
-                    teams_repo.soft_delete_team(binding.local_id)
+                    team_management.soft_delete_team(binding.local_id)
             elif kind == "user":
                 # Global accounts and login identities survive departure from a team.
                 binding.present = False

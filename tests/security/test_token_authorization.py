@@ -14,14 +14,19 @@ from app.modules.db.models import (
     Alert, AlertRoute, ApiToken, PendingOrchestratedEvent, Service, Team, User,
 )
 from app.modules.db.orchestrations_repo import (
-    create_orchestration, get_or_create_draft, publish_draft,
-    replace_draft_rules, set_runtime_state,
+    create_orchestration,
+    get_or_create_draft,
+    replace_draft_rules,
+    set_runtime_state,
 )
 from app.services.integrations.auth import hash_token
 from tests.factories import (
     add_user_to_team, create_group, create_route, create_service, create_team,
     create_user, unique,
 )
+from app.services import team_management
+from app.services.service_catalog import mutations as service_mutations
+from app.services.orchestration.publication import publish_draft
 
 
 def personal_token(user, *, group=None, team=None, scopes=None, expires_at=None):
@@ -364,12 +369,11 @@ def test_legacy_pending_claim_survives_retrigger_and_foreign_resolve(client, db)
 @pytest.mark.parametrize("change", ["revoke", "scopes", "move"])
 def test_team_write_rechecks_authority_at_mutation(client, admin_user, db,
                                                  monkeypatch, change):
-    from app.modules.db import teams_repo
 
     group, other_group = create_group(), create_group()
     team = create_team(group)
     headers, token = personal_token(admin_user, group=group, scopes=["teams:write"])
-    original = teams_repo.update_team
+    original = team_management.update_team
 
     def change_then_update(team_id, data):
         if change == "revoke":
@@ -380,7 +384,7 @@ def test_team_write_rechecks_authority_at_mutation(client, admin_user, db,
             Team.update(group=other_group.id).where(Team.id == team.id).execute()
         return original(team_id, data)
 
-    monkeypatch.setattr(teams_repo, "update_team", change_then_update)
+    monkeypatch.setattr(team_management, "update_team", change_then_update)
     response = client.put(f"/api/teams/{team.id}", headers=headers, json={
         "name": "Unauthorized", "slug": team.slug, "group_id": group.id,
     })
@@ -475,7 +479,6 @@ def test_orchestration_control_plane_respects_token_bounds(client, admin_user, d
 
 @pytest.mark.parametrize("credential", ["personal", "route"])
 def test_intake_rejects_service_moved_out_of_route_team(client, admin_user, db, credential):
-    from app.modules.db import services_repo
 
     own, other = create_team(create_group()), create_team(create_group())
     headers, route = route_token(own)
@@ -484,7 +487,7 @@ def test_intake_rejects_service_moved_out_of_route_team(client, admin_user, db, 
     if credential == "personal":
         headers, _ = personal_token(admin_user, team=own, scopes=["alerts:write"])
     assert webhook(client, headers, team=own, fingerprint="before-move").status_code == 200
-    services_repo.update_service(service.id, {"team": other.id})
+    service_mutations.update_service(service.id, {"team": other.id})
     response = webhook(client, headers, team=own, fingerprint="after-move")
     assert response.status_code == 403
     assert Alert.select().count() == 1
@@ -508,14 +511,13 @@ def test_intake_rechecks_route_ownership_before_write(client, admin_user, db, mo
 
 
 def test_intake_uses_live_parent_group_after_team_move(client, admin_user, db):
-    from app.modules.db import teams_repo
 
     old_group, new_group = create_group(), create_group()
     team = create_team(old_group)
     _, route = route_token(team)
     service = create_service(team)
     AlertRoute.update(service=service.id).where(AlertRoute.id == route.id).execute()
-    teams_repo.update_team(team.id, {"group": new_group.id})
+    team_management.update_team(team.id, {"group": new_group.id})
     headers, _ = personal_token(admin_user, group=new_group, scopes=["alerts:write"])
     assert webhook(client, headers, team=team).status_code == 200
     assert Alert.get().service_id == service.id

@@ -3,7 +3,6 @@ import copy
 import pytest
 
 from app.login import create_access_token
-from app.modules.db import alerts_repo
 from app.modules.db.models import (
     Alert,
     AlertGroup,
@@ -16,15 +15,12 @@ from app.modules.db.models import (
     OrchestrationWebhookAction,
     PendingOrchestratedEvent,
 )
-from app.modules.db.orchestrations_repo import (
-    create_orchestration,
-    get_or_create_draft,
-    publish_draft,
-    replace_draft_rules,
-)
+from app.modules.db.orchestrations_repo import create_orchestration, get_or_create_draft, replace_draft_rules
 from app.services.integrations.normalizers.alertmanager import normalize_alertmanager
 from app.services.serializers.alerts import serialize_alert
 from tests.factories import create_alert, create_group, create_route, create_team, create_user
+from app.services.alerts import group_state
+from app.services.orchestration.publication import publish_draft
 
 
 @pytest.fixture(autouse=True)
@@ -173,7 +169,7 @@ def test_simulate_api_accepts_data_copied_from_stored_alert(
         )
         alert.group = alert_group
         alert.save()
-        alerts_repo.recalculate_alert_group(alert_group)
+        group_state.recalculate_alert_group(alert_group)
         details = client.get(
             f"/api/alert-groups/{alert_group.id}", headers=admin_headers,
         )

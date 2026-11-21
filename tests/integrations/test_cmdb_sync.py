@@ -96,6 +96,58 @@ def apply(source):
     return service.run(source.id, mode="apply", preview_token=preview["preview_token"])
 
 
+@pytest.mark.parametrize("api_path", [
+    "rest/insight/1.0/iql/objects", "/rest/insight/1.0/iql/objects",
+    "  rest/insight/1.0/iql/objects  ", "  /rest/insight/1.0/iql/objects  ",
+])
+def test_catalog_api_path_normalizes_missing_slash(api_path):
+    config = CmdbConfig.model_validate({**jira_assets_preset(), "api_path": api_path})
+    assert config.api_path == "/rest/insight/1.0/iql/objects"
+    assert config.operations["services"].path == config.api_path
+
+
+@pytest.mark.parametrize("api_path", [
+    "", "   ", "https://jira.example.com/rest/insight/1.0/iql/objects",
+    "//jira.example.com/rest/insight/1.0/iql/objects", "https:rest/insight",
+    "rest/insight?iql=objectType", "/rest/insight#fragment", "rest\\insight",
+])
+def test_catalog_api_path_rejects_urls_and_non_path_input(api_path):
+    with pytest.raises(ValidationError):
+        CmdbConfig.model_validate({**jira_assets_preset(), "api_path": api_path})
+
+
+@pytest.mark.parametrize("updating", [False, True])
+def test_save_catalog_normalizes_api_path(client, admin_headers, cmdb_source, updating):
+    config = {**cmdb_source.config, "api_path": "rest/insight/1.0/iql/objects"}
+    payload = {"name": "Catalog with relative path", "group_id": cmdb_source.group_id, "config": config}
+    if updating:
+        payload["revision"] = cmdb_source.revision
+        response = client.put(f"{URL}/{cmdb_source.id}", headers=admin_headers, json=payload)
+    else:
+        response = client.post(URL, headers=admin_headers, json=payload)
+    assert response.status_code == (200 if updating else 201), response.json
+    assert response.json["config"]["api_path"] == "/rest/insight/1.0/iql/objects"
+    assert Source.get_by_id(response.json["id"]).config["api_path"] == "/rest/insight/1.0/iql/objects"
+
+
+@pytest.mark.parametrize("field, value", [
+    ("api_path", "https://jira.example.com/rest/insight?token=private-test-token"),
+    ("page_size", 0),
+    ("services", {"query": ""}),
+])
+def test_invalid_catalog_only_reports_selected_schema(client, admin_headers, cmdb_source, field, value):
+    response = client.post(URL, headers=admin_headers, json={
+        "name": "Invalid catalog", "group_id": cmdb_source.group_id,
+        "config": {**cmdb_source.config, field: value},
+        "headers": {"Authorization": "Bearer private-test-token"},
+    })
+    assert response.status_code == 400
+    expected_field = "config.services.query" if field == "services" else f"config.{field}"
+    assert [item["field"] for item in response.json["details"]] == [expected_field]
+    assert "private-test-token" not in response.get_data(as_text=True)
+    assert Source.select().count() == 1
+
+
 def test_inspect_preview_apply_and_repeat_preserve_identity(cmdb_source, upstream, pages):
     inspected = service.run(cmdb_source.id, mode="inspect")
     assert inspected["attributes"]["services"]

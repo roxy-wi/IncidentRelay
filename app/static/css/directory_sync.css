@@ -102,6 +102,11 @@ body.md-theme #ds-editor .json-editor-header .btn:hover {
     display: none !important;
 }
 
+.cmdb-object-columns {
+    /* Unequal field counts must not stretch the shorter column's grid rows. */
+    align-items: start;
+}
+
 #cmdb-issues {
     padding: 12px;
     border-left: 4px solid var(--md-warning);

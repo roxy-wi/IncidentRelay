@@ -1,13 +1,14 @@
 """Remove source ownership with an explicit choice about imported resources."""
 
 from app.modules.common import utc_now
-from app.modules.db import rotations_repo, teams_repo
+from app.modules.db import rotations_repo
 from app.modules.db.models import (
     DirectorySyncBinding as Binding, DirectorySyncCurrent as Current,
     DirectorySyncShift as Shift, Rotation, Team,
 )
 from app.modules.db.transactions import lock_row
 from app.services.sync.directory.config import SyncError
+from app.services import team_management
 
 
 def remove_source(source, *, delete_imported):
@@ -60,7 +61,7 @@ def remove_source(source, *, delete_imported):
         # operational state receive the same cleanup as a manual resource deletion.
         for team in teams:
             if not team.deleted:
-                teams_repo.soft_delete_team(team.id)
+                team_management.soft_delete_team(team.id)
         for rotation in rotations:
             if not Rotation.get_by_id(rotation.id).deleted:
                 rotations_repo.soft_delete_rotation(rotation.id)

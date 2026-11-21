@@ -28,6 +28,7 @@ from app.services.rbac import (
 from app.services.serializers.users import serialize_user, serialize_user_group
 from app.services.serializers.teams import serialize_group
 from app.services.validation import validate_body
+from app.services import group_management
 
 
 groups_bp = Blueprint("groups_api", __name__)
@@ -71,7 +72,7 @@ def create_group():
 
     try:
         with db.atomic():
-            group = groups_repo.create_group(
+            group = group_management.create_group(
                 payload.slug,
                 payload.name,
                 payload.description,
@@ -112,7 +113,7 @@ def update_group(group_id):
         return error
 
     with db.atomic():
-        group = groups_repo.update_group(group_id, payload.model_dump())
+        group = group_management.update_group(group_id, payload.model_dump())
         write_audit("group.update", object_type="group", object_id=group.id, group_id=group.id, data=payload.model_dump())
     return jsonify(serialize_group(group, request.current_user))
 
@@ -319,7 +320,7 @@ def delete_group(group_id):
         return error
 
     with db.atomic():
-        group = groups_repo.soft_delete_group(group_id)
+        group = group_management.soft_delete_group(group_id)
         write_audit(
             "group.delete",
             object_type="group",

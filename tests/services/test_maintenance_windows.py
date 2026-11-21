@@ -7,7 +7,7 @@ import pytest
 from app.modules.db.models import MaintenanceWindow, MaintenanceWindowScope
 from app.api.schemas.roles import GROUP_USER_ADMIN_ROLE
 from app.login import create_access_token
-from app.modules.db import services_repo, maintenance_repo
+from app.modules.db import maintenance_repo
 from app.modules.db.models import AlertEvent, AlertGroup, Alert
 from app.services.alerts.lifecycle import upsert_alert
 from tests.factories import (
@@ -20,6 +20,7 @@ from tests.factories import (
 from app.modules.db.models import AuditLog
 from app.modules.common import as_naive_datetime, as_utc_aware
 from app.modules.common import utc_now
+from app.services.service_catalog import mutations as service_mutations
 
 
 def response_items(response):
@@ -109,7 +110,7 @@ def make_headers(user):
 
 
 def create_service(team, *, name="Payments API", enabled=True):
-    return services_repo.create_service({
+    return service_mutations.create_service({
         "team": team.id,
         "slug": unique_slug("service"),
         "name": name,

@@ -10,6 +10,7 @@ from app.modules.db.models import (
     MaintenanceWindowAlertApplication,
 )
 from app.services import escalation_policies as escalation_policy_service
+from app.services.alerts import group_state
 
 SUPPRESS_NOTIFICATIONS_BEHAVIOR = "suppress_notifications"
 PAUSE_ESCALATION_BEHAVIOR = "pause_escalation_only"
@@ -402,7 +403,7 @@ def _recompute_group_effects(
         group.resolved_at = None
         group.resolved_by = None
         group.save()
-        group = alerts_repo.recalculate_alert_group(group)
+        group = group_state.recalculate_alert_group(group)
         if restore_status == "acknowledged" and group.status != "resolved":
             group.status = "acknowledged"
 

@@ -1,13 +1,18 @@
 from uuid import uuid4
 
 from app.db import database_proxy
-from app.modules.db import alert_episodes_repo, alerts_repo, incidents_repo
+from app.modules.db import alerts_repo, incidents_repo
 from app.modules.db.models import Service, Team
 from app.services.alerts.escalation import apply_initial_escalation_policy_assignment
 from app.services.alerts.notification_queue import schedule_group_notification
 from app.services.alerts.priority import incident_priority_create_kwargs, incident_priority_from_alert
-from app.services.routing.service_resolution import get_effective_escalation_policy, get_effective_route_rotation
+from app.services.routing.service_resolution import (
+    get_effective_escalation_policy,
+    get_effective_route_rotation,
+)
 from app.modules.common import utc_now
+from app.services.alerts import episodes
+from app.services.alerts import group_state
 
 
 def _get_manual_incident_team(team_id):
@@ -113,7 +118,7 @@ def create_manual_alert_group(payload, *, user_id=None):
     )
 
     with database_proxy.atomic():
-        group = alerts_repo.create_alert_group(
+        group = group_state.create_alert_group(
             team=team.id,
             route=None,
             service=service.id if service else None,
@@ -169,8 +174,8 @@ def create_manual_alert_group(payload, *, user_id=None):
             user_id=user_id,
         )
 
-        alert_episodes_repo.open_episode(group, event=event)
-        group = alerts_repo.recalculate_alert_group(group)
+        episodes.open_episode(group, event=event)
+        group = group_state.recalculate_alert_group(group)
 
         if notify:
             schedule_group_notification(
