@@ -8,7 +8,7 @@
   "alerts.actions.reload": "Recargar",
   "alerts.actions.create_incident": "Crear incidente",
   "alerts.actions.explain_trace": "Explicar traza",
-  "alerts.search.placeholder": "Buscar por ID, nombre de alerta, equipo, responsable, fuente...",
+  "alerts.search.placeholder": "Buscar texto, ID o label=value...",
   "alerts.filters.all_services": "Todos los servicios",
   "alerts.filters.all_statuses": "Todos los estados",
   "alerts.filters.all_severities": "Todas las severidades",

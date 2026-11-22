@@ -522,13 +522,12 @@ function renderServiceSloStatusBadge(status, enabled) {
 }
 
 
-const SERVICE_SLI_IMPACT_TYPES = ["incident_availability", "incident_count"];
-const SERVICE_SLI_PRIORITY_OPTIONS = [
-    ["p1", "P1"],
-    ["p2", "P2"],
-    ["p3", "P3"],
-    ["p4", "P4"],
-];
+const SERVICE_SLI_RULES = window.__INCIDENTRELAY_SLI_RULES__;
+const SERVICE_SLI_IMPACT_TYPES = SERVICE_SLI_RULES.impact_types;
+const SERVICE_SLI_PRIORITY_VALUES = SERVICE_SLI_RULES.priorities;
+const SERVICE_SLI_PRIORITY_OPTIONS = SERVICE_SLI_PRIORITY_VALUES.map(function (value) {
+    return [value, value.toUpperCase()];
+});
 
 
 function isImpactServiceSliType(type) {
@@ -545,7 +544,7 @@ function serviceSliPriorityScope(sli) {
     }
 
     if (!scope && sli && isImpactServiceSliType(sli.sli_type)) {
-        scope = ["p1", "p2"];
+        scope = SERVICE_SLI_RULES.default_impact_scope.slice();
     }
 
     if (typeof scope === "string") {
@@ -557,9 +556,9 @@ function serviceSliPriorityScope(sli) {
     }
 
     return scope.map(function (value) {
-        return String(value || "").toLowerCase();
+        return String(value || "").trim().toLowerCase();
     }).filter(function (value, index, values) {
-        return ["p1", "p2", "p3", "p4"].indexOf(value) !== -1 && values.indexOf(value) === index;
+        return SERVICE_SLI_PRIORITY_VALUES.indexOf(value) !== -1 && values.indexOf(value) === index;
     });
 }
 
@@ -818,7 +817,10 @@ function renderServiceSliPriorityScopeField(sli) {
     wrapper.append(
         $("<div>")
             .addClass("row-subtitle")
-            .text("Incident availability and incident count are calculated from impact priorities. Default: P1/P2.")
+            .text("Incident availability and incident count are calculated from impact priorities. Default: " +
+                SERVICE_SLI_RULES.default_impact_scope.map(function (value) {
+                    return value.toUpperCase();
+                }).join("/") + ".")
     );
 
     return wrapper;
@@ -840,8 +842,9 @@ function updateServiceSliScopeVisibility() {
     $("#service-sli-priority-field").show();
 
     if (impact && !checkedInputValues("service-sli-priority-scope").length) {
-        $("input[name='service-sli-priority-scope'][value='p1']").prop("checked", true);
-        $("input[name='service-sli-priority-scope'][value='p2']").prop("checked", true);
+        $("input[name='service-sli-priority-scope']").each(function () {
+            $(this).prop("checked", SERVICE_SLI_RULES.default_impact_scope.indexOf($(this).val()) !== -1);
+        });
     }
 }
 
@@ -855,7 +858,7 @@ function collectServiceSliPayload() {
     if (priorityScope.length) {
         configuration.priority_scope = priorityScope;
     } else if (impact) {
-        configuration.priority_scope = ["p1", "p2"];
+        configuration.priority_scope = SERVICE_SLI_RULES.default_impact_scope.slice();
     }
 
     return {

@@ -263,6 +263,7 @@ function loadOrchestrations() {
 }
 
 function populateOrchestrationServiceSelect(selector, selectedId) {
+    destroyTomSelectIfExists(getSelectElement(selector));
     const select = $(selector).empty();
     asArray(orchestrationCatalogCache && orchestrationCatalogCache.services).forEach(function (item) {
         select.append($("<option>").val(item.id).text(item.name));
@@ -270,6 +271,7 @@ function populateOrchestrationServiceSelect(selector, selectedId) {
     if (selectedId) {
         select.val(String(selectedId));
     }
+    initSearchableSelect(select);
 }
 
 function populateOrchestrationCreateServices() {
@@ -961,7 +963,7 @@ function orchestrationActionParamEditor(action, index) {
     } else if (["remove_label", "remove_custom_field"].includes(type)) {
         container.append($("<input>").addClass("input orchestration-action-name").attr("placeholder", "name").val(action.name || ""));
     } else if (referenceActions.includes(type)) {
-        const select = $("<select>").addClass("input orchestration-action-reference");
+        const select = $("<select>").addClass("input orchestration-action-reference").attr("aria-label", type);
         orchestrationCatalogOptions(type).forEach(function (item) { select.append($("<option>").val(item.id).text(item.name)); });
         const value = action.action_id || action.team_id || action.route_id || action.service_id || action.escalation_policy_id || action.notification_policy_id || action.priority_policy_id || action.value;
         select.val(value || "");
@@ -991,6 +993,7 @@ function orchestrationActionParamEditor(action, index) {
 }
 
 function renderOrchestrationActionEditor() {
+    destroyTomSelects("#orchestration-action-editor");
     const target = $("#orchestration-action-editor").empty();
     const actions = asArray(orchestrationRuleBuffer.actions);
     if (!actions.length) { target.append($("<div>").addClass("details-empty").text(i18n.t("orchestrations.rules.no_actions"))); return; }
@@ -1024,6 +1027,9 @@ function renderOrchestrationActionEditor() {
             remove
         );
         target.append(row);
+    });
+    target.find("select.orchestration-action-type, select.orchestration-action-reference").each(function () {
+        initSearchableSelect(this);
     });
 }
 
@@ -1770,7 +1776,7 @@ $(document).on("drop", ".orchestration-rule-card", function (event) {
     orchestrationDefinition.rules.splice(target, 0, item);
     renderOrchestrationRules();
 });
-$(document).on("click", "#orchestration-action-add", function () { orchestrationRuleBuffer.actions.push({type: "set_title", value: ""}); renderOrchestrationActionEditor(); });
+$(document).on("click", "#orchestration-action-add", function () { syncOrchestrationActionEditor(); orchestrationRuleBuffer.actions.push({type: "set_title", value: ""}); renderOrchestrationActionEditor(); });
 $(document).on("change", ".orchestration-action-type", function () { syncOrchestrationActionEditor(); renderOrchestrationActionEditor(); });
 $(document).on("click", "[data-action-remove]", function () { syncOrchestrationActionEditor(); orchestrationRuleBuffer.actions.splice(Number($(this).attr("data-action-remove")), 1); renderOrchestrationActionEditor(); });
 $(document).on("click", "#orchestration-save-draft", function () { saveOrchestrationDraft(); });

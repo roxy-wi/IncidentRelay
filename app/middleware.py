@@ -112,7 +112,12 @@ def load_api_token_principal():
     if not raw_token:
         return None
 
-    api_token = authenticate_api_token(raw_token)
+    # Status polling must remain read-only even with a personal token, while a
+    # synchronization worker holds SQLite's writer lock. Other requests retain
+    # normal last-used accounting, including all queued synchronization actions.
+    status_read = (request.endpoint == "directory_sync_api.get_source"
+                   and request.method in {"GET", "HEAD"})
+    api_token = authenticate_api_token(raw_token, track_usage=not status_read)
 
     if not api_token:
         return None

@@ -1,21 +1,24 @@
 """Configurable directory sync administration, including personal token access."""
 
 from app.api.openapi.common import json_body, path_param, query_param, response
-from app.services.directory_sync.config import SyncConfig
-from app.services.directory_sync.shift_editor import ShiftInput
+from app.services.sync.directory.config import SyncConfig
+from app.services.sync.cmdb.config import CmdbConfig
+from app.services.sync.directory.shift_editor import ShiftInput
 
 TAG = "Directory synchronization"
 ROOT = "/api/admin/directory-sync"
 
 
 def tags():
-    return [{"name": TAG, "description": "Group-owned team, user and on-call imports with preview."}]
+    return [{"name": TAG, "description": "Group-owned directory/on-call and Jira Assets service catalog imports with preview."}]
 
 
 def components():
     """Expose the same configuration contract that validates API writes."""
     schema = SyncConfig.model_json_schema(ref_template="#/components/schemas/DirectorySync{model}")
     definitions = schema.pop("$defs", {})
+    cmdb = CmdbConfig.model_json_schema(ref_template="#/components/schemas/DirectorySync{model}")
+    definitions.update(cmdb.pop("$defs", {}))
     shift = ShiftInput.model_json_schema(ref_template="#/components/schemas/DirectorySync{model}")
     definitions.update(shift.pop("$defs", {}))
 
@@ -25,6 +28,9 @@ def components():
         if not isinstance(value, dict):
             return value
         result = {key: convert(item) for key, item in value.items()}
+        # OpenAPI 3.0 expresses a single allowed value with enum, not const.
+        if "const" in result:
+            result["enum"] = [result.pop("const")]
         choices = result.get("anyOf", [])
         if any(item == {"type": "null"} for item in choices):
             choices = [item for item in choices if item != {"type": "null"}]
@@ -33,16 +39,20 @@ def components():
             result["nullable"] = True
         return result
 
-    return {"DirectorySyncConfig": convert(schema), "DirectorySyncShiftInput": convert(shift),
+    return {"DirectorySyncConfig": convert(schema), "DirectorySyncCmdbConfig": convert(cmdb), "DirectorySyncShiftInput": convert(shift),
             **{"DirectorySync" + key: convert(value) for key, value in definitions.items()}}
 
 
 def paths():
     config = {"type": "object", "required": ["name", "group_id", "config"], "additionalProperties": False,
               "properties": {"name": {"type": "string", "maxLength": 255}, "group_id": {"type": "integer"},
-                             "config": {"$ref": "#/components/schemas/DirectorySyncConfig"},
+                             "config": {"oneOf": [{"$ref": "#/components/schemas/DirectorySyncConfig"},
+                                                  {"$ref": "#/components/schemas/DirectorySyncCmdbConfig"}]},
                              "headers": {"type": "object", "additionalProperties": {"type": "string"}, "writeOnly": True},
-                             "enabled": {"type": "boolean", "default": False}, "revision": {"type": "integer"}}}
+                             "enabled": {"type": "boolean", "default": False,
+                                         "description": "Requested schedule state. Changed imports wait for preview and Apply; "
+                                                        "successful Apply automatically resumes a selected schedule."},
+                             "revision": {"type": "integer"}}}
     common = {"tags": [TAG], "security": [{"bearerAuth": []}],
               "description": "Requires global admin or destination Group user_admin. Personal tokens require directory-sync:read/write; team-bound tokens are denied. Headers are encrypted and never returned.",
               "responses": {"200": response("Result"), "400": response("Invalid configuration"),
@@ -50,19 +60,25 @@ def paths():
                             "404": response("Not found"), "409": response("Busy, stale revision or conflict")}}
     result = {
         ROOT: {"get": {**common, "summary": "List visible synchronization sources"},
-               "post": {**common, "summary": "Create a disabled source", "requestBody": json_body("Source", config),
+               "post": {**common, "summary": "Create a source awaiting preview and Apply", "requestBody": json_body("Source", config),
                         "responses": {**common["responses"], "201": response("Created")}}},
-        ROOT + "/options": {"get": {**common, "summary": "Get managed groups, teams and the editable org-service preset"}},
+        ROOT + "/options": {"get": {**common, "summary": "Get managed groups, teams, retained sources and the editable org-service preset"}},
         ROOT + "/{source_id}": {"parameters": [path_param("source_id", "Source ID")],
                                "get": {**common, "summary": "Read configuration, queue and preview status"},
-                               "put": {**common, "summary": "Update using the last read revision", "requestBody": json_body("Source", config)}},
+                               "put": {**common, "summary": "Update using the last read revision", "requestBody": json_body("Source", config)},
+                               "delete": {**common, "summary": "Remove an idle source and choose whether to keep imported data",
+                                          "description": common["description"] + " Keep retains editable concrete schedules; assignments use saved shifts. Delete removes source-created teams (with dependent configuration) and rotations, and imported shifts. Existing matched teams and all user accounts are retained. Running or queued work returns 409. Repeated deletion is idempotent.",
+                                          "requestBody": json_body("Removal choice", {
+                                              "type": "object", "required": ["revision", "data_action"], "additionalProperties": False,
+                                              "properties": {"revision": {"type": "integer", "minimum": 1},
+                                                             "data_action": {"type": "string", "enum": ["keep", "delete"]}}})}},
         ROOT + "/{source_id}/sample": {"parameters": [path_param("source_id", "Source ID")],
                                        "post": {**common, "summary": "Inspect response field names and types",
                                                 "responses": {**common["responses"],
                                                               "502": response("External API failure (sync_api_error)"),
                                                               "504": response("External API timeout (sync_api_error)")}}},
     }
-    for action in ("preview", "apply", "run"):
+    for action in ("preview", "apply", "run", "inspect"):
         result[ROOT + "/{source_id}/" + action] = {
             "parameters": [path_param("source_id", "Source ID")],
             "post": {**common, "summary": f"Queue {action}; poll the source for completion",

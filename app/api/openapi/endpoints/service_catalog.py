@@ -6,6 +6,7 @@ All paths still use the existing `services` Swagger tag.
 """
 
 from app.api.openapi.common import json_body, path_param, query_param, response
+from app.modules.service_sli import DEFAULT_IMPACT_PRIORITY_SCOPE, PRIORITY_VALUES
 
 from app.api.schemas.limits import (
     DESCRIPTION_MAX_LENGTH,
@@ -482,7 +483,12 @@ SERVICE_SLI_INPUT_SCHEMA = {
             "type": "object",
             "additionalProperties": True,
             "default": {},
-            "description": "Reserved for source-specific filters and future external providers.",
+            "description": (
+                "Optional priority_scope: a priority string or list, normalized case-insensitively. "
+                "Duplicates are removed; unknown priorities are rejected. Missing impact scopes "
+                "default to " + "/".join(DEFAULT_IMPACT_PRIORITY_SCOPE) + ". "
+                "An empty latency scope includes all priorities; an empty impact scope is invalid."
+            ),
         },
         "severity": {
             "type": "string",
@@ -494,7 +500,8 @@ SERVICE_SLI_INPUT_SCHEMA = {
         "priority": {
             "type": "string",
             "nullable": True,
-            "description": "Optional priority filter placeholder for future priority-aware SLIs.",
+            "enum": [*PRIORITY_VALUES, None],
+            "description": "Single priority fallback when configuration.priority_scope is absent.",
             "example": "p1",
         },
         "enabled": {"type": "boolean", "default": True},

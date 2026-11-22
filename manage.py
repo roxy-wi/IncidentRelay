@@ -8,9 +8,18 @@ from app.db import init_database
 from app.login import hash_password
 from app.modules.db.models import User, UserGroup
 from app.modules.db.migrations import create_migration, list_migrations, migrate, rollback
-from app.modules.db import channels_repo, groups_repo, rotations_repo, routes_repo, teams_repo, tokens_repo, users_repo
+from app.modules.db import (
+    channels_repo,
+    groups_repo,
+    rotations_repo,
+    routes_repo,
+    teams_repo,
+    tokens_repo,
+    users_repo,
+)
 from app.services.integrations.auth import create_raw_token, hash_token
 from app.version import get_service_version
+from app.services import team_management
 
 
 def cmd_migrate(args):
@@ -179,7 +188,7 @@ def cmd_demo_data(args):
         description="Database access group",
     )
 
-    infra = teams_repo.create_team_if_missing(
+    infra = team_management.create_team_if_missing(
         group_id=infra_group.id,
         slug="infra",
         name="Infrastructure",
@@ -188,9 +197,9 @@ def cmd_demo_data(args):
     )
 
     if infra.group_id != infra_group.id:
-        teams_repo.update_team(infra.id, {"group": infra_group.id})
+        team_management.update_team(infra.id, {"group": infra_group.id})
 
-    db_team = teams_repo.create_team_if_missing(
+    db_team = team_management.create_team_if_missing(
         group_id=db_group.id,
         slug="db",
         name="Database",
@@ -199,7 +208,7 @@ def cmd_demo_data(args):
     )
 
     if db_team.group_id != db_group.id:
-        teams_repo.update_team(db_team.id, {"group": db_group.id})
+        team_management.update_team(db_team.id, {"group": db_group.id})
 
     users_by_name = {}
 

@@ -260,7 +260,7 @@ def list_effective_layer_members(
 
 
 def check_rotation_structure(rotation, starts_at: datetime, ends_at: datetime) -> list[HealthIssue]:
-    from app.services.directory_sync.runtime import source_for
+    from app.services.sync.directory.runtime import source_for
     if source_for("rotation", rotation.id):
         # Imported concrete intervals do not require local cyclic layers.
         return []
@@ -451,7 +451,7 @@ def check_rotation_schedule_gaps(
     gap_start = None
     issues: list[HealthIssue] = []
 
-    from app.services.directory_sync.runtime import source_for
+    from app.services.sync.directory.runtime import source_for
     from app.services.oncall import get_scheduled_oncall_user
     imported = source_for("rotation", rotation.id)
     while cursor < ends_at:

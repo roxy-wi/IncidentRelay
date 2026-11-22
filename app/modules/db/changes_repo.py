@@ -11,7 +11,7 @@ from app.db import database_proxy
 from app.modules.common import utc_now
 from app.modules.db.models import ChangeJob
 from app.modules.db.incident_core_repo import write_transaction
-from app.services.system_settings import get_settings
+from app.modules.db.system_settings_repo import get_settings
 
 
 class LostChangeLease(RuntimeError):

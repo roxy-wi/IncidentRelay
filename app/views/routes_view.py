@@ -23,6 +23,7 @@ from app.services.serializers.routes import serialize_route
 from app.services.validation import make_error_response, validate_body
 from app.services.routing.matcher import service as matcher_preset_service
 from app.services.service_catalog.reconciliation import reconcile_route_services
+from app.services import route_management
 
 
 routes_bp = Blueprint("routes_api", __name__)
@@ -670,7 +671,7 @@ def delete_route(route_id):
     if error:
         return error
 
-    route = routes_repo.soft_delete_route(route_id)
+    route = route_management.soft_delete_route(route_id)
 
     write_audit(
         "route.delete",

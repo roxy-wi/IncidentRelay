@@ -175,10 +175,13 @@ POST /api/event-orchestrations/{orchestration_id}/validate
 
 Симуляция принимает либо одно нормализованное событие, либо один необработанный payload интеграции. Она не создаёт алерты, не меняет состояние production и не выполняет webhook'и.
 
+Нормализованное событие должно содержать `source`, `dedup_key` и `title`; одних меток недостаточно. При `source: "alertmanager"` в `payload` можно передать полный webhook с массивом `alerts` или отдельный сырой алерт из его карточки в IR. Для некорректных данных API возвращает `orchestration_simulation_invalid` с конкретным объяснением в `message`.
+
 ```json
 {
   "normalized_event": {
     "source": "webhook",
+    "dedup_key": "database-unavailable",
     "title": "Database unavailable",
     "severity": "critical",
     "labels": {"environment": "production"}

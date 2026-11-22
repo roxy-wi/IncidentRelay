@@ -8,7 +8,7 @@
   "alerts.actions.reload": "Обновить",
   "alerts.actions.create_incident": "Создать инцидент",
   "alerts.actions.explain_trace": "Трассировка обработки",
-  "alerts.search.placeholder": "Поиск по ID, названию алерта, команде, ответственному, источнику...",
+  "alerts.search.placeholder": "Поиск по тексту, ID или label=value...",
   "alerts.filters.all_services": "Все сервисы",
   "alerts.filters.all_statuses": "Все статусы",
   "alerts.filters.all_severities": "Все уровни важности",

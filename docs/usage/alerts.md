@@ -28,6 +28,27 @@ The Alerts page also exposes **Involvement**. The API accepts `GET /api/alert-gr
 
 Removed Incident links do not count. Closed Incidents can still provide membership when searching historical alert groups. Personal filters never expand team access; without a user identity they return no groups. Existing `assigned_to_me=true` requests still work; if both parameters are supplied, their conditions are combined using AND.
 
+## Searching alerts
+
+The search field matches text in group and child alert fields, including label values.
+For example, `rack7` finds that value even when it appears only in labels.
+
+Use `label=value` for an exact, case-sensitive match on a label in the group's common
+labels or any child alert. For example, `alertgroup=NET_GOBGPD_GROUP` matches that
+label only; the same text in a title, payload or grouping key does not count.
+Dots and slashes in label names are literal, so `app.kubernetes.io/name=api` looks
+for that complete key, not a nested JSON path.
+
+Spaces around `=` are ignored. Use double quotes for values containing leading or
+trailing spaces: `team="Platform Ops"`, `rack=" padded "`. Quoted values use JSON
+escaping, for example `note="rack \"seven\""`. `rack=""` (or `rack=`) matches an
+empty string, not a missing or null label. Numeric and boolean label values can be
+searched as text, for example `priority=2` and `enabled=true`.
+
+One label condition is supported per search. AND/OR expressions and parentheses
+are not supported yet. Team access and the other selected filters still apply;
+matching several children returns the group once, with correct totals and pagination.
+
 ## Main terms
 
 | Term | Meaning |

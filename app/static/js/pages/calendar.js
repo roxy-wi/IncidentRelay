@@ -6,6 +6,16 @@ let selectedCalendarEvent = null;
 let selectedCalendarClippedStart = null;
 let selectedCalendarClippedEnd = null;
 let calendarExportFeed = null;
+const calendarPagination = createClientTablePagination({
+    id: "calendar-pagination",
+    tableSelector: "#calendar-grid",
+    afterSelector: ".calendar-shell",
+    pageSize: 10,
+    onChange: function () {
+        renderRotationCalendars(calendarMode === "month");
+        renderCalendarDetailsEmpty();
+    },
+});
 
 const calendarWeekdaysShort = [
     i18n.t("calendar.weekdays.sun"),
@@ -516,6 +526,7 @@ function loadCalendar() {
     /*
      * Load calendar page data.
      */
+    calendarPagination.reset();
     calendarSelectedTeamId = getCalendarInitialTeamId();
     calendarSelectedRotationId = getCalendarQueryRotationId();
 
@@ -751,10 +762,12 @@ function refreshCalendar() {
     const grid = $("#calendar-grid");
 
     calendarEventsCache = [];
+    $("#calendar-pagination").hide();
     grid.empty();
     updateCalendarTitle();
 
     if (!teams.length) {
+        calendarPagination.render([]);
         $("#calendar-rotation-filter").hide().empty();
         grid.append(
             $("<div>")
@@ -920,7 +933,16 @@ function renderRotationCalendars(monthMode) {
     const grid = $("#calendar-grid");
     const start = parseCalendarDate($("#calendar-start").val());
     const end = parseCalendarDate($("#calendar-end").val());
-    const calendars = getRotationCalendarsForCurrentView();
+    let calendars = getRotationCalendarsForCurrentView();
+    if (monthMode) {
+        // Monthly view already selects a single rotation through its dropdown.
+        calendarPagination.render([]);
+    } else {
+        const matchingRotations = new Set(filterCalendarEventsForSearch(calendarEventsCache)
+            .map(event => getCalendarEventTeamId(event) + ":" + getCalendarEventRotationId(event)));
+        calendars = calendars.filter(calendar => matchingRotations.has(calendar.team_id + ":" + calendar.rotation_id));
+        calendars = calendarPagination.render(calendars);
+    }
 
     let days;
 
@@ -1681,6 +1703,7 @@ $(document).on("change", "#calendar-rotation-filter", function () {
 
 
 $(document).on("input", "#calendar-search", function () {
+    calendarPagination.reset();
     if (calendarMode === "month") {
         renderCalendarMonth();
     } else {

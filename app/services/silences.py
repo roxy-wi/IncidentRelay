@@ -14,6 +14,7 @@ from app.modules.db.models import (
 from app.services.alerts.escalation import apply_initial_escalation_policy_assignment
 from app.services.alerts.notification_queue import schedule_group_notification
 from app.services.routing.matcher.match_context import alert_rule_matches
+from app.services.alerts import group_state
 
 
 def _lock_groups_for_alerts(alert_ids):
@@ -382,7 +383,7 @@ def apply_silence_to_existing_alerts(
         for group_id in sorted(changed_group_ids):
             group = AlertGroup.get_by_id(group_id)
             previous_status = group.status
-            group = alerts_repo.recalculate_alert_group(group)
+            group = group_state.recalculate_alert_group(group)
             if previous_status == "firing" and group.status == "silenced":
                 _pause_group_after_silencing(
                     group,
@@ -540,7 +541,7 @@ def release_silence_applications(
         for group_id in sorted(changed_group_ids):
             group = AlertGroup.get_by_id(group_id)
             previous_status = group.status
-            group = alerts_repo.recalculate_alert_group(group)
+            group = group_state.recalculate_alert_group(group)
             if previous_status == "silenced" and group.status == "firing":
                 _restart_group_after_unsilencing(
                     group,
@@ -713,7 +714,7 @@ def reconcile_orphan_silenced_alerts(
         for group_id in sorted(changed_group_ids):
             group = AlertGroup.get_by_id(group_id)
             previous_status = group.status
-            group = alerts_repo.recalculate_alert_group(group)
+            group = group_state.recalculate_alert_group(group)
             if previous_status == "silenced" and group.status == "firing":
                 _restart_group_after_unsilencing(
                     group,

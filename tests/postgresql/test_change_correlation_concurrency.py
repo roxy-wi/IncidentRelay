@@ -5,7 +5,7 @@ from threading import Barrier, Event
 
 import pytest
 
-from app.modules.db import alert_episodes_repo, incident_core_repo
+from app.modules.db import incident_core_repo
 from app.modules.db.models import (
     AlertGroupEpisode,
     ChangeAlertGroupCorrelation,
@@ -24,6 +24,7 @@ from tests.integrations.test_change_correlation import (
     request_change,
     setup_identity,
 )
+from app.services.alerts import episodes
 
 __all__ = ["intake", "setup_identity"]
 pytestmark = pytest.mark.postgresql
@@ -68,7 +69,7 @@ def test_publication_waits_and_rechecks_committed_input(
     with ThreadPoolExecutor(max_workers=1) as pool:
         if mutation == "episode":
             with incident_core_repo.write_transaction():
-                group = incident_core_repo.lock_alert_group(episode.alert_group_id)
+                incident_core_repo.lock_alert_group(episode.alert_group_id)
                 original(
                     AlertGroupEpisode.select().where(AlertGroupEpisode.id == episode.id)
                 )
@@ -77,7 +78,7 @@ def test_publication_waits_and_rechecks_committed_input(
                 AlertGroupEpisode.update(
                     context_revision=AlertGroupEpisode.context_revision + 1
                 ).where(AlertGroupEpisode.id == episode.id).execute()
-                alert_episodes_repo.request_discovery(
+                episodes.request_discovery(
                     AlertGroupEpisode.get_by_id(episode.id)
                 )
         else:

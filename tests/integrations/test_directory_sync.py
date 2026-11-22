@@ -3,6 +3,7 @@
 import copy
 import json
 import socket
+import sqlite3
 import ssl
 import threading
 from datetime import datetime, timedelta, timezone
@@ -23,11 +24,11 @@ from app.modules.db.models import (
     DirectorySyncShift as Shift, DirectorySyncSource as Source,
     Rotation, SsoIdentity, SsoProvider, Team, TeamUser, User, UserGroup,
 )
-from app.services.directory_sync import client as client_module, service
-from app.services.directory_sync.client import ApiClient
-from app.services.directory_sync.config import SyncApiError, SyncBusy, SyncConfig, SyncError, org_service_preset
-from app.services.directory_sync.fetch import fetch_snapshot, iso, window
-from app.services.directory_sync.runtime import imported_candidates
+from app.services.sync.directory import client as client_module, service
+from app.services.sync.directory.client import ApiClient
+from app.services.sync.directory.config import SyncApiError, SyncBusy, SyncConfig, SyncError, org_service_preset
+from app.services.sync.directory.fetch import fetch_snapshot, iso, window
+from app.services.sync.directory.runtime import imported_candidates
 from app.services.oncall import get_current_oncall_user
 from app.services.orchestration import webhooks
 from tests.factories import create_group, create_team, create_user
@@ -61,6 +62,43 @@ def snapshot():
 def fetched(monkeypatch, snapshot):
     monkeypatch.setattr(service, "fetch_snapshot", lambda _client: copy.deepcopy(snapshot))
     return snapshot
+
+
+@pytest.fixture
+def rollback_resets_cursors(db, monkeypatch):
+    """Emulate SQLite drivers that invalidate unfinished reads on rollback."""
+    execute_sql = db.execute_sql
+    rollback = db.rollback
+    generation = 0
+
+    class RollbackSensitiveCursor:
+        def __init__(self, cursor):
+            self.cursor = cursor
+            self.generation = generation
+
+        def __getattr__(self, name):
+            return getattr(self.cursor, name)
+
+        def fetchone(self):
+            if self.generation != generation:
+                raise sqlite3.InterfaceError(
+                    "Cursor needed to be reset because of commit/rollback "
+                    "and can no longer be fetched from."
+                )
+            return self.cursor.fetchone()
+
+    def execute(*args, **kwargs):
+        cursor = execute_sql(*args, **kwargs)
+        return RollbackSensitiveCursor(cursor) if cursor.description else cursor
+
+    def reset(*args, **kwargs):
+        nonlocal generation
+        result = rollback(*args, **kwargs)
+        generation += 1
+        return result
+
+    monkeypatch.setattr(db, "execute_sql", execute)
+    monkeypatch.setattr(db, "rollback", reset)
 
 
 def binding(source, kind, key):
@@ -241,6 +279,33 @@ def test_readonly_enforced_on_existing_apis(client, admin_headers, source, fetch
     assert client.delete(f"/api/rotations/{rotation}", headers=admin_headers).status_code == 200
 
 
+@pytest.mark.parametrize("role", ["viewer", "manager"])
+def test_imported_team_members_are_readable_without_write_access(
+    client, source, fetched, role,
+):
+    """Read-only imports expose their roster while retaining access boundaries."""
+    service.run(source.id)
+    team_id = binding(source, "team", "t1").local_id
+    reader = User.get_by_id(binding(source, "user", "u1").local_id)
+    TeamUser.update(role=role).where(
+        TeamUser.team == team_id, TeamUser.user == reader.id,
+    ).execute()
+    headers = {"Authorization": "Bearer " + create_access_token(reader)[0]}
+    teams = client.get("/api/teams", headers=headers).get_json()
+    team = next(item for item in teams if item["id"] == team_id)
+    assert team["permissions"]["can_read"] is True
+    assert team["permissions"]["can_manage_users"] is False
+    response = client.get(f"/api/teams/{team_id}/users", headers=headers)
+    assert response.status_code == 200
+    assert [member["username"] for member in response.get_json()] == ["first"]
+    membership_id = response.get_json()[0]["id"]
+    deletion = client.delete(f"/api/teams/users/{membership_id}", headers=headers)
+    assert deletion.status_code == 409
+    stranger = create_user(group=create_group(), group_role="user_admin")
+    headers = {"Authorization": "Bearer " + create_access_token(stranger)[0]}
+    assert client.get(f"/api/teams/{team_id}/users", headers=headers).status_code == 403
+
+
 def test_email_linking_reuses_imported_user_without_oidc_autocreate(source, fetched):
     from app.modules.sso.sso_login import _resolve_sso_user
     service.run(source.id)
@@ -286,7 +351,7 @@ def test_tls_setting_is_per_source_and_used_by_every_operation(monkeypatch):
         assert calls[-len(config.operations):] == [verify_tls] * len(config.operations)
 
 
-def test_tls_setting_preserves_legacy_defaults_and_requires_new_preview(client, admin_headers, source, fetched):
+def test_tls_setting_preserves_legacy_defaults_and_import_approval(client, admin_headers, source, fetched):
     source.config.pop("verify_tls", None)
     source.save()
     service.run(source.id)
@@ -298,11 +363,10 @@ def test_tls_setting_preserves_legacy_defaults_and_requires_new_preview(client, 
     assert response.json["config"]["verify_tls"] is True
     assert response.json["approved"] is True
     payload.update(config={**source.config, "verify_tls": False}, revision=response.json["revision"])
-    assert client.put(f"{URL}/{source.id}", headers=admin_headers, json=payload).status_code == 409
-    payload["enabled"] = False
     response = client.put(f"{URL}/{source.id}", headers=admin_headers, json=payload)
     assert response.status_code == 200
-    assert response.json["approved"] is False
+    assert response.json["approved"] is True
+    assert response.json["enabled"] is True
     assert client.get(f"{URL}/{source.id}", headers=admin_headers).json["config"]["verify_tls"] is False
 
 
@@ -558,7 +622,233 @@ def test_api_owned_memberships_are_not_removed_or_demoted_by_oidc(source, fetche
     assert membership.active and membership.role == "viewer"
 
 
-def test_changed_config_must_be_previewed_before_enabling(client, admin_headers, source, fetched):
+def test_reading_source_does_not_start_or_change_sync(client, admin_headers, source, fetched, monkeypatch):
+    """Opening configuration only reads state, even for an enabled source."""
+    source.enabled = True
+    source.save()
+    service.run(source.id)
+    before = Source.get_by_id(source.id).__data__
+
+    def unexpected_request(*_args, **_kwargs):
+        pytest.fail("Reading configuration must not call the external API")
+
+    monkeypatch.setattr(client_module, "_request_once", unexpected_request)
+    monkeypatch.setattr(service, "fetch_snapshot", unexpected_request)
+    for path in (URL, f"{URL}/options", f"{URL}/{source.id}", f"{URL}/{source.id}"):
+        assert client.get(path, headers=admin_headers).status_code == 200
+    assert Source.get_by_id(source.id).__data__ == before
+    assert service.process_due_sources() == 0
+
+
+@pytest.mark.parametrize("enabled", [False, True])
+def test_local_edit_setting_preserves_approval_and_schedule(
+    client, admin_headers, source, fetched, monkeypatch, enabled,
+):
+    """Local edit permissions do not change the approved import or cached duty."""
+    source.enabled = enabled
+    source.save()
+    service.run(source.id)
+    monkeypatch.setattr(service, "fetch_current", lambda *_args: [
+        {"id": key, "status": "active", "user_id": "u1"}
+        for key in ("s1", "s2")
+    ])
+    service.refresh_current(source.id)
+    before = Source.get_by_id(source.id)
+    cache = list(Current.select().dicts())
+    team_id = binding(source, "team", "t1").local_id
+
+    for editable in (True, False):
+        current = Source.get_by_id(source.id)
+        response = client.put(f"{URL}/{source.id}", headers=admin_headers, json={
+            "name": current.name, "group_id": current.group_id,
+            "config": {**current.config, "editable": editable},
+            "revision": current.revision, "enabled": enabled,
+        })
+        assert response.status_code == 200
+        assert response.json["approved"] is True
+        assert response.json["enabled"] is enabled
+        assert response.json["config"]["editable"] is editable
+        after = Source.get_by_id(source.id)
+        assert after.approved_revision == after.revision == current.revision + 1
+        assert after.last_success_at == before.last_success_at
+        assert after.next_run_at == before.next_run_at
+        assert after.next_current_at == before.next_current_at
+        assert after.pending_mode is None
+        assert list(Current.select().dicts()) == cache
+        team = next(item for item in client.get("/api/teams", headers=admin_headers).json
+                    if item["id"] == team_id)
+        assert team["permissions"]["can_write"] is editable
+
+
+@pytest.mark.parametrize("change,value", [
+    ("delete_missing", True), ("overwrite_existing", True),
+    ("horizon_months", 3), ("membership_authority", "oidc"),
+    ("group_role", "editor"), ("member_role", "viewer"),
+    ("responsible_role", "responder"), ("user_fetch", "all"),
+    ("base_url", "https://changed.example.com"),
+    ("team_filter", "active"), ("team_fields", {"id": "uuid", "name": "label"}),
+    ("team_matches", {"t1": 1}), ("catalog_operation", "/new-catalog"),
+    ("headers", {"Authorization": "PAT new-test-value"}),
+])
+def test_local_edit_setting_cannot_bypass_import_preview(
+    client, admin_headers, source, fetched, change, value,
+):
+    """Changing import settings together with local edits still needs approval."""
+    service.run(source.id)
+    current = Source.get_by_id(source.id)
+    payload = {
+        "name": current.name, "group_id": current.group_id,
+        "config": {**current.config, "editable": True},
+        "revision": current.revision, "enabled": True,
+    }
+    if change == "headers":
+        payload["headers"] = value
+    elif change == "catalog_operation":
+        payload["config"]["operations"]["teams"]["path"] = value
+    else:
+        payload["config"][change] = value
+    response = client.put(f"{URL}/{source.id}", headers=admin_headers, json=payload)
+    assert response.status_code == 200
+    assert response.json["approved"] is False
+    assert response.json["enabled"] is True
+    assert response.json["next_run_at"] is None
+    assert response.json["next_current_at"] is None
+    assert Source.get_by_id(source.id).config["editable"] is True
+    assert service.process_due_sources() == service.process_due_current() == 0
+
+
+@pytest.mark.parametrize("field,value", [
+    ("interval_seconds", 7200), ("current_interval_seconds", 30),
+    ("timeout_seconds", 30), ("verify_tls", False),
+    ("private_network_policy", "allowlist"),
+    ("current_max_age_seconds", 30), ("current_fetch", "per_schedule"),
+    ("current_fields", {"id": "scheduleUuid", "status": {"value": "gap"}}),
+    ("operations", None), ("name", "Renamed source"),
+    ("enabled", False), ("headers", {"Authorization": "PAT secret-test"}),
+])
+def test_runtime_settings_do_not_require_import_preview(
+    client, admin_headers, source, fetched, monkeypatch, field, value,
+):
+    """Operational settings preserve approval and refresh only affected state."""
+    from app.views import directory_sync_view
+
+    source.enabled = True
+    source.save()
+    service.run(source.id)
+    monkeypatch.setattr(service, "fetch_current", lambda *_args: [
+        {"id": key, "status": "active", "user_id": "u1"}
+        for key in ("s1", "s2")
+    ])
+    service.refresh_current(source.id)
+    before = Source.get_by_id(source.id)
+    cache = list(Current.select().dicts())
+    payload = {
+        "name": before.name, "group_id": before.group_id,
+        "config": copy.deepcopy(before.config),
+        "revision": before.revision, "enabled": True,
+    }
+    if field in {"name", "enabled", "headers"}:
+        payload[field] = value
+    elif field == "operations":
+        payload["config"]["operations"]["current"]["path"] = "/new-current-duty"
+    else:
+        payload["config"][field] = value
+    saved_at = utc_now()
+    monkeypatch.setattr(directory_sync_view, "utc_now", lambda: saved_at)
+    response = client.put(f"{URL}/{source.id}", headers=admin_headers, json=payload)
+    assert response.status_code == 200
+    assert response.json["approved"] is True
+    after = Source.get_by_id(source.id)
+    assert after.last_success_at == before.last_success_at
+    assert after.pending_mode is None
+    assert after.approved_revision == after.revision == before.revision + 1
+    if field == "interval_seconds":
+        assert after.next_run_at == before.last_success_at + timedelta(seconds=value)
+    else:
+        assert after.next_run_at == before.next_run_at
+    if field in {"current_fields", "current_fetch", "current_max_age_seconds", "operations"}:
+        assert not Current.select().exists()
+        assert after.next_current_at <= utc_now()
+    else:
+        assert list(Current.select().dicts()) == cache
+        if field == "current_interval_seconds":
+            assert after.next_current_at == saved_at + timedelta(seconds=value)
+        else:
+            assert after.next_current_at == before.next_current_at
+    assert client.put(f"{URL}/{source.id}", headers=admin_headers, json=payload).status_code == 409
+
+
+def test_runtime_settings_preserve_prepared_preview(client, admin_headers, source, fetched):
+    """A prepared snapshot remains applicable without fetching it again."""
+    preview = service.run(source.id, mode="preview")
+    before = Source.get_by_id(source.id)
+    response = client.put(f"{URL}/{source.id}", headers=admin_headers, json={
+        "name": "Updated name", "group_id": source.group_id,
+        "revision": before.revision,
+        "config": {**before.config, "editable": True, "timeout_seconds": 30},
+    })
+    assert response.status_code == 200
+    assert response.json["approved"] is False
+    assert response.json["preview_token"] == preview["preview_token"]
+    after = Source.get_by_id(source.id)
+    assert after.preview_until == before.preview_until
+    assert after.preview_result == before.preview_result
+    assert decrypt_json(after.preview_encrypted)["revision"] == after.revision
+    service.run(source.id, mode="apply", preview_token=preview["preview_token"])
+    assert Team.select().count() == 1
+
+
+@pytest.mark.parametrize("invalid", ["expired", "stale_revision"])
+def test_runtime_settings_do_not_restore_invalid_preview(
+    client, admin_headers, source, fetched, invalid,
+):
+    """Only a current, unexpired preview can survive operational changes."""
+    service.run(source.id, mode="preview")
+    source = Source.get_by_id(source.id)
+    if invalid == "expired":
+        source.preview_until = utc_now() - timedelta(seconds=1)
+    else:
+        source.revision += 1
+    source.save()
+    response = client.put(f"{URL}/{source.id}", headers=admin_headers, json={
+        "name": source.name, "group_id": source.group_id, "revision": source.revision,
+        "config": {**source.config, "editable": True},
+    })
+    assert response.status_code == 200
+    assert response.json["approved"] is False
+    assert response.json["preview_token"] is None
+    assert response.json["preview_until"] is None
+
+
+def test_stale_approval_is_not_restored_by_runtime_settings(client, admin_headers, source):
+    """An old approved revision does not approve a newer import configuration."""
+    source.revision = 2
+    source.approved_revision = 1
+    source.save()
+    response = client.put(f"{URL}/{source.id}", headers=admin_headers, json={
+        "name": source.name, "group_id": source.group_id, "revision": source.revision,
+        "config": {**source.config, "editable": True},
+    })
+    assert response.status_code == 200
+    assert response.json["approved"] is False
+    assert Source.get_by_id(source.id).approved_revision is None
+
+
+def test_local_edit_setting_does_not_approve_a_new_source(client, admin_headers, source):
+    """The first import still requires preview and apply."""
+    payload = {
+        "name": source.name, "group_id": source.group_id,
+        "config": {**source.config, "editable": True},
+        "revision": source.revision, "enabled": True,
+    }
+    response = client.put(f"{URL}/{source.id}", headers=admin_headers, json=payload)
+    assert response.status_code == 200
+    assert response.json["approved"] is False
+    assert response.json["enabled"] is True
+    assert service.process_due_sources() == service.process_due_current() == 0
+
+
+def test_changed_config_must_be_previewed_before_scheduled_execution(client, admin_headers, source, fetched):
     service.run(source.id)
     config = copy.deepcopy(source.config)
     config["delete_missing"] = True
@@ -568,8 +858,11 @@ def test_changed_config_must_be_previewed_before_enabling(client, admin_headers,
     assert not response.json["approved"]
     response = client.put(f"{URL}/{source.id}", headers=admin_headers,
                           json={"name": source.name, "group_id": source.group_id, "config": config, "revision": 2, "enabled": True})
-    assert response.status_code == 409
-    assert response.json["error"] == "sync_conflict"
+    assert response.status_code == 200
+    assert response.json["enabled"] is True
+    assert response.json["approved"] is False
+    assert response.json["schedule_state"] == "pending_approval"
+    assert service.process_due_sources() == service.process_due_current() == 0
 
 
 def test_editable_imported_shifts_use_existing_rotation_access(client, admin_headers, source, fetched):
@@ -681,6 +974,149 @@ def test_current_unknown_person_keeps_cache_and_requests_full_refresh(source, fe
         service.refresh_current(source.id)
     assert list(Current.select().dicts()) == previous
     assert Source.get_by_id(source.id).next_run_at <= utc_now()
+
+
+@pytest.mark.parametrize("failure", ["unknown_status", "timeout"])
+def test_current_failure_preserves_full_sync_schedule(source, fetched, monkeypatch, failure):
+    """A persistent current-duty error must not cause repeated full imports."""
+    now = utc_now()
+    clock = [now]
+    monkeypatch.setattr(service, "utc_now", lambda: clock[0])
+    source.enabled = True
+    source.save()
+    service.run(source.id)
+    scheduled = Source.get_by_id(source.id).next_run_at
+    rows = [{"scheduleUuid": key, "status": "active", "currentEmployeeUuid": "u1"}
+            for key in ("s1", "s2")]
+    monkeypatch.setattr(ApiClient, "records", lambda *_args: rows)
+    assert service.process_due_current() == 1
+    previous = list(Current.select().dicts())
+
+    if failure == "unknown_status":
+        rows[0]["status"] = "unknown_status"
+    else:
+        def fail(*_args):
+            raise SyncApiError("current: API request timed out", status_code=504)
+        monkeypatch.setattr(ApiClient, "records", fail)
+
+    for seconds in (60, 65, 75, 90):
+        clock[0] = now + timedelta(seconds=seconds)
+        assert service.process_due_current() == 0
+        assert service.process_due_sources() == 0
+        updated = Source.get_by_id(source.id)
+        assert updated.next_run_at == scheduled
+        assert updated.last_success_at == now
+        assert updated.current_error
+        assert updated.lease is None
+        assert updated.current_lease is None
+        if failure == "timeout":
+            assert list(Current.select().dicts()) == previous
+        else:
+            assert not Current.select().where(Current.rotation == binding(source, "rotation", "s1").local_id).exists()
+            healthy = Current.get(Current.rotation == binding(source, "rotation", "s2").local_id)
+            assert healthy.status == "active"
+            assert healthy.observed_at == now + timedelta(seconds=60)
+
+    clock[0] = scheduled
+    assert service.process_due_sources() == 1
+    assert service.process_due_sources() == 0
+    assert Source.get_by_id(source.id).last_success_at == scheduled
+
+
+def test_unresolved_current_person_does_not_loop_full_imports(
+    source, fetched, monkeypatch, rollback_resets_cursors,
+):
+    """Request one early import for a new person, then keep the normal interval."""
+    now = utc_now()
+    clock = [now]
+    monkeypatch.setattr(service, "utc_now", lambda: clock[0])
+    source.enabled = True
+    source.save()
+    service.run(source.id)
+    rows = [{"id": key, "status": "active", "user_id": "new-person"}
+            for key in ("s1", "s2")]
+    monkeypatch.setattr(service, "fetch_current", lambda *_args: rows)
+
+    assert service.process_due_current() == 0
+    assert service.process_due_sources() == 1
+    scheduled = Source.get_by_id(source.id).next_run_at
+    for seconds in (5, 20, 35):
+        clock[0] = now + timedelta(seconds=seconds)
+        assert service.process_due_current() == 0
+        assert service.process_due_sources() == 0
+        assert Source.get_by_id(source.id).next_run_at == scheduled
+
+    def timeout(*_args):
+        raise SyncApiError("current: API request timed out", status_code=504)
+
+    # Alternating errors must not reset the protection against import loops.
+    monkeypatch.setattr(service, "fetch_current", timeout)
+    clock[0] = Source.get_by_id(source.id).next_current_at
+    assert service.process_due_current() == 0
+    monkeypatch.setattr(service, "fetch_current", lambda *_args: rows)
+    clock[0] = Source.get_by_id(source.id).next_current_at
+    assert service.process_due_current() == 0
+    assert service.process_due_sources() == 0
+
+    # Recovery permits a later genuinely new person to request an early import.
+    clock[0] = Source.get_by_id(source.id).next_current_at
+    for row in rows:
+        row["user_id"] = "u1"
+    assert service.process_due_current() == 1
+    assert Source.get_by_id(source.id).current_error is None
+    clock[0] = Source.get_by_id(source.id).next_current_at
+    rows[0]["user_id"] = "another-new-person"
+    assert service.process_due_current() == 0
+    assert service.process_due_sources() == 1
+
+
+@pytest.mark.parametrize("mode", ["current", "run", "preview"])
+def test_scheduler_continues_after_one_source_rolls_back(
+    source, fetched, monkeypatch, rollback_resets_cursors, mode,
+):
+    second = Source.create(name="Second source", group=create_group(), created_by=source.created_by,
+                           config=source.config, headers_encrypted=encrypt_json({}))
+    service.run(source.id)
+    service.run(second.id)
+    now = utc_now()
+    monkeypatch.setattr(service, "utc_now", lambda: now)
+    Source.update(enabled=True, next_run_at=now, next_current_at=now,
+                  pending_mode="preview" if mode == "preview" else None).where(
+        Source.id.in_([source.id, second.id]),
+    ).execute()
+    monkeypatch.setattr(service, "fetch_current", lambda _client, ids: [
+        {"id": key, "status": "active", "user_id": "u1"} for key in ids
+    ])
+    locked_source = service.locked_source
+    attempted = []
+
+    def fail_first_source(source_id, *args, **kwargs):
+        locked = locked_source(source_id, *args, **kwargs)
+        attempted.append(source_id)
+        if source_id == source.id:
+            Source.update(name="Must roll back").where(Source.id == source_id).execute()
+            raise SyncError("Injected source failure")
+        return locked
+
+    monkeypatch.setattr(service, "locked_source", fail_first_source)
+    process = service.process_due_current if mode == "current" else service.process_due_sources
+    assert process() == (0 if mode == "preview" else 1)
+    assert set(attempted) == {source.id, second.id}
+    failed = Source.get_by_id(source.id)
+    healthy = Source.get_by_id(second.id)
+    assert failed.name == source.name
+    assert (failed.current_error if mode == "current" else failed.last_error) == "Injected source failure"
+    assert failed.lease is None and failed.current_lease is None
+    assert healthy.lease is None and healthy.current_lease is None
+    if mode == "current":
+        assert healthy.last_current_at == now
+        assert Current.select().where(Current.source == healthy.id).count() == 2
+    elif mode == "preview":
+        assert healthy.preview_token
+        assert healthy.pending_mode is None
+    else:
+        assert healthy.last_success_at == now
+        assert healthy.next_run_at > now
 
 
 def test_concurrent_workers_only_one_claims_source(source, db):

@@ -59,6 +59,7 @@ from app.services.validation import (
     validate_body,
     validate_query,
 )
+from app.services.alerts import group_state
 
 alerts_bp = Blueprint("alerts_api", __name__)
 
@@ -600,7 +601,7 @@ def merge_alert_groups_view(target_group_id):
     # Merge mutation, timeline and audit must commit or roll back together.
     try:
         with incident_core_repo.write_transaction():
-            group = alerts_repo.merge_alert_groups(
+            group = group_state.merge_alert_groups(
                 target_group_id=target_group_id,
                 source_group_ids=source_group_ids,
                 user_id=user_id,

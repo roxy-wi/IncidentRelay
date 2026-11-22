@@ -5,6 +5,7 @@ from zoneinfo import ZoneInfo, ZoneInfoNotFoundError
 from pydantic import AwareDatetime, Field, StringConstraints, field_validator, model_validator
 
 from app.api.schemas.base import ApiModel
+from app.modules.db.alert_search import parse_label_search
 
 
 class AlertActivityQuerySchema(ApiModel):
@@ -115,6 +116,13 @@ class AlertListQuerySchema(ApiModel):
     )
     order: str = Field(default="desc", pattern=r"^(asc|desc)$")
     include_merged: bool = False
+
+    @field_validator("search")
+    @classmethod
+    def validate_label_search(cls, value: str | None) -> str | None:
+        """Report incomplete quoted label values as query validation errors."""
+        parse_label_search(value)
+        return value
 
     @field_validator("status", "source", "severity", "priority", mode="before")
     @classmethod

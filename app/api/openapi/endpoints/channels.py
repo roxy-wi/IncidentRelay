@@ -161,6 +161,24 @@ CHANNEL_CONFLICT_RESPONSE_SCHEMA = {
 }
 
 
+CHANNEL_UPDATE_SCHEMA = {
+    **CHANNEL_SCHEMA,
+    "required": ["name", "channel_type", "config"],
+    "properties": {
+        **CHANNEL_SCHEMA["properties"],
+        "team_id": {
+            **CHANNEL_SCHEMA["properties"]["team_id"],
+            "description": (
+                "Omit to keep the current team. A different team requires write "
+                "access to both the channel and the destination team. Null is "
+                "accepted only for an existing channel without a team; a "
+                "team-owned channel cannot be detached."
+            ),
+        },
+    },
+}
+
+
 EMAIL_DEFAULT_TEMPLATE_SCHEMA = {
     "type": "object",
     "properties": {
@@ -192,6 +210,10 @@ def tags():
                 "Team-level outbound notification channels. Channels are connected "
                 "to alert routes and are used to send initial notifications, "
                 "reminders, escalations and resolve messages to external systems. "
+                "Legacy channels without a team require editor or administrator "
+                "access to their owning group for every operation. Channels "
+                "without either owner are inaccessible. Token ownership bounds "
+                "apply in addition to user permissions. "
                 "User-level browser push, email and voice call preferences are "
                 "configured with profile notification rules."
             ),
@@ -288,7 +310,10 @@ def paths():
                 "description": "Returns one channel by id, including config.",
                 "operationId": "getChannel",
                 "parameters": [path_param("channel_id", "Channel id.")],
-                "responses": {"200": response("Channel details.", CHANNEL_SCHEMA)},
+                "responses": {
+                    "200": response("Channel details.", CHANNEL_SCHEMA),
+                    "403": response("Access denied.", ERROR_SCHEMA),
+                },
             },
             "put": {
                 "tags": ["channels"],
@@ -296,10 +321,11 @@ def paths():
                 "description": "Updates channel name, type, enabled flag and config.",
                 "operationId": "updateChannel",
                 "parameters": [path_param("channel_id", "Channel id.")],
-                "requestBody": json_body("Updated channel properties.", CHANNEL_SCHEMA),
+                "requestBody": json_body("Updated channel properties.", CHANNEL_UPDATE_SCHEMA),
                 "responses": {
                     "200": response("Channel updated.", CHANNEL_SCHEMA),
                     "400": response("Validation error.", ERROR_SCHEMA),
+                    "403": response("Access denied.", ERROR_SCHEMA),
                     "409": response(
                         "Channel name already exists in this team.",
                         CHANNEL_CONFLICT_RESPONSE_SCHEMA,
@@ -326,7 +352,10 @@ def paths():
                 "description": "Disables a notification channel by setting enabled=false.",
                 "operationId": "disableChannel",
                 "parameters": [path_param("channel_id", "Channel id.")],
-                "responses": {"200": response("Channel disabled.", CHANNEL_SCHEMA)},
+                "responses": {
+                    "200": response("Channel disabled.", CHANNEL_SCHEMA),
+                    "403": response("Access denied.", ERROR_SCHEMA),
+                },
             }
         },
         "/api/channels/{channel_id}/enable": {
@@ -336,7 +365,10 @@ def paths():
                 "description": "Enables a previously disabled notification channel.",
                 "operationId": "enableChannel",
                 "parameters": [path_param("channel_id", "Channel id.")],
-                "responses": {"200": response("Channel enabled.", CHANNEL_SCHEMA)},
+                "responses": {
+                    "200": response("Channel enabled.", CHANNEL_SCHEMA),
+                    "403": response("Access denied.", ERROR_SCHEMA),
+                },
             }
         },
         "/api/channels/{channel_id}/test": {
@@ -351,6 +383,7 @@ def paths():
                 "parameters": [path_param("channel_id", "Channel id.")],
                 "responses": {
                     "200": response("Test notification sent."),
+                    "403": response("Access denied.", ERROR_SCHEMA),
                     "400": response(
                         "Test failed. The response contains the transport error.",
                         ERROR_SCHEMA,

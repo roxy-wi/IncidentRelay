@@ -118,5 +118,8 @@
   "rbac.group.admin": "Gruppenadministrator",
   "rbac.team.viewer": "Teamleser",
   "rbac.team.responder": "Team-Einsatzkraft",
-  "rbac.team.manager": "Teammanager"
+  "rbac.team.manager": "Teammanager",
+  "teams.members.read_only": "Teammitglieder anzeigen. Die Mitgliedschaft dieses Teams kann nicht geändert werden.",
+  "teams.members.load_failed": "Teammitglieder konnten nicht geladen werden. Öffnen Sie die Liste erneut, um es noch einmal zu versuchen.",
+  "teams.permissions.view_members": "Sie haben keine Berechtigung, die Mitglieder dieses Teams anzuzeigen."
 }

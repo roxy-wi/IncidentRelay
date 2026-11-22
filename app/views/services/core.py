@@ -22,6 +22,7 @@ from app.services.service_catalog.events import (
     emit_service_catalog_event,
 )
 from app.services.validation import validate_body, make_error_response
+from app.services.service_catalog import mutations as service_mutations
 
 SERVICE_TIMELINE_CONFIGURATION_FIELDS = (
     "name",
@@ -250,7 +251,7 @@ def create_service():
 
     try:
         with incident_core_repo.write_transaction():
-            service = services_repo.create_service(_service_data_from_payload(payload))
+            service = service_mutations.create_service(_service_data_from_payload(payload))
             write_audit(
                 "service.create",
                 object_type="service",
@@ -323,7 +324,7 @@ def update_service(service_id):
 
     try:
         with incident_core_repo.write_transaction():
-            service = services_repo.update_service(
+            service = service_mutations.update_service(
                 service_id,
                 _service_data_from_payload(payload),
             )
@@ -382,7 +383,7 @@ def delete_service(service_id):
         return error
 
     actor_user = current_user()
-    service = services_repo.soft_delete_service(service_id)
+    service = service_mutations.soft_delete_service(service_id)
 
     write_audit(
         "service.delete",

@@ -118,5 +118,8 @@
   "rbac.group.admin": "Group Admin",
   "rbac.team.viewer": "Team Viewer",
   "rbac.team.responder": "Team Responder",
-  "rbac.team.manager": "Team Manager"
+  "rbac.team.manager": "Team Manager",
+  "teams.members.read_only": "View team members. Membership changes are not available for this team.",
+  "teams.members.load_failed": "Unable to load team members. Reopen the members list to retry.",
+  "teams.permissions.view_members": "You do not have permission to view this team's members."
 }

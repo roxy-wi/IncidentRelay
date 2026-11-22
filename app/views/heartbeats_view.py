@@ -21,6 +21,7 @@ from app.services.rbac import (
 )
 from app.services.serializers.heartbeats import serialize_heartbeat, serialize_heartbeat_ping
 from app.services.validation import make_error_response, validate_body
+from app.services import heartbeat_management
 
 
 heartbeats_bp = Blueprint("heartbeats_api", __name__)
@@ -287,7 +288,7 @@ def delete_heartbeat(heartbeat_id):
     if error:
         return error
 
-    heartbeats_repo.soft_delete_heartbeat(item)
+    heartbeat_management.soft_delete_heartbeat(item)
     _audit_heartbeat("heartbeat.delete", item)
     return jsonify({"deleted": True})
 

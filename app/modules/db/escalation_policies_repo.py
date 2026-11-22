@@ -47,19 +47,6 @@ def get_policy(policy_id, include_deleted=False):
     return query.get()
 
 
-def get_policy_or_none(policy_id, include_deleted=False):
-    """Return an escalation policy or None."""
-    if not policy_id:
-        return None
-
-    query = EscalationPolicy.select().where(EscalationPolicy.id == policy_id)
-
-    if not include_deleted:
-        query = query.where(EscalationPolicy.deleted == False)
-
-    return query.first()
-
-
 def create_policy(team_id, name, description=None, enabled=True, repeat_count=0):
     """Create or restore an escalation policy by team/name."""
     existing = EscalationPolicy.get_or_none(
@@ -176,20 +163,6 @@ def get_first_rule(policy_id):
         .where(
             (EscalationPolicyRule.policy == policy_id)
             & (EscalationPolicyRule.enabled == True)
-        )
-        .order_by(EscalationPolicyRule.position.asc(), EscalationPolicyRule.id.asc())
-        .first()
-    )
-
-
-def get_next_rule(policy_id, current_position):
-    """Return the next enabled rule after current position."""
-    return (
-        EscalationPolicyRule.select()
-        .where(
-            (EscalationPolicyRule.policy == policy_id)
-            & (EscalationPolicyRule.enabled == True)
-            & (EscalationPolicyRule.position > current_position)
         )
         .order_by(EscalationPolicyRule.position.asc(), EscalationPolicyRule.id.asc())
         .first()

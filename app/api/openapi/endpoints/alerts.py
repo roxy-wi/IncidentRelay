@@ -96,6 +96,22 @@ def alert_group_incident_link_schema():
     }
 
 
+def alert_resource_links_schema():
+    """Describe typed links extracted from alert labels and stored payloads."""
+    return {
+        "type": "array",
+        "description": "Distinct HTTP(S) links from this alert or the group's latest alert.",
+        "items": {
+            "type": "object",
+            "required": ["kind", "url"],
+            "properties": {
+                "kind": {"type": "string", "enum": ["source", "dashboard", "panel", "runbook"]},
+                "url": {"type": "string", "format": "uri"},
+            },
+        },
+    }
+
+
 def alert_child_schema(include_payload=False):
     """Build a child alert response schema."""
 
@@ -119,6 +135,7 @@ def alert_child_schema(include_payload=False):
         "silenced": {"type": "boolean"},
         "labels": {"type": "object", "additionalProperties": True},
         "labels_count": {"type": "integer"},
+        "resource_links": alert_resource_links_schema(),
         "assignee": {"type": "string", "nullable": True},
         "assignee_id": {"type": "integer", "nullable": True},
         "assignee_details": user_short_schema(),
@@ -558,6 +575,7 @@ def alert_group_schema(include_details=False):
             "additionalProperties": True,
             "description": "Labels common to all child alerts in this group.",
         },
+        "resource_links": alert_resource_links_schema(),
         "label_values": {
             "type": "object",
             "nullable": True,
@@ -1179,7 +1197,9 @@ def paths():
                     ),
                     query_param(
                         "search",
-                        "Search by id, title, team, assignee, source, route, rotation or group fields.",
+                        "Search text in group and child alert fields, including labels, or use one "
+                        "case-sensitive label=value condition. Values may be double-quoted JSON strings. "
+                        "Exact label conditions only match scalar labels, not titles or payload fields.",
                     ),
                     query_param(
                         "page",

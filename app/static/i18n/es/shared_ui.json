@@ -1,4 +1,6 @@
 {
+  "shared.user_teams.title": "Equipos",
+  "shared.user_teams.empty": "No hay equipos que mostrar.",
   "shared.action": "Acción",
   "shared.actions": "Acciones",
   "shared.edit": "Editar",
@@ -42,6 +44,8 @@
   "shared.select.user": "Usuario #{id}",
   "shared.select.user_placeholder": "Seleccionar usuario...",
   "shared.select.no_users": "No se encontraron usuarios",
+  "shared.select.search_placeholder": "Escribe para buscar…",
+  "shared.select.no_results": "No se encontraron resultados",
   "shared.timezone.select": "Seleccionar zona horaria",
   "shared.timezone.browser": "Usar zona horaria del navegador",
   "shared.timezone.browser_named": "Usar zona horaria del navegador ({timezone})",

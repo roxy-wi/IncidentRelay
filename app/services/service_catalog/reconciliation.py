@@ -261,46 +261,6 @@ def reconcile_dependency_component(service_ids, *, trigger, actor_user=None):
     )
 
 
-def list_services_for_route(route_id):
-    if not route_id:
-        return []
-
-    service_ids = set()
-
-    direct_services = Service.select(Service.id).where(
-        Service.deleted == False,
-        Service.id.in_(
-            AlertRoute.select(AlertRoute.service).where(
-                AlertRoute.id == route_id,
-                AlertRoute.service.is_null(False),
-            )
-        ),
-    )
-
-    service_ids.update(service.id for service in direct_services)
-
-    matched_services = Service.select(Service.id).where(
-        Service.deleted == False,
-        Service.id.in_(
-            ServiceMatchRule.select(ServiceMatchRule.service).where(
-                ServiceMatchRule.route == route_id,
-                ServiceMatchRule.deleted == False,
-            )
-        ),
-    )
-
-    service_ids.update(service.id for service in matched_services)
-
-    if not service_ids:
-        return []
-
-    return list(
-        Service.select()
-        .where(Service.id.in_(service_ids))
-        .order_by(Service.id)
-    )
-
-
 def list_group_services(group_id):
     return list(
         Service.select()

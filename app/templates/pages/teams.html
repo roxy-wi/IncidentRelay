@@ -93,7 +93,7 @@
               <th>{{ _('teams.table.slug') }}</th>
               <th>{{ _('teams.form.description') }}</th>
               <th>{{ _('teams.table.escalation') }}</th>
-              <th>{{ _('teams.table.health') }}</th>
+              <th class="oncall-health-th">{{ _('teams.table.health') }}</th>
               <th>{{ _('teams.table.status') }}</th>
               <th class="actions-th">{{ _('teams.table.actions') }}</th>
             </tr>
@@ -200,7 +200,7 @@
       <div class="app-modal-header">
         <div>
           <h2 id="team-members-title">{{ _('teams.members.title') }}</h2>
-          <div class="card-subtitle">
+          <div id="team-members-subtitle" class="card-subtitle">
             {{ _('teams.members.subtitle') }}
           </div>
         </div>

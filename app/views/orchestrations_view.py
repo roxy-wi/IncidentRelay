@@ -49,6 +49,7 @@ from app.services.orchestration.permissions import (
 )
 from app.services.rbac import current_user, get_allowed_group_ids
 from app.services.validation import make_error_response, validate_body
+from app.services.orchestration import publication
 
 
 orchestrations_bp = Blueprint("event_orchestrations_api", __name__)
@@ -205,7 +206,12 @@ def handle_orchestration_simulation_error(error):
     else:
         code = "orchestration_simulation_invalid"
         status = 400
-    return jsonify({"error": code, "message": "Orchestration simulation failed."}), status
+    message = (
+        str(error)
+        if isinstance(error, simulator.OrchestrationSimulationInputError)
+        else "Orchestration simulation failed."
+    )
+    return jsonify({"error": code, "message": message}), status
 
 
 @orchestrations_bp.route("", methods=["GET"])
@@ -398,7 +404,7 @@ def validate_orchestration(orchestration_id):
             "Orchestration has no draft to validate.",
             409,
         )
-    result = orchestrations_repo.validate_version(draft.id)
+    result = publication.validate_version(draft.id)
     # Validation is read-only but an explicit operator action worth auditing;
     # never persist the supplied rules or validation error details in AuditLog.
     write_audit(
@@ -426,7 +432,7 @@ def publish_orchestration(orchestration_id):
         return error
     user = current_user()
     try:
-        version = orchestrations_repo.publish_draft(
+        version = publication.publish_draft(
             orchestration.id,
             actor_id=user.id,
             comment=payload.comment,
@@ -454,7 +460,7 @@ def rollback_orchestration(orchestration_id):
         return error
     user = current_user()
     try:
-        version = orchestrations_repo.rollback_to_version(
+        version = publication.rollback_to_version(
             orchestration.id,
             payload.version_id,
             actor_id=user.id,

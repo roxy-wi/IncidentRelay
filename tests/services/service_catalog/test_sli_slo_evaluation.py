@@ -1,5 +1,7 @@
 from datetime import datetime, timedelta
 
+import pytest
+
 from app.modules.db.models import (
     AlertGroup,
     MaintenanceWindow,
@@ -70,6 +72,22 @@ def _slo(service, sli, **kwargs):
         include_open_alerts=kwargs.pop("include_open_alerts", True),
         **kwargs,
     )
+
+
+@pytest.mark.parametrize("scope", [["unknown"], ["p1", "unknown"], 123, []])
+def test_invalid_stored_impact_scope_does_not_evaluate_all_priorities(scope):
+    """Corrupt or obsolete scopes must not silently broaden an SLO query."""
+    service = create_service(create_team(create_group()))
+    now = utc_now()
+    sli = _sli(service, SLI_TYPE_INCIDENT_COUNT, configuration={"priority_scope": scope})
+    slo = _slo(service, sli, comparison="value_lte", threshold_count=0)
+    _alert_group(service, first_seen_at=now - timedelta(hours=1), priority_slug="p4")
+
+    evaluation = evaluate_service_slo(slo, now=now, persist=False)
+
+    assert evaluation["status"] == "no_data"
+    assert evaluation["value_count"] is None
+    assert evaluation["message"].startswith("Invalid SLI priority scope:")
 
 
 def test_ack_latency_slo_calculates_percent_good_and_persists_measurement():

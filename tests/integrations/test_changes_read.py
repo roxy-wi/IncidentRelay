@@ -11,7 +11,7 @@ from app.api.schemas.change_integrations import (
     IntegrationUpdate,
     SourceUpdate,
 )
-from app.modules.db import services_repo, tokens_repo
+from app.modules.db import tokens_repo
 from app.modules.db.models import (
     Change,
     ChangeEvent,
@@ -36,6 +36,7 @@ from tests.integrations.test_change_events import event_payload, intake, setup_i
 from tests.integrations.test_change_integration_groups import headers
 from tests.integrations.test_change_integrations import grant, revision
 from tests.integrations.test_change_worker import process_resolution
+from app.services.service_catalog import mutations as service_mutations
 
 __all__ = ["intake", "setup_identity"]
 BASE = "/api/changes"
@@ -130,7 +131,7 @@ def test_unresolved_reference_has_no_invented_service_name(client, changes):
 
 def test_resolved_reference_does_not_reveal_service_moved_to_another_team(client, changes):
     own_service = changes["intake"][0][2]
-    services_repo.update_service(own_service.id, {"team": changes["service"].team_id})
+    service_mutations.update_service(own_service.id, {"team": changes["service"].team_id})
     response = client.get(url(changes, "/services"), headers=headers(changes["owner"]))
     assert response.status_code == 200
     assert response.json["references"]["items"] == []
@@ -259,7 +260,7 @@ def test_stale_or_revoked_links_disappear_before_worker_and_pagination(
         with graph_change():
             pass
     elif mutation == "move":
-        services_repo.update_service(
+        service_mutations.update_service(
             changes["service"].id, {"team": create_team(create_group()).id}
         )
     else:

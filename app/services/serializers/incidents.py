@@ -4,36 +4,6 @@ from app.modules.user_colors import user_color
 from app.services.serializers.common import serialize_utc_datetime
 
 
-def serialize_incident_stakeholder(stakeholder):
-    user = stakeholder.user if stakeholder.user_id else None
-
-    return {
-        "id": stakeholder.id,
-        "incident_id": stakeholder.incident_id,
-        "user_id": stakeholder.user_id,
-        "user": {
-            "id": user.id,
-            "username": user.username,
-            "display_name": user.display_name,
-            "color": user_color(user),
-            "email": user.email,
-        } if user else None,
-        "email": stakeholder.email,
-        "display_name": stakeholder.display_name,
-        "role": stakeholder.role,
-        "source": stakeholder.source,
-        "notify_on_created": stakeholder.notify_on_created,
-        "notify_on_priority_change": stakeholder.notify_on_priority_change,
-        "notify_on_status_change": stakeholder.notify_on_status_change,
-        "notify_on_resolved": stakeholder.notify_on_resolved,
-        "notify_on_comment": bool(getattr(stakeholder, "notify_on_comment", True)),
-        "active": stakeholder.active,
-        "created_by_id": stakeholder.created_by_id,
-        "created_at": serialize_utc_datetime(stakeholder.created_at),
-        "updated_at": serialize_utc_datetime(stakeholder.updated_at),
-    }
-
-
 def serialize_incident(incident, *, current_user=None, include_details=False):
     """Serialize a first-class operational Incident."""
     team = incident.team if getattr(incident, "team_id", None) else None

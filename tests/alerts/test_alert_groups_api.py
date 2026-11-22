@@ -7,6 +7,7 @@ from app.services.alerts.lifecycle import upsert_alert
 import app.services.alerts.notification_queue as notification_queue
 from tests.factories import create_group, create_route, create_team
 from app.modules.common import utc_now
+from app.services.alerts import group_state
 
 
 def _route(group_by):
@@ -69,7 +70,7 @@ def test_ack_group_does_not_ack_each_child_alert(db):
     group = result.group
 
 
-    group = alerts_repo.acknowledge_alert_group(group.id, user_id=None)
+    group = group_state.acknowledge_alert_group(group.id, user_id=None)
     child = alerts_repo.list_alerts_for_group(group.id)[0]
 
     assert group.status == "acknowledged"
@@ -82,7 +83,7 @@ def test_resolve_group_resolves_child_alerts(db):
     group = result.group
 
 
-    group = alerts_repo.resolve_alert_group(group.id)
+    group = group_state.resolve_alert_group(group.id)
     child = alerts_repo.list_alerts_for_group(group.id)[0]
 
     assert group.status == "resolved"
@@ -99,7 +100,7 @@ def test_merge_groups_moves_alerts_to_target(db):
     group2 = result.group
 
 
-    merged = alerts_repo.merge_alert_groups(
+    merged = group_state.merge_alert_groups(
         target_group_id=group1.id,
         source_group_ids=[group2.id],
         reason="same incident",
@@ -329,8 +330,8 @@ def test_acknowledged_group_stays_acknowledged_after_recalculate(db):
     group = result.group
 
 
-    group = alerts_repo.acknowledge_alert_group(group.id)
-    group = alerts_repo.recalculate_alert_group(group)
+    group = group_state.acknowledge_alert_group(group.id)
+    group = group_state.recalculate_alert_group(group)
     child = alerts_repo.list_alerts_for_group(group.id)[0]
 
     assert group.status == "acknowledged"
@@ -343,7 +344,7 @@ def test_new_child_alert_reopens_acknowledged_group(db):
     result = upsert_alert(_alert(route, "DiskFull", "host1"))
     group1 = result.group
 
-    alerts_repo.acknowledge_alert_group(group1.id)
+    group_state.acknowledge_alert_group(group1.id)
     result = upsert_alert(_alert(route, "DiskFull", "host2"))
     group2 = result.group
     created2 = result.created_group

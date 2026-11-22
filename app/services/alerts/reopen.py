@@ -13,13 +13,13 @@ import hashlib
 from app.db import database_proxy as db
 from app.modules.common import utc_now
 from app.modules.db import (
-    alert_episodes_repo,
     alerts_repo,
     audit_repo,
     incident_core_repo,
 )
 from app.modules.db.models import AlertGroup, AlertRoute, RecoveryNotificationDelivery
 from app.services.notifications.rules import cancel_pending_group_deliveries
+from app.services.alerts import episodes
 
 
 
@@ -146,7 +146,7 @@ def restart_resolved_group(
     group.notification_reason = None
     group.updated_at = now
     group.save()
-    alert_episodes_repo.open_episode(group, started_at=now)
+    episodes.open_episode(group, started_at=now)
 
     if recovery_pending:
         (
@@ -217,7 +217,7 @@ def record_reopened_occurrence(group, alert):
         event_type="reopened",
         message=f"Resolved AlertGroup reopened by new Alert #{alert.id}",
     )
-    alert_episodes_repo.open_episode(group, event=event)
+    episodes.open_episode(group, event=event)
     audit_repo.create_audit_log(
         action="alert_group.reopen", object_type="alert_group",
         object_id=group.id,

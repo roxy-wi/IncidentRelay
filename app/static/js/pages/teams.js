@@ -1,12 +1,19 @@
 let teamsCache = [];
 let selectedTeamForMembers = null;
 let selectedTeamNameForMembers = "";
+let teamMembersRequestVersion = 0;
+const teamsPagination = createClientTablePagination({
+    id: "teams-pagination",
+    tableSelector: ".teams-table",
+    onChange: renderTeamsTable,
+});
 
 function loadTeams() {
     /*
      * Load teams page.
      */
     RbacRoles.fillTeamSelect(TEAM_VIEWER_ROLE);
+    teamsPagination.reset();
 
     if (window.AppSlug) {
         window.AppSlug.bind("#team-name", "#team-slug", {
@@ -16,7 +23,6 @@ function loadTeams() {
 
     loadTeamGroups(function () {
         refreshTeams();
-        fillUserSelect("#team-member-user", null, "/api/users?all=1");
     });
 }
 
@@ -200,6 +206,7 @@ function renderTeamsTable() {
 
     tbody.empty();
     renderTeamsCounter(teams, scopedTeams);
+    const pageTeams = teamsPagination.render(teams);
 
     if (!teams.length) {
         tbody.append(
@@ -213,7 +220,7 @@ function renderTeamsTable() {
         return;
     }
 
-    teams.forEach(function (team) {
+    pageTeams.forEach(function (team) {
         tbody.append(renderTeamRow(team));
     });
     if (typeof loadTeamHealthSummariesForVisibleRows === "function") {
@@ -299,8 +306,8 @@ function renderTeamActions(team) {
             {
                 label: i18n.t("teams.actions.members"),
                 icon: "fas fa-users",
-                required: "manage_users",
-                denyMessage: i18n.t("teams.permissions.members"),
+                required: "read",
+                denyMessage: i18n.t("teams.permissions.view_members"),
                 onClick: function () {
                     openTeamMembers(team.id, team.name);
                 }
@@ -368,6 +375,9 @@ function fillTeamMemberUserSelect(team, callback) {
     apiGet(
         "/api/groups/" + encodeURIComponent(team.group_id) + "/users",
         function (memberships) {
+            if (Number(selectedTeamForMembers) !== Number(team.id)) {
+                return;
+            }
             memberships = asArray(memberships).filter(function (membership) {
                 return !!membership.active;
             });
@@ -409,16 +419,16 @@ function openTeamMembers(teamId, teamName) {
         return;
     }
 
-    if (!canManageUsersObject(team)) {
-        showAppError(i18n.t("teams.permissions.manage_members"));
+    if (!canReadObject(team)) {
+        showAppError(i18n.t("teams.permissions.view_members"));
         return;
     }
 
-    RbacRoles.fillTeamSelect(TEAM_VIEWER_ROLE);
-    fillTeamMemberUserSelect(team, function () {
-        resetTeamMemberForm();
-    });
     loadTeamMembers(teamId, teamName);
+    if (canManageUsersObject(team)) {
+        RbacRoles.fillTeamSelect(TEAM_VIEWER_ROLE);
+        fillTeamMemberUserSelect(team, resetTeamMemberForm);
+    }
     openTeamMembersModal();
 }
 
@@ -428,6 +438,12 @@ function loadTeamMembers(teamId, teamName) {
      */
     selectedTeamForMembers = teamId;
     selectedTeamNameForMembers = teamName;
+    const version = ++teamMembersRequestVersion;
+    const canManage = canManageUsersObject(getSelectedTeamForMembers());
+    $("#team-members-modal .team-member-form-card").toggleClass("is-hidden", !canManage);
+    $("#team-members-modal .actions-th").toggleClass("is-hidden", !canManage);
+    $("#team-members-subtitle").text(i18n.t(canManage
+        ? "teams.members.subtitle" : "teams.members.read_only"));
 
     $("#team-members-title").text(i18n.t("teams.members.title_named", {name: teamName}));
     $("#team-member-team-id").val(teamId);
@@ -435,25 +451,30 @@ function loadTeamMembers(teamId, teamName) {
     $("#team-member-team-label").val(teamName);
 
     const tbody = $("#team-members-table");
-    tbody.empty();
+    const colspan = canManage ? 6 : 5;
+    function showStatus(message) {
+        tbody.empty().append($("<tr>").append(
+            $("<td>").attr("colspan", colspan).addClass("empty-cell").text(message)
+        ));
+    }
+    showStatus(i18n.t("common.loading"));
 
     apiGet("/api/teams/" + teamId + "/users", function (members) {
+        if (version !== teamMembersRequestVersion) return;
+        tbody.empty();
         members = asArray(members);
         if (!members.length) {
-            tbody.append(
-                $("<tr>").append(
-                    $("<td>")
-                        .attr("colspan", "6")
-                        .addClass("empty-cell")
-                        .text(i18n.t("teams.empty.members"))
-                )
-            );
+            showStatus(i18n.t("teams.empty.members"));
             return;
         }
 
         members.forEach(function (member) {
             tbody.append(renderTeamMemberRow(member));
         });
+    }, function (xhr) {
+        if (version !== teamMembersRequestVersion) return;
+        showStatus(i18n.t("teams.members.load_failed"));
+        showApiError(xhr);
     });
 }
 
@@ -481,6 +502,10 @@ function renderTeamMemberRow(member) {
             renderStatusBadge(member.active, i18n.t("teams.status.enabled"), i18n.t("teams.status.disabled"))
         )
     );
+
+    if (!canManageUsersObject(selectedTeam)) {
+        return row;
+    }
 
     row.append(
         $("<td>")
@@ -777,11 +802,18 @@ function openTeamMembersModal() {
 }
 
 function closeTeamMembersModal() {
+    teamMembersRequestVersion += 1;
+    selectedTeamForMembers = null;
     closeAppModal("#team-members-modal");
 }
 
-$(document).on("input", "#teams-search", renderTeamsTable);
-$(document).on("change", "#teams-group-filter, #teams-status-filter", renderTeamsTable);
+function filterTeamsTable() {
+    teamsPagination.reset();
+    renderTeamsTable();
+}
+
+$(document).on("input", "#teams-search", filterTeamsTable);
+$(document).on("change", "#teams-group-filter, #teams-status-filter", filterTeamsTable);
 $(document).on("click", "#open-team-create-modal", openCreateTeamModal);
 $(document).on("click", "#save-team", saveTeam);
 $(document).on("click", "#reset-team-form", resetTeamForm);

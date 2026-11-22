@@ -40,3 +40,28 @@ body.md-theme .profile-color-picker {
     padding: 3px;
     cursor: pointer;
 }
+
+.user-team-memberships {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    margin: 0;
+    padding: 0;
+    list-style: none;
+}
+
+.user-team-membership {
+    min-width: 0;
+    overflow-wrap: anywhere;
+}
+
+.user-team-membership-heading {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 10px;
+}
+
+.user-team-membership-heading strong {
+    min-width: 0;
+}

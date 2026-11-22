@@ -1,5 +1,22 @@
+import json
+import re
+
 from app.modules.db.models import ServiceEvent, ServiceSloMeasurement
+from app.modules.service_sli import DEFAULT_IMPACT_PRIORITY_SCOPE, IMPACT_SLI_TYPES, PRIORITY_VALUES
 from tests.factories import create_group, create_service, create_team
+
+
+def test_service_editor_receives_server_priority_rules(client, admin_headers):
+    """The UI must use the same values and defaults as API and SLO evaluation."""
+    response = client.get("/services", headers=admin_headers)
+    assert response.status_code == 200
+    match = re.search(r"window\.__INCIDENTRELAY_SLI_RULES__ = (.*?);", response.get_data(as_text=True))
+    assert match
+    assert json.loads(match.group(1)) == {
+        "priorities": list(PRIORITY_VALUES),
+        "impact_types": list(IMPACT_SLI_TYPES),
+        "default_impact_scope": list(DEFAULT_IMPACT_PRIORITY_SCOPE),
+    }
 
 
 def _sli_payload(**overrides):

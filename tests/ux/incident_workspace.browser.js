@@ -61,7 +61,9 @@ async function main() {
             });
             const buttons = await page.evaluate(() =>
                 Array.from(document.querySelectorAll("button"))
-                    .filter(button => /reload|refresh/i.test(button.id) || button.classList.contains("btn-reload"))
+                    // Other actions such as "Refresh status" have their own
+                    // labels/styles; an ID containing "refresh" is not a Reload contract.
+                    .filter(button => button.textContent.trim() === "Reload" || button.classList.contains("btn-reload"))
                     .map(button => {
                         const style = getComputedStyle(button);
                         return {

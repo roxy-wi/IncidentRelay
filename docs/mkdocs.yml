@@ -119,6 +119,7 @@ nav:
       - Overview: administration/index.md
       - SSO: administration/sso.md
       - Directory synchronization: administration/directory-sync.md
+      - Jira CMDB synchronization: administration/jira-cmdb.md
       - Scheduler: administration/scheduler.md
       - Data Retention: administration/data-retention.md
       - Logging: administration/logging.md

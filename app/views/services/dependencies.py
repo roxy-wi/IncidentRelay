@@ -21,6 +21,7 @@ from app.services.service_catalog.impact import build_service_effective_impact_m
 from app.services.service_catalog.snapshots import service_dependency_snapshot
 from app.services.validation import make_error_response, validate_body
 from app.views.services.links import _readable_services_from_request
+from app.services.service_catalog import mutations as service_mutations
 
 
 def _business_component_seed_service_ids(anchor_service_ids):
@@ -204,7 +205,7 @@ def create_service_dependency(service_id):
     if validation_error:
         return validation_error
 
-    dependency = services_repo.create_service_dependency(
+    dependency = service_mutations.create_service_dependency(
         service_id,
         {
             "depends_on_service": payload.depends_on_service_id,
@@ -281,7 +282,7 @@ def update_service_dependency(dependency_id):
     if validation_error:
         return validation_error
 
-    dependency = services_repo.update_service_dependency(
+    dependency = service_mutations.update_service_dependency(
         dependency_id,
         {
             "depends_on_service": payload.depends_on_service_id,
@@ -376,7 +377,7 @@ def delete_service_dependency(dependency_id):
 
     dependency_snapshot_before = service_dependency_snapshot(dependency_before)
     depends_on_service = dependency_before.depends_on_service
-    dependency = services_repo.soft_delete_service_dependency(dependency_id)
+    dependency = service_mutations.soft_delete_service_dependency(dependency_id)
 
     write_audit(
         "service_dependency.delete",

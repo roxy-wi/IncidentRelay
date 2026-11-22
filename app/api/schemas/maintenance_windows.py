@@ -8,7 +8,6 @@ from pydantic_core import PydanticCustomError
 
 from app.api.schemas.base import ApiModel
 from app.modules.common import as_naive_datetime
-from app.modules.common import utc_now
 
 
 MAINTENANCE_WINDOW_NAME_MAX_LENGTH = 255
@@ -240,27 +239,6 @@ class MaintenanceWindowUpdateSchema(ApiModel):
 
             if self.ends_at <= local_now:
                 raise PydanticCustomError(
-                "maintenance_time_range",
-                "ends_at must be in the future",
-            )
-
-        return self
-
-
-class MaintenanceWindowExtendSchema(ApiModel):
-    """Validate maintenance window extension."""
-
-    ends_at: datetime
-
-    @field_validator("ends_at")
-    @classmethod
-    def normalize_ends_at(cls, value: datetime) -> datetime:
-        return as_naive_datetime(value)
-
-    @model_validator(mode="after")
-    def validate_ends_at(self):
-        if self.ends_at <= utc_now():
-            raise PydanticCustomError(
                 "maintenance_time_range",
                 "ends_at must be in the future",
             )

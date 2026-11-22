@@ -7,11 +7,8 @@ import pytest
 from app.api.schemas.change_events import ChangeEventInput
 from app.modules.common import utc_now
 from app.modules.db import (
-    alert_episodes_repo,
-    alerts_repo,
     changes_repo,
     incident_core_repo,
-    services_repo,
 )
 from app.modules.db.models import (
     SystemSettings,
@@ -40,6 +37,9 @@ from app.services.change_intelligence.resolver import StaleChangeInputs
 from tests.factories import create_service, unique
 from tests.integrations.test_change_events import event_payload, intake, setup_identity
 from tests.integrations.test_change_worker import process_resolution
+from app.services.alerts import episodes
+from app.services.alerts import group_state
+from app.services.service_catalog import mutations as service_mutations
 
 __all__ = ["intake", "setup_identity"]
 
@@ -53,7 +53,7 @@ def opt_in(service, exclusions=None):
 
 def episode_for(service, *, start=None, labels=None, source="prometheus"):
     start = start or utc_now()
-    group = alerts_repo.create_alert_group(
+    group = group_state.create_alert_group(
         team=service.team_id,
         service=service.id,
         source=source,
@@ -72,7 +72,7 @@ def episode_for(service, *, start=None, labels=None, source="prometheus"):
         labels=labels or {},
         first_seen_at=start,
     )
-    alerts_repo.recalculate_alert_group(group)
+    group_state.recalculate_alert_group(group)
     return AlertGroupEpisode.get_by_id(group.current_episode_id)
 
 
@@ -134,7 +134,7 @@ def test_disabled_and_unmapped_groups_do_not_enqueue_search(intake):
         group = AlertGroup.get_by_id(episode.alert_group_id)
         group.service = None
         group.save()
-        alert_episodes_repo.refresh_context(group)
+        episodes.refresh_context(group)
     assert episode_eligibility(AlertGroupEpisode.get_by_id(episode.id)) == "no_service"
     assert (
         not ChangeJob.select().where(ChangeJob.job_type == "discover_episode").exists()
@@ -181,14 +181,14 @@ def test_mixed_children_and_closed_snapshot(intake):
         title="Real failure",
         labels={"kind": "real"},
     )
-    alerts_repo.recalculate_alert_group(group)
+    group_state.recalculate_alert_group(group)
     episode = AlertGroupEpisode.get_by_id(episode.id)
     assert episode_eligibility(episode) == "eligible"
     assert (
         ChangeJob.get(ChangeJob.job_type == "discover_episode").target_revision
         == episode.context_revision
     )
-    alerts_repo.resolve_alert_group(group.id)
+    group_state.resolve_alert_group(group.id)
     closed = AlertGroupEpisode.get_by_id(episode.id)
     saved = closed.correlation_context
     Alert.update(labels={"kind": "changed"}, source="heartbeat").where(
@@ -198,7 +198,7 @@ def test_mixed_children_and_closed_snapshot(intake):
         current = AlertGroup.get_by_id(group.id)
         current.status = "firing"
         current.save()
-        next_episode = alert_episodes_repo.open_episode(current, started_at=utc_now())
+        next_episode = episodes.open_episode(current, started_at=utc_now())
     assert next_episode.id != closed.id
     assert AlertGroupEpisode.get_by_id(closed.id).correlation_context == saved
     assert episode_eligibility(AlertGroupEpisode.get_by_id(closed.id)) == "eligible"
@@ -214,7 +214,7 @@ def test_existing_episode_without_context_stays_unknown(intake):
         AlertGroupEpisode.id == episode.id
     ).execute()
     ChangeJob.delete().where(ChangeJob.job_type == "discover_episode").execute()
-    alerts_repo.recalculate_alert_group(episode.alert_group)
+    group_state.recalculate_alert_group(episode.alert_group)
     assert AlertGroupEpisode.get_by_id(episode.id).correlation_context is None
     assert (
         not ChangeJob.select().where(ChangeJob.job_type == "discover_episode").exists()
@@ -324,7 +324,7 @@ def test_stale_computation_cannot_publish(intake, mutation):
     claim = claim_kind("refresh_impacts", change.id)
     plan = engine.compute_correlation_batch(claim)
     if mutation == "graph":
-        services_repo.update_service(service.id, {"change_correlation_enabled": False})
+        service_mutations.update_service(service.id, {"change_correlation_enabled": False})
     elif mutation == "authority":
         ChangeIntegration.update(
             auth_revision=ChangeIntegration.auth_revision + 1
@@ -391,7 +391,7 @@ def test_manual_decision_survives_recompute_and_disable_hides_immediately(intake
     assert row.review_evidence == {"original": "snapshot"} and row.row_version == 3
     ChangeAlertGroupCorrelation.update(review_status="suggested").execute()
     assert len(engine.current_suggestions(episode)) == 1
-    services_repo.update_service(service.id, {"change_correlation_enabled": False})
+    service_mutations.update_service(service.id, {"change_correlation_enabled": False})
     assert engine.current_suggestions(episode) == []
     assert worker.process_claim(claim_kind("discover_graph", 1)) == "processed"
     process_resolution(change)
@@ -473,7 +473,7 @@ def test_graph_sweep_reenables_eligible_history_in_bounded_batches(intake):
     for change in changes:
         run_change(change)
     assert not ChangeAlertGroupCorrelation.select().exists()
-    services_repo.update_service(service.id, {"change_correlation_enabled": True})
+    service_mutations.update_service(service.id, {"change_correlation_enabled": True})
     SystemSettings.update(change_worker_batch_size=1).execute()
     for _ in range(4):
         claim = claim_kind("discover_graph", 1)
@@ -541,7 +541,7 @@ def test_context_revision_immediately_hides_changed_exclusions(intake):
         child = Alert.get(Alert.group == group.id)
         child.labels = {"kind": "synthetic"}
         child.save()
-        alert_episodes_repo.refresh_context(group, observed_alert=child)
+        episodes.refresh_context(group, observed_alert=child)
     # Even a caller holding an older model instance cannot display the old result.
     assert engine.current_suggestions(episode) == []
     current = AlertGroupEpisode.get_by_id(episode.id)
@@ -617,7 +617,7 @@ def test_retention_removes_only_unreviewed_derived_history(intake, review):
         review_status=review,
         review_evidence=None if review == "suggested" else {"kept": True},
     ).execute()
-    alerts_repo.resolve_alert_group(episode.alert_group_id)
+    group_state.resolve_alert_group(episode.alert_group_id)
     result = cleanup_alert_history(
         retention_days=1, now=utc_now() + timedelta(days=2), batch_size=1
     )

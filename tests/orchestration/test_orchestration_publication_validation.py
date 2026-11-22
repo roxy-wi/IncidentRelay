@@ -13,11 +13,10 @@ from app.modules.db.orchestrations_repo import (
     OrchestrationValidationError,
     create_orchestration,
     get_or_create_draft,
-    publish_draft,
     replace_draft_rules,
-    validate_version,
 )
 from tests.factories import create_group, create_service, create_team, create_user
+from app.services.orchestration.publication import publish_draft, validate_version
 
 
 @pytest.fixture(autouse=True)

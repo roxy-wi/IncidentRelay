@@ -127,6 +127,7 @@ def _allowed_loggers_for_role(log_role):
     """
     if log_role == LOG_ROLE_SCHEDULER:
         return {
+            "oncall.directory_sync",
             "oncall.scheduler",
             "oncall.alerts",
             "oncall.notifications",
@@ -149,6 +150,7 @@ def _allowed_loggers_for_role(log_role):
         }
 
     return {
+        "oncall.directory_sync",
         "oncall.audit",
         "oncall.alerts",
         "oncall.error",

@@ -3,6 +3,31 @@ function asArray(value) {
     return Array.isArray(value) ? value : [];
 }
 
+function renderUserTeamMemberships(selector, memberships) {
+    /* Render actual team memberships without treating admin access as membership. */
+    const container = $(selector).empty();
+    const teams = asArray(memberships);
+    if (!teams.length) {
+        container.append($("<li>").addClass("muted").text(i18n.t("shared.user_teams.empty")));
+        return;
+    }
+    teams.forEach(function (membership) {
+        const row = $("<li>").addClass("user-team-membership").attr("data-team-id", membership.team_id);
+        const heading = $("<div>").addClass("user-team-membership-heading")
+            .append($("<strong>").text(membership.team_name || membership.team_slug))
+            .append($("<span>").addClass("status-pill " + RbacRoles.teamClass(membership.role))
+                .text(RbacRoles.teamLabel(membership.role)));
+        if (membership.active === false) {
+            heading.append($("<span>").addClass("status-pill status-inactive").text(i18n.t("shared.disabled")));
+        }
+        row.append(heading);
+        if (membership.group_name) {
+            row.append($("<div>").addClass("details-meta").text(membership.group_name));
+        }
+        container.append(row);
+    });
+}
+
 function parseJsonInput(selector, fallback, options) {
     /* Parse JSON from an input field. */
     options = options || {};

@@ -1,6 +1,6 @@
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict
 
 
 
@@ -16,14 +16,6 @@ class EmptySchema(ApiModel):
     """
     Empty request body schema.
     """
-
-
-class IdBody(ApiModel):
-    """
-    Request body containing a user id.
-    """
-
-    user_id: Optional[int] = Field(default=None, ge=1)
 
 
 JsonDict = Dict[str, Any]

@@ -4,6 +4,11 @@ from app.modules.db import maintenance_repo, services_repo
 from app.modules.db.models import AlertGroup
 from app.services.serializers.services import serialize_utc_datetime
 from app.modules.common import as_utc_naive, utc_now
+from app.modules.service_sli import (
+    DEFAULT_IMPACT_PRIORITY_SCOPE as DEFAULT_IMPACT_PRIORITY_SCOPE,
+    PRIORITY_VALUES as PRIORITY_VALUES,
+    normalize_priority_scope,
+)
 
 
 SLI_TYPE_ACK_LATENCY = "alert_ack_latency"
@@ -19,8 +24,6 @@ STATUS_NO_DATA = "no_data"
 DEFAULT_WINDOW_DAYS = 30
 MAX_WINDOW_DAYS = 365
 
-PRIORITY_VALUES = ("p1", "p2", "p3", "p4")
-DEFAULT_IMPACT_PRIORITY_SCOPE = ("p1", "p2")
 SLO_COMPARISON_PERCENT_GOOD_GTE = "percent_good_gte"
 SLO_COMPARISON_VALUE_LTE = "value_lte"
 
@@ -68,7 +71,16 @@ def evaluate_service_slo(slo, *, now=None, persist=True):
     since = now - timedelta(days=window_days)
     sli = slo.sli
 
-    if sli.sli_type == SLI_TYPE_ACK_LATENCY:
+    scope_error = None
+    try:
+        priority_scope_for_sli(sli)
+    except ValueError as exc:
+        scope_error = str(exc)
+
+    if scope_error:
+        evaluation = _base_evaluation(slo, since=since, now=now)
+        evaluation["message"] = "Invalid SLI priority scope: " + scope_error
+    elif sli.sli_type == SLI_TYPE_ACK_LATENCY:
         evaluation = _evaluate_latency_slo(slo, since=since, now=now, field="acknowledged_at")
     elif sli.sli_type == SLI_TYPE_RESOLVE_LATENCY:
         evaluation = _evaluate_latency_slo(slo, since=since, now=now, field="resolved_at")
@@ -178,30 +190,11 @@ def _alert_query_for_sli(sli, *, since):
 
 
 def priority_scope_for_sli(sli):
+    """Resolve the stored scope using the same rules as API validation."""
     configuration = sli.configuration or {}
-    scope = configuration.get("priority_scope")
-
-    if scope is None and sli.priority:
-        scope = [sli.priority]
-
-    if scope is None and sli.sli_type in (SLI_TYPE_INCIDENT_AVAILABILITY, SLI_TYPE_INCIDENT_COUNT):
-        scope = DEFAULT_IMPACT_PRIORITY_SCOPE
-
-    if isinstance(scope, str):
-        scope = [scope]
-
-    if not isinstance(scope, (list, tuple, set)):
-        return []
-
-    normalized = []
-
-    for value in scope:
-        value = str(value or "").strip().lower()
-
-        if value in PRIORITY_VALUES and value not in normalized:
-            normalized.append(value)
-
-    return normalized
+    return normalize_priority_scope(
+        configuration.get("priority_scope"), sli_type=sli.sli_type, priority=sli.priority,
+    )
 
 
 def _evaluate_latency_slo(slo, *, since, now, field):

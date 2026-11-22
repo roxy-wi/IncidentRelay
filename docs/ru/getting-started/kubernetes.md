@@ -35,7 +35,7 @@ ServiceAccount и Ingress, если он включён
 ```bash
 helm install incidentrelay \
   oci://ghcr.io/roxy-wi/incidentrelay-charts/incidentrelay \
-  --version 2.1.0 \
+  --version 2.5.2 \
   --set-string config.main.secret_key="$(openssl rand -hex 32)"
 ```
 
@@ -44,9 +44,9 @@ helm install incidentrelay \
 ```bash
 helm upgrade --install incidentrelay \
   oci://ghcr.io/roxy-wi/incidentrelay-charts/incidentrelay \
-  --version 2.1.0 \
+  --version 2.5.2 \
   --set image.repository=ghcr.io/roxy-wi/incidentrelay \
-  --set image.tag=2.1 \
+  --set image.tag=2.5.2 \
   --set-string config.main.secret_key="$(openssl rand -hex 32)"
 ```
 
@@ -529,7 +529,7 @@ outbound_private_network_allowlist = 10.20.0.0/16,192.168.50.10/32
 ```bash
 helm upgrade incidentrelay \
   oci://ghcr.io/roxy-wi/incidentrelay-charts/incidentrelay \
-  --version 2.1.0 \
+  --version 2.5.2 \
   --reuse-values
 ```
 

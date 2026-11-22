@@ -10,7 +10,6 @@ from app.api.schemas.change_integrations import (
     MachineTokenCreate,
     SourceUpdate,
 )
-from app.modules.db import services_repo
 from app.modules.db.models import (
     ApiToken,
     Change,
@@ -32,6 +31,8 @@ from tests.integrations.test_change_integrations import (
 )
 from tests.integrations.test_change_integration_groups import owned_identity
 from tests.integrations.test_change_integration_editing import add_change
+from app.services import group_management
+from app.services.service_catalog import mutations as service_mutations
 
 __all__ = ["setup_identity", "owned_identity"]  # Shared pytest fixtures.
 
@@ -184,7 +185,7 @@ def test_catalog_edit_waits_for_admitted_transaction(db, setup_identity):
     def disable():
         with db.connection_context():
             editing.set()
-            services_repo.update_service(service.id, {"enabled": False})
+            service_mutations.update_service(service.id, {"enabled": False})
 
     with ThreadPoolExecutor(max_workers=2) as pool:
         writer = pool.submit(admitted_write)
@@ -254,7 +255,6 @@ def test_group_disable_serializes_with_empty_integration_token_issue(
     db, owned_identity
 ):
     """Owner Group changes invalidate even identities that have no sources yet."""
-    from app.modules.db import groups_repo
 
     _, _, service, manager = owned_identity
     integration = admin.create_integration(
@@ -266,7 +266,7 @@ def test_group_disable_serializes_with_empty_integration_token_issue(
 
     def disable_group():
         with db.connection_context(), db.atomic():
-            groups_repo.update_group(service.group_id, {"active": False})
+            group_management.update_group(service.group_id, {"active": False})
             disabled.set()
             assert release.wait(timeout=10)
 

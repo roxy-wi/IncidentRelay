@@ -1,5 +1,6 @@
 from app.modules.db import alerts_repo
 from tests.factories import create_group, create_route, create_service, create_team
+from app.services.alerts import group_state
 
 
 def _create_alert_group(team, route, service, title, status, severity, group_key):
@@ -19,7 +20,7 @@ def _create_alert_group(team, route, service, title, status, severity, group_key
     elif status == "silenced":
         counters["silenced_count"] = 1
 
-    return alerts_repo.create_alert_group(
+    return group_state.create_alert_group(
         team=team.id,
         route=route.id,
         service=service.id,

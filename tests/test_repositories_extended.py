@@ -1,6 +1,15 @@
 from datetime import timedelta
 
-from app.modules.db import channels_repo, groups_repo, locks_repo, rotations_repo, routes_repo, teams_repo, tokens_repo, users_repo
+from app.modules.db import (
+    channels_repo,
+    groups_repo,
+    locks_repo,
+    rotations_repo,
+    routes_repo,
+    teams_repo,
+    tokens_repo,
+    users_repo,
+)
 from app.modules.db.models import (
     AlertRouteChannel,
     ApiToken,
@@ -35,6 +44,10 @@ from tests.factories import (
 from app.modules.db import alerts_repo
 from tests.factories import create_group, create_route, create_service, create_team
 from app.modules.common import utc_now
+from app.services import route_management
+from app.services import group_management
+from app.services import team_management
+from app.services.alerts import group_state
 
 
 def _create_repo_alert_group(team, route, service, title, status, severity, group_key):
@@ -54,7 +67,7 @@ def _create_repo_alert_group(team, route, service, title, status, severity, grou
     elif status == "silenced":
         counters["silenced_count"] = 1
 
-    return alerts_repo.create_alert_group(
+    return group_state.create_alert_group(
         team=team.id,
         route=route.id,
         service=service.id,
@@ -183,7 +196,7 @@ def test_soft_delete_route_disables_route_and_removes_channel_links(db):
     channel = create_channel(group, team)
     attach_channel(route, channel)
 
-    deleted = routes_repo.soft_delete_route(route.id)
+    deleted = route_management.soft_delete_route(route.id)
 
     assert deleted.deleted is True
     assert deleted.enabled is False
@@ -248,7 +261,7 @@ def test_soft_delete_group_disables_child_resources_and_tokens(db):
         scopes=["*"],
     )
 
-    deleted = groups_repo.soft_delete_group(group.id)
+    deleted = group_management.soft_delete_group(group.id)
 
     assert deleted.deleted is True
     assert deleted.active is False
@@ -356,7 +369,7 @@ def test_locks_repo_acquires_rejects_busy_steals_expired_and_releases(db):
 def test_create_team_respects_active_flag(db):
     group = create_group(slug="infra")
 
-    team = teams_repo.create_team(
+    team = team_management.create_team(
         group_id=group.id,
         slug=unique("team"),
         name="Inactive team",
@@ -377,14 +390,14 @@ def test_soft_deleted_group_team_and_user_restore_same_natural_key_rows(db):
     original_user_id = user.id
 
     users_repo.soft_delete_user(user.id)
-    groups_repo.soft_delete_group(group.id)
+    group_management.soft_delete_group(group.id)
 
-    restored_group = groups_repo.create_group(
+    restored_group = group_management.create_group(
         slug="restore-group",
         name="Restored Group",
         description="fresh configuration",
     )
-    restored_team = teams_repo.create_team(
+    restored_team = team_management.create_team(
         slug="restore-team",
         name="Restored Team",
         group_id=restored_group.id,

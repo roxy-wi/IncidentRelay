@@ -5,9 +5,9 @@ import uuid
 from pydantic import Field
 
 from app.modules.db.models import DirectorySyncBinding as Binding, DirectorySyncShift as Shift, User
-from app.services.directory_sync.config import StrictModel, SyncError
-from app.services.directory_sync.fetch import instant, iso
-from app.services.directory_sync.runtime import source_for
+from app.services.sync.directory.config import StrictModel, SyncError
+from app.services.sync.directory.fetch import instant, iso
+from app.services.sync.directory.runtime import source_for
 
 
 class ReplacementInput(StrictModel):
@@ -35,10 +35,21 @@ def serialize_shift(shift):
             "replacements": [{**item, "precedence": str(item["precedence"])} for item in shift.replacements]}
 
 
-def edit_shift(rotation, payload, shift=None):
+def editable_source(rotation):
+    """Resolve ownership after serializing against imports and reconnections."""
+    from app.services.sync.directory.service import apply_lock
+
+    apply_lock()
     source = source_for("rotation", rotation.id)
     if not source or not source.config.get("editable"):
         raise SyncError("Imported schedule is read-only")
+    return source
+
+
+def edit_shift(rotation, payload, shift=None):
+    source = editable_source(rotation)
+    if shift:
+        shift = Shift.get_by_id(shift.id)
     start, end = instant(payload.start), instant(payload.end)
     if start >= end:
         raise SyncError("Shift end must follow its start")

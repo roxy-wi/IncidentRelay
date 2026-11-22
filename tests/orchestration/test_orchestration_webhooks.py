@@ -19,7 +19,6 @@ from app.modules.db.orchestrations_repo import (
     OrchestrationValidationError,
     create_orchestration,
     get_or_create_draft,
-    publish_draft,
     replace_draft_rules,
     set_runtime_state,
 )
@@ -39,6 +38,7 @@ from app.services.orchestration.webhooks import (
     serialize_webhook_action,
 )
 from tests.factories import create_group, create_route, create_team, create_user
+from app.services.orchestration.publication import publish_draft
 
 
 @pytest.fixture(autouse=True)

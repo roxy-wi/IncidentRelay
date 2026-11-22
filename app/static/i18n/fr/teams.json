@@ -118,5 +118,8 @@
   "rbac.group.admin": "Administrateur du groupe",
   "rbac.team.viewer": "Lecteur de l’équipe",
   "rbac.team.responder": "Intervenant de l’équipe",
-  "rbac.team.manager": "Responsable de l’équipe"
+  "rbac.team.manager": "Responsable de l’équipe",
+  "teams.members.read_only": "Consultez les membres de l’équipe. La modification des membres de cette équipe est indisponible.",
+  "teams.members.load_failed": "Impossible de charger les membres. Rouvrez la liste pour réessayer.",
+  "teams.permissions.view_members": "Vous n’avez pas l’autorisation de consulter les membres de cette équipe."
 }

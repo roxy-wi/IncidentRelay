@@ -3,17 +3,19 @@
 import hashlib
 import re
 from datetime import datetime
+from uuid import uuid4
 
 from peewee import fn
 
-from app.modules.common import utc_now
-from app.modules.db import rotations_repo, teams_repo, users_repo
+from app.modules.db import rotations_repo, users_repo
 from app.modules.db.models import (
     DirectorySyncBinding as Binding, DirectorySyncShift as Shift,
     Rotation, Team, TeamUser, User, UserGroup,
 )
-from app.services.directory_sync.config import SyncConfig, SyncError
-from app.services.directory_sync.fetch import instant
+from app.services.sync.directory.config import SyncConfig, SyncError
+from app.services.sync.directory.fetch import instant
+from app.services.sync.directory.reconnect import reconnect
+from app.services import team_management
 
 
 def slug(value, suffix):
@@ -28,11 +30,68 @@ def shared_user(user_id, group_id):
     ).exists()
 
 
+def prepare_rotation_names(team, schedules, bindings):
+    """Validate final names and vacate renamed rows inside the import transaction.
+
+    API order determines fallback names, so two existing schedules can exchange
+    names. Temporary names never leave the transaction or enter the preview plan.
+    Keep the loaded objects unchanged so recorded diffs retain the original names.
+    """
+    names = {}
+    existing = {}
+    for schedule in schedules:
+        key, name = schedule["id"], schedule["name"]
+        if name in names:
+            raise SyncError(
+                f"Schedule names are not unique in team {team.id}: schedules "
+                f"{names[name]} and {key} use {name!r}. Map distinct schedule names."
+            )
+        names[name] = key
+        binding = bindings.get(("rotation", key))
+        rotation = Rotation.get_or_none(Rotation.id == binding.local_id) if binding else None
+        if binding and rotation is None:
+            raise SyncError(f"Imported rotation {binding.local_id} is missing; restore it before synchronizing")
+        if rotation and rotation.team_id != team.id:
+            raise SyncError("A schedule cannot change its team implicitly")
+        existing[key] = rotation
+
+    incoming_ids = [rotation.id for rotation in existing.values() if rotation]
+    for schedule in schedules:
+        conflict = Rotation.get_or_none(
+            Rotation.team == team.id, Rotation.name == schedule["name"],
+            Rotation.deleted == False, Rotation.id.not_in(incoming_ids),
+        )
+        if conflict:
+            raise SyncError(
+                f"Rotation name conflict in team {team.id}: schedule {schedule['id']} "
+                f"uses {schedule['name']!r}, already used by rotation {conflict.id}. "
+                "Choose unique names or reconnect the retained source if this is a previous import."
+            )
+
+    for schedule in schedules:
+        rotation = existing[schedule["id"]]
+        if rotation is None or rotation.deleted or rotation.name == schedule["name"]:
+            continue
+        temporary = f"directory-sync-{uuid4().hex}"
+        while temporary in names or Rotation.select().where(
+            Rotation.team == team.id, Rotation.name == temporary,
+        ).exists():
+            temporary = f"directory-sync-{uuid4().hex}"
+        Rotation.update(name=temporary).where(Rotation.id == rotation.id).execute()
+    return existing
+
+
 def reconcile(source, snapshot):
     """Apply inside the caller's transaction; preview rolls this transaction back."""
     config = SyncConfig.model_validate(source.config)
+    changes, reconnected_teams = reconnect(source, config)
     bindings = {(row.kind, row.external_id): row for row in Binding.select().where(Binding.source == source.id)}
-    seen, changes = set(), []
+    schedule_ids = {schedule["id"] for team in snapshot["teams"] for schedule in team["schedules"]}
+    missing_rotations = {
+        row.local_id: row for row in bindings.values()
+        if row.kind == "rotation" and row.owned and row.present and row.external_id not in schedule_ids
+    }
+    seen = set()
     users, rotations = {}, {}
     labels = {("user", item["id"]): item.get("name") or item["email"] for item in snapshot["users"]}
     labels.update({("group_member", item["id"]): item.get("name") or item["email"] for item in snapshot["users"]})
@@ -157,13 +216,14 @@ def reconcile(source, snapshot):
             raise SyncError("Team is managed by another synchronization source")
         created = team is None
         if created:
-            team = teams_repo.create_team(slug=slug(data["name"], f"{source.id}:{key}"),
+            team = team_management.create_team(slug=slug(data["name"], f"{source.id}:{key}"),
                                           name=data["name"], description=data.get("description"),
                                           group_id=source.group_id, active=data["enabled"])
             record("team", key, "create", {"name": data["name"]})
         binding = bind("team", key, team, owned=created or config.overwrite_existing, created=created)
-        if not binding.created and binding.owned != config.overwrite_existing:
-            binding.owned = config.overwrite_existing
+        manage_existing = config.overwrite_existing or team.id in reconnected_teams
+        if not binding.created and binding.owned != manage_existing:
+            binding.owned = manage_existing
             binding.save()
         if not binding.owned:
             for existing_key, existing_binding in bindings.items():
@@ -183,12 +243,22 @@ def reconcile(source, snapshot):
                            team=team.id, user=user.id,
                            role=config.responsible_role if user_key == data["responsible"] else config.member_role,
                            active=user.active and not external_user["inactive"])
+        if config.delete_missing:
+            # Free names of removed slots before the surviving slots are renamed.
+            # The same transaction rolls back these deletions during preview/failure.
+            for removed in list(Rotation.select().where(
+                Rotation.team == team.id, Rotation.id.in_(list(missing_rotations)), Rotation.deleted == False,
+            )):
+                rotations_repo.soft_delete_rotation(removed.id)
+                removed_binding = missing_rotations[removed.id]
+                removed_binding.present = False
+                removed_binding.save(only=[Binding.present])
+                record("rotation", removed_binding.external_id, "delete")
+        existing_rotations = prepare_rotation_names(team, data["schedules"], bindings)
         for schedule in data["schedules"]:
             skey = schedule["id"]
             rb = bindings.get(("rotation", skey))
-            rotation = Rotation.get_or_none(Rotation.id == rb.local_id) if rb else None
-            if rotation and rotation.team_id != team.id:
-                raise SyncError("A schedule cannot change its team implicitly")
+            rotation = existing_rotations[skey]
             if rotation is None:
                 rotation = Rotation.create(team=team, name=schedule["name"],
                                            start_at=instant(snapshot["from"]), timezone=schedule["timezone"],
@@ -253,7 +323,7 @@ def reconcile(source, snapshot):
                     rotations_repo.soft_delete_rotation(binding.local_id)
             elif kind == "team":
                 if Team.select().where(Team.id == binding.local_id, Team.deleted == False).exists():
-                    teams_repo.soft_delete_team(binding.local_id)
+                    team_management.soft_delete_team(binding.local_id)
             elif kind == "user":
                 # Global accounts and login identities survive departure from a team.
                 binding.present = False

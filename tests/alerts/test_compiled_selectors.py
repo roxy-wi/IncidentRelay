@@ -4,6 +4,7 @@ from peewee import AutoField, BooleanField, TextField
 from app.modules.db import alerts_repo, compiled_select
 from app.modules.db.models import Alert, AlertGroup, BaseModel
 from tests.factories import create_group, create_route, create_team
+from app.services.alerts import group_state
 
 
 @pytest.mark.parametrize("entity", ["alert", "group"])
@@ -36,8 +37,8 @@ def test_compiled_selector_executes_identical_sql_and_parameters(db, monkeypatch
 def test_cached_dedup_lookup_keeps_route_scope_and_sees_resolves(db):
     team = create_team(create_group())
     first_route, other_route = create_route(team), create_route(team)
-    first_group = alerts_repo.create_alert_group(team=team, route=first_route, source="test", group_key="first", title="First")
-    other_group = alerts_repo.create_alert_group(team=team, route=other_route, source="test", group_key="other", title="Other")
+    first_group = group_state.create_alert_group(team=team, route=first_route, source="test", group_key="first", title="First")
+    other_group = group_state.create_alert_group(team=team, route=other_route, source="test", group_key="other", title="Other")
     first = Alert.create(group=first_group, source="test", dedup_key="same-key", group_key="first", title="First", route=first_route)
     other = Alert.create(group=other_group, source="test", dedup_key="same-key", group_key="other", title="Other", route=other_route)
     for _ in range(2):
@@ -52,8 +53,8 @@ def test_cached_dedup_lookup_keeps_route_scope_and_sees_resolves(db):
 def test_cached_group_lookup_binds_each_identity_and_excludes_terminal_groups(db):
     team = create_team(create_group())
     route = create_route(team)
-    first = alerts_repo.create_alert_group(team=team, route=route, source="test", title="Test", group_key="first")
-    second = alerts_repo.create_alert_group(team=team, route=route, source="test", title="Test", group_key="second")
+    first = group_state.create_alert_group(team=team, route=route, source="test", title="Test", group_key="first")
+    second = group_state.create_alert_group(team=team, route=route, source="test", title="Test", group_key="second")
     for group in (first, second, first):
         assert alerts_repo.find_open_alert_group("test", group.group_key, team.id, route.id).id == group.id
     second.status = "merged"

@@ -421,7 +421,7 @@ def _sync_team_membership_from_mapping(user, mapping):
     if not team_id:
         return
 
-    from app.services.directory_sync.runtime import sync_managed_team_member
+    from app.services.sync.directory.runtime import sync_managed_team_member
     if sync_managed_team_member(user.id, team_id):
         return
 
@@ -494,7 +494,7 @@ def _sync_group_memberships(user, provider, claims):
 
     provider_group_ids = []
     matched_group_ids = []
-    from app.services.directory_sync.runtime import sync_managed_groups
+    from app.services.sync.directory.runtime import sync_managed_groups
     api_managed_groups = sync_managed_groups(user.id)
 
     for mapping in mappings:

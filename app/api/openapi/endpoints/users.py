@@ -7,7 +7,20 @@ from app.api.schemas.limits import (
     USERNAME_MAX_LENGTH,
     USERNAME_MIN_LENGTH,
 )
-from app.api.schemas.roles import GROUP_ROLE_VALUES, GROUP_VIEWER_ROLE
+from app.api.schemas.roles import GROUP_ROLE_VALUES, GROUP_VIEWER_ROLE, TEAM_ROLE_VALUES
+
+USER_TEAM_MEMBERSHIP_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "team_id": {"type": "integer"},
+        "team_slug": {"type": "string"},
+        "team_name": {"type": "string"},
+        "group_id": {"type": "integer", "nullable": True},
+        "group_name": {"type": "string", "nullable": True},
+        "role": {"type": "string", "enum": list(TEAM_ROLE_VALUES)},
+        "active": {"type": "boolean", "description": "Whether the team and its group are enabled."},
+    },
+}
 
 USER_RESPONSE_SCHEMA = {
     "type": "object",
@@ -32,6 +45,16 @@ USER_RESPONSE_SCHEMA = {
         "active_group_slug": {"type": "string", "nullable": True, "description": "Slug of the currently selected group scope.", "example": "production"},
         "active_group_role": {"type": "string", "nullable": True, "enum": list(GROUP_ROLE_VALUES), "description": "Role in the active group.", "example": GROUP_VIEWER_ROLE},
         "is_current_user": {"type": "boolean", "description": "True when this record is the authenticated user.", "example": False},
+        "teams": {
+            "type": "array",
+            "readOnly": True,
+            "description": (
+                "Included in admin user responses. Active team memberships within the caller's "
+                "administrative group scope and token bounds. Deleted teams and groups are excluded; "
+                "disabled teams are included with active=false. Administrative access alone is not membership."
+            ),
+            "items": USER_TEAM_MEMBERSHIP_SCHEMA,
+        },
     },
 }
 

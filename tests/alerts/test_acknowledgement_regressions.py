@@ -2,7 +2,7 @@ from datetime import timedelta
 from types import SimpleNamespace
 
 from app.modules.common import utc_now
-from app.modules.db import alerts_repo, incidents_repo
+from app.modules.db import incidents_repo
 from app.modules.db.models import AlertEvent, AlertGroup, UserNotificationDelivery
 from app.services.alerts.actions import acknowledge_alert
 from app.services.alerts.lifecycle import upsert_alert
@@ -17,6 +17,7 @@ from tests.factories import (
     create_team,
     create_user,
 )
+from app.services.alerts import group_state
 
 
 def _alert_payload(
@@ -387,7 +388,7 @@ def test_reminder_scheduler_reloads_group_after_batch_selection(db, monkeypatch)
     alert_group.save()
 
     stale_firing_group = AlertGroup.get_by_id(alert_group.id)
-    alerts_repo.acknowledge_alert_group(alert_group.id)
+    group_state.acknowledge_alert_group(alert_group.id)
 
     monkeypatch.setattr(
         alert_reminders.alerts_repo,
@@ -448,7 +449,7 @@ def test_notify_alert_rechecks_firing_status_before_delivery(db, monkeypatch):
     result = upsert_alert(_alert_payload(route, dedup_key="ack-race-delivery"))
 
     stale_firing_group = AlertGroup.get_by_id(result.group.id)
-    alerts_repo.acknowledge_alert_group(result.group.id)
+    group_state.acknowledge_alert_group(result.group.id)
 
     monkeypatch.setattr(
         notification_delivery,

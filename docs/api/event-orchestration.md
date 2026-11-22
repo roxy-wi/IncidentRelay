@@ -175,10 +175,13 @@ POST /api/event-orchestrations/{orchestration_id}/validate
 
 Simulation accepts either one normalized event or one raw integration payload. It does not create alerts, change production state or execute webhooks.
 
+Normalized events require `source`, `dedup_key` and `title`; labels alone are not an event. With `source: "alertmanager"`, `payload` can be either the full webhook with an `alerts` array or a single raw alert copied from the alert details in IR. Invalid input returns `orchestration_simulation_invalid` with a specific explanation in `message`.
+
 ```json
 {
   "normalized_event": {
     "source": "webhook",
+    "dedup_key": "database-unavailable",
     "title": "Database unavailable",
     "severity": "critical",
     "labels": {"environment": "production"}

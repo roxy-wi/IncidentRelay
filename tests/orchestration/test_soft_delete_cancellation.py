@@ -1,7 +1,6 @@
 from datetime import timedelta
 
 from app.modules.common import utc_now
-from app.modules.db import routes_repo, services_repo
 from app.modules.db.models import (
     AlertGroup,
     AutomationExecution,
@@ -20,6 +19,8 @@ from tests.factories import (
     create_team,
     unique,
 )
+from app.services import route_management
+from app.services.service_catalog import mutations as service_mutations
 
 
 def _orchestration(group, *, service=None):
@@ -194,7 +195,7 @@ def test_service_soft_delete_cancels_global_and_service_work_before_detach(
 
     monkeypatch.setattr(webhook_service, "deliver_webhook", fake_deliver_webhook)
 
-    services_repo.soft_delete_service(target_service.id)
+    service_mutations.soft_delete_service(target_service.id)
 
     global_work = AutomationExecution.get_by_id(global_work.id)
     service_work = AutomationExecution.get_by_id(service_work.id)
@@ -258,7 +259,7 @@ def test_service_soft_delete_cancels_global_work_with_no_service_orchestration(d
         service=service,
     )
 
-    services_repo.soft_delete_service(service.id)
+    service_mutations.soft_delete_service(service.id)
 
     assert AutomationExecution.get_by_id(work.id).status == "cancelled"
     assert PendingOrchestratedEvent.get_by_id(pending.id).status == "cancelled"
@@ -333,7 +334,7 @@ def test_route_soft_delete_cancels_global_and_service_work_before_detach(db):
         service=service,
     )
 
-    routes_repo.soft_delete_route(target_route.id)
+    route_management.soft_delete_route(target_route.id)
 
     assert AutomationExecution.get_by_id(global_work.id).status == "cancelled"
     assert AutomationExecution.get_by_id(service_work.id).status == "cancelled"

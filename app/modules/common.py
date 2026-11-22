@@ -125,16 +125,6 @@ def as_naive_datetime(value):
     return value
 
 
-def truncate_text(value, limit=500):
-    value = str(value or "").strip()
-
-    if len(value) <= limit:
-        return value
-
-    return value[: limit - 1].rstrip() + "…"
-
-
-
 UTC = getattr(dt, "UTC", dt.timezone.utc)
 
 

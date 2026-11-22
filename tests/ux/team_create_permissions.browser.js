@@ -34,6 +34,12 @@ async function main() {
             // A read-only team in the global filter must not clear the form's
             // writable default, particularly when a policy form is reset.
             await page.goto(`/${route}?team=${fixture.readOnlyTeamId}`);
+            if (fixture.imported && ["rotation", "matcher-preset"].includes(object)) {
+                await page.waitForFunction(() => currentUserUiTeams !== null);
+                assert.equal(await page.locator(`#open-${object}-create-modal`).isVisible(), false,
+                    object + " must not gain write access to the imported team");
+                continue;
+            }
             await page.locator(`#${object}-team option[value='${fixture.teamId}']`).waitFor({state: "attached"});
             await page.locator(`#open-${object}-create-modal`).click();
             const modal = page.locator(`#${object}-form-modal`);
@@ -49,7 +55,7 @@ async function main() {
                     nodes => nodes.map(node => node.value).filter(Boolean)
                 ), [String(fixture.groupId)], "channel groups must have writable teams");
             }
-            if (!["rotation", "route", "channel", "silence"].includes(object)) continue;
+            if (object === "matcher-preset") continue;
 
             await page.locator(`#${object}-name`).fill("Managed " + object);
             if (object === "rotation") {
@@ -92,19 +98,24 @@ async function main() {
             assert.equal(response.status(), 200);
             await page.waitForFunction(group => currentUser.active_group_id === group, groupId);
             // Stay in the same SPA session to exercise cached permission invalidation.
-            await page.locator("a.menu-link[href='/rotations']").click();
-            await page.locator("#rotation-team").waitFor({state: "attached"});
+            await page.locator("a.menu-link[href='/escalation-policies']").click();
+            await page.locator("#escalation-policy-team").waitFor({state: "attached"});
         }
         await switchGroup(fixture.otherGroupId);
         await page.waitForFunction(groupId => currentUser.active_group_id === groupId &&
-            document.querySelector("#open-rotation-create-modal").disabled, fixture.otherGroupId);
-        assert.equal(await page.locator("#open-rotation-create-modal").isVisible(), false);
+            document.querySelector("#open-escalation-policy-create-modal").disabled, fixture.otherGroupId);
+        assert.equal(await page.locator("#open-escalation-policy-create-modal").isVisible(), false);
         await switchGroup(fixture.groupId);
-        await page.locator("#open-rotation-create-modal").waitFor({state: "visible"});
-        await page.locator("#open-rotation-create-modal").click();
-        assert.equal(await page.locator("#rotation-team").inputValue(), String(fixture.teamId));
+        await page.locator("#open-escalation-policy-create-modal").waitFor({state: "visible"});
+        await page.locator("#open-escalation-policy-create-modal").click();
+        assert.equal(await page.locator("#escalation-policy-team").inputValue(), String(fixture.teamId));
+        if (fixture.imported) {
+            const team = await (await context.request.get(`/api/teams/${fixture.teamId}`)).json();
+            assert.equal(team.sync.editable, false, "creating policies does not enable local edits");
+            assert.equal(team.permissions.can_write, false);
+        }
         assert.deepEqual(errors, [], "no browser JavaScript errors");
-        console.log("All eight create forms and four POSTs passed for group viewer + team manager");
+        console.log("Create forms, policy POSTs and group switching passed for group viewer + team manager");
     } finally {
         await browser.close();
     }

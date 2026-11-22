@@ -148,7 +148,7 @@
         document.documentElement.lang = locale;
         translateMenu();
 
-        setText('label[for="global-team-filter"]', "common.team");
+        setText("#global-team-filter-label", "common.team");
         setText("#app-dialog-title", "common.message");
         setText("#app-dialog-cancel", "common.cancel");
         setText("#app-dialog-confirm", "common.ok");

@@ -1,5 +1,6 @@
 from app.api.schemas.roles import TEAM_ROLE_VALUES
 from app.api.openapi.common import response, path_param, json_body
+from app.api.openapi.endpoints.users import USER_TEAM_MEMBERSHIP_SCHEMA
 from app.services.api_token_scopes import PROFILE_TOKEN_SCOPE_OPTIONS
 from app.i18n import SUPPORTED_LOCALES
 
@@ -160,6 +161,17 @@ PROFILE_SCHEMA = {
             "type": "array",
             "description": "Groups available to the current user.",
             "items": GROUP_MEMBERSHIP_SCHEMA,
+        },
+        "teams": {
+            "type": "array",
+            "readOnly": True,
+            "description": (
+                "The user's active team memberships across groups, subject to token bounds. "
+                "Deleted teams and groups are excluded. Disabled teams are included with active=false. "
+                "The selected active group does not restrict this list; administrative access alone "
+                "is not membership."
+            ),
+            "items": USER_TEAM_MEMBERSHIP_SCHEMA,
         },
         "available_token_scopes": {
             "type": "array",

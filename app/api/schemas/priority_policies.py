@@ -170,23 +170,6 @@ class PriorityPolicyRuleUpdateSchema(ApiModel):
     enabled: bool | None = None
 
 
-class PriorityPolicyRuleOrderSchema(ApiModel):
-    """Validate complete priority policy rule ordering."""
-
-    rule_ids: list[int] = Field(default_factory=list)
-
-    @field_validator("rule_ids")
-    @classmethod
-    def validate_rule_ids(cls, value):
-        for rule_id in value:
-            if rule_id < 1:
-                raise ValueError(
-                    "priority policy rule id must be greater than 0"
-                )
-
-        return value
-
-
 class PriorityPolicyRuleReorderSchema(ApiModel):
     """Validate complete rule ordering."""
 

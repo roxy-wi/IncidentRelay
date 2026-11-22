@@ -66,7 +66,7 @@
   "orchestrations.rules.no_actions": "Нет действий",
   "orchestrations.rules.no_draft": "Нет черновика",
   "orchestrations.simulator.input": "Входное событие",
-  "orchestrations.simulator.help": "Проверка черновика без создания алертов и вызова webhook.",
+  "orchestrations.simulator.help": "Проверка без создания алертов и вызова webhook. Нормализованному событию нужны source, dedup_key и title. Для исходных данных из карточки выберите формат интеграции; Alertmanager принимает отдельный алерт или полный webhook.",
   "orchestrations.simulator.source": "Формат входа",
   "orchestrations.simulator.normalized": "Нормализованное событие",
   "orchestrations.simulator.payload": "JSON события",

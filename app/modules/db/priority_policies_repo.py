@@ -319,22 +319,6 @@ def get_priority_policy_rule(rule_id):
     )
 
 
-def get_priority_policy_rule_or_none(rule_id):
-    """Return one active priority policy rule or None."""
-    if not rule_id:
-        return None
-
-    return (
-        PriorityPolicyRule.select(PriorityPolicyRule, IncidentPriority)
-        .join(IncidentPriority)
-        .where(
-            PriorityPolicyRule.id == rule_id,
-            PriorityPolicyRule.deleted == False,
-        )
-        .first()
-    )
-
-
 def get_next_priority_policy_rule_position(policy_id):
     """Return the next position for a policy rule."""
     maximum = (

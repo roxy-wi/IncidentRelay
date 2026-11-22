@@ -1,6 +1,7 @@
 from app.modules.db import alerts_repo
 from app.services.alerts.lifecycle import upsert_alert
 from tests.factories import create_group, create_route, create_silence, create_team
+from app.services.alerts import group_state
 
 
 def _alert(route, instance="host1", dedup_key=None):
@@ -73,7 +74,7 @@ def test_silenced_child_does_not_reopen_acknowledged_group(monkeypatch, db):
 
     assert created is True
 
-    alerts_repo.acknowledge_alert_group(alert_group.id)
+    group_state.acknowledge_alert_group(alert_group.id)
 
     create_silence(
         team,

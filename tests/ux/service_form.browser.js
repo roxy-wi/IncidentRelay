@@ -132,6 +132,28 @@ async function main() {
         assert.equal((await saved).status(), 200);
         await page.locator("#close-business-service-details-modal").click();
     }
+
+    async function checkSliPriorityRules() {
+        await page.goto("/services");
+        await page.waitForFunction(id => typeof getServiceById === "function" && getServiceById(id), fixture.serviceId);
+        const rules = await page.evaluate(() => window.__INCIDENTRELAY_SLI_RULES__);
+        await page.evaluate(id => openServiceSliModal(getServiceById(id)), fixture.serviceId);
+        const sliModal = page.locator("#service-sli-modal");
+        await sliModal.waitFor({state: "visible"});
+        const priorities = sliModal.locator("input[name=service-sli-priority-scope]");
+        assert.deepEqual(await priorities.evaluateAll(inputs => inputs.map(input => input.value)), rules.priorities);
+        assert.deepEqual(await priorities.evaluateAll(inputs => inputs.filter(input => input.checked).map(input => input.value)), []);
+        await page.locator("#service-sli-type").selectOption("incident_count");
+        assert.deepEqual(await priorities.evaluateAll(inputs => inputs.filter(input => input.checked).map(input => input.value)), rules.default_impact_scope);
+        assert.deepEqual(await page.evaluate(() => collectServiceSliPayload().configuration.priority_scope), rules.default_impact_scope);
+        assert.deepEqual(await page.evaluate(() => serviceSliPriorityScope({
+            sli_type: "alert_ack_latency", configuration: {priority_scope: [" P2 ", "p1", "P2"]},
+        })), ["p2", "p1"]);
+        await page.locator("#service-sli-type").selectOption("alert_ack_latency");
+        for (const input of await priorities.all()) await input.uncheck();
+        assert.deepEqual(await page.evaluate(() => collectServiceSliPayload().configuration), {});
+        await sliModal.locator(".app-modal-close").click();
+    }
     try {
         await page.goto("/services");
         // Shared helpers must retain their legacy behavior for other pages.
@@ -315,6 +337,7 @@ async function main() {
         }
         await page.locator("#cancel-service-form").click();
         await checkServiceWorkspaces();
+        await checkSliPriorityRules();
         assert.deepEqual(errors, []);
     } catch (error) {
         await screenshot("service-form-failure.png");

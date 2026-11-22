@@ -42,6 +42,9 @@ def attach_team_permissions(data, team_id, current_user=None):
         )
 
         permissions = get_team_permissions(current_user, team_id)
+        # Policies are local configuration even when the team's imported fields
+        # are read-only. Preserve the strict team-writer permission for their UI.
+        permissions["can_manage_policies"] = permissions["can_write"]
         permissions["can_write_resources"] = can_access_team_or_group_resource(
             current_user,
             team_id,

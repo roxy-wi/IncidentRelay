@@ -4,7 +4,7 @@ import pytest
 
 from app.api.schemas.change_integrations import MachineTokenCreate, SourceCreate
 from app.login import create_access_token
-from app.modules.db import groups_repo, teams_repo
+from app.modules.db import groups_repo
 from app.modules.db.models import ApiToken, AuditLog, ChangeIntegration, UserGroup
 from app.services.change_intelligence import administration as admin
 from app.services.change_intelligence.authorization import (
@@ -15,6 +15,8 @@ from app.services.change_intelligence.authorization import (
 )
 from tests.factories import create_group, create_service, create_team, create_user
 from tests.integrations.test_change_integrations import BASE, grant, revision
+from app.services import group_management
+from app.services import team_management
 
 
 def headers(user):
@@ -251,9 +253,9 @@ def test_revoked_administrator_cannot_issue_credentials(client, owned_identity, 
         manager.save()
     else:
         if revoke == "group_disabled":
-            groups_repo.update_group(service.group_id, {"active": False})
+            group_management.update_group(service.group_id, {"active": False})
         else:
-            groups_repo.soft_delete_group(service.group_id)
+            group_management.soft_delete_group(service.group_id)
     response = client.post(
         f"{BASE}/{integration.id}/tokens",
         headers=auth,
@@ -285,7 +287,7 @@ def test_machine_authority_does_not_follow_team_to_another_group(
         target_team = create_team(service.group)
         service = create_service(target_team)
     grant(owned_identity, team=service.team_id)
-    teams_repo.update_team(service.team_id, {"group": create_group().id})
+    team_management.update_team(service.team_id, {"group": create_group().id})
     with pytest.raises(ChangeAccessDenied):
         with authorized_source(integration.id, source.owner_team_id, source.source) as (
             current,
@@ -306,7 +308,7 @@ def test_inactive_owner_invalidates_empty_integration_and_credential(owned_ident
         MachineTokenCreate(expected_revision=1, name="Before disable"),
         actor_id=actor.id,
     )
-    groups_repo.update_group(service.group_id, {"active": False})
+    group_management.update_group(service.group_id, {"active": False})
     assert revision(empty) == 2
     assert not valid_machine_token(token, ChangeIntegration.get_by_id(empty.id))
 

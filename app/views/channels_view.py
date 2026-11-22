@@ -12,6 +12,7 @@ from app.services.audit import write_audit
 from app.services.rbac import (
     current_user,
     get_allowed_team_or_group_resource_ids,
+    require_group_write,
     require_team_or_group_resource_access,
 )
 from app.services.channel_config import merge_channel_config_secrets
@@ -20,6 +21,26 @@ from app.services.validation import make_error_response, safe_exception_response
 from app.services.service_catalog.reconciliation import reconcile_channel_services
 
 channels_bp = Blueprint("channels_api", __name__)
+
+
+def load_authorized_channel(channel_id, *, write_required=False):
+    """Load a channel and enforce its team or legacy group ownership."""
+    channel = channels_repo.get_channel(channel_id)
+    if channel.team_id is not None:
+        error = require_team_or_group_resource_access(
+            channel.team_id, write_required=write_required,
+        )
+    elif channel.group_id is not None:
+        # Group operational resources require an editor even for reads. A
+        # team-bound token cannot access resources owned only by its group.
+        error = require_group_write(channel.group_id)
+    else:
+        error = make_error_response(
+            error="channel_access_denied",
+            message="Channel has no owning team or group; access is denied.",
+            status_code=403,
+        )
+    return channel, error
 
 
 def channel_name_conflict_response(name):
@@ -90,12 +111,9 @@ def list_channels():
 @channels_bp.route("/<int:channel_id>", methods=["GET"])
 def get_channel(channel_id):
     """Return a single channel."""
-    channel = channels_repo.get_channel(channel_id)
-
-    if channel.team_id:
-        error = require_team_or_group_resource_access(channel.team_id)
-        if error:
-            return error
+    channel, error = load_authorized_channel(channel_id)
+    if error:
+        return error
 
     return jsonify(serialize_channel(channel, current_user=current_user()))
 
@@ -197,15 +215,23 @@ def update_channel(channel_id):
     if error:
         return error
 
-    current_channel = channels_repo.get_channel(channel_id)
+    current_channel, error = load_authorized_channel(channel_id, write_required=True)
+    if error:
+        return error
 
-    if current_channel.team_id:
-        error = require_team_or_group_resource_access(
-            current_channel.team_id,
-            write_required=True,
+    if (
+        current_channel.team_id is not None
+        and "team_id" in payload.model_fields_set
+        and payload.team_id is None
+    ):
+        return make_error_response(
+            error="validation_error",
+            message=(
+                "A team-owned channel cannot be detached from its team. "
+                "Omit team_id to keep the current team or provide another team id."
+            ),
+            status_code=400,
         )
-        if error:
-            return error
 
     if payload.team_id and payload.team_id != current_channel.team_id:
         error = require_team_or_group_resource_access(
@@ -242,7 +268,7 @@ def update_channel(channel_id):
         )
 
     update_data = {
-        "team": payload.team_id,
+        "team": target_team_id,
         "name": payload.name,
         "channel_type": payload.channel_type,
         "config": merged_config,
@@ -289,15 +315,9 @@ def update_channel(channel_id):
 @channels_bp.route("/<int:channel_id>/disable", methods=["POST"])
 def disable_channel(channel_id):
     """Disable a notification channel without deleting it."""
-    channel_before = channels_repo.get_channel(channel_id)
-
-    if channel_before.team_id:
-        error = require_team_or_group_resource_access(
-            channel_before.team_id,
-            write_required=True,
-        )
-        if error:
-            return error
+    _, error = load_authorized_channel(channel_id, write_required=True)
+    if error:
+        return error
 
     channel = channels_repo.disable_channel(channel_id)
 
@@ -321,15 +341,9 @@ def disable_channel(channel_id):
 @channels_bp.route("/<int:channel_id>/enable", methods=["POST"])
 def enable_channel(channel_id):
     """Enable a disabled notification channel."""
-    channel_before = channels_repo.get_channel(channel_id)
-
-    if channel_before.team_id:
-        error = require_team_or_group_resource_access(
-            channel_before.team_id,
-            write_required=True,
-        )
-        if error:
-            return error
+    _, error = load_authorized_channel(channel_id, write_required=True)
+    if error:
+        return error
 
     channel = channels_repo.enable_channel(channel_id)
 
@@ -356,15 +370,9 @@ def delete_channel(channel_id):
 
     The channel is soft-deleted so historical data remains preserved.
     """
-    channel_before = channels_repo.get_channel(channel_id)
-
-    if channel_before.team_id:
-        error = require_team_or_group_resource_access(
-            channel_before.team_id,
-            write_required=True,
-        )
-        if error:
-            return error
+    _, error = load_authorized_channel(channel_id, write_required=True)
+    if error:
+        return error
 
     channel = channels_repo.delete_channel(channel_id)
 
@@ -392,12 +400,9 @@ def delete_channel(channel_id):
 @channels_bp.route("/<int:channel_id>/test", methods=["POST"])
 def test_channel(channel_id):
     """Send a test notification through a channel."""
-    channel = channels_repo.get_channel(channel_id)
-
-    if channel.team_id:
-        error = require_team_or_group_resource_access(channel.team_id)
-        if error:
-            return error
+    channel, error = load_authorized_channel(channel_id)
+    if error:
+        return error
 
     notifier = get_notifier(channel.channel_type)
     team = channel.team

@@ -275,6 +275,13 @@ Common fields:
 | `configuration.priority_scope` | Priority list used by incident-based availability and incident count, for example `["p1", "p2"]`. Defaults to P1/P2 for impact SLI types. |
 | `enabled` | Enables or disables this SLI. |
 
+The API, evaluator and editor share the supported priorities (`p1`–`p4`) and
+impact defaults. Scope values are trimmed, lowercased and deduplicated without
+changing their order; a single string is also accepted. An empty latency scope
+includes all priorities. An explicitly empty impact scope or an unknown priority
+is rejected. If an existing stored SLI contains an invalid scope, its SLO reports
+`no_data` with an explanation instead of evaluating a broader or narrower scope.
+
 Supported `sli_type` values:
 
 ```text

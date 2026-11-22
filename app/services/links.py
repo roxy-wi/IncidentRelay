@@ -1,3 +1,4 @@
+from collections.abc import Mapping
 from urllib.parse import urlsplit
 
 from app.settings import Config
@@ -43,7 +44,10 @@ def _normalize_external_url(value):
     if not value:
         return ""
 
-    parsed = urlsplit(value)
+    try:
+        parsed = urlsplit(value)
+    except ValueError:
+        return ""
 
     if parsed.scheme.lower() not in {"http", "https"} or not parsed.netloc:
         return ""
@@ -69,4 +73,57 @@ def build_source_event_url(alert):
                 return value
 
     return ""
+
+
+def build_alert_resource_links(alert):
+    """Extract distinct resource links, including from already stored payloads."""
+    fields = [
+        {"event_link": getattr(alert, "event_link", None)},
+        getattr(alert, "labels", None),
+        getattr(alert, "common_labels", None),
+    ]
+    payload = getattr(alert, "payload", None)
+    if not isinstance(payload, Mapping):
+        summary = getattr(alert, "payload_summary", None)
+        payload = summary.get("latest_payload", summary) if isinstance(summary, Mapping) else {}
+    if isinstance(payload, Mapping):
+        # Grafana stores a webhook envelope containing this alert instance only.
+        instances = payload.get("alerts")
+        if isinstance(instances, list) and len(instances) == 1:
+            instance = instances[0]
+            if isinstance(instance, Mapping):
+                fields.extend([instance.get("annotations"), instance.get("labels"), instance])
+        fields.extend([
+            payload.get("annotations"), payload.get("commonAnnotations"),
+            payload.get("labels"), payload,
+        ])
+    fields = [item for item in fields if isinstance(item, Mapping)]
+
+    def first_url(keys, excluded=()):
+        for values in fields:
+            for key in keys:
+                url = _normalize_external_url(values.get(key))
+                if url and url not in excluded:
+                    return url
+        return ""
+
+    links = []
+    seen = set()
+    for kind, keys in (
+        ("dashboard", ("dashboard_url", "dashboardURL")),
+        ("panel", ("panel_url", "panelURL")),
+        ("runbook", ("runbook_url", "runbookURL")),
+    ):
+        url = first_url(keys)
+        if url and url not in seen:
+            links.append({"kind": kind, "url": url})
+            seen.add(url)
+
+    source_keys = tuple(
+        key for key in SOURCE_EVENT_URL_KEYS if key not in {"dashboard_url", "panel_url"}
+    )
+    source_url = first_url((*source_keys, "generatorURL"), excluded=seen)
+    if source_url:
+        links.insert(0, {"kind": "source", "url": source_url})
+    return links
 

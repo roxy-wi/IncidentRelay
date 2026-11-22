@@ -11,7 +11,8 @@ import pytest
 from werkzeug.serving import make_server
 
 from app.login import create_access_token
-from app.modules.db.models import UserGroup
+from app.modules.db.models import DirectorySyncBinding, DirectorySyncSource, UserGroup
+from app.services.sync.directory.config import org_service_preset
 from tests.factories import (
     add_user_to_team,
     create_group,
@@ -47,8 +48,9 @@ def test_team_create_permissions_in_javascript():
         ("viewer", None, True, True, True, True),
     ],
 )
+@pytest.mark.parametrize("imported", [False, True])
 def test_team_api_exposes_create_capabilities(
-    client, group_role, team_role, active_membership, admin, write, resources,
+    client, admin_user, group_role, team_role, active_membership, admin, write, resources, imported,
 ):
     """The UI receives distinct strict-team and group-resource permissions."""
     group = create_group()
@@ -58,23 +60,36 @@ def test_team_api_exposes_create_capabilities(
         membership = add_user_to_team(team, user, team_role)
         membership.active = active_membership
         membership.save()
+    if imported:
+        source = DirectorySyncSource.create(
+            name="Read-only import", group=group, config=org_service_preset(), created_by=admin_user,
+        )
+        DirectorySyncBinding.create(source=source, kind="team", external_id="team1", local_id=team.id)
+    headers = {"Authorization": f"Bearer {create_access_token(user)[0]}"}
     response = client.get(
         "/api/teams",
-        headers={"Authorization": f"Bearer {create_access_token(user)[0]}"},
+        headers=headers,
     )
     assert response.status_code == 200
     permissions = next(
         item["permissions"] for item in response.get_json() if item["id"] == team.id
     )
-    assert permissions["can_write"] is write
+    assert permissions["can_write"] is (write and not imported)
+    assert permissions["can_manage_policies"] is write
     assert permissions["can_write_resources"] is resources
+    for policy in ("escalation-policies", "notification-policies", "priority-policies"):
+        response = client.post(f"/api/{policy}", headers=headers, json={"team_id": team.id, "name": "Local policy"})
+        assert response.status_code == (201 if write else 403), response.json
+    if imported and write:
+        assert client.put(f"/api/teams/{team.id}", headers=headers, json={"name": "Local edit"}).status_code == 409
 
 
 @pytest.mark.skipif(
     os.environ.get("INCIDENTRELAY_BROWSER_TESTS") != "1",
     reason="Enable browser tests and install Node playwright",
 )
-def test_team_manager_create_forms_in_browser(app, db):
+@pytest.mark.parametrize("imported", [False, True])
+def test_team_manager_create_forms_in_browser(app, db, admin_user, imported):
     """Exercise real forms, read-only choices and active-group switching."""
     empty_group = create_group()
     group = create_group()
@@ -89,6 +104,11 @@ def test_team_manager_create_forms_in_browser(app, db):
     add_user_to_team(managed, user, "manager")
     add_user_to_team(read_only, user, "responder")
     add_user_to_team(inactive, user, "manager")
+    if imported:
+        source = DirectorySyncSource.create(
+            name="Read-only import", group=group, config=org_service_preset(), created_by=admin_user,
+        )
+        DirectorySyncBinding.create(source=source, kind="team", external_id="team1", local_id=managed.id)
     for extra_group in (empty_group, other_group):
         UserGroup.create(user=user, group=extra_group, role="viewer", active=True)
     server = make_server("127.0.0.1", 0, app, threaded=True)
@@ -101,6 +121,7 @@ def test_team_manager_create_forms_in_browser(app, db):
         "readOnlyTeamId": read_only.id,
         "groupId": group.id,
         "otherGroupId": other_group.id,
+        "imported": imported,
     }
     try:
         result = subprocess.run(

@@ -1,10 +1,10 @@
 import pytest
 
-from app.modules.db import alerts_repo
 from app.modules.db.models import Alert, AlertExplainTrace, AlertGroup
 from app.services.alerts import correlation
 from app.services.alerts.lifecycle import _sync_orchestration_group_fields, upsert_alert
 from tests.factories import create_group, create_route, create_team
+from app.services.alerts import group_state
 
 
 @pytest.mark.parametrize("fails", [False, True])
@@ -31,7 +31,7 @@ def test_new_alert_refreshes_correlations_once_and_isolates_refresh_failure(db, 
 
 
 def test_orchestration_state_skips_unchanged_writes_and_persists_dirty_values(db, monkeypatch):
-    group = alerts_repo.create_alert_group(source="test", group_key="unchanged", title="Unchanged")
+    group = group_state.create_alert_group(source="test", group_key="unchanged", title="Unchanged")
     calls = []
     execute = db.execute_sql
 
@@ -55,7 +55,7 @@ def test_orchestration_state_skips_unchanged_writes_and_persists_dirty_values(db
 
 
 def test_recalculation_updates_derived_fields_without_rewriting_unrelated_state(db, monkeypatch):
-    group = alerts_repo.create_alert_group(source="test", group_key="derived", title="Original")
+    group = group_state.create_alert_group(source="test", group_key="derived", title="Original")
     group.escalation_repeat_count = 17
     group.save(only=[AlertGroup.escalation_repeat_count])
     Alert.create(group=group, source="test", dedup_key="derived", group_key="derived",
@@ -69,7 +69,7 @@ def test_recalculation_updates_derived_fields_without_rewriting_unrelated_state(
         return execute(sql, params, *args, **kwargs)
 
     monkeypatch.setattr(db, "execute_sql", capture)
-    alerts_repo.recalculate_alert_group(group)
+    group_state.recalculate_alert_group(group)
     assert len(updates) == 1
     assert '"escalation_repeat_count"' not in updates[0]
     fetched = AlertGroup.get_by_id(group.id)

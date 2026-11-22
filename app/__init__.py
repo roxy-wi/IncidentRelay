@@ -106,7 +106,7 @@ def create_app(log_role=None):
             return auth_response
 
         if request.path.startswith("/api/"):
-            from app.services.directory_sync.runtime import guard_mutation
+            from app.services.sync.directory.runtime import guard_mutation
             return guard_mutation()
 
     @flask_app.teardown_request

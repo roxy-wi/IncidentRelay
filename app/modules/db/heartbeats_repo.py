@@ -1,9 +1,8 @@
 
 from peewee import JOIN
 
-from app.modules.db import incident_core_repo
 from app.modules.db.models import Group, Heartbeat, HeartbeatInstance, HeartbeatPing, Service, Team
-from app.services.integrations.auth import hash_token
+from app.modules.token_hashing import hash_token
 from app.modules.common import utc_now
 
 
@@ -48,18 +47,6 @@ def list_heartbeats(
         query = query.where(Heartbeat.group == group_id)
 
     return list(query.order_by(Team.slug.asc(), Heartbeat.name.asc()))
-
-
-def list_heartbeats_for_service(service_id, *, enabled_only=False):
-    query = Heartbeat.select().where(
-        (Heartbeat.service == service_id)
-        & (Heartbeat.deleted == False)
-    )
-
-    if enabled_only:
-        query = query.where(Heartbeat.enabled == True)
-
-    return list(query.order_by(Heartbeat.name.asc()))
 
 
 def list_due_heartbeat_candidates(now, limit=100, team_ids=None):
@@ -150,18 +137,6 @@ def get_heartbeat(heartbeat_id, *, include_deleted=False):
     return query.get()
 
 
-def get_heartbeat_or_none(heartbeat_id, *, include_deleted=False):
-    if not heartbeat_id:
-        return None
-
-    query = Heartbeat.select().where(Heartbeat.id == heartbeat_id)
-
-    if not include_deleted:
-        query = query.where(Heartbeat.deleted == False)
-
-    return query.first()
-
-
 def get_heartbeat_by_slug(team_id, slug, *, include_deleted=False):
     query = Heartbeat.select().where(
         (Heartbeat.team == team_id)
@@ -242,42 +217,6 @@ def update_heartbeat(heartbeat, data):
     return heartbeat
 
 
-def soft_delete_heartbeat(heartbeat):
-    """Soft-delete a heartbeat and terminate its current runtime state."""
-    from app.modules.db.soft_delete_hardening import resolve_alert_groups_by_ids
-
-    with incident_core_repo.write_transaction():
-        now = utc_now()
-        group_ids = {getattr(heartbeat, "current_alert_group_id", None)}
-        group_ids.update(
-            row.current_alert_group_id
-            for row in HeartbeatInstance.select(
-                HeartbeatInstance.current_alert_group
-            ).where(HeartbeatInstance.heartbeat == heartbeat.id)
-            if row.current_alert_group_id
-        )
-        resolve_alert_groups_by_ids(
-            group_ids,
-            now=now,
-            reason="heartbeat_deleted",
-        )
-        # Instances are mutable scheduler state. Ping history remains preserved.
-        HeartbeatInstance.delete().where(
-            HeartbeatInstance.heartbeat == heartbeat.id
-        ).execute()
-
-        heartbeat.deleted = True
-        heartbeat.deleted_at = now
-        heartbeat.enabled = False
-        heartbeat.status = "paused"
-        heartbeat.next_expected_at = None
-        heartbeat.overdue_since = None
-        heartbeat.current_alert_group = None
-        heartbeat.updated_at = now
-        heartbeat.save()
-        return heartbeat
-
-
 def record_ping(
     heartbeat,
     *,
@@ -344,18 +283,6 @@ def create_heartbeat_instance(heartbeat, instance_key, **data):
         instance_key=str(instance_key),
         **data,
     )
-
-
-def update_heartbeat_instance(instance, data):
-    for key, value in data.items():
-        setattr(instance, key, value)
-    instance.updated_at = utc_now()
-    instance.save()
-    return instance
-
-
-def delete_heartbeat_instance(instance):
-    instance.delete_instance()
 
 
 def disable_heartbeat_instance(instance, status="paused"):

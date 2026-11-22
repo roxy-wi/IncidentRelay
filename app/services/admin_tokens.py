@@ -7,17 +7,19 @@ from app.services.rbac import current_api_token
 from app.services.authorization import token_allows_owner, valid_personal_token
 
 
-def lock_admin_api_token(actor_id, scope, *, group_id=None):
+def lock_admin_api_token(actor_id, scope, *, group_id=None, for_update=True):
     """Lock a request token until commit; JWT and internal callers need no token.
 
     Administrative resources span teams, so team-bound credentials cannot
     manage them. Group-bound tokens may only manage that Group's resources;
     installation-wide settings and central integrations require no Group bound.
+    Read-only endpoints may set for_update=False to validate without a write lock.
     """
     authenticated = current_api_token()
     if authenticated is None:
         return
-    token = lock_row(ApiToken.select().where(ApiToken.id == authenticated.id))
+    query = ApiToken.select().where(ApiToken.id == authenticated.id)
+    token = lock_row(query) if for_update else query.first()
     if (
         not valid_personal_token(token)
         or token.user_id != actor_id

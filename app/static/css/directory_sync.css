@@ -1,0 +1,115 @@
+body.md-theme #ds-editor .app-modal-footer {
+    flex-wrap: wrap;
+}
+
+body.md-theme #ds-editor .json-editor-header .btn {
+    background: var(--md-primary-soft);
+    color: var(--md-text);
+    border-color: var(--md-primary);
+}
+
+body.md-theme #ds-editor .json-editor-header .btn:hover {
+    background: var(--md-surface-hover);
+    color: var(--md-text);
+}
+
+#ds-workflow {
+    display: flex;
+    align-items: flex-start;
+    gap: 12px;
+    flex-basis: 100%;
+    grid-column: 1 / -1;
+    min-width: 0;
+    margin: 0;
+    padding: 12px 14px;
+    border: 1px solid var(--md-border);
+    border-left: 4px solid var(--md-primary);
+    border-radius: 10px;
+    background: var(--md-surface);
+    color: var(--md-text);
+    line-height: 1.4;
+}
+
+#ds-workflow-title {
+    display: block;
+    margin-bottom: 4px;
+    font-size: 14px;
+}
+
+#ds-workflow-detail {
+    margin: 0;
+    color: var(--md-text-soft);
+    font-size: 13px;
+    overflow-wrap: anywhere;
+}
+
+#ds-workflow-icon {
+    flex-shrink: 0;
+    margin-top: 2px;
+    font-size: 20px;
+    color: var(--md-primary);
+}
+
+#ds-workflow[data-step="preview"],
+#ds-workflow[data-step="mapping"],
+#ds-workflow[data-step="current_error"],
+#ds-workflow[data-step="retrying"],
+#ds-workflow[data-step="expired"] {
+    border-color: var(--md-warning-border);
+    border-left-color: var(--md-warning);
+    background: var(--md-warning-soft);
+}
+
+#ds-workflow[data-step="preview"] #ds-workflow-icon,
+#ds-workflow[data-step="mapping"] #ds-workflow-icon,
+#ds-workflow[data-step="current_error"] #ds-workflow-icon,
+#ds-workflow[data-step="retrying"] #ds-workflow-icon,
+#ds-workflow[data-step="expired"] #ds-workflow-icon {
+    color: var(--md-warning);
+}
+
+#ds-workflow[data-step="apply"] {
+    background: var(--md-primary-soft);
+}
+
+#ds-workflow[data-step="error"],
+#ds-workflow[data-step="disconnected"] {
+    border-color: var(--md-danger-border);
+    border-left-color: var(--md-danger);
+    background: var(--md-danger-soft);
+}
+
+#ds-workflow[data-step="error"] #ds-workflow-icon,
+#ds-workflow[data-step="disconnected"] #ds-workflow-icon {
+    color: var(--md-danger);
+}
+
+@media (max-width: 600px) {
+    body.md-theme #ds-editor .app-modal-footer {
+        display: grid;
+        grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+        gap: 8px;
+        padding: 12px 16px;
+    }
+
+    body.md-theme #ds-editor .app-modal-footer .btn {
+        min-width: 0;
+        height: auto;
+        white-space: normal;
+    }
+}
+#ds-editor [hidden] {
+    display: none !important;
+}
+
+.cmdb-object-columns {
+    /* Unequal field counts must not stretch the shorter column's grid rows. */
+    align-items: start;
+}
+
+#cmdb-issues {
+    padding: 12px;
+    border-left: 4px solid var(--md-warning);
+    background: var(--md-warning-soft);
+    overflow-wrap: anywhere;
+}

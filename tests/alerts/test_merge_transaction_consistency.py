@@ -2,9 +2,9 @@
 
 import pytest
 
-from app.modules.db import alerts_repo
 from app.modules.db.models import Alert, AlertGroup, AlertGroupMerge
 from tests.factories import create_group, create_route, create_team, unique
+from app.services.alerts import group_state
 
 
 def _group(team, route):
@@ -39,7 +39,7 @@ def test_merge_rolls_back_when_saving_merge_record_fails(db, monkeypatch):
     monkeypatch.setattr(AlertGroupMerge, "create", fail_create)
 
     with pytest.raises(RuntimeError, match="merge-record-write-failed"):
-        alerts_repo.merge_alert_groups(
+        group_state.merge_alert_groups(
             target_group_id=target.id,
             source_group_ids=[source.id],
             user_id=None,

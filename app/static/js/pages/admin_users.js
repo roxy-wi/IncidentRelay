@@ -633,6 +633,8 @@ function fillAdminUserForm(user) {
     $("#admin-user-password").val("");
     $("#admin-user-is-admin").prop("checked", !!user.is_admin);
     $("#admin-user-active").prop("checked", !!user.active);
+    $("#admin-user-teams-section").show();
+    renderUserTeamMemberships("#admin-user-teams", user.teams);
 
     const activeGroupId = getAdminUserActiveGroupId(user);
 
@@ -730,6 +732,8 @@ function resetAdminUserForm() {
      * Reset admin user form.
      */
     $("#admin-user-id").val("");
+    $("#admin-user-teams-section").hide();
+    $("#admin-user-teams").empty();
     $("#admin-user-username").val("");
     $("#admin-user-display").val("");
     $("#admin-user-email").val("");
