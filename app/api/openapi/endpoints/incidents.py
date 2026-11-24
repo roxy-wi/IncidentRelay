@@ -1,3 +1,5 @@
+from typing import get_args
+
 from app.api.openapi.common import (
     ERROR_SCHEMA,
     json_body,
@@ -5,6 +7,7 @@ from app.api.openapi.common import (
     query_param,
     response,
 )
+from app.api.schemas.incidents import IncidentRelationType
 
 
 INCIDENT_STATUS_VALUES = [
@@ -123,17 +126,15 @@ INCIDENT_UPDATE_SCHEMA = {
     },
 }
 
+INCIDENT_RELATION_TYPE_SCHEMA = {"type": "string", "enum": list(get_args(IncidentRelationType))}
+
 INCIDENT_LINK_SCHEMA = {
     "type": "object",
     "required": ["alert_group_id"],
     "additionalProperties": False,
     "properties": {
         "alert_group_id": {"type": "integer", "minimum": 1},
-        "relation_type": {
-            "type": "string",
-            "enum": ["primary", "related"],
-            "default": "related",
-        },
+        "relation_type": {**INCIDENT_RELATION_TYPE_SCHEMA, "default": "related"},
     },
 }
 
@@ -480,6 +481,7 @@ INCIDENT_ALERT_GROUP_LINK_SCHEMA = {
         "id",
         "incident_id",
         "alert_group_id",
+        "incident_row_version",
         "relation_type",
         "active",
         "linked_by_id",
@@ -493,7 +495,8 @@ INCIDENT_ALERT_GROUP_LINK_SCHEMA = {
         "id": {"type": "integer"},
         "incident_id": {"type": "integer"},
         "alert_group_id": {"type": "integer"},
-        "relation_type": {"type": "string", "enum": ["primary", "related"]},
+        "incident_row_version": {"type": "integer", "minimum": 1},
+        "relation_type": INCIDENT_RELATION_TYPE_SCHEMA,
         "active": {"type": "boolean"},
         "linked_by_id": {"type": "integer", "nullable": True},
         "linked_at": {"type": "string", "format": "date-time"},
@@ -501,8 +504,11 @@ INCIDENT_ALERT_GROUP_LINK_SCHEMA = {
         "removed_at": {"type": "string", "format": "date-time", "nullable": True},
         "permissions": {
             "type": "object",
-            "required": ["can_unlink"],
-            "properties": {"can_unlink": {"type": "boolean"}},
+            "required": ["can_unlink", "can_change_relation_type"],
+            "properties": {
+                "can_unlink": {"type": "boolean"},
+                "can_change_relation_type": {"type": "boolean"},
+            },
         },
         "alert_group": {
             "type": "object",
@@ -778,6 +784,34 @@ def paths():
             },
         },
         "/api/incidents/{incident_id}/alert-groups/{group_id}": {
+            "patch": {
+                "tags": ["incidents"],
+                "summary": "Change the type of an active AlertGroup link",
+                "security": auth,
+                "parameters": [
+                    path_param("incident_id", "Incident id."),
+                    path_param("group_id", "AlertGroup id."),
+                ],
+                "requestBody": json_body(
+                    "Send the observed link id and Incident row version.",
+                    {
+                        "type": "object",
+                        "additionalProperties": False,
+                        "required": ["link_id", "row_version", "relation_type"],
+                        "properties": {
+                            "link_id": {"type": "integer", "minimum": 1},
+                            "row_version": {"type": "integer", "minimum": 1},
+                            "relation_type": INCIDENT_RELATION_TYPE_SCHEMA,
+                        },
+                    },
+                ),
+                "responses": {
+                    **standard_errors,
+                    "200": response("Current link and Incident revision.", INCIDENT_ALERT_GROUP_LINK_SCHEMA),
+                    "404": response("Incident or active link not found.", ERROR_SCHEMA),
+                    "409": response("Stale link or revision, terminal Incident or primary conflict.", ERROR_SCHEMA),
+                },
+            },
             "delete": {
                 "tags": ["incidents"],
                 "summary": "Unlink AlertGroup",

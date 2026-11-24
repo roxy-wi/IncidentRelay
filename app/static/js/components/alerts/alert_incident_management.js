@@ -160,7 +160,7 @@ window.AlertIncidentManagement = (function () {
                                         .text(
                                             i18n.t("incidents.status." + status, {}, status)
                                             + " · " + priority
-                                            + " · " + relation
+                                            + " · " + i18n.t("incidents.links." + relation, {}, relation)
                                         )
                                 )
                         )

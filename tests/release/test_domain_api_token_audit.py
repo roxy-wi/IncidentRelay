@@ -1,6 +1,6 @@
 """API-token attribution must survive service-owned and nested audit writes."""
 
-from app.modules.db import tokens_repo
+from app.modules.db import incident_core_repo, tokens_repo
 from app.modules.db.models import AlertGroup, AuditLog
 from app.services.integrations.auth import hash_token
 from tests.factories import create_group, create_route, create_team, unique
@@ -94,6 +94,16 @@ def test_create_incident_from_alert_group_keeps_token_on_nested_audits(
         assert record.api_token_id == token.id
         assert record.user_id == admin_user.id
         assert record.data["source"] == "api"
+
+    link = incident_core_repo.active_link(incident_id, group.id)
+    edited = client.patch(
+        f"/api/incidents/{incident_id}/alert-groups/{group.id}", headers=headers,
+        json={"link_id": link.id, "row_version": response.get_json()["row_version"], "relation_type": "duplicate"},
+    )
+    assert edited.status_code == 200, edited.get_json()
+    record = _audit(incident_id, "incident.group_relation_change")
+    assert record.api_token_id == token.id
+    assert record.user_id == admin_user.id
 
 
 def test_shelve_then_resolve_keeps_token_on_nested_unshelve_audit(

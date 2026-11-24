@@ -1,6 +1,9 @@
-from app.api.openapi.common import json_body, path_param, query_param, response
+from app.api.openapi.common import (
+    catalog_list_schema, catalog_page_parameters, json_body, path_param, query_param, response,
+)
 from app.api.openapi.endpoints.service_catalog import (
     READINESS_STATE_SCHEMA,
+    READINESS_STATUSES,
     SERVICE_READINESS_RESPONSE_SCHEMA,
     SERVICE_TIMELINE_EVENT_SCHEMA,
     SERVICE_SLI_SCHEMA,
@@ -1103,10 +1106,21 @@ def paths():
                         "team_id",
                         "Filter services by team id.",
                         {"type": "integer", "minimum": 1},
-                    )
+                    ),
+                    *catalog_page_parameters(),
+                    query_param("service_id", "Exact service ID (paged mode).", {"type": "integer"}),
+                    query_param("status", "Own service status (paged mode).",
+                                {"type": "string", "enum": SERVICE_STATUSES}),
+                    query_param("criticality", "Criticality (paged mode).",
+                                {"type": "string", "enum": SERVICE_CRITICALITIES}),
+                    query_param("readiness", "Readiness status (paged mode).",
+                                {"type": "string", "enum": [*READINESS_STATUSES, "not_evaluated"]}),
                 ],
                 "responses": {
-                    "200": response("List of services.", {"type": "array", "items": SERVICE_SCHEMA}),
+                    "200": response(
+                        "List of services, paged when page or page_size is specified.",
+                        catalog_list_schema(SERVICE_SCHEMA, ("total", "operational", "affected", "major")),
+                    ),
                     "403": response("Access denied.", ERROR_SCHEMA),
                 },
             },

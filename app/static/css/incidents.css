@@ -114,6 +114,7 @@ body.md-theme .incidents-linked-groups {
 
 body.md-theme .incident-linked-group {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 12px;
   padding: 12px;
@@ -122,9 +123,14 @@ body.md-theme .incident-linked-group {
   background: var(--md-surface-soft);
 }
 
+body.md-theme .incident-linked-group .incident-relation-editor {
+  width: auto;
+  max-width: 100%;
+}
+
 body.md-theme .incident-linked-group-main {
   min-width: 0;
-  flex: 1;
+  flex: 1 1 12rem;
 }
 
 body.md-theme .incident-linked-group-title {

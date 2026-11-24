@@ -107,6 +107,52 @@ def test_concurrent_adds_have_one_record_and_one_audit(
     assert IncidentEvent.select().count() == AuditLog.select().count() == 1
 
 
+def test_competing_relation_edits_preserve_one_winner(app, db):
+    incident, actors = _context()
+    group = AlertGroup.create(team=incident.team, source="manual", title="Signal",
+                              group_key=unique("key"), group_key_hash=unique("hash"))
+    link = IncidentAlertGroupLink.create(incident=incident, alert_group=group)
+    headers = _headers(actors[0])
+
+    def edit(relation_type):
+        with app.test_client() as client:
+            response = client.patch(
+                f"/api/incidents/{incident.id}/alert-groups/{group.id}", headers=headers,
+                json={"link_id": link.id, "row_version": incident.row_version, "relation_type": relation_type},
+            )
+            return response.status_code, relation_type
+
+    results = _concurrent(lambda: edit("symptom"), lambda: edit("duplicate"))
+    assert sorted(status for status, _ in results) == [200, 409]
+    winner = next(relation for status, relation in results if status == 200)
+    assert IncidentAlertGroupLink.get_by_id(link.id).relation_type == winner
+    assert Incident.get_by_id(incident.id).row_version == incident.row_version + 1
+    assert IncidentEvent.select().count() == AuditLog.select().count() == 1
+    assert IncidentEvent.get().data["to"] == AuditLog.get().data["to"] == winner
+
+
+def test_reopen_racing_new_link_leaves_only_one_open_incident(app, db):
+    incident, actors = _context()
+    group = AlertGroup.create(team=incident.team, source="manual", title="Signal",
+                              group_key=unique("key"), group_key_hash=unique("hash"))
+    IncidentAlertGroupLink.create(incident=incident, alert_group=group, relation_type="duplicate")
+    Incident.update(workflow_status="closed").where(Incident.id == incident.id).execute()
+    other = Incident.create(team=incident.team, title="Other incident")
+    headers = _headers(actors[0])
+
+    def post(path, payload):
+        with app.test_client() as client:
+            return client.post(path, headers=headers, json=payload).status_code
+
+    reopened, linked = _concurrent(
+        lambda: post(f"/api/incidents/{incident.id}/reopen", {"row_version": incident.row_version}),
+        lambda: post(f"/api/incidents/{other.id}/alert-groups", {"alert_group_id": group.id, "relation_type": "symptom"}),
+    )
+    assert (reopened, linked) in {(200, 409), (409, 201)}
+    owner = incident_core_repo.active_link_for_group(group.id)
+    assert owner.incident_id == (incident.id if reopened == 200 else other.id)
+
+
 def test_competing_responder_decisions_do_not_overwrite_each_other(app, db):
     incident, actors = _context()
     row = IncidentResponder.create(

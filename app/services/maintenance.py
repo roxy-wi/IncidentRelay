@@ -274,9 +274,11 @@ def _ensure_can_manage_existing_window(current_user, window):
     # Legacy windows may have only scopes and no primary owner columns.
     if window.group_id or window.team_id or not scope_payloads:
         _ensure_token_owner(window.group_id, window.team_id)
-    for scope in scope_payloads:
-        _ensure_token_scope(scope)
+    if scope_payloads:
+        _ensure_can_manage_scopes(current_user, scope_payloads)
+        return
 
+    # Windows without stored scopes still use their recorded owner for authorization.
     if getattr(current_user, "is_admin", False):
         return
 
@@ -285,10 +287,6 @@ def _ensure_can_manage_existing_window(current_user, window):
 
     if window.group_id and rbac.can_write_group(current_user, window.group_id):
         return
-
-    for scope_payload in scope_payloads:
-        if _can_manage_scope(current_user, scope_payload):
-            return
 
     raise PermissionError("access denied")
 

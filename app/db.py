@@ -56,7 +56,7 @@ def create_database():
     if Config.DB_TYPE == "sqlite":
         ensure_sqlite_directory(Config.DB_NAME)
 
-        return SqliteDatabase(
+        database = SqliteDatabase(
             Config.DB_NAME,
             pragmas={
                 "journal_mode": "wal",
@@ -64,6 +64,12 @@ def create_database():
                 "foreign_keys": 1,
             },
         )
+
+        database.register_function(
+            lambda *fields: " ".join(str(field) for field in fields if field is not None).lower(),
+            "catalog_search_text",
+        )
+        return database
 
     if Config.DB_TYPE == "mysql":
         return MySQLDatabase(

@@ -1,6 +1,12 @@
 // Service catalog core: global state, service list, service form and details modal entry points.
 
 let servicesCache = [];
+let servicesPageItems = [];
+let servicesSummary = {};
+let servicesPageRequest = 0;
+let servicesContextLoaded = false;
+let servicesContextLoading = false;
+let linkedCatalogService = null;
 let servicesHasLoaded = false;
 let servicesLoadGeneration = 0;
 let selectedServiceDetailsId = null;
@@ -22,10 +28,10 @@ let serviceSloAnalyticsCache = [];
 let serviceAnalyticsCharts = {};
 let serviceRunbookMatcherPresetsCache = [];
 
-const servicesPagination = createClientTablePagination({
+const servicesPagination = createServerTablePagination({
     id: "services-pagination",
     tableSelector: "#services-table",
-    onChange: renderServicesTable,
+    onChange: fetchServicesPage,
 });
 
 const SERVICE_TYPE_OPTIONS = [
@@ -422,13 +428,62 @@ function loadServices() {
         resetServiceForm();
     });
 
-    switchServicesPageTab(servicesPageTab || "services");
     refreshServices();
 }
 
 
 function refreshServices() {
-    const generation = ++servicesLoadGeneration;
+    ++servicesLoadGeneration;
+    servicesContextLoaded = false;
+    servicesContextLoading = false;
+    linkedCatalogService = null;
+    servicesPageItems = [];
+    servicesCache = [];
+    serviceAnalyticsPayload = null;
+    serviceAnalyticsCache = [];
+    window.servicesCache = servicesCache;
+    fetchServicesPage();
+    switchServicesPageTab(servicesPageTab);
+    refreshAllServiceContext();
+    refreshServiceImpact({refreshDetails: false});
+
+    const linkedId = Number(new URLSearchParams(location.search).get("service_id"));
+    if (linkedId > 0) {
+        const generation = servicesLoadGeneration;
+        const url = catalogPageUrl("/api/services", selectedTeamQuery(), servicesPagination,
+            {page: 1, page_size: 1, service_id: linkedId});
+        apiGet(url, function ({items}) {
+            if (generation !== servicesLoadGeneration || !items.length) return;
+            linkedCatalogService = items[0];
+            openServiceDetailsModal(linkedId);
+        });
+    }
+}
+
+
+// The graph and cross-service editors need the complete scoped catalog.
+function loadServicesForContext() {
+    if (servicesContextLoading) return;
+    servicesContextLoading = true;
+    const generation = servicesLoadGeneration;
+    apiGet("/api/services" + selectedTeamQuery(), function (services) {
+        if (generation !== servicesLoadGeneration) return;
+        servicesCache = asArray(services);
+        window.servicesCache = servicesCache;
+        servicesContextLoaded = true;
+        servicesContextLoading = false;
+        if (servicesPageTab !== "services") switchServicesPageTab(servicesPageTab);
+    }, function (xhr) {
+        if (generation !== servicesLoadGeneration) return;
+        servicesContextLoading = false;
+        switchServicesPageTab("services");
+        showApiError(xhr);
+    });
+}
+
+
+function fetchServicesPage() {
+    const generation = ++servicesPageRequest;
     let delayedIndicator = null;
 
 
@@ -438,7 +493,7 @@ function refreshServices() {
         } else {
             AppLoading.clear("#services-loading-indicator");
             delayedIndicator = AppLoading.delayed(function () {
-                if (generation === servicesLoadGeneration) {
+                if (generation === servicesPageRequest) {
                     AppLoading.showInline(
                         "#services-loading-indicator",
                         i18n.t("common.updating")
@@ -449,7 +504,7 @@ function refreshServices() {
     }
 
     function finishServicesLoading() {
-        if (generation !== servicesLoadGeneration || !window.AppLoading) {
+        if (generation !== servicesPageRequest || !window.AppLoading) {
             return;
         }
 
@@ -463,36 +518,29 @@ function refreshServices() {
         }
     }
 
-    apiGet("/api/services" + selectedTeamQuery(), function (services) {
-        if (generation !== servicesLoadGeneration) {
-            return;
+    const url = catalogPageUrl("/api/services", selectedTeamQuery(), servicesPagination, {
+        search: String($("#services-search").val() || "").trim(),
+        status: $("#services-status-filter").val(),
+        criticality: $("#services-criticality-filter").val(),
+        readiness: $("#services-readiness-filter").val(),
+    });
+    apiGet(url, function ({items, pagination, summary}) {
+        if (generation !== servicesPageRequest) return;
+        servicesPageItems = items;
+        if (!servicesContextLoaded) {
+            servicesCache = items;
+            window.servicesCache = servicesCache;
         }
-
-        servicesCache = asArray(services);
-        window.servicesCache = servicesCache;
+        servicesSummary = summary;
         servicesHasLoaded = true;
         finishServicesLoading();
-
-        renderServicesSummary();
-        renderServicesTable();
-        // Open service details from an Incident deep link, only for services
-        // already present within the API-scoped catalog.
-        const linkedServiceId = Number(new URLSearchParams(window.location.search).get("service_id"));
-        if (linkedServiceId > 0 && servicesCache.some(function (service) {
-            return Number(service.id) === linkedServiceId;
-        })) {
-            openServiceDetailsModal(linkedServiceId);
-        }
-
-        if (typeof window.loadServiceStandards === "function") {
-            window.loadServiceStandards();
-        }
-
-        refreshAllServiceContext();
-        refreshServiceImpact({ refreshDetails: false });
-        refreshServiceAnalytics();
+        if (servicesPageTab === "services") renderServicesSummary();
+        servicesPagination.render(pagination);
+        $("#services-filtered-count").text(pagination.total_items);
+        $("#services-total-count").text(summary.total);
+        renderServicesTable(items);
     }, function (xhr) {
-        if (generation !== servicesLoadGeneration) {
+        if (generation !== servicesPageRequest) {
             return;
         }
 
@@ -506,29 +554,8 @@ function refreshServices() {
 
 
 function renderServicesSummary() {
-    const total = servicesCache.length;
-
-    const operational = servicesCache.filter(function (service) {
-        return service.status === "operational" && service.enabled;
-    }).length;
-
-    const affected = servicesCache.filter(function (service) {
-        if (!service.enabled || service.status === "disabled") {
-            return false;
-        }
-
-        return service.status && service.status !== "operational";
-    }).length;
-
-    const major = servicesCache.filter(function (service) {
-        return service.status === "major_outage";
-    }).length;
-
     renderServiceSummaryTiles({
-        total: total,
-        operational: operational,
-        affected: affected,
-        major: major,
+        ...servicesSummary,
         totalHint: i18n.t("services.summary.current_scope"),
         operationalHint: i18n.t("services.summary.own_status"),
         affectedHint: i18n.t("services.summary.own_status_not_operational"),
@@ -557,70 +584,8 @@ function renderServiceSummaryTiles(summary) {
 }
 
 
-function getServiceSearchText(service) {
-    const readiness = service.readiness || {};
-    return [
-        service.id,
-        service.name,
-        service.slug,
-        service.description,
-        service.team_name,
-        service.team_slug,
-        service.service_type,
-        service.environment,
-        service.criticality,
-        service.tier,
-        service.status,
-        service.kind,
-        service.lifecycle,
-        readiness.status,
-        readiness.score,
-        service.default_rotation_name,
-        service.default_escalation_policy_name,
-        service.notification_policy_name,
-        service.priority_policy_name,
-        service.enabled ? "enabled" : "disabled",
-    ].join(" ").toLowerCase();
-}
-
-
-function getFilteredServices() {
-    const query = String($("#services-search").val() || "").trim().toLowerCase();
-    const status = String($("#services-status-filter").val() || "");
-    const criticality = String($("#services-criticality-filter").val() || "");
-    const readinessStatus = String($("#services-readiness-filter").val() || "");
-
-    return servicesCache.filter(function (service) {
-        if (status && service.status !== status) {
-            return false;
-        }
-
-        if (criticality && service.criticality !== criticality) {
-            return false;
-        }
-
-        if (readinessStatus && getServiceReadinessStatus(service) !== readinessStatus) {
-            return false;
-        }
-
-        if (!query) {
-            return true;
-        }
-
-        return getServiceSearchText(service).indexOf(query) !== -1;
-    });
-}
-
-
-function renderServicesTable() {
-    const tbody = $("#services-table");
-    const services = getFilteredServices();
-    const pageServices = servicesPagination.render(services);
-
-    tbody.empty();
-
-    $("#services-filtered-count").text(services.length);
-    $("#services-total-count").text(servicesCache.length);
+function renderServicesTable(services) {
+    const tbody = $("#services-table").empty();
 
     if (!services.length) {
         tbody.append(
@@ -634,7 +599,7 @@ function renderServicesTable() {
         return;
     }
 
-    pageServices.forEach(function (service) {
+    services.forEach(function (service) {
         tbody.append(renderServiceRow(service));
     });
 }

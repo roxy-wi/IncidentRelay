@@ -82,3 +82,20 @@ def test_incident_assignment_does_not_change_alert_group_assignment(db):
     updated = core.assign_incident(incident.id, assignee_id=replacement.id, expected_version=incident.row_version, user_id=operational.id)
     assert updated.assignee_id == replacement.id
     assert AlertGroup.get_by_id(alert_group.id).assignee_id == technical.id
+
+
+def test_reopen_preserves_one_open_incident_per_linked_group(db):
+    team = create_team(create_group())
+    first = Incident.create(team=team, title="Earlier incident")
+    second = Incident.create(team=team, title="New incident")
+    group = _alert_group(team)
+    link = core.link_alert_group(first.id, group.id, relation_type="symptom")
+    Incident.update(workflow_status="closed").where(Incident.id == first.id).execute()
+    core.link_alert_group(second.id, group.id, relation_type="duplicate")
+    with pytest.raises(core.IncidentConflictError, match="another open incident"):
+        core.transition_incident(first.id, "investigating", expected_version=first.row_version)
+    assert Incident.get_by_id(first.id).workflow_status == "closed"
+    assert IncidentAlertGroupLink.get_by_id(link.id).removed_at is None
+    core.unlink_alert_group(second.id, group.id)
+    reopened = core.transition_incident(first.id, "investigating", expected_version=first.row_version)
+    assert reopened.workflow_status == "investigating"

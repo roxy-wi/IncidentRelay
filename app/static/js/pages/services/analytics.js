@@ -1,6 +1,7 @@
 // Service analytics and SLO analytics rendering.
 
 function refreshServiceAnalytics() {
+    const generation = servicesLoadGeneration;
     const days = Number($("#service-analytics-days").val() || 30);
     const separator = selectedTeamQuery() ? "&" : "?";
     const url = "/api/services/analytics" + selectedTeamQuery()
@@ -18,10 +19,11 @@ function refreshServiceAnalytics() {
         ].join("&");
 
     apiGet(url, function (payload) {
+        if (generation !== servicesLoadGeneration) return;
         serviceAnalyticsPayload = payload || {};
         serviceAnalyticsCache = asArray(serviceAnalyticsPayload.items);
 
-        renderServiceAnalyticsSummary();
+        if (servicesPageTab === "analytics") renderServiceAnalyticsSummary();
         renderServiceAnalyticsCharts();
         renderServiceAnalyticsTable();
     });

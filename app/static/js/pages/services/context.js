@@ -1,9 +1,12 @@
 // Service page tabs, shared context loading, links, runbooks and dependencies CRUD.
 
+let serviceContextVersion = 0;
+let serviceGraphContextVersion = null;
+
 function getServiceById(serviceId) {
-    return servicesCache.find(function (service) {
-        return Number(service.id) === Number(serviceId);
-    }) || null;
+    const matches = service => Number(service.id) === Number(serviceId);
+    return servicesPageItems.find(matches) || servicesCache.find(matches) ||
+        (linkedCatalogService && matches(linkedCatalogService) ? linkedCatalogService : null);
 }
 
 
@@ -86,7 +89,10 @@ function fillServiceSelect(selectSelector, selectedId) {
     const select = $(selectElement);
     select.empty();
 
-    servicesCache.forEach(function (service) {
+    const selected = getServiceById(selectedId);
+    const choices = selected && !servicesCache.some(service => service.id === selected.id)
+        ? [selected, ...servicesCache] : servicesCache;
+    choices.forEach(function (service) {
         if (!service.enabled) {
             return;
         }
@@ -125,12 +131,18 @@ function switchServicesPageTab(tab) {
 
     $("#services-page-layout").addClass("is-full-width");
 
+    if (servicesPageTab !== "services" && !servicesContextLoaded) {
+        $("#services-tab-" + servicesPageTab).hide();
+        loadServicesForContext();
+        return;
+    }
+
     if (servicesPageTab === "links") {
         renderAllServiceLinksTable();
     } else if (servicesPageTab === "runbooks") {
         renderAllServiceRunbooksTable();
     } else if (servicesPageTab === "dependencies") {
-       applyServiceDependenciesView(serviceDependenciesView, { persist: false });
+        applyServiceDependenciesView(serviceDependenciesView, {persist: false});
     } else if (servicesPageTab === "impact") {
         applyServiceImpactView(serviceImpactView);
 
@@ -168,6 +180,7 @@ function switchServicesPageTab(tab) {
 
 
 function refreshAllServiceContext() {
+    const version = ++serviceContextVersion;
     allServiceLinksCache = [];
     allServiceRunbooksCache = [];
     allServiceDependenciesCache = [];
@@ -179,7 +192,7 @@ function refreshAllServiceContext() {
     $("#services-dependencies-count").text("0");
 
     const query = selectedTeamQuery();
-    let pending = 5;
+    let pending = 3;
 
     function done() {
         pending -= 1;
@@ -203,6 +216,7 @@ function refreshAllServiceContext() {
     }
 
     apiGet("/api/services/links" + query, function (links) {
+        if (version !== serviceContextVersion) return;
         allServiceLinksCache = asArray(links).map(function (link) {
             link._service = getServiceById(link.service_id);
             return link;
@@ -211,6 +225,7 @@ function refreshAllServiceContext() {
     });
 
     apiGet("/api/services/runbooks" + query, function (runbooks) {
+        if (version !== serviceContextVersion) return;
         allServiceRunbooksCache = asArray(runbooks).map(function (runbook) {
             runbook._service = getServiceById(runbook.service_id);
             return runbook;
@@ -219,31 +234,38 @@ function refreshAllServiceContext() {
     });
 
     apiGet("/api/services/dependencies" + query, function (dependencies) {
+        if (version !== serviceContextVersion) return;
         allServiceDependenciesCache = asArray(dependencies).map(function (dependency) {
             dependency._service = getServiceById(dependency.service_id);
             return dependency;
         });
         done();
     });
+}
 
-    apiGet("/api/services/dependencies/graph" + query + (query ? "&" : "?") + "max_depth=5", function (dependencies) {
-        allServiceGraphDependenciesCache = asArray(dependencies).map(function (dependency) {
-            dependency._service = getServiceById(dependency.service_id);
-            return dependency;
-        });
-        done();
-    }, function () {
-        allServiceGraphDependenciesCache = [];
-        done();
-    });
 
-    apiGet("/api/business-services/components" + query, function (components) {
-        businessServiceComponentsCache = asArray(components);
-        done();
-    }, function () {
-        businessServiceComponentsCache = [];
-        done();
-    });
+function loadServiceGraphContext() {
+    if (serviceGraphContextVersion === serviceContextVersion) return;
+    const version = serviceContextVersion;
+    serviceGraphContextVersion = version;
+    const query = selectedTeamQuery();
+
+    function failed(xhr) {
+        if (version !== serviceContextVersion) return;
+        serviceGraphContextVersion = null;
+        showApiError(xhr);
+    }
+
+    apiGet("/api/services/dependencies/graph" + query + (query ? "&" : "?") + "max_depth=5", function (items) {
+        if (version !== serviceContextVersion) return;
+        allServiceGraphDependenciesCache = asArray(items);
+        scheduleRenderServiceDependencyGraph(100);
+    }, failed);
+    apiGet("/api/business-services/components" + query, function (items) {
+        if (version !== serviceContextVersion) return;
+        businessServiceComponentsCache = asArray(items);
+        scheduleRenderServiceDependencyGraph(100);
+    }, failed);
 }
 
 
@@ -1310,13 +1332,8 @@ $(document).on("click", "#services-page-tabs .page-tab", function () {
     switchServicesPageTab($(this).data("services-tab"));
 });
 
-function applyServiceListFilters() {
-    servicesPagination.reset();
-    renderServicesTable();
-}
-
-$(document).on("input", "#services-search", applyServiceListFilters);
-$(document).on("change", "#services-status-filter, #services-criticality-filter, #services-readiness-filter", applyServiceListFilters);
+$(document).on("input", "#services-search", servicesPagination.applyFilters);
+$(document).on("change", "#services-status-filter, #services-criticality-filter, #services-readiness-filter", servicesPagination.applyFilters);
 $(document).on("click", "#reload-services", refreshServices);
 $(document).on("click", "#open-service-create-modal", openCreateServiceModal);
 $(document).on("click", "#save-service", saveService);

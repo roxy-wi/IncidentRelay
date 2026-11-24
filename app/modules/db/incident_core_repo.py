@@ -157,8 +157,9 @@ def create_event(incident_id: int, event_type: str, *, user_id=None, message=Non
 
 def list_active_links(incident_id: int):
     return list(
-        IncidentAlertGroupLink.select(IncidentAlertGroupLink, AlertGroup)
+        IncidentAlertGroupLink.select(IncidentAlertGroupLink, AlertGroup, Incident)
         .join(AlertGroup)
+        .join_from(IncidentAlertGroupLink, Incident)
         .where(
             IncidentAlertGroupLink.incident == int(incident_id),
             IncidentAlertGroupLink.removed_at.is_null(True),

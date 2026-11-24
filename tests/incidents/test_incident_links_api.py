@@ -1,6 +1,8 @@
+import pytest
+
 from app.login import create_access_token
 from app.modules.db import incident_core_repo
-from app.modules.db.models import AlertGroup
+from app.modules.db.models import AlertGroup, AuditLog, Incident, IncidentEvent
 from app.services.incidents import core
 from tests.factories import add_user_to_team, create_group, create_team, create_user, unique
 
@@ -21,7 +23,8 @@ def _alert_group(team):
     )
 
 
-def test_link_is_visible_from_incident_and_alert_group_api(client, db):
+@pytest.mark.parametrize("relation_type", ["primary", "related", "symptom", "duplicate"])
+def test_link_is_visible_from_incident_and_alert_group_api(client, db, relation_type):
     group = create_group()
     team = create_team(group)
     user = create_user(group=group)
@@ -37,7 +40,7 @@ def test_link_is_visible_from_incident_and_alert_group_api(client, db):
 
     linked = client.post(
         f"/api/incidents/{incident.id}/alert-groups",
-        json={"alert_group_id": alert_group.id, "relation_type": "related"},
+        json={"alert_group_id": alert_group.id, "relation_type": relation_type},
         headers=headers,
     )
     assert linked.status_code == 201, linked.get_json()
@@ -57,9 +60,78 @@ def test_link_is_visible_from_incident_and_alert_group_api(client, db):
     )
     assert alert_link.status_code == 200, alert_link.get_json()
     payload = alert_link.get_json()
-    assert payload["relation_type"] == "related"
+    assert payload["relation_type"] == relation_type
     assert payload["incident"]["id"] == incident.id
     assert payload["incident"]["title"] == "Operational incident"
+
+
+def test_edit_preserves_link_identity_and_audits_each_change_once(client, db):
+    team = create_team(create_group())
+    actor = create_user(group=team.group)
+    add_user_to_team(team, actor, role="responder")
+    headers = _headers(actor)
+    group = _alert_group(team)
+    incident = Incident.create(team=team, title="Service outage")
+    creator = create_user(group=team.group)
+    link = core.link_alert_group(incident.id, group.id, relation_type="primary", user_id=creator.id)
+    path = f"/api/incidents/{incident.id}/alert-groups/{group.id}"
+    version = incident.row_version
+    previous_type = "primary"
+    for new_type in ("symptom", "duplicate", "related", "primary"):
+        payload = {"link_id": link.id, "row_version": version, "relation_type": new_type}
+        response = client.patch(path, headers=headers, json=payload)
+        assert response.status_code == 200, response.get_json()
+        changed = response.get_json()
+        assert changed["id"] == link.id
+        assert changed["relation_type"] == new_type
+        assert changed["incident_row_version"] == version + 1
+        assert changed["linked_by_id"] == creator.id
+        current = incident_core_repo.active_link(incident.id, group.id)
+        assert current.linked_at == link.linked_at
+        audit = AuditLog.select().order_by(AuditLog.id.desc()).get()
+        assert audit.action == "incident.group_relation_change"
+        event = IncidentEvent.select().order_by(IncidentEvent.id.desc()).get()
+        assert event.event_type == "incident_group_relation_changed"
+        assert event.user_id == audit.user_id == actor.id
+        assert event.data == {"alert_group_id": group.id, "link_id": link.id, "from": previous_type, "to": new_type}
+        assert audit.data == {**event.data, "source": "api"}
+        assert client.patch(path, headers=headers, json=payload).status_code == 409
+        version = changed["incident_row_version"]
+        same = client.patch(path, headers=headers, json={**payload, "row_version": version})
+        assert same.status_code == 200
+        assert same.get_json()["incident_row_version"] == version
+        previous_type = new_type
+    assert IncidentEvent.select().where(IncidentEvent.event_type == "incident_group_relation_changed").count() == 4
+    assert AuditLog.select().where(AuditLog.action == "incident.group_relation_change").count() == 4
+
+
+def test_edit_rejects_invalid_primary_stale_link_and_terminal_incident(client, db, admin_user):
+    team = create_team(create_group())
+    incident = Incident.create(team=team, title="Link conflicts")
+    primary = _alert_group(team)
+    group = _alert_group(team)
+    core.link_alert_group(incident.id, primary.id, relation_type="primary")
+    link = core.link_alert_group(incident.id, group.id)
+    headers = _headers(admin_user)
+    path = f"/api/incidents/{incident.id}/alert-groups/{group.id}"
+    payload = {"row_version": incident.row_version, "link_id": link.id, "relation_type": "primary"}
+    assert client.patch(path, headers=headers, json=payload).status_code == 409
+    assert client.patch(path, headers=headers, json={**payload, "relation_type": "bad"}).status_code == 400
+    for field in payload:
+        incomplete = payload.copy()
+        del incomplete[field]
+        assert client.patch(path, headers=headers, json=incomplete).status_code == 400
+    core.unlink_alert_group(incident.id, group.id)
+    payload["relation_type"] = "symptom"
+    assert client.patch(path, headers=headers, json=payload).status_code == 404
+    replacement = core.link_alert_group(incident.id, group.id)
+    assert client.patch(path, headers=headers, json=payload).status_code == 409
+    payload["link_id"] = replacement.id
+    for status in ("closed", "cancelled"):
+        Incident.update(workflow_status=status).where(Incident.id == incident.id).execute()
+        assert client.patch(path, headers=headers, json=payload).status_code == 409
+    assert incident_core_repo.active_link(incident.id, group.id).relation_type == "related"
+    assert Incident.get_by_id(incident.id).row_version == incident.row_version
 
 
 def test_alert_group_incident_endpoint_returns_null_after_unlink(client, db):
@@ -84,6 +156,29 @@ def test_alert_group_incident_endpoint_returns_null_after_unlink(client, db):
     )
     assert response.status_code == 200, response.get_json()
     assert response.get_json() is None
+
+
+def test_responder_permission_is_rechecked_inside_relation_edit(client, db, monkeypatch):
+    team = create_team(create_group())
+    actor = create_user(group=team.group, group_role="viewer")
+    membership = add_user_to_team(team, actor, role="responder")
+    incident = Incident.create(team=team, title="Permission change")
+    group = _alert_group(team)
+    link = core.link_alert_group(incident.id, group.id)
+    original_lock = incident_core_repo.lock_incident
+
+    def lock_after_demotion(incident_id):
+        membership.role = "viewer"
+        membership.save()
+        return original_lock(incident_id)
+
+    monkeypatch.setattr(incident_core_repo, "lock_incident", lock_after_demotion)
+    response = client.patch(
+        f"/api/incidents/{incident.id}/alert-groups/{group.id}", headers=_headers(actor),
+        json={"link_id": link.id, "row_version": incident.row_version, "relation_type": "symptom"},
+    )
+    assert response.status_code == 403
+    assert incident_core_repo.active_link(incident.id, group.id).relation_type == "related"
 
 
 def test_link_rejects_alert_group_outside_user_team_scope(client, db):
@@ -214,7 +309,12 @@ def test_incident_link_operations_reject_foreign_team_and_unscoped_signals(clien
             headers=headers,
         )
         assert link_response.status_code in (403, 404), link_response.get_json()
-        IncidentAlertGroupLink.create(incident=incident, alert_group=signal, relation_type="related")
+        link = IncidentAlertGroupLink.create(incident=incident, alert_group=signal, relation_type="related")
+        edit = client.patch(
+            f"/api/incidents/{incident.id}/alert-groups/{signal.id}", headers=headers,
+            json={"link_id": link.id, "row_version": incident.row_version, "relation_type": "symptom"},
+        )
+        assert edit.status_code == 403
         unlink_response = client.delete(
             f"/api/incidents/{incident.id}/alert-groups/{signal.id}", headers=headers,
         )

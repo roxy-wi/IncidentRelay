@@ -1,4 +1,6 @@
-from app.api.openapi.common import ERROR_SCHEMA, json_body, path_param, query_param, response
+from app.api.openapi.common import (
+    ERROR_SCHEMA, catalog_list_schema, catalog_page_parameters, json_body, path_param, query_param, response,
+)
 
 
 BUSINESS_SERVICE_STATUSES = [
@@ -364,11 +366,19 @@ def paths():
                 "parameters": [
                     query_param("group_id", "Filter by group id.", {"type": "integer", "minimum": 1}),
                     query_param("public", "Return public business services only.", {"type": "boolean"}),
+                    *catalog_page_parameters(),
+                    query_param("visibility", "Filter by publication state (paged mode).",
+                                {"type": "string", "enum": ["public", "private"]}),
+                    query_param("status", "Effective business service status (paged mode).",
+                                {"type": "string", "enum": BUSINESS_SERVICE_STATUSES}),
+                    query_param("refresh_status", "Recalculate statuses in the scoped catalog before paging. "
+                                "By default only unevaluated and expired statuses are refreshed.",
+                                {"type": "boolean", "default": False}),
                 ],
                 "responses": {
                     "200": response(
-                        "Business services.",
-                        {"type": "array", "items": BUSINESS_SERVICE_SCHEMA},
+                        "Business services, paged when page or page_size is specified.",
+                        catalog_list_schema(BUSINESS_SERVICE_SCHEMA, ("total", "operational", "affected", "public")),
                     ),
                     "401": response("Authentication required.", ERROR_SCHEMA),
                     "403": response("Access denied.", ERROR_SCHEMA),

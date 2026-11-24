@@ -2,12 +2,20 @@
 
 from __future__ import annotations
 
+from typing import get_args
+
+from app.api.schemas.incidents import IncidentRelationType
 from app.db import database_proxy as db
 from app.modules.common import utc_now
 from app.modules.db import audit_repo, incident_core_repo, incidents_repo
-from app.modules.db.models import AlertGroup, Incident, IncidentStakeholder, Service, ServiceOwner, Team, User, UserGroup
+from app.modules.db.models import (
+    AlertGroup, Incident, IncidentAlertGroupLink, IncidentStakeholder,
+    Service, ServiceOwner, Team, User, UserGroup,
+)
 from app.modules.redaction import redact_secrets
+from app.services.authorization import refresh_authority
 from app.services.notifications.incidents import enqueue_stakeholders
+from app.services.rbac import can_respond_team, is_admin_user
 
 
 VALID_STATUSES = {
@@ -29,7 +37,7 @@ STATUS_TRANSITIONS = {
     "closed": {"investigating"},
     "cancelled": set(),
 }
-CORE_RELATION_TYPES = {"primary", "related"}
+CORE_RELATION_TYPES = get_args(IncidentRelationType)
 
 
 class IncidentValidationError(ValueError):
@@ -268,7 +276,14 @@ def transition_incident(
     elif incident.workflow_status == "closed" and new_status == "investigating":
         changes.update(closed_at=None, closed_by=None, resolved_at=None)
     try:
-        with db.atomic():
+        with incident_core_repo.incident_transaction(incident.id) as locked:
+            if locked.workflow_status == "closed" and new_status == "investigating":
+                # A group may have acquired a different open Incident while this one was closed.
+                links = incident_core_repo.list_active_links(incident.id)
+                for group_id in sorted(link.alert_group_id for link in links):
+                    incident_core_repo.lock_alert_group(group_id)
+                    if incident_core_repo.active_link_for_group(group_id):
+                        raise IncidentConflictError("alert group is already linked to another open incident")
             updated = incident_core_repo.compare_and_swap(incident.id, expected_version, **changes)
             data = {"from": incident.workflow_status, "to": new_status}
             event = incident_core_repo.create_event(updated.id, "incident_status_changed", user_id=user_id, data=data)
@@ -286,9 +301,28 @@ def transition_incident(
         raise IncidentConflictError(str(exc)) from exc
 
 
+def _validate_relation_type(relation_type):
+    if relation_type not in CORE_RELATION_TYPES:
+        raise IncidentValidationError(f"relation_type must be one of {', '.join(CORE_RELATION_TYPES)}")
+
+
+def _require_available_primary(incident_id, relation_type):
+    if relation_type == "primary" and incident_core_repo.active_primary_link(incident_id):
+        raise IncidentConflictError("incident already has an active primary alert group")
+
+
+def _require_link_responder(user, team_id):
+    authority = refresh_authority(lock=True)
+    actor = authority.user if authority.token else User.get_or_none(
+        User.id == getattr(user, "id", None), User.active == True, User.deleted == False,  # noqa: E712
+    )
+    if not actor or not (is_admin_user(actor) or (team_id and can_respond_team(actor, team_id))):
+        raise PermissionError("Team responder role is required for this incident")
+
+
 def link_alert_group(
     incident_id, alert_group_id, *, relation_type="related", user_id=None,
-    api_token_id=None, source="system",
+    api_token_id=None, source="system", user=None,
 ):
     incident = incident_core_repo.get_incident(incident_id)
     if not incident:
@@ -296,31 +330,33 @@ def link_alert_group(
     if incident.workflow_status in TERMINAL_STATUSES:
         raise IncidentValidationError("cannot link alert groups to a terminal incident")
     relation_type = str(relation_type or "related").strip().lower()
-    if relation_type not in CORE_RELATION_TYPES:
-        raise IncidentValidationError("relation_type must be primary or related in IncidentRelay 2.3")
+    _validate_relation_type(relation_type)
     alert_group = AlertGroup.get_or_none(AlertGroup.id == int(alert_group_id))
     if not alert_group:
         raise IncidentValidationError("alert group not found")
     if alert_group.team_id != incident.team_id:
         raise IncidentValidationError("alert group belongs to another team")
     with incident_core_repo.incident_transaction(incident.id) as locked_incident:
+        if user is not None:
+            _require_link_responder(user, locked_incident.team_id)
         # The AlertGroup lock also serializes links from different Incidents.
         locked_group = incident_core_repo.lock_alert_group(alert_group.id)
         if locked_incident.workflow_status in TERMINAL_STATUSES:
             raise IncidentValidationError("cannot link alert groups to a terminal incident")
         if not locked_group:
             raise IncidentValidationError("incident or alert group disappeared during linking")
+        if locked_group.team_id != locked_incident.team_id:
+            raise IncidentValidationError("alert group belongs to another team")
         existing = incident_core_repo.active_link(incident.id, alert_group.id)
         if existing:
             return existing
         conflicting = incident_core_repo.active_link_for_group(alert_group.id)
         if conflicting and conflicting.incident_id != incident.id:
             raise IncidentConflictError("alert group is already linked to another open incident")
-        if relation_type == "primary" and incident_core_repo.active_primary_link(incident.id):
-            raise IncidentConflictError("incident already has an active primary alert group")
+        _require_available_primary(incident.id, relation_type)
         link = incident_core_repo.create_link(
-            incident=incident,
-            alert_group=alert_group,
+            incident=locked_incident,
+            alert_group=locked_group,
             relation_type=relation_type,
             linked_by=user_id,
         )
@@ -328,6 +364,45 @@ def link_alert_group(
         incident_core_repo.create_event(incident.id, "incident_group_linked", user_id=user_id, data=data)
         _audit(
             "incident.group_link", incident, user_id=user_id,
+            api_token_id=api_token_id, source=source, data=data,
+        )
+    return link
+
+
+def change_alert_group_relation(
+    incident_id, alert_group_id, *, link_id, relation_type, expected_version,
+    user, api_token_id=None, source="system",
+):
+    """Change the active link in place and record the old and new types atomically."""
+    _validate_relation_type(relation_type)
+    with incident_core_repo.incident_transaction(incident_id) as incident:
+        _require_link_responder(user, incident.team_id)
+        link = incident_core_repo.active_link(incident.id, alert_group_id)
+        if not link:
+            raise LookupError("Active Incident/AlertGroup link not found")
+        group = incident_core_repo.lock_alert_group(alert_group_id)
+        if not group:
+            raise LookupError("Alert group not found")
+        if group.team_id != incident.team_id:
+            raise PermissionError("Alert group is outside the incident team")
+        if incident.workflow_status in TERMINAL_STATUSES:
+            raise IncidentConflictError("cannot change alert group relations on a terminal incident")
+        if link.id != link_id or incident.row_version != expected_version:
+            raise IncidentConflictError("incident or alert group link was modified by another request")
+        if link.relation_type == relation_type:
+            link.incident = incident
+            return link
+        _require_available_primary(incident.id, relation_type)
+        data = {
+            "alert_group_id": group.id, "link_id": link.id,
+            "from": link.relation_type, "to": relation_type,
+        }
+        link.relation_type = relation_type
+        link.save(only=[IncidentAlertGroupLink.relation_type])
+        link.incident = incident_core_repo.compare_and_swap(incident.id, expected_version)
+        incident_core_repo.create_event(incident.id, "incident_group_relation_changed", user_id=user.id, data=data)
+        _audit(
+            "incident.group_relation_change", incident, user_id=user.id,
             api_token_id=api_token_id, source=source, data=data,
         )
     return link

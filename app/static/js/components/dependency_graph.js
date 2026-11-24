@@ -48,6 +48,7 @@ function applyServiceDependenciesView(view, options) {
         return;
     }
 
+    if (servicesPageTab === "dependencies" && servicesContextLoaded) loadServiceGraphContext();
     scheduleRenderServiceDependencyGraph(100);
 }
 

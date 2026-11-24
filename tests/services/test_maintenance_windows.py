@@ -1332,7 +1332,64 @@ def test_cannot_take_over_foreign_maintenance_with_own_scopes(
     assert reconciled == []
 
 
-@pytest.mark.parametrize("actor_kind", ["owner", "admin", "legacy_scope_owner"])
+@pytest.mark.parametrize("operation", ["update", "replace_scopes", "cancel", "delete"])
+@pytest.mark.parametrize(("managed_scope", "group_role"), [
+    ("primary", "viewer"), ("secondary", "viewer"), ("secondary", "editor"),
+])
+def test_shared_window_requires_write_access_to_every_current_scope(
+    client, db, monkeypatch, operation, managed_scope, group_role,
+):
+    from unittest.mock import Mock
+
+    from app.services import maintenance
+
+    group = create_group()
+    primary = create_team(group)
+    secondary = create_team(group)
+    window = create_fixed_maintenance_window(
+        team=primary, service=create_service(primary),
+        starts_at=utc_now() + timedelta(days=1), ends_at=utc_now() + timedelta(days=2),
+    )
+    MaintenanceWindowScope.create(maintenance_window=window, scope_type="team", team=secondary)
+    managed, other = (primary, secondary) if managed_scope == "primary" else (secondary, primary)
+    manager = create_user(group=group, group_role=group_role)
+    add_user_to_team(managed, manager, role="manager")
+    headers = make_headers(manager)
+    url = f"/api/maintenance-windows/{window.id}"
+    reconcile = Mock()
+    monkeypatch.setattr(maintenance, "_reconcile_after_command", reconcile)
+
+    def submit():
+        if operation == "cancel":
+            return client.post(url + "/cancel", headers=headers)
+        if operation == "delete":
+            return client.delete(url, headers=headers)
+        if operation == "replace_scopes":
+            replacement = {"scope_type": "team", "team_id": managed.id}
+            return client.put(url, headers=headers, json={"scopes": [replacement]})
+        return client.put(url, headers=headers, json={"name": "Updated maintenance"})
+
+    windows = MaintenanceWindow.select().where(MaintenanceWindow.id == window.id).dicts()
+    scopes = MaintenanceWindowScope.select().where(
+        MaintenanceWindowScope.maintenance_window == window.id,
+    ).order_by(MaintenanceWindowScope.id).dicts()
+    before_window, before_scopes = windows.get(), list(scopes)
+    audits_before = AuditLog.select().count()
+
+    denied = submit()
+    assert denied.status_code == 403, denied.get_json()
+    assert windows.get() == before_window
+    assert list(scopes.clone()) == before_scopes
+    assert AuditLog.select().count() == audits_before
+    reconcile.assert_not_called()
+
+    add_user_to_team(other, manager, role="manager")
+    allowed = submit()
+    assert allowed.status_code == 200, allowed.get_json()
+    reconcile.assert_called_once()
+
+
+@pytest.mark.parametrize("actor_kind", ["owner", "admin", "legacy_scope_owner", "legacy_owner_only"])
 def test_authorized_user_can_replace_maintenance_scopes(client, db, actor_kind):
     group, team, route, service, user, headers = create_manager_context()
     window = create_fixed_maintenance_window(
@@ -1346,6 +1403,8 @@ def test_authorized_user_can_replace_maintenance_scopes(client, db, actor_kind):
         window.team = None
         window.group = None
         window.save()
+    elif actor_kind == "legacy_owner_only":
+        MaintenanceWindowScope.delete().where(MaintenanceWindowScope.maintenance_window == window).execute()
     response = client.put(
         f"/api/maintenance-windows/{window.id}", headers=headers,
         json={"scopes": [{"scope_type": "team", "team_id": team.id}]},

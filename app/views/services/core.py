@@ -194,24 +194,36 @@ def list_services():
         if error:
             return error
 
-        services = services_repo.list_services(team_id=team_id)
-    else:
-        services = services_repo.list_services(
-            team_ids=get_allowed_team_ids()
+    scope = {"team_id": team_id} if team_id else {"team_ids": get_allowed_team_ids()}
+    result = None
+    if "page" in request.args or "page_size" in request.args:
+        result = services_repo.paginate_services(
+            **scope,
+            page=request.args.get("page", 1, type=int),
+            page_size=request.args.get("page_size", 25, type=int),
+            search=request.args.get("search", "").strip(),
+            status=request.args.get("status", ""),
+            service_id=request.args.get("service_id", type=int),
+            criticality=request.args.get("criticality", ""),
+            readiness=request.args.get("readiness", ""),
         )
+        services = result["items"]
+    else:
+        services = services_repo.list_services(**scope)
 
     readiness_states = service_readiness.list_service_readiness_states(
         [service.id for service in services]
     )
 
-    return jsonify([
+    items = [
         serialize_service(
             service,
             current_user(),
             readiness_state=readiness_states.get(service.id),
         )
         for service in services
-    ])
+    ]
+    return jsonify({**result, "items": items} if result is not None else items)
 
 
 @services_bp.route("/<int:service_id>", methods=["GET"])

@@ -37,17 +37,32 @@ const fixture = JSON.parse(process.env.RELEASE_26_FIXTURE);
             ["teams", "Roster"], ["rotations", "Schedule"],
             ["services", "Workload"], ["business-services", "Product"],
         ]) {
+            const serviceList = name === "services" || name === "business-services";
+            const catalogRequests = [];
+            function recordCatalogRequest(request) {
+                const url = new URL(request.url());
+                if (url.pathname === "/api/" + name) catalogRequests.push(url.searchParams);
+            }
+            if (serviceList) page.on("request", recordCatalogRequest);
             await page.goto("/" + name);
             await count("#" + name + "-table > tr", 25);
             const pager = "#" + name + "-pagination";
-            const serviceList = name === "services" || name === "business-services";
             assert.equal(await page.locator(pager + "-filtered-count").textContent(), "27");
             assert.equal(await page.locator(pager).evaluate(el => el.parentElement.tagName),
                 name === "services" ? "DIV" : "SECTION", "footer sits outside the table wrapper");
             assert.ok(await page.locator(pager).evaluate(el => el.previousElementSibling.matches(".table-wrapper")));
             if (!serviceList) await centeredHealth();
+            const nextResponse = serviceList && page.waitForResponse(response => {
+                const url = new URL(response.url());
+                return url.pathname === "/api/" + name && url.searchParams.get("page") === "2";
+            });
             await page.locator(pager + "-next-page").click();
             await count("#" + name + "-table > tr", 2);
+            if (serviceList) {
+                const payload = await (await nextResponse).json();
+                assert.equal(payload.items.length, 2);
+                assert.equal(payload.pagination.total_items, 27);
+            }
             if (name === "rotations") {
                 await page.waitForFunction(() => Array.from(document.querySelectorAll("#rotations-table > tr")).every(row =>
                     row.querySelector("[data-rotation-health-id]")?.dataset.rotationHealthId === row.dataset.rotationId));
@@ -70,7 +85,7 @@ const fixture = JSON.parse(process.env.RELEASE_26_FIXTURE);
             assert.equal(await page.locator(pager + "-current-page").textContent(), "1");
             assert.match(await page.locator("#" + name + "-table").textContent(), /26/);
             await page.locator("#" + name + "-search").fill("not-a-match");
-            assert.equal(await page.locator(pager).isVisible(), false);
+            await page.locator(pager).waitFor({state: "hidden"});
             await page.locator("#" + name + "-search").fill("");
             await page.locator(pager + "-page-size").selectOption("10");
             await count("#" + name + "-table > tr", 10);
@@ -82,6 +97,24 @@ const fixture = JSON.parse(process.env.RELEASE_26_FIXTURE);
             assert.equal(await page.locator(pager).count(), 1);
             if (!serviceList) await centeredHealth();
             await page.screenshot({path: path.join(fixture.screenshots, name + ".png"), fullPage: true});
+            if (serviceList) {
+                page.off("request", recordCatalogRequest);
+                assert.ok(catalogRequests.every(params => params.has("page") && params.has("page_size")));
+                assert.ok(catalogRequests.some(params => params.get("search") === search + " 26"));
+            }
+            if (name === "services") {
+                const lookup = await page.request.get("/api/services?page=1&search=Workload%2026");
+                const target = (await lookup.json()).items[0];
+                await page.goto("/services?service_id=" + target.id);
+                await page.locator("#service-details-modal").waitFor();
+                await page.waitForFunction(name =>
+                    document.querySelector("#service-details-modal-title").textContent.includes(name), target.name);
+                await page.locator("#close-service-details-modal").click();
+                await page.locator('[data-services-tab="links"]').click();
+                await page.locator("#open-service-link-create-modal").click();
+                await page.locator("#service-link-modal").waitFor();
+                assert.equal(await page.locator("#service-link-service option[value='" + target.id + "']").count(), 1);
+            }
         }
         await page.goto("/calendar");
         await count("#calendar-grid > .rotation-calendar-block", 10);

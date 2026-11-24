@@ -1,21 +1,28 @@
+from peewee import JOIN, Case, fn
 
+from app.modules.common import utc_now
+from app.modules.db.catalog_pagination import catalog_page, catalog_search, catalog_summary
 from app.modules.db.models import (
+    EscalationPolicy,
+    NotificationPolicy,
+    PriorityPolicy,
+    Rotation,
     Service,
     ServiceDependency,
     ServiceLink,
     ServiceMatchRule,
-    ServiceRunbook,
-    Team,
     ServiceOwner,
+    ServiceReadinessState,
+    ServiceRunbook,
     ServiceSli,
     ServiceSlo,
     ServiceSloMeasurement,
+    Team,
     User,
 )
-from app.modules.common import utc_now
 
 
-def list_services(team_id=None, team_ids=None, include_disabled=True):
+def _service_scope(team_id=None, team_ids=None, include_disabled=True):
     """Return services filtered by team visibility."""
     query = (
         Service
@@ -28,15 +35,54 @@ def list_services(team_id=None, team_ids=None, include_disabled=True):
         query = query.where(Service.team == team_id)
 
     if team_ids is not None:
-        team_ids = list(team_ids)
-        if not team_ids:
-            return []
-        query = query.where(Service.team.in_(team_ids))
+        query = query.where(Service.team.in_(list(team_ids)))
 
     if not include_disabled:
         query = query.where(Service.enabled == True)
 
-    return list(query.order_by(Team.slug.asc(), Service.name.asc()))
+    return query
+
+
+def list_services(team_id=None, team_ids=None, include_disabled=True):
+    """Return all services filtered by team visibility."""
+    scope = _service_scope(team_id, team_ids, include_disabled)
+    return list(scope.order_by(Team.slug, Service.name, Service.id))
+
+
+def paginate_services(*, team_id=None, team_ids=None, page=1, page_size=25,
+                      search="", status="", criticality="", readiness="", service_id=None):
+    """Return a filtered page and summary of the authorized technical catalog."""
+    scope = _service_scope(team_id, team_ids)
+    summary = catalog_summary(
+        scope,
+        operational=Service.enabled & (Service.status == "operational"),
+        affected=Service.enabled & Service.status.not_in(("operational", "disabled", "")),
+        major=Service.status == "major_outage",
+    )
+    query = scope
+    if service_id is not None:
+        query = query.where(Service.id == service_id)
+    if status:
+        query = query.where(Service.status == status)
+    if criticality:
+        query = query.where(Service.criticality == criticality)
+    if search or readiness:
+        query = query.join_from(Service, ServiceReadinessState, JOIN.LEFT_OUTER)
+    if readiness:
+        query = query.where(fn.COALESCE(ServiceReadinessState.status, "not_evaluated") == readiness)
+    if search:
+        for model in (Rotation, EscalationPolicy, NotificationPolicy, PriorityPolicy):
+            query = query.join_from(Service, model, JOIN.LEFT_OUTER)
+        fields = (
+            Service.id, Service.name, Service.slug, Service.description,
+            Team.name, Team.slug, Service.service_type, Service.environment, Service.criticality,
+            Service.tier, Service.status, Service.kind, Service.lifecycle,
+            ServiceReadinessState.status, ServiceReadinessState.score,
+            Rotation.name, EscalationPolicy.name, NotificationPolicy.name, PriorityPolicy.name,
+            Case(None, ((Service.enabled, "enabled"),), "disabled"),
+        )
+        query = query.where(catalog_search(fields, search))
+    return catalog_page(query.order_by(Team.slug, Service.name, Service.id), page, page_size, summary)
 
 
 def get_service(service_id, include_deleted=False):

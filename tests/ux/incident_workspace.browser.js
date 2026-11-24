@@ -40,6 +40,27 @@ async function main() {
         await page.locator(".incident-title-button").first().click();
         await ready();
         assert.equal(await page.locator("#close-incident-details").count(), 0);
+        const relationEditor = page.locator("#incident-linked-alert-groups .incident-relation-editor");
+        assert.deepEqual(await relationEditor.locator("option").evaluateAll(options => options.map(o => o.value)),
+            ["related", "primary", "symptom", "duplicate"]);
+        await relationEditor.selectOption("symptom");
+        await waitForText("#incident-events", "Related → Symptom");
+        await page.reload();
+        await ready();
+        assert.equal(await relationEditor.inputValue(), "symptom");
+        const linksUrl = `/api/incidents/${fixture.incidentId}/alert-groups`;
+        const [link] = await (await context.request.get(linksUrl)).json();
+        const concurrentEdit = await context.request.patch(linksUrl + "/" + fixture.groupId, {
+            data: {link_id: link.id, row_version: link.incident_row_version, relation_type: "primary"},
+        });
+        assert.equal(concurrentEdit.status(), 200);
+        await relationEditor.selectOption("duplicate");
+        await waitForText("#incident-details-error", "The link type could not be saved.");
+        assert.equal(await relationEditor.inputValue(), "symptom");
+        await page.locator("#incident-details-reload").click();
+        await page.waitForFunction(() => document.querySelector(".incident-relation-editor")?.value === "primary");
+        await relationEditor.selectOption("duplicate");
+        await waitForText("#incident-events", "Primary → Duplicate");
         assert.equal(await page.locator(".incidents-workspace .incidents-card-description").count(), 0);
         assert.equal(await page.locator(".incidents-operation-card > .card-header .card-subtitle").count(), 1);
         assert.equal(await page.locator(".incidents-links-card > .card-header .card-subtitle").count(), 1);
@@ -232,6 +253,7 @@ async function main() {
         await ready();
         assert.equal(await page.locator("#incident-participant-add").isVisible(), false);
         assert.equal(await page.locator("#incident-root-cause").isDisabled(), true);
+        assert.equal(await relationEditor.count(), 0);
         assert.equal((await context.request.post(`/api/incidents/${fixture.incidentId}/comments`, {data: {body: "forbidden"}})).status(), 403);
         console.log("Workspace browser scenarios passed");
     } catch (error) {

@@ -367,6 +367,12 @@ def apply_business_service_status(business_service):
         return result
 
 
+def refresh_business_catalog_statuses(group_id=None, public_only=False, refresh_all=False):
+    """Refresh never-evaluated or expired statuses, or the full scope on reload."""
+    for item in business_services_repo.business_services_to_refresh(group_id, public_only, refresh_all):
+        apply_business_service_status(item)
+
+
 def impacted_service_ids_for_technical_service(service_id, max_depth=5):
     """Return the alert service and downstream services affected through dependencies."""
     if not service_id:

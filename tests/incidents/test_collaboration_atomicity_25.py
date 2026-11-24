@@ -111,7 +111,7 @@ def test_declaration_rolls_back_incident_snapshot_event_and_audit(
 
 
 @pytest.mark.parametrize(
-    "operation", ["update", "assign", "transition", "link", "unlink"]
+    "operation", ["update", "assign", "transition", "link", "unlink", "change_relation"]
 )
 @pytest.mark.parametrize("failure_point", ["event", "audit"])
 def test_incident_operations_roll_back_when_history_write_fails(
@@ -123,8 +123,8 @@ def test_incident_operations_roll_back_when_history_write_fails(
     team, actor = _context()
     incident = Incident.create(team=team, title="Original")
     group = _technical_group(team)
-    if operation == "unlink":
-        IncidentAlertGroupLink.create(incident=incident, alert_group=group)
+    if operation in {"unlink", "change_relation"}:
+        link = IncidentAlertGroupLink.create(incident=incident, alert_group=group)
     before = Incident.get_by_id(incident.id).__data__.copy()
     _inject_failure(monkeypatch, failure_point)
 
@@ -137,14 +137,20 @@ def test_incident_operations_roll_back_when_history_write_fails(
             core.transition_incident(incident.id, "investigating", expected_version=1)
         elif operation == "link":
             core.link_alert_group(incident.id, group.id)
+        elif operation == "change_relation":
+            core.change_alert_group_relation(
+                incident.id, group.id, link_id=link.id, user=actor,
+                expected_version=incident.row_version, relation_type="duplicate",
+            )
         else:
             core.unlink_alert_group(incident.id, group.id)
     assert Incident.get_by_id(incident.id).__data__ == before
     assert IncidentEvent.select().count() == AuditLog.select().count() == 0
     links = list(IncidentAlertGroupLink.select())
-    assert len(links) == (1 if operation == "unlink" else 0)
+    assert len(links) == (1 if operation in {"unlink", "change_relation"} else 0)
     if links:
         assert links[0].removed_at is None
+        assert links[0].relation_type == "related"
 
 
 def test_failed_primary_link_does_not_leave_incident_or_send_notification(

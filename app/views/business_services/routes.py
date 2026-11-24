@@ -12,7 +12,10 @@ from app.api.schemas.business_services import (
 )
 from app.modules.db import business_services_repo, services_repo, teams_repo
 from app.services.audit import write_audit
-from app.services.business_services.status import apply_business_service_status
+from app.services.business_services.status import (
+    apply_business_service_status,
+    refresh_business_catalog_statuses,
+)
 from app.services.service_catalog.impact import build_service_effective_impact_map
 from app.services.rbac import (
     can_read_group,
@@ -198,21 +201,37 @@ def list_business_services():
     else:
         current_user = request.current_user
 
-    items = business_services_repo.list_business_services(group_id=group_id, public_only=public_only)
-    items = _refresh_business_services_for_list(items)
+    result = None
+    if "page" in request.args or "page_size" in request.args:
+        refresh_business_catalog_statuses(
+            group_id, public_only, refresh_all=request.args.get("refresh_status") == "true",
+        )
+        result = business_services_repo.paginate_business_services(
+            group_id=group_id, public_only=public_only,
+            page=request.args.get("page", 1, type=int),
+            page_size=request.args.get("page_size", 25, type=int),
+            search=request.args.get("search", "").strip(),
+            status=request.args.get("status", ""),
+            visibility=request.args.get("visibility", ""),
+        )
+        items = result["items"]
+    else:
+        items = business_services_repo.list_business_services(group_id=group_id, public_only=public_only)
+        items = _refresh_business_services_for_list(items)
 
     component_counts = business_services_repo.count_components_by_business_service_ids(
         [item.id for item in items],
     )
 
-    return jsonify([
+    rows = [
         serialize_business_service(
             item,
             current_user=current_user,
             components_count=component_counts.get(item.id, 0),
         )
         for item in items
-    ])
+    ]
+    return jsonify({**result, "items": rows} if result is not None else rows)
 
 
 @business_services_bp.route("", methods=["POST"])

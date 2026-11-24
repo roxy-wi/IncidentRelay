@@ -50,6 +50,7 @@ is a no-op and generates neither record. Similarly, `resolve` maps to
 | Change Incident assignee | `incident.assignee_change` | `incident_assignee_changed` |
 | Change Incident status | `incident.status_change` | `incident_status_changed` |
 | Link/unlink AlertGroup | `incident.group_link` / `incident.group_unlink` | `incident_group_linked` / `incident_group_unlinked` |
+| Change AlertGroup link type | `incident.group_relation_change` | `incident_group_relation_changed` (link ID, AlertGroup ID, previous and new type) |
 | Reopen Incident via AlertGroup | `incident.reopen_by_alert_group` | `incident_reopened_by_alert_group` |
 
 Internal integrations that call ACK/Resolve without an explicit source are

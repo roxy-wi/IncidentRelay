@@ -1,16 +1,17 @@
-
-from peewee import fn
+from peewee import JOIN, fn
 
 from app.db import database_proxy as db
-
+from app.modules.common import utc_now
+from app.modules.db.catalog_pagination import catalog_page, catalog_search, catalog_summary
 from app.modules.db.models import (
     BusinessService,
     BusinessServiceComponent,
     BusinessServiceIncidentImpact,
     BusinessServiceStatusHistory,
+    Group,
     Service,
+    Team,
 )
-from app.modules.common import utc_now
 
 
 def set_business_service_manual_status(
@@ -71,7 +72,7 @@ def get_business_service_or_none(business_service_id):
     )
 
 
-def list_business_services(group_id=None, public_only=False, active_only=True):
+def _business_service_scope(group_id=None, public_only=False, active_only=True):
     query = BusinessService.select().where(BusinessService.deleted == False)  # noqa: E712
 
     if group_id:
@@ -83,7 +84,52 @@ def list_business_services(group_id=None, public_only=False, active_only=True):
     if active_only:
         query = query.where(BusinessService.enabled == True)  # noqa: E712
 
-    return list(query.order_by(BusinessService.public_order.asc(), BusinessService.name.asc()))
+    return query
+
+
+def list_business_services(group_id=None, public_only=False, active_only=True):
+    scope = _business_service_scope(group_id, public_only, active_only)
+    return list(scope.order_by(BusinessService.public_order, BusinessService.name, BusinessService.id))
+
+
+def business_services_to_refresh(group_id, public_only, refresh_all):
+    """Select only IDs needed by the status calculator before reading the catalog."""
+    scope = _business_service_scope(group_id, public_only)
+    if not refresh_all:
+        scope = scope.where(
+            BusinessService.status_updated_at.is_null()
+            | (BusinessService.manual_status.is_null(False) & (BusinessService.manual_status_until <= utc_now()))
+        )
+    return list(scope.select(BusinessService.id).order_by(BusinessService.id))
+
+
+def paginate_business_services(*, group_id=None, public_only=False, page=1, page_size=25,
+                               search="", status="", visibility=""):
+    """Return a filtered page and summary for the authorized business catalog."""
+    scope = _business_service_scope(group_id, public_only)
+    summary = catalog_summary(
+        scope,
+        operational=BusinessService.status == "operational",
+        affected=BusinessService.status.in_(("degraded", "partial_outage", "major_outage", "maintenance")),
+        public=BusinessService.public,
+    )
+    query = (
+        scope.select(BusinessService, Group, Team)
+        .join_from(BusinessService, Group)
+        .join_from(BusinessService, Team, JOIN.LEFT_OUTER)
+    )
+    if status:
+        query = query.where(BusinessService.status == status)
+    if visibility in ("public", "private"):
+        query = query.where(BusinessService.public == (visibility == "public"))
+    if search:
+        fields = (BusinessService.name, BusinessService.slug, BusinessService.description,
+                  Group.name, Group.slug, Team.name, Team.slug, BusinessService.status,
+                  BusinessService.criticality, BusinessService.tier,
+                  BusinessService.public_name, BusinessService.public_description)
+        query = query.where(catalog_search(fields, search))
+    order = (BusinessService.public_order, BusinessService.name, BusinessService.id)
+    return catalog_page(query.order_by(*order), page, page_size, summary)
 
 
 def create_business_service(data):

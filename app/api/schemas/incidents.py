@@ -22,6 +22,8 @@ IncidentPrioritySlug = Literal[
     "p5",
 ]
 
+IncidentRelationType = Literal["primary", "related", "symptom", "duplicate"]
+
 IncidentResponderTargetType = Literal[
     "user",
     "team",
@@ -79,7 +81,15 @@ class IncidentAssignmentSchema(ApiModel):
 
 class IncidentLinkSchema(ApiModel):
     alert_group_id: int = Field(ge=1)
-    relation_type: Literal["primary", "related"] = "related"
+    relation_type: IncidentRelationType = "related"
+
+
+class IncidentLinkUpdateSchema(ApiModel):
+    """Identify the observed link and guard the edit with the Incident version."""
+
+    link_id: int = Field(ge=1)
+    row_version: int = Field(ge=1)
+    relation_type: IncidentRelationType
 
 
 class IncidentParticipantCreateSchema(ApiModel):

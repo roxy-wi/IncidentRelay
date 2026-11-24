@@ -50,3 +50,36 @@ def response(description, schema=None):
     if schema:
         item["content"] = {"application/json": {"schema": schema}}
     return item
+
+
+def catalog_page_parameters():
+    """Query options shared by both paged service lists."""
+    return [
+        query_param("page", "Request a page instead of the full list (1-based).",
+                    {"type": "integer", "minimum": 1, "default": 1}),
+        query_param("page_size", "Rows per page. Also enables the paged response.",
+                    {"type": "integer", "minimum": 1, "maximum": 100, "default": 25}),
+        query_param("search", "Case-insensitive substring search over the scoped catalog (paged mode)."),
+    ]
+
+
+def catalog_list_schema(item, summary_fields):
+    """Describe the legacy array and the opt-in paged catalog response."""
+    items = {"type": "array", "items": item}
+    count = {"type": "integer", "minimum": 0}
+    pagination = {
+        name: count for name in ("page", "page_size", "total_items", "total_pages", "from", "to")
+    }
+    pagination.update({name: {"type": "boolean"} for name in ("has_prev", "has_next")})
+    return {"oneOf": [items, {
+        "type": "object",
+        "required": ["items", "pagination", "summary"],
+        "properties": {
+            "items": items,
+            "pagination": {"type": "object", "properties": pagination, "required": list(pagination)},
+            "summary": {
+                "type": "object", "description": "Totals before applying table filters.",
+                "properties": {name: count for name in summary_fields}, "required": list(summary_fields),
+            },
+        },
+    }]}

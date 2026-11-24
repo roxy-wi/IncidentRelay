@@ -282,13 +282,13 @@ def test_incident_workspace_responses_follow_published_contract(
             **ids,
             payload={"service_id": service.id},
         )
-    request(
-        "POST",
-        base + "/alert-groups",
-        201,
-        **ids,
-        payload={"alert_group_id": technical.id},
+    link = request("POST", base + "/alert-groups", 201, **ids,
+                   payload={"alert_group_id": technical.id, "relation_type": "symptom"})
+    changed = request(
+        "PATCH", base + "/alert-groups/{group_id}", 200, **ids, group_id=technical.id,
+        payload={"link_id": link["id"], "row_version": link["incident_row_version"], "relation_type": "duplicate"},
     )
+    assert changed["relation_type"] == "duplicate"
     for suffix in (
         "",
         "/participants",

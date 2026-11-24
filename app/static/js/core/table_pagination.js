@@ -246,22 +246,34 @@ function renderTablePaginationControls(options) {
 }
 
 
-function createClientTablePagination(options) {
-    // Filter first, then paginate the cached collection without changing API responses.
+function createServerTablePagination(options) {
     const prefix = options.prefix || options.id;
     const sizes = options.pageSizeOptions || [10, 25, 50, 100];
     let page = 1;
     let pageSize = options.pageSize || 25;
     let totalPages = 1;
+    let searchTimer = null;
+
+    function cancelSearch() {
+        if (searchTimer !== null) clearTimeout(searchTimer);
+        searchTimer = null;
+    }
+
+    function reset() {
+        cancelSearch();
+        page = 1;
+    }
 
     $(document).on("click", tablePaginationIdSelector(prefix + "-prev-page"), function () {
         if (page > 1) {
+            cancelSearch();
             page -= 1;
             options.onChange();
         }
     });
     $(document).on("click", tablePaginationIdSelector(prefix + "-next-page"), function () {
         if (page < totalPages) {
+            cancelSearch();
             page += 1;
             options.onChange();
         }
@@ -270,31 +282,63 @@ function createClientTablePagination(options) {
         const value = Number($(this).val());
         if (sizes.includes(value)) {
             pageSize = value;
-            page = 1;
+            reset();
             options.onChange();
         }
     });
 
     return {
-        reset: function () {
-            page = 1;
+        reset: reset,
+        applyFilters: function (event) {
+            reset();
+            if (event.type === "input") {
+                searchTimer = setTimeout(function () {
+                    reset();
+                    options.onChange();
+                }, 180);
+            } else {
+                options.onChange();
+            }
         },
+        parameters: function () {
+            return {page: page, page_size: pageSize};
+        },
+        render: function (pagination) {
+            page = pagination.page;
+            totalPages = pagination.total_pages;
+            renderTablePaginationControls({...options, pagination: pagination});
+        },
+    };
+}
+
+
+function catalogPageUrl(path, scope, pager, filters) {
+    const params = new URLSearchParams(scope);
+    Object.entries({...pager.parameters(), ...filters}).forEach(([key, value]) => {
+        if (value) params.set(key, value);
+    });
+    return path + "?" + params.toString();
+}
+
+
+function createClientTablePagination(options) {
+    const pager = createServerTablePagination(options);
+    return {
+        reset: pager.reset,
         render: function (items) {
-            totalPages = Math.max(1, Math.ceil(items.length / pageSize));
-            page = Math.min(page, totalPages);
+            const {page: requestedPage, page_size: pageSize} = pager.parameters();
+            const totalPages = Math.max(1, Math.ceil(items.length / pageSize));
+            const page = Math.min(requestedPage, totalPages);
             const offset = (page - 1) * pageSize;
-            renderTablePaginationControls({
-                ...options,
-                pagination: {
-                    page: page,
-                    page_size: pageSize,
-                    total_pages: totalPages,
-                    total_items: items.length,
-                    from: items.length ? offset + 1 : 0,
-                    to: Math.min(offset + pageSize, items.length),
-                    has_prev: page > 1,
-                    has_next: page < totalPages,
-                },
+            pager.render({
+                page: page,
+                page_size: pageSize,
+                total_pages: totalPages,
+                total_items: items.length,
+                from: items.length ? offset + 1 : 0,
+                to: Math.min(offset + pageSize, items.length),
+                has_prev: page > 1,
+                has_next: page < totalPages,
             });
             return items.slice(offset, offset + pageSize);
         },

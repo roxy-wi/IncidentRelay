@@ -43,6 +43,21 @@ fields, status or assignee. On `409`, reload the current record and reconcile yo
 edit before retrying. Collaboration actions have their own conflict rules.
 Workspace and collaboration timestamps use explicit UTC; the UI formats local time.
 
+## AlertGroup link types
+
+In **Linked AlertGroups**, a responder can choose the link type when adding a group
+or change it using the selector next to an existing group. Use `primary` for the
+main signal, `related` for additional context, `symptom` for an observed effect
+and `duplicate` for a group that reports the same problem. Only one active link
+per Incident can be primary. An AlertGroup can belong to at most one open Incident.
+
+To edit an active link, send `PATCH /api/incidents/{incident_id}/alert-groups/{group_id}`
+with the link's `id` as `link_id`, its `incident_row_version` as `row_version`, and
+the new `relation_type`. A successful edit keeps the link ID and original creator
+and records both types in the Incident activity and audit log. The response
+contains the updated link and Incident version. On `409`, reload the Incident and
+links before retrying. Closed and cancelled Incidents cannot be edited this way.
+
 ## Reading
 
 1. [2.5 release notes and release gates](release-notes-2.5.md)

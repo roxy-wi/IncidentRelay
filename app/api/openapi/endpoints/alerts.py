@@ -1,5 +1,6 @@
 from app.api.openapi.common import response, path_param, json_body, query_param
 from app.api.openapi.endpoints.business_services import BUSINESS_SERVICE_IMPACT_SCHEMA
+from app.api.openapi.endpoints.incidents import INCIDENT_RELATION_TYPE_SCHEMA
 
 
 def string_path_param(name, description):
@@ -75,7 +76,7 @@ def alert_group_incident_link_schema():
         "nullable": True,
         "properties": {
             "id": {"type": "integer"},
-            "relation_type": {"type": "string", "enum": ["primary", "related"]},
+            "relation_type": INCIDENT_RELATION_TYPE_SCHEMA,
             "linked_by_id": {"type": "integer", "nullable": True},
             "linked_at": date_time_property("Time when the AlertGroup was linked to the Incident."),
             "incident": {

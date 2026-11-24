@@ -670,8 +670,9 @@ function renderIncidentDetails(incident) {
     renderIncidentStatusControl(incident, canRespond);
     renderIncidentAssignmentControl(incident, canRespond);
 
-    $("#incident-link-controls").toggleClass("is-hidden", !canRespond);
-    if (canRespond) {
+    const canLink = canRespond && !["closed", "cancelled"].includes(incident.workflow_status);
+    $("#incident-link-controls").toggleClass("is-hidden", !canLink);
+    if (canLink) {
         const picker = initIncidentAlertGroupLinkPicker();
         if (picker) {
             picker.clear(true);
@@ -707,6 +708,7 @@ function renderIncidentLinks(links, canRespond) {
         target.append($("<div>").addClass("overview-empty").text(i18n.t("incidents.links.none")));
         return;
     }
+    const hasPrimary = links.some(link => link.relation_type === "primary");
     links.forEach(function (link) {
         const group = link.alert_group || {};
         const item = $("<div>").addClass("incident-linked-group");
@@ -725,6 +727,15 @@ function renderIncidentLinks(links, canRespond) {
                 .text(i18n.t("incidents.actions.open_alert"))
                 .on("click", function () { navigate("/alerts/" + link.alert_group_id, true); })
         );
+        if (canRespond && link.permissions && link.permissions.can_change_relation_type) {
+            const select = $("#incident-link-relation").clone().removeAttr("id")
+                .addClass("incident-relation-editor")
+                .attr("aria-label", i18n.t("incidents.links.relation_type") + " #" + link.alert_group_id)
+                .val(link.relation_type);
+            select.find("option[value=primary]").prop("disabled", hasPrimary && link.relation_type !== "primary");
+            select.on("change", function () { changeIncidentRelation(link, select); });
+            item.append(select);
+        }
         if (canRespond && link.permissions && link.permissions.can_unlink) {
             item.append(
                 $("<button>")
@@ -768,6 +779,11 @@ function renderIncidentEvents(events) {
         if ((reopened || event.event_type === "incident_status_changed") && data.from && data.to) {
             detail.append($("<div>").addClass("table-subtitle")
                 .text(incidentStatusLabel(data.from) + " → " + incidentStatusLabel(data.to)));
+        }
+        if (event.event_type === "incident_group_relation_changed" && data.from && data.to) {
+            const groupLabel = data.alert_group_id ? "#" + data.alert_group_id + " · " : "";
+            detail.append($("<div>").addClass("table-subtitle").text(groupLabel
+                + i18n.t("incidents.links." + data.from) + " → " + i18n.t("incidents.links." + data.to)));
         }
         if (event.source_type === "AlertGroup") {
             detail.append($("<a>").attr("href", "/alerts/" + encodeURIComponent(event.source_id))
@@ -1081,10 +1097,10 @@ function clearIncidentDetailsErrors() {
     $("#incident-details-reload").addClass("is-hidden");
 }
 
-function showIncidentDetailsError(xhr) {
+function showIncidentDetailsError(xhr, conflictKey = "incidents.workspace.conflict") {
     $("#incident-details-error")
         .removeClass("is-hidden")
-        .text(xhr && xhr.status === 409 ? i18n.t("incidents.workspace.conflict") : incidentInlineErrorMessage(xhr));
+        .text(xhr && xhr.status === 409 ? i18n.t(conflictKey) : incidentInlineErrorMessage(xhr));
     $("#incident-details-reload").toggleClass("is-hidden", !xhr || xhr.status !== 409);
 }
 
@@ -1131,6 +1147,27 @@ function transitionIncident(suffix, payload) {
             showIncidentStatusError(xhr);
         }
     );
+}
+
+function changeIncidentRelation(link, select) {
+    const incident = currentIncident;
+    const relationType = select.val();
+    if (!incident || relationType === link.relation_type) { return; }
+    select.prop("disabled", true);
+    clearIncidentDetailsErrors();
+    apiRequest("PATCH", "/api/incidents/" + incident.id + "/alert-groups/" + link.alert_group_id,
+        {link_id: link.id, row_version: incident.row_version, relation_type: relationType},
+        function (updated) {
+            if (!incidentIsCurrent(incident)) { return; }
+            incident.row_version = updated.incident_row_version;
+            currentIncidentLinks = currentIncidentLinks.map(item => item.id === updated.id ? updated : item);
+            renderIncidentLinks(currentIncidentLinks, incidentCanRespond(incident));
+            loadIncidentEvents(incident, false);
+        }, function (xhr) {
+            if (!incidentIsCurrent(incident)) { return; }
+            select.val(link.relation_type).prop("disabled", false);
+            showIncidentDetailsError(xhr, "incidents.links.conflict");
+        });
 }
 
 function unlinkIncidentAlertGroup(groupId) {

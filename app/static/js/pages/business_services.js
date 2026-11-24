@@ -1,16 +1,16 @@
-let businessServicesCache = [];
 let businessServiceDetailsCache = null;
 let businessServiceTeamsCache = [];
 let businessServiceGroupsCache = [];
 let businessServiceTechnicalServicesCache = [];
 let selectedBusinessServiceId = null;
 let businessServicesLoadSerial = 0;
+let businessServiceScopeLoading = false;
 let businessServiceDetailsLoadSerial = 0;
 
-const businessServicesPagination = createClientTablePagination({
+const businessServicesPagination = createServerTablePagination({
     id: "business-services-pagination",
     tableSelector: "#business-services-table",
-    onChange: renderBusinessServicesTable,
+    onChange: fetchBusinessServicesPage,
 });
 
 
@@ -252,20 +252,6 @@ function fillBusinessServiceGroupSelect(selectedId) {
 }
 
 
-function loadBusinessServiceTeams(callback) {
-    businessServiceTeamsCache = [];
-
-    apiGet("/api/teams", function (teams) {
-        businessServiceTeamsCache = asArray(teams);
-        refreshBusinessServiceGroupsCache();
-
-        if (typeof callback === "function") {
-            callback();
-        }
-    });
-}
-
-
 function loadBusinessServiceTechnicalServices(groupId, callback) {
     businessServiceTechnicalServicesCache = [];
 
@@ -341,94 +327,45 @@ function refreshBusinessServices() {
 
     initializeBusinessServiceSlugBinding();
 
-    loadBusinessServiceTeams(function () {
-        const groupId = selectedBusinessServiceListGroupId();
-
-        loadBusinessServiceTechnicalServices(groupId, function () {
-            apiGet("/api/business-services" + businessServiceListQuery(), function (items) {
-                if (serial !== businessServicesLoadSerial) {
-                    return;
-                }
-
-                businessServicesCache = asArray(items);
-                renderBusinessServicesSummary();
-                renderBusinessServicesTable();
-            });
-        });
+    businessServiceScopeLoading = true;
+    apiGet("/api/teams", function (teams) {
+        if (serial !== businessServicesLoadSerial) return;
+        businessServiceTeamsCache = asArray(teams);
+        refreshBusinessServiceGroupsCache();
+        businessServiceScopeLoading = false;
+        fetchBusinessServicesPage(true);
+    }, function (xhr) {
+        if (serial === businessServicesLoadSerial) showApiError(xhr);
     });
 }
 
 
-function getFilteredBusinessServices() {
-    const query = String($("#business-services-search").val() || "").trim().toLowerCase();
-    const status = $("#business-services-status-filter").val();
-    const publicFilter = $("#business-services-public-filter").val();
-
-    return businessServicesCache.filter(function (item) {
-        if (status && item.status !== status) {
-            return false;
-        }
-
-        if (publicFilter === "public" && !item.public) {
-            return false;
-        }
-
-        if (publicFilter === "private" && item.public) {
-            return false;
-        }
-
-        if (!query) {
-            return true;
-        }
-
-        return [
-            item.name,
-            item.slug,
-            item.description,
-            item.group_name,
-            item.group_slug,
-            item.owner_team_name,
-            item.owner_team_slug,
-            item.status,
-            item.criticality,
-            item.tier,
-            item.public_name,
-            item.public_description
-        ].join(" ").toLowerCase().indexOf(query) !== -1;
+function fetchBusinessServicesPage(refreshStatus = false) {
+    if (businessServiceScopeLoading) return;
+    const serial = ++businessServicesLoadSerial;
+    const url = catalogPageUrl("/api/business-services", businessServiceListQuery(), businessServicesPagination, {
+        search: String($("#business-services-search").val() || "").trim(),
+        status: $("#business-services-status-filter").val(),
+        visibility: $("#business-services-public-filter").val(),
+        refresh_status: refreshStatus === true ? "true" : "",
+    });
+    apiGet(url, function ({items, pagination, summary}) {
+        if (serial !== businessServicesLoadSerial) return;
+        businessServicesPagination.render(pagination);
+        $("#business-services-total, #business-services-total-count").text(summary.total);
+        $("#business-services-operational").text(summary.operational);
+        $("#business-services-affected").text(summary.affected);
+        $("#business-services-public").text(summary.public);
+        $("#business-services-filtered-count").text(pagination.total_items);
+        renderBusinessServicesTable(items);
+    }, function (xhr) {
+        if (serial === businessServicesLoadSerial) showApiError(xhr);
     });
 }
 
 
-function renderBusinessServicesSummary() {
-    const total = businessServicesCache.length;
-    const filtered = getFilteredBusinessServices().length;
-    const operational = businessServicesCache.filter(function (item) {
-        return item.status === "operational";
-    }).length;
-    const affected = businessServicesCache.filter(function (item) {
-        return ["degraded", "partial_outage", "major_outage", "maintenance"].indexOf(item.status) !== -1;
-    }).length;
-    const publicCount = businessServicesCache.filter(function (item) {
-        return !!item.public;
-    }).length;
-
-    $("#business-services-total").text(total);
-    $("#business-services-operational").text(operational);
-    $("#business-services-affected").text(affected);
-    $("#business-services-public").text(publicCount);
-    $("#business-services-total-count").text(total);
-    $("#business-services-filtered-count").text(filtered);
-}
-
-
-function renderBusinessServicesTable() {
+function renderBusinessServicesTable(items) {
     const tbody = $("#business-services-table");
-    const items = getFilteredBusinessServices();
-    const pageItems = businessServicesPagination.render(items);
-
-    $("#business-services-filtered-count").text(items.length);
-    $("#business-services-total-count").text(businessServicesCache.length);
-
     tbody.empty();
 
     if (!items.length) {
@@ -440,7 +377,7 @@ function renderBusinessServicesTable() {
         return;
     }
 
-    pageItems.forEach(function (item) {
+    items.forEach(function (item) {
         tbody.append(
             $("<tr>")
                 .toggleClass("row-disabled", !item.enabled)
@@ -884,15 +821,10 @@ function businessServicePayloadFromItem(item, enabled) {
 function setBusinessServiceEnabled(item, enabled) {
     const payload = businessServicePayloadFromItem(item, enabled);
 
-    apiPut("/api/business-services/" + item.id, payload, function (updatedItem) {
-        replaceBusinessServiceInCache(updatedItem || Object.assign({}, item, {enabled: enabled}));
-        renderBusinessServicesSummary();
-        renderBusinessServicesTable();
-
+    apiPut("/api/business-services/" + item.id, payload, function () {
+        fetchBusinessServicesPage();
         if (Number(selectedBusinessServiceId) === Number(item.id)) {
             openBusinessServiceDetailsModal(item.id);
-        } else {
-            refreshBusinessServices();
         }
     });
 }
@@ -1002,22 +934,15 @@ function recalculateBusinessService() {
 
     apiPost("/api/business-services/" + selectedBusinessServiceId + "/recalculate", {}, function (item) {
         businessServiceDetailsCache = item;
-        replaceBusinessServiceInCache(item);
-        renderBusinessServicesSummary();
-        renderBusinessServicesTable();
+        fetchBusinessServicesPage();
         renderBusinessServiceDetails(item);
     });
 }
 
 
-function applyBusinessServiceListFilters() {
-    businessServicesPagination.reset();
-    renderBusinessServicesTable();
-}
-
 $(document).on("click", "#reload-business-services", refreshBusinessServices);
-$(document).on("input", "#business-services-search", applyBusinessServiceListFilters);
-$(document).on("change", "#business-services-status-filter, #business-services-public-filter", applyBusinessServiceListFilters);
+$(document).on("input", "#business-services-search", businessServicesPagination.applyFilters);
+$(document).on("change", "#business-services-status-filter, #business-services-public-filter", businessServicesPagination.applyFilters);
 
 $(document).on("click", "#open-business-service-create-modal", openCreateBusinessServiceModal);
 $(document).on("click", "#save-business-service", saveBusinessService);
@@ -1095,27 +1020,6 @@ function showBusinessServiceManualStatusError(message) {
     node.text(message).show();
 }
 
-
-function replaceBusinessServiceInCache(item) {
-    if (!item || !item.id) {
-        return;
-    }
-
-    let replaced = false;
-
-    businessServicesCache = asArray(businessServicesCache).map(function (existing) {
-        if (Number(existing.id) !== Number(item.id)) {
-            return existing;
-        }
-
-        replaced = true;
-        return item;
-    });
-
-    if (!replaced) {
-        businessServicesCache.push(item);
-    }
-}
 
 function renderBusinessServiceManualStatus(details) {
     const source = details.status_source || "calculated";
@@ -1199,10 +1103,7 @@ function setBusinessServiceManualStatus() {
         $("#set-business-service-manual-status").prop("disabled", false);
 
         businessServiceDetailsCache = item;
-        replaceBusinessServiceInCache(item);
-
-        renderBusinessServicesSummary();
-        renderBusinessServicesTable();
+        fetchBusinessServicesPage();
         renderBusinessServiceDetails(item);
     }, function (xhr) {
         $("#set-business-service-manual-status").prop("disabled", false);
@@ -1227,10 +1128,7 @@ function clearBusinessServiceManualStatus() {
         $("#clear-business-service-manual-status").prop("disabled", false);
 
         businessServiceDetailsCache = item;
-        replaceBusinessServiceInCache(item);
-
-        renderBusinessServicesSummary();
-        renderBusinessServicesTable();
+        fetchBusinessServicesPage();
         renderBusinessServiceDetails(item);
     }, function (xhr) {
         $("#clear-business-service-manual-status").prop("disabled", false);

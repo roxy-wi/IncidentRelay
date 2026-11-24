@@ -344,10 +344,10 @@ Maintenance windows use write permissions for the selected scope.
 | `service` | Write access to the service team |
 | `route` | Write access to the route team |
 
-When updating a window:
-
-- If `scopes` is provided, permissions are checked against the new scopes.
-- If `scopes` is omitted, permissions are checked against the existing window owner or existing scopes.
+Updating, cancelling or deleting a window requires write access to every
+current scope. Replacing `scopes` also requires write access to every new
+scope. For legacy windows without stored scopes, the recorded owner determines
+write access.
 
 ## Audit log
 

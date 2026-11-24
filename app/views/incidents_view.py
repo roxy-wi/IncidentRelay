@@ -13,6 +13,7 @@ from app.api.schemas.incidents import (
     IncidentAffectedServiceSchema,
     IncidentCreateSchema,
     IncidentLinkSchema,
+    IncidentLinkUpdateSchema,
     IncidentTransitionSchema,
     IncidentUpdateSchema,
 )
@@ -30,6 +31,7 @@ from app.services.incidents.core import (
     IncidentConflictError,
     IncidentValidationError,
     assign_incident,
+    change_alert_group_relation,
     create_incident,
     link_alert_group,
     transition_incident,
@@ -375,13 +377,39 @@ def link_incident_alert_group(incident_id):
             incident.id,
             payload.alert_group_id,
             relation_type=payload.relation_type,
+            user=_request_user(),
             user_id=_request_user_id(),
             api_token_id=current_api_token_id(),
             source="api",
         )
     except (IncidentValidationError, IncidentConflictError) as exc:
         return _service_error(exc)
+    except PermissionError as exc:
+        return make_error_response("forbidden", str(exc), 403)
     return jsonify(serialize_incident_link(link, current_user=_request_user())), 201
+
+
+@incidents_bp.route("/<int:incident_id>/alert-groups/<int:group_id>", methods=["PATCH"])
+def change_incident_alert_group_relation(incident_id, group_id):
+    incident, error = _get_incident_or_error(incident_id, respond=True)
+    if error:
+        return error
+    payload, error = validate_body(IncidentLinkUpdateSchema)
+    if error:
+        return error
+    try:
+        link = change_alert_group_relation(
+            incident.id, group_id, link_id=payload.link_id, relation_type=payload.relation_type,
+            expected_version=payload.row_version, user=_request_user(),
+            api_token_id=current_api_token_id(), source="api",
+        )
+    except PermissionError as exc:
+        return make_error_response("forbidden", str(exc), 403)
+    except LookupError as exc:
+        return make_error_response("not_found", str(exc), 404)
+    except (IncidentConflictError, IncidentValidationError) as exc:
+        return _service_error(exc)
+    return jsonify(serialize_incident_link(link, current_user=_request_user()))
 
 
 @incidents_bp.route("/<int:incident_id>/alert-groups/<int:group_id>", methods=["DELETE"])
