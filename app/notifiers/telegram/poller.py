@@ -1,3 +1,4 @@
+import hashlib
 import re
 import logging
 from datetime import timedelta
@@ -27,7 +28,10 @@ from app.modules.common import utc_now
 
 logger = logging.getLogger("oncall.telegram")
 
-_channel_offsets = {}
+# getUpdates confirms offsets per bot token, not per channel. Channels that
+# share a token must share this offset, or the first channel to poll consumes
+# the button press and the channel named in the button never sees it.
+_token_offsets = {}
 _channel_auth_failed_until = {}
 _channel_transport_failed_until = {}
 
@@ -132,31 +136,99 @@ def list_polling_telegram_channels():
     ]
 
 
-def poll_telegram_channels_once(timeout=20):
-    """Poll all Telegram channels once."""
-    processed = 0
+def _token_key(token):
+    """Stable offset key that is not the bot token itself."""
+
+    return hashlib.sha256(str(token).encode()).hexdigest()
+
+
+def _channels_by_token():
+    """Group polling channels by bot token, keeping list order inside a group."""
+
+    grouped = {}
 
     for channel in list_polling_telegram_channels():
-        if _is_channel_auth_backoff_active(channel.id):
+        token = (channel.config or {}).get("bot_token")
+
+        if not token:
             continue
 
-        if _is_channel_transport_backoff_active(channel.id):
+        grouped.setdefault(token, []).append(channel)
+
+    return grouped
+
+
+def _group_in_backoff(channels):
+    return any(
+        _is_channel_auth_backoff_active(channel.id)
+        or _is_channel_transport_backoff_active(channel.id)
+        for channel in channels
+    )
+
+
+def _mark_group_auth_failed(channels):
+    for channel in channels:
+        _mark_channel_auth_failed(channel.id)
+
+
+def _mark_group_transport_failed(channels):
+    for channel in channels:
+        _mark_channel_transport_failed(channel.id)
+
+
+def _channel_log_fields(channels):
+    return {
+        "channel_id": channels[0].id,
+        "channel_ids": [channel.id for channel in channels],
+        "channel_name": getattr(channels[0], "name", None),
+    }
+
+
+def _channel_for_callback(callback, channels):
+    """Return the channel named in the button, when it shares this bot.
+
+    A press that does not parse, or names a channel this bot does not serve,
+    stays on the first channel. handle_telegram_callback then answers
+    "Invalid action" or "Action belongs to another channel" and does not
+    edit the message.
+    """
+
+    action_data = parse_telegram_action_data(getattr(callback, "data", None))
+
+    if not action_data:
+        return channels[0]
+
+    wanted = int(action_data["channel_id"])
+
+    for channel in channels:
+        if int(channel.id) == wanted:
+            return channel
+
+    return channels[0]
+
+
+def poll_telegram_channels_once(timeout=20):
+    """Poll each distinct Telegram bot token once."""
+
+    processed = 0
+
+    for token, channels in _channels_by_token().items():
+        if _group_in_backoff(channels):
             continue
 
         try:
-            processed += poll_telegram_channel_once(channel, timeout=timeout)
+            processed += poll_telegram_token_once(token, channels, timeout=timeout)
 
         except ApiTelegramException as exc:
             if _is_telegram_unauthorized(exc):
-                _mark_channel_auth_failed(channel.id)
+                _mark_group_auth_failed(channels)
 
                 logger.error(
                     "telegram channel token is unauthorized; polling temporarily suspended",
                     extra={
                         "extra": {
                             "event_type": "telegram_poll_auth_error",
-                            "channel_id": channel.id,
-                            "channel_name": getattr(channel, "name", None),
+                            **_channel_log_fields(channels),
                             "retry_after_seconds": TELEGRAM_AUTH_RETRY_SECONDS,
                             "telegram_error_code": _telegram_exception_error_code(exc),
                             "telegram_error": getattr(exc, "description", str(exc)),
@@ -170,8 +242,7 @@ def poll_telegram_channels_once(timeout=20):
                 extra={
                     "extra": {
                         "event_type": "telegram_poll_api_error",
-                        "channel_id": channel.id,
-                        "channel_name": getattr(channel, "name", None),
+                        **_channel_log_fields(channels),
                         "telegram_error_code": _telegram_exception_error_code(exc),
                         "telegram_error": _sanitize_error_message(
                             getattr(exc, "description", str(exc))
@@ -182,15 +253,14 @@ def poll_telegram_channels_once(timeout=20):
             continue
 
         except requests_exceptions.RequestException as exc:
-            _mark_channel_transport_failed(channel.id)
+            _mark_group_transport_failed(channels)
 
             logger.warning(
                 "telegram channel poll transport error; polling temporarily suspended",
                 extra={
                     "extra": {
                         "event_type": "telegram_poll_transport_error",
-                        "channel_id": channel.id,
-                        "channel_name": getattr(channel, "name", None),
+                        **_channel_log_fields(channels),
                         "reason": _friendly_transport_error(exc),
                         "retry_after_seconds": TELEGRAM_TRANSPORT_RETRY_SECONDS,
                         "proxy": _safe_proxy_label(),
@@ -207,8 +277,7 @@ def poll_telegram_channels_once(timeout=20):
                 extra={
                     "extra": {
                         "event_type": "telegram_poll_unexpected_error",
-                        "channel_id": channel.id,
-                        "channel_name": getattr(channel, "name", None),
+                        **_channel_log_fields(channels),
                         "error": str(exc),
                     }
                 },
@@ -217,13 +286,11 @@ def poll_telegram_channels_once(timeout=20):
     return processed
 
 
-def poll_telegram_channel_once(channel, timeout=20):
-    """
-    Poll one Telegram channel with getUpdates.
-    """
-    config = channel.config or {}
-    bot = get_telegram_bot(config.get("bot_token"))
-    offset = _channel_offsets.get(channel.id)
+def poll_telegram_token_once(token, channels, timeout=20):
+    """Poll one bot token and deliver each press to the channel stored in it."""
+
+    bot = get_telegram_bot(token)
+    offset = _token_offsets.get(_token_key(token))
 
     updates = bot.get_updates(
         offset=offset,
@@ -234,15 +301,30 @@ def poll_telegram_channel_once(channel, timeout=20):
     processed = 0
 
     for update in updates:
-        _channel_offsets[channel.id] = update.update_id + 1
+        _token_offsets[_token_key(token)] = update.update_id + 1
 
         if not update.callback_query:
             continue
 
-        handle_telegram_callback(channel, update.callback_query)
+        handle_telegram_callback(
+            _channel_for_callback(update.callback_query, channels),
+            update.callback_query,
+        )
         processed += 1
 
     return processed
+
+
+def poll_telegram_channel_once(channel, timeout=20):
+    """
+    Poll one Telegram channel with getUpdates.
+
+    A token shared with other channels is still polled on its own here.
+    poll_telegram_channels_once groups those channels so the press is read once.
+    """
+
+    token = (channel.config or {}).get("bot_token")
+    return poll_telegram_token_once(token, [channel], timeout=timeout)
 
 
 def handle_telegram_callback(channel, callback):

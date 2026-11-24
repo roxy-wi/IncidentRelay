@@ -36,6 +36,10 @@ For RPM installations:
 journalctl -u incidentrelay-telegram-worker -f
 ```
 
+## Several channels on one bot
+
+`getUpdates` belongs to the bot token, not to a channel. Channels that use the same `bot_token` are polled once, and a button press is handled by the channel id stored in the signed callback (`ir:<action>:<alert>:<channel>:<signature>`). A press for a channel this bot does not serve is rejected and the message is not edited. Distinct bot tokens are still polled one after another.
+
 ## User Telegram ID
 
 A user can have a Telegram user ID in their profile. This can be used for action attribution and future direct-user workflows.
