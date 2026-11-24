@@ -4,6 +4,7 @@ SEVERITY_ALIASES = {
     "error": "critical",
     "fatal": "critical",
     "disaster": "critical",
+    "emergency": "critical",
 
     "high": "high",
 

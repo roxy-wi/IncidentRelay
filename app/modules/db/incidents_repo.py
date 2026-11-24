@@ -117,7 +117,7 @@ def get_default_priority():
 def priority_from_severity(severity):
     severity = str(severity or "").strip().lower()
 
-    if severity in ("critical", "fatal", "disaster"):
+    if severity in ("critical", "fatal", "disaster", "emergency"):
         return get_priority_by_slug("p1") or get_default_priority()
 
     if severity in ("high", "error"):

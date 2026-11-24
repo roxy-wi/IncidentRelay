@@ -6,6 +6,7 @@ from app.services.severity import normalize_severity, normalize_severity_list
 def test_normalize_severity_known_aliases():
     assert normalize_severity("crit") == "critical"
     assert normalize_severity("disaster") == "critical"
+    assert normalize_severity("emergency") == "critical"
     assert normalize_severity("avg") == "medium"
     assert normalize_severity("average") == "medium"
     assert normalize_severity("warn") == "warning"
