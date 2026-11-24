@@ -1310,10 +1310,13 @@ $(document).on("click", "#services-page-tabs .page-tab", function () {
     switchServicesPageTab($(this).data("services-tab"));
 });
 
-$(document).on("input", "#services-search", renderServicesTable);
-$(document).on("change", "#services-status-filter", renderServicesTable);
-$(document).on("change", "#services-criticality-filter", renderServicesTable);
-$(document).on("change", "#services-readiness-filter", renderServicesTable);
+function applyServiceListFilters() {
+    servicesPagination.reset();
+    renderServicesTable();
+}
+
+$(document).on("input", "#services-search", applyServiceListFilters);
+$(document).on("change", "#services-status-filter, #services-criticality-filter, #services-readiness-filter", applyServiceListFilters);
 $(document).on("click", "#reload-services", refreshServices);
 $(document).on("click", "#open-service-create-modal", openCreateServiceModal);
 $(document).on("click", "#save-service", saveService);

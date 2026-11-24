@@ -22,6 +22,12 @@ let serviceSloAnalyticsCache = [];
 let serviceAnalyticsCharts = {};
 let serviceRunbookMatcherPresetsCache = [];
 
+const servicesPagination = createClientTablePagination({
+    id: "services-pagination",
+    tableSelector: "#services-table",
+    onChange: renderServicesTable,
+});
+
 const SERVICE_TYPE_OPTIONS = [
     ["api", "API"],
     ["web", "Web"],
@@ -402,6 +408,7 @@ function initializeServiceMatcherEditors() {
 }
 
 function loadServices() {
+    servicesPagination.reset();
     translateServicesWorkspace();
     initializeServiceClassificationSelects();
     initializeServiceMatcherEditors();
@@ -608,6 +615,7 @@ function getFilteredServices() {
 function renderServicesTable() {
     const tbody = $("#services-table");
     const services = getFilteredServices();
+    const pageServices = servicesPagination.render(services);
 
     tbody.empty();
 
@@ -626,7 +634,7 @@ function renderServicesTable() {
         return;
     }
 
-    services.forEach(function (service) {
+    pageServices.forEach(function (service) {
         tbody.append(renderServiceRow(service));
     });
 }

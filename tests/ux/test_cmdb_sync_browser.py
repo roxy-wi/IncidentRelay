@@ -11,14 +11,21 @@ import pytest
 from werkzeug.serving import make_server
 
 from app.login import create_access_token
-from app.modules.db.models import Service, BusinessService, BusinessServiceComponent
+from app.modules.db.models import Service, BusinessService, BusinessServiceComponent, ServiceDependency
 from app.services.sync.directory import service
-from tests.integrations.test_cmdb_sync import cmdb_source as cmdb_source, pages as pages, upstream as upstream
+from tests.integrations.test_cmdb_sync import cmdb_source as cmdb_source, obj, pages as pages, ref, upstream as upstream
 
 
 @pytest.mark.skipif(os.environ.get("INCIDENTRELAY_BROWSER_TESTS") != "1", reason="Enable browser tests")
 @pytest.mark.parametrize("locale", ["en", "ru"])
-def test_cmdb_sync_browser(app, db, cmdb_source, upstream, admin_user, locale):
+def test_cmdb_sync_browser(app, db, cmdb_source, pages, upstream, admin_user, locale):
+    systems = pages["services"]
+    systems["objectTypeAttributes"].append({"id": 16, "name": "Prod System", "type": 1})
+    systems["objectEntries"].extend([
+        obj(102, "Pending owner", {}),
+        obj(103, "Network", {1: [ref(11, "Operations")], 16: [ref(101, "Compute")]}),
+    ])
+    systems["totalFilterCount"] = 3
     stop = threading.Event()
     failures = []
 
@@ -49,7 +56,10 @@ def test_cmdb_sync_browser(app, db, cmdb_source, upstream, admin_user, locale):
         )
         assert result.returncode == 0, result.stdout + result.stderr
         assert not failures
-        assert Service.select().count() == BusinessService.select().count() == BusinessServiceComponent.select().count() == 1
+        assert Service.select().count() == 2
+        assert BusinessService.select().count() == BusinessServiceComponent.select().count() == 1
+        dependency = ServiceDependency.get()
+        assert (dependency.service.name, dependency.depends_on_service.name) == ("Network", "Compute")
     finally:
         stop.set()
         worker.join(timeout=10)

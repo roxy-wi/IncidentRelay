@@ -1,4 +1,6 @@
 {
+  "ds.cmdb_dependency_attribute": "Campo de dependencias entre servicios",
+  "ds.cmdb_dependency_hint": "Seleccione Prod System si el sistema depende de cada sistema indicado en ese campo. Déjelo vacío para desactivar la importación de dependencias.",
   "ds.format_json": "Formatear JSON",
   "ds.workflow_title_error": "Error de sincronización",
   "ds.workflow_title_current_error": "Error al comprobar la guardia",
@@ -151,7 +153,8 @@
   "ds.cmdb_mapping_hint": "Guarda y carga los campos para elegir atributos de Jira. El estado del ciclo de vida se guarda como información de CMDB y no cambia el estado operativo.",
   "ds.cmdb_inspect": "Cargar campos y equipos",
   "ds.cmdb_team_matches": "Relacionar equipos existentes de IR",
-  "ds.cmdb_team_hint": "Elige los campos de equipo por separado y vuelve a cargar los equipos. Relaciona los ID de CMDB con equipos activos existentes de IR. Esta fuente no crea equipos.",
+  "ds.cmdb_create_missing_teams": "Crear los equipos que falten en IR",
+  "ds.cmdb_team_hint": "La selección manual tiene prioridad. Con esta opción activa, si dejas una fila vacía, IR busca un equipo activo con el mismo nombre en el grupo de destino o lo crea allí durante la importación.",
   "ds.cmdb_value_mappings": "Correspondencias de entorno y criticidad",
   "ds.cmdb_object_label": "Usar la etiqueta del objeto",
   "ds.cmdb_not_mapped": "Sin correspondencia",

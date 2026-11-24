@@ -1,4 +1,6 @@
 {
+  "ds.cmdb_dependency_attribute": "Service dependency field",
+  "ds.cmdb_dependency_hint": "Select Prod System if the system depends on each system referenced in that field. Leave it empty to turn off dependency import.",
   "ds.format_json": "Format JSON",
   "ds.workflow_title_error": "Synchronization failed",
   "ds.workflow_title_current_error": "Current-duty check failed",
@@ -151,7 +153,8 @@
   "ds.cmdb_mapping_hint": "Save and load fields to choose attributes from Jira. Lifecycle status is stored as CMDB information and does not override operational health.",
   "ds.cmdb_inspect": "Load fields and teams",
   "ds.cmdb_team_matches": "Match existing IR teams",
-  "ds.cmdb_team_hint": "Select owner fields independently above, then load teams again. Match CMDB object IDs to existing active IR teams. This source never creates teams.",
+  "ds.cmdb_create_missing_teams": "Create missing teams in IR",
+  "ds.cmdb_team_hint": "Manual selections take priority. With this option enabled, an empty selection uses the active team with the same name in the destination group or creates a team there during import.",
   "ds.cmdb_value_mappings": "Environment and criticality value mappings",
   "ds.cmdb_object_label": "Use object label",
   "ds.cmdb_not_mapped": "Not mapped",

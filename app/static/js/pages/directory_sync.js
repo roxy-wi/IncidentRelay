@@ -51,7 +51,11 @@ function dsError(xhr) {
 function loadDirectorySync() {
     const version = ++directorySyncListVersion;
     apiGet(directorySyncPath + "/options", function (data) {
-        if (version === directorySyncListVersion) directorySyncOptions = data;
+        if (version !== directorySyncListVersion) return;
+        directorySyncOptions = data;
+        if (directorySyncOpen && directorySyncSource?.config.create_missing_teams) {
+            cmdbRenderResult(directorySyncSource);
+        }
     });
     apiGet(directorySyncPath, function (sources) {
         if (version !== directorySyncListVersion) return;

@@ -1,4 +1,4 @@
-"""Regression coverage for paginated on-call pages in release 2.6."""
+"""Regression coverage for paginated on-call and service catalogs in release 2.6."""
 
 import json
 import os
@@ -13,10 +13,12 @@ from werkzeug.serving import make_server
 
 from app.login import create_access_token
 from app.modules.common import utc_now
+from app.modules.db.models import BusinessService
 from tests.factories import (
     add_user_to_team,
     create_group,
     create_rotation,
+    create_service,
     create_team,
     create_user,
 )
@@ -54,6 +56,11 @@ def test_oncall_pagination_browser(app, db):
     for index in range(27):
         team = create_team(group, name=f"Roster {index:02d}")
         add_user_to_team(team, admin)
+        create_service(team, name=f"Workload {index:02d}")
+        BusinessService.create(
+            group=group, owner_team=team, name=f"Product {index:02d}",
+            slug=f"product-{index}", public=False,
+        )
         create_rotation(
             team, name=f"Schedule {index:02d}", users=[admin],
             start_at=utc_now() - timedelta(days=7),

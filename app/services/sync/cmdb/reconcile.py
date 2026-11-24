@@ -1,20 +1,24 @@
-"""Reconcile explicitly mapped catalog ownership and source-owned components."""
+"""Reconcile catalog ownership, business components and technical dependencies."""
 
 import re
+
+from peewee import chunked
 
 from app.modules.common import utc_now
 from app.modules.db import business_services_repo
 from app.modules.db.models import (
     BusinessService, BusinessServiceComponent, DirectorySyncBinding as Binding,
-    DirectorySyncSource as Source, Service, ServiceChannel, Team,
+    DirectorySyncSource as Source, Service, ServiceChannel, ServiceDependency, Team,
 )
 from app.modules.db.transactions import lock_row
 from app.services.service_catalog import mutations as service_mutations
 from app.services.sync.cmdb.config import CmdbConfig, is_cmdb
+from app.services.sync.cmdb.teams import resolve_teams
 from app.services.sync.directory.config import SyncError
 
 
 MODELS = {"service": Service, "business_service": BusinessService}
+LINK_MODELS = {"component": BusinessServiceComponent, "dependency": ServiceDependency}
 
 
 def slug_for(source_id, row):
@@ -36,7 +40,7 @@ def existing_binding(source, kind, external_id):
             continue
         if not parent.deleted:
             raise SyncError(f"CMDB {kind} object {external_id} is already managed by source {parent.id}")
-        model = MODELS.get(kind, BusinessServiceComponent)
+        model = MODELS[kind] if kind in MODELS else LINK_MODELS[kind]
         if model.select().where(model.id == binding.local_id, model.deleted == False).exists():
             candidates.append(binding)
     if len(candidates) > 1:
@@ -79,6 +83,92 @@ def changes_for(source, row, local, team_id, kind):
             if getattr(local, key + "_id" if key in {"team", "owner_team"} else key) != value}
 
 
+def previously_imported_targets(source, external_ids):
+    """Resolve referenced services from this source under the catalog lock."""
+    targets = {}
+    for batch in chunked(external_ids, 500):
+        bindings = (Binding.select(Binding.external_id, Service.id, Service.enabled)
+                    .join(Service, on=(Binding.local_id == Service.id).alias("service"))
+                    .join(Team)
+                    .where(Binding.source == source.id, Binding.kind == "service", Binding.owned == True,
+                           Binding.external_id.in_(batch), Service.group == source.group_id, Service.deleted == False,
+                           Team.group == source.group_id, Team.deleted == False))
+        for binding in bindings:
+            targets[binding.external_id] = binding.service
+    return targets
+
+
+def reconcile_links(source, kind, pairs, services, targets, changes, warnings, *, previous_targets=None):
+    """Resolve declared links and prune only when both endpoints were imported in this run."""
+    is_dependency = kind == "dependency"
+    model = LINK_MODELS[kind]
+    target_field = ServiceDependency.depends_on_service if is_dependency else BusinessServiceComponent.business_service
+    expected = set()
+    for service_id, target_id in pairs:
+        service, target = services.get(service_id), targets.get(target_id)
+        if target is None and previous_targets:
+            target = previous_targets.get(target_id)
+        if is_dependency and service and target is None:
+            warnings.append(f"Dependency {service_id} -> {target_id} was skipped: the target is outside the "
+                            "current service selection and has no eligible service binding from this source.")
+            continue
+        if not service or not target:
+            label = "Dependency" if is_dependency else "Relationship"
+            warnings.append(f"{label} {service_id} -> {target_id} refers to an object outside this import. "
+                            "Existing links were retained.")
+            continue
+        if is_dependency and service.id == target.id:
+            warnings.append(f"Service {service_id} cannot depend on itself. This reference was skipped.")
+            continue
+        external_id = f"{service_id}:{target_id}"
+        expected.add(external_id)
+        binding = existing_binding(source, kind, external_id)
+        link = model.get_or_none(model.service == service.id, target_field == target.id)
+        if binding and (not link or link.id != binding.local_id):
+            raise SyncError(f"An imported {kind} binding no longer matches its catalog objects")
+        if not binding and link and not link.deleted:
+            continue  # The existing link is managed locally.
+        if not link or link.deleted:
+            if is_dependency:
+                if not target.enabled:
+                    warnings.append(f"Dependency {service_id} -> {target_id} was skipped because the target is disabled.")
+                    continue
+                link = service_mutations.create_service_dependency(service.id, {"depends_on_service": target.id})
+            else:
+                link = business_services_repo.create_business_service_component(target.id, {"service": service.id})
+            fields = {"service": service_id, target_field.name: target_id}
+            if target_id not in targets:
+                # Pin the previously imported IR destination in the reviewed plan.
+                fields["depends_on_service_ir_id"] = target.id
+            changes.append({"kind": kind, "external_id": external_id, "action": "create", "fields": fields})
+        if not binding:
+            Binding.create(source=source.id, kind=kind, external_id=external_id, local_id=link.id, created=True)
+        elif binding.source_id != source.id:
+            binding.source = source.id
+            binding.owned = True
+            binding.save()
+            changes.append({"kind": kind, "external_id": external_id, "action": "reconnect", "fields": {}})
+
+    owned = Binding.select().where(Binding.source == source.id, Binding.kind == kind, Binding.owned == True)
+    for binding in list(owned):
+        service_id, target_id = binding.external_id.split(":", 1)
+        if binding.external_id in expected or service_id not in services or target_id not in targets:
+            continue
+        link = model.get_by_id(binding.local_id)
+        if (link.service_id != services[service_id].id
+                or getattr(link, target_field.object_id_name) != targets[target_id].id):
+            raise SyncError(f"An imported {kind} moved outside its original catalog objects")
+        if not link.deleted:
+            if is_dependency:
+                service_mutations.soft_delete_service_dependency(link.id)
+            else:
+                business_services_repo.soft_delete_business_service_component(link.id)
+            changes.append({"kind": kind, "external_id": binding.external_id, "action": "remove", "fields": {}})
+        if is_dependency:
+            # A later manual creation restores the same row; it must have a new owner.
+            binding.delete_instance()
+
+
 def reconcile(source, snapshot):
     """Run inside the shared fenced transaction (rolled back when previewing)."""
     from app.services.change_intelligence.administration import lock_catalog
@@ -86,16 +176,10 @@ def reconcile(source, snapshot):
     lock_catalog()
     config = CmdbConfig.model_validate(source.config)
     changes, issues = [], list(snapshot["issues"])
-    teams = {}
-    for external in snapshot["team_catalog"]:
-        local_id = config.team_matches.get(external["id"])
-        team = lock_row(Team.select().where(Team.id == local_id)) if local_id else None
-        if not team or team.deleted or not team.active or team.group_id != source.group_id:
-            issues.append(f"CMDB team {external['id']}: select an active existing IR team in the destination group")
-        else:
-            teams[external["id"]] = team.id
+    warnings = list(snapshot.get("warnings", []))
+    teams, created_teams = resolve_teams(source, config, snapshot["team_catalog"], changes, issues)
     if issues:
-        return {"changes": [], "issues": issues}
+        return {"changes": [], "issues": issues, "warnings": warnings}, {}
 
     locals_by_kind = {"service": {}, "business_service": {}}
     for kind, collection in (("business_service", "business_services"), ("service", "services")):
@@ -110,11 +194,26 @@ def reconcile(source, snapshot):
         for row in sorted(snapshot[collection], key=lambda item: int(item["id"])):
             binding = existing_binding(source, kind, row["id"])
             local = validate_local(source, kind, binding) if binding else None
-            values = changes_for(source, row, local, teams[row["team_id"]], kind)
+            if row["team_id"] is not None:
+                team_id = teams[row["team_id"]]
+            elif local:
+                team_id = local.team_id if kind == "service" else local.owner_team_id
+            elif kind == "service":
+                warnings.append(f"Service {row['key']} ({row['name']}, ID {row['id']}) was skipped because "
+                                "a new technical service requires an owner team.")
+                continue
+            else:
+                team_id = None
+            values = changes_for(source, row, local, team_id, kind)
             reconnect = binding and binding.source_id != source.id
             if values or reconnect:
+                fields = values
+                if row["team_id"] in created_teams:
+                    # PostgreSQL allocates different team IDs on preview and apply.
+                    owner_field = "team" if kind == "service" else "owner_team"
+                    fields = {**values, owner_field: {"cmdb_team_id": row["team_id"]}}
                 changes.append({"kind": kind, "external_id": row["id"], "label": row["name"],
-                                "action": "reconnect" if reconnect else "update" if local else "create", "fields": values})
+                                "action": "reconnect" if reconnect else "update" if local else "create", "fields": fields})
             if not local:
                 local = create_object(values)
                 binding = Binding.create(source=source.id, kind=kind, external_id=row["id"], local_id=local.id, created=True)
@@ -126,59 +225,26 @@ def reconcile(source, snapshot):
                 binding.save()
             locals_by_kind[kind][row["id"]] = local
 
-    expected_edges = set()
-    warnings = []
-    for row in snapshot[config.relationship_side]:
-        for ref in sorted(set(row["references"])):
-            service_id, business_id = (row["id"], ref) if config.relationship_side == "services" else (ref, row["id"])
-            service = locals_by_kind["service"].get(service_id)
-            business = locals_by_kind["business_service"].get(business_id)
-            if not service or not business:
-                warnings.append(f"Relationship {service_id} -> {business_id}: referenced object is outside the selected queries; existing links retained")
-                continue
-            external_id = f"{service_id}:{business_id}"
-            expected_edges.add(external_id)
-            binding = existing_binding(source, "component", external_id)
-            component = BusinessServiceComponent.get_or_none(
-                BusinessServiceComponent.business_service == business.id, BusinessServiceComponent.service == service.id,
-            )
-            if binding and (not component or component.id != binding.local_id):
-                raise SyncError("An imported component binding no longer matches its catalog objects")
-            if not binding and component and not component.deleted:
-                # A locally maintained link is not acquired by this source.
-                continue
-            if not component or component.deleted:
-                component = business_services_repo.create_business_service_component(business.id, {"service": service.id})
-                changes.append({"kind": "component", "external_id": external_id, "action": "create",
-                                "fields": {"service": service_id, "business_service": business_id}})
-            if not binding:
-                Binding.create(source=source.id, kind="component", external_id=external_id, local_id=component.id, created=True)
-            elif binding.source_id != source.id:
-                binding.source = source.id
-                binding.owned = True
-                binding.save()
-                changes.append({"kind": "component", "external_id": external_id, "action": "reconnect", "fields": {}})
-
+    services = locals_by_kind["service"]
     if config.relationship_attribute:
-        # Query exclusions / missing objects are not evidence of deletion. Only
-        # remove source-created links when both endpoints are in this snapshot.
-        for binding in list(Binding.select().where(Binding.source == source.id, Binding.kind == "component", Binding.owned == True)):
-            service_id, business_id = binding.external_id.split(":", 1)
-            if (binding.external_id in expected_edges or service_id not in locals_by_kind["service"]
-                    or business_id not in locals_by_kind["business_service"]):
-                continue
-            component = BusinessServiceComponent.get_by_id(binding.local_id)
-            if (component.service_id != locals_by_kind["service"][service_id].id
-                    or component.business_service_id != locals_by_kind["business_service"][business_id].id):
-                raise SyncError("An imported component moved outside its original catalog objects")
-            if not component.deleted:
-                business_services_repo.soft_delete_business_service_component(component.id)
-                changes.append({"kind": "component", "external_id": binding.external_id, "action": "remove", "fields": {}})
+        pairs = (
+            (row["id"], ref) if config.relationship_side == "services" else (ref, row["id"])
+            for row in snapshot[config.relationship_side] for ref in sorted(set(row["references"]))
+        )
+        reconcile_links(source, "component", pairs, services, locals_by_kind["business_service"], changes, warnings)
+    if config.dependency_attribute:
+        pairs = (
+            (row["id"], ref) for row in snapshot["services"] for ref in sorted(set(row["dependencies"]))
+        )
+        previous_targets = previously_imported_targets(source, snapshot.get("external_dependency_ids", ()))
+        reconcile_links(source, "dependency", pairs, services, services, changes, warnings,
+                        previous_targets=previous_targets)
 
     from app.services.business_services.status import apply_business_service_status
     for business in locals_by_kind["business_service"].values():
         apply_business_service_status(business)
-    return {"changes": changes, "issues": [], "warnings": warnings}
+    new_matches = {key: team_id for key, team_id in teams.items() if key not in config.team_matches}
+    return {"changes": changes, "issues": [], "warnings": warnings}, new_matches
 
 
 def remove_catalog(source, *, delete_imported):

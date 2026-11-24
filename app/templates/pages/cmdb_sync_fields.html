@@ -15,6 +15,7 @@
       {% endfor %}
       {% if kind == 'services' %}
       <div class="form-group"><label for="cmdb-services-environment_attribute">{{ _('ds.cmdb_environment_attribute') }}</label><select id="cmdb-services-environment_attribute" class="input cmdb-attribute" data-kind="services" data-field="environment_attribute"></select></div>
+      <div class="form-group"><label for="cmdb-dependency-attribute">{{ _('ds.cmdb_dependency_attribute') }}</label><select id="cmdb-dependency-attribute" class="input" aria-describedby="cmdb-dependency-hint"></select><small id="cmdb-dependency-hint" class="muted">{{ _('ds.cmdb_dependency_hint') }}</small></div>
       {% endif %}
     </div>
     {% endfor %}
@@ -26,7 +27,8 @@
   <p class="muted">{{ _('ds.cmdb_mapping_hint') }}</p>
   <button id="ds-inspect" type="button" class="btn btn-info">{{ _('ds.cmdb_inspect') }}</button>
   <h3>{{ _('ds.cmdb_team_matches') }}</h3>
-  <p class="muted">{{ _('ds.cmdb_team_hint') }}</p>
+  <label class="checkbox-label"><input id="cmdb-create-missing-teams" type="checkbox" aria-describedby="cmdb-team-hint"><span>{{ _('ds.cmdb_create_missing_teams') }}</span></label>
+  <p id="cmdb-team-hint" class="muted">{{ _('ds.cmdb_team_hint') }}</p>
   <div id="cmdb-team-matches" class="form-grid-2"></div>
   <details><summary>{{ _('ds.cmdb_value_mappings') }}</summary>
     <div class="json-editor"><div class="json-editor-header"><span>JSON</span><button id="cmdb-format-values" type="button" class="btn btn-small">{{ _('ds.format_json') }}</button></div><textarea id="cmdb-values" class="input code-textarea json-editor-textarea" rows="10" spellcheck="false"></textarea></div>

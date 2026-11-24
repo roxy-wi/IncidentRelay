@@ -1,4 +1,6 @@
 {
+  "ds.cmdb_dependency_attribute": "Champ des dépendances entre services",
+  "ds.cmdb_dependency_hint": "Sélectionnez Prod System si le système dépend de chaque système référencé dans ce champ. Laissez le champ vide pour désactiver l’importation des dépendances.",
   "ds.format_json": "Formater le JSON",
   "ds.workflow_title_error": "Échec de la synchronisation",
   "ds.workflow_title_current_error": "Échec de la vérification des astreintes",
@@ -151,7 +153,8 @@
   "ds.cmdb_mapping_hint": "Enregistrez et chargez les champs pour choisir les attributs Jira. L’état du cycle de vie est conservé comme information CMDB et ne remplace pas l’état opérationnel.",
   "ds.cmdb_inspect": "Charger les champs et équipes",
   "ds.cmdb_team_matches": "Associer les équipes IR existantes",
-  "ds.cmdb_team_hint": "Choisissez séparément les champs d’équipe, puis rechargez les équipes. Associez les identifiants CMDB aux équipes IR actives existantes. Cette source ne crée pas d’équipes.",
+  "ds.cmdb_create_missing_teams": "Créer les équipes manquantes dans IR",
+  "ds.cmdb_team_hint": "Les choix manuels sont prioritaires. Si cette option est activée, IR recherche pour chaque ligne vide une équipe active du même nom dans le groupe cible ou y crée une équipe lors de l’importation.",
   "ds.cmdb_value_mappings": "Correspondances d’environnement et de criticité",
   "ds.cmdb_object_label": "Utiliser le libellé de l’objet",
   "ds.cmdb_not_mapped": "Non associé",

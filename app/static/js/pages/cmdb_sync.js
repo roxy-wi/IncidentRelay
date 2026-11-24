@@ -1,5 +1,5 @@
 /* Jira object selection and explicit mapping share the source editor lifecycle. */
-let cmdbTeamMatches = {};
+let cmdbTeamEdits = {};
 let cmdbAttributeCatalog = {};
 
 function dsIsCmdb() { return $("#ds-type").val() === "jira_assets"; }
@@ -21,14 +21,16 @@ function cmdbRenderAttributes(config) {
             field === "owner_team_attribute", field === "name_attribute");
     });
     cmdbSelectAttribute($("#cmdb-relationship-attribute"), cmdbAttributeCatalog[config.relationship_side], config.relationship_attribute, true);
+    cmdbSelectAttribute($("#cmdb-dependency-attribute"), cmdbAttributeCatalog.services, config.dependency_attribute, true);
 }
 
 function cmdbOpen(config, result) {
-    cmdbTeamMatches = {...config.team_matches};
+    cmdbTeamEdits = {};
     cmdbAttributeCatalog = result?.attributes || {};
     $("#cmdb-api-path").val(config.api_path);
     $("#cmdb-query-parameter").val(config.query_parameter);
     $("#cmdb-page-size").val(config.page_size);
+    $("#cmdb-create-missing-teams").prop("checked", Boolean(config.create_missing_teams));
     ["services", "business_services"].forEach(kind => $("#cmdb-" + kind + "-query").val(config[kind].query));
     $("#cmdb-relationship-side").val(config.relationship_side);
     $("#cmdb-values").val(JSON.stringify({environment_values: config.environment_values,
@@ -59,12 +61,19 @@ function dsApplyType() {
 
 function cmdbConfigFromForm() {
     const original = directorySyncSource?.config || directorySyncOptions.cmdb_preset;
+    const matches = {...original.team_matches};
+    for (const [externalId, localId] of Object.entries(cmdbTeamEdits)) {
+        if (localId) matches[externalId] = localId;
+        else delete matches[externalId];
+    }
     const config = {...original, ...JSON.parse($("#cmdb-values").val()), source_type: "jira_assets",
         base_url: $("#ds-url").val(), private_network_policy: $("#ds-network").val(),
         verify_tls: !$("#ds-skip-tls").prop("checked"), interval_seconds: Number($("#ds-interval").val()),
         api_path: $("#cmdb-api-path").val(), query_parameter: $("#cmdb-query-parameter").val(),
-        page_size: Number($("#cmdb-page-size").val()), team_matches: {...cmdbTeamMatches},
+        page_size: Number($("#cmdb-page-size").val()), team_matches: matches,
+        create_missing_teams: $("#cmdb-create-missing-teams").prop("checked"),
         relationship_side: $("#cmdb-relationship-side").val(),
+        dependency_attribute: $("#cmdb-dependency-attribute").val() || null,
         relationship_attribute: $("#cmdb-relationship-attribute").val() || null};
     ["services", "business_services"].forEach(kind => {
         config[kind] = {...original[kind], query: $("#cmdb-" + kind + "-query").val()};
@@ -80,18 +89,17 @@ function cmdbRenderResult(source) {
     const result = source.preview_result;
     cmdbAttributeCatalog = result?.attributes || cmdbAttributeCatalog;
     cmdbRenderAttributes(source.config);
-    cmdbTeamMatches = {...source.config.team_matches};
+    cmdbTeamEdits = {};
     destroyTomSelects("#cmdb-team-matches");
     const container = $("#cmdb-team-matches").empty();
     (result?.team_catalog || []).forEach(team => {
         const select = $("<select>", {id: "cmdb-team-" + team.id, class: "input", "data-cmdb-team": team.id})
-            .append($("<option>", {value: "", text: dsText("cmdb_select_team")}));
+            .append($("<option>", {value: "", text: dsText(source.config.create_missing_teams ? "automatic_match" : "cmdb_select_team")}));
         directorySyncOptions.teams.filter(local => local.group_id === source.group_id && local.active !== false)
             .forEach(local => select.append($("<option>", {value: local.id, text: local.name})));
-        select.val(cmdbTeamMatches[team.id] || "");
+        select.val(source.config.team_matches?.[team.id] || "");
         select.on("change", () => {
-            if (select.val()) cmdbTeamMatches[team.id] = Number(select.val());
-            else delete cmdbTeamMatches[team.id];
+            cmdbTeamEdits[team.id] = Number(select.val()) || null;
             directorySyncDirty = true;
             dsRenderWorkflow(directorySyncSource);
         });
@@ -120,7 +128,7 @@ $(document).on("change", "#cmdb-relationship-side", () => {
 });
 $(document).on("change", "#ds-group", () => {
     if (dsIsCmdb() && !directorySyncSource) {
-        cmdbTeamMatches = {};
+        cmdbTeamEdits = {};
         destroyTomSelects("#cmdb-team-matches");
         $("#cmdb-team-matches").empty();
     }

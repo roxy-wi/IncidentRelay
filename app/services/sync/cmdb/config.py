@@ -42,7 +42,12 @@ class CmdbConfig(StrictModel):
     business_services: CatalogSelection
     relationship_side: Literal["services", "business_services"] = "services"
     relationship_attribute: str | None = Field(default="Product", max_length=255)
+    dependency_attribute: str | None = Field(
+        default=None, max_length=255,
+        description="Optional reference attribute on a technical service listing the services it depends on.",
+    )
     team_matches: dict[str, Annotated[int, Field(strict=True, ge=1)]] = Field(default_factory=dict)
+    create_missing_teams: bool = Field(default=False, strict=True)
     environment_values: dict[str, Literal["production", "staging", "development", "testing", "shared"]] = Field(
         default_factory=lambda: {"Prod": "production", "Stage": "staging", "Dev": "development", "Test": "testing"},
     )

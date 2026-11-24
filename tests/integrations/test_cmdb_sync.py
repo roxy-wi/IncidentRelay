@@ -14,16 +14,17 @@ from app.modules.common import utc_now
 from app.modules.crypto import encrypt_json
 from app.modules.db.models import (
     BusinessService, BusinessServiceComponent, DirectorySyncBinding as Binding,
-    DirectorySyncSource as Source, Service, Team,
+    DirectorySyncSource as Source, Service, ServiceDependency, Team,
 )
 from app.services.sync.cmdb.config import CmdbConfig, jira_assets_preset
+from app.services.service_catalog import mutations as service_mutations
 from app.services.sync.cmdb.fetch import fetch_snapshot
 from app.services.sync.directory import client as http, service
 from app.services.sync.directory.client import ApiClient
 from app.services.sync.directory.config import SyncError
 from app.services.sync.directory.management import remove_source
 from app.modules.db.transactions import write_transaction
-from tests.factories import create_group, create_team
+from tests.factories import create_group, create_service, create_team
 
 
 URL = "/api/admin/directory-sync"
@@ -220,6 +221,102 @@ def test_foreign_team_rejected_on_save_and_rechecked_on_apply(cmdb_source, upstr
     assert not Service.select().exists()
 
 
+def test_automatic_teams_preview_apply_and_reuse(cmdb_source, upstream, pages, client, admin_headers):
+    group = cmdb_source.group
+    existing = create_team(group=group, name="  OPERATIONS ")
+    create_team(group=create_group(), name="Product team")
+    config = {**cmdb_source.config, "create_missing_teams": True, "team_matches": {}}
+    payload = {"name": cmdb_source.name, "group_id": group.id, "revision": cmdb_source.revision, "config": config}
+    saved = client.put(f"{URL}/{cmdb_source.id}", headers=admin_headers, json=payload)
+    assert saved.status_code == 200
+    preview = service.run(cmdb_source.id, mode="preview")
+    assert preview["preview_token"] and not preview["issues"]
+    assert [(item["external_id"], item["action"]) for item in preview["changes"] if item["kind"] == "team"] == [
+        ("11", "match"), ("12", "create"),
+    ]
+    assert not Team.select().where(Team.group == group, Team.name == "Product team").exists()
+    assert Source.get_by_id(cmdb_source.id).config["team_matches"] == {}
+    # Consume the team ID used by the rolled-back preview.
+    create_team(group=group, name="Unrelated team")
+    result = service.run(cmdb_source.id, mode="apply", preview_token=preview["preview_token"])
+    assert result["changes"] == preview["changes"]
+    created = Team.get(Team.group == group, Team.name == "Product team")
+    assert created.active and BusinessService.get().owner_team_id == created.id
+    assert Service.get().team_id == existing.id
+    source = Source.get_by_id(cmdb_source.id)
+    assert source.config["team_matches"] == {"11": existing.id, "12": created.id}
+    assert source.revision == source.approved_revision == saved.json["revision"] + 1
+    payload["revision"] = saved.json["revision"]
+    assert client.put(f"{URL}/{source.id}", headers=admin_headers, json=payload).status_code == 409
+
+    owner = pages["business_services"]["objectEntries"][0]["attributes"][0]
+    owner["objectAttributeValues"] = [ref(12, "Renamed in Jira")]
+    assert service.run(source.id)["changes"] == []
+    with write_transaction():
+        remove_source(Source.get_by_id(source.id), delete_imported=True)
+    assert not Team.get_by_id(created.id).deleted and not Team.get_by_id(existing.id).deleted
+
+
+@pytest.mark.parametrize("conflict", ["ambiguous", "inactive", "foreign_mapping", "missing_name", "duplicate_jira_name"])
+def test_automatic_teams_require_explicit_resolution_on_conflict(cmdb_source, upstream, pages, conflict):
+    cmdb_source.config.update(create_missing_teams=True, team_matches={})
+    if conflict == "ambiguous":
+        for name in ("Operations", "operations"):
+            create_team(group=cmdb_source.group, name=name)
+    elif conflict == "inactive":
+        Team.update(name="Operations", active=False).where(Team.id == Team.select().first().id).execute()
+    elif conflict == "foreign_mapping":
+        foreign = create_team(group=create_group(), name="Operations")
+        cmdb_source.config["team_matches"]["11"] = foreign.id
+    elif conflict == "missing_name":
+        pages["services"]["objectEntries"][0]["attributes"][0]["objectAttributeValues"] = [ref(11, "")]
+    else:
+        pages["business_services"]["objectEntries"][0]["attributes"][0]["objectAttributeValues"] = [ref(12, "OPERATIONS")]
+    cmdb_source.save()
+    count = Team.select().count()
+    result = service.run(cmdb_source.id, mode="preview")
+    assert result["issues"] and result["preview_token"] is None
+    assert Team.select().count() == count and not Service.select().exists()
+
+
+def test_automatic_teams_roll_back_when_plan_changes(cmdb_source, upstream):
+    cmdb_source.config.update(create_missing_teams=True, team_matches={})
+    cmdb_source.save()
+    preview = service.run(cmdb_source.id, mode="preview")
+    create_team(group=cmdb_source.group, name="Product team")
+    with pytest.raises(SyncError, match="Local data changed"):
+        service.run(cmdb_source.id, mode="apply", preview_token=preview["preview_token"])
+    assert not Team.select().where(Team.name == "Operations").exists()
+    assert not Service.select().exists() and not BusinessService.select().exists()
+    assert Source.get_by_id(cmdb_source.id).config["team_matches"] == {}
+
+
+def test_scheduled_team_creation_and_disabling_the_option(cmdb_source, upstream, pages, client, admin_headers):
+    cmdb_source.config["create_missing_teams"] = True
+    cmdb_source.enabled = True
+    cmdb_source.save()
+    apply(cmdb_source)
+    systems = pages["services"]
+    systems["objectEntries"].append(obj(102, "Storage", {1: [ref(13, "Storage team")]}))
+    systems["totalFilterCount"] = 2
+    Source.update(next_run_at=utc_now() - timedelta(seconds=1)).where(Source.id == cmdb_source.id).execute()
+    assert service.process_due_sources() == 1
+    source = Source.get_by_id(cmdb_source.id)
+    assert source.config["team_matches"]["13"] == Service.get(Service.name == "Storage").team_id
+    assert source.approved_revision == source.revision
+
+    payload = {"name": source.name, "group_id": source.group_id, "revision": source.revision,
+               "config": {**source.config, "create_missing_teams": False}}
+    saved = client.put(f"{URL}/{source.id}", headers=admin_headers, json=payload)
+    assert saved.status_code == 200 and not saved.json["approved"]
+    assert apply(source)["changes"] == []
+    systems["objectEntries"].append(obj(103, "Payments", {1: [ref(14, "Payment team")]}))
+    systems["totalFilterCount"] = 3
+    preview = service.run(source.id, mode="preview")
+    assert preview["issues"] and not preview["preview_token"]
+    assert not Team.select().where(Team.name == "Payment team").exists()
+
+
 def test_failed_or_incomplete_fetch_preserves_catalog_and_retries_at_interval(cmdb_source, upstream, pages):
     apply(cmdb_source)
     pages["business_services"]["totalFilterCount"] = 2
@@ -344,6 +441,223 @@ def test_removed_reference_only_removes_owned_link(cmdb_source, upstream, pages)
     assert not Service.get().deleted and not BusinessService.get().deleted
 
 
+@pytest.fixture
+def dependency_catalog(cmdb_source, pages):
+    """Two systems reference a common upstream service, returned last by Jira."""
+    systems = pages["services"]
+    systems["objectTypeAttributes"].append({"id": 16, "name": "Prod System", "type": 1})
+    systems["objectEntries"][0]["attributes"].append(
+        {"objectTypeAttributeId": 16, "objectAttributeValues": [ref(103, "Platform"), ref(103, "Platform")]}
+    )
+    systems["objectEntries"].extend([
+        obj(102, "Network", {1: [ref(11, "Operations")], 16: [ref(103, "Platform")]}),
+        obj(103, "Platform", {1: [ref(12, "Product team")]}),
+    ])
+    systems["totalFilterCount"] = 3
+    cmdb_source.config["dependency_attribute"] = "Prod System"
+    cmdb_source.save()
+    return systems
+
+
+def test_dependency_preview_apply_and_repeat(cmdb_source, upstream, dependency_catalog):
+    preview = service.run(cmdb_source.id, mode="preview")
+    planned = [c for c in preview["changes"] if c["kind"] == "dependency"]
+    assert [(c["external_id"], c["fields"]) for c in planned] == [
+        ("101:103", {"service": "101", "depends_on_service": "103"}),
+        ("102:103", {"service": "102", "depends_on_service": "103"}),
+    ]
+    assert not ServiceDependency.select().exists()
+    applied = service.run(cmdb_source.id, mode="apply", preview_token=preview["preview_token"])
+    assert applied["changes"] == preview["changes"]
+    assert {(d.service.name, d.depends_on_service.name) for d in ServiceDependency.select()} == {
+        ("Compute", "Platform"), ("Network", "Platform"),
+    }
+    assert BusinessServiceComponent.get().service.name == "Compute"
+    assert service.run(cmdb_source.id)["changes"] == []
+
+
+@pytest.fixture
+def filtered_dependency_target(cmdb_source, upstream, dependency_catalog):
+    """Import the upstream alone, then scope Jira to its two dependents."""
+    systems = dependency_catalog
+    dependents, platform = systems["objectEntries"][:-1], systems["objectEntries"][-1]
+    systems.update(objectEntries=[platform], totalFilterCount=1)
+    apply(cmdb_source)
+    systems.update(objectEntries=dependents, totalFilterCount=len(dependents))
+    return Service.get(Service.name == "Platform")
+
+
+def test_dependencies_use_previous_target_by_id(cmdb_source, upstream, filtered_dependency_target):
+    target = filtered_dependency_target
+    target.name = "Local platform name"
+    target.save()
+    upstream.clear()
+    preview = service.run(cmdb_source.id, mode="preview")
+    planned = [change for change in preview["changes"] if change["kind"] == "dependency"]
+    assert not preview["issues"] and not preview["warnings"]
+    assert [change["external_id"] for change in planned] == ["101:103", "102:103"]
+    assert all(change["fields"]["depends_on_service_ir_id"] == target.id for change in planned)
+    assert not ServiceDependency.select().exists()
+    applied = service.run(cmdb_source.id, mode="apply", preview_token=preview["preview_token"])
+    assert applied["changes"] == preview["changes"] and len(upstream) == 2
+    assert {(d.service.name, d.depends_on_service_id) for d in ServiceDependency.select()} == {
+        ("Compute", target.id), ("Network", target.id),
+    }
+    assert Service.get_by_id(target.id).name == "Local platform name"
+    assert service.run(cmdb_source.id)["changes"] == []
+
+
+@pytest.mark.parametrize("reason", [
+    "other_source", "unowned", "wrong_kind", "deleted", "disabled", "moved_service", "moved_team",
+    "archived_reference", "archived_object",
+])
+def test_ineligible_previous_target_is_skipped(cmdb_source, filtered_dependency_target, dependency_catalog, reason):
+    target = filtered_dependency_target
+    binding = Binding.get(Binding.source == cmdb_source.id, Binding.kind == "service", Binding.external_id == "103")
+    if reason == "other_source":
+        binding.source = Source.create(name="Other", group=cmdb_source.group_id, created_by=cmdb_source.created_by_id,
+                                       config=cmdb_source.config, headers_encrypted=encrypt_json({}))
+        binding.save()
+    elif reason == "unowned":
+        Binding.update(owned=False).where(Binding.id == binding.id).execute()
+    elif reason == "wrong_kind":
+        Binding.update(kind="business_service").where(Binding.id == binding.id).execute()
+    elif reason == "deleted":
+        Service.update(deleted=True).where(Service.id == target.id).execute()
+    elif reason == "disabled":
+        Service.update(enabled=False).where(Service.id == target.id).execute()
+    elif reason == "moved_service":
+        Service.update(group=create_group()).where(Service.id == target.id).execute()
+    elif reason == "moved_team":
+        Service.update(team=create_team(create_group())).where(Service.id == target.id).execute()
+    elif reason == "archived_reference":
+        attrs = dependency_catalog["objectEntries"][0]["attributes"]
+        attrs[-1]["objectAttributeValues"][0]["referencedObject"]["archived"] = True
+    else:
+        dependency_catalog["objectEntries"].append({**obj(103, "Platform", {}), "archived": True})
+        dependency_catalog["totalFilterCount"] += 1
+    applied = apply(cmdb_source)
+    assert any("Dependency 101 -> 103" in warning for warning in applied["warnings"])
+    assert not ServiceDependency.select().exists()
+    assert Service.get(Service.name == "Compute")
+
+
+def test_replaced_previous_target_invalidates_preview(cmdb_source, filtered_dependency_target):
+    target = filtered_dependency_target
+    preview = service.run(cmdb_source.id, mode="preview")
+    replacement = create_service(target.team)
+    Binding.update(local_id=replacement.id).where(
+        Binding.source == cmdb_source.id, Binding.kind == "service", Binding.external_id == "103"
+    ).execute()
+    with pytest.raises(SyncError, match="Local data changed"):
+        service.run(cmdb_source.id, mode="apply", preview_token=preview["preview_token"])
+    assert not ServiceDependency.select().exists()
+    assert not Service.select().where(Service.name == "Compute").exists()
+
+
+def test_dependency_removal_requires_mapping_and_both_services(cmdb_source, upstream, dependency_catalog):
+    systems = dependency_catalog
+    apply(cmdb_source)
+    network = ServiceDependency.get(ServiceDependency.service == Service.get(Service.name == "Network"))
+    platform = systems["objectEntries"].pop()
+    systems["totalFilterCount"] = 2
+    systems["objectEntries"][1]["attributes"].pop()
+    filtered = service.run(cmdb_source.id)
+    assert not filtered["warnings"]
+    assert filtered["changes"] == [] and not ServiceDependency.get_by_id(network.id).deleted
+    systems["objectEntries"].append(platform)
+    systems["totalFilterCount"] = 3
+    source = Source.get_by_id(cmdb_source.id)
+    source.config["dependency_attribute"] = None
+    source.save()
+    assert apply(source)["changes"] == []
+    source = Source.get_by_id(source.id)
+    source.config["dependency_attribute"] = "16"
+    source.save()
+    removed = apply(source)
+    assert [(c["external_id"], c["action"]) for c in removed["changes"]] == [("102:103", "remove")]
+    assert ServiceDependency.get_by_id(network.id).deleted
+    systems["objectEntries"][1]["attributes"].append(
+        {"objectTypeAttributeId": 16, "objectAttributeValues": [ref(103, "Platform")]}
+    )
+    assert service.run(source.id)["changes"][0]["action"] == "create"
+    assert not ServiceDependency.get_by_id(network.id).deleted
+
+
+def test_dependency_manual_links_and_skipped_references(cmdb_source, upstream, dependency_catalog):
+    apply(cmdb_source)
+    manual = ServiceDependency.get(ServiceDependency.service == Service.get(Service.name == "Compute"))
+    Binding.delete().where(Binding.kind == "dependency", Binding.local_id == manual.id).execute()
+    manual.dependency_type = "soft"
+    manual.save()
+    values = dependency_catalog["objectEntries"][0]["attributes"][-1]["objectAttributeValues"]
+    values.extend([ref(101, "Compute"), ref(201, "Cloud")])
+    result = service.run(cmdb_source.id)
+    assert result["changes"] == []
+    assert any("cannot depend on itself" in w for w in result["warnings"])
+    assert any("Dependency 101 -> 201" in w for w in result["warnings"])
+    values.clear()
+    assert service.run(cmdb_source.id)["changes"] == []
+    assert not ServiceDependency.get_by_id(manual.id).deleted
+    assert not Binding.select().where(Binding.kind == "dependency", Binding.local_id == manual.id).exists()
+    assert ServiceDependency.get_by_id(manual.id).dependency_type == "soft"
+
+
+def test_manual_dependency_after_preview_requires_new_plan(cmdb_source, upstream, dependency_catalog):
+    refs = dependency_catalog["objectEntries"][0]["attributes"][-1]["objectAttributeValues"]
+    refs.clear()
+    apply(cmdb_source)
+    refs.append(ref(103, "Platform"))
+    preview = service.run(cmdb_source.id, mode="preview")
+    assert [c["external_id"] for c in preview["changes"]] == ["101:103"]
+    compute = Service.get(Service.name == "Compute")
+    platform = Service.get(Service.name == "Platform")
+    manual = service_mutations.create_service_dependency(compute.id, {"depends_on_service": platform.id})
+    with pytest.raises(SyncError, match="Local data changed"):
+        service.run(cmdb_source.id, mode="apply", preview_token=preview["preview_token"])
+    assert apply(cmdb_source)["changes"] == []
+    assert not Binding.select().where(Binding.kind == "dependency", Binding.local_id == manual.id).exists()
+
+
+def test_manual_restoration_after_import_removal_survives(cmdb_source, upstream, dependency_catalog):
+    apply(cmdb_source)
+    refs = dependency_catalog["objectEntries"][0]["attributes"][-1]["objectAttributeValues"]
+    refs.clear()
+    assert service.run(cmdb_source.id)["changes"][0]["action"] == "remove"
+    compute = Service.get(Service.name == "Compute")
+    platform = Service.get(Service.name == "Platform")
+    restored = service_mutations.create_service_dependency(compute.id, {"depends_on_service": platform.id})
+    assert service.run(cmdb_source.id)["changes"] == []
+    assert not ServiceDependency.get_by_id(restored.id).deleted
+
+
+@pytest.mark.parametrize("attribute", ["Missing reference", "Description"])
+def test_invalid_dependency_mapping_preserves_links(cmdb_source, upstream, dependency_catalog, attribute):
+    apply(cmdb_source)
+    source = Source.get_by_id(cmdb_source.id)
+    source.config["dependency_attribute"] = attribute
+    source.save()
+    result = service.run(source.id, mode="preview")
+    assert result["issues"] and not result["preview_token"]
+    assert ServiceDependency.select().where(ServiceDependency.deleted == False).count() == 2
+
+
+def test_dependency_reconnect_and_delete(cmdb_source, upstream, dependency_catalog):
+    apply(cmdb_source)
+    with write_transaction():
+        remove_source(Source.get_by_id(cmdb_source.id), delete_imported=False)
+    replacement = Source.create(name="Replacement", group=cmdb_source.group_id, created_by=cmdb_source.created_by_id,
+                                config=cmdb_source.config, headers_encrypted=encrypt_json({}))
+    result = apply(replacement)
+    assert [(c["external_id"], c["action"]) for c in result["changes"] if c["kind"] == "dependency"] == [
+        ("101:103", "reconnect"), ("102:103", "reconnect"),
+    ]
+    assert ServiceDependency.select().count() == 2
+    with write_transaction():
+        remove_source(Source.get_by_id(replacement.id), delete_imported=True)
+    assert not ServiceDependency.select().where(ServiceDependency.deleted == False).exists()
+
+
 def test_owner_field_change_updates_existing_service_team(cmdb_source, upstream, pages):
     apply(cmdb_source)
     before = Service.get()
@@ -355,6 +669,78 @@ def test_owner_field_change_updates_existing_service_team(cmdb_source, upstream,
     apply(cmdb_source)
     assert Service.get().id == before.id
     assert Service.get().team_id == cmdb_source.config["team_matches"]["12"]
+
+
+@pytest.mark.parametrize("owner_attributes", [{}, {1: []}], ids=["field-absent", "field-empty"])
+def test_new_service_without_owner_is_skipped_until_owner_arrives(cmdb_source, upstream, pages, owner_attributes):
+    pending = obj(102, "Pending", {**owner_attributes, 5: [ref(201, "Cloud")]})
+    pages["services"]["objectEntries"].append(pending)
+    pages["services"]["totalFilterCount"] = 2
+    business = pages["business_services"]
+    business["objectEntries"][0]["attributes"] = []
+    business["objectTypeAttributes"] = [attr for attr in business["objectTypeAttributes"] if attr["id"] != 7]
+
+    inspection = service.run(cmdb_source.id, mode="inspect")
+    assert not inspection["issues"] and inspection["warnings"]
+    preview = service.run(cmdb_source.id, mode="preview")
+    assert preview["preview_token"] and not preview["issues"]
+    assert any("DEMO-102" in warning and "skipped" in warning for warning in preview["warnings"])
+    result = service.run(cmdb_source.id, mode="apply", preview_token=preview["preview_token"])
+    assert result["warnings"] == preview["warnings"]
+    assert [item.name for item in Service.select()] == ["Compute"]
+    assert BusinessService.get().owner_team_id is None
+    assert BusinessServiceComponent.select().count() == 1
+    assert not Binding.select().where(Binding.external_id == "102").exists()
+
+    pending["attributes"] = obj(102, "Pending", {1: [ref(11, "Operations")], 5: [ref(201, "Cloud")]})["attributes"]
+    service.run(cmdb_source.id)
+    assert Service.get(Service.name == "Pending").team_id == cmdb_source.config["team_matches"]["11"]
+    assert BusinessServiceComponent.select().count() == 2
+    assert service.run(cmdb_source.id)["changes"] == []
+
+
+def test_missing_owners_preserve_imported_teams_and_update_other_fields(cmdb_source, upstream, pages):
+    apply(cmdb_source)
+    for kind, owner_id in (("services", 1), ("business_services", 7)):
+        collection = pages[kind]
+        record = collection["objectEntries"][0]
+        record["label"] += " renamed"
+        record["attributes"] = [attr for attr in record["attributes"] if attr["objectTypeAttributeId"] != owner_id]
+        collection["objectTypeAttributes"] = [attr for attr in collection["objectTypeAttributes"] if attr["id"] != owner_id]
+
+    result = apply(cmdb_source)
+    assert [change["fields"] for change in result["changes"]] == [{"name": "Cloud renamed"}, {"name": "Compute renamed"}]
+    assert Service.get().team_id == cmdb_source.config["team_matches"]["11"]
+    assert BusinessService.get().owner_team_id == cmdb_source.config["team_matches"]["12"]
+    assert not BusinessServiceComponent.get().deleted
+    assert service.run(cmdb_source.id)["changes"] == []
+
+
+@pytest.mark.parametrize("automatic", [False, True])
+def test_archived_owner_references_are_excluded_before_matching(cmdb_source, upstream, pages, automatic):
+    cmdb_source.config["create_missing_teams"] = automatic
+    cmdb_source.save()
+    systems = pages["services"]
+    # The same archived team also appears in a partial reference on another object.
+    partial = ref(13, "Retired")
+    systems["objectEntries"][0]["attributes"][0]["objectAttributeValues"].append(partial)
+    systems["objectEntries"].append(obj(102, "Legacy", {1: [partial]}))
+    systems["totalFilterCount"] = 2
+    archived = {"referencedObject": {"id": 13, "label": "Retired", "archived": True}}
+    pages["business_services"]["objectEntries"][0]["attributes"][0]["objectAttributeValues"] = [archived]
+
+    for mode in ("inspect", "preview"):
+        result = service.run(cmdb_source.id, mode=mode)
+        assert not result["issues"]
+        assert [team["id"] for team in result["team_catalog"]] == ["11"]
+    applied = service.run(cmdb_source.id, mode="apply", preview_token=result["preview_token"])
+    assert any("DEMO-102" in warning for warning in applied["warnings"])
+    assert [item.name for item in Service.select()] == ["Compute"]
+    assert Service.get().team_id == cmdb_source.config["team_matches"]["11"]
+    assert BusinessService.get().owner_team_id is None
+    assert not Team.select().where(Team.name == "Retired").exists()
+    assert "13" not in Source.get_by_id(cmdb_source.id).config["team_matches"]
+    assert service.run(cmdb_source.id)["changes"] == []
 
 
 def test_second_active_source_cannot_duplicate_import(cmdb_source, upstream):

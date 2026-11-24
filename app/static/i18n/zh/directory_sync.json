@@ -1,4 +1,6 @@
 {
+  "ds.cmdb_dependency_attribute": "服务依赖字段",
+  "ds.cmdb_dependency_hint": "如果系统依赖 Prod System 字段中引用的每个系统，请选择该字段。留空可关闭依赖关系导入。",
   "ds.format_json": "格式化 JSON",
   "ds.workflow_title_error": "同步失败",
   "ds.workflow_title_current_error": "值班检查失败",
@@ -151,7 +153,8 @@
   "ds.cmdb_mapping_hint": "保存并加载字段，以选择 Jira 属性。生命周期状态作为 CMDB 信息保存，不覆盖运行状态。",
   "ds.cmdb_inspect": "加载字段和团队",
   "ds.cmdb_team_matches": "映射现有 IR 团队",
-  "ds.cmdb_team_hint": "分别选择上方的所属团队字段，然后重新加载团队。将 CMDB 对象 ID 映射到现有的活跃 IR 团队。此来源不会创建团队。",
+  "ds.cmdb_create_missing_teams": "在 IR 中创建缺少的团队",
+  "ds.cmdb_team_hint": "手动选择优先。启用此选项后，对于留空的条目，IR 会在目标组中查找同名的活跃团队，或在导入时创建团队。",
   "ds.cmdb_value_mappings": "环境和关键性值映射",
   "ds.cmdb_object_label": "使用对象标签",
   "ds.cmdb_not_mapped": "未映射",

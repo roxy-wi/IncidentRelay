@@ -7,6 +7,12 @@ let selectedBusinessServiceId = null;
 let businessServicesLoadSerial = 0;
 let businessServiceDetailsLoadSerial = 0;
 
+const businessServicesPagination = createClientTablePagination({
+    id: "business-services-pagination",
+    tableSelector: "#business-services-table",
+    onChange: renderBusinessServicesTable,
+});
+
 
 function businessServiceUserIsAdmin() {
     return !!(currentUser && currentUser.is_admin);
@@ -325,6 +331,12 @@ function fillBusinessServiceComponentServiceSelect(selectedId) {
 }
 
 function loadBusinessServices() {
+    businessServicesPagination.reset();
+    refreshBusinessServices();
+}
+
+
+function refreshBusinessServices() {
     const serial = ++businessServicesLoadSerial;
 
     initializeBusinessServiceSlugBinding();
@@ -412,6 +424,7 @@ function renderBusinessServicesSummary() {
 function renderBusinessServicesTable() {
     const tbody = $("#business-services-table");
     const items = getFilteredBusinessServices();
+    const pageItems = businessServicesPagination.render(items);
 
     $("#business-services-filtered-count").text(items.length);
     $("#business-services-total-count").text(businessServicesCache.length);
@@ -427,7 +440,7 @@ function renderBusinessServicesTable() {
         return;
     }
 
-    items.forEach(function (item) {
+    pageItems.forEach(function (item) {
         tbody.append(
             $("<tr>")
                 .toggleClass("row-disabled", !item.enabled)
@@ -814,7 +827,7 @@ function saveBusinessService() {
     if (id) {
         apiPut("/api/business-services/" + id, payload, function () {
             closeAppModal("#business-service-modal");
-            loadBusinessServices();
+            refreshBusinessServices();
         });
         return;
     }
@@ -822,7 +835,7 @@ function saveBusinessService() {
     apiPost("/api/business-services", payload, function (item) {
         closeAppModal("#business-service-modal");
         selectedBusinessServiceId = item.id;
-        loadBusinessServices();
+        refreshBusinessServices();
     });
 }
 
@@ -841,7 +854,7 @@ function deleteBusinessService(item) {
                 closeAppModal("#business-service-details-modal");
             }
 
-            loadBusinessServices();
+            refreshBusinessServices();
         });
     });
 }
@@ -879,7 +892,7 @@ function setBusinessServiceEnabled(item, enabled) {
         if (Number(selectedBusinessServiceId) === Number(item.id)) {
             openBusinessServiceDetailsModal(item.id);
         } else {
-            loadBusinessServices();
+            refreshBusinessServices();
         }
     });
 }
@@ -997,19 +1010,14 @@ function recalculateBusinessService() {
 }
 
 
-$(document).on("click", "#reload-business-services", loadBusinessServices);
-
-$(document).on("input", "#business-services-search", function () {
+function applyBusinessServiceListFilters() {
+    businessServicesPagination.reset();
     renderBusinessServicesTable();
-});
+}
 
-$(document).on("change", "#business-services-status-filter", function () {
-    renderBusinessServicesTable();
-});
-
-$(document).on("change", "#business-services-public-filter", function () {
-    renderBusinessServicesTable();
-});
+$(document).on("click", "#reload-business-services", refreshBusinessServices);
+$(document).on("input", "#business-services-search", applyBusinessServiceListFilters);
+$(document).on("change", "#business-services-status-filter, #business-services-public-filter", applyBusinessServiceListFilters);
 
 $(document).on("click", "#open-business-service-create-modal", openCreateBusinessServiceModal);
 $(document).on("click", "#save-business-service", saveBusinessService);

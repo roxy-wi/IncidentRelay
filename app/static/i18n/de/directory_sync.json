@@ -1,4 +1,6 @@
 {
+  "ds.cmdb_dependency_attribute": "Feld für Serviceabhängigkeiten",
+  "ds.cmdb_dependency_hint": "Wählen Sie Prod System, wenn das System von jedem dort referenzierten System abhängt. Lassen Sie das Feld leer, um den Import von Abhängigkeiten auszuschalten.",
   "ds.format_json": "JSON formatieren",
   "ds.workflow_title_error": "Synchronisierung fehlgeschlagen",
   "ds.workflow_title_current_error": "Bereitschaftsprüfung fehlgeschlagen",
@@ -151,7 +153,8 @@
   "ds.cmdb_mapping_hint": "Speichern und laden Sie die Felder zur Auswahl der Jira-Attribute. Der Lebenszyklusstatus wird als CMDB-Information gespeichert und überschreibt nicht den Betriebszustand.",
   "ds.cmdb_inspect": "Felder und Teams laden",
   "ds.cmdb_team_matches": "Vorhandene IR-Teams zuordnen",
-  "ds.cmdb_team_hint": "Wählen Sie die Teamfelder oben getrennt aus und laden Sie die Teams erneut. Ordnen Sie CMDB-IDs vorhandenen aktiven IR-Teams zu. Diese Quelle erstellt keine Teams.",
+  "ds.cmdb_create_missing_teams": "Fehlende Teams in IR erstellen",
+  "ds.cmdb_team_hint": "Die manuelle Auswahl hat Vorrang. Bei aktivierter Option sucht IR für leere Einträge nach einem aktiven Team mit demselben Namen in der Zielgruppe oder erstellt dort beim Import ein Team.",
   "ds.cmdb_value_mappings": "Werte für Umgebung und Kritikalität zuordnen",
   "ds.cmdb_object_label": "Objektbezeichnung verwenden",
   "ds.cmdb_not_mapped": "Nicht zugeordnet",

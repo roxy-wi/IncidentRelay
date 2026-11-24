@@ -33,13 +33,19 @@ const fixture = JSON.parse(process.env.RELEASE_26_FIXTURE);
         assert.equal(await page.locator(".view-visible th.oncall-health-th").evaluate(el => getComputedStyle(el).textAlign), "center");
     }
     try {
-        for (const [name, search] of [["teams", "Roster"], ["rotations", "Schedule"]]) {
+        for (const [name, search] of [
+            ["teams", "Roster"], ["rotations", "Schedule"],
+            ["services", "Workload"], ["business-services", "Product"],
+        ]) {
             await page.goto("/" + name);
             await count("#" + name + "-table > tr", 25);
             const pager = "#" + name + "-pagination";
+            const serviceList = name === "services" || name === "business-services";
             assert.equal(await page.locator(pager + "-filtered-count").textContent(), "27");
-            assert.equal(await page.locator(pager).evaluate(el => el.parentElement.tagName), "SECTION", "footer sits outside the table wrapper");
-            await centeredHealth();
+            assert.equal(await page.locator(pager).evaluate(el => el.parentElement.tagName),
+                name === "services" ? "DIV" : "SECTION", "footer sits outside the table wrapper");
+            assert.ok(await page.locator(pager).evaluate(el => el.previousElementSibling.matches(".table-wrapper")));
+            if (!serviceList) await centeredHealth();
             await page.locator(pager + "-next-page").click();
             await count("#" + name + "-table > tr", 2);
             if (name === "rotations") {
@@ -48,6 +54,17 @@ const fixture = JSON.parse(process.env.RELEASE_26_FIXTURE);
             }
             assert.equal(await page.locator(pager + "-page-from").textContent(), "26");
             assert.equal(await page.locator(pager + "-next-page").isDisabled(), true);
+            if (serviceList) {
+                const filter = name === "services" ? "#services-criticality-filter" : "#business-services-public-filter";
+                await page.locator(filter).selectOption(name === "services" ? "medium" : "private");
+                await count("#" + name + "-table > tr", 25);
+                assert.equal(await page.locator(pager + "-current-page").textContent(), "1");
+                assert.equal(await page.locator("#" + name + "-total-count").textContent(), "27");
+                await page.locator(pager + "-next-page").click();
+                await page.locator("#" + name + "-search").fill(search);
+                await count("#" + name + "-table > tr", 25);
+                assert.equal(await page.locator(pager + "-current-page").textContent(), "1");
+            }
             await page.locator("#" + name + "-search").fill(search + " 26");
             await count("#" + name + "-table > tr", 1);
             assert.equal(await page.locator(pager + "-current-page").textContent(), "1");
@@ -58,10 +75,12 @@ const fixture = JSON.parse(process.env.RELEASE_26_FIXTURE);
             await page.locator(pager + "-page-size").selectOption("10");
             await count("#" + name + "-table > tr", 10);
             await page.locator(pager + "-next-page").click();
+            const previousRow = await page.locator("#" + name + "-table > tr").first().elementHandle();
             await page.locator("#reload-" + name).click();
+            await page.waitForFunction(row => !row.isConnected, previousRow);
             await page.waitForFunction(prefix => document.querySelector(prefix + "-current-page").textContent === "2", pager);
             assert.equal(await page.locator(pager).count(), 1);
-            await centeredHealth();
+            if (!serviceList) await centeredHealth();
             await page.screenshot({path: path.join(fixture.screenshots, name + ".png"), fullPage: true});
         }
         await page.goto("/calendar");

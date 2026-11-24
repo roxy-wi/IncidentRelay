@@ -50,7 +50,10 @@ def run(source_id, *, mode="run", preview_token=None, scheduled=False):
                        "attributes": snapshot["attributes"], "team_catalog": snapshot["team_catalog"]}
             if mode in {"preview", "inspect"}:
                 with db.atomic() as preview:
-                    result = reconcile(source, snapshot) if mode == "preview" else {"changes": [], "issues": snapshot["issues"]}
+                    if mode == "preview":
+                        result, _ = reconcile(source, snapshot)
+                    else:
+                        result = {"changes": [], "issues": snapshot["issues"], "warnings": snapshot["warnings"]}
                     preview.rollback()
                 result = {**summary, **result, "inspection": mode == "inspect"}
                 ready = mode == "preview" and not result["issues"]
@@ -63,11 +66,14 @@ def run(source_id, *, mode="run", preview_token=None, scheduled=False):
                 source.save(only=[Source.preview_token, Source.preview_until, Source.preview_encrypted,
                                   Source.preview_result, Source.last_error])
                 return {**result, "preview_token": source.preview_token}
-            result = reconcile(source, snapshot)
+            result, new_matches = reconcile(source, snapshot)
             if result["issues"]:
                 raise SyncError("Catalog team or field mappings need attention; inspect the source and create a new preview")
             if saved and saved["plan"] != digest(result["changes"]):
                 raise SyncError("Local data changed since preview; fetch a new preview")
+            if new_matches:
+                source.config = {**source.config, "team_matches": {**config.team_matches, **new_matches}}
+                source.revision += 1
             source.last_success_at = utc_now()
             source.next_run_at = source.last_success_at + timedelta(seconds=config.interval_seconds)
             source.last_result = {"services": summary["services"], "business_services": summary["business_services"],
