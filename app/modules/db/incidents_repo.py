@@ -129,7 +129,7 @@ def priority_from_severity(severity):
     if severity in ("low",):
         return get_priority_by_slug("p4") or get_default_priority()
 
-    if severity in ("info", "notice", "informational"):
+    if severity in ("info", "notice", "informational", "information"):
         return get_priority_by_slug("p5") or get_default_priority()
 
     return get_default_priority()
