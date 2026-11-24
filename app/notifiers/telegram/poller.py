@@ -13,7 +13,10 @@ from app.services.alerts.actions import acknowledge_alert, resolve_alert
 from app.services.alerts.shelving import shelve_alert_group, unshelve_alert_group
 from app.services.rbac import can_respond_team
 from app.notifiers.telegram.templates import format_telegram_alert_message
-from app.notifiers.telegram.actions import parse_telegram_action_data
+from app.notifiers.telegram.actions import (
+    parse_telegram_action_data,
+    shelve_duration_label,
+)
 from app.notifiers.telegram.bot import (
     answer_telegram_callback,
     get_telegram_bot,
@@ -309,14 +312,18 @@ def handle_telegram_callback(channel, callback):
             event_type = "resolved"
             answer_text = f"Alert #{alert.id} resolved"
         elif action == "shelve":
+            duration_seconds = action_data.get("duration_seconds") or 3600
             alert, _ = shelve_alert_group(
                 alert_id,
                 user_id=user.id,
-                duration_seconds=action_data.get("duration_seconds") or 3600,
+                duration_seconds=duration_seconds,
                 source="telegram",
             )
             event_type = "shelved"
-            answer_text = f"Alert #{alert.id} shelved for 1 hour"
+            answer_text = (
+                f"Alert #{alert.id} shelved for "
+                f"{shelve_duration_label(duration_seconds)}"
+            )
         elif action == "unshelve":
             alert, _ = unshelve_alert_group(
                 alert_id,

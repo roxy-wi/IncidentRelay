@@ -6,7 +6,10 @@ from requests import exceptions as requests_exceptions
 from telebot.apihelper import ApiTelegramException
 
 from app.settings import Config
-from app.notifiers.telegram.actions import build_telegram_action_data
+from app.notifiers.telegram.actions import (
+    build_telegram_action_data,
+    configured_shelve_durations,
+)
 from app.services.links import build_alert_web_url
 from app.services.alerts.shelving import is_alert_group_shelved
 
@@ -82,6 +85,27 @@ def get_telegram_bot(bot_token):
     return bot
 
 
+def _shelve_buttons(alert, channel):
+    """Inline buttons for the configured shelve durations."""
+
+    return [
+        types.InlineKeyboardButton(
+            spec["button"],
+            callback_data=build_telegram_action_data(
+                spec["code"], alert.id, channel.id
+            ),
+        )
+        for spec in configured_shelve_durations()
+    ]
+
+
+def _resolve_button(alert, channel):
+    return types.InlineKeyboardButton(
+        "Resolve",
+        callback_data=build_telegram_action_data("resolve", alert.id, channel.id),
+    )
+
+
 def build_alert_keyboard(channel, alert):
     """
     Build Telegram inline keyboard for alert actions.
@@ -112,20 +136,14 @@ def build_alert_keyboard(channel, alert):
             )
             has_buttons = True
         elif alert.status == "acknowledged":
-            keyboard.add(
-                types.InlineKeyboardButton(
-                    "Shelve 1h",
-                    callback_data=build_telegram_action_data(
-                        "s1h", alert.id, channel.id
-                    ),
-                ),
-                types.InlineKeyboardButton(
-                    "Resolve",
-                    callback_data=build_telegram_action_data(
-                        "resolve", alert.id, channel.id
-                    ),
-                ),
-            )
+            shelve_buttons = _shelve_buttons(alert, channel)
+
+            if len(shelve_buttons) == 1:
+                keyboard.row(shelve_buttons[0], _resolve_button(alert, channel))
+            else:
+                keyboard.row(_resolve_button(alert, channel))
+                keyboard.row(*shelve_buttons)
+
             has_buttons = True
         else:
             keyboard.add(
@@ -135,21 +153,9 @@ def build_alert_keyboard(channel, alert):
                         "ack", alert.id, channel.id
                     ),
                 ),
-                types.InlineKeyboardButton(
-                    "Resolve",
-                    callback_data=build_telegram_action_data(
-                        "resolve", alert.id, channel.id
-                    ),
-                ),
+                _resolve_button(alert, channel),
             )
-            keyboard.add(
-                types.InlineKeyboardButton(
-                    "Shelve 1h",
-                    callback_data=build_telegram_action_data(
-                        "s1h", alert.id, channel.id
-                    ),
-                )
-            )
+            keyboard.row(*_shelve_buttons(alert, channel))
             has_buttons = True
 
     if alert_url:

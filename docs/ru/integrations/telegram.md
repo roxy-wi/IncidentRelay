@@ -7,7 +7,7 @@ description: Настройка уведомлений через Telegram Bot �
 
 Telegram — это исходящий канал уведомлений на основе Telegram Bot API.
 
-Он отправляет уведомления об алертах и поддерживает встроенные действия Acknowledge, Resolve, Shelve 1h и Unshelve, когда включена обработка polling/callback.
+Он отправляет уведомления об алертах и поддерживает встроенные действия Acknowledge, Resolve, Shelve и Unshelve, когда включена обработка polling/callback. Кнопки Shelve задаются параметром `shelve_durations` в секции `[telegram]` (по умолчанию `1h`; можно добавить `4h` и `7d`).
 
 ## Обязательная конфигурация канала
 
@@ -56,4 +56,4 @@ journalctl -u incidentrelay-telegram-worker -f
 
 ## Shelving
 
-В интерактивном сообщении доступны **Shelve 1h** и **Unshelve**. Telegram-пользователь должен быть связан с IncidentRelay user и иметь responder-доступ к команде алерта. Подробнее: [Shelving](../usage/shelving.md).
+В интерактивном сообщении доступны настроенные кнопки Shelve (по умолчанию **Shelve 1h**) и **Unshelve**. Telegram-пользователь должен быть связан с IncidentRelay user и иметь responder-доступ к команде алерта. Подробнее: [Shelving](../usage/shelving.md).

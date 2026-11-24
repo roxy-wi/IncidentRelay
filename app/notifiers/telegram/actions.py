@@ -4,12 +4,89 @@ import hmac
 from app.settings import Config
 
 
+# Shelve buttons the callback payload can carry. 7 days is the longest
+# duration the shelving service accepts.
+SHELVE_DURATION_SPECS = (
+    {
+        "token": "1h",
+        "code": "s1h",
+        "seconds": 3600,
+        "button": "Shelve 1h",
+        "label": "1 hour",
+    },
+    {
+        "token": "4h",
+        "code": "s4h",
+        "seconds": 4 * 3600,
+        "button": "Shelve 4h",
+        "label": "4 hours",
+    },
+    {
+        "token": "7d",
+        "code": "s7d",
+        "seconds": 7 * 24 * 3600,
+        "button": "Shelve 7d",
+        "label": "7 days",
+    },
+)
+
+_SPECS_BY_TOKEN = {item["token"]: item for item in SHELVE_DURATION_SPECS}
+_SPECS_BY_CODE = {item["code"]: item for item in SHELVE_DURATION_SPECS}
+
 ALLOWED_TELEGRAM_ACTIONS = {
     "ack": "acknowledge",
     "resolve": "resolve",
-    "s1h": "shelve",
     "uns": "unshelve",
+    **{item["code"]: "shelve" for item in SHELVE_DURATION_SPECS},
 }
+
+
+def parse_shelve_duration_list(value):
+    """Return shelve specs for a comma-separated config value.
+
+    Unknown tokens are ignored. An empty or fully invalid value keeps the
+    single 1 hour button, which is the historical keyboard.
+    """
+
+    chosen = []
+    seen = set()
+
+    for raw in str(value or "").split(","):
+        token = raw.strip().lower()
+
+        if not token or token in seen or token not in _SPECS_BY_TOKEN:
+            continue
+
+        seen.add(token)
+        chosen.append(_SPECS_BY_TOKEN[token])
+
+    if not chosen:
+        return [_SPECS_BY_TOKEN["1h"]]
+
+    return chosen
+
+
+def configured_shelve_durations():
+    """Return the shelve buttons enabled in the service config."""
+
+    return parse_shelve_duration_list(
+        getattr(Config, "TELEGRAM_SHELVE_DURATIONS", "1h")
+    )
+
+
+def shelve_duration_label(seconds):
+    """Return a short human label for a shelve duration."""
+
+    try:
+        seconds = int(seconds)
+    except (TypeError, ValueError):
+        return "unknown duration"
+
+    for item in SHELVE_DURATION_SPECS:
+        if item["seconds"] == seconds:
+            return item["label"]
+
+    return f"{seconds} seconds"
 
 
 def build_telegram_action_data(action, alert_id, channel_id):
@@ -60,6 +137,9 @@ def parse_telegram_action_data(value):
         "alert_id": int(alert_id),
         "channel_id": int(channel_id),
     }
-    if action == "s1h":
-        result["duration_seconds"] = 3600
+    spec = _SPECS_BY_CODE.get(action)
+
+    if spec:
+        result["duration_seconds"] = spec["seconds"]
+
     return result

@@ -368,6 +368,11 @@ class Config:
     )
 
     TELEGRAM_PROXY_URL = settings.get("telegram", "proxy_url", "")
+    TELEGRAM_SHELVE_DURATIONS = settings.get(
+        "telegram",
+        "shelve_durations",
+        "1h",
+    )
 
     ONCALL_SHIFT_EMAIL_CHECK_INTERVAL_SECONDS = settings.get_int(
         "oncall",
