@@ -10,6 +10,13 @@ from app.notifiers.telegram.actions import (
     build_telegram_action_data,
     configured_shelve_durations,
 )
+from app.notifiers.telegram.direct import (
+    DIRECT_PAYLOAD_KEY,
+    channel_post_url,
+    refresh_direct,
+    send_direct,
+)
+from app.notifiers.telegram.direct_policy import should_send_dm, telegram_chat_id
 from app.services.links import build_alert_web_url
 from app.services.alerts.shelving import is_alert_group_shelved
 
@@ -195,16 +202,59 @@ def send_telegram_alert(channel, alert, text, event_type="notification"):
         parse_mode="HTML",
     )
 
+    provider_payload = {
+        "chat_id": message.chat.id,
+        "message_id": message.message_id,
+        "event_type": event_type,
+    }
+
+    direct = _notify_assignee(bot, channel, alert, event_type, message)
+
+    if direct:
+        provider_payload[DIRECT_PAYLOAD_KEY] = direct
+
     return {
         "provider": "telegram",
         "external_message_id": str(message.message_id),
         "external_channel_id": str(message.chat.id),
-        "provider_payload": {
-            "chat_id": message.chat.id,
-            "message_id": message.message_id,
-            "event_type": event_type,
-        },
+        "provider_payload": provider_payload,
     }
+
+
+def _notify_assignee(bot, channel, alert, event_type, post):
+    """Page the assignee in a private chat. Never fails the channel delivery."""
+
+    try:
+        if getattr(alert, "status", None) != "firing":
+            return None
+
+        if not should_send_dm(alert, event_type):
+            return None
+
+        chat_id = telegram_chat_id(getattr(alert, "assignee", None))
+
+        if chat_id is None:
+            return None
+
+        return send_direct(
+            bot,
+            chat_id,
+            alert,
+            event_type,
+            channel_post_url(post),
+            build_alert_keyboard(channel, alert),
+        )
+    except Exception:
+        logger.exception(
+            "telegram direct message failed",
+            extra={
+                "extra": {
+                    "event_type": "telegram_direct_error",
+                    "alert_group_id": getattr(alert, "id", None),
+                }
+            },
+        )
+        return None
 
 
 def update_telegram_alert(channel, alert, text, delivery, event_type="resolved"):
@@ -220,12 +270,12 @@ def update_telegram_alert(channel, alert, text, delivery, event_type="resolved")
     if not bot_token or not chat_id or not message_id:
         raise RuntimeError("telegram bot_token, chat_id or message_id is missing")
 
-    reply_markup = build_alert_keyboard(channel, alert)
-
-    if alert.status == "resolved":
-        reply_markup = None
+    previous = dict(getattr(delivery, "provider_payload", None) or {})
+    keyboard = build_alert_keyboard(channel, alert)
+    reply_markup = None if alert.status == "resolved" else keyboard
 
     bot = get_telegram_bot(bot_token)
+    post_changed = True
 
     try:
         bot.edit_message_text(
@@ -237,22 +287,52 @@ def update_telegram_alert(channel, alert, text, delivery, event_type="resolved")
             disable_web_page_preview=True,
         )
     except ApiTelegramException as exc:
-        if "message is not modified" in str(exc).lower():
-            return False
+        if "message is not modified" not in str(exc).lower():
+            raise
 
-        raise
+        post_changed = False
+
+    _refresh_direct_message(bot, alert, previous, keyboard)
+
+    if not post_changed:
+        return False
 
     return {
         "provider": "telegram",
         "external_message_id": str(message_id),
         "external_channel_id": str(chat_id),
         "provider_payload": {
+            **previous,
             "chat_id": chat_id,
             "message_id": message_id,
             "event_type": event_type,
             "updated": True,
         },
     }
+
+
+def _refresh_direct_message(bot, alert, payload, keyboard):
+    """Keep the stored direct message in step with the alert state."""
+
+    stored = payload.get(DIRECT_PAYLOAD_KEY)
+
+    if not stored:
+        return
+
+    try:
+        refresh_direct(bot, alert, stored, keyboard)
+    except Exception as exc:
+        logger.warning(
+            "telegram direct message was not refreshed",
+            extra={
+                "extra": {
+                    "event_type": "telegram_direct_refresh_failed",
+                    "alert_group_id": getattr(alert, "id", None),
+                    "telegram_error": getattr(exc, "description", None)
+                    or exc.__class__.__name__,
+                }
+            },
+        )
 
 
 def answer_telegram_callback(channel, callback_query_id, text, show_alert=False):

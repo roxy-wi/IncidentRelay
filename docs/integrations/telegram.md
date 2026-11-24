@@ -42,7 +42,11 @@ journalctl -u incidentrelay-telegram-worker -f
 
 ## User Telegram ID
 
-A user can have a Telegram user ID in their profile. This can be used for action attribution and future direct-user workflows.
+A user can have a Telegram user ID in their profile. Callbacks are attributed to that user. When `[telegram] dm_priorities` is set, the same id is the private chat the bot writes to. The user has to press Start in the bot once, or Telegram refuses the message. That refusal is logged and the channel post is still delivered.
+
+## Direct messages
+
+With `dm_priorities` empty, nothing here changes. With `dm_priorities = p1,p2`, a firing notification or reminder at those priorities also sends the assignee a private message: the alert title, a short journal, the same action buttons, and a link to the channel post. An escalation sends that message to the new assignee at any priority. Acknowledge, Resolve and Shelve from the private message update both the private message and the channel post.
 
 ## Proxy
 

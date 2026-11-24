@@ -20,9 +20,11 @@ from app.notifiers.telegram.actions import (
 )
 from app.notifiers.telegram.bot import (
     answer_telegram_callback,
+    build_alert_keyboard,
     get_telegram_bot,
     update_telegram_alert,
 )
+from app.notifiers.telegram.direct import post_url_from_message, refresh_direct
 from app.modules.common import utc_now
 
 
@@ -327,6 +329,70 @@ def poll_telegram_channel_once(channel, timeout=20):
     return poll_telegram_token_once(token, [channel], timeout=timeout)
 
 
+def _is_channel_post(channel, message):
+    """True when the pressed button sits on the channel post itself."""
+
+    chat_id = (channel.config or {}).get("chat_id")
+
+    try:
+        return int(message.chat.id) == int(chat_id)
+    except (TypeError, ValueError):
+        return str(message.chat.id) == str(chat_id)
+
+
+def _refresh_pressed_message(channel, alert, action, event_type, user, callback):
+    """Show the new alert state on the message whose button was pressed.
+
+    The channel post and the stored direct message are refreshed by the shared
+    alert services. This covers the pressed message itself: the channel post,
+    or a direct message from an earlier reminder.
+    """
+
+    message = getattr(callback, "message", None)
+
+    if message is None:
+        return
+
+    if _is_channel_post(channel, message):
+        # Shelve/Unshelve already update every stored provider message.
+        # Avoid a second edit for the same press.
+        if action in {"shelve", "unshelve"}:
+            return
+
+        update_telegram_alert(
+            channel=channel,
+            alert=alert,
+            text=format_telegram_alert_message(alert, event_type, actor=user),
+            delivery=type("TelegramDelivery", (), {
+                "external_channel_id": str(message.chat.id),
+                "external_message_id": str(message.message_id),
+            })(),
+            event_type=event_type,
+        )
+        return
+
+    try:
+        bot = get_telegram_bot((channel.config or {}).get("bot_token"))
+        stored = {
+            "chat_id": str(message.chat.id),
+            "message_id": message.message_id,
+            "post_url": post_url_from_message(message),
+        }
+        refresh_direct(bot, alert, stored, build_alert_keyboard(channel, alert))
+    except Exception:
+        logger.warning(
+            "telegram direct message was not refreshed after action",
+            exc_info=True,
+            extra={
+                "extra": {
+                    "event_type": "telegram_direct_refresh_failed",
+                    "channel_id": channel.id,
+                    "alert_group_id": getattr(alert, "id", None),
+                }
+            },
+        )
+
+
 def handle_telegram_callback(channel, callback):
     """
     Handle Telegram ACK/Resolve callback.
@@ -423,21 +489,9 @@ def handle_telegram_callback(channel, callback):
             )
             return
 
-        # Shelve/Unshelve already update every stored provider message from
-        # the shared shelving service. Avoid issuing a second Telegram edit
-        # for the same callback message. ACK/Resolve keep the existing direct
-        # callback update behavior.
-        if action not in {"shelve", "unshelve"}:
-            update_telegram_alert(
-                channel=channel,
-                alert=alert,
-                text=format_telegram_alert_message(alert, event_type, actor=user),
-                delivery=type("TelegramDelivery", (), {
-                    "external_channel_id": str(callback.message.chat.id),
-                    "external_message_id": str(callback.message.message_id),
-                })(),
-                event_type=event_type,
-            )
+        _refresh_pressed_message(
+            channel, alert, action, event_type, user, callback
+        )
 
         answer_telegram_callback(channel, callback.id, answer_text)
 

@@ -373,12 +373,16 @@ Email channels default to the assigned user's profile email; optional fallback/f
 [telegram]
 proxy_url =
 shelve_durations = 1h
+dm_priorities =
+timezone = UTC
 ```
 
 | Option | Default | Description |
 |---|---|---|
 | `proxy_url` | empty | Proxy for Telegram Bot API calls. Keep bot tokens in the channel configuration. |
 | `shelve_durations` | `1h` | Comma-separated shelve buttons: `1h`, `4h`, `7d`. Unknown tokens are ignored. |
+| `dm_priorities` | empty | Priorities that also page the assignee in a private Telegram chat, for example `p1,p2`. Empty disables direct messages. While the list is not empty, an escalation messages the new assignee at any priority. The user needs a numeric Telegram id in the profile and must have pressed Start in the bot. A delivery failure is logged and does not block the channel post. |
+| `timezone` | `UTC` | IANA zone for times in Telegram messages. `UTC` keeps `dd.mm.YYYY HH:MM:SS UTC`. |
 
 Use the same config file for the web process and the Telegram worker. `shelve_durations = 1h,4h,7d` adds 4 hour and 7 day buttons. Seven days is the longest shelf the service accepts.
 
