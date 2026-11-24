@@ -36,6 +36,10 @@ For RPM installations:
 journalctl -u incidentrelay-telegram-worker -f
 ```
 
+## Message text
+
+Posts keep the existing fields, including priority, source, alert id and the ACK link. They also show **Started** when the group has a start time, **Firing for** on reminders, and any of Environment, Cluster, Namespace, Project, Server, Address and Device that the alert actually carries. A `dashboard` or `dashboard_url` annotation or label becomes a Dashboard link. Acknowledged posts use 👀 so they are not mistaken for a resolved alert. Times follow `[telegram] timezone`.
+
 ## Several channels on one bot
 
 `getUpdates` belongs to the bot token, not to a channel. Channels that use the same `bot_token` are polled once, and a button press is handled by the channel id stored in the signed callback (`ir:<action>:<alert>:<channel>:<signature>`). A press for a channel this bot does not serve is rejected and the message is not edited. Distinct bot tokens are still polled one after another.
