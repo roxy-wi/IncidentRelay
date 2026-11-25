@@ -23,21 +23,31 @@ const fixture = JSON.parse(process.env.ALERT_LINKS_FIXTURE);
         const links = page.locator("#alert-primary-details .alert-primary-links a");
         assert.equal(await links.count(), 3);
         for (const [kind, label] of [["source", "Открыть событие в источнике"], ["dashboard", "Дашборд"], ["runbook", "Ранбук"]]) {
-            const link = page.locator(`#alert-primary-details [data-alert-resource='${kind}']`);
+            const link = page.getByRole("link", {name: label, exact: true});
+            assert.equal(await link.getAttribute("data-alert-resource"), kind);
             assert.equal(await link.getAttribute("href"), fixture[kind]);
             assert.equal(await link.getAttribute("target"), "_blank");
             assert.equal(await link.getAttribute("rel"), "noopener noreferrer");
             assert.equal(await link.textContent(), label);
+            assert.equal(await link.locator(".fa-external-link-alt[aria-hidden='true']").count(), 1);
         }
         for (const theme of ["light", "dark"]) {
             await page.evaluate(value => AppTheme.apply(value), theme);
             await page.locator(".alert-primary-links").scrollIntoViewIfNeeded();
+            assert(await links.evaluateAll(nodes => nodes.every(link =>
+                getComputedStyle(link.querySelector("span")).textDecorationLine.includes("underline")
+                && getComputedStyle(link).color !== getComputedStyle(link.parentElement).color
+            )), theme);
             await page.screenshot({path: path.join(fixture.screenshots, `links-${theme}.png`)});
         }
         await page.setViewportSize({width: 390, height: 844});
         await page.locator(".alert-primary-links").scrollIntoViewIfNeeded();
         assert.ok(await page.locator(".alert-primary-links").evaluate(node => node.scrollWidth <= node.clientWidth + 1));
         await page.screenshot({path: path.join(fixture.screenshots, "links-mobile.png")});
+        await links.first().focus();
+        await page.keyboard.press("Tab");
+        assert(await links.nth(1).evaluate(link => link.matches(":focus-visible")
+            && getComputedStyle(link).outlineStyle === "solid"));
 
         // Malformed/unsafe values must not become links even with an unexpected API response.
         await page.evaluate(() => renderAlertPrimaryDetails({

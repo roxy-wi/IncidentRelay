@@ -2114,8 +2114,10 @@ function renderAlertPrimaryDetails(alert, modal) {
                 .attr("target", "_blank")
                 .attr("rel", "noopener noreferrer")
                 .attr("data-alert-resource", link.kind)
-                .addClass("btn btn-secondary btn-sm")
-                .text(i18n.t(linkLabels[link.kind]))
+                .append(
+                    $("<span>").text(i18n.t(linkLabels[link.kind])),
+                    $("<i>").addClass("fas fa-external-link-alt").attr("aria-hidden", "true")
+                )
         );
     });
     if (links.children().length) {
