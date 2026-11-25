@@ -1,7 +1,7 @@
 import logging
 
 from app.modules.db import incidents_repo
-from app.modules.db.models import TeamUser, User
+from app.modules.db.models import Group, Team, TeamUser, User, UserGroup
 from app.services import escalation_policies as escalation_policy_service
 from app.services.oncall import get_current_oncall_user
 from app.services.incidents.responder_display import user_display_name
@@ -34,16 +34,14 @@ def _unique_active_users(users):
     return result
 
 
-def _team_responder_users(team_id):
-    if not team_id:
-        return []
-
-    rows = (
-        TeamUser
-        .select(TeamUser, User)
-        .join(User)
+def team_help_recipients(responder):
+    """Select current recipients, including when rechecking queued deliveries."""
+    users = (
+        User.select().join(TeamUser).join(Team)
         .where(
-            TeamUser.team == team_id,
+            Team.id == responder.target_team_id,
+            Team.active == True,
+            Team.deleted == False,
             TeamUser.active == True,  # noqa: E712
             TeamUser.role.in_(("responder", "manager")),
             User.active == True,  # noqa: E712
@@ -52,7 +50,14 @@ def _team_responder_users(team_id):
         .order_by(TeamUser.id.asc())
     )
 
-    return [row.user for row in rows]
+    group_id = responder.incident.team.group_id if responder.incident.team_id else None
+    if group_id:
+        memberships = UserGroup.select(UserGroup.user).join(Group).where(
+            UserGroup.group == group_id, UserGroup.active == True,
+            Group.active == True, Group.deleted == False,
+        )
+        users = users.where(Team.group == group_id, User.id.in_(memberships))
+    return users
 
 
 def _rotation_current_user(responder):
@@ -93,9 +98,7 @@ def resolve_responder_recipients(responder):
         ])
 
     if responder.target_type == "team":
-        return _unique_active_users(
-            _team_responder_users(responder.target_team_id)
-        )
+        return list(team_help_recipients(responder))
 
     if responder.target_type == "rotation":
         return _unique_active_users([

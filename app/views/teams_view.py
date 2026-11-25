@@ -11,10 +11,14 @@ from app.api.schemas.teams import (
     TeamUserUpdateSchema,
 )
 from app.modules.db import groups_repo, teams_repo
+from app.services.api_token_scopes import required_scopes_for_path
 from app.services.audit import write_audit
+from app.services.authorization import token_allows_operation
+from app.services.oncall_health import get_team_health_summary
 from app.services.rbac import (
+    current_api_token,
     is_admin_user,
-    get_allowed_oncall_team_ids,
+    oncall_team_scope,
     require_group_write,
     require_team_user_admin,
     require_team_write,
@@ -38,21 +42,35 @@ def list_teams():
     )
     active_only = not include_inactive
 
-    if is_admin_user(user):
-        teams = teams_repo.list_teams(active_only=active_only)
-    else:
-        team_ids = set(
-            get_allowed_oncall_team_ids(
-                use_active_group=True,
-                active_only=active_only,
-            )
-        )
-        teams = [
-            team
-            for team in teams_repo.list_teams(active_only=active_only)
-            if team.id in team_ids
-        ]
-    return jsonify([serialize_team(team, current_user=user) for team in teams])
+    scope = {} if is_admin_user(user) else oncall_team_scope(user)
+    if "page" not in request.args and "page_size" not in request.args:
+        teams = teams_repo.list_teams(active_only=active_only, **scope)
+        return jsonify([serialize_team(team, current_user=user) for team in teams])
+
+    page = teams_repo.paginate_teams(
+        **scope,
+        active_only=active_only,
+        page=request.args.get("page", 1, type=int),
+        page_size=request.args.get("page_size", 25, type=int),
+        team_id=request.args.get("team_id", type=int),
+        group=request.args.get("group", ""),
+        status=request.args.get("status", ""),
+        search=request.args.get("search", "").strip(),
+    )
+    include_health = request.args.get("include_health", "").lower() in {"1", "true", "yes", "on"}
+    token = current_api_token()
+    if include_health and token is not None:
+        health_scopes = required_scopes_for_path("/api/oncall-health/teams/summaries", "GET")
+        include_health = token_allows_operation(token, health_scopes)
+
+    rows = []
+    for team in page["items"]:
+        row = serialize_team(team, current_user=user)
+        # Directory visibility is broader than access to team diagnostics.
+        if include_health and row.get("permissions", {}).get("can_read"):
+            row["health"] = get_team_health_summary(team)
+        rows.append(row)
+    return jsonify({**page, "items": rows})
 
 
 @teams_bp.route("/<int:team_id>", methods=["GET"])

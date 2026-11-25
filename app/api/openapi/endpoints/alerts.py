@@ -1,6 +1,66 @@
+from typing import get_args
+
 from app.api.openapi.common import response, path_param, json_body, query_param
+from app.api.schemas.alerts import AlertClassification
 from app.api.openapi.endpoints.business_services import BUSINESS_SERVICE_IMPACT_SCHEMA
 from app.api.openapi.endpoints.incidents import INCIDENT_RELATION_TYPE_SCHEMA
+
+
+def review_schema(*, writable=False):
+    """Describe the assessment returned by the API or accepted in a replacement."""
+    classification = {"type": "string", "enum": list(get_args(AlertClassification))}
+    fields = {
+        "version": {"type": "integer", "minimum": 0},
+        "classification": classification,
+        "note": {"type": "string", "nullable": True, "maxLength": 5000},
+        "canonical_group_id": {"type": "integer", "minimum": 1, "nullable": True},
+        "incident_id": {"type": "integer", "minimum": 1, "nullable": True},
+    }
+    if writable:
+        fields["create_incident"] = {"type": "boolean", "default": False}
+    else:
+        classification.update(nullable=True)
+        classification["enum"].append(None)
+        fields.update({
+            "classified_by_id": {"type": "integer", "nullable": True},
+            "classified_by": {"type": "string", "nullable": True},
+            "classified_by_color": {"type": "string", "pattern": "^#[0-9a-fA-F]{6}$", "nullable": True},
+            "classified_at": {"type": "string", "format": "date-time", "nullable": True},
+            "can_classify": {"type": "boolean"},
+        })
+    return {"type": "object", "properties": fields, "additionalProperties": False,
+            "required": ["version", "classification"] if writable else list(fields)}
+
+
+def classification_operations():
+    """Document the versioned classification resource."""
+    operations = {}
+    for method, summary in (("get", "Read AlertGroup classification"), ("put", "Set AlertGroup classification"),
+                            ("delete", "Clear AlertGroup classification")):
+        operation = {
+            "tags": ["alerts"], "summary": summary, "security": bearer_security(),
+            "operationId": {"get": "getAlertGroupClassification", "put": "setAlertGroupClassification",
+                            "delete": "clearAlertGroupClassification"}[method],
+            "parameters": [path_param("alert_id", "AlertGroup ID.")],
+            "responses": {
+                "200": response("Current assessment.", review_schema()),
+                "403": response("Access denied."), "404": response("Group or target unavailable."),
+            },
+        }
+        if method != "get":
+            operation["responses"].update({"400": response("Invalid assessment."), "409": response("Conflict.")})
+        if method == "put":
+            operation["requestBody"] = json_body(
+                "Supply the last review version (initially 0). For duplicate, specify exactly one canonical_group_id "
+                "or incident_id. For incident, supply incident_id or set create_incident. "
+                "Other outcomes accept a note only.", review_schema(writable=True),
+            )
+        if method == "delete":
+            operation["parameters"].append(query_param(
+                "version", "Last review version.", {"type": "integer", "minimum": 0}, required=True,
+            ))
+        operations[method] = operation
+    return operations
 
 
 def string_path_param(name, description):
@@ -650,6 +710,7 @@ def alert_group_schema(include_details=False):
             "type": "array",
             "items": alert_event_schema(),
         }
+        properties["review"] = review_schema()
         properties["events_pagination"] = {
             "type": "object",
             "additionalProperties": True,
@@ -1877,6 +1938,7 @@ def paths():
                 "responses": {"200": response("Priority definitions.", {"type": "array", "items": {"type": "object"}})},
             }
         },
+        "/api/alert-groups/{alert_id}/classification": classification_operations(),
         "/api/alert-groups/{alert_id}/assignee": {
             "put": {
                 "tags": ["alerts"],

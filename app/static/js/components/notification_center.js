@@ -1,4 +1,14 @@
 (function () {
+    let loadSequence = 0;
+
+    function clearFocusedRequest() {
+        const url = new URL(window.location.href);
+        if (!url.searchParams.has("responder_request")) { return false; }
+        url.searchParams.delete("responder_request");
+        history.replaceState({...history.state, path: url.pathname + url.search + url.hash}, "", url);
+        return true;
+    }
+
     function notificationCenterRoot() {
         let root = $("#notification-center-root");
 
@@ -21,10 +31,10 @@
         return root;
     }
 
-    function renderNotificationButton(payload) {
+    function renderNotificationButton(payload, open) {
         const root = notificationCenterRoot();
         const count = Number(payload.unread_count || 0);
-
+        const wasOpen = root.find(".notification-center-panel").is(":visible");
         root.empty();
 
         const button = $("<button>")
@@ -48,13 +58,14 @@
 
         const panel = $("<div>")
             .addClass("notification-center-panel")
-            .hide();
+            .toggle(open || wasOpen);
 
         renderNotificationItems(panel, payload.items || []);
 
         button.on("click", function (event) {
             event.stopPropagation();
             panel.toggle();
+            if (!panel.is(":visible") && clearFocusedRequest()) { loadNotificationCenter(); }
         });
 
         panel.on("click", function (event) {
@@ -65,6 +76,7 @@
             .off("click.notificationCenter")
             .on("click.notificationCenter", function () {
                 panel.hide();
+                if (clearFocusedRequest()) { loadNotificationCenter(); }
             });
 
         root.append(button).append(panel);
@@ -181,6 +193,11 @@
             row.find(".notification-center-item-body").prepend(UserAppearance.avatar(item.responder.requested_by));
         }
 
+        if (item.responder && item.responder.target_type === "team") {
+            $("<div>").addClass("notification-center-item-meta")
+                .text("#" + item.incident_id + " · " + item.responder.target.label).appendTo(row);
+        }
+
         if (item.alert_group) {
             $("<div>")
                 .addClass("notification-center-item-meta")
@@ -235,6 +252,7 @@
                 status: status,
             },
             function () {
+                clearFocusedRequest();
                 loadNotificationCenter();
 
                 if (
@@ -248,8 +266,14 @@
     }
 
     function loadNotificationCenter() {
-        apiGet("/api/notification-center", function (payload) {
-            renderNotificationButton(payload || {});
+        const sequence = ++loadSequence;
+        const url = new URL(window.location.href);
+        const id = url.searchParams.get("responder_request");
+        const focused = /^\d+$/.test(id || "");
+        apiGet("/api/notification-center" + (focused ? "?responder_id=" + id : ""), function (payload) {
+            if (sequence !== loadSequence) { return; }
+            if (focused && new URLSearchParams(window.location.search).get("responder_request") !== id) { return; }
+            renderNotificationButton(payload || {}, focused);
         });
     }
 

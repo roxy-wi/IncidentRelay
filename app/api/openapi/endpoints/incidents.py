@@ -924,11 +924,23 @@ def paths():
                 "tags": ["incidents"],
                 "summary": "List Incident responder requests and assignments",
                 "security": auth,
-                "parameters": [path_param("incident_id", "Incident id.")],
+                "parameters": [
+                    path_param("incident_id", "Incident id."),
+                    query_param("include_team_options", "Use 1 to include eligible sibling teams.",
+                                {"type": "integer", "enum": [1]}),
+                ],
                 "responses": {
                     "200": response(
                         "Responders.",
-                        {"type": "array", "items": INCIDENT_RESPONDER_SCHEMA},
+                        {"oneOf": [
+                            {"type": "array", "items": INCIDENT_RESPONDER_SCHEMA},
+                            {"type": "object", "required": ["items", "teams"], "properties": {
+                                "items": {"type": "array", "items": INCIDENT_RESPONDER_SCHEMA},
+                                "teams": {"type": "array", "items": {"type": "object", "properties": {
+                                    "id": {"type": "integer"}, "name": {"type": "string"},
+                                }}},
+                            }},
+                        ]},
                     ),
                     **standard_errors,
                 },
@@ -936,7 +948,7 @@ def paths():
             "post": {
                 "tags": ["incidents"],
                 "summary": "Request operational responders",
-                "description": "Creates a request, not an accepted participant. Repeated POSTs create separate requests. Delivery is queued durably and retried independently of HTTP success.",
+                "description": "Creates a pending request. An open request for the same target returns 409. Team requests queue browser push and, when SMTP is configured, email to eligible team members.",
                 "security": auth,
                 "parameters": [path_param("incident_id", "Incident id.")],
                 "requestBody": json_body(
@@ -955,6 +967,7 @@ def paths():
             "put": {
                 "tags": ["incidents"],
                 "summary": "Accept/decline/resolve responder request",
+                "description": "Invited team responders may accept or decline their team's request from the notification center, including when only the owning team can open the Incident.",
                 "security": auth,
                 "parameters": [
                     path_param("incident_id", "Incident id."),

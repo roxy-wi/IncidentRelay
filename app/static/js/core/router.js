@@ -163,6 +163,9 @@ function navigate(path, pushState) {
     }
 
     safePageLoad(selectedRoute.load);
+    if (window.NotificationCenter && new URLSearchParams(window.location.search).has("responder_request")) {
+        window.NotificationCenter.load();
+    }
     applyRbacUiState();
 }
 

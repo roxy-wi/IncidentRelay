@@ -1,11 +1,12 @@
 let teamsCache = [];
+let teamsPageRequest = 0;
 let selectedTeamForMembers = null;
 let selectedTeamNameForMembers = "";
 let teamMembersRequestVersion = 0;
-const teamsPagination = createClientTablePagination({
+const teamsPagination = createServerTablePagination({
     id: "teams-pagination",
     tableSelector: ".teams-table",
-    onChange: renderTeamsTable,
+    onChange: fetchTeamsPage,
 });
 
 function loadTeams() {
@@ -21,12 +22,11 @@ function loadTeams() {
         });
     }
 
-    loadTeamGroups(function () {
-        refreshTeams();
-    });
+    loadTeamGroups();
+    refreshTeams();
 }
 
-function loadTeamGroups(callback) {
+function loadTeamGroups() {
     /*
      * Load groups into the team form.
      */
@@ -40,9 +40,6 @@ function loadTeamGroups(callback) {
             );
         }
         updateTeamCreateButtonState(groups);
-        if (typeof callback === "function") {
-            callback(groups);
-        }
     });
 }
 
@@ -58,156 +55,58 @@ function updateTeamCreateButtonState(groups) {
 }
 
 function refreshTeams() {
-    /*
-     * Refresh teams table.
-     */
-    apiGet("/api/teams?include_inactive=1", function (teams) {
-        teamsCache = asArray(teams);
-        const scopedTeams = getGlobalTeamScopedTeams();
-        renderTeamsSummary(scopedTeams);
-        fillTeamsGroupFilter(scopedTeams);
-        renderTeamsTable();
+    fetchTeamsPage(true);
+}
 
-        if ($("#team-members-modal").hasClass("is-open") && selectedTeamForMembers) {
+function fetchTeamsPage(refreshMembers = false) {
+    const requestId = ++teamsPageRequest;
+    const groupFilter = $("#teams-group-filter");
+    // A deep link may select a group before its dropdown option exists.
+    const group = groupFilter.data("page-url-state-pending") || groupFilter.val() || "";
+    const url = catalogPageUrl("/api/teams", selectedTeamQuery(), teamsPagination, {
+        include_inactive: 1,
+        include_health: 1,
+        search: String($("#teams-search").val() || "").trim(),
+        group: group,
+        status: $("#teams-status-filter").val(),
+    });
+    apiGet(url, function ({items, pagination, summary, group_slugs}) {
+        if (requestId !== teamsPageRequest) return;
+        fillTeamsGroupFilter(group_slugs, group);
+        if (group && !group_slugs.includes(group)) {
+            // The global scope changed and no longer contains the selected group.
+            teamsPagination.reset();
+            if (window.PageUrlState) window.PageUrlState.write("teams");
+            fetchTeamsPage(refreshMembers);
+            return;
+        }
+        teamsCache = items;
+        $("#teams-summary-total, #teams-total-count").text(summary.total);
+        $("#teams-summary-active").text(summary.active);
+        $("#teams-summary-escalation").text(summary.escalation);
+        $("#teams-summary-groups").text(summary.groups);
+        $("#teams-filtered-count").text(pagination.total_items);
+        teamsPagination.render(pagination);
+        renderTeamsTable(items);
+        if (refreshMembers && $("#team-members-modal").hasClass("is-open") && selectedTeamForMembers) {
             loadTeamMembers(selectedTeamForMembers, selectedTeamNameForMembers);
         }
+    }, function (xhr) {
+        if (requestId === teamsPageRequest) showApiError(xhr);
     });
 }
 
-function getGlobalTeamScopedTeams() {
-    /*
-     * Apply the global team selector to the teams page.
-     */
-    const selectedId = (
-        typeof selectedTeamNumber === "function"
-            ? selectedTeamNumber()
-            : Number($("#global-team-filter").val() || 0) || null
-    );
-
-    if (!selectedId) {
-        return teamsCache.slice();
-    }
-
-    return teamsCache.filter(function (team) {
-        return Number(team.id) === Number(selectedId);
-    });
-}
-
-function renderTeamsSummary(teams) {
-    /*
-     * Render teams summary cards.
-     */
-    teams = asArray(teams);
-    const active = teams.filter(function (team) { return !!team.active; }).length;
-    const escalation = teams.filter(function (team) { return !!team.escalation_enabled; }).length;
-    const groups = {};
-
-    teams.forEach(function (team) {
-        if (team.group_slug || team.group_id) {
-            groups[team.group_slug || team.group_id] = true;
-        }
-    });
-
-    $("#teams-summary-total").text(teams.length);
-    $("#teams-summary-active").text(active);
-    $("#teams-summary-escalation").text(escalation);
-    $("#teams-summary-groups").text(Object.keys(groups).length);
-}
-
-function fillTeamsGroupFilter(teams) {
-    /*
-     * Fill group filter from loaded teams.
-     */
-    const filter = $("#teams-group-filter");
-    const selected = filter.val();
-    const groups = {};
-
-    asArray(teams).forEach(function (team) {
-        if (team.group_slug) {
-            groups[team.group_slug] = true;
-        }
-    });
-
-    filter.empty();
+function fillTeamsGroupFilter(groups, selected) {
+    const filter = $("#teams-group-filter").empty().removeData("page-url-state-pending");
     filter.append($("<option>").val("").text(i18n.t("teams.filters.all_groups")));
-    Object.keys(groups).sort().forEach(function (groupSlug) {
-        filter.append($("<option>").val(groupSlug).text(groupSlug));
+    groups.forEach(function (slug) {
+        filter.append($("<option>").val(slug).text(slug));
     });
-    if (selected && groups[selected]) {
-        filter.val(selected);
-    }
-
-    if (window.PageUrlState) {
-        window.PageUrlState.restoreFields("teams");
-    }
+    filter.val(groups.includes(selected) ? selected : "");
 }
 
-function getTeamSearchText(team) {
-    /*
-     * Build searchable team text.
-     */
-    return [
-        team.id,
-        team.group_slug,
-        team.slug,
-        team.name,
-        team.description,
-        team.escalation_enabled ? "escalation" : "no escalation",
-        team.active ? "active" : "inactive",
-    ].join(" ").toLowerCase();
-}
-
-function getFilteredTeams() {
-    /*
-     * Apply client-side filters.
-     */
-    const query = String($("#teams-search").val() || "").trim().toLowerCase();
-    const group = String($("#teams-group-filter").val() || "");
-    const status = String($("#teams-status-filter").val() || "");
-    const scopedTeams = getGlobalTeamScopedTeams();
-
-    return scopedTeams.filter(function (team) {
-        if (group && team.group_slug !== group) {
-            return false;
-        }
-        if (group && team.group_slug !== group) {
-            return false;
-        }
-        if (status === "active" && !team.active) {
-            return false;
-        }
-        if (status === "inactive" && team.active) {
-            return false;
-        }
-        if (!query) {
-            return true;
-        }
-        return getTeamSearchText(team).indexOf(query) !== -1;
-    });
-}
-
-function renderTeamsCounter(filteredTeams, allTeams) {
-    /*
-     * Render "Showing X of Y teams".
-     */
-    filteredTeams = asArray(filteredTeams);
-    allTeams = asArray(allTeams);
-    $("#teams-filtered-count").text(filteredTeams.length);
-    $("#teams-total-count").text(allTeams.length);
-}
-
-function renderTeamsTable() {
-    /*
-     * Render filtered teams table.
-     */
-    const tbody = $("#teams-table");
-    const scopedTeams = getGlobalTeamScopedTeams();
-    const teams = getFilteredTeams();
-
-    tbody.empty();
-    renderTeamsCounter(teams, scopedTeams);
-    const pageTeams = teamsPagination.render(teams);
-
+function renderTeamsTable(teams) {
+    const tbody = $("#teams-table").empty();
     if (!teams.length) {
         tbody.append(
             $("<tr>").append(
@@ -220,12 +119,9 @@ function renderTeamsTable() {
         return;
     }
 
-    pageTeams.forEach(function (team) {
+    teams.forEach(function (team) {
         tbody.append(renderTeamRow(team));
     });
-    if (typeof loadTeamHealthSummariesForVisibleRows === "function") {
-        loadTeamHealthSummariesForVisibleRows();
-    }
 }
 
 function renderTeamRow(team) {
@@ -278,7 +174,7 @@ function renderTeamRow(team) {
             .attr("data-team-health-id", team.id)
             .append(
                 typeof renderTeamHealthIndicator === "function"
-                    ? renderTeamHealthIndicator(null, team.id)
+                    ? renderTeamHealthIndicator(team.health || {status: "unknown"}, team.id)
                     : $("<span>").text("?")
             )
     );
@@ -807,18 +703,17 @@ function closeTeamMembersModal() {
     closeAppModal("#team-members-modal");
 }
 
-function filterTeamsTable() {
-    teamsPagination.reset();
-    renderTeamsTable();
-}
-
-$(document).on("input", "#teams-search", filterTeamsTable);
-$(document).on("change", "#teams-group-filter, #teams-status-filter", filterTeamsTable);
+$(document).on("input", "#teams-search", teamsPagination.applyFilters);
+$(document).on("change", "#teams-group-filter, #teams-status-filter", function (event) {
+    $(this).removeData("page-url-state-pending");
+    teamsPagination.applyFilters(event);
+});
 $(document).on("click", "#open-team-create-modal", openCreateTeamModal);
 $(document).on("click", "#save-team", saveTeam);
 $(document).on("click", "#reset-team-form", resetTeamForm);
 $(document).on("click", "#reload-teams", function () {
-    loadTeamGroups(refreshTeams);
+    loadTeamGroups();
+    refreshTeams();
 });
 $(document).on("click", "#save-team-user", saveTeamUser);
 $(document).on("click", "#reset-team-member-form", resetTeamMemberForm);

@@ -60,6 +60,7 @@ from app.services.validation import make_error_response, safe_exception_response
 from app.services.incidents.responders import (
     create_incident_responder as request_incident_responder,
     set_incident_responder_status,
+    team_help_options,
 )
 
 incidents_bp = Blueprint("incidents_api", __name__)
@@ -887,8 +888,13 @@ def get_incident_responders(incident_id):
     incident, error = _get_incident_or_error(incident_id)
     if error:
         return error
-    return jsonify([serialize_incident_responder(row) for row in
-        incidents_repo.list_incident_responders(incident.id)])
+    items = [
+        serialize_incident_responder(row)
+        for row in incidents_repo.list_incident_responders(incident.id)
+    ]
+    if request.args.get("include_team_options") == "1":
+        return jsonify(items=items, teams=team_help_options(incident, _request_user()))
+    return jsonify(items)
 
 
 @incidents_bp.route("/<int:incident_id>/responders", methods=["POST"])
@@ -899,15 +905,17 @@ def request_incident_responder_view(incident_id):
     payload, error = validate_body(IncidentResponderCreateSchema)
     if error:
         return error
-    actor = _request_user_id()
-    if actor is None:
+    user = _request_user()
+    if user is None:
         return make_error_response("forbidden", "Authenticated user required", 403)
     try:
         row = request_incident_responder(
-            incident_id=incident.id, payload=payload.model_dump(), user_id=actor,
+            incident_id=incident.id, payload=payload.model_dump(), user=user,
             api_token_id=current_api_token_id(), source="api")
     except incident_core_repo.IncidentConflictError:
         return make_error_response("conflict", "Responder request already exists", 409)
+    except PermissionError:
+        return make_error_response("forbidden", "Incident responder permission required", 403)
     except (ValueError, KeyError) as exc:
         return safe_exception_response(exc, error="validation_error",
                                        message="Invalid responder request", status_code=400)
@@ -918,9 +926,6 @@ def request_incident_responder_view(incident_id):
 
 @incidents_bp.route("/<int:incident_id>/responders/<int:responder_id>", methods=["PUT"])
 def update_incident_responder_view(incident_id, responder_id):
-    incident, error = _get_incident_or_error(incident_id)
-    if error:
-        return error
     payload, error = validate_body(IncidentResponderUpdateSchema)
     if error:
         return error
@@ -929,7 +934,8 @@ def update_incident_responder_view(incident_id, responder_id):
         return make_error_response("forbidden", "Authenticated user required", 403)
     try:
         row = set_incident_responder_status(
-            incident_id=incident.id, responder_id=responder_id,
+            incident_id=incident_id, responder_id=responder_id,
+            require_incident_access=True,
             status=payload.status, response_message=payload.response_message,
             user_id=user.id, user=user,
             api_token_id=current_api_token_id(), source="api")

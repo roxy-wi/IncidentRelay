@@ -129,6 +129,45 @@
             {% endif %}
           </div>
 
+          <section id="alert-review" class="details-section details-card is-hidden" aria-labelledby="alert-review-title">
+            <div class="details-section-header">
+              <h3 id="alert-review-title">{{ _('alert_details.review.title') }}</h3>
+              <button type="button" class="btn btn-secondary btn-small" data-review-edit aria-controls="alert-review-form" aria-expanded="false">{{ _('alert_details.review.edit') }}</button>
+            </div>
+            <div data-review-summary></div>
+            <p data-review-note></p>
+            <form id="alert-review-form" class="is-hidden" data-review-form>
+              <p class="form-error is-hidden" role="alert" data-review-error></p>
+              <div class="alert-review-fields">
+                <div class="alert-review-field">
+                  <label for="alert-review-outcome">{{ _('alert_details.review.title') }}</label>
+                  <select id="alert-review-outcome" name="classification" required class="input">
+                    <option value="">{{ _('alert_details.review.none') }}</option>
+                    {% for outcome in alert_classifications %}
+                      <option value="{{ outcome }}">{{ _('alert_details.review.' ~ outcome) }}</option>
+                    {% endfor %}
+                  </select>
+                </div>
+                <div class="alert-review-field" data-review-mode>
+                  <label for="alert-review-mode">{{ _('alert_details.review.target') }}</label>
+                  <select id="alert-review-mode" name="mode" class="input"></select>
+                </div>
+                <div class="alert-review-field" data-review-picker>
+                  <label for="alert-review-target">{{ _('alert_details.review.choose') }}</label>
+                  <select id="alert-review-target" name="target" class="input"></select>
+                </div>
+              </div>
+              <div class="alert-review-field">
+                <label for="alert-review-note">{{ _('alert_details.review.note') }}</label>
+                <textarea id="alert-review-note" name="note" class="input" maxlength="5000" rows="2"></textarea>
+              </div>
+              <div class="modal-actions">
+                <button type="submit" class="btn btn-primary">{{ _('alert_details.review.save') }}</button>
+                <button type="button" class="btn btn-secondary" data-review-clear>{{ _('alert_details.review.clear') }}</button>
+              </div>
+            </form>
+          </section>
+
           <section class="details-section alert-comments-section">
             <div class="details-section-header">
               <h3>{{ _('alert_details.comments.title') }}</h3>

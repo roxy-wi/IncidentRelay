@@ -58,6 +58,23 @@ and records both types in the Incident activity and audit log. The response
 contains the updated link and Incident version. On `409`, reload the Incident and
 links before retrying. Closed and cancelled Incidents cannot be edited this way.
 
+## Classifying an AlertGroup
+
+Open the AlertGroup and choose **Classify**. Select an outcome and optionally add a note.
+For **Duplicate**, select the canonical AlertGroup or Incident. For **Incident**,
+link an existing open Incident in the same team or explicitly choose to create one.
+Clearing the assessment keeps the Incident and its operational link. The technical status,
+acknowledgement and escalation continue independently.
+
+Read `GET /api/alert-groups/{id}/classification` for the current assessment and its
+`version` (initially 0). Send that version with `PUT`, for example
+`{"version":0,"classification":"false_positive","note":"Threshold corrected"}`.
+Use `DELETE /api/alert-groups/{id}/classification?version=N` to clear it. A conflicting edit
+returns 409. The technical timeline and audit record each change.
+
+The 2.6 migration creates the `alert_group_review` table. Existing groups start unclassified.
+Downgrade of this migration is supported while the table is empty.
+
 ## Reading
 
 1. [2.5 release notes and release gates](release-notes-2.5.md)

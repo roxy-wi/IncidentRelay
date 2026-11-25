@@ -23,7 +23,7 @@ from app.modules.db.models import (
 from app.notifiers.browser_push import service as push
 from app.services.incidents import core, responders, stakeholders
 from app.services.notifications import incidents as delivery
-from tests.factories import create_group, create_team, create_user, unique
+from tests.factories import add_user_to_team, create_group, create_team, create_user, unique
 
 
 @pytest.fixture(autouse=True)
@@ -139,6 +139,82 @@ def test_partial_responder_push_retries_only_failed_device(db, transports):
     assert IncidentResponder.get_by_id(row.id).notification_error is None
     responders.notify_incident_responder_requested(row)
     assert calls == [first.id, second.id, second.id]
+
+
+def test_team_help_delivers_to_eligible_members_and_retries_only_mail(db, transports, monkeypatch):
+    incident, actor, member = _context()
+    group = incident.team.group
+    team = create_team(group)
+    manager = create_user(group=group, email=None)
+    for user, role in (
+        (member, "responder"), (manager, "manager"),
+        (create_user(group=group), "viewer"), (create_user(group=group, active=False), "responder"),
+        (create_user(group=create_group()), "manager"),
+    ):
+        add_user_to_team(team, user, role)
+        _subscription(user)
+    monkeypatch.setattr(delivery.Config, "SMTP_HOST", "smtp.example.test")
+    mail, webpush = transports
+    mail.side_effect = OSError("offline")
+    row = responders.create_incident_responder(
+        incident_id=incident.id, user_id=actor.id,
+        payload={"target_type": "team", "target_team_id": team.id, "message": "Check the primary"},
+    )
+    assert {(d.user_id, d.method, d.status) for d in Delivery.select()} == {
+        (member.id, "email", "pending"), (member.id, "browser_push", "sent"),
+        (manager.id, "browser_push", "sent"),
+    }
+    link = f"https://incidentrelay.example.test/incidents?responder_request={row.id}"
+    assert webpush.call_args.args[1]["url"] == link
+    recipient, subject, body = mail.call_args.args
+    assert recipient == member.email and incident.title in subject
+    assert "Check the primary" in body and link in body
+    mail.side_effect = None
+    _retry()
+    assert mail.call_count == webpush.call_count == 2
+    assert IncidentResponder.get_by_id(row.id).notification_status == "sent"
+
+
+@pytest.mark.parametrize("smtp_enabled", [False, True])
+def test_team_mail_is_optional_and_deduplicated_without_push_devices(db, transports, monkeypatch, smtp_enabled):
+    incident, actor, member = _context()
+    team = create_team(incident.team.group)
+    add_user_to_team(team, member, "manager")
+    second = create_user(group=team.group, email=member.email.upper())
+    add_user_to_team(team, second, "responder")
+    monkeypatch.setattr(delivery.Config, "SMTP_HOST", "smtp.example.test" if smtp_enabled else "")
+    row = responders.create_incident_responder(
+        incident_id=incident.id, user_id=actor.id,
+        payload={"target_type": "team", "target_team_id": team.id},
+    )
+    assert row.status == "requested"
+    assert transports[0].call_count == int(smtp_enabled)
+    assert not transports[1].called
+    assert Delivery.select().where(Delivery.method == "email").count() == int(smtp_enabled)
+
+
+@pytest.mark.parametrize("change", ["email", "membership"])
+def test_team_mail_retry_rechecks_recipient(db, transports, monkeypatch, change):
+    incident, actor, user = _context()
+    team = create_team(incident.team.group)
+    membership = add_user_to_team(team, user, "responder")
+    _subscription(user)
+    monkeypatch.setattr(delivery.Config, "SMTP_HOST", "smtp.example.test")
+    mail, _ = transports
+    mail.side_effect = OSError("offline")
+    responders.create_incident_responder(
+        incident_id=incident.id, user_id=actor.id,
+        payload={"target_type": "team", "target_team_id": team.id},
+    )
+    if change == "email":
+        user.email = "new@example.test"
+        user.save()
+    else:
+        membership.active = False
+        membership.save()
+    _retry()
+    assert mail.call_count == 1
+    assert Delivery.get(Delivery.method == "email").status == "skipped"
 
 
 @pytest.mark.parametrize("status", [404, 410])

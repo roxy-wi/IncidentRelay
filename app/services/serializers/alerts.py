@@ -10,6 +10,8 @@ from app.services.serializers.services import serialize_service_short, serialize
 from app.services.serializers.teams import serialize_team_short
 from app.services.serializers.users import serialize_user_short
 from app.services.alerts.shelving import serialize_shelve_state
+from app.services.alerts.classification import review_data
+from app.services.rbac import is_admin_user
 from app.services.links import build_alert_resource_links
 
 
@@ -707,6 +709,8 @@ def serialize_alert_group(
 
     if include_details:
         data["policy_context"] = _current_alert_group_policy_context(group, route, service)
+        if group.team_id or is_admin_user(current_user):
+            data["review"] = review_data(group, current_user)
         data["alerts"] = [
             serialize_alert(alert, current_user=current_user)
             for alert in alerts or []

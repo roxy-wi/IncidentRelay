@@ -11,7 +11,7 @@ import pytest
 from app.modules.common import utc_now
 from app.modules.db import tokens_repo
 from app.modules.db.models import (
-    Alert, AlertRoute, ApiToken, PendingOrchestratedEvent, Service, Team, User,
+    Alert, AlertRoute, ApiToken, Incident, IncidentResponder, PendingOrchestratedEvent, Service, Team, User,
 )
 from app.modules.db.orchestrations_repo import (
     create_orchestration,
@@ -71,6 +71,29 @@ def publish_pause(group, user):
     return set_runtime_state(
         orchestration.id, enabled=True, mode="active", compatibility_mode="hybrid",
     )
+
+
+def test_team_help_respects_the_credential_incident_boundary(client, db):
+    group = create_group()
+    source, target = create_team(group), create_team(group)
+    actor = create_user(group=group, group_role="viewer")
+    add_user_to_team(target, actor, "responder")
+    incident = Incident.create(title="Database", team=source)
+    row = IncidentResponder.create(incident=incident, target_type="team", target_team=target)
+    url = f"/api/incidents/{incident.id}/responders/{row.id}"
+    scopes = ["incidents:write", "profile:read"]
+    bounded, _ = personal_token(actor, team=target, scopes=scopes)
+    assert client.put(url, headers=bounded, json={"status": "accepted"}).status_code == 403
+    assert not client.get(f"/api/notification-center?responder_id={row.id}", headers=bounded).json["items"]
+    grouped, _ = personal_token(actor, group=group, scopes=scopes)
+    assert client.put(url, headers=grouped, json={"status": "accepted"}).status_code == 200
+
+    add_user_to_team(source, actor, "responder")
+    options = f"/api/incidents/{incident.id}/responders?include_team_options=1"
+    limited, _ = personal_token(actor, group=group, scopes=["incidents:read"])
+    assert client.get(options, headers=limited).json["teams"] == []
+    directory, _ = personal_token(actor, group=group, scopes=["incidents:read", "teams:read"])
+    assert client.get(options, headers=directory).json["teams"] == [{"id": target.id, "name": target.name}]
 
 
 @pytest.mark.parametrize("bound", ["group", "team"])

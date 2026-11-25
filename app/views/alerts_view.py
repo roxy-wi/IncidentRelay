@@ -3,6 +3,8 @@ from flask import Blueprint, jsonify, request
 
 from app.api.schemas.alerts import (
     AlertActivityQuerySchema,
+    AlertClassificationUpdate,
+    AlertReviewVersion,
     AlertAnalyticsQuerySchema,
     AlertAnalyticsSelectionQuerySchema,
     AlertDetailQuerySchema,
@@ -15,6 +17,7 @@ from app.modules.db import alerts_repo, incident_core_repo, incidents_repo, noti
 from app.services.alerts.actions import acknowledge_alert, resolve_alert
 from app.services.alerts.analytics import build_alert_analytics_v1, select_analytics_groups
 from app.services.alerts.assignment import set_alert_group_assignee
+from app.services.alerts.classification import can_classify, review_data, update_review
 from app.services.alerts.shelving import shelve_alert_group, unshelve_alert_group
 from app.services.audit import current_api_token_id, write_audit
 from app.services.rbac import (
@@ -74,6 +77,9 @@ ALERT_GROUP_ACTIVITY_EVENT_TYPES = frozenset({
     "alert_group_unshelved",
     "alert_group_shelve_expired",
     "assignee_changed",
+    "alert_classification_set",
+    "alert_classification_changed",
+    "alert_classification_cleared",
     "priority_changed",
     "priority_auto_updated",
     "priority_auto_recalculated",
@@ -403,6 +409,42 @@ def resolve_alert_view(alert_id):
             current_user=_request_user(),
         )
     )
+
+
+@alerts_bp.route("/<int:alert_id>/classification", methods=["GET", "PUT", "DELETE"])
+def alert_group_classification(alert_id):
+    """Read, replace or clear the operator's assessment of an AlertGroup."""
+    if request.method in ("GET", "HEAD"):
+        group, error = _get_alert_group_or_404(alert_id)
+        if error:
+            return error
+        user = _request_user()
+        if not can_classify(user, group.team_id):
+            if not group.team_id:
+                return make_error_response("forbidden", "AlertGroup has no team scope", 403)
+            error = require_team_read(group.team_id)
+            if error:
+                return error
+        return jsonify(review_data(group, user))
+
+    if request.method == "DELETE":
+        payload, error = validate_query(AlertReviewVersion)
+        update = None
+    else:
+        payload, error = validate_body(AlertClassificationUpdate)
+        update = payload
+    if error:
+        return error
+    try:
+        return jsonify(update_review(alert_id, expected_version=payload.version, update=update))
+    except PermissionError as exc:
+        return make_error_response("forbidden", str(exc), 403)
+    except LookupError as exc:
+        return _not_found(str(exc))
+    except IncidentConflictError as exc:
+        return make_error_response("conflict", str(exc), 409)
+    except ValueError as exc:
+        return make_error_response("validation_error", str(exc), 400)
 
 
 @alerts_bp.route("/<int:alert_id>/assignee", methods=["PUT"])

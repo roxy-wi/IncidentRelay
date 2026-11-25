@@ -2160,6 +2160,22 @@ class AlertGroup(BaseModel):
         )
 
 
+class AlertGroupReview(BaseModel):
+    """Latest operator assessment, versioned independently of the signal lifecycle."""
+
+    group = ForeignKeyField(AlertGroup, primary_key=True, on_delete="CASCADE")
+    classification = CharField(null=True, index=True)
+    note = TextField(null=True)
+    canonical_group = ForeignKeyField(AlertGroup, null=True, on_delete="SET NULL", backref="duplicate_reviews")
+    incident = ForeignKeyField(Incident, null=True, on_delete="SET NULL")
+    classified_by = ForeignKeyField(User, null=True, on_delete="SET NULL")
+    classified_at = DateTimeField(null=True)
+    version = IntegerField(default=0)
+
+    class Meta:
+        table_name = "alert_group_review"
+
+
 class IncidentAlertGroupLink(BaseModel):
     """Historical, non-destructive link between Incident and AlertGroup."""
 

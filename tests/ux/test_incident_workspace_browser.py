@@ -36,6 +36,10 @@ def test_incident_workspace_in_browser(app, db, monkeypatch):
     add_user_to_team(team, user, role="responder")
     reader = create_user(group=group, group_role="viewer")
     add_user_to_team(team, reader, role="viewer")
+    help_team = create_team(group, name="Database response")
+    helper = create_user(group=group, group_role="viewer", email=None)
+    add_user_to_team(help_team, helper, role="responder")
+    helper_token, _ = create_access_token(helper)
     service = create_service(team, name="Workspace service")
     incident = Incident.create(team=team, title="Workspace browser regression")
     alert_group = create_impact_alert_group(team=team, service=service)
@@ -54,6 +58,7 @@ def test_incident_workspace_in_browser(app, db, monkeypatch):
     env = {**os.environ, "INCIDENT_WORKSPACE_FIXTURE": json.dumps({
         "baseUrl": f"http://127.0.0.1:{server.server_port}", "token": token,
         "readerToken": reader_token, "incidentId": incident.id, "userId": user.id,
+        "helpTeamId": help_team.id, "helperToken": helper_token,
         "serviceId": service.id, "groupId": alert_group.id, "actorName": admin.display_name or admin.username,
     })}
     try:

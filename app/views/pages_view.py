@@ -1,5 +1,6 @@
 import json
 from pathlib import Path
+from typing import get_args
 from urllib.parse import quote
 
 from flask import (
@@ -13,6 +14,7 @@ from flask import (
     send_from_directory,
 )
 
+from app.api.schemas.alerts import AlertClassification
 from app.api.schemas.system_settings import settings_properties
 from app.i18n import get_current_locale, translate
 from app.login import normalize_auth_redirect_target
@@ -180,6 +182,7 @@ def app_page(alert_id=None, incident_id=None, change_uid=None):
         advanced_settings=ADVANCED_SETTINGS if user.is_admin else {},
         initial_page=request.path,
         initial_alert_id=alert_id,
+        alert_classifications=get_args(AlertClassification),
         current_theme=get_current_theme(),
         service_sli_rules={
             "priorities": PRIORITY_VALUES,

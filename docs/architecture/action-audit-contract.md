@@ -44,6 +44,7 @@ is a no-op and generates neither record. Similarly, `resolve` maps to
 | Resolve AlertGroup | `alert_group.resolve` | `resolved` |
 | Reopen AlertGroup | `alert_group.reopen` | `reopened` |
 | Change AlertGroup assignee | `alert_group.assignee_change` | `assignee_changed` |
+| Set, change or clear AlertGroup classification | `alert_group.classification.set`, `alert_group.classification.changed`, `alert_group.classification.cleared` | `alert_classification_set`, `alert_classification_changed`, `alert_classification_cleared` |
 | Set/reset manual AlertGroup priority | `alert_group.priority.set` / `alert_group.priority.reset` | `priority_changed` / `priority_auto_restored` |
 | Declare Incident | `incident.declare` | `incident_declared` |
 | Update Incident | `incident.update` | `incident_updated` |

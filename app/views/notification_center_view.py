@@ -19,5 +19,6 @@ def get_notification_center():
         list_notification_center_items(
             _request_user(),
             limit=limit,
+            responder_id=request.args.get("responder_id", type=int),
         )
     )

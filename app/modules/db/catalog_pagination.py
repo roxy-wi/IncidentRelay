@@ -1,4 +1,4 @@
-"""Shared SQL search, counters and pagination for the service catalogs."""
+"""Shared SQL search, counters and pagination for paged catalogs."""
 
 from peewee import Case, SqliteDatabase, fn
 

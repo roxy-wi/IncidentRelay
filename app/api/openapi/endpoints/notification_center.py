@@ -130,6 +130,8 @@ def paths():
                 "operationId": "listNotificationCenterItems",
                 "security": [{"bearerAuth": []}],
                 "parameters": [
+                    query_param("responder_id", "Look up one pending request actionable by the caller.",
+                                {"type": "integer"}),
                     query_param(
                         "limit",
                         "Maximum number of items to return.",

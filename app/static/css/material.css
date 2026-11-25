@@ -1117,6 +1117,53 @@ body.md-theme .details-body {
   padding: 14px 16px 16px;
 }
 
+#alert-review .details-section-header {
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px 16px;
+    margin-bottom: 8px;
+}
+
+#alert-review [data-review-summary],
+#alert-review .modal-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    gap: 6px 12px;
+}
+
+#alert-review [data-review-summary] {
+    color: var(--md-text-soft);
+    font-size: 0.875rem;
+    overflow-wrap: anywhere;
+}
+
+#alert-review time { color: var(--md-muted); }
+#alert-review [data-review-note] { margin: 8px 0 0; white-space: pre-wrap; overflow-wrap: anywhere; }
+
+#alert-review-form {
+    display: grid;
+    gap: 14px;
+    margin-top: 14px;
+    padding-top: 14px;
+    border-top: 1px solid var(--md-border);
+}
+
+#alert-review-form > * { width: 100%; max-width: 54rem; min-width: 0; }
+#alert-review-form .modal-actions { justify-content: flex-start; margin: 0; }
+
+.alert-review-fields {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 15rem), 1fr));
+    align-items: start;
+    gap: 12px;
+}
+
+.alert-review-field { display: grid; gap: 5px; min-width: 0; }
+.alert-review-field label { color: var(--md-text-soft); font-size: 0.875rem; font-weight: 600; }
+.alert-review-field .ts-wrapper { min-width: 0; }
+.alert-review-field textarea { width: 100%; resize: vertical; font-family: inherit; }
+
 body.md-theme .details-empty {
   padding: 12px;
   color: var(--md-muted);
@@ -3319,6 +3366,18 @@ body.md-theme .ui-status-badge-accent {
     background: color-mix(in srgb, var(--md-maintenance) 10%, transparent);
     color: var(--md-maintenance);
     border-color: color-mix(in srgb, var(--md-maintenance) 25%, transparent);
+}
+
+body.md-theme .ui-status-badge-primary {
+    background: var(--md-primary-soft);
+    color: var(--md-primary);
+    border-color: color-mix(in srgb, var(--md-primary) 25%, transparent);
+}
+
+body.md-theme .ui-status-badge-orange {
+    background: color-mix(in srgb, var(--md-partial-outage) 12%, var(--md-surface));
+    color: color-mix(in srgb, var(--md-partial-outage) 60%, var(--md-text));
+    border-color: color-mix(in srgb, var(--md-partial-outage) 28%, transparent);
 }
 
 /* Profile interface settings layout */

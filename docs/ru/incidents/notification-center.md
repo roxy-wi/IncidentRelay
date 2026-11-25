@@ -12,7 +12,10 @@ description: Ожидающие запросы responder операционно�
 
 Запись содержит ID `responder-request-<id>`, тип `responder_request`, title, body,
 время, `incident_id`, объект `responder` и описания действий. Вложенного объекта
-`incident` в ответе 2.5 нет. Ссылка `url` открывает `/incidents/<incident_id>`.
+`incident` в ответе 2.5 нет. Ссылка `url` открывает `/incidents/<incident_id>`
+при наличии прав на чтение. Если доступен только ответ на приглашение, `url`
+равен `null`. Параметр `?responder_id=<id>` возвращает конкретный запрос, на
+который пользователь может ответить.
 
 ```http
 PUT /api/incidents/17/responders/8

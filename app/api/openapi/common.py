@@ -53,7 +53,7 @@ def response(description, schema=None):
 
 
 def catalog_page_parameters():
-    """Query options shared by both paged service lists."""
+    """Query options shared by paged catalogs."""
     return [
         query_param("page", "Request a page instead of the full list (1-based).",
                     {"type": "integer", "minimum": 1, "default": 1}),
@@ -63,7 +63,7 @@ def catalog_page_parameters():
     ]
 
 
-def catalog_list_schema(item, summary_fields):
+def catalog_list_schema(item, summary_fields, *, page_fields=None):
     """Describe the legacy array and the opt-in paged catalog response."""
     items = {"type": "array", "items": item}
     count = {"type": "integer", "minimum": 0}
@@ -73,8 +73,9 @@ def catalog_list_schema(item, summary_fields):
     pagination.update({name: {"type": "boolean"} for name in ("has_prev", "has_next")})
     return {"oneOf": [items, {
         "type": "object",
-        "required": ["items", "pagination", "summary"],
+        "required": ["items", "pagination", "summary", *(page_fields or {})],
         "properties": {
+            **(page_fields or {}),
             "items": items,
             "pagination": {"type": "object", "properties": pagination, "required": list(pagination)},
             "summary": {

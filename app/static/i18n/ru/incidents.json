@@ -1,4 +1,7 @@
 {
+  "incidents.help.title": "Запросить помощь другой команды",
+  "incidents.help.message": "Сообщение (необязательно)",
+  "incidents.help.send": "Запросить помощь",
   "incidents.summary.total": "Всего инцидентов",
   "incidents.summary.total_hint": "Текущий выбор команд",
   "incidents.summary.active": "Активные",

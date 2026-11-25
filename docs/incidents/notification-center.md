@@ -13,7 +13,10 @@ separate read/unread receipt or a count of the notification delivery queue.
 Each item includes its ID (`responder-request-<id>`), type `responder_request`,
 title, body, timestamps, `incident_id`, the serialized `responder`, and action
 descriptors. There is no embedded `incident` summary in the 2.5 response.
-`url` opens `/incidents/<incident_id>`. Accept and decline actions use:
+`url` opens `/incidents/<incident_id>` when the user can read the Incident.
+The link is null for invited responders who can only act on the request.
+Use `?responder_id=<id>` to retrieve one actionable invitation by ID.
+Accept and decline actions use:
 
 ```http
 PUT /api/incidents/17/responders/8

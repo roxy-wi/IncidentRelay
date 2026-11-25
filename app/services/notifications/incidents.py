@@ -52,7 +52,11 @@ def _active_user(user_id):
 def _payload(incident, event, event_type, context=None):
     context = context or {}
     priority = incident.priority.slug if incident.priority_id else "-"
-    url = f"{(Config.PUBLIC_BASE_URL or '').rstrip('/')}/incidents/{incident.id}"
+    base_url = (Config.PUBLIC_BASE_URL or "").rstrip("/")
+    url = f"{base_url}/incidents/{incident.id}"
+    team_help = event_type == "responder_requested" and context.get("target_type") == "team"
+    if team_help:
+        url = f"{base_url}/incidents?responder_request={context['responder_id']}"
     body = (
         f"Incident: {incident.title}\nPriority: {priority}\n"
         f"Status: {incident.workflow_status}\nURL: {url}"
@@ -64,9 +68,13 @@ def _payload(incident, event, event_type, context=None):
         event_type=event_type,
         context={**context, "message": body, "event_id": event.id},
     )
+    subject = f"Incident #{incident.id}: {incident.title} ({event_type})"
+    if team_help:
+        subject = f"Team help requested for Incident #{incident.id}: {incident.title}"
+        push.update(title=subject, url=url)
     return {
         "event_type": event_type,
-        "subject": f"Incident #{incident.id}: {incident.title} ({event_type})",
+        "subject": subject,
         "body": body,
         "push": push,
     }
@@ -151,6 +159,12 @@ def enqueue_responder(responder, event):
             user=user,
             responder_id=responder.id,
         )
+        email = (user.email or "").strip()
+        if responder.target_type == "team" and Config.SMTP_HOST and email:
+            _enqueue(
+                incident, event, "email", hashlib.sha256(email.casefold().encode()).hexdigest(),
+                payload, user=user, recipient=email, responder_id=responder.id,
+            )
 
 
 def _owned(delivery):
@@ -180,7 +194,7 @@ def _is_relevant(delivery):
     if delivery.target_key.startswith("user:") and not delivery.user_id:
         return False
     if delivery.responder_id:
-        return (
+        responder = (
             IncidentResponder.select()
             .where(
                 IncidentResponder.id == delivery.responder_id,
@@ -189,8 +203,19 @@ def _is_relevant(delivery):
                 IncidentResponder.expires_at.is_null(True)
                 | (IncidentResponder.expires_at > utc_now()),
             )
-            .exists()
+            .first()
         )
+        if not responder:
+            return False
+        if responder.target_type == "team" and delivery.target_key != "no_recipients":
+            from app.services.incidents.responder_notifications import team_help_recipients
+
+            recipients = team_help_recipients(responder).where(User.id == delivery.user_id)
+            if delivery.method == "email":
+                user = recipients.first()
+                return bool(user and (user.email or "").strip().casefold() == delivery.recipient.casefold())
+            return recipients.exists()
+        return True
     ids = delivery.payload.get("stakeholder_ids", [])
     flag = getattr(
         IncidentStakeholder, STAKEHOLDER_FLAGS[delivery.payload["event_type"]]

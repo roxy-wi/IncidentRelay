@@ -22,6 +22,7 @@ from app.modules.db.models import (
 )
 from app.services.incidents import core, responders, stakeholders
 from tests.factories import (
+    add_user_to_team,
     create_group,
     create_service,
     create_team,
@@ -180,12 +181,19 @@ def test_competing_responder_decisions_do_not_overwrite_each_other(app, db):
     assert IncidentEvent.get().user_id == AuditLog.get().user_id == winner[2]
 
 
-def test_collective_request_cannot_be_accepted_by_two_people(app, db):
+@pytest.mark.parametrize("cross_team", [False, True])
+def test_collective_request_cannot_be_accepted_by_two_people(app, db, cross_team):
     incident, actors = _context()
+    target = incident.team
+    if cross_team:
+        target = create_team(incident.team.group)
+        actors = [create_user(group=target.group, group_role="viewer") for _ in range(2)]
+        for actor in actors:
+            add_user_to_team(target, actor, "responder")
     row = IncidentResponder.create(
         incident=incident,
         target_type="team",
-        target_team=incident.team,
+        target_team=target,
     )
     headers = [_headers(actor) for actor in actors]
 

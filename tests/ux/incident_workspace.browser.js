@@ -118,10 +118,109 @@ async function main() {
         assert.equal(await activity.getByText(`Open AlertGroup #${fixture.groupId}`, {exact: true}).count(), 1);
         await activity.getByText(`Open AlertGroup #${fixture.groupId}`, {exact: true}).click();
         await page.waitForURL(new RegExp(`/alerts/${fixture.groupId}`));
+        const review = page.locator("#alert-review");
+        const outcomePicker = review.locator("#alert-review-outcome + .ts-wrapper");
+        const outcomeMenu = page.locator("#alert-review-outcome-ts-dropdown");
+        async function selectOutcome(value) {
+            await outcomePicker.locator(".ts-control").click();
+            await outcomeMenu.locator('.option[data-value="' + value + '"]').click();
+        }
+        await review.locator("[data-review-edit]").click();
+        await outcomePicker.locator(".ts-control").click();
+        await outcomeMenu.waitFor({state: "visible"});
+        for (const scheme of ["dark", "light"]) {
+            await page.evaluate(value => window.AppTheme.apply(value), scheme);
+            const badgeColors = await outcomeMenu.locator(".option .ui-status-badge").evaluateAll(
+                badges => badges.map(badge => getComputedStyle(badge).backgroundColor)
+            );
+            assert.equal(badgeColors.length, 8);
+            assert.equal(new Set(badgeColors).size, 8);
+        }
+        await outcomeMenu.locator('.option[data-value="duplicate"]').click();
+        await review.locator("[name=mode]").selectOption("incident_target");
+        const targetPicker = review.locator("[data-review-picker]");
+        await targetPicker.locator(".ts-control input").fill("#" + fixture.incidentId);
+        await page.locator("#alert-review-target-ts-dropdown .option").filter({hasText: "Workspace browser regression"}).click();
+        await review.locator("[name=note]").fill("Verified canonical incident");
+        await review.locator("[type=submit]").click();
+        await waitForText("#alert-review [data-review-summary]", "Duplicate");
+        const summary = review.locator("[data-review-summary]");
+        assert.equal(await summary.locator(".ui-status-badge-primary").innerText(), "Duplicate");
+        const author = await (await context.request.get("/api/auth/me")).json();
+        const avatar = summary.locator(".user-avatar");
+        assert.equal(await avatar.getAttribute("data-user-id"), String(author.id));
+        assert.equal(await avatar.evaluate((el, color) => {
+            const probe = document.createElement("span");
+            probe.style.backgroundColor = color;
+            return getComputedStyle(el).backgroundColor === probe.style.backgroundColor;
+        }, author.color), true);
+        assert.equal(await review.locator("[data-review-summary] a").getAttribute("href"), "/incidents/" + fixture.incidentId);
+        assert.equal(await review.locator("[data-review-note]").innerText(), "Verified canonical incident");
+        await context.addCookies([{name: "incidentrelay_locale", value: "ru", url: fixture.baseUrl}]);
+        await page.reload();
+        await waitForText("#alert-review [data-review-summary]", "#" + fixture.incidentId);
+        await review.locator("[data-review-edit]").click();
+        const desktop = page.viewportSize();
+        await review.screenshot({path: "tests/.tmp/classification-desktop.png"});
+        await page.setViewportSize({width: 390, height: 844});
+        const fields = await review.locator(".alert-review-fields .alert-review-field:visible").evaluateAll(
+            nodes => nodes.map(node => node.getBoundingClientRect().toJSON())
+        );
+        assert.equal(fields.length, 3);
+        assert(fields.every((field, i) => field.right <= 391 && field.left >= 0
+            && (i === 0 || field.top >= fields[i - 1].bottom)));
+        await review.screenshot({path: "tests/.tmp/classification-mobile.png"});
+        await selectOutcome("false_positive");
+        assert.equal(await review.locator("[name=classification]").inputValue(), "false_positive");
+        const [classified] = await Promise.all([
+            page.waitForResponse(response => response.request().method() === "PUT"
+                && response.url().endsWith("/classification")),
+            review.locator("[type=submit]").click(),
+        ]);
+        assert.equal(classified.status(), 200, await classified.text());
+        await waitForText("#alert-review [data-review-summary]", "Ложное срабатывание");
+        await page.setViewportSize(desktop);
+        await context.addCookies([{name: "incidentrelay_locale", value: "en", url: fixture.baseUrl}]);
+        await page.reload();
+        await waitForText("#alert-review [data-review-summary]", "False positive");
+        await review.locator("[data-review-edit]").click();
+        await review.locator("[data-review-clear]").click();
+        await waitForText("#alert-review [data-review-summary]", "Unclassified");
+        await review.locator("[data-review-edit]").click();
+        const reviewUrl = "/api/alert-groups/" + fixture.groupId + "/classification";
+        const savedReview = await (await context.request.get(reviewUrl)).json();
+        await context.request.put(reviewUrl, {data: {classification: "other", version: savedReview.version}});
+        await selectOutcome("test_alert");
+        await review.locator("[type=submit]").click();
+        await review.locator("[data-review-error] button").click();
+        await waitForText("#alert-review [data-review-summary]", "Other");
         await page.goBack();
         await ready();
 
         // The real controls persist data through real endpoints.
+        await page.locator("#incident-team-help summary").click();
+        await page.locator("#incident-help-team").selectOption(String(fixture.helpTeamId));
+        await page.locator("#incident-help-message").fill("Check replication lag");
+        const requestSaved = page.waitForResponse(response => response.url().endsWith("/responders")
+            && response.request().method() === "POST");
+        await page.locator("#incident-help-form button").click();
+        const request = await (await requestSaved).json();
+        await waitForText("#incident-help-requests", "Database response · Requested");
+        const helper = await browser.newContext({baseURL: fixture.baseUrl});
+        await helper.addCookies([{name: "incidentrelay_jwt", value: fixture.helperToken, url: fixture.baseUrl},
+            {name: "incidentrelay_locale", value: "en", url: fixture.baseUrl}]);
+        const inbox = await helper.newPage();
+        await inbox.route("**/*", route => new URL(route.request().url()).origin === fixture.baseUrl
+            ? route.continue() : route.abort());
+        await inbox.goto("/incidents?responder_request=" + request.id);
+        const invitation = inbox.locator(".notification-center-item").filter({hasText: "Check replication lag"});
+        await invitation.getByRole("button", {name: "Accept"}).click();
+        await invitation.waitFor({state: "detached"});
+        await helper.close();
+        await page.reload();
+        await ready();
+        await page.locator("#incident-team-help summary").click();
+        await waitForText("#incident-help-requests", "Database response · Accepted");
         await page.locator("#incident-participant-user").selectOption(String(fixture.userId));
         await page.locator("#incident-participant-role").selectOption("commander");
         await page.locator("#incident-participant-add").click();
@@ -232,7 +331,11 @@ async function main() {
         assert.equal(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1), true);
         assert.deepEqual(errors, []);
 
-        for (const selector of ["#incident-participants-list", "#incident-stakeholders-list", "#incident-services-list"]) {
+        const commander = page.locator("#incident-participants-list .incidents-collection-row").filter({hasText: "Commander"});
+        await commander.getByRole("button", {name: "Remove", exact: true}).click();
+        await waitForText("#incident-participants-list", "Responder");
+        await commander.waitFor({state: "detached"});
+        for (const selector of ["#incident-stakeholders-list", "#incident-services-list"]) {
             await page.locator(selector).getByRole("button", {name: "Remove", exact: true}).click();
             await page.waitForFunction(target => document.querySelectorAll(target + " button").length === 0
                 && !document.querySelector(target).textContent.includes("Loading..."), selector);
@@ -252,6 +355,9 @@ async function main() {
         await page.goto(url);
         await ready();
         assert.equal(await page.locator("#incident-participant-add").isVisible(), false);
+        await page.locator("#incident-team-help summary").click();
+        await waitForText("#incident-help-requests", "Database response · Accepted");
+        assert.equal(await page.locator("#incident-help-form button").isVisible(), false);
         assert.equal(await page.locator("#incident-root-cause").isDisabled(), true);
         assert.equal(await relationEditor.count(), 0);
         assert.equal((await context.request.post(`/api/incidents/${fixture.incidentId}/comments`, {data: {body: "forbidden"}})).status(), 403);

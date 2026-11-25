@@ -7,7 +7,10 @@ from app.api.schemas.limits import (
     SLUG_MIN_LENGTH,
 )
 from app.api.schemas.roles import TEAM_ROLE_VALUES, TEAM_VIEWER_ROLE
-from app.api.openapi.common import response, path_param, json_body, query_param
+from app.api.openapi.common import (
+    catalog_list_schema, catalog_page_parameters, json_body, path_param, query_param, response,
+)
+from app.api.openapi.endpoints.oncall_health import health_summary_schema
 
 ERROR_SCHEMA = {
     "type": "object",
@@ -93,10 +96,35 @@ def paths():
             "get": {
                 "tags": ["teams"],
                 "summary": "List teams",
-                "description": "Returns teams visible to the current user. Regular users must have active team membership.",
+                "description": "Returns the visible team directory. Use page or page_size for a paged response.",
                 "operationId": "listTeams",
-                "parameters": [query_param("include_inactive", "Set to true/1 to include disabled teams.", {"type": "string", "enum": ["1", "true", "yes", "on"]})],
-                "responses": {"200": response("List of teams.", {"type": "array", "items": TEAM_SCHEMA})},
+                "parameters": [
+                    query_param("include_inactive", "Include disabled teams.", {"type": "boolean"}),
+                    *catalog_page_parameters(),
+                    query_param("team_id", "Limit the catalog scope to this team (paged mode).", {"type": "integer"}),
+                    query_param("group", "Filter by group slug (paged mode)."),
+                    query_param("status", "Filter by team status (paged mode).",
+                                {"type": "string", "enum": ["active", "inactive"]}),
+                    query_param(
+                        "include_health",
+                        "Include on-call health for readable teams on this page. API tokens also need rotations:read.",
+                        {"type": "boolean", "default": False},
+                    ),
+                ],
+                "responses": {"200": response("Visible teams.", catalog_list_schema(
+                    {
+                        **TEAM_SCHEMA,
+                        "properties": {
+                            **TEAM_SCHEMA["properties"],
+                            "permissions": {"type": "object"},
+                            "sync": {"type": "object", "nullable": True},
+                            "health": health_summary_schema(),
+                        },
+                    },
+                    ("total", "active", "escalation", "groups"),
+                    page_fields={"group_slugs": {"type": "array", "items": {"type": "string"},
+                                                  "description": "Visible group options before table filters."}},
+                ))},
             },
             "post": {
                 "tags": ["teams"],

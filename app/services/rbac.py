@@ -150,38 +150,18 @@ def get_allowed_team_ids(
     return authorization.filter_team_ids(sorted(managed_team_ids | member_team_ids))
 
 
-def get_allowed_oncall_team_ids(
-    user=None,
-    use_active_group=True,
-    active_only=True,
-):
-    """
-    Return team ids whose on-call schedule is visible to a user.
+def oncall_team_scope(user=None, use_active_group=True):
+    """Bound team-directory queries by readable groups and any team-scoped credential."""
+    group_ids = get_allowed_group_ids(user=user, use_active_group=use_active_group)
+    token = current_api_token()
+    return {"group_ids": group_ids, "allowed_team_id": token.team_id if token else None}
 
-    This is intentionally broader than get_allowed_team_ids():
-    group members may view on-call schedules for all teams in their groups,
-    but they still cannot read or edit team resources without team membership.
-    """
 
-    user = user or current_user()
-
-    group_ids = get_allowed_group_ids(
-        user=user,
-        write_required=False,
-        manage_users_required=False,
-        use_active_group=use_active_group,
+def get_allowed_oncall_team_ids(user=None, use_active_group=True, active_only=True):
+    """Group members may view team schedules without team resource read access."""
+    return teams_repo.list_oncall_team_ids(
+        **oncall_team_scope(user, use_active_group), active_only=active_only,
     )
-
-    if not group_ids:
-        return []
-
-    return authorization.filter_team_ids([
-        team.id
-        for team in teams_repo.list_teams(
-            active_only=active_only,
-            group_ids=group_ids,
-        )
-    ])
 
 
 def _user_can_read_group(user, group_id):

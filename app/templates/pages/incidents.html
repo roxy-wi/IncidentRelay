@@ -230,6 +230,21 @@
             <div class="incidents-form-field"><label for="incident-participant-role">{{ _('incidents.workspace.role_label') }}</label><select id="incident-participant-role" class="input"><option value="responder">{{ _('incidents.workspace.role.responder') }}</option><option value="commander">{{ _('incidents.workspace.role.commander') }}</option><option value="communications">{{ _('incidents.workspace.role.communications') }}</option></select></div>
             <button id="incident-participant-add" type="button" class="btn btn-primary btn-small">{{ _('incidents.workspace.add_participant') }}</button>
           </div>
+          <details id="incident-team-help" class="form-body">
+            <summary>{{ _('incidents.help.title') }}</summary>
+            <div id="incident-help-requests" class="incidents-collection" aria-live="polite"></div>
+            <form id="incident-help-form" class="incidents-inline-form is-hidden">
+              <div class="incidents-form-field">
+                <label for="incident-help-team">{{ _('incidents.form.team') }}</label>
+                <select id="incident-help-team" class="input" required></select>
+              </div>
+              <div class="incidents-form-field">
+                <label for="incident-help-message">{{ _('incidents.help.message') }}</label>
+                <textarea id="incident-help-message" class="input" rows="2" maxlength="2000"></textarea>
+              </div>
+              <button type="submit" class="btn btn-primary btn-small" disabled>{{ _('incidents.help.send') }}</button>
+            </form>
+          </details>
         </section>
         <section class="card incidents-collaboration-card workspace-section" data-section="stakeholders" id="incident-stakeholders-section">
           <div class="card-header"><div class="section-heading"><span class="section-icon" aria-hidden="true"><i class="fas fa-users"></i></span><h3>{{ _('incidents.workspace.stakeholders') }}</h3></div></div>

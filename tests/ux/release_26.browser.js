@@ -38,12 +38,19 @@ const fixture = JSON.parse(process.env.RELEASE_26_FIXTURE);
             ["services", "Workload"], ["business-services", "Product"],
         ]) {
             const serviceList = name === "services" || name === "business-services";
+            const serverList = serviceList || name === "teams";
             const catalogRequests = [];
+            const teamHealthRequests = [];
             function recordCatalogRequest(request) {
                 const url = new URL(request.url());
-                if (url.pathname === "/api/" + name) catalogRequests.push(url.searchParams);
+                if (url.pathname === "/api/oncall-health/teams/summaries") teamHealthRequests.push(url);
+                if (url.pathname !== "/api/" + name) return;
+                // The global team selector still loads its own active-team list.
+                if (name !== "teams" || url.searchParams.has("include_inactive") || url.searchParams.has("page")) {
+                    catalogRequests.push(url.searchParams);
+                }
             }
-            if (serviceList) page.on("request", recordCatalogRequest);
+            if (serverList) page.on("request", recordCatalogRequest);
             await page.goto("/" + name);
             await count("#" + name + "-table > tr", 25);
             const pager = "#" + name + "-pagination";
@@ -52,16 +59,17 @@ const fixture = JSON.parse(process.env.RELEASE_26_FIXTURE);
                 name === "services" ? "DIV" : "SECTION", "footer sits outside the table wrapper");
             assert.ok(await page.locator(pager).evaluate(el => el.previousElementSibling.matches(".table-wrapper")));
             if (!serviceList) await centeredHealth();
-            const nextResponse = serviceList && page.waitForResponse(response => {
+            const nextResponse = serverList && page.waitForResponse(response => {
                 const url = new URL(response.url());
                 return url.pathname === "/api/" + name && url.searchParams.get("page") === "2";
             });
             await page.locator(pager + "-next-page").click();
             await count("#" + name + "-table > tr", 2);
-            if (serviceList) {
+            if (serverList) {
                 const payload = await (await nextResponse).json();
                 assert.equal(payload.items.length, 2);
                 assert.equal(payload.pagination.total_items, 27);
+                if (name === "teams") assert.ok(payload.items.every(team => team.health.partial));
             }
             if (name === "rotations") {
                 await page.waitForFunction(() => Array.from(document.querySelectorAll("#rotations-table > tr")).every(row =>
@@ -69,13 +77,18 @@ const fixture = JSON.parse(process.env.RELEASE_26_FIXTURE);
             }
             assert.equal(await page.locator(pager + "-page-from").textContent(), "26");
             assert.equal(await page.locator(pager + "-next-page").isDisabled(), true);
-            if (serviceList) {
-                const filter = name === "services" ? "#services-criticality-filter" : "#business-services-public-filter";
-                await page.locator(filter).selectOption(name === "services" ? "medium" : "private");
+            if (serverList) {
+                const [filter, value] = {
+                    teams: ["#teams-status-filter", "active"],
+                    services: ["#services-criticality-filter", "medium"],
+                    "business-services": ["#business-services-public-filter", "private"],
+                }[name];
+                await page.locator(filter).selectOption(value);
                 await count("#" + name + "-table > tr", 25);
                 assert.equal(await page.locator(pager + "-current-page").textContent(), "1");
                 assert.equal(await page.locator("#" + name + "-total-count").textContent(), "27");
                 await page.locator(pager + "-next-page").click();
+                await count("#" + name + "-table > tr", 2);
                 await page.locator("#" + name + "-search").fill(search);
                 await count("#" + name + "-table > tr", 25);
                 assert.equal(await page.locator(pager + "-current-page").textContent(), "1");
@@ -97,7 +110,15 @@ const fixture = JSON.parse(process.env.RELEASE_26_FIXTURE);
             assert.equal(await page.locator(pager).count(), 1);
             if (!serviceList) await centeredHealth();
             await page.screenshot({path: path.join(fixture.screenshots, name + ".png"), fullPage: true});
-            if (serviceList) {
+            if (name === "teams") {
+                const group = await page.locator("#teams-group-filter option").nth(1).getAttribute("value");
+                await page.goto("/teams?group=" + encodeURIComponent(group) + "&search=Roster%2026");
+                await count("#teams-table .team-name", 1);
+                assert.equal(await page.locator("#teams-group-filter").inputValue(), group);
+                assert.ok(catalogRequests.some(params => params.get("group") === group && params.get("search") === "Roster 26"));
+                assert.equal(teamHealthRequests.length, 0);
+            }
+            if (serverList) {
                 page.off("request", recordCatalogRequest);
                 assert.ok(catalogRequests.every(params => params.has("page") && params.has("page_size")));
                 assert.ok(catalogRequests.some(params => params.get("search") === search + " 26"));

@@ -1655,6 +1655,7 @@ function showAlertDetails(alertId) {
         && (isDifferentAlert || !initialModal.hasClass("is-open"))
     ) {
         currentDetailsAlertCanRespond = false;
+        renderAlertReview(null, initialModal);
         resetAlertDetailsTabs(alertId);
 
         initialModal.find("#alert-details-title").text(
@@ -1714,6 +1715,7 @@ function showAlertDetails(alertId) {
             isCurrent: () => currentDetailsAlertId === alert.id && alertDetailsModal().hasClass("is-open"),
         });
         renderAlertDetailsActionBar(alert, modal);
+        renderAlertReview(alert, modal);
         currentDetailsAlertShelved = Boolean(alert.shelved || (alert.shelve && alert.shelve.active));
 
         modal.find("#alert-details-title").text(alert.title || i18n.t("alert_details.entity.alert_number", {id: alert.id}));
@@ -2848,6 +2850,9 @@ function focusAlertChildOccurrence(childAlertId) {
 
 function alertEventTypeLabel(eventType) {
     const labels = {
+        alert_classification_set: i18n.t("alert_details.events.classification_set"),
+        alert_classification_changed: i18n.t("alert_details.events.classification_changed"),
+        alert_classification_cleared: i18n.t("alert_details.events.classification_cleared"),
         correlation_detected: i18n.t("alert_details.events.correlation_detected"),
         correlation_deactivated: i18n.t("alert_details.events.correlation_deactivated"),
         business_impact_detected: i18n.t("alert_details.events.business_detected"),
@@ -3761,6 +3766,7 @@ function openAlertDetailsForTrace(traceId) {
             currentDetailsExplainTraceId = trace.trace_id;
             currentDetailsExplainLoadedAlertId = trace.group_id || null;
 
+            renderAlertReview(null, modal);
             modal.find("#alert-details-title").text(i18n.t("alert_details.trace.details_title"));
             modal.find("#alert-details-subtitle").text(
                 trace.group_id

@@ -10,6 +10,16 @@ Incident. The operational assignee is separate from the participant list.
 
 ## Request help
 
+In the Incident workspace, open **Participants → Request help from another team**.
+Select an active team in the same group, add an optional message and submit.
+This section shows the status of each request and who accepted it.
+
+Active responders and managers of the invited team receive the request in the
+notification center. Browser push reaches subscribed devices. When SMTP is
+configured, members with a profile email address also receive an email.
+Both links open the invitation. A team member can accept or decline it without
+membership in the owning team. Opening the full Incident requires its usual read permission.
+
 ```http
 POST /api/incidents/17/responders
 Content-Type: application/json
@@ -21,7 +31,7 @@ The other target types are `team`, `rotation` and `escalation_policy`. Supply
 exactly one matching `target_*_id`. `message` is at most 2,000 characters;
 `expires_after_minutes`, when supplied, is 1–10,080. A successful request returns
 `201` and a responder record with its target, status, actors and timestamps.
-Repeated POSTs create separate requests; this endpoint has no idempotency key.
+A second request for a target with a pending or accepted request returns `409`.
 
 `GET /api/incidents/17/responders` lists requests. To act on one:
 

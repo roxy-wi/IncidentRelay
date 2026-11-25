@@ -439,6 +439,7 @@ def create_incident_from_alert_group(
     description=None,
     priority_slug=None,
     assignee_id=None,
+    notify=True,
 ):
     """Create a first-class Incident and primary-link one AlertGroup atomically."""
     group = AlertGroup.get_or_none(AlertGroup.id == int(alert_group_id))
@@ -468,6 +469,7 @@ def create_incident_from_alert_group(
             api_token_id=api_token_id,
             source=source,
         )
-    from app.services.incidents.stakeholders import notify_stakeholders
-    notify_stakeholders(incident, "created", skip_user_id=user_id)
+    if notify:
+        from app.services.incidents.stakeholders import notify_stakeholders
+        notify_stakeholders(incident, "created", skip_user_id=user_id)
     return incident

@@ -1,9 +1,11 @@
+from app.modules.common import utc_now
 from app.modules.db import incidents_repo
 from app.services.incidents.responders import (
     can_user_act_as_responder_target,
 )
 from app.services.serializers.alerts import serialize_incident_responder
 from app.services.incidents.responder_display import user_display_name
+from app.services.rbac import can_read_team, is_admin_user
 
 
 def _responder_request_body(responder):
@@ -22,6 +24,10 @@ def _responder_request_body(responder):
 
 def serialize_notification_center_responder_item(responder, current_user=None):
     incident = responder.incident
+    url = f"/incidents/{incident.id}" if incident else None
+    if incident and responder.target_type == "team" and not is_admin_user(current_user):
+        if not incident.team_id or not can_read_team(current_user, incident.team_id):
+            url = None
 
     return {
         "id": f"responder-request-{responder.id}",
@@ -38,7 +44,7 @@ def serialize_notification_center_responder_item(responder, current_user=None):
             if responder.expires_at
             else None
         ),
-        "url": f"/incidents/{incident.id}" if incident else None,
+        "url": url,
         "incident_id": incident.id if incident else None,
         "responder": serialize_incident_responder(responder),
         "actions": [
@@ -68,20 +74,24 @@ def serialize_notification_center_responder_item(responder, current_user=None):
     }
 
 
-def list_notification_center_items(user, *, limit=20):
+def list_notification_center_items(user, *, limit=20, responder_id=None):
     if not user:
         return {
             "items": [],
             "unread_count": 0,
         }
 
-    candidates = incidents_repo.list_requested_incident_responders(
-        limit=max(limit * 5, 50),
-    )
+    if responder_id is None:
+        candidates = incidents_repo.list_requested_incident_responders(limit=max(limit * 5, 50))
+    else:
+        row = incidents_repo.get_incident_responder(responder_id)
+        candidates = [row] if row and row.status == "requested" else []
 
     items = []
-
+    now = utc_now()
     for responder in candidates:
+        if responder.expires_at and responder.expires_at <= now:
+            continue
         if not can_user_act_as_responder_target(user, responder):
             continue
 

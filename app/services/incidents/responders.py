@@ -5,7 +5,7 @@ from peewee import IntegrityError
 from app import Config
 from app.db import database_proxy as db
 from app.modules.common import utc_now
-from app.modules.db import incident_core_repo, incidents_repo
+from app.modules.db import incident_core_repo, incidents_repo, teams_repo
 from app.modules.db.models import (
     EscalationPolicy,
     Rotation,
@@ -24,7 +24,11 @@ from app.services.incidents.responder_display import (
 from app.services.incidents.responder_notifications import (
     notify_incident_responder_requested,
 )
-from app.services.rbac import can_respond_team, can_write_group
+from app.services.api_token_scopes import required_scopes_for_path
+from app.services.authorization import token_allows_operation, token_allows_team
+from app.services.rbac import (
+    can_read_team, can_respond_team, can_write_group, current_api_token, is_admin_user,
+)
 from app.services.notifications.incidents import enqueue_responder
 
 logger = logging.getLogger("oncall.incidents.responders")
@@ -104,6 +108,20 @@ def _validate_responder_team(target_id, group):
         raise ValueError("target team belongs to another group")
 
     return team
+
+
+def team_help_options(incident, user):
+    """List active sibling teams visible in the incident's directory."""
+    group_id = _incident_group_id(incident)
+    if not group_id or not can_respond_team(user, incident.team_id):
+        return []
+    token = current_api_token()
+    if token and not token_allows_operation(token, required_scopes_for_path("/api/teams", "GET")):
+        return []
+    teams = teams_repo.list_teams(
+        active_only=True, group_ids=[group_id], allowed_team_id=token.team_id if token else None,
+    )
+    return [{"id": team.id, "name": team.name} for team in teams if team.id != incident.team_id]
 
 
 def _validate_responder_rotation(target_id, group):
@@ -188,7 +206,7 @@ def _can_operate_incident_responders(user, group):
     if not user:
         return False
 
-    if user.is_admin:
+    if is_admin_user(user):
         return True
 
     if group.team_id:
@@ -254,9 +272,14 @@ def _can_act_as_responder_target(user, responder, status):
         return responder.target_user_id == user.id
 
     if responder.target_type == "team":
-        if not responder.target_team_id:
-            return False
-        return can_respond_team(user, responder.target_team_id)
+        team = responder.target_team
+        group_id = _incident_group_id(responder.incident)
+        return bool(
+            team and team.active and not team.deleted
+            and (not group_id or team.group_id == group_id)
+            and token_allows_team(responder.incident.team_id)
+            and can_respond_team(user, team.id)
+        )
 
     if responder.target_type == "rotation":
         return _is_active_rotation_member(
@@ -331,7 +354,7 @@ def require_incident_responder_action_allowed(user, group, responder, status):
 
 
 def create_incident_responder(
-    *, incident_id, payload, user_id=None, api_token_id=None, source="system",
+    *, incident_id, payload, user_id=None, user=None, api_token_id=None, source="system",
 ):
     """Create the request, event and audit record before sending notifications."""
     target_type = payload["target_type"]
@@ -343,6 +366,10 @@ def create_incident_responder(
             getattr(Config, "INCIDENT_RESPONDER_DEFAULT_EXPIRES_AFTER_MINUTES", 30)
         )
     with incident_core_repo.incident_transaction(incident_id) as incident:
+        if user is not None:
+            if not _can_operate_incident_responders(user, incident):
+                raise PermissionError("Incident responder permission required")
+            user_id = user.id
         _validate_responder_target(incident, target_type, target_id)
         responder = incidents_repo.create_incident_responder(
             incident.id,
@@ -375,7 +402,7 @@ def create_incident_responder(
 
 def set_incident_responder_status(
     *, incident_id, responder_id, status, response_message=None, user_id=None,
-    user=None, api_token_id=None, source="system",
+    user=None, api_token_id=None, source="system", require_incident_access=False,
 ):
     """Change a request and its assignment, event and audit atomically."""
     if status not in VALID_RESPONDER_UPDATE_STATUSES:
@@ -384,9 +411,21 @@ def set_incident_responder_status(
         user_id = user.id
     with incident_core_repo.incident_transaction(incident_id) as incident:
         responder = incidents_repo.get_incident_responder(responder_id)
+        can_read = (
+            not require_incident_access or is_admin_user(user)
+            or (incident.team_id and can_read_team(user, incident.team_id))
+        )
         if not responder or responder.incident_id != incident.id:
+            if not can_read:
+                raise PermissionError("Incident outside your team scope")
             raise LookupError("responder not found in this incident")
-        require_incident_responder_action_allowed(user, incident, responder, status)
+        if can_read:
+            require_incident_responder_action_allowed(user, incident, responder, status)
+        elif not (
+            responder.target_type == "team" and _incident_group_id(incident)
+            and _can_act_as_responder_target(user, responder, status)
+        ):
+            raise PermissionError("Not an actionable invitation for your team")
         if responder.status == status:
             # Repeated requests must not replace the original actor, response or
             # concrete assignee, nor produce duplicate events and audit entries.

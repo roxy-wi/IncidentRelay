@@ -6,7 +6,6 @@
     const SUMMARY_DEBOUNCE_MS = 120;
     const SUMMARY_ENDPOINT = "/api/oncall-health/rotations/summaries";
     const DETAIL_ENDPOINT_PREFIX = "/api/oncall-health/rotations/";
-    const TEAM_SUMMARY_ENDPOINT = "/api/oncall-health/teams/summaries";
     const TEAM_DETAIL_ENDPOINT_PREFIX = "/api/oncall-health/teams/";
 
     let pendingSummaryIds = new Set();
@@ -711,78 +710,6 @@
             .text(healthIcon(status));
     }
 
-    function updateTeamHealthSummary(teamId, summary) {
-        const id = String(teamId || "");
-        if (!id) {
-            return;
-        }
-
-        $(`td.oncall-health-cell[data-team-health-id="${id}"]`).each(function () {
-            $(this)
-                .empty()
-                .append(renderTeamHealthIndicator(summary, id));
-        });
-    }
-
-    function loadTeamHealthSummariesForVisibleRows() {
-        const ids = [];
-
-        $("td.oncall-health-cell[data-team-health-id]").each(function () {
-            const id = String($(this).attr("data-team-health-id") || "");
-
-            if (id && ids.indexOf(id) === -1) {
-                ids.push(id);
-            }
-        });
-
-        if (!ids.length) {
-            return;
-        }
-
-        const params = new URLSearchParams();
-        ids.forEach(function (id) {
-            params.append("team_id", id);
-        });
-
-        $.ajax({
-            url: `${TEAM_SUMMARY_ENDPOINT}?${params.toString()}`,
-            method: "GET",
-            dataType: "json",
-        }).done(function (payload) {
-            const byId = payload && payload.by_id ? payload.by_id : {};
-
-            ids.forEach(function (id) {
-                if (byId[String(id)]) {
-                    updateTeamHealthSummary(id, byId[String(id)]);
-                } else {
-                    updateTeamHealthSummary(id, {
-                        status: "unknown",
-                        critical: 0,
-                        warning: 0,
-                        info: 0,
-                        total: 0,
-                        tooltip: healthT("oncall_health.errors.summary_missing_team", {}, "Team health summary was not returned."),
-                    });
-                }
-            });
-        }).fail(function (xhr) {
-            const message = xhr.responseJSON && (xhr.responseJSON.message || xhr.responseJSON.error)
-                ? (xhr.responseJSON.message || xhr.responseJSON.error)
-                : healthT("oncall_health.errors.team_summary_failed", {}, "Team health summary failed to load.");
-
-            ids.forEach(function (id) {
-                updateTeamHealthSummary(id, {
-                    status: "unknown",
-                    critical: 0,
-                    warning: 0,
-                    info: 0,
-                    total: 0,
-                    tooltip: message,
-                });
-            });
-        });
-    }
-
     function renderTeamHealthModal(payload) {
         ensureRotationHealthModal();
 
@@ -888,7 +815,6 @@
     window.renderTeamHealthIndicator = renderTeamHealthIndicator;
     window.openTeamHealthModal = openTeamHealthModal;
     window.renderTeamHealthModal = renderTeamHealthModal;
-    window.loadTeamHealthSummariesForVisibleRows = loadTeamHealthSummariesForVisibleRows;
 
     $(function () {
         installRotationHealthIntegration(0);

@@ -8,6 +8,36 @@ from app.api.schemas.base import ApiModel
 from app.modules.db.alert_search import parse_label_search
 
 
+AlertClassification = Literal[
+    "incident", "false_positive", "duplicate", "known_issue",
+    "no_action_required", "planned_activity", "test_alert", "other",
+]
+
+
+class AlertReviewVersion(ApiModel):
+    version: int = Field(ge=0)
+
+
+class AlertClassificationUpdate(AlertReviewVersion):
+    classification: AlertClassification
+    note: str | None = Field(default=None, max_length=5000)
+    canonical_group_id: int | None = Field(default=None, gt=0)
+    incident_id: int | None = Field(default=None, gt=0)
+    create_incident: bool = False
+
+    @model_validator(mode="after")
+    def check_target(self):
+        if self.classification == "duplicate":
+            if self.create_incident or (self.canonical_group_id is None) == (self.incident_id is None):
+                raise ValueError("Select exactly one canonical AlertGroup or Incident")
+        elif self.classification == "incident":
+            if self.canonical_group_id or self.create_incident == (self.incident_id is not None):
+                raise ValueError("Choose an existing Incident or create one")
+        elif self.canonical_group_id or self.incident_id or self.create_incident:
+            raise ValueError("A target applies only to incident or duplicate classification")
+        return self
+
+
 class AlertActivityQuerySchema(ApiModel):
     """Filters for the cross-group recent activity feed."""
 

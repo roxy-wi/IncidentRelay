@@ -1,4 +1,7 @@
 {
+  "incidents.help.title": "Pedir ayuda a otro equipo",
+  "incidents.help.message": "Mensaje (opcional)",
+  "incidents.help.send": "Pedir ayuda",
   "incidents.summary.total": "Total incidents",
   "incidents.summary.total_hint": "Current team selection",
   "incidents.summary.active": "Active",

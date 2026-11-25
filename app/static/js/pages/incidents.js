@@ -523,6 +523,9 @@ function loadIncidentDetails(incidentId) {
         currentIncidentEvents = [];
         $("#incident-details-modal").addClass("is-hidden");
         $("#incident-comment-input").val("");
+        $("#incident-team-help").prop("open", false);
+        $("#incident-help-requests").empty();
+        $("#incident-help-team, #incident-help-message").val("");
         $("#incident-workspace-stakeholder-email").val("");
     }
     clearIncidentDetailsErrors();
@@ -907,6 +910,8 @@ function renderIncidentComments(items) {
 
 function loadIncidentCollaboration(incident) {
     const canWrite = incidentCanRespond(incident);
+    $("#incident-help-form").toggleClass("is-hidden", !canWrite);
+    if ($("#incident-team-help").prop("open")) { loadIncidentTeamHelp(incident); }
     incidentCollaborationGet(incident, "/participants", "#incident-participants-list", function (items) {
         incidentListRows("#incident-participants-list", items, function (item) {
             return incidentUserLabel(item.user, item.user_id || item.target_user_id)
@@ -991,6 +996,68 @@ function loadIncidentCollaboration(incident) {
         });
     }
 }
+
+function loadIncidentTeamHelp(incident) {
+    const form = $("#incident-help-form");
+    const team = $("#incident-help-team").empty();
+    const submit = form.find("button").prop("disabled", true);
+    const list = $("#incident-help-requests");
+    incidentCollectionMessage(list, i18n.t("common.loading"));
+    const url = "/api/incidents/" + incident.id + "/responders?include_team_options=1";
+    apiGet(url, function (data) {
+        if (!incidentIsCurrent(incident)) { return; }
+        list.empty();
+        const activeTeams = new Set();
+        data.items.filter(item => item.target_type === "team").forEach(function (item) {
+            if (["requested", "accepted"].includes(item.status)) { activeTeams.add(item.target_team_id); }
+            const status = i18n.t("alert_details.responder." + item.status);
+            const row = $("<div>").addClass("incidents-collection-row");
+            const label = [item.target.label, status];
+            if (item.accepted_by) { label.push(incidentUserLabel(item.accepted_by)); }
+            if (item.message) { label.push(item.message); }
+            list.append(row.text(label.join(" · ")));
+        });
+        if (!list.children().length) {
+            incidentCollectionMessage(list, i18n.t("incidents.workspace.empty_entries"));
+        }
+        const available = data.teams.filter(team => !activeTeams.has(team.id));
+        team.append($("<option>").val("").text(i18n.t(
+            available.length ? "incidents.form.select_team" : "alert_details.target.none"
+        )));
+        available.sort((a, b) => a.name.localeCompare(b.name)).forEach(function (item) {
+            team.append($("<option>").val(item.id).text(item.name));
+        });
+        team.prop("disabled", !available.length);
+        submit.prop("disabled", !available.length);
+    }, function (xhr) {
+        if (incidentIsCurrent(incident)) { incidentCollectionMessage(list, getApiErrorMessage(xhr)); }
+    });
+}
+
+$("#incident-team-help").on("toggle", function () {
+    if (this.open && currentIncident) { loadIncidentTeamHelp(currentIncident); }
+});
+
+$("#incident-help-form").on("submit", function (event) {
+    event.preventDefault();
+    const incident = currentIncident;
+    const teamId = Number($("#incident-help-team").val());
+    const submit = $(this).find("button");
+    if (!incident || !incidentCanRespond(incident) || !teamId || submit.prop("disabled")) { return; }
+    submit.prop("disabled", true);
+    apiPost("/api/incidents/" + incident.id + "/responders", {
+        target_type: "team", target_team_id: teamId, message: $("#incident-help-message").val().trim() || null,
+    }, function () {
+        if (!incidentIsCurrent(incident)) { return; }
+        $("#incident-help-form")[0].reset();
+        refreshCurrentIncident();
+    }, function (xhr) {
+        if (!incidentIsCurrent(incident)) { return; }
+        submit.prop("disabled", false);
+        showIncidentDetailsError(xhr);
+        if (xhr.status === 409) { loadIncidentTeamHelp(incident); }
+    });
+});
 
 function incidentCollaborationPost(suffix, payload, onSuccess) {
     if (!currentIncident || !incidentCanRespond(currentIncident)) { return; }

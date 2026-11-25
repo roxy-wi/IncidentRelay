@@ -1,4 +1,7 @@
 {
+  "incidents.help.title": "请求其他团队协助",
+  "incidents.help.message": "留言（可选）",
+  "incidents.help.send": "请求协助",
   "incidents.summary.total": "Total incidents",
   "incidents.summary.total_hint": "Current team selection",
   "incidents.summary.active": "Active",

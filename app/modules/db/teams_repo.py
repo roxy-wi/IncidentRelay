@@ -1,7 +1,8 @@
-from peewee import JOIN
+from peewee import JOIN, Case
 
 from app.api.schemas.roles import TEAM_VIEWER_ROLE
 from app.db import database_proxy
+from app.modules.db.catalog_pagination import catalog_page, catalog_search, catalog_summary
 from app.modules.db.models import (
     Group,
     Rotation,
@@ -14,18 +15,60 @@ from app.modules.db.models import (
 )
 
 
-def list_teams(active_only=False, group_ids=None, include_deleted=False):
-    """Return teams ordered by id."""
-    query = Team.select().order_by(Team.id.asc())
+def _team_scope(active_only=False, group_ids=None, include_deleted=False, allowed_team_id=None):
+    query = Team.select()
     if not include_deleted:
         query = query.where(Team.deleted == False)
     if group_ids is not None:
-        if not group_ids:
-            return []
         query = query.where(Team.group.in_(group_ids))
+    if allowed_team_id is not None:
+        query = query.where(Team.id == allowed_team_id)
     if active_only:
         query = query.where(Team.active == True)
-    return list(query)
+    return query
+
+
+def list_teams(active_only=False, group_ids=None, include_deleted=False, allowed_team_id=None):
+    """Return visible teams ordered by ID."""
+    scope = _team_scope(active_only, group_ids, include_deleted, allowed_team_id)
+    return list(scope.order_by(Team.id))
+
+
+def list_oncall_team_ids(*, group_ids, allowed_team_id, active_only):
+    """Return only IDs to consumers of on-call visibility."""
+    scope = _team_scope(active_only=active_only, group_ids=group_ids, allowed_team_id=allowed_team_id)
+    return list(scope.select(Team.id).order_by(Team.id).scalars())
+
+
+def paginate_teams(*, page, page_size, active_only, group_ids=None, allowed_team_id=None,
+                   team_id=None, search="", group="", status=""):
+    """Filter the scoped directory in SQL and fetch the requested team rows."""
+    scope = _team_scope(active_only=active_only, group_ids=group_ids, allowed_team_id=allowed_team_id)
+    if team_id is not None:
+        scope = scope.where(Team.id == team_id)
+
+    summary = catalog_summary(scope, active=Team.active, escalation=Team.escalation_enabled)
+    joined = scope.select(Team, Group).join(Group, JOIN.LEFT_OUTER)
+    group_slugs = list(
+        joined.select(Group.slug).where(Group.slug.is_null(False))
+        .distinct().order_by(Group.slug).scalars()
+    )
+    summary["groups"] = len(group_slugs)
+    query = joined
+    if group:
+        query = query.where(Group.slug == group)
+    if status in ("active", "inactive"):
+        query = query.where(Team.active == (status == "active"))
+    if search:
+        fields = (
+            Team.id, Group.slug, Team.slug, Team.name, Team.description,
+            Case(None, ((Team.escalation_enabled, "escalation"),), "no escalation"),
+            Case(None, ((Team.active, "active"),), "inactive"),
+        )
+        query = query.where(catalog_search(fields, search))
+    result = catalog_page(query.order_by(Team.id), page, page_size, summary)
+    result["group_slugs"] = group_slugs
+    return result
 
 
 def list_teams_for_user(user_id, roles=None, group_ids=None, active_only=True):
