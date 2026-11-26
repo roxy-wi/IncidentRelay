@@ -61,7 +61,7 @@
   "channels.form.group": "Groupe",
   "channels.form.team": "Équipe",
   "channels.form.name": "Nom",
-  "channels.form.name_placeholder": "Telegram principal",
+  "channels.form.name_placeholder": "Canal principal",
   "channels.form.type": "Type",
   "channels.form.notify_severities": "Notifier pour les niveaux de gravité",
   "channels.form.enabled": "Activé",

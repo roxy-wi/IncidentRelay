@@ -61,7 +61,7 @@
   "channels.form.group": "Группа",
   "channels.form.team": "Команда",
   "channels.form.name": "Название",
-  "channels.form.name_placeholder": "Основной Telegram",
+  "channels.form.name_placeholder": "Основной канал",
   "channels.form.type": "Тип",
   "channels.form.notify_severities": "Уведомлять при важности",
   "channels.form.enabled": "Включён",
