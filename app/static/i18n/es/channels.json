@@ -61,7 +61,7 @@
   "channels.form.group": "Grupo",
   "channels.form.team": "Equipo",
   "channels.form.name": "Nombre",
-  "channels.form.name_placeholder": "Telegram principal",
+  "channels.form.name_placeholder": "Canal principal",
   "channels.form.type": "Tipo",
   "channels.form.notify_severities": "Notificar severidades",
   "channels.form.enabled": "Habilitado",
