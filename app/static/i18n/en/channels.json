@@ -61,7 +61,7 @@
   "channels.form.group": "Group",
   "channels.form.team": "Team",
   "channels.form.name": "Name",
-  "channels.form.name_placeholder": "Channel primary",
+  "channels.form.name_placeholder": "Primary channel",
   "channels.form.type": "Type",
   "channels.form.notify_severities": "Notify on severities",
   "channels.form.enabled": "Enabled",

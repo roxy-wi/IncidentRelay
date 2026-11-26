@@ -61,7 +61,7 @@
   "channels.form.group": "用户组",
   "channels.form.team": "团队",
   "channels.form.name": "名称",
-  "channels.form.name_placeholder": "渠道主要",
+  "channels.form.name_placeholder": "主要渠道",
   "channels.form.type": "类型",
   "channels.form.notify_severities": "通知的严重程度",
   "channels.form.enabled": "启用",
