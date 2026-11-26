@@ -317,27 +317,35 @@ def poll_telegram_token_once(token, channels, timeout=20):
     return processed
 
 
-def poll_telegram_channel_once(channel, timeout=20):
-    """
-    Poll one Telegram channel with getUpdates.
-
-    A token shared with other channels is still polled on its own here.
-    poll_telegram_channels_once groups those channels so the press is read once.
-    """
-
-    token = (channel.config or {}).get("bot_token")
-    return poll_telegram_token_once(token, [channel], timeout=timeout)
-
 
 def _is_channel_post(channel, message):
     """True when the pressed button sits on the channel post itself."""
 
-    chat_id = (channel.config or {}).get("chat_id")
+    chat = getattr(message, "chat", None)
+
+    if not chat:
+        return False
+
+    chat_type = getattr(chat, "type", None)
+
+    if chat_type == "private":
+        return False
+
+    configured_chat_id = (channel.config or {}).get("chat_id")
+
+    if not configured_chat_id:
+        return False
+
+    configured_str = str(configured_chat_id).lstrip("@")
+    message_username = getattr(chat, "username", None)
+
+    if message_username and configured_str == message_username:
+        return True
 
     try:
-        return int(message.chat.id) == int(chat_id)
+        return int(chat.id) == int(configured_chat_id)
     except (TypeError, ValueError):
-        return str(message.chat.id) == str(chat_id)
+        return str(chat.id) == str(configured_chat_id)
 
 
 def _refresh_pressed_message(channel, alert, action, event_type, user, callback):

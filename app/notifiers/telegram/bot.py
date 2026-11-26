@@ -221,6 +221,56 @@ def send_telegram_alert(channel, alert, text, event_type="notification"):
     }
 
 
+def _can_receive_dm(user, alert, stored_chat_id=None):
+    """Check whether the user is authorized to receive alert details right now.
+
+    Returns the Telegram chat id when the user passes every check, or None.
+    """
+
+    if not user:
+        return None
+
+    assignee = getattr(alert, "assignee", None)
+
+    if not assignee or user.id != assignee.id:
+        return None
+
+    if not getattr(user, "active", False):
+        return None
+
+    alert_team = getattr(alert, "team", None)
+
+    if alert_team:
+        try:
+            from app.modules.db.models import UserGroup
+
+            membership = (
+                UserGroup
+                .select()
+                .where(
+                    UserGroup.user == user,
+                    UserGroup.group == alert_team.group,
+                    UserGroup.active == True,
+                )
+                .get_or_none()
+            )
+
+            if not membership:
+                return None
+        except Exception:
+            return None
+
+    current_chat_id = telegram_chat_id(user)
+
+    if not current_chat_id:
+        return None
+
+    if stored_chat_id is not None and str(current_chat_id) != str(stored_chat_id):
+        return None
+
+    return current_chat_id
+
+
 def _notify_assignee(bot, channel, alert, event_type, post):
     """Page the assignee in a private chat. Never fails the channel delivery."""
 
@@ -231,7 +281,8 @@ def _notify_assignee(bot, channel, alert, event_type, post):
         if not should_send_dm(alert, event_type):
             return None
 
-        chat_id = telegram_chat_id(getattr(alert, "assignee", None))
+        assignee = getattr(alert, "assignee", None)
+        chat_id = _can_receive_dm(assignee, alert)
 
         if chat_id is None:
             return None
@@ -297,17 +348,21 @@ def update_telegram_alert(channel, alert, text, delivery, event_type="resolved")
     if not post_changed:
         return False
 
+    new_payload = {
+        "chat_id": chat_id,
+        "message_id": message_id,
+        "event_type": event_type,
+        "updated": True,
+    }
+
+    if DIRECT_PAYLOAD_KEY in previous:
+        new_payload[DIRECT_PAYLOAD_KEY] = previous[DIRECT_PAYLOAD_KEY]
+
     return {
         "provider": "telegram",
         "external_message_id": str(message_id),
         "external_channel_id": str(chat_id),
-        "provider_payload": {
-            **previous,
-            "chat_id": chat_id,
-            "message_id": message_id,
-            "event_type": event_type,
-            "updated": True,
-        },
+        "provider_payload": new_payload,
     }
 
 
@@ -317,6 +372,13 @@ def _refresh_direct_message(bot, alert, payload, keyboard):
     stored = payload.get(DIRECT_PAYLOAD_KEY)
 
     if not stored:
+        return
+
+    stored_chat_id = stored.get("chat_id")
+    assignee = getattr(alert, "assignee", None)
+    authorized_chat_id = _can_receive_dm(assignee, alert, stored_chat_id)
+
+    if not authorized_chat_id:
         return
 
     try:

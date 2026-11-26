@@ -312,6 +312,13 @@ def _state_note(alert: Any, event_type: str, actor: Any = None) -> list[str]:
     return _started_line(alert)
 
 
+def _is_absolute_url(value: Any) -> bool:
+    """Return True when the value is an absolute HTTP(S) URL."""
+
+    url = str(value or "").strip()
+    return url.startswith("http://") or url.startswith("https://")
+
+
 def _ack_url(alert: Any) -> str:
     """Return the ACK API URL."""
 
@@ -324,6 +331,30 @@ def _ack_url(alert: Any) -> str:
     return f"{base_url}/api/alert-groups/{alert_id}/acknowledge"
 
 
+def _safe_join_with_budget(lines: list[str], max_length: int) -> str:
+    """Join lines with newlines, stopping when the budget is exhausted."""
+
+    result = []
+    current_length = 0
+
+    for line in lines:
+        line_with_newline = line + "\n" if result else line
+        new_length = current_length + len(line_with_newline)
+
+        if new_length > max_length:
+            break
+
+        result.append(line)
+        current_length = new_length
+
+    text = "\n".join(result)
+
+    if len(lines) > len(result):
+        text = text.rstrip() + "\n…"
+
+    return text
+
+
 def format_telegram_alert_message(
     alert: Any,
     event_type: str = "notification",
@@ -331,17 +362,17 @@ def format_telegram_alert_message(
 ) -> str:
     """Build a rich Telegram HTML message for an alert."""
 
-    lines = [
+    core_lines = [
         _title(alert, event_type),
         "",
     ]
 
     state_lines = _state_note(alert, event_type, actor)
     if state_lines:
-        lines.extend(state_lines)
-        lines.append("")
+        core_lines.extend(state_lines)
+        core_lines.append("")
 
-    lines.extend(
+    core_lines.extend(
         [
             f"Team: {_team_name(alert)}",
             f"Service: {_service_name(alert)}",
@@ -353,30 +384,33 @@ def format_telegram_alert_message(
             f"Alert ID: #{_html(getattr(alert, 'id', None))}",
         ]
     )
+
+    optional_lines = []
+
     for title, value in present_label_fields(alert):
-        lines.append(f"{title}: {_html(value)}")
+        optional_lines.append(f"{title}: {_html(value)}")
 
     source_event_url = build_source_event_url(alert)
 
     if source_event_url:
-        lines.append(
+        optional_lines.append(
             f'🔗 <a href="{_attr(source_event_url)}">Open source event</a>'
         )
 
     dashboard_url = alert_annotation(alert, "dashboard", "dashboard_url")
 
-    if dashboard_url:
-        lines.append(f'📊 <a href="{_attr(dashboard_url)}">Dashboard</a>')
+    if dashboard_url and _is_absolute_url(dashboard_url):
+        optional_lines.append(f'📊 <a href="{_attr(dashboard_url)}">Dashboard</a>')
 
-    lines.extend(_service_context_lines(alert))
+    optional_lines.extend(_service_context_lines(alert))
 
-    lines.extend(
-        [
-            "",
-            "<b>Message:</b>",
-            f"<blockquote>{_trim_html(getattr(alert, 'message', None))}</blockquote>",
-        ]
-    )
+    message_lines = [
+        "",
+        "<b>Message:</b>",
+        f"<blockquote>{_trim_html(getattr(alert, 'message', None))}</blockquote>",
+    ]
+
+    footer_lines = []
 
     if (
         getattr(alert, "status", None) == "firing"
@@ -384,16 +418,32 @@ def format_telegram_alert_message(
     ):
         ack_url = _ack_url(alert)
         if ack_url:
-            lines.extend(
+            footer_lines.extend(
                 [
                     "",
                     f"🔗 <a href=\"{_attr(ack_url)}\">ACK URL</a>",
                 ]
             )
 
-    lines.extend(_correlation_context_lines(alert))
+    footer_lines.extend(_correlation_context_lines(alert))
 
-    text = "\n".join(lines)
+    core_text = "\n".join(core_lines)
+    message_text = "\n".join(message_lines)
+    footer_text = "\n".join(footer_lines) if footer_lines else ""
+
+    core_and_message_length = len(core_text) + len(message_text) + len(footer_text) + 10
+
+    if core_and_message_length >= MAX_TELEGRAM_MESSAGE_LENGTH:
+        return _safe_join_with_budget(
+            core_lines + message_lines + footer_lines,
+            MAX_TELEGRAM_MESSAGE_LENGTH
+        )
+
+    optional_budget = MAX_TELEGRAM_MESSAGE_LENGTH - core_and_message_length
+    optional_text = _safe_join_with_budget(optional_lines, optional_budget)
+
+    all_lines = core_lines + ([optional_text] if optional_text else []) + message_lines + footer_lines
+    text = "\n".join(all_lines)
 
     if len(text) <= MAX_TELEGRAM_MESSAGE_LENGTH:
         return text
