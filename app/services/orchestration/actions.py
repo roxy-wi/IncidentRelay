@@ -1,9 +1,7 @@
 """Deterministic Event Orchestration action execution.
 
-The action layer mutates an isolated JSON-compatible event state. It never
-loads database entities, performs network I/O or calls provider integrations.
-Static entity references are validated by the control-plane repository before
-publication and are resolved by a later ingestion-integration workstream.
+The action layer mutates an isolated JSON-compatible event state. Runtime and
+simulation supply a scoped catalog lookup for label-based ownership actions.
 """
 
 from __future__ import annotations
@@ -12,7 +10,7 @@ import copy
 import json
 import re
 from dataclasses import dataclass, field
-from typing import Any, Dict, List, Mapping, MutableMapping, Optional, Sequence, Tuple
+from typing import Any, Callable, Dict, List, Mapping, MutableMapping, Optional, Sequence, Tuple
 
 from .errors import OrchestrationEvaluationError, ValidationIssue
 from .fields import MISSING, resolve_field
@@ -90,6 +88,9 @@ class ActionValidationError(OrchestrationEvaluationError):
     code = "invalid_action"
 
 
+LabelTargetLookup = Callable[[str, str, "EventActionState"], Optional[int]]
+
+
 @dataclass
 class EventActionState:
     """Mutable internal state; caller-owned mappings are always deep-copied."""
@@ -103,6 +104,7 @@ class EventActionState:
     integration: Dict[str, Any]
     time: Dict[str, Any]
     result: Dict[str, Any]
+    lookup_label_target: Optional[LabelTargetLookup] = None
 
     @classmethod
     def from_context(cls, context: Mapping[str, Any]) -> "EventActionState":
@@ -383,6 +385,27 @@ def _static_reference(action: Mapping[str, Any], keys: Sequence[str], *, path: s
     return _positive_id(value, path=f"{path}.{source}")
 
 
+def _validate_routing_reference(action: Mapping[str, Any], *, path: str) -> None:
+    action_type = action["type"]
+    _, id_key = _ROUTING_ACTIONS[action_type]
+    if "label_key" not in action:
+        _static_reference(action, (id_key, "value"), path=path)
+        return
+
+    key = action["label_key"]
+    if action_type not in {"set_team", "set_service"}:
+        raise ActionValidationError("Only team and service actions accept label_key", path=path)
+    if not isinstance(key, str) or not key.strip() or len(key) > MAX_LABEL_NAME_LENGTH:
+        raise ActionValidationError(
+            f"Expected a nonblank label name of at most {MAX_LABEL_NAME_LENGTH} characters",
+            path=f"{path}.label_key",
+        )
+    params = action.get("params")
+    selectors = {id_key, "value", "value_from", "template"}
+    if selectors.intersection(action) or (isinstance(params, dict) and selectors.intersection(params)):
+        raise ActionValidationError("Choose a single source for the routing target", path=path)
+
+
 def _validate_value_source(action: Mapping[str, Any], *, path: str, required: bool = True) -> List[ValidationIssue]:
     issues: List[ValidationIssue] = []
     sources = _action_value_sources(action)
@@ -467,9 +490,8 @@ def validate_action(action: Any, *, path: str = "action") -> List[ValidationIssu
         except ActionValidationError as exc:
             issues.append(ValidationIssue(exc.path or f"{path}.name", exc.code, str(exc)))
     elif action_type in _ROUTING_ACTIONS:
-        _, id_key = _ROUTING_ACTIONS[action_type]
         try:
-            _static_reference(action, (id_key, "value"), path=path)
+            _validate_routing_reference(action, path=path)
         except ActionValidationError as exc:
             issues.append(ValidationIssue(exc.path or path, exc.code, str(exc)))
     elif action_type in _POLICY_ACTIONS:
@@ -676,13 +698,27 @@ def _execute_action(action: Mapping[str, Any], state: EventActionState, *, path:
 
     if action_type in _ROUTING_ACTIONS:
         root, id_key = _ROUTING_ACTIONS[action_type]
-        identifier = _static_reference(action, (id_key, "value"), path=path)
+        references = ()
+        if "label_key" in action:
+            key = action["label_key"]
+            slug = state.labels.get(key)
+            if not isinstance(slug, str) or not slug.strip():
+                raise ActionValidationError(f"Label {key!r} must contain a nonempty {root} slug", path=path)
+            if state.lookup_label_target is None:
+                raise ActionValidationError("Catalog lookup is unavailable", path=path)
+            identifier = state.lookup_label_target(root, slug, state)
+            if identifier is None:
+                scope = "the orchestration group" if root == "team" else "the selected team"
+                raise ActionValidationError(f"No active {root} matches label {key!r} in {scope}", path=path)
+            references = (f"labels.{key}",)
+        else:
+            identifier = _static_reference(action, (id_key, "value"), path=path)
         target = getattr(state, root)
         before = copy.deepcopy(target)
         target.clear()
         target["id"] = identifier
         state.result.setdefault("routing", {})[id_key] = identifier
-        return before, copy.deepcopy(target), (), "continue"
+        return before, copy.deepcopy(target), references, "continue"
 
     if action_type in _POLICY_ACTIONS:
         id_key = _POLICY_ACTIONS[action_type]

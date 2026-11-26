@@ -336,7 +336,8 @@ def test_nagios_personal_ack_is_scoped_to_selected_route(client, admin_user, db)
     assert Alert.get(Alert.route == own_route.id).group.status == "acknowledged"
 
 
-def test_orchestration_cannot_redirect_route_credential(client, db):
+@pytest.mark.parametrize("by_label", [False, True], ids=["fixed-route", "team-label"])
+def test_orchestration_cannot_redirect_route_credential(client, db, by_label):
     group = create_group()
     user = create_user(group=group)
     headers, _ = route_token(create_team(group))
@@ -346,15 +347,23 @@ def test_orchestration_cannot_redirect_route_credential(client, db):
         created_by_id=user.id,
     )
     draft = get_or_create_draft(orchestration.id, actor_id=user.id)
+    destination = (
+        {"type": "set_team", "label_key": "l3_team"} if by_label
+        else {"type": "set_route", "route_id": foreign_route.id}
+    )
     replace_draft_rules(draft.id, [{
         "name": "Route elsewhere", "condition_tree": {},
-        "actions": [{"type": "set_route", "route_id": foreign_route.id}],
+        "actions": [destination],
         "processing_mode": "continue",
     }])
     publish_draft(orchestration.id, actor_id=user.id)
     set_runtime_state(orchestration.id, enabled=True, mode="active",
                       compatibility_mode="hybrid")
-    assert webhook(client, headers).status_code == 403
+    response = client.post("/api/integrations/webhook", headers=headers, json={
+        "title": "Token isolation", "fingerprint": "bounded",
+        "labels": {"l3_team": foreign_route.team.slug},
+    })
+    assert response.status_code == 403
     assert Alert.select().count() == 0
     assert PendingOrchestratedEvent.select().count() == 0
 

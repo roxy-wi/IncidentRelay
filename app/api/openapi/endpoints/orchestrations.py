@@ -136,6 +136,13 @@ ACTION_SCHEMA = {
         "route_id": {"type": "integer", "minimum": 1},
         "team_id": {"type": "integer", "minimum": 1},
         "service_id": {"type": "integer", "minimum": 1},
+        "label_key": {
+            "type": "string", "minLength": 1, "maxLength": 128,
+            "description": (
+                "For set_team or set_service, use the value of this literal alert label "
+                "as the catalog slug. Service lookup requires a selected team."
+            ),
+        },
         "escalation_policy_id": {"type": "integer", "minimum": 1},
         "notification_policy_id": {"type": "integer", "minimum": 1},
         "priority_policy_id": {"type": "integer", "minimum": 1},

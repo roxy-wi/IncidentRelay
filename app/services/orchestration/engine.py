@@ -5,7 +5,7 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from typing import Any, Dict, List, Mapping, Optional, Sequence, Tuple
 
-from .actions import ActionStepResult, EventActionState, execute_actions, validate_action_list
+from .actions import ActionStepResult, EventActionState, LabelTargetLookup, execute_actions, validate_action_list
 from .conditions import ConditionResult, evaluate_condition_tree, validate_condition_tree
 from .errors import ConditionValidationError
 
@@ -252,12 +252,15 @@ def _execute_level(
 def execute_rule_tree(
     rules: Sequence[Mapping[str, Any]],
     context: Mapping[str, Any],
+    *,
+    lookup_label_target: Optional[LabelTargetLookup] = None,
 ) -> OrchestrationExecutionResult:
     """Evaluate a published rule definition against an isolated event copy."""
 
     rule_list = list(rules)
     _validate_rules(rule_list)
     state = EventActionState.from_context(context)
+    state.lookup_label_target = lookup_label_target
     counters = _EngineCounters()
     traces, outcome = _execute_level(
         rule_list,

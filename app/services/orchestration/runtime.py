@@ -11,7 +11,7 @@ from typing import Any, Dict, List, Mapping, Optional
 
 from app.modules.common import utc_now
 from app.settings import Config
-from app.modules.db import orchestrations_repo
+from app.modules.db import orchestrations_repo, services_repo
 from app.modules.db.models import (
     AlertRoute,
     EscalationPolicy,
@@ -22,11 +22,13 @@ from app.modules.db.models import (
     Service,
     Team,
 )
+from app.services.orchestration.actions import ActionValidationError
 from app.services.orchestration.cache import published_definition_cache
 from app.services.orchestration.engine import execute_rule_tree
 from app.services.orchestration.fields import build_context
 from app.services.orchestration.safety import safe_trace_value
 from app.services.alerts.event_history import ALERT_EVENT_HISTORY_LEVELS
+from app.services.routing.routing import get_active_team_by_slug
 
 logger = logging.getLogger("oncall.orchestration.runtime")
 
@@ -330,6 +332,41 @@ def _safe_record_execution(**kwargs):
         return None
 
 
+def execute_catalog_rules(rules, context, *, group_id):
+    """Evaluate rules with group-scoped, indexed slug lookups for label actions."""
+
+    def lookup_label_target(kind, slug, state):
+        if kind == "team":
+            team = get_active_team_by_slug(slug)
+            if team and team.group_id == group_id and not team.group.deleted and team.slug == slug:
+                return team.id
+            return None
+
+        routing = state.result["routing"]
+        team_id = routing.get("team_id")
+        if team_id is None and routing.get("route_id"):
+            try:
+                route = _load_route(
+                    routing["route_id"], group_id=group_id, source=state.integration.get("source")
+                )
+            except RuntimeOrchestrationError as exc:
+                raise ActionValidationError(str(exc)) from exc
+            team_id = route.team_id
+        if team_id is None:
+            team_id = state.team.get("id")
+        if team_id is None:
+            raise ActionValidationError("Select a team before resolving a service from an alert label")
+        service = services_repo.get_service_by_team_and_slug(team_id, slug)
+        if (
+            service and service.group_id == group_id and service.slug == slug
+            and services_repo.is_service_active(service)
+        ):
+            return service.id
+        return None
+
+    return execute_rule_tree(rules, context, lookup_label_target=lookup_label_target)
+
+
 def _run_one(orchestration: EventOrchestration, context, alert_data):
     started = time.perf_counter()
     initial_context = copy.deepcopy(context)
@@ -337,7 +374,7 @@ def _run_one(orchestration: EventOrchestration, context, alert_data):
         version = orchestrations_repo.get_published_runtime_version(orchestration)
         definition = published_definition_cache.get(version)
         rules = definition.get("rules") or []
-        result = execute_rule_tree(rules, context)
+        result = execute_catalog_rules(rules, context, group_id=orchestration.group_id)
         duration_ms = max(0, int((time.perf_counter() - started) * 1000))
         applied = (
             orchestration.mode == "active"

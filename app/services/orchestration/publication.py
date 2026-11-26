@@ -104,6 +104,9 @@ def _validate_action_references(
         model_name, id_keys = reference_spec
         reference_id = _extract_reference_id(node, id_keys)
         if reference_id in (None, ""):
+            if action_type in {"set_team", "set_service"} and "label_key" in node:
+                # Rule validation checks the key. Its value is known only at intake.
+                continue
             errors.append(f"{rule_path}: {action_type} requires a reference id")
             continue
 

@@ -796,13 +796,14 @@ function orchestrationCatalogOptions(type) {
     return asArray(orchestrationCatalogCache && orchestrationCatalogCache[map[type]]);
 }
 
-function orchestrationEditorColumnHeader(labelKey, helpKey) {
+function orchestrationEditorColumnHeader(labelKey, helpKey, controlId) {
     const helpText = i18n.t(helpKey);
+    const label = controlId ? $("<label>").attr("for", controlId) : $("<span>");
 
     return $("<div>")
         .addClass("orchestration-editor-column-header")
         .append(
-            $("<span>").text(i18n.t(labelKey)),
+            label.text(i18n.t(labelKey)),
             $("<span>")
                 .addClass("orchestration-editor-column-help")
                 .attr({
@@ -814,24 +815,14 @@ function orchestrationEditorColumnHeader(labelKey, helpKey) {
         );
 }
 
-function orchestrationActionEditorHeader() {
-    return $("<div>")
-        .addClass("orchestration-action-editor-header")
-        .append(
-            orchestrationEditorColumnHeader(
-                "orchestrations.rule_editor.action_type",
-                "orchestrations.rule_editor.action_type_help"
-            ),
-            orchestrationEditorColumnHeader(
-                "orchestrations.rule_editor.parameters",
-                "orchestrations.rule_editor.parameters_help"
-            ),
-            orchestrationEditorColumnHeader(
-                "orchestrations.rule_editor.on_failure",
-                "orchestrations.rule_editor.on_failure_help"
-            ),
-            $("<span>").attr("aria-hidden", "true")
-        );
+function orchestrationActionField(name, control, index) {
+    const key = "orchestrations.rule_editor." + name;
+    const controlId = control.is("select") ? `orchestration-action-${index}-${name}` : null;
+    if (controlId) control.attr("id", controlId);
+    return $("<div>").addClass("orchestration-action-field").append(
+        orchestrationEditorColumnHeader(key, key + "_help", controlId),
+        control
+    );
 }
 
 function orchestrationActionFailureEditor(action) {
@@ -963,6 +954,24 @@ function orchestrationActionParamEditor(action, index) {
     } else if (["remove_label", "remove_custom_field"].includes(type)) {
         container.append($("<input>").addClass("input orchestration-action-name").attr("placeholder", "name").val(action.name || ""));
     } else if (referenceActions.includes(type)) {
+        if (type === "set_team" || type === "set_service") {
+            const fromLabel = action.label_key !== undefined;
+            container.append($("<select>")
+                .addClass("input orchestration-reference-mode")
+                .attr("aria-label", i18n.t("orchestrations.rule_editor.reference_mode"))
+                .append(
+                    $("<option>").val("catalog").text(i18n.t("orchestrations.rule_editor.from_catalog")),
+                    $("<option>").val("label").text(i18n.t("orchestrations.rule_editor.from_label"))
+                ).val(fromLabel ? "label" : "catalog"));
+            if (fromLabel) {
+                const labelName = i18n.t("orchestrations.rule_editor.label_key");
+                container.append($("<input>").addClass("input orchestration-label-key").attr({
+                    "aria-label": labelName, title: labelName, maxlength: 128,
+                    placeholder: type === "set_team" ? "l3_team" : "service"
+                }).val(action.label_key));
+                return container;
+            }
+        }
         const select = $("<select>").addClass("input orchestration-action-reference").attr("aria-label", type);
         orchestrationCatalogOptions(type).forEach(function (item) { select.append($("<option>").val(item.id).text(item.name)); });
         const value = action.action_id || action.team_id || action.route_id || action.service_id || action.escalation_policy_id || action.notification_policy_id || action.priority_policy_id || action.value;
@@ -998,8 +1007,6 @@ function renderOrchestrationActionEditor() {
     const actions = asArray(orchestrationRuleBuffer.actions);
     if (!actions.length) { target.append($("<div>").addClass("details-empty").text(i18n.t("orchestrations.rules.no_actions"))); return; }
 
-    target.append(orchestrationActionEditorHeader());
-
     actions.forEach(function (action, index) {
         const row = $("<div>").addClass("orchestration-action-row").attr("data-action-index", index);
         const actionTypeHelp = i18n.t("orchestrations.rule_editor.action_type_help");
@@ -1014,6 +1021,7 @@ function renderOrchestrationActionEditor() {
             .addClass("btn btn-compact btn-danger")
             .attr({
                 "data-action-remove": index,
+                type: "button",
                 title: removeLabel,
                 "aria-label": removeLabel
             })
@@ -1021,9 +1029,9 @@ function renderOrchestrationActionEditor() {
 
         orchestrationActionOptions(select, action.type);
         row.append(
-            select,
-            orchestrationActionParamEditor(action, index),
-            orchestrationActionFailureEditor(action),
+            orchestrationActionField("action_type", select, index),
+            orchestrationActionField("parameters", orchestrationActionParamEditor(action, index), index),
+            orchestrationActionField("on_failure", orchestrationActionFailureEditor(action), index),
             remove
         );
         target.append(row);
@@ -1083,7 +1091,11 @@ function syncOrchestrationActionEditor() {
         }
         const ref = Number(row.find(".orchestration-action-reference").val() || 0);
         const refKeys = {set_team: "team_id", set_route: "route_id", set_service: "service_id", set_escalation_policy: "escalation_policy_id", set_notification_policy: "notification_policy_id", set_priority_policy: "priority_policy_id", enqueue_webhook: "action_id"};
-        if (refKeys[type] && ref) { action[refKeys[type]] = ref; }
+        if ((type === "set_team" || type === "set_service") && row.find(".orchestration-reference-mode").val() === "label") {
+            action.label_key = row.find(".orchestration-label-key").val() || "";
+        } else if (refKeys[type] && ref) {
+            action[refKeys[type]] = ref;
+        }
         if (type === "set_grouping") {
             const groupKey = row.find(".orchestration-action-group-key").val();
             const dedupKey = row.find(".orchestration-action-dedup-key").val();
@@ -1777,7 +1789,7 @@ $(document).on("drop", ".orchestration-rule-card", function (event) {
     renderOrchestrationRules();
 });
 $(document).on("click", "#orchestration-action-add", function () { syncOrchestrationActionEditor(); orchestrationRuleBuffer.actions.push({type: "set_title", value: ""}); renderOrchestrationActionEditor(); });
-$(document).on("change", ".orchestration-action-type", function () { syncOrchestrationActionEditor(); renderOrchestrationActionEditor(); });
+$(document).on("change", ".orchestration-action-type, .orchestration-reference-mode", function () { syncOrchestrationActionEditor(); renderOrchestrationActionEditor(); });
 $(document).on("click", "[data-action-remove]", function () { syncOrchestrationActionEditor(); orchestrationRuleBuffer.actions.splice(Number($(this).attr("data-action-remove")), 1); renderOrchestrationActionEditor(); });
 $(document).on("click", "#orchestration-save-draft", function () { saveOrchestrationDraft(); });
 $(document).on("click", "#orchestration-validate", validateOrchestrationDraft);

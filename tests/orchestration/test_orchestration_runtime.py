@@ -143,6 +143,93 @@ def test_hybrid_runtime_applies_event_routing_service_and_grouping(db):
     assert execution.trace_json["applied"] is True
 
 
+def test_label_routing_reuses_one_rule_for_multiple_teams_and_services(db):
+    group = create_group()
+    orchestration = _publish(group, _always([
+        {"type": "set_team", "label_key": "owner.example/l3_team"},
+        {"type": "set_service", "label_key": "tech.service"},
+    ]))
+    # These catalog entries did not exist at publication. Both teams own a compute service.
+    for team_slug in ("l3", "sre"):
+        team = create_team(group, slug=team_slug)
+        route = create_route(team, source="alertmanager")
+        service = create_service(team, slug="compute")
+        event = {
+            "source": route.source, "orchestration_group_id": group.id,
+            "title": "Compute unavailable", "dedup_key": team_slug,
+            "labels": {"owner.example/l3_team": team_slug, "tech.service": "compute"},
+        }
+        simulation = simulate_event(orchestration.id, event, version_id=orchestration.active_version_id)
+        assert simulation["selected"]["team"]["id"] == team.id
+        assert simulation["selected"]["service"]["id"] == service.id
+        result = upsert_alert(event)
+        assert result.alert_id is not None, result.reason
+        alert = Alert.get_by_id(result.alert_id)
+        assert (alert.team_id, alert.service_id, alert.route_id) == (team.id, service.id, route.id)
+
+
+@pytest.mark.parametrize("case", ["missing", "non_string", "foreign", "inactive", "deleted"])
+def test_team_label_failure_respects_scope_and_failure_policy(db, case):
+    group = create_group()
+    team = create_team(create_group() if case == "foreign" else group)
+    if case in {"inactive", "deleted"}:
+        team.active = case != "inactive"
+        team.deleted = case == "deleted"
+        team.save()
+    _publish(group, _always([
+        {"type": "set_team", "label_key": "support", "on_failure": "stop_rule"},
+        {"type": "set_title", "value": "Should be skipped"},
+    ]))
+    event = {
+        "source": "alertmanager", "orchestration_group_id": group.id, "title": "Original",
+        "labels": {} if case == "missing" else {"support": 123 if case == "non_string" else team.slug},
+    }
+    runtime = run_event_orchestration(event)
+    assert runtime.team is None
+    assert event["title"] == "Original"
+    execution = OrchestrationExecution.get_by_id(runtime.execution_ids[0])
+    action, = execution.trace_json["result"]["rules"][0]["actions"]
+    assert not action["success"] and action["outcome"] == "stop_rule"
+    assert "support" in action["reason"]
+
+
+@pytest.mark.parametrize("case", ["wrong_team", "disabled", "deleted", "no_team"])
+def test_service_label_cannot_select_an_unavailable_service(db, case):
+    group = create_group()
+    team = create_team(group)
+    owner = create_team(group) if case == "wrong_team" else team
+    service = create_service(owner, slug="compute", enabled=case != "disabled")
+    if case == "deleted":
+        service.deleted = True
+        service.save()
+    actions = [] if case == "no_team" else [{"type": "set_team", "team_id": team.id}]
+    actions.append({"type": "set_service", "label_key": "app"})
+    orchestration = _publish(group, _always(actions))
+    event = {
+        "source": "alertmanager", "orchestration_group_id": group.id,
+        "dedup_key": "test", "title": "Test", "labels": {"app": "compute"},
+    }
+    result = simulate_event(orchestration.id, event, version_id=orchestration.active_version_id)
+    assert result["selected"]["service"] is None
+    step = result["execution"]["rules"][0]["actions"][-1]
+    assert step["success"] is False
+    assert step["outcome"] == "continue"
+
+
+def test_service_label_uses_the_team_of_an_explicit_route(db):
+    group = create_group()
+    team = create_team(group)
+    route = create_route(team)
+    service = create_service(team, slug="compute")
+    _publish(group, _always([
+        {"type": "set_route", "route_id": route.id},
+        {"type": "set_label", "name": "routing_service", "value": "compute"},
+        {"type": "set_service", "label_key": "routing_service"},
+    ]))
+    result = run_event_orchestration({"source": route.source, "orchestration_group_id": group.id})
+    assert result.service.id == service.id
+
+
 def test_active_runtime_propagates_reopen_window_without_changing_group_window(db):
     group = create_group()
     team = create_team(group)

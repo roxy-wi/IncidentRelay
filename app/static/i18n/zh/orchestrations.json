@@ -1,4 +1,8 @@
 {
+  "orchestrations.rule_editor.reference_mode": "目标选择方式",
+  "orchestrations.rule_editor.from_catalog": "从目录选择",
+  "orchestrations.rule_editor.from_label": "按告警标签选择",
+  "orchestrations.rule_editor.label_key": "标签名称，无需 labels. 前缀",
   "nav.event_orchestration": "事件编排",
   "pages.orchestrations.title": "事件编排",
   "pages.orchestrations.subtitle": "对传入事件进行路由、信息增强、抑制和自动化处置",

@@ -121,9 +121,9 @@ def test_orchestration_action_editor_has_localized_column_help():
         assert expected_keys <= set(catalog)
         assert all(catalog[key].strip() for key in expected_keys)
 
-    assert "orchestrationActionEditorHeader" in javascript
+    assert "orchestrationActionField" in javascript
     assert "orchestrationActionFailureEditor" in javascript
-    assert "orchestration-action-editor-header" in javascript
+    assert "orchestration-action-field" in javascript
     assert 'i18n.t("orchestrations.rule_editor.action_type_help")' in javascript
     assert 'i18n.t("orchestrations.rule_editor.on_failure_help")' in javascript
     assert 'i18n.t("orchestrations.rule_editor.failure_stop_orchestration")' in javascript

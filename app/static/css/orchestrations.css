@@ -23,13 +23,45 @@
 .orchestration-condition-children { display: grid; gap: 8px; }
 .orchestration-condition-editor-header, .orchestration-condition-leaf { display: grid; grid-template-columns: minmax(160px, 1.4fr) minmax(140px, .9fr) minmax(180px, 1.4fr) auto; gap: 8px; align-items: center; }
 .orchestration-condition-editor-header { padding: 0; }
-.orchestration-action-editor-header, .orchestration-action-row { display: grid; grid-template-columns: minmax(180px, .8fr) minmax(300px, 2fr) minmax(180px, .8fr) auto; gap: 8px; align-items: center; }
-.orchestration-action-editor-header { padding: 0 10px; }
 .orchestration-editor-column-header { display: flex; align-items: center; gap: 6px; min-width: 0; font-size: 12px; font-weight: 600; color: var(--muted); }
 .orchestration-editor-column-help { display: inline-flex; align-items: center; justify-content: center; width: 16px; height: 16px; border: 1px solid currentColor; border-radius: 50%; font-size: 11px; font-weight: 700; line-height: 1; cursor: help; opacity: .75; }
 .orchestration-editor-column-help:focus { outline: 2px solid currentColor; outline-offset: 2px; opacity: 1; }
-.orchestration-action-row { border: 1px solid var(--border-color); border-radius: 10px; padding: 10px; }
-.orchestration-action-params { display: grid; grid-template-columns: repeat(auto-fit, minmax(150px, 1fr)); gap: 8px; }
+.orchestration-action-editor {
+  grid-template-columns: minmax(0, 1fr);
+  padding: 14px 16px;
+}
+.orchestration-action-row {
+  display: grid;
+  grid-template-columns: minmax(11rem, 1fr) minmax(0, 2.3fr) minmax(12rem, 1fr) 36px;
+  gap: 6px 12px;
+  align-items: start;
+  padding: 12px;
+  border: 1px solid var(--md-border);
+  border-radius: 10px;
+  background: var(--md-surface-soft);
+}
+.orchestration-action-field {
+  display: grid;
+  grid-row: 1 / span 2;
+  grid-template-rows: subgrid;
+  min-width: 0;
+}
+.orchestration-action-params {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 10rem), 1fr));
+  gap: 8px;
+}
+.orchestration-action-field .input {
+  min-width: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+.orchestration-action-editor .orchestration-action-row > [data-action-remove] {
+  grid-area: 2 / 4;
+  width: 36px;
+  min-height: 35px;
+  padding: 0;
+}
 .orchestration-message { padding: 12px; border-radius: 8px; white-space: pre-wrap; margin-bottom: 12px; }
 .orchestration-message.validation-success { background: var(--md-success-soft); color: var(--md-success); border: 1px solid var(--md-success-border); }
 .orchestration-message.validation-error { background: var(--md-danger-soft); color: var(--md-danger); border: 1px solid var(--md-danger-border); }
@@ -52,8 +84,12 @@ body.md-theme #orchestration-webhook-modal .app-modal-dialog-wide,
 .status-badge.status-muted { background: var(--md-surface-soft); color: var(--md-text-soft); }
 .status-badge.status-active { background: var(--md-success-soft); color: var(--md-success); }
 @media (max-width: 900px) {
-  .orchestration-condition-editor-header, .orchestration-action-editor-header { display: none; }
-  .orchestration-condition-leaf, .orchestration-action-row { grid-template-columns: 1fr; }
+  .orchestration-condition-editor-header { display: none; }
+  .orchestration-condition-leaf { grid-template-columns: 1fr; }
+  .orchestration-action-row { grid-template-columns: minmax(0, 1fr) 36px; row-gap: 12px; }
+  .orchestration-action-field { grid-column: 1 / -1; grid-row: auto; grid-template-rows: auto auto; gap: 6px; }
+  .orchestration-action-field:first-child { grid-column: 1; }
+  .orchestration-action-editor .orchestration-action-row > [data-action-remove] { grid-area: 1 / 2; align-self: end; }
   .orchestration-rule-card-body > div { grid-template-columns: 1fr; }
   .orchestration-webhook-grid, .orchestration-webhook-options { grid-template-columns: 1fr; }
 }
@@ -112,6 +148,8 @@ body.md-theme .orchestration-simulation-diff-table code {
 }
 
 @media (max-width: 700px) {
+  .orchestration-action-editor { padding: 10px; }
+  .orchestration-action-params { grid-template-columns: minmax(0, 1fr); }
   .orchestration-simulation-overview,
   .orchestration-simulation-kv-grid { grid-template-columns: 1fr; }
   .orchestration-simulation-rule { margin-left: 0; }

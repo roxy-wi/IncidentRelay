@@ -1,4 +1,8 @@
 {
+  "orchestrations.rule_editor.reference_mode": "Selección del destino",
+  "orchestrations.rule_editor.from_catalog": "Elegir del catálogo",
+  "orchestrations.rule_editor.from_label": "Por etiqueta de alerta",
+  "orchestrations.rule_editor.label_key": "Nombre de la etiqueta sin el prefijo labels.",
   "nav.event_orchestration": "Orquestación de eventos",
   "pages.orchestrations.title": "Orquestación de eventos",
   "pages.orchestrations.subtitle": "Enruta, enriquece, suprime y automatiza eventos entrantes",

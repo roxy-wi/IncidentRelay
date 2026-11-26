@@ -1,4 +1,19 @@
+import pytest
+
 from app.services.orchestration.validation import validate_rule_definition
+
+
+@pytest.mark.parametrize("action", [
+    {"type": "set_team", "label_key": ""},
+    {"type": "set_team", "label_key": "  "},
+    {"type": "set_service", "label_key": 123},
+    {"type": "set_team", "label_key": "a" * 129},
+    {"type": "set_service", "label_key": "app", "service_id": 1},
+    {"type": "set_team", "label_key": "owner", "params": {"value": 2}},
+    {"type": "set_route", "label_key": "route", "route_id": 1},
+])
+def test_label_routing_rejects_invalid_or_conflicting_selectors(action):
+    assert validate_rule_definition({}, [action])["errors"]
 
 
 def test_publication_validation_accepts_supported_actions():

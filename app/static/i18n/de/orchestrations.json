@@ -1,4 +1,8 @@
 {
+  "orchestrations.rule_editor.reference_mode": "Zielauswahl",
+  "orchestrations.rule_editor.from_catalog": "Aus Katalog wählen",
+  "orchestrations.rule_editor.from_label": "Aus Alarm-Label",
+  "orchestrations.rule_editor.label_key": "Label-Name ohne das Präfix labels.",
   "nav.event_orchestration": "Ereignis-Orchestrierung",
   "pages.orchestrations.title": "Ereignis-Orchestrierung",
   "pages.orchestrations.subtitle": "Eingehende Ereignisse routen, anreichern, unterdrücken und automatisieren",

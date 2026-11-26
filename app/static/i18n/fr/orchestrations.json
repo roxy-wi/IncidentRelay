@@ -1,4 +1,8 @@
 {
+  "orchestrations.rule_editor.reference_mode": "Sélection de la cible",
+  "orchestrations.rule_editor.from_catalog": "Choisir dans le catalogue",
+  "orchestrations.rule_editor.from_label": "Par libellé de l’alerte",
+  "orchestrations.rule_editor.label_key": "Nom du libellé sans le préfixe labels.",
   "nav.event_orchestration": "Orchestration des événements",
   "pages.orchestrations.title": "Orchestration des événements",
   "pages.orchestrations.subtitle": "Acheminez, enrichissez, supprimez et automatisez les événements entrants",

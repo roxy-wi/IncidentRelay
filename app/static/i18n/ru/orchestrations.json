@@ -1,4 +1,8 @@
 {
+  "orchestrations.rule_editor.reference_mode": "Способ выбора",
+  "orchestrations.rule_editor.from_catalog": "Из каталога",
+  "orchestrations.rule_editor.from_label": "По метке алерта",
+  "orchestrations.rule_editor.label_key": "Имя метки без префикса labels.",
   "nav.event_orchestration": "Оркестрация событий",
   "pages.orchestrations.title": "Оркестрация событий",
   "pages.orchestrations.subtitle": "Маршрутизация, обогащение, подавление и автоматизация входящих событий",

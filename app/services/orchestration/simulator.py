@@ -26,12 +26,12 @@ from app.services.integrations.normalizers.registry import (
     normalize_for_source,
 )
 from app.services.orchestration.actions import EventActionState
-from app.services.orchestration.engine import execute_rule_tree
 from app.services.orchestration.runtime import (
     RuntimeOrchestrationError,
     _build_runtime_context,
     _initial_entities,
     _resolve_selected_entities,
+    execute_catalog_rules,
 )
 from app.services.orchestration.safety import (
     OrchestrationJsonError,
@@ -462,7 +462,9 @@ def _simulate_version(
     baseline_context = EventActionState.from_context(context).to_dict()
     started = time.perf_counter()
     try:
-        result = execute_rule_tree(definition.get("rules") or [], context)
+        result = execute_catalog_rules(
+            definition.get("rules") or [], context, group_id=orchestration.group_id
+        )
     except Exception as exc:
         response.update(
             {

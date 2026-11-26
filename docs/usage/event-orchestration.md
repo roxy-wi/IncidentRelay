@@ -635,6 +635,17 @@ value: platform
 | `set_notification_policy` | Select an enabled notification policy belonging to the selected team. |
 | `set_priority_policy` | Select an enabled priority policy belonging to the selected team. |
 
+For `set_team` and `set_service`, select **From alert label** and enter any label name, such as `l3_team` or `app.kubernetes.io/name`. Enter the key exactly as it appears in the `labels` object. Dots and slashes are part of the key.
+
+```json
+[
+  {"type": "set_team", "label_key": "l3_team", "on_failure": "stop_rule"},
+  {"type": "set_service", "label_key": "service"}
+]
+```
+
+For an alert with labels `{"l3_team":"l3","service":"compute"}`, the first action finds the active team with slug `l3` in the orchestration group. The second finds the enabled service with slug `compute` in that team. The same rule picks up new teams and services as they appear in the catalog. If the label is missing or the lookup fails, the action records the reason in its trace and follows **On failure**. In this example, a failed team lookup skips the remaining actions in the rule.
+
 The Builder loads allowed objects from the current group. Runtime validates that the selected route, team, service and policies form a consistent combination.
 
 Examples of invalid combinations:

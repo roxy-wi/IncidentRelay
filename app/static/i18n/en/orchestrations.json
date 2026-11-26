@@ -1,4 +1,8 @@
 {
+  "orchestrations.rule_editor.reference_mode": "Target selection",
+  "orchestrations.rule_editor.from_catalog": "Choose from catalog",
+  "orchestrations.rule_editor.from_label": "From alert label",
+  "orchestrations.rule_editor.label_key": "Label name without the labels. prefix",
   "nav.event_orchestration": "Event Orchestration",
   "pages.orchestrations.title": "Event Orchestration",
   "pages.orchestrations.subtitle": "Route, enrich, suppress and automate incoming events",

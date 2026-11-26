@@ -58,7 +58,8 @@ const fixture = JSON.parse(process.env.SEARCHABLE_SELECTS_FIXTURE);
         const serviceInputId = await page.locator("#orchestration-create-service").evaluate(el => el.tomselect.control_input.id);
         await page.locator(`label[for="${serviceInputId}"]`).click();
         assert.equal(await page.locator("#" + serviceInputId).evaluate(el => el === document.activeElement), true);
-        await page.locator("#" + serviceInputId).fill("no matching service xyz");
+        await page.waitForFunction(() => document.querySelector("#orchestration-create-service").tomselect.isOpen);
+        await page.locator("#" + serviceInputId).pressSequentially("no matching service xyz");
         assert.equal(await page.locator("#orchestration-create-service-ts-dropdown .no-results").innerText(), "No results found");
         await page.locator("#" + serviceInputId).press("Escape");
         await page.locator('#orchestration-create-modal [data-close-modal]').first().click();
@@ -78,18 +79,69 @@ const fixture = JSON.parse(process.env.SEARCHABLE_SELECTS_FIXTURE);
         assert.equal(await page.locator("#orchestration-action-editor .searchable-select").count(), 4);
         assert.equal(await page.locator("#orchestration-action-editor .ts-control team, #orchestration-action-editor .ts-control service").count(), 0);
         await page.screenshot({path: path.join(fixture.screenshots, "orchestration.png"), fullPage: true});
-        await page.locator("#orchestration-rule-save").click();
-        const saved = page.waitForResponse(response => response.url().endsWith(`/api/event-orchestrations/${fixture.orchestrationId}/draft`)
-            && response.request().method() === "PUT");
-        await page.locator("#orchestration-save-draft").click();
-        const response = await saved;
-        assert.equal(response.status(), 200);
-        assert.deepEqual((await response.json()).definition.rules[0].actions, [
+        async function saveActions() {
+            await page.locator("#orchestration-rule-save").click();
+            const saved = page.waitForResponse(response => response.url().endsWith(`/api/event-orchestrations/${fixture.orchestrationId}/draft`)
+                && response.request().method() === "PUT");
+            await page.locator("#orchestration-save-draft").click();
+            const response = await saved;
+            assert.equal(response.status(), 200);
+            return (await response.json()).definition.rules[0].actions;
+        }
+        assert.deepEqual(await saveActions(), [
             {type: "set_team", team_id: fixture.teamId},
             {type: "set_service", service_id: fixture.serviceId},
         ]);
         await page.locator("[data-rule-edit='0']").click();
         assert.equal(await page.locator(row(1) + " select.orchestration-action-reference").inputValue(), String(fixture.serviceId));
+        await page.locator(row(0) + " .orchestration-reference-mode").selectOption("label");
+        await page.locator(row(0) + " .orchestration-label-key").fill("l3_team");
+        await page.locator(row(1) + " .orchestration-reference-mode").selectOption("label");
+        await page.locator(row(1) + " .orchestration-label-key").fill("app.kubernetes.io/name");
+        const actionRow = page.locator(row(0));
+        for (const width of [1440, 960, 390]) {
+            await page.setViewportSize({width, height: 850});
+            await actionRow.scrollIntoViewIfNeeded();
+            const bounds = await actionRow.evaluate(element => {
+                const rect = node => node.getBoundingClientRect().toJSON();
+                return {
+                    row: rect(element),
+                    headings: [...element.querySelectorAll(".orchestration-editor-column-header")].map(rect),
+                    controls: [".ts-control", ".orchestration-reference-mode", ".orchestration-action-failure"]
+                        .map(selector => rect(element.querySelector(selector))),
+                    key: rect(element.querySelector(".orchestration-label-key")),
+                    remove: rect(element.querySelector("[data-action-remove]")),
+                };
+            });
+            assert.equal(bounds.headings.length, 3);
+            bounds.headings.forEach((heading, index) => {
+                const control = bounds.controls[index];
+                assert.ok(heading.height > 0 && heading.bottom <= control.top, "visible heading above its control");
+                assert.ok(Math.abs(heading.left - control.left) < 2, "heading and control align");
+            });
+            for (const box of [...bounds.controls, bounds.key, bounds.remove]) {
+                assert.ok(box.left >= bounds.row.left && box.right <= Math.min(width, bounds.row.right) + 1,
+                    "action controls fit inside the row");
+            }
+            if (width > 900) {
+                assert.ok(Math.abs(bounds.controls[0].top - bounds.controls[2].top) < 2, "wide row controls align");
+            } else {
+                assert.ok(bounds.key.top >= bounds.controls[1].bottom, "mobile label input stacks below its mode");
+                assert.ok(bounds.controls[2].top > bounds.key.bottom, "mobile failure selector follows parameters");
+            }
+            if (width !== 960) {
+                await actionRow.screenshot({path: path.join(fixture.screenshots, `action-row-${width}.png`)});
+            }
+        }
+        await page.setViewportSize({width: 1440, height: 1050});
+        assert.deepEqual(await saveActions(), [
+            {type: "set_team", label_key: "l3_team"},
+            {type: "set_service", label_key: "app.kubernetes.io/name"},
+        ]);
+        await page.locator("[data-rule-edit='0']").click();
+        assert.equal(await page.locator(row(1) + " .orchestration-label-key").inputValue(), "app.kubernetes.io/name");
+        await page.locator(row(0) + " .orchestration-reference-mode").selectOption("catalog");
+        await searchSelect(row(0) + " select.orchestration-action-reference", "ZZZ Search target", fixture.teamId);
         await page.locator("[data-action-remove='1']").click();
         assert.equal(await page.locator("#orchestration-action-editor .searchable-select").count(), 2);
         await page.locator('#orchestration-rule-modal [data-close-modal]').first().click();
