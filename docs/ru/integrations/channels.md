@@ -72,7 +72,7 @@ IncidentRelay нормализует распространённые псевд
 
 | Входящее значение | Нормализованное значение |
 |---|---|
-| `crit`, `error`, `fatal`, `disaster` | `critical` |
+| `crit`, `error`, `fatal`, `disaster`, `emergency` | `critical` |
 | `avg`, `average` | `medium` |
 | `warn` | `warning` |
 | `information`, `informational`, `not_classified`, `not classified` | `info` |

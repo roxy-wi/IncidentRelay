@@ -334,6 +334,35 @@ def test_reset_manual_priority_uses_highest_active_alert_for_recalculate(db):
     assert group.priority_set_manually is False
 
 
+def test_information_severity_maps_to_lowest_priority(db):
+    _, _, _, route = create_priority_route()
+
+    result = upsert_alert(
+        make_alert_payload(
+            route,
+            severity="information",
+        )
+    )
+
+    assert incidents_repo.priority_from_severity("information").slug == "p5"
+    assert result.group.priority_slug == "p5"
+
+
+def test_emergency_severity_maps_to_highest_priority(db):
+    _, _, _, route = create_priority_route()
+
+    result = upsert_alert(
+        make_alert_payload(
+            route,
+            severity="emergency",
+        )
+    )
+
+    assert incidents_repo.priority_from_severity("Emergency").slug == "p1"
+    assert result.alert.priority_slug == "p1"
+    assert result.group.priority_slug == "p1"
+
+
 def test_missing_policy_keeps_legacy_severity_mapping(db):
     _, _, _, route = create_priority_route()
 

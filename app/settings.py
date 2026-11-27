@@ -368,6 +368,14 @@ class Config:
     )
 
     TELEGRAM_PROXY_URL = settings.get("telegram", "proxy_url", "")
+    TELEGRAM_SHELVE_DURATIONS = settings.get(
+        "telegram",
+        "shelve_durations",
+        "1h",
+    )
+    # Empty disables direct messages, including escalation handoffs.
+    TELEGRAM_DM_PRIORITIES = settings.get("telegram", "dm_priorities", "")
+    TELEGRAM_TIMEZONE = settings.get("telegram", "timezone", "UTC")
 
     ONCALL_SHIFT_EMAIL_CHECK_INTERVAL_SECONDS = settings.get_int(
         "oncall",

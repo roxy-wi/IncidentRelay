@@ -1,6 +1,9 @@
+from datetime import datetime, timezone
 from html import escape
 from typing import Any
 
+from app.notifiers.label_fields import alert_annotation, present_label_fields
+from app.notifiers.telegram import timefmt
 from app.settings import Config
 from app.services.routing.service_context import (
     get_alert_service_links,
@@ -179,15 +182,35 @@ def _action_user(alert: Any, event_type: str, actor: Any = None) -> Any:
 
 
 def _format_dt(value: Any) -> str:
-    """Format a datetime-like value for Telegram."""
+    """Format a datetime-like value in the configured Telegram zone."""
 
-    if not value:
-        return "-"
+    return timefmt.format_moment(value)
+
+
+def _started_line(alert: Any) -> list[str]:
+    started = getattr(alert, "first_seen_at", None)
+
+    if not started:
+        return []
+
+    return [f"🕒 <b>Started:</b> {_html(_format_dt(started))}"]
+
+
+def _firing_for_line(alert: Any) -> list[str]:
+    started = getattr(alert, "first_seen_at", None)
+
+    if not started:
+        return []
 
     try:
-        return value.strftime("%d.%m.%Y %H:%M:%S UTC")
-    except Exception:
-        return _html(value)
+        if started.tzinfo is not None:
+            started = started.astimezone(timezone.utc).replace(tzinfo=None)
+
+        delta = datetime.now(timezone.utc).replace(tzinfo=None) - started
+    except (AttributeError, TypeError):
+        return []
+
+    return [f"⏱ <b>Firing for:</b> {_html(timefmt.format_duration(delta))}"]
 
 
 def _severity_icon(alert: Any) -> str:
@@ -195,7 +218,7 @@ def _severity_icon(alert: Any) -> str:
 
     severity = str(getattr(alert, "severity", "") or "").lower()
 
-    if severity in {"critical", "crit", "high", "error"}:
+    if severity in {"critical", "crit", "fatal", "disaster", "emergency", "high", "error"}:
         return "🚨"
 
     if severity in {"warning", "warn", "medium"}:
@@ -220,7 +243,7 @@ def _title(alert: Any, event_type: str) -> str:
         return f"🔕 <b>SHELVED · {title}</b>"
 
     if event_type == "acknowledged" or status == "acknowledged":
-        return f"✅ <b>ACKNOWLEDGED · {title}</b>"
+        return f"👀 <b>ACKNOWLEDGED · {title}</b>"
 
     if event_type == "reminder":
         return f"🔔 <b>REMINDER · {title}</b>"
@@ -246,6 +269,7 @@ def _state_note(alert: Any, event_type: str, actor: Any = None) -> list[str]:
         return [
             "🟢 <b>Alert has been resolved.</b>",
             f"👤 <b>Resolved by:</b> {_person_name(user)}",
+            *_started_line(alert),
             f"🕒 <b>Resolved at:</b> {_html(_format_dt(getattr(alert, 'resolved_at', None)))}",
         ]
 
@@ -255,6 +279,7 @@ def _state_note(alert: Any, event_type: str, actor: Any = None) -> list[str]:
         reason = getattr(shelf, "reason", None) if shelf else None
         lines = [
             "🔕 <b>Alert is temporarily shelved.</b>",
+            *_started_line(alert),
             f"🕒 <b>Until:</b> {_html(until)}",
         ]
         if reason:
@@ -263,8 +288,9 @@ def _state_note(alert: Any, event_type: str, actor: Any = None) -> list[str]:
 
     if event_type == "acknowledged" or status == "acknowledged":
         return [
-            "✅ <b>Alert has been acknowledged.</b>",
+            "👀 <b>Alert has been acknowledged.</b>",
             f"👤 <b>Acknowledged by:</b> {_person_name(user)}",
+            *_started_line(alert),
             f"🕒 <b>Acknowledged at:</b> {_html(_format_dt(getattr(alert, 'acknowledged_at', None)))}",
         ]
 
@@ -272,15 +298,25 @@ def _state_note(alert: Any, event_type: str, actor: Any = None) -> list[str]:
         return [
             "🔔 <b>This alert is still firing.</b>",
             f"🔁 <b>Reminder count:</b> {_html(getattr(alert, 'reminder_count', 0))}",
+            *_started_line(alert),
+            *_firing_for_line(alert),
         ]
 
     if event_type == "escalation":
         return [
             "⏫ <b>Alert has been escalated.</b>",
             f"📈 <b>Escalation level:</b> {_html(getattr(alert, 'escalation_level', 0))}",
+            *_started_line(alert),
         ]
 
-    return []
+    return _started_line(alert)
+
+
+def _is_absolute_url(value: Any) -> bool:
+    """Return True when the value is an absolute HTTP(S) URL."""
+
+    url = str(value or "").strip()
+    return url.startswith("http://") or url.startswith("https://")
 
 
 def _ack_url(alert: Any) -> str:
@@ -302,17 +338,17 @@ def format_telegram_alert_message(
 ) -> str:
     """Build a rich Telegram HTML message for an alert."""
 
-    lines = [
+    core_lines = [
         _title(alert, event_type),
         "",
     ]
 
     state_lines = _state_note(alert, event_type, actor)
     if state_lines:
-        lines.extend(state_lines)
-        lines.append("")
+        core_lines.extend(state_lines)
+        core_lines.append("")
 
-    lines.extend(
+    core_lines.extend(
         [
             f"Team: {_team_name(alert)}",
             f"Service: {_service_name(alert)}",
@@ -325,22 +361,32 @@ def format_telegram_alert_message(
         ]
     )
 
+    optional_lines = []
+
+    for title, value in present_label_fields(alert):
+        optional_lines.append(f"{title}: {_html(value)}")
+
     source_event_url = build_source_event_url(alert)
 
     if source_event_url:
-        lines.append(
+        optional_lines.append(
             f'🔗 <a href="{_attr(source_event_url)}">Open source event</a>'
         )
 
-    lines.extend(_service_context_lines(alert))
+    dashboard_url = alert_annotation(alert, "dashboard", "dashboard_url")
 
-    lines.extend(
-        [
-            "",
-            "<b>Message:</b>",
-            f"<blockquote>{_trim_html(getattr(alert, 'message', None))}</blockquote>",
-        ]
-    )
+    if dashboard_url and _is_absolute_url(dashboard_url):
+        optional_lines.append(f'📊 <a href="{_attr(dashboard_url)}">Dashboard</a>')
+
+    optional_lines.extend(_service_context_lines(alert))
+
+    message_lines = [
+        "",
+        "<b>Message:</b>",
+        f"<blockquote>{_trim_html(getattr(alert, 'message', None))}</blockquote>",
+    ]
+
+    footer_lines = []
 
     if (
         getattr(alert, "status", None) == "firing"
@@ -348,16 +394,43 @@ def format_telegram_alert_message(
     ):
         ack_url = _ack_url(alert)
         if ack_url:
-            lines.extend(
+            footer_lines.extend(
                 [
                     "",
                     f"🔗 <a href=\"{_attr(ack_url)}\">ACK URL</a>",
                 ]
             )
 
-    lines.extend(_correlation_context_lines(alert))
+    footer_lines.extend(_correlation_context_lines(alert))
 
-    text = "\n".join(lines)
+    core_text = "\n".join(core_lines)
+    message_text = "\n".join(message_lines)
+    footer_text = "\n".join(footer_lines)
+
+    fixed_length = len(core_text) + len(message_text) + len(footer_text) + 20
+
+    if fixed_length >= MAX_TELEGRAM_MESSAGE_LENGTH:
+        all_lines = core_lines + message_lines + footer_lines
+        text = "\n".join(all_lines)
+        return text[: MAX_TELEGRAM_MESSAGE_LENGTH - 1] + "…"
+
+    available_budget = MAX_TELEGRAM_MESSAGE_LENGTH - fixed_length
+
+    added_optional = []
+    current_optional_length = 0
+
+    for line in optional_lines:
+        line_length = len(line) + (1 if added_optional else 0)
+
+        if current_optional_length + line_length > available_budget:
+            added_optional.append("…")
+            break
+
+        added_optional.append(line)
+        current_optional_length += line_length
+
+    all_parts = core_lines + added_optional + message_lines + footer_lines
+    text = "\n".join(all_parts)
 
     if len(text) <= MAX_TELEGRAM_MESSAGE_LENGTH:
         return text

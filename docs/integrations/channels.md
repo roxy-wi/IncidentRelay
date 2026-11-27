@@ -73,7 +73,7 @@ IncidentRelay normalizes common incoming severity aliases before comparing them 
 
 | Incoming value | Normalized value |
 |---|---|
-| `crit`, `error`, `fatal`, `disaster` | `critical` |
+| `crit`, `error`, `fatal`, `disaster`, `emergency` | `critical` |
 | `avg`, `average` | `medium` |
 | `warn` | `warning` |
 | `information`, `informational`, `not_classified`, `not classified` | `info` |

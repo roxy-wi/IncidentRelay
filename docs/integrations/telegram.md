@@ -7,7 +7,7 @@ description: Telegram Bot notification setup and troubleshooting.
 
 Telegram is an outgoing notification channel based on Telegram Bot API.
 
-It can send alert notifications and supports inline Acknowledge, Resolve, Shelve 1h and Unshelve actions when polling/callback handling is enabled.
+It can send alert notifications and supports inline Acknowledge, Resolve, Shelve and Unshelve actions when polling/callback handling is enabled. The shelve buttons come from `shelve_durations` in the `[telegram]` section (`1h` by default; `4h` and `7d` can be added).
 
 ## Required channel config
 
@@ -36,9 +36,21 @@ For RPM installations:
 journalctl -u incidentrelay-telegram-worker -f
 ```
 
+## Message text
+
+Posts keep the existing fields, including priority, source, alert id and the ACK link. They also show **Started** when the group has a start time, **Firing for** on reminders, and any of Environment, Cluster, Namespace, Project, Server, Address and Device that the alert actually carries. A `dashboard` or `dashboard_url` annotation or label becomes a Dashboard link. Acknowledged posts use 👀 so they are not mistaken for a resolved alert. Times follow `[telegram] timezone`.
+
+## Several channels on one bot
+
+`getUpdates` belongs to the bot token, not to a channel. Channels that use the same `bot_token` are polled once, and a button press is handled by the channel id stored in the signed callback (`ir:<action>:<alert>:<channel>:<signature>`). A press for a channel this bot does not serve is rejected and the message is not edited. Distinct bot tokens are still polled one after another.
+
 ## User Telegram ID
 
-A user can have a Telegram user ID in their profile. This can be used for action attribution and future direct-user workflows.
+A user can have a Telegram user ID in their profile. Callbacks are attributed to that user. When `[telegram] dm_priorities` is set, the same id is the private chat the bot writes to. The user has to press Start in the bot once, or Telegram refuses the message. That refusal is logged and the channel post is still delivered.
+
+## Direct messages
+
+With `dm_priorities` empty, nothing here changes. With `dm_priorities = p1,p2`, a firing notification or reminder at those priorities also sends the assignee a private message: the alert title, a short journal, the same action buttons, and a link to the channel post. An escalation sends that message to the new assignee at any priority. Acknowledge, Resolve and Shelve from the private message update both the private message and the channel post.
 
 ## Proxy
 
@@ -56,4 +68,4 @@ Check:
 
 ## Shelving
 
-Interactive alert messages include **Shelve 1h** for open groups and **Unshelve** while a shelf is active. The Telegram account must be linked to an IncidentRelay user with responder access to the alert team. Shelving does not change the technical alert status. See [Alert shelving](../usage/shelving.md).
+Interactive alert messages include the configured shelve buttons ( **Shelve 1h** by default) for open groups and **Unshelve** while a shelf is active. The Telegram account must be linked to an IncidentRelay user with responder access to the alert team. Shelving does not change the technical alert status. See [Alert shelving](../usage/shelving.md).

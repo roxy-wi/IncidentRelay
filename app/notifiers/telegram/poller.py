@@ -1,3 +1,4 @@
+import hashlib
 import re
 import logging
 from datetime import timedelta
@@ -13,18 +14,26 @@ from app.services.alerts.actions import acknowledge_alert, resolve_alert
 from app.services.alerts.shelving import shelve_alert_group, unshelve_alert_group
 from app.services.rbac import can_respond_team
 from app.notifiers.telegram.templates import format_telegram_alert_message
-from app.notifiers.telegram.actions import parse_telegram_action_data
+from app.notifiers.telegram.actions import (
+    parse_telegram_action_data,
+    shelve_duration_label,
+)
 from app.notifiers.telegram.bot import (
     answer_telegram_callback,
+    build_alert_keyboard,
     get_telegram_bot,
     update_telegram_alert,
 )
+from app.notifiers.telegram.direct import post_url_from_message, refresh_direct
 from app.modules.common import utc_now
 
 
 logger = logging.getLogger("oncall.telegram")
 
-_channel_offsets = {}
+# getUpdates confirms offsets per bot token, not per channel. Channels that
+# share a token must share this offset, or the first channel to poll consumes
+# the button press and the channel named in the button never sees it.
+_token_offsets = {}
 _channel_auth_failed_until = {}
 _channel_transport_failed_until = {}
 
@@ -129,31 +138,99 @@ def list_polling_telegram_channels():
     ]
 
 
-def poll_telegram_channels_once(timeout=20):
-    """Poll all Telegram channels once."""
-    processed = 0
+def _token_key(token):
+    """Stable offset key that is not the bot token itself."""
+
+    return hashlib.sha256(str(token).encode()).hexdigest()
+
+
+def _channels_by_token():
+    """Group polling channels by bot token, keeping list order inside a group."""
+
+    grouped = {}
 
     for channel in list_polling_telegram_channels():
-        if _is_channel_auth_backoff_active(channel.id):
+        token = (channel.config or {}).get("bot_token")
+
+        if not token:
             continue
 
-        if _is_channel_transport_backoff_active(channel.id):
+        grouped.setdefault(token, []).append(channel)
+
+    return grouped
+
+
+def _group_in_backoff(channels):
+    return any(
+        _is_channel_auth_backoff_active(channel.id)
+        or _is_channel_transport_backoff_active(channel.id)
+        for channel in channels
+    )
+
+
+def _mark_group_auth_failed(channels):
+    for channel in channels:
+        _mark_channel_auth_failed(channel.id)
+
+
+def _mark_group_transport_failed(channels):
+    for channel in channels:
+        _mark_channel_transport_failed(channel.id)
+
+
+def _channel_log_fields(channels):
+    return {
+        "channel_id": channels[0].id,
+        "channel_ids": [channel.id for channel in channels],
+        "channel_name": getattr(channels[0], "name", None),
+    }
+
+
+def _channel_for_callback(callback, channels):
+    """Return the channel named in the button, when it shares this bot.
+
+    A press that does not parse, or names a channel this bot does not serve,
+    stays on the first channel. handle_telegram_callback then answers
+    "Invalid action" or "Action belongs to another channel" and does not
+    edit the message.
+    """
+
+    action_data = parse_telegram_action_data(getattr(callback, "data", None))
+
+    if not action_data:
+        return channels[0]
+
+    wanted = int(action_data["channel_id"])
+
+    for channel in channels:
+        if int(channel.id) == wanted:
+            return channel
+
+    return channels[0]
+
+
+def poll_telegram_channels_once(timeout=20):
+    """Poll each distinct Telegram bot token once."""
+
+    processed = 0
+
+    for token, channels in _channels_by_token().items():
+        if _group_in_backoff(channels):
             continue
 
         try:
-            processed += poll_telegram_channel_once(channel, timeout=timeout)
+            processed += poll_telegram_token_once(token, channels, timeout=timeout)
 
         except ApiTelegramException as exc:
             if _is_telegram_unauthorized(exc):
-                _mark_channel_auth_failed(channel.id)
+                _mark_group_auth_failed(channels)
 
                 logger.error(
                     "telegram channel token is unauthorized; polling temporarily suspended",
                     extra={
                         "extra": {
                             "event_type": "telegram_poll_auth_error",
-                            "channel_id": channel.id,
-                            "channel_name": getattr(channel, "name", None),
+                            **_channel_log_fields(channels),
                             "retry_after_seconds": TELEGRAM_AUTH_RETRY_SECONDS,
                             "telegram_error_code": _telegram_exception_error_code(exc),
                             "telegram_error": getattr(exc, "description", str(exc)),
@@ -167,8 +244,7 @@ def poll_telegram_channels_once(timeout=20):
                 extra={
                     "extra": {
                         "event_type": "telegram_poll_api_error",
-                        "channel_id": channel.id,
-                        "channel_name": getattr(channel, "name", None),
+                        **_channel_log_fields(channels),
                         "telegram_error_code": _telegram_exception_error_code(exc),
                         "telegram_error": _sanitize_error_message(
                             getattr(exc, "description", str(exc))
@@ -179,15 +255,14 @@ def poll_telegram_channels_once(timeout=20):
             continue
 
         except requests_exceptions.RequestException as exc:
-            _mark_channel_transport_failed(channel.id)
+            _mark_group_transport_failed(channels)
 
             logger.warning(
                 "telegram channel poll transport error; polling temporarily suspended",
                 extra={
                     "extra": {
                         "event_type": "telegram_poll_transport_error",
-                        "channel_id": channel.id,
-                        "channel_name": getattr(channel, "name", None),
+                        **_channel_log_fields(channels),
                         "reason": _friendly_transport_error(exc),
                         "retry_after_seconds": TELEGRAM_TRANSPORT_RETRY_SECONDS,
                         "proxy": _safe_proxy_label(),
@@ -204,8 +279,7 @@ def poll_telegram_channels_once(timeout=20):
                 extra={
                     "extra": {
                         "event_type": "telegram_poll_unexpected_error",
-                        "channel_id": channel.id,
-                        "channel_name": getattr(channel, "name", None),
+                        **_channel_log_fields(channels),
                         "error": str(exc),
                     }
                 },
@@ -214,13 +288,11 @@ def poll_telegram_channels_once(timeout=20):
     return processed
 
 
-def poll_telegram_channel_once(channel, timeout=20):
-    """
-    Poll one Telegram channel with getUpdates.
-    """
-    config = channel.config or {}
-    bot = get_telegram_bot(config.get("bot_token"))
-    offset = _channel_offsets.get(channel.id)
+def poll_telegram_token_once(token, channels, timeout=20):
+    """Poll one bot token and deliver each press to the channel stored in it."""
+
+    bot = get_telegram_bot(token)
+    offset = _token_offsets.get(_token_key(token))
 
     updates = bot.get_updates(
         offset=offset,
@@ -231,15 +303,114 @@ def poll_telegram_channel_once(channel, timeout=20):
     processed = 0
 
     for update in updates:
-        _channel_offsets[channel.id] = update.update_id + 1
+        _token_offsets[_token_key(token)] = update.update_id + 1
 
         if not update.callback_query:
             continue
 
-        handle_telegram_callback(channel, update.callback_query)
+        handle_telegram_callback(
+            _channel_for_callback(update.callback_query, channels),
+            update.callback_query,
+        )
         processed += 1
 
     return processed
+
+
+
+def _is_channel_post(channel, message):
+    """True when the pressed button sits on the channel post itself."""
+
+    chat = getattr(message, "chat", None)
+
+    if not chat:
+        return False
+
+    chat_type = getattr(chat, "type", None)
+
+    if chat_type == "private":
+        return False
+
+    configured_chat_id = (channel.config or {}).get("chat_id")
+
+    if not configured_chat_id:
+        return False
+
+    configured_str = str(configured_chat_id).lstrip("@")
+    message_username = getattr(chat, "username", None)
+
+    if message_username and configured_str == message_username:
+        return True
+
+    try:
+        return int(chat.id) == int(configured_chat_id)
+    except (TypeError, ValueError):
+        return str(chat.id) == str(configured_chat_id)
+
+
+def _refresh_pressed_message(channel, alert, action, event_type, user, callback):
+    """Show the new alert state on the message whose button was pressed.
+
+    The channel post and the stored direct message are refreshed by the shared
+    alert services. The direct message from an earlier reminder must be
+    refreshed here because it is not stored in the notification delivery.
+    """
+
+    message = getattr(callback, "message", None)
+
+    if message is None:
+        return
+
+    if _is_channel_post(channel, message):
+        from app.modules.db import notifications_repo
+        from app.notifiers.telegram.templates import format_telegram_alert_message
+        from types import SimpleNamespace
+        
+        notification = notifications_repo.get_notification(
+            group_id=alert.id,
+            channel_id=channel.id
+        )
+        
+        if notification:
+            return
+        
+        text = format_telegram_alert_message(alert, event_type)
+        
+        delivery = SimpleNamespace(
+            external_channel_id=str(message.chat.id),
+            external_message_id=message.message_id,
+            provider_payload={}
+        )
+        
+        update_telegram_alert(
+            channel,
+            alert,
+            text,
+            delivery,
+            event_type,
+        )
+        return
+
+    try:
+        bot = get_telegram_bot((channel.config or {}).get("bot_token"))
+        stored = {
+            "chat_id": str(message.chat.id),
+            "message_id": message.message_id,
+            "post_url": post_url_from_message(message),
+        }
+        refresh_direct(bot, alert, stored, build_alert_keyboard(channel, alert))
+    except Exception:
+        logger.warning(
+            "telegram direct message was not refreshed after action",
+            exc_info=True,
+            extra={
+                "extra": {
+                    "event_type": "telegram_direct_refresh_failed",
+                    "channel_id": channel.id,
+                    "alert_group_id": getattr(alert, "id", None),
+                }
+            },
+        )
 
 
 def handle_telegram_callback(channel, callback):
@@ -309,14 +480,18 @@ def handle_telegram_callback(channel, callback):
             event_type = "resolved"
             answer_text = f"Alert #{alert.id} resolved"
         elif action == "shelve":
+            duration_seconds = action_data.get("duration_seconds") or 3600
             alert, _ = shelve_alert_group(
                 alert_id,
                 user_id=user.id,
-                duration_seconds=action_data.get("duration_seconds") or 3600,
+                duration_seconds=duration_seconds,
                 source="telegram",
             )
             event_type = "shelved"
-            answer_text = f"Alert #{alert.id} shelved for 1 hour"
+            answer_text = (
+                f"Alert #{alert.id} shelved for "
+                f"{shelve_duration_label(duration_seconds)}"
+            )
         elif action == "unshelve":
             alert, _ = unshelve_alert_group(
                 alert_id,
@@ -334,21 +509,9 @@ def handle_telegram_callback(channel, callback):
             )
             return
 
-        # Shelve/Unshelve already update every stored provider message from
-        # the shared shelving service. Avoid issuing a second Telegram edit
-        # for the same callback message. ACK/Resolve keep the existing direct
-        # callback update behavior.
-        if action not in {"shelve", "unshelve"}:
-            update_telegram_alert(
-                channel=channel,
-                alert=alert,
-                text=format_telegram_alert_message(alert, event_type, actor=user),
-                delivery=type("TelegramDelivery", (), {
-                    "external_channel_id": str(callback.message.chat.id),
-                    "external_message_id": str(callback.message.message_id),
-                })(),
-                event_type=event_type,
-            )
+        _refresh_pressed_message(
+            channel, alert, action, event_type, user, callback
+        )
 
         answer_telegram_callback(channel, callback.id, answer_text)
 

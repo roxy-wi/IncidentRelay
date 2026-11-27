@@ -6,7 +6,17 @@ from requests import exceptions as requests_exceptions
 from telebot.apihelper import ApiTelegramException
 
 from app.settings import Config
-from app.notifiers.telegram.actions import build_telegram_action_data
+from app.notifiers.telegram.actions import (
+    build_telegram_action_data,
+    configured_shelve_durations,
+)
+from app.notifiers.telegram.direct import (
+    DIRECT_PAYLOAD_KEY,
+    channel_post_url,
+    refresh_direct,
+    send_direct,
+)
+from app.notifiers.telegram.direct_policy import should_send_dm, telegram_chat_id
 from app.services.links import build_alert_web_url
 from app.services.alerts.shelving import is_alert_group_shelved
 
@@ -82,6 +92,27 @@ def get_telegram_bot(bot_token):
     return bot
 
 
+def _shelve_buttons(alert, channel):
+    """Inline buttons for the configured shelve durations."""
+
+    return [
+        types.InlineKeyboardButton(
+            spec["button"],
+            callback_data=build_telegram_action_data(
+                spec["code"], alert.id, channel.id
+            ),
+        )
+        for spec in configured_shelve_durations()
+    ]
+
+
+def _resolve_button(alert, channel):
+    return types.InlineKeyboardButton(
+        "Resolve",
+        callback_data=build_telegram_action_data("resolve", alert.id, channel.id),
+    )
+
+
 def build_alert_keyboard(channel, alert):
     """
     Build Telegram inline keyboard for alert actions.
@@ -112,20 +143,14 @@ def build_alert_keyboard(channel, alert):
             )
             has_buttons = True
         elif alert.status == "acknowledged":
-            keyboard.add(
-                types.InlineKeyboardButton(
-                    "Shelve 1h",
-                    callback_data=build_telegram_action_data(
-                        "s1h", alert.id, channel.id
-                    ),
-                ),
-                types.InlineKeyboardButton(
-                    "Resolve",
-                    callback_data=build_telegram_action_data(
-                        "resolve", alert.id, channel.id
-                    ),
-                ),
-            )
+            shelve_buttons = _shelve_buttons(alert, channel)
+
+            if len(shelve_buttons) == 1:
+                keyboard.row(shelve_buttons[0], _resolve_button(alert, channel))
+            else:
+                keyboard.row(_resolve_button(alert, channel))
+                keyboard.row(*shelve_buttons)
+
             has_buttons = True
         else:
             keyboard.add(
@@ -135,21 +160,9 @@ def build_alert_keyboard(channel, alert):
                         "ack", alert.id, channel.id
                     ),
                 ),
-                types.InlineKeyboardButton(
-                    "Resolve",
-                    callback_data=build_telegram_action_data(
-                        "resolve", alert.id, channel.id
-                    ),
-                ),
+                _resolve_button(alert, channel),
             )
-            keyboard.add(
-                types.InlineKeyboardButton(
-                    "Shelve 1h",
-                    callback_data=build_telegram_action_data(
-                        "s1h", alert.id, channel.id
-                    ),
-                )
-            )
+            keyboard.row(*_shelve_buttons(alert, channel))
             has_buttons = True
 
     if alert_url:
@@ -189,16 +202,110 @@ def send_telegram_alert(channel, alert, text, event_type="notification"):
         parse_mode="HTML",
     )
 
+    provider_payload = {
+        "chat_id": message.chat.id,
+        "message_id": message.message_id,
+        "event_type": event_type,
+    }
+
+    direct = _notify_assignee(bot, channel, alert, event_type, message)
+
+    if direct:
+        provider_payload[DIRECT_PAYLOAD_KEY] = direct
+
     return {
         "provider": "telegram",
         "external_message_id": str(message.message_id),
         "external_channel_id": str(message.chat.id),
-        "provider_payload": {
-            "chat_id": message.chat.id,
-            "message_id": message.message_id,
-            "event_type": event_type,
-        },
+        "provider_payload": provider_payload,
     }
+
+
+def _can_receive_dm(user, alert, stored_chat_id=None):
+    """Check whether the user is authorized to receive alert details right now.
+
+    Returns the Telegram chat id when the user passes every check, or None.
+    """
+
+    if not user:
+        return None
+
+    assignee = getattr(alert, "assignee", None)
+
+    if not assignee or user.id != assignee.id:
+        return None
+
+    if not getattr(user, "active", False):
+        return None
+
+    alert_team = getattr(alert, "team", None)
+
+    if alert_team:
+        try:
+            from app.modules.db.models import UserGroup
+
+            membership = (
+                UserGroup
+                .select()
+                .where(
+                    UserGroup.user == user,
+                    UserGroup.group == alert_team.group,
+                    UserGroup.active == True,
+                )
+                .get_or_none()
+            )
+
+            if not membership:
+                return None
+        except Exception:
+            return None
+
+    current_chat_id = telegram_chat_id(user)
+
+    if not current_chat_id:
+        return None
+
+    if stored_chat_id is not None and str(current_chat_id) != str(stored_chat_id):
+        return None
+
+    return current_chat_id
+
+
+def _notify_assignee(bot, channel, alert, event_type, post):
+    """Page the assignee in a private chat. Never fails the channel delivery."""
+
+    try:
+        if getattr(alert, "status", None) != "firing":
+            return None
+
+        if not should_send_dm(alert, event_type):
+            return None
+
+        assignee = getattr(alert, "assignee", None)
+        chat_id = _can_receive_dm(assignee, alert)
+
+        if chat_id is None:
+            return None
+
+        return send_direct(
+            bot,
+            chat_id,
+            alert,
+            event_type,
+            channel_post_url(post),
+            build_alert_keyboard(channel, alert),
+        )
+    except Exception:
+        logger.exception(
+            "telegram direct message failed",
+            extra={
+                "extra": {
+                    "event_type": "telegram_direct_error",
+                    "alert_group_id": getattr(alert, "id", None),
+                }
+            },
+        )
+        return None
 
 
 def update_telegram_alert(channel, alert, text, delivery, event_type="resolved"):
@@ -214,12 +321,12 @@ def update_telegram_alert(channel, alert, text, delivery, event_type="resolved")
     if not bot_token or not chat_id or not message_id:
         raise RuntimeError("telegram bot_token, chat_id or message_id is missing")
 
-    reply_markup = build_alert_keyboard(channel, alert)
-
-    if alert.status == "resolved":
-        reply_markup = None
+    previous = dict(getattr(delivery, "provider_payload", None) or {})
+    keyboard = build_alert_keyboard(channel, alert)
+    reply_markup = None if alert.status == "resolved" else keyboard
 
     bot = get_telegram_bot(bot_token)
+    post_changed = True
 
     try:
         bot.edit_message_text(
@@ -231,22 +338,63 @@ def update_telegram_alert(channel, alert, text, delivery, event_type="resolved")
             disable_web_page_preview=True,
         )
     except ApiTelegramException as exc:
-        if "message is not modified" in str(exc).lower():
-            return False
+        if "message is not modified" not in str(exc).lower():
+            raise
 
-        raise
+        post_changed = False
+
+    _refresh_direct_message(bot, alert, previous, keyboard)
+
+    if not post_changed:
+        return False
+
+    new_payload = {
+        "chat_id": chat_id,
+        "message_id": message_id,
+        "event_type": event_type,
+        "updated": True,
+    }
+
+    if DIRECT_PAYLOAD_KEY in previous:
+        new_payload[DIRECT_PAYLOAD_KEY] = previous[DIRECT_PAYLOAD_KEY]
 
     return {
         "provider": "telegram",
         "external_message_id": str(message_id),
         "external_channel_id": str(chat_id),
-        "provider_payload": {
-            "chat_id": chat_id,
-            "message_id": message_id,
-            "event_type": event_type,
-            "updated": True,
-        },
+        "provider_payload": new_payload,
     }
+
+
+def _refresh_direct_message(bot, alert, payload, keyboard):
+    """Keep the stored direct message in step with the alert state."""
+
+    stored = payload.get(DIRECT_PAYLOAD_KEY)
+
+    if not stored:
+        return
+
+    stored_chat_id = stored.get("chat_id")
+    assignee = getattr(alert, "assignee", None)
+    authorized_chat_id = _can_receive_dm(assignee, alert, stored_chat_id)
+
+    if not authorized_chat_id:
+        return
+
+    try:
+        refresh_direct(bot, alert, stored, keyboard)
+    except Exception as exc:
+        logger.warning(
+            "telegram direct message was not refreshed",
+            extra={
+                "extra": {
+                    "event_type": "telegram_direct_refresh_failed",
+                    "alert_group_id": getattr(alert, "id", None),
+                    "telegram_error": getattr(exc, "description", None)
+                    or exc.__class__.__name__,
+                }
+            },
+        )
 
 
 def answer_telegram_callback(channel, callback_query_id, text, show_alert=False):

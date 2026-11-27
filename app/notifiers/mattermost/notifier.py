@@ -1,6 +1,7 @@
 from urllib.parse import urljoin
 
 from app import Config
+from app.notifiers.label_fields import alert_annotation, present_label_fields
 from app.notifiers.plugins import IncomingWebhookNotifier, alert_service_label
 from app.notifiers.mattermost.actions import build_mattermost_action_signature
 from app.services.outbound_http import safe_request
@@ -324,6 +325,15 @@ class MattermostNotifier(IncomingWebhookNotifier):
             {"short": True, "title": "Source", "value": alert.source},
             {"short": True, "title": "Alert ID", "value": str(alert.id)},
         ]
+        for title, value in present_label_fields(alert):
+            fields.append({"short": True, "title": title, "value": value})
+
+        dashboard_url = alert_annotation(alert, "dashboard", "dashboard_url")
+
+        if dashboard_url:
+            fields.append(
+                {"short": False, "title": "Dashboard", "value": dashboard_url}
+            )
         service_links = format_service_links_markdown(alert)
         if service_links:
             fields.append(
