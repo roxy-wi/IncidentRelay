@@ -352,8 +352,8 @@ def _refresh_pressed_message(channel, alert, action, event_type, user, callback)
     """Show the new alert state on the message whose button was pressed.
 
     The channel post and the stored direct message are refreshed by the shared
-    alert services. This covers the pressed message itself: the channel post,
-    or a direct message from an earlier reminder.
+    alert services. The direct message from an earlier reminder must be
+    refreshed here because it is not stored in the notification delivery.
     """
 
     message = getattr(callback, "message", None)
@@ -362,20 +362,32 @@ def _refresh_pressed_message(channel, alert, action, event_type, user, callback)
         return
 
     if _is_channel_post(channel, message):
-        # Shelve/Unshelve already update every stored provider message.
-        # Avoid a second edit for the same press.
-        if action in {"shelve", "unshelve"}:
+        from app.modules.db import notifications_repo
+        from app.notifiers.telegram.templates import format_telegram_alert_message
+        from types import SimpleNamespace
+        
+        notification = notifications_repo.get_notification(
+            group_id=alert.id,
+            channel_id=channel.id
+        )
+        
+        if notification:
             return
-
+        
+        text = format_telegram_alert_message(alert, event_type)
+        
+        delivery = SimpleNamespace(
+            external_channel_id=str(message.chat.id),
+            external_message_id=message.message_id,
+            provider_payload={}
+        )
+        
         update_telegram_alert(
-            channel=channel,
-            alert=alert,
-            text=format_telegram_alert_message(alert, event_type, actor=user),
-            delivery=type("TelegramDelivery", (), {
-                "external_channel_id": str(message.chat.id),
-                "external_message_id": str(message.message_id),
-            })(),
-            event_type=event_type,
+            channel,
+            alert,
+            text,
+            delivery,
+            event_type,
         )
         return
 

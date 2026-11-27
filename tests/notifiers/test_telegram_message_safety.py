@@ -187,7 +187,7 @@ def test_long_labels_with_html_escapes_do_not_break_delivery():
         message="test",
         severity="info",
         status="firing",
-        common_labels={"escaped_label": long_value_with_escapes},
+        common_labels={"cluster": long_value_with_escapes},
     )
 
     text = format_telegram_alert_message(alert, "notification")

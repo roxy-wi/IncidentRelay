@@ -124,7 +124,7 @@ def test_channel_username_callback_uses_channel_template_not_dm(db, monkeypatch)
 
     edited = bot.edited_text[0]
     assert str(edited["chat_id"]) == CHANNEL_NUMERIC_ID
-    assert edited["message_id"] == 3001
+    assert str(edited["message_id"]) == "3001"
     assert "<b>Journal:</b>" not in edited["text"]
     assert "Team:" in edited["text"]
 

@@ -331,30 +331,6 @@ def _ack_url(alert: Any) -> str:
     return f"{base_url}/api/alert-groups/{alert_id}/acknowledge"
 
 
-def _safe_join_with_budget(lines: list[str], max_length: int) -> str:
-    """Join lines with newlines, stopping when the budget is exhausted."""
-
-    result = []
-    current_length = 0
-
-    for line in lines:
-        line_with_newline = line + "\n" if result else line
-        new_length = current_length + len(line_with_newline)
-
-        if new_length > max_length:
-            break
-
-        result.append(line)
-        current_length = new_length
-
-    text = "\n".join(result)
-
-    if len(lines) > len(result):
-        text = text.rstrip() + "\n…"
-
-    return text
-
-
 def format_telegram_alert_message(
     alert: Any,
     event_type: str = "notification",
@@ -429,21 +405,32 @@ def format_telegram_alert_message(
 
     core_text = "\n".join(core_lines)
     message_text = "\n".join(message_lines)
-    footer_text = "\n".join(footer_lines) if footer_lines else ""
+    footer_text = "\n".join(footer_lines)
 
-    core_and_message_length = len(core_text) + len(message_text) + len(footer_text) + 10
+    fixed_length = len(core_text) + len(message_text) + len(footer_text) + 20
 
-    if core_and_message_length >= MAX_TELEGRAM_MESSAGE_LENGTH:
-        return _safe_join_with_budget(
-            core_lines + message_lines + footer_lines,
-            MAX_TELEGRAM_MESSAGE_LENGTH
-        )
+    if fixed_length >= MAX_TELEGRAM_MESSAGE_LENGTH:
+        all_lines = core_lines + message_lines + footer_lines
+        text = "\n".join(all_lines)
+        return text[: MAX_TELEGRAM_MESSAGE_LENGTH - 1] + "…"
 
-    optional_budget = MAX_TELEGRAM_MESSAGE_LENGTH - core_and_message_length
-    optional_text = _safe_join_with_budget(optional_lines, optional_budget)
+    available_budget = MAX_TELEGRAM_MESSAGE_LENGTH - fixed_length
 
-    all_lines = core_lines + ([optional_text] if optional_text else []) + message_lines + footer_lines
-    text = "\n".join(all_lines)
+    added_optional = []
+    current_optional_length = 0
+
+    for line in optional_lines:
+        line_length = len(line) + (1 if added_optional else 0)
+
+        if current_optional_length + line_length > available_budget:
+            added_optional.append("…")
+            break
+
+        added_optional.append(line)
+        current_optional_length += line_length
+
+    all_parts = core_lines + added_optional + message_lines + footer_lines
+    text = "\n".join(all_parts)
 
     if len(text) <= MAX_TELEGRAM_MESSAGE_LENGTH:
         return text
